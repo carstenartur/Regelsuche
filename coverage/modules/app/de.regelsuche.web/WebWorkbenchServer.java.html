@@ -368,8 +368,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L368">                ? profile.defaultGoal()</span>
 <span class="fc" id="L369">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L370">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="nc" id="L372">            return;</span>
+<span class="fc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="fc" id="L372">            return;</span>
 <span class="fc" id="L373">        }</span>
 <span class="fc" id="L374">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1398,8 +1398,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L1399">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1400" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
-<span class="fc" id="L1402">            return;</span>
+<span class="nc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
+<span class="nc" id="L1402">            return;</span>
         }
 <span class="fc" id="L1404">        String selectedPathKey = queryParam(exchange, &quot;selectedPathKey&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1405">        de.regelsuche.ide.RuleInspectionDto dto =</span>
@@ -1905,407 +1905,408 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1905">            de.regelsuche.search.SearchProfile profile = de.regelsuche.search.SearchProfile.DISCOVERY_PLUS;</span>
 <span class="fc" id="L1906">            de.regelsuche.search.strategy.SearchProblem problem =</span>
                 new de.regelsuche.search.strategy.SearchProblem(
-<span class="fc" id="L1908">                    root, engine, scorer, canonicalizer, profile.heuristic(), searchMemory);</span>
-<span class="fc" id="L1909">            List&lt;de.regelsuche.search.strategy.SearchState&gt; states =</span>
-<span class="fc" id="L1910">                profile.newStrategy().search(problem);</span>
-<span class="fc" id="L1911">            long elapsed = (System.nanoTime() - t0) / 1_000_000L;</span>
-<span class="fc" id="L1912">            int stepsOnBest = 0;</span>
-<span class="fc" id="L1913">            de.regelsuche.search.strategy.SearchState best = null;</span>
-<span class="fc" id="L1914">            boolean usedLearnedHere = false;</span>
-<span class="fc bfc" id="L1915" title="All 2 branches covered.">            for (de.regelsuche.search.strategy.SearchState s : states) {</span>
-<span class="pc bpc" id="L1916" title="1 of 4 branches missed.">                if (s.depth() == 0 || !equivalence.areEquivalent(root, s.expression())) {</span>
-<span class="nc" id="L1917">                    continue;</span>
+<span class="fc" id="L1908">                    root, engine, scorer, canonicalizer, profile.heuristic())</span>
+<span class="fc" id="L1909">                    .withMemory(searchMemory);</span>
+<span class="fc" id="L1910">            List&lt;de.regelsuche.search.strategy.SearchState&gt; states =</span>
+<span class="fc" id="L1911">                profile.newStrategy().search(problem);</span>
+<span class="fc" id="L1912">            long elapsed = (System.nanoTime() - t0) / 1_000_000L;</span>
+<span class="fc" id="L1913">            int stepsOnBest = 0;</span>
+<span class="fc" id="L1914">            de.regelsuche.search.strategy.SearchState best = null;</span>
+<span class="fc" id="L1915">            boolean usedLearnedHere = false;</span>
+<span class="fc bfc" id="L1916" title="All 2 branches covered.">            for (de.regelsuche.search.strategy.SearchState s : states) {</span>
+<span class="pc bpc" id="L1917" title="1 of 4 branches missed.">                if (s.depth() == 0 || !equivalence.areEquivalent(root, s.expression())) {</span>
+<span class="nc" id="L1918">                    continue;</span>
                 }
-<span class="pc bpc" id="L1919" title="1 of 4 branches missed.">                if (best == null || s.depth() &lt; best.depth()) {</span>
-<span class="fc" id="L1920">                    best = s;</span>
+<span class="pc bpc" id="L1920" title="1 of 4 branches missed.">                if (best == null || s.depth() &lt; best.depth()) {</span>
+<span class="fc" id="L1921">                    best = s;</span>
                 }
-<span class="fc" id="L1922">                aggregated.add(new de.regelsuche.mining.SuccessfulTransformationPath(</span>
-<span class="fc" id="L1923">                    &quot;macro-&quot; + i + &quot;-d&quot; + s.depth() + &quot;-&quot; + Integer.toHexString(s.canonicalHash().hashCode()),</span>
-<span class="fc" id="L1924">                    root, s.expression(), s.path(), s.appliedRuleIds(),</span>
-<span class="fc" id="L1925">                    before, s.score(), true, &quot;macro-demo&quot;,</span>
-<span class="fc" id="L1926">                    java.util.Map.of(&quot;variable&quot;, &quot;x&quot;)));</span>
-<span class="fc bfc" id="L1927" title="All 2 branches covered.">                for (String rid : s.appliedRuleIds()) {</span>
-<span class="pc bpc" id="L1928" title="2 of 4 branches missed.">                    if (rid != null &amp;&amp; rid.startsWith(&quot;macro_&quot;)) {</span>
-<span class="nc" id="L1929">                        usedLearnedHere = true;</span>
+<span class="fc" id="L1923">                aggregated.add(new de.regelsuche.mining.SuccessfulTransformationPath(</span>
+<span class="fc" id="L1924">                    &quot;macro-&quot; + i + &quot;-d&quot; + s.depth() + &quot;-&quot; + Integer.toHexString(s.canonicalHash().hashCode()),</span>
+<span class="fc" id="L1925">                    root, s.expression(), s.path(), s.appliedRuleIds(),</span>
+<span class="fc" id="L1926">                    before, s.score(), true, &quot;macro-demo&quot;,</span>
+<span class="fc" id="L1927">                    java.util.Map.of(&quot;variable&quot;, &quot;x&quot;)));</span>
+<span class="fc bfc" id="L1928" title="All 2 branches covered.">                for (String rid : s.appliedRuleIds()) {</span>
+<span class="pc bpc" id="L1929" title="2 of 4 branches missed.">                    if (rid != null &amp;&amp; rid.startsWith(&quot;macro_&quot;)) {</span>
+<span class="nc" id="L1930">                        usedLearnedHere = true;</span>
                     }
-<span class="fc" id="L1931">                }</span>
-<span class="fc" id="L1932">            }</span>
-<span class="pc bpc" id="L1933" title="1 of 2 branches missed.">            if (best != null) {</span>
-<span class="fc" id="L1934">                stepsOnBest = best.appliedRuleIds().size();</span>
+<span class="fc" id="L1932">                }</span>
+<span class="fc" id="L1933">            }</span>
+<span class="pc bpc" id="L1934" title="1 of 2 branches missed.">            if (best != null) {</span>
+<span class="fc" id="L1935">                stepsOnBest = best.appliedRuleIds().size();</span>
             }
-<span class="fc" id="L1936">            de.regelsuche.learning.MacroLearningResult learning = learner.learn(aggregated);</span>
-<span class="fc bfc" id="L1937" title="All 2 branches covered.">            double confidence = learning.touchedRules().isEmpty()</span>
-<span class="fc" id="L1938">                ? 0.0 : learning.touchedRules().get(0).confidenceScore();</span>
-<span class="fc" id="L1939">            confidenceTrace.add(confidence);</span>
-<span class="fc" id="L1940">            lastConfidence = confidence;</span>
-<span class="fc bfc" id="L1941" title="All 2 branches covered.">            if (i == 0) {</span>
-<span class="fc" id="L1942">                firstRunSteps = stepsOnBest;</span>
-<span class="fc" id="L1943">                firstRunMillis = elapsed;</span>
+<span class="fc" id="L1937">            de.regelsuche.learning.MacroLearningResult learning = learner.learn(aggregated);</span>
+<span class="fc bfc" id="L1938" title="All 2 branches covered.">            double confidence = learning.touchedRules().isEmpty()</span>
+<span class="fc" id="L1939">                ? 0.0 : learning.touchedRules().get(0).confidenceScore();</span>
+<span class="fc" id="L1940">            confidenceTrace.add(confidence);</span>
+<span class="fc" id="L1941">            lastConfidence = confidence;</span>
+<span class="fc bfc" id="L1942" title="All 2 branches covered.">            if (i == 0) {</span>
+<span class="fc" id="L1943">                firstRunSteps = stepsOnBest;</span>
+<span class="fc" id="L1944">                firstRunMillis = elapsed;</span>
             }
-<span class="fc bfc" id="L1945" title="All 2 branches covered.">            if (i == expressions.length - 1) {</span>
-<span class="fc" id="L1946">                lastRunSteps = stepsOnBest;</span>
-<span class="fc" id="L1947">                lastRunMillis = elapsed;</span>
-<span class="fc" id="L1948">                usedLearnedRule = usedLearnedHere;</span>
+<span class="fc bfc" id="L1946" title="All 2 branches covered.">            if (i == expressions.length - 1) {</span>
+<span class="fc" id="L1947">                lastRunSteps = stepsOnBest;</span>
+<span class="fc" id="L1948">                lastRunMillis = elapsed;</span>
+<span class="fc" id="L1949">                usedLearnedRule = usedLearnedHere;</span>
             }
-<span class="fc" id="L1950">            stepReports.add(java.util.Map.of(</span>
-<span class="fc" id="L1951">                &quot;index&quot;, i,</span>
+<span class="fc" id="L1951">            stepReports.add(java.util.Map.of(</span>
+<span class="fc" id="L1952">                &quot;index&quot;, i,</span>
                 &quot;expression&quot;, expr,
-<span class="fc" id="L1953">                &quot;stepCount&quot;, stepsOnBest,</span>
-<span class="fc" id="L1954">                &quot;elapsedMillis&quot;, elapsed,</span>
-<span class="fc" id="L1955">                &quot;confidenceScore&quot;, confidence,</span>
-<span class="fc" id="L1956">                &quot;learnedRulesActive&quot;, inventoryRepository.findEnabled().stream()</span>
-<span class="fc" id="L1957">                    .filter(r -&gt; r.id().startsWith(&quot;macro_&quot;)).count()</span>
+<span class="fc" id="L1954">                &quot;stepCount&quot;, stepsOnBest,</span>
+<span class="fc" id="L1955">                &quot;elapsedMillis&quot;, elapsed,</span>
+<span class="fc" id="L1956">                &quot;confidenceScore&quot;, confidence,</span>
+<span class="fc" id="L1957">                &quot;learnedRulesActive&quot;, inventoryRepository.findEnabled().stream()</span>
+<span class="fc" id="L1958">                    .filter(r -&gt; r.id().startsWith(&quot;macro_&quot;)).count()</span>
             ));
         }
-<span class="fc" id="L1960">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
-<span class="fc" id="L1961">        w.beginObject();</span>
-<span class="fc" id="L1962">        w.property(&quot;id&quot;, &quot;macro-learning&quot;);</span>
-<span class="fc" id="L1963">        w.property(&quot;title&quot;, &quot;System lernt eine Makroregel&quot;);</span>
-<span class="fc" id="L1964">        w.property(&quot;usedLearnedRule&quot;, usedLearnedRule);</span>
-<span class="fc" id="L1965">        w.property(&quot;finalConfidenceScore&quot;, lastConfidence);</span>
-<span class="fc" id="L1966">        w.array(&quot;confidenceTrace&quot;, arr -&gt; confidenceTrace.forEach(v -&gt; arr.value(v.toString())));</span>
-<span class="fc" id="L1967">        final long fSteps = firstRunSteps, fMs = firstRunMillis;</span>
-<span class="fc" id="L1968">        final long lSteps = lastRunSteps, lMs = lastRunMillis;</span>
-<span class="fc" id="L1969">        w.object(&quot;speedup&quot;, s -&gt; {</span>
-<span class="fc" id="L1970">            s.property(&quot;firstRunSteps&quot;, fSteps);</span>
-<span class="fc" id="L1971">            s.property(&quot;firstRunMillis&quot;, fMs);</span>
-<span class="fc" id="L1972">            s.property(&quot;lastRunSteps&quot;, lSteps);</span>
-<span class="fc" id="L1973">            s.property(&quot;lastRunMillis&quot;, lMs);</span>
-<span class="fc" id="L1974">        });</span>
-<span class="fc" id="L1975">        w.array(&quot;steps&quot;, arr -&gt; stepReports.forEach(rep -&gt; arr.objectValue(inner -&gt; {</span>
-<span class="fc" id="L1976">            inner.property(&quot;index&quot;, (int) rep.get(&quot;index&quot;));</span>
-<span class="fc" id="L1977">            inner.property(&quot;expression&quot;, (String) rep.get(&quot;expression&quot;));</span>
-<span class="fc" id="L1978">            inner.property(&quot;stepCount&quot;, (int) rep.get(&quot;stepCount&quot;));</span>
-<span class="fc" id="L1979">            inner.property(&quot;elapsedMillis&quot;, (long) rep.get(&quot;elapsedMillis&quot;));</span>
-<span class="fc" id="L1980">            inner.property(&quot;confidenceScore&quot;, (double) rep.get(&quot;confidenceScore&quot;));</span>
-<span class="fc" id="L1981">            inner.property(&quot;learnedRulesActive&quot;, (long) rep.get(&quot;learnedRulesActive&quot;));</span>
-<span class="fc" id="L1982">        })));</span>
-<span class="fc" id="L1983">        w.endObject();</span>
-<span class="fc" id="L1984">        return w.toString();</span>
+<span class="fc" id="L1961">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
+<span class="fc" id="L1962">        w.beginObject();</span>
+<span class="fc" id="L1963">        w.property(&quot;id&quot;, &quot;macro-learning&quot;);</span>
+<span class="fc" id="L1964">        w.property(&quot;title&quot;, &quot;System lernt eine Makroregel&quot;);</span>
+<span class="fc" id="L1965">        w.property(&quot;usedLearnedRule&quot;, usedLearnedRule);</span>
+<span class="fc" id="L1966">        w.property(&quot;finalConfidenceScore&quot;, lastConfidence);</span>
+<span class="fc" id="L1967">        w.array(&quot;confidenceTrace&quot;, arr -&gt; confidenceTrace.forEach(v -&gt; arr.value(v.toString())));</span>
+<span class="fc" id="L1968">        final long fSteps = firstRunSteps, fMs = firstRunMillis;</span>
+<span class="fc" id="L1969">        final long lSteps = lastRunSteps, lMs = lastRunMillis;</span>
+<span class="fc" id="L1970">        w.object(&quot;speedup&quot;, s -&gt; {</span>
+<span class="fc" id="L1971">            s.property(&quot;firstRunSteps&quot;, fSteps);</span>
+<span class="fc" id="L1972">            s.property(&quot;firstRunMillis&quot;, fMs);</span>
+<span class="fc" id="L1973">            s.property(&quot;lastRunSteps&quot;, lSteps);</span>
+<span class="fc" id="L1974">            s.property(&quot;lastRunMillis&quot;, lMs);</span>
+<span class="fc" id="L1975">        });</span>
+<span class="fc" id="L1976">        w.array(&quot;steps&quot;, arr -&gt; stepReports.forEach(rep -&gt; arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L1977">            inner.property(&quot;index&quot;, (int) rep.get(&quot;index&quot;));</span>
+<span class="fc" id="L1978">            inner.property(&quot;expression&quot;, (String) rep.get(&quot;expression&quot;));</span>
+<span class="fc" id="L1979">            inner.property(&quot;stepCount&quot;, (int) rep.get(&quot;stepCount&quot;));</span>
+<span class="fc" id="L1980">            inner.property(&quot;elapsedMillis&quot;, (long) rep.get(&quot;elapsedMillis&quot;));</span>
+<span class="fc" id="L1981">            inner.property(&quot;confidenceScore&quot;, (double) rep.get(&quot;confidenceScore&quot;));</span>
+<span class="fc" id="L1982">            inner.property(&quot;learnedRulesActive&quot;, (long) rep.get(&quot;learnedRulesActive&quot;));</span>
+<span class="fc" id="L1983">        })));</span>
+<span class="fc" id="L1984">        w.endObject();</span>
+<span class="fc" id="L1985">        return w.toString();</span>
     }
 
     private void handleMemory(HttpExchange exchange) throws IOException {
-<span class="fc" id="L1988">        String path = exchange.getRequestURI().getPath();</span>
-<span class="fc" id="L1989">        String suffix = path.substring(&quot;/api/memory&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
-<span class="fc" id="L1990">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
-<span class="pc bpc" id="L1991" title="4 of 6 branches missed.">        switch (suffix) {</span>
+<span class="fc" id="L1989">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L1990">        String suffix = path.substring(&quot;/api/memory&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="fc" id="L1991">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
+<span class="pc bpc" id="L1992" title="4 of 6 branches missed.">        switch (suffix) {</span>
             case &quot;states&quot; -&gt; {
-<span class="nc" id="L1993">                w.beginObject();</span>
-<span class="nc" id="L1994">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
-<span class="nc" id="L1995">                w.array(&quot;entries&quot;, arr -&gt; searchMemory.table().entries().forEach(e -&gt;</span>
-<span class="nc" id="L1996">                    arr.objectValue(inner -&gt; {</span>
-<span class="nc" id="L1997">                        inner.property(&quot;canonicalHash&quot;, e.canonicalHash());</span>
-<span class="nc" id="L1998">                        inner.property(&quot;canonicalExpression&quot;, e.canonicalExpression());</span>
-<span class="nc" id="L1999">                        inner.property(&quot;bestScore&quot;, e.bestScore());</span>
-<span class="nc" id="L2000">                        inner.property(&quot;minDepthSeen&quot;, e.minDepthSeen());</span>
-<span class="nc" id="L2001">                        inner.property(&quot;bestKnownPathId&quot;, e.bestKnownPathId());</span>
-<span class="nc" id="L2002">                        inner.stringArray(&quot;reachedByRuleIds&quot;,</span>
-<span class="nc" id="L2003">                            new java.util.ArrayList&lt;&gt;(e.reachedByRuleIds()));</span>
-<span class="nc" id="L2004">                        inner.property(&quot;visitCount&quot;, e.visitCount());</span>
-<span class="nc" id="L2005">                        inner.property(&quot;firstSeen&quot;, e.firstSeen().toString());</span>
-<span class="nc" id="L2006">                        inner.property(&quot;lastSeen&quot;, e.lastSeen().toString());</span>
-<span class="nc" id="L2007">                    })));</span>
-<span class="nc" id="L2008">                w.endObject();</span>
-<span class="nc" id="L2009">                sendJson(exchange, 200, w.toString());</span>
-<span class="nc" id="L2010">            }</span>
-<span class="nc" id="L2011">            case &quot;pruning&quot; -&gt; sendJson(exchange, 200, renderPruningDecisionsJson());</span>
+<span class="nc" id="L1994">                w.beginObject();</span>
+<span class="nc" id="L1995">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
+<span class="nc" id="L1996">                w.array(&quot;entries&quot;, arr -&gt; searchMemory.table().entries().forEach(e -&gt;</span>
+<span class="nc" id="L1997">                    arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L1998">                        inner.property(&quot;canonicalHash&quot;, e.canonicalHash());</span>
+<span class="nc" id="L1999">                        inner.property(&quot;canonicalExpression&quot;, e.canonicalExpression());</span>
+<span class="nc" id="L2000">                        inner.property(&quot;bestScore&quot;, e.bestScore());</span>
+<span class="nc" id="L2001">                        inner.property(&quot;minDepthSeen&quot;, e.minDepthSeen());</span>
+<span class="nc" id="L2002">                        inner.property(&quot;bestKnownPathId&quot;, e.bestKnownPathId());</span>
+<span class="nc" id="L2003">                        inner.stringArray(&quot;reachedByRuleIds&quot;,</span>
+<span class="nc" id="L2004">                            new java.util.ArrayList&lt;&gt;(e.reachedByRuleIds()));</span>
+<span class="nc" id="L2005">                        inner.property(&quot;visitCount&quot;, e.visitCount());</span>
+<span class="nc" id="L2006">                        inner.property(&quot;firstSeen&quot;, e.firstSeen().toString());</span>
+<span class="nc" id="L2007">                        inner.property(&quot;lastSeen&quot;, e.lastSeen().toString());</span>
+<span class="nc" id="L2008">                    })));</span>
+<span class="nc" id="L2009">                w.endObject();</span>
+<span class="nc" id="L2010">                sendJson(exchange, 200, w.toString());</span>
+<span class="nc" id="L2011">            }</span>
+<span class="nc" id="L2012">            case &quot;pruning&quot; -&gt; sendJson(exchange, 200, renderPruningDecisionsJson());</span>
             case &quot;macros&quot; -&gt; {
-<span class="nc" id="L2013">                w.beginObject();</span>
-<span class="nc" id="L2014">                w.array(&quot;macros&quot;, arr -&gt; inventoryRepository.findAll().stream()</span>
-<span class="nc bnc" id="L2015" title="All 4 branches missed.">                    .filter(r -&gt; r.occurrenceCount() &gt; 0 || r.confidenceScore() &gt; 0)</span>
-<span class="nc" id="L2016">                    .forEach(r -&gt; arr.objectValue(inner -&gt; {</span>
-<span class="nc" id="L2017">                        inner.property(&quot;id&quot;, r.id());</span>
-<span class="nc" id="L2018">                        inner.property(&quot;leftPattern&quot;, r.leftPattern());</span>
-<span class="nc" id="L2019">                        inner.property(&quot;rightPattern&quot;, r.rightPattern());</span>
-<span class="nc" id="L2020">                        inner.property(&quot;occurrenceCount&quot;, r.occurrenceCount());</span>
-<span class="nc" id="L2021">                        inner.property(&quot;confidenceScore&quot;, r.confidenceScore());</span>
-<span class="nc" id="L2022">                        inner.property(&quot;averageImprovement&quot;, r.averageImprovement());</span>
-<span class="nc" id="L2023">                        inner.stringArray(&quot;supportingPathIds&quot;, r.supportingPathIds());</span>
-<span class="nc" id="L2024">                        inner.property(&quot;enabled&quot;, inventoryRepository.isEnabled(r.id()));</span>
-<span class="nc" id="L2025">                    })));</span>
-<span class="nc" id="L2026">                w.endObject();</span>
-<span class="nc" id="L2027">                sendJson(exchange, 200, w.toString());</span>
-<span class="nc" id="L2028">            }</span>
+<span class="nc" id="L2014">                w.beginObject();</span>
+<span class="nc" id="L2015">                w.array(&quot;macros&quot;, arr -&gt; inventoryRepository.findAll().stream()</span>
+<span class="nc bnc" id="L2016" title="All 4 branches missed.">                    .filter(r -&gt; r.occurrenceCount() &gt; 0 || r.confidenceScore() &gt; 0)</span>
+<span class="nc" id="L2017">                    .forEach(r -&gt; arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L2018">                        inner.property(&quot;id&quot;, r.id());</span>
+<span class="nc" id="L2019">                        inner.property(&quot;leftPattern&quot;, r.leftPattern());</span>
+<span class="nc" id="L2020">                        inner.property(&quot;rightPattern&quot;, r.rightPattern());</span>
+<span class="nc" id="L2021">                        inner.property(&quot;occurrenceCount&quot;, r.occurrenceCount());</span>
+<span class="nc" id="L2022">                        inner.property(&quot;confidenceScore&quot;, r.confidenceScore());</span>
+<span class="nc" id="L2023">                        inner.property(&quot;averageImprovement&quot;, r.averageImprovement());</span>
+<span class="nc" id="L2024">                        inner.stringArray(&quot;supportingPathIds&quot;, r.supportingPathIds());</span>
+<span class="nc" id="L2025">                        inner.property(&quot;enabled&quot;, inventoryRepository.isEnabled(r.id()));</span>
+<span class="nc" id="L2026">                    })));</span>
+<span class="nc" id="L2027">                w.endObject();</span>
+<span class="nc" id="L2028">                sendJson(exchange, 200, w.toString());</span>
+<span class="nc" id="L2029">            }</span>
             case &quot;universal&quot; -&gt; {
                 // Surfaces the top universal patterns + cross-task rule
                 // coverage so the workbench UI can show &quot;the moves that work
                 // everywhere&quot; — see GlobalMemoryService for the scoring rule.
-<span class="fc" id="L2033">                de.regelsuche.search.memory.GlobalMemoryService global =</span>
-<span class="fc" id="L2034">                    new de.regelsuche.search.memory.GlobalMemoryService(searchMemory.table());</span>
-<span class="fc" id="L2035">                java.time.Instant now = java.time.Instant.now();</span>
-<span class="fc" id="L2036">                var topPatterns = global.topUniversalPatterns(20, now);</span>
-<span class="fc" id="L2037">                java.util.Map&lt;String, Integer&gt; coverage = global.ruleCoverage();</span>
-<span class="fc" id="L2038">                w.beginObject();</span>
-<span class="fc" id="L2039">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
-<span class="fc" id="L2040">                w.array(&quot;patterns&quot;, arr -&gt; topPatterns.forEach(entry -&gt;</span>
-<span class="nc" id="L2041">                    arr.objectValue(inner -&gt; {</span>
-<span class="nc" id="L2042">                        inner.property(&quot;canonicalHash&quot;, entry.canonicalHash());</span>
-<span class="nc" id="L2043">                        inner.property(&quot;canonicalExpression&quot;, entry.canonicalExpression());</span>
-<span class="nc" id="L2044">                        inner.property(&quot;universalityScore&quot;, global.universalityScore(entry, now));</span>
-<span class="nc" id="L2045">                        inner.property(&quot;visitCount&quot;, entry.visitCount());</span>
-<span class="nc" id="L2046">                        inner.property(&quot;bestScore&quot;, entry.bestScore());</span>
-<span class="nc" id="L2047">                        inner.property(&quot;minDepthSeen&quot;, entry.minDepthSeen());</span>
-<span class="nc" id="L2048">                        inner.property(&quot;bestKnownPathId&quot;, entry.bestKnownPathId());</span>
-<span class="nc" id="L2049">                        inner.stringArray(&quot;reachedByRuleIds&quot;,</span>
-<span class="nc" id="L2050">                            new java.util.ArrayList&lt;&gt;(entry.reachedByRuleIds()));</span>
-<span class="nc" id="L2051">                        inner.property(&quot;firstSeen&quot;, entry.firstSeen().toString());</span>
-<span class="nc" id="L2052">                        inner.property(&quot;lastSeen&quot;, entry.lastSeen().toString());</span>
-<span class="nc" id="L2053">                    })));</span>
-<span class="fc" id="L2054">                w.array(&quot;ruleCoverage&quot;, arr -&gt; coverage.forEach((ruleId, count) -&gt;</span>
-<span class="nc" id="L2055">                    arr.objectValue(inner -&gt; {</span>
-<span class="nc" id="L2056">                        inner.property(&quot;ruleId&quot;, ruleId);</span>
-<span class="nc" id="L2057">                        inner.property(&quot;coverage&quot;, count);</span>
-<span class="nc" id="L2058">                    })));</span>
-<span class="fc" id="L2059">                w.endObject();</span>
-<span class="fc" id="L2060">                sendJson(exchange, 200, w.toString());</span>
-<span class="fc" id="L2061">            }</span>
+<span class="fc" id="L2034">                de.regelsuche.search.memory.GlobalMemoryService global =</span>
+<span class="fc" id="L2035">                    new de.regelsuche.search.memory.GlobalMemoryService(searchMemory.table());</span>
+<span class="fc" id="L2036">                java.time.Instant now = java.time.Instant.now();</span>
+<span class="fc" id="L2037">                var topPatterns = global.topUniversalPatterns(20, now);</span>
+<span class="fc" id="L2038">                java.util.Map&lt;String, Integer&gt; coverage = global.ruleCoverage();</span>
+<span class="fc" id="L2039">                w.beginObject();</span>
+<span class="fc" id="L2040">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
+<span class="fc" id="L2041">                w.array(&quot;patterns&quot;, arr -&gt; topPatterns.forEach(entry -&gt;</span>
+<span class="nc" id="L2042">                    arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L2043">                        inner.property(&quot;canonicalHash&quot;, entry.canonicalHash());</span>
+<span class="nc" id="L2044">                        inner.property(&quot;canonicalExpression&quot;, entry.canonicalExpression());</span>
+<span class="nc" id="L2045">                        inner.property(&quot;universalityScore&quot;, global.universalityScore(entry, now));</span>
+<span class="nc" id="L2046">                        inner.property(&quot;visitCount&quot;, entry.visitCount());</span>
+<span class="nc" id="L2047">                        inner.property(&quot;bestScore&quot;, entry.bestScore());</span>
+<span class="nc" id="L2048">                        inner.property(&quot;minDepthSeen&quot;, entry.minDepthSeen());</span>
+<span class="nc" id="L2049">                        inner.property(&quot;bestKnownPathId&quot;, entry.bestKnownPathId());</span>
+<span class="nc" id="L2050">                        inner.stringArray(&quot;reachedByRuleIds&quot;,</span>
+<span class="nc" id="L2051">                            new java.util.ArrayList&lt;&gt;(entry.reachedByRuleIds()));</span>
+<span class="nc" id="L2052">                        inner.property(&quot;firstSeen&quot;, entry.firstSeen().toString());</span>
+<span class="nc" id="L2053">                        inner.property(&quot;lastSeen&quot;, entry.lastSeen().toString());</span>
+<span class="nc" id="L2054">                    })));</span>
+<span class="fc" id="L2055">                w.array(&quot;ruleCoverage&quot;, arr -&gt; coverage.forEach((ruleId, count) -&gt;</span>
+<span class="nc" id="L2056">                    arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L2057">                        inner.property(&quot;ruleId&quot;, ruleId);</span>
+<span class="nc" id="L2058">                        inner.property(&quot;coverage&quot;, count);</span>
+<span class="nc" id="L2059">                    })));</span>
+<span class="fc" id="L2060">                w.endObject();</span>
+<span class="fc" id="L2061">                sendJson(exchange, 200, w.toString());</span>
+<span class="fc" id="L2062">            }</span>
             case &quot;&quot; -&gt; {
-<span class="fc" id="L2063">                w.beginObject();</span>
-<span class="fc" id="L2064">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
-<span class="fc" id="L2065">                w.property(&quot;pruningDecisions&quot;, searchMemory.decisions().size());</span>
-<span class="fc" id="L2066">                w.object(&quot;links&quot;, l -&gt; {</span>
-<span class="fc" id="L2067">                    l.property(&quot;states&quot;, &quot;/api/memory/states&quot;);</span>
-<span class="fc" id="L2068">                    l.property(&quot;pruning&quot;, &quot;/api/memory/pruning&quot;);</span>
-<span class="fc" id="L2069">                    l.property(&quot;macros&quot;, &quot;/api/memory/macros&quot;);</span>
-<span class="fc" id="L2070">                    l.property(&quot;universal&quot;, &quot;/api/memory/universal&quot;);</span>
-<span class="fc" id="L2071">                });</span>
-<span class="fc" id="L2072">                w.endObject();</span>
-<span class="fc" id="L2073">                sendJson(exchange, 200, w.toString());</span>
-<span class="fc" id="L2074">            }</span>
-<span class="nc" id="L2075">            default -&gt; sendStatus(exchange, 404, &quot;unknown memory endpoint: &quot; + suffix);</span>
+<span class="fc" id="L2064">                w.beginObject();</span>
+<span class="fc" id="L2065">                w.property(&quot;size&quot;, searchMemory.table().size());</span>
+<span class="fc" id="L2066">                w.property(&quot;pruningDecisions&quot;, searchMemory.decisions().size());</span>
+<span class="fc" id="L2067">                w.object(&quot;links&quot;, l -&gt; {</span>
+<span class="fc" id="L2068">                    l.property(&quot;states&quot;, &quot;/api/memory/states&quot;);</span>
+<span class="fc" id="L2069">                    l.property(&quot;pruning&quot;, &quot;/api/memory/pruning&quot;);</span>
+<span class="fc" id="L2070">                    l.property(&quot;macros&quot;, &quot;/api/memory/macros&quot;);</span>
+<span class="fc" id="L2071">                    l.property(&quot;universal&quot;, &quot;/api/memory/universal&quot;);</span>
+<span class="fc" id="L2072">                });</span>
+<span class="fc" id="L2073">                w.endObject();</span>
+<span class="fc" id="L2074">                sendJson(exchange, 200, w.toString());</span>
+<span class="fc" id="L2075">            }</span>
+<span class="nc" id="L2076">            default -&gt; sendStatus(exchange, 404, &quot;unknown memory endpoint: &quot; + suffix);</span>
         }
-<span class="fc" id="L2077">    }</span>
+<span class="fc" id="L2078">    }</span>
 
     private void handleDemo(HttpExchange exchange) throws IOException {
-<span class="fc" id="L2080">        String path = exchange.getRequestURI().getPath();</span>
-<span class="fc" id="L2081">        String suffix = path.substring(&quot;/api/demo&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
-<span class="fc bfc" id="L2082" title="All 2 branches covered.">        if (suffix.isEmpty()) {</span>
+<span class="fc" id="L2081">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L2082">        String suffix = path.substring(&quot;/api/demo&quot;.length()).replaceFirst(&quot;^/&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L2083" title="All 2 branches covered.">        if (suffix.isEmpty()) {</span>
             // List all available demos.
-<span class="fc" id="L2084">            JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2085">            writer.beginObject();</span>
-<span class="fc" id="L2086">            writer.array(&quot;demos&quot;, arr -&gt; de.regelsuche.demo.DemoCatalog.all().values().forEach(demo -&gt;</span>
-<span class="fc" id="L2087">                arr.objectValue(inner -&gt; {</span>
-<span class="fc" id="L2088">                    inner.property(&quot;id&quot;, demo.id());</span>
-<span class="fc" id="L2089">                    inner.property(&quot;title&quot;, demo.title());</span>
-<span class="fc" id="L2090">                    inner.property(&quot;description&quot;, demo.description());</span>
-<span class="fc" id="L2091">                    inner.property(&quot;expression&quot;, demo.expression());</span>
-<span class="fc" id="L2092">                    inner.property(&quot;inputType&quot;, demo.inputType().name());</span>
-<span class="fc" id="L2093">                    inner.property(&quot;profile&quot;, demo.profile().name());</span>
-<span class="fc" id="L2094">                    inner.property(&quot;expectedHighlight&quot;, demo.expectedHighlight());</span>
-<span class="fc" id="L2095">                    inner.property(&quot;expectedResultExpression&quot;, demo.expectedResultExpression());</span>
-<span class="fc" id="L2096">                    inner.property(&quot;domain&quot;, demo.domain());</span>
-<span class="fc" id="L2097">                })));</span>
-<span class="fc" id="L2098">            writer.endObject();</span>
-<span class="fc" id="L2099">            sendJson(exchange, 200, writer.toString());</span>
-<span class="fc" id="L2100">            return;</span>
+<span class="fc" id="L2085">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2086">            writer.beginObject();</span>
+<span class="fc" id="L2087">            writer.array(&quot;demos&quot;, arr -&gt; de.regelsuche.demo.DemoCatalog.all().values().forEach(demo -&gt;</span>
+<span class="fc" id="L2088">                arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L2089">                    inner.property(&quot;id&quot;, demo.id());</span>
+<span class="fc" id="L2090">                    inner.property(&quot;title&quot;, demo.title());</span>
+<span class="fc" id="L2091">                    inner.property(&quot;description&quot;, demo.description());</span>
+<span class="fc" id="L2092">                    inner.property(&quot;expression&quot;, demo.expression());</span>
+<span class="fc" id="L2093">                    inner.property(&quot;inputType&quot;, demo.inputType().name());</span>
+<span class="fc" id="L2094">                    inner.property(&quot;profile&quot;, demo.profile().name());</span>
+<span class="fc" id="L2095">                    inner.property(&quot;expectedHighlight&quot;, demo.expectedHighlight());</span>
+<span class="fc" id="L2096">                    inner.property(&quot;expectedResultExpression&quot;, demo.expectedResultExpression());</span>
+<span class="fc" id="L2097">                    inner.property(&quot;domain&quot;, demo.domain());</span>
+<span class="fc" id="L2098">                })));</span>
+<span class="fc" id="L2099">            writer.endObject();</span>
+<span class="fc" id="L2100">            sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L2101">            return;</span>
         }
-<span class="fc" id="L2102">        de.regelsuche.demo.DemoCatalog.Demo demo = de.regelsuche.demo.DemoCatalog.byId(suffix);</span>
-<span class="pc bpc" id="L2103" title="1 of 2 branches missed.">        if (demo == null) {</span>
-<span class="nc" id="L2104">            sendStatus(exchange, 404, &quot;unknown demo: &quot; + suffix);</span>
-<span class="nc" id="L2105">            return;</span>
+<span class="fc" id="L2103">        de.regelsuche.demo.DemoCatalog.Demo demo = de.regelsuche.demo.DemoCatalog.byId(suffix);</span>
+<span class="pc bpc" id="L2104" title="1 of 2 branches missed.">        if (demo == null) {</span>
+<span class="nc" id="L2105">            sendStatus(exchange, 404, &quot;unknown demo: &quot; + suffix);</span>
+<span class="nc" id="L2106">            return;</span>
         }
-<span class="fc" id="L2107">        String method = exchange.getRequestMethod();</span>
-<span class="pc bpc" id="L2108" title="2 of 4 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(method) &amp;&amp; !&quot;POST&quot;.equalsIgnoreCase(method)) {</span>
-<span class="nc" id="L2109">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="nc" id="L2110">            return;</span>
+<span class="fc" id="L2108">        String method = exchange.getRequestMethod();</span>
+<span class="pc bpc" id="L2109" title="2 of 4 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(method) &amp;&amp; !&quot;POST&quot;.equalsIgnoreCase(method)) {</span>
+<span class="nc" id="L2110">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2111">            return;</span>
         }
-<span class="pc bpc" id="L2112" title="1 of 4 branches missed.">        if (&quot;macro-learning&quot;.equals(demo.id()) &amp;&amp; &quot;POST&quot;.equalsIgnoreCase(method)) {</span>
-<span class="fc" id="L2113">            sendJson(exchange, 200, runMacroLearningDemo());</span>
-<span class="fc" id="L2114">            return;</span>
+<span class="pc bpc" id="L2113" title="1 of 4 branches missed.">        if (&quot;macro-learning&quot;.equals(demo.id()) &amp;&amp; &quot;POST&quot;.equalsIgnoreCase(method)) {</span>
+<span class="fc" id="L2114">            sendJson(exchange, 200, runMacroLearningDemo());</span>
+<span class="fc" id="L2115">            return;</span>
         }
-<span class="fc" id="L2116">        de.regelsuche.demo.DemoService demoService =</span>
+<span class="fc" id="L2117">        de.regelsuche.demo.DemoService demoService =</span>
             new de.regelsuche.demo.DemoService(graphStore,
                 new de.regelsuche.transform.AstRewriteTransformationEngine(
-<span class="fc" id="L2119">                    de.regelsuche.demo.DemoRuleSet.rules()),</span>
+<span class="fc" id="L2120">                    de.regelsuche.demo.DemoRuleSet.rules()),</span>
                 searchMemory);
-<span class="fc" id="L2121">        demoService.useProofBridge(leanProofBridgeService);</span>
-<span class="fc" id="L2122">        de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);</span>
-<span class="fc" id="L2123">        sendJson(exchange, 200, renderDemoBundle(result));</span>
-<span class="fc" id="L2124">    }</span>
+<span class="fc" id="L2122">        demoService.useProofBridge(leanProofBridgeService);</span>
+<span class="fc" id="L2123">        de.regelsuche.demo.DemoService.DemoRunResult result = demoService.run(demo);</span>
+<span class="fc" id="L2124">        sendJson(exchange, 200, renderDemoBundle(result));</span>
+<span class="fc" id="L2125">    }</span>
 
     private String renderDemoBundle(de.regelsuche.demo.DemoService.DemoRunResult result) {
-<span class="fc" id="L2127">        de.regelsuche.demo.DemoCatalog.Demo demo = result.demo();</span>
-<span class="fc" id="L2128">        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());</span>
-<span class="fc" id="L2129">        var known = new de.regelsuche.mining.KnownRuleRepository();</span>
-<span class="fc" id="L2130">        JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2131">        writer.beginObject();</span>
-<span class="fc" id="L2132">        writer.property(&quot;id&quot;, demo.id());</span>
-<span class="fc" id="L2133">        writer.property(&quot;title&quot;, demo.title());</span>
-<span class="fc" id="L2134">        writer.property(&quot;description&quot;, demo.description());</span>
-<span class="fc" id="L2135">        writer.property(&quot;expression&quot;, demo.expression());</span>
+<span class="fc" id="L2128">        de.regelsuche.demo.DemoCatalog.Demo demo = result.demo();</span>
+<span class="fc" id="L2129">        var macros = new de.regelsuche.mining.MacroRuleMiner().mine(graphStore.discoveredTransformations());</span>
+<span class="fc" id="L2130">        var known = new de.regelsuche.mining.KnownRuleRepository();</span>
+<span class="fc" id="L2131">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2132">        writer.beginObject();</span>
+<span class="fc" id="L2133">        writer.property(&quot;id&quot;, demo.id());</span>
+<span class="fc" id="L2134">        writer.property(&quot;title&quot;, demo.title());</span>
+<span class="fc" id="L2135">        writer.property(&quot;description&quot;, demo.description());</span>
+<span class="fc" id="L2136">        writer.property(&quot;expression&quot;, demo.expression());</span>
         // Stage 4+: ship a LaTeX rendering of the raw user expression
         // alongside the original ASCII string so the front-end demo banner
         // and &quot;Eingabe&quot; cells can typeset it via KaTeX instead of falling
         // back to a hand-styled ASCII fragment with literal `^`, `*`, `/`.
-<span class="fc" id="L2140">        String expressionLatex =</span>
-<span class="fc" id="L2141">            de.regelsuche.export.MathPresentation.DEFAULT.latex(demo.expression());</span>
-<span class="pc bpc" id="L2142" title="1 of 2 branches missed.">        if (!expressionLatex.isEmpty()) {</span>
-<span class="fc" id="L2143">            writer.property(&quot;expressionLatex&quot;, expressionLatex);</span>
+<span class="fc" id="L2141">        String expressionLatex =</span>
+<span class="fc" id="L2142">            de.regelsuche.export.MathPresentation.DEFAULT.latex(demo.expression());</span>
+<span class="pc bpc" id="L2143" title="1 of 2 branches missed.">        if (!expressionLatex.isEmpty()) {</span>
+<span class="fc" id="L2144">            writer.property(&quot;expressionLatex&quot;, expressionLatex);</span>
         }
-<span class="fc" id="L2145">        writer.property(&quot;inputType&quot;, demo.inputType().name());</span>
-<span class="fc" id="L2146">        writer.property(&quot;profile&quot;, demo.profile().name());</span>
-<span class="fc" id="L2147">        writer.property(&quot;expectedHighlight&quot;, demo.expectedHighlight());</span>
-<span class="fc" id="L2148">        writer.property(&quot;expectedResultExpression&quot;, demo.expectedResultExpression());</span>
-<span class="fc" id="L2149">        writer.property(&quot;domain&quot;, demo.domain());</span>
-<span class="fc" id="L2150">        writer.property(&quot;expressionType&quot;, result.expressionType().name());</span>
-<span class="fc" id="L2151">        writer.property(&quot;comparatorFlipped&quot;, result.comparatorFlipped());</span>
-<span class="fc bfc" id="L2152" title="All 2 branches covered.">        if (!result.inputLatex().isEmpty()) {</span>
-<span class="fc" id="L2153">            writer.property(&quot;inputLatex&quot;, result.inputLatex());</span>
+<span class="fc" id="L2146">        writer.property(&quot;inputType&quot;, demo.inputType().name());</span>
+<span class="fc" id="L2147">        writer.property(&quot;profile&quot;, demo.profile().name());</span>
+<span class="fc" id="L2148">        writer.property(&quot;expectedHighlight&quot;, demo.expectedHighlight());</span>
+<span class="fc" id="L2149">        writer.property(&quot;expectedResultExpression&quot;, demo.expectedResultExpression());</span>
+<span class="fc" id="L2150">        writer.property(&quot;domain&quot;, demo.domain());</span>
+<span class="fc" id="L2151">        writer.property(&quot;expressionType&quot;, result.expressionType().name());</span>
+<span class="fc" id="L2152">        writer.property(&quot;comparatorFlipped&quot;, result.comparatorFlipped());</span>
+<span class="fc bfc" id="L2153" title="All 2 branches covered.">        if (!result.inputLatex().isEmpty()) {</span>
+<span class="fc" id="L2154">            writer.property(&quot;inputLatex&quot;, result.inputLatex());</span>
         }
-<span class="fc bfc" id="L2155" title="All 2 branches covered.">        if (!result.resultLatex().isEmpty()) {</span>
-<span class="fc" id="L2156">            writer.property(&quot;resultLatex&quot;, result.resultLatex());</span>
+<span class="fc bfc" id="L2156" title="All 2 branches covered.">        if (!result.resultLatex().isEmpty()) {</span>
+<span class="fc" id="L2157">            writer.property(&quot;resultLatex&quot;, result.resultLatex());</span>
         }
-<span class="fc bfc" id="L2158" title="All 2 branches covered.">        if (result.proofOutcome() != null) {</span>
-<span class="fc" id="L2159">            writer.object(&quot;proofOutcome&quot;, po -&gt; {</span>
-<span class="fc" id="L2160">                var outcome = result.proofOutcome();</span>
-<span class="fc" id="L2161">                po.property(&quot;proofStatus&quot;, outcome.candidate().proofStatus().name());</span>
-<span class="fc bfc" id="L2162" title="All 2 branches covered.">                if (outcome.execution() != null) {</span>
-<span class="fc" id="L2163">                    po.property(&quot;proverStatus&quot;, outcome.execution().status().name());</span>
-<span class="fc" id="L2164">                    po.property(&quot;exitCode&quot;, outcome.execution().exitCode());</span>
-<span class="fc" id="L2165">                    po.property(&quot;stdout&quot;, outcome.execution().stdout());</span>
-<span class="fc" id="L2166">                    po.property(&quot;stderr&quot;, outcome.execution().stderr());</span>
-<span class="fc" id="L2167">                    po.property(&quot;elapsedMillis&quot;, outcome.execution().durationMillis());</span>
+<span class="fc bfc" id="L2159" title="All 2 branches covered.">        if (result.proofOutcome() != null) {</span>
+<span class="fc" id="L2160">            writer.object(&quot;proofOutcome&quot;, po -&gt; {</span>
+<span class="fc" id="L2161">                var outcome = result.proofOutcome();</span>
+<span class="fc" id="L2162">                po.property(&quot;proofStatus&quot;, outcome.candidate().proofStatus().name());</span>
+<span class="fc bfc" id="L2163" title="All 2 branches covered.">                if (outcome.execution() != null) {</span>
+<span class="fc" id="L2164">                    po.property(&quot;proverStatus&quot;, outcome.execution().status().name());</span>
+<span class="fc" id="L2165">                    po.property(&quot;exitCode&quot;, outcome.execution().exitCode());</span>
+<span class="fc" id="L2166">                    po.property(&quot;stdout&quot;, outcome.execution().stdout());</span>
+<span class="fc" id="L2167">                    po.property(&quot;stderr&quot;, outcome.execution().stderr());</span>
+<span class="fc" id="L2168">                    po.property(&quot;elapsedMillis&quot;, outcome.execution().durationMillis());</span>
                 }
-<span class="pc bpc" id="L2169" title="1 of 2 branches missed.">                if (outcome.attempt() != null) {</span>
-<span class="fc" id="L2170">                    po.property(&quot;artifact&quot;, outcome.attempt().artifact());</span>
-<span class="fc" id="L2171">                    po.property(&quot;tool&quot;, outcome.attempt().tool());</span>
+<span class="pc bpc" id="L2170" title="1 of 2 branches missed.">                if (outcome.attempt() != null) {</span>
+<span class="fc" id="L2171">                    po.property(&quot;artifact&quot;, outcome.attempt().artifact());</span>
+<span class="fc" id="L2172">                    po.property(&quot;tool&quot;, outcome.attempt().tool());</span>
                 }
-<span class="fc" id="L2173">            });</span>
+<span class="fc" id="L2174">            });</span>
         }
-<span class="fc" id="L2175">        writer.property(&quot;canonicalTargetExpression&quot;,</span>
-<span class="pc bpc" id="L2176" title="1 of 2 branches missed.">            result.canonicalTargetExpression() == null ? &quot;&quot; : result.canonicalTargetExpression());</span>
-<span class="fc" id="L2177">        writer.property(&quot;rootExpression&quot;, result.rootExpression());</span>
-<span class="fc" id="L2178">        writer.property(&quot;targetReached&quot;, result.targetReached());</span>
-<span class="fc" id="L2179">        writer.stringArray(&quot;assumptions&quot;, result.assumptions());</span>
-<span class="fc" id="L2180">        writer.object(&quot;metrics&quot;, m -&gt; {</span>
-<span class="fc" id="L2181">            m.property(&quot;nodes&quot;, result.nodesSaved());</span>
-<span class="fc" id="L2182">            m.property(&quot;edges&quot;, result.edgesSaved());</span>
-<span class="fc" id="L2183">            m.property(&quot;pathsDiscovered&quot;, result.pathsDiscovered());</span>
-<span class="fc" id="L2184">            m.property(&quot;elapsedMillis&quot;, result.elapsedMillis());</span>
-<span class="fc" id="L2185">            m.property(&quot;identitiesFound&quot;, macros.size());</span>
-<span class="fc" id="L2186">            m.property(&quot;appliedRuleCount&quot;, result.appliedRuleIds().size());</span>
-<span class="fc" id="L2187">        });</span>
-<span class="fc" id="L2188">        writePath(writer, &quot;selectedPath&quot;, result.selectedPath());</span>
-<span class="fc" id="L2189">        writePath(writer, &quot;bestPath&quot;, result.bestPath());</span>
-<span class="fc" id="L2190">        writePath(writer, &quot;targetPath&quot;, result.targetPath());</span>
-<span class="fc" id="L2191">        writer.array(&quot;identities&quot;, arr -&gt; macros.forEach(macro -&gt;</span>
-<span class="fc" id="L2192">            arr.objectValue(inner -&gt; {</span>
-<span class="fc" id="L2193">                inner.property(&quot;id&quot;, macro.id());</span>
-<span class="fc" id="L2194">                inner.property(&quot;leftPattern&quot;, macro.leftPattern());</span>
-<span class="fc" id="L2195">                inner.property(&quot;rightPattern&quot;, macro.rightPattern());</span>
+<span class="fc" id="L2176">        writer.property(&quot;canonicalTargetExpression&quot;,</span>
+<span class="pc bpc" id="L2177" title="1 of 2 branches missed.">            result.canonicalTargetExpression() == null ? &quot;&quot; : result.canonicalTargetExpression());</span>
+<span class="fc" id="L2178">        writer.property(&quot;rootExpression&quot;, result.rootExpression());</span>
+<span class="fc" id="L2179">        writer.property(&quot;targetReached&quot;, result.targetReached());</span>
+<span class="fc" id="L2180">        writer.stringArray(&quot;assumptions&quot;, result.assumptions());</span>
+<span class="fc" id="L2181">        writer.object(&quot;metrics&quot;, m -&gt; {</span>
+<span class="fc" id="L2182">            m.property(&quot;nodes&quot;, result.nodesSaved());</span>
+<span class="fc" id="L2183">            m.property(&quot;edges&quot;, result.edgesSaved());</span>
+<span class="fc" id="L2184">            m.property(&quot;pathsDiscovered&quot;, result.pathsDiscovered());</span>
+<span class="fc" id="L2185">            m.property(&quot;elapsedMillis&quot;, result.elapsedMillis());</span>
+<span class="fc" id="L2186">            m.property(&quot;identitiesFound&quot;, macros.size());</span>
+<span class="fc" id="L2187">            m.property(&quot;appliedRuleCount&quot;, result.appliedRuleIds().size());</span>
+<span class="fc" id="L2188">        });</span>
+<span class="fc" id="L2189">        writePath(writer, &quot;selectedPath&quot;, result.selectedPath());</span>
+<span class="fc" id="L2190">        writePath(writer, &quot;bestPath&quot;, result.bestPath());</span>
+<span class="fc" id="L2191">        writePath(writer, &quot;targetPath&quot;, result.targetPath());</span>
+<span class="fc" id="L2192">        writer.array(&quot;identities&quot;, arr -&gt; macros.forEach(macro -&gt;</span>
+<span class="fc" id="L2193">            arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L2194">                inner.property(&quot;id&quot;, macro.id());</span>
+<span class="fc" id="L2195">                inner.property(&quot;leftPattern&quot;, macro.leftPattern());</span>
+<span class="fc" id="L2196">                inner.property(&quot;rightPattern&quot;, macro.rightPattern());</span>
                 // Stage 4+: KaTeX-ready LaTeX of the pattern endpoints so
                 // the identities list in the demo summary can render the
                 // pattern visually instead of as raw `*`/`^` ASCII.
-<span class="fc" id="L2199">                String leftPatternLatex = de.regelsuche.export.MathPresentation.DEFAULT</span>
-<span class="fc" id="L2200">                    .latex(macro.leftPattern());</span>
-<span class="fc" id="L2201">                String rightPatternLatex = de.regelsuche.export.MathPresentation.DEFAULT</span>
-<span class="fc" id="L2202">                    .latex(macro.rightPattern());</span>
-<span class="pc bpc" id="L2203" title="1 of 2 branches missed.">                if (!leftPatternLatex.isEmpty()) {</span>
-<span class="fc" id="L2204">                    inner.property(&quot;leftPatternLatex&quot;, leftPatternLatex);</span>
+<span class="fc" id="L2200">                String leftPatternLatex = de.regelsuche.export.MathPresentation.DEFAULT</span>
+<span class="fc" id="L2201">                    .latex(macro.leftPattern());</span>
+<span class="fc" id="L2202">                String rightPatternLatex = de.regelsuche.export.MathPresentation.DEFAULT</span>
+<span class="fc" id="L2203">                    .latex(macro.rightPattern());</span>
+<span class="pc bpc" id="L2204" title="1 of 2 branches missed.">                if (!leftPatternLatex.isEmpty()) {</span>
+<span class="fc" id="L2205">                    inner.property(&quot;leftPatternLatex&quot;, leftPatternLatex);</span>
                 }
-<span class="pc bpc" id="L2206" title="1 of 2 branches missed.">                if (!rightPatternLatex.isEmpty()) {</span>
-<span class="fc" id="L2207">                    inner.property(&quot;rightPatternLatex&quot;, rightPatternLatex);</span>
+<span class="pc bpc" id="L2207" title="1 of 2 branches missed.">                if (!rightPatternLatex.isEmpty()) {</span>
+<span class="fc" id="L2208">                    inner.property(&quot;rightPatternLatex&quot;, rightPatternLatex);</span>
                 }
-<span class="fc" id="L2209">                inner.property(&quot;occurrences&quot;, macro.occurrences());</span>
-<span class="fc" id="L2210">                inner.property(&quot;compressionRatio&quot;, macro.compressionRatio());</span>
-<span class="fc" id="L2211">                inner.property(&quot;proofStatus&quot;, macro.proofStatus().name());</span>
-<span class="fc" id="L2212">                inner.property(&quot;knownRuleStatus&quot;,</span>
-<span class="fc" id="L2213">                    known.statusFor(macro.leftPattern(), macro.rightPattern()).name());</span>
-<span class="fc" id="L2214">                inner.property(&quot;domain&quot;,</span>
-<span class="fc" id="L2215">                    new de.regelsuche.mining.MacroDomainInferrer().inferDomain(macro));</span>
-<span class="fc" id="L2216">            })));</span>
-<span class="fc" id="L2217">        writer.object(&quot;links&quot;, l -&gt; {</span>
-<span class="fc" id="L2218">            l.property(&quot;searchGraph&quot;, &quot;/api/search-graph&quot;);</span>
-<span class="fc" id="L2219">            l.property(&quot;semanticSearchGraph&quot;, &quot;/api/search-graph/semantic&quot;);</span>
-<span class="fc" id="L2220">            l.property(&quot;paths&quot;, &quot;/api/paths&quot;);</span>
-<span class="fc" id="L2221">            l.property(&quot;identities&quot;, &quot;/api/identities&quot;);</span>
-<span class="fc" id="L2222">            l.property(&quot;candidates&quot;, &quot;/api/candidates&quot;);</span>
-<span class="fc" id="L2223">            l.property(&quot;inventory&quot;, &quot;/api/inventory&quot;);</span>
-<span class="fc" id="L2224">            l.property(&quot;reportMarkdown&quot;, &quot;/api/exports/search-analysis-report.md&quot;);</span>
-<span class="fc" id="L2225">            l.property(&quot;reportLatex&quot;, &quot;/api/exports/search-analysis-report.tex&quot;);</span>
-<span class="fc" id="L2226">            l.property(&quot;reportJson&quot;, &quot;/api/exports/search-analysis-report.json&quot;);</span>
-<span class="fc" id="L2227">            l.property(&quot;searchGraphMermaid&quot;, &quot;/api/exports/search-graph.mmd&quot;);</span>
-<span class="fc" id="L2228">            l.property(&quot;searchGraphGraphMl&quot;, &quot;/api/exports/search-graph.graphml&quot;);</span>
-<span class="fc" id="L2229">            l.property(&quot;reportBundleZip&quot;, &quot;/api/exports/bundle.zip&quot;);</span>
-<span class="fc" id="L2230">            l.property(&quot;analyzeMove&quot;, &quot;/api/analyze/move?expression=&quot; + demo.expression());</span>
-<span class="fc" id="L2231">        });</span>
-<span class="fc" id="L2232">        writer.endObject();</span>
-<span class="fc" id="L2233">        return writer.toString();</span>
+<span class="fc" id="L2210">                inner.property(&quot;occurrences&quot;, macro.occurrences());</span>
+<span class="fc" id="L2211">                inner.property(&quot;compressionRatio&quot;, macro.compressionRatio());</span>
+<span class="fc" id="L2212">                inner.property(&quot;proofStatus&quot;, macro.proofStatus().name());</span>
+<span class="fc" id="L2213">                inner.property(&quot;knownRuleStatus&quot;,</span>
+<span class="fc" id="L2214">                    known.statusFor(macro.leftPattern(), macro.rightPattern()).name());</span>
+<span class="fc" id="L2215">                inner.property(&quot;domain&quot;,</span>
+<span class="fc" id="L2216">                    new de.regelsuche.mining.MacroDomainInferrer().inferDomain(macro));</span>
+<span class="fc" id="L2217">            })));</span>
+<span class="fc" id="L2218">        writer.object(&quot;links&quot;, l -&gt; {</span>
+<span class="fc" id="L2219">            l.property(&quot;searchGraph&quot;, &quot;/api/search-graph&quot;);</span>
+<span class="fc" id="L2220">            l.property(&quot;semanticSearchGraph&quot;, &quot;/api/search-graph/semantic&quot;);</span>
+<span class="fc" id="L2221">            l.property(&quot;paths&quot;, &quot;/api/paths&quot;);</span>
+<span class="fc" id="L2222">            l.property(&quot;identities&quot;, &quot;/api/identities&quot;);</span>
+<span class="fc" id="L2223">            l.property(&quot;candidates&quot;, &quot;/api/candidates&quot;);</span>
+<span class="fc" id="L2224">            l.property(&quot;inventory&quot;, &quot;/api/inventory&quot;);</span>
+<span class="fc" id="L2225">            l.property(&quot;reportMarkdown&quot;, &quot;/api/exports/search-analysis-report.md&quot;);</span>
+<span class="fc" id="L2226">            l.property(&quot;reportLatex&quot;, &quot;/api/exports/search-analysis-report.tex&quot;);</span>
+<span class="fc" id="L2227">            l.property(&quot;reportJson&quot;, &quot;/api/exports/search-analysis-report.json&quot;);</span>
+<span class="fc" id="L2228">            l.property(&quot;searchGraphMermaid&quot;, &quot;/api/exports/search-graph.mmd&quot;);</span>
+<span class="fc" id="L2229">            l.property(&quot;searchGraphGraphMl&quot;, &quot;/api/exports/search-graph.graphml&quot;);</span>
+<span class="fc" id="L2230">            l.property(&quot;reportBundleZip&quot;, &quot;/api/exports/bundle.zip&quot;);</span>
+<span class="fc" id="L2231">            l.property(&quot;analyzeMove&quot;, &quot;/api/analyze/move?expression=&quot; + demo.expression());</span>
+<span class="fc" id="L2232">        });</span>
+<span class="fc" id="L2233">        writer.endObject();</span>
+<span class="fc" id="L2234">        return writer.toString();</span>
     }
 
     private static void writePath(JsonWriter writer, String key,
                                   de.regelsuche.discovery.DiscoveredTransformation path) {
-<span class="pc bpc" id="L2238" title="1 of 2 branches missed.">        if (path == null) {</span>
-<span class="nc" id="L2239">            writer.nullProperty(key);</span>
-<span class="nc" id="L2240">            return;</span>
+<span class="pc bpc" id="L2239" title="1 of 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L2240">            writer.nullProperty(key);</span>
+<span class="nc" id="L2241">            return;</span>
         }
         // Use the central MathPresentation so the LaTeX rendering goes
         // through the AST-based renderer (with safe fallback) rather than
         // raw string concatenation.
-<span class="fc" id="L2245">        de.regelsuche.export.MathPresentation latex = de.regelsuche.export.MathPresentation.DEFAULT;</span>
-<span class="fc" id="L2246">        writer.object(key, b -&gt; {</span>
-<span class="fc" id="L2247">            b.property(&quot;id&quot;, path.id());</span>
-<span class="fc" id="L2248">            b.property(&quot;originalExpression&quot;, path.originalExpression());</span>
-<span class="fc" id="L2249">            b.property(&quot;improvedExpression&quot;, path.improvedExpression());</span>
+<span class="fc" id="L2246">        de.regelsuche.export.MathPresentation latex = de.regelsuche.export.MathPresentation.DEFAULT;</span>
+<span class="fc" id="L2247">        writer.object(key, b -&gt; {</span>
+<span class="fc" id="L2248">            b.property(&quot;id&quot;, path.id());</span>
+<span class="fc" id="L2249">            b.property(&quot;originalExpression&quot;, path.originalExpression());</span>
+<span class="fc" id="L2250">            b.property(&quot;improvedExpression&quot;, path.improvedExpression());</span>
             // Stage 4+: dedicated LaTeX fields for the path endpoints so
             // the front-end can typeset the demo-summary banner and the
             // &quot;Treffer (selectedPath)&quot; row with KaTeX instead of ASCII.
-<span class="fc" id="L2253">            String originalLatex = latex.latex(path.originalExpression());</span>
-<span class="fc" id="L2254">            String improvedLatex = latex.latex(path.improvedExpression());</span>
-<span class="pc bpc" id="L2255" title="1 of 2 branches missed.">            if (!originalLatex.isEmpty()) {</span>
-<span class="fc" id="L2256">                b.property(&quot;originalExpressionLatex&quot;, originalLatex);</span>
+<span class="fc" id="L2254">            String originalLatex = latex.latex(path.originalExpression());</span>
+<span class="fc" id="L2255">            String improvedLatex = latex.latex(path.improvedExpression());</span>
+<span class="pc bpc" id="L2256" title="1 of 2 branches missed.">            if (!originalLatex.isEmpty()) {</span>
+<span class="fc" id="L2257">                b.property(&quot;originalExpressionLatex&quot;, originalLatex);</span>
             }
-<span class="pc bpc" id="L2258" title="1 of 2 branches missed.">            if (!improvedLatex.isEmpty()) {</span>
-<span class="fc" id="L2259">                b.property(&quot;improvedExpressionLatex&quot;, improvedLatex);</span>
+<span class="pc bpc" id="L2259" title="1 of 2 branches missed.">            if (!improvedLatex.isEmpty()) {</span>
+<span class="fc" id="L2260">                b.property(&quot;improvedExpressionLatex&quot;, improvedLatex);</span>
             }
-<span class="fc" id="L2261">            b.property(&quot;totalImprovement&quot;, path.totalImprovement());</span>
-<span class="fc" id="L2262">            b.property(&quot;steps&quot;, path.steps().size());</span>
-<span class="fc" id="L2263">            b.property(&quot;proofStatus&quot;, path.validationStatus().name());</span>
-<span class="fc" id="L2264">            b.array(&quot;stepDetails&quot;, arr -&gt; path.steps().forEach(step -&gt;</span>
-<span class="fc" id="L2265">                arr.objectValue(s -&gt; {</span>
-<span class="fc" id="L2266">                    s.property(&quot;index&quot;, step.index());</span>
-<span class="fc" id="L2267">                    s.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
-<span class="fc" id="L2268">                    s.property(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="fc" id="L2262">            b.property(&quot;totalImprovement&quot;, path.totalImprovement());</span>
+<span class="fc" id="L2263">            b.property(&quot;steps&quot;, path.steps().size());</span>
+<span class="fc" id="L2264">            b.property(&quot;proofStatus&quot;, path.validationStatus().name());</span>
+<span class="fc" id="L2265">            b.array(&quot;stepDetails&quot;, arr -&gt; path.steps().forEach(step -&gt;</span>
+<span class="fc" id="L2266">                arr.objectValue(s -&gt; {</span>
+<span class="fc" id="L2267">                    s.property(&quot;index&quot;, step.index());</span>
+<span class="fc" id="L2268">                    s.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="fc" id="L2269">                    s.property(&quot;afterExpression&quot;, step.afterExpression());</span>
                     // Stage 4+: matching LaTeX fields per step so the
                     // best-move block and replay views can KaTeX-typeset
                     // before/after expressions without a client-side
                     // ASCII fallback.
-<span class="fc" id="L2273">                    String beforeLatex = latex.latex(step.beforeExpression());</span>
-<span class="fc" id="L2274">                    String afterLatex = latex.latex(step.afterExpression());</span>
-<span class="pc bpc" id="L2275" title="1 of 2 branches missed.">                    if (!beforeLatex.isEmpty()) {</span>
-<span class="fc" id="L2276">                        s.property(&quot;beforeLatex&quot;, beforeLatex);</span>
+<span class="fc" id="L2274">                    String beforeLatex = latex.latex(step.beforeExpression());</span>
+<span class="fc" id="L2275">                    String afterLatex = latex.latex(step.afterExpression());</span>
+<span class="pc bpc" id="L2276" title="1 of 2 branches missed.">                    if (!beforeLatex.isEmpty()) {</span>
+<span class="fc" id="L2277">                        s.property(&quot;beforeLatex&quot;, beforeLatex);</span>
                     }
-<span class="pc bpc" id="L2278" title="1 of 2 branches missed.">                    if (!afterLatex.isEmpty()) {</span>
-<span class="fc" id="L2279">                        s.property(&quot;afterLatex&quot;, afterLatex);</span>
+<span class="pc bpc" id="L2279" title="1 of 2 branches missed.">                    if (!afterLatex.isEmpty()) {</span>
+<span class="fc" id="L2280">                        s.property(&quot;afterLatex&quot;, afterLatex);</span>
                     }
-<span class="fc" id="L2281">                    s.property(&quot;ruleId&quot;, step.ruleId());</span>
-<span class="fc" id="L2282">                    s.property(&quot;ruleKind&quot;, step.ruleKind().name());</span>
-<span class="fc" id="L2283">                    s.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
-<span class="fc" id="L2284">                    s.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
-<span class="fc" id="L2285">                    s.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
-<span class="fc" id="L2286">                })));</span>
-<span class="fc" id="L2287">        });</span>
-<span class="fc" id="L2288">    }</span>
+<span class="fc" id="L2282">                    s.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L2283">                    s.property(&quot;ruleKind&quot;, step.ruleKind().name());</span>
+<span class="fc" id="L2284">                    s.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
+<span class="fc" id="L2285">                    s.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
+<span class="fc" id="L2286">                    s.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="fc" id="L2287">                })));</span>
+<span class="fc" id="L2288">        });</span>
+<span class="fc" id="L2289">    }</span>
 
     private void handleProofStatus(HttpExchange exchange) throws IOException {
-<span class="nc bnc" id="L2291" title="All 2 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L2292">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="nc" id="L2293">            return;</span>
+<span class="nc bnc" id="L2292" title="All 2 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L2293">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2294">            return;</span>
         }
-<span class="nc" id="L2295">        JsonWriter writer = new JsonWriter();</span>
-<span class="nc" id="L2296">        writer.beginObject();</span>
-<span class="nc" id="L2297">        writer.array(&quot;statuses&quot;, arr -&gt;</span>
-<span class="nc" id="L2298">            de.regelsuche.proof.ProofStatusDescription.all().values().forEach(d -&gt;</span>
-<span class="nc" id="L2299">                arr.objectValue(inner -&gt; {</span>
-<span class="nc" id="L2300">                    inner.property(&quot;status&quot;, d.status().name());</span>
-<span class="nc" id="L2301">                    inner.property(&quot;ordinal&quot;, d.status().ordinal());</span>
-<span class="nc" id="L2302">                    inner.property(&quot;label&quot;, d.label());</span>
-<span class="nc" id="L2303">                    inner.property(&quot;descriptionDe&quot;, d.summaryDe());</span>
-<span class="nc" id="L2304">                    inner.property(&quot;descriptionEn&quot;, d.summaryEn());</span>
-<span class="nc" id="L2305">                })));</span>
-<span class="nc" id="L2306">        writer.endObject();</span>
-<span class="nc" id="L2307">        sendJson(exchange, 200, writer.toString());</span>
-<span class="nc" id="L2308">    }</span>
+<span class="nc" id="L2296">        JsonWriter writer = new JsonWriter();</span>
+<span class="nc" id="L2297">        writer.beginObject();</span>
+<span class="nc" id="L2298">        writer.array(&quot;statuses&quot;, arr -&gt;</span>
+<span class="nc" id="L2299">            de.regelsuche.proof.ProofStatusDescription.all().values().forEach(d -&gt;</span>
+<span class="nc" id="L2300">                arr.objectValue(inner -&gt; {</span>
+<span class="nc" id="L2301">                    inner.property(&quot;status&quot;, d.status().name());</span>
+<span class="nc" id="L2302">                    inner.property(&quot;ordinal&quot;, d.status().ordinal());</span>
+<span class="nc" id="L2303">                    inner.property(&quot;label&quot;, d.label());</span>
+<span class="nc" id="L2304">                    inner.property(&quot;descriptionDe&quot;, d.summaryDe());</span>
+<span class="nc" id="L2305">                    inner.property(&quot;descriptionEn&quot;, d.summaryEn());</span>
+<span class="nc" id="L2306">                })));</span>
+<span class="nc" id="L2307">        writer.endObject();</span>
+<span class="nc" id="L2308">        sendJson(exchange, 200, writer.toString());</span>
+<span class="nc" id="L2309">    }</span>
 
     /**
      * POST /api/proof-bridge — body {@code {&quot;leftPattern&quot;: &quot;...&quot;, &quot;rightPattern&quot;: &quot;...&quot;,
@@ -2319,71 +2320,71 @@ public class WebWorkbenchServer {
      * an executor configured we report {@code SCRIPT_GENERATED}.&lt;/p&gt;
      */
     private void handleProofBridge(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L2322" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L2323">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="nc" id="L2324">            return;</span>
+<span class="pc bpc" id="L2323" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L2324">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2325">            return;</span>
         }
-<span class="fc" id="L2326">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
-<span class="fc" id="L2327">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;);</span>
-<span class="fc" id="L2328">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;);</span>
-<span class="pc bpc" id="L2329" title="2 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
-<span class="nc" id="L2330">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
-<span class="nc" id="L2331">            return;</span>
+<span class="fc" id="L2327">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="fc" id="L2328">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;);</span>
+<span class="fc" id="L2329">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L2330" title="2 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
+<span class="nc" id="L2331">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
+<span class="nc" id="L2332">            return;</span>
         }
-<span class="fc" id="L2333">        String tool = stringValue(body, &quot;tool&quot;, &quot;lean4&quot;).toLowerCase(java.util.Locale.ROOT);</span>
+<span class="fc" id="L2334">        String tool = stringValue(body, &quot;tool&quot;, &quot;lean4&quot;).toLowerCase(java.util.Locale.ROOT);</span>
         de.regelsuche.proof.ProofBridgeService service =
-<span class="pc bpc" id="L2335" title="1 of 2 branches missed.">            &quot;smt&quot;.equals(tool) ? smtProofBridgeService : leanProofBridgeService;</span>
-<span class="fc" id="L2336">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
-<span class="fc" id="L2337">        Object raw = body.get(&quot;assumptions&quot;);</span>
-<span class="fc bfc" id="L2338" title="All 2 branches covered.">        if (raw instanceof List&lt;?&gt; list) {</span>
-<span class="pc bpc" id="L2339" title="1 of 2 branches missed.">            for (Object item : list) {</span>
-<span class="nc bnc" id="L2340" title="All 2 branches missed.">                if (item != null) {</span>
-<span class="nc" id="L2341">                    assumptions.add(new de.regelsuche.assumption.Assumption(</span>
-<span class="nc" id="L2342">                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));</span>
+<span class="pc bpc" id="L2336" title="1 of 2 branches missed.">            &quot;smt&quot;.equals(tool) ? smtProofBridgeService : leanProofBridgeService;</span>
+<span class="fc" id="L2337">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc" id="L2338">        Object raw = body.get(&quot;assumptions&quot;);</span>
+<span class="fc bfc" id="L2339" title="All 2 branches covered.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="pc bpc" id="L2340" title="1 of 2 branches missed.">            for (Object item : list) {</span>
+<span class="nc bnc" id="L2341" title="All 2 branches missed.">                if (item != null) {</span>
+<span class="nc" id="L2342">                    assumptions.add(new de.regelsuche.assumption.Assumption(</span>
+<span class="nc" id="L2343">                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));</span>
                 }
-<span class="nc" id="L2344">            }</span>
+<span class="nc" id="L2345">            }</span>
         }
-<span class="fc" id="L2346">        de.regelsuche.mining.RuleCandidate candidate = new de.regelsuche.mining.RuleCandidate(</span>
+<span class="fc" id="L2347">        de.regelsuche.mining.RuleCandidate candidate = new de.regelsuche.mining.RuleCandidate(</span>
             left, right, 1, 1.0, 1, true, true, false,
-<span class="fc" id="L2348">            List.of(),</span>
+<span class="fc" id="L2349">            List.of(),</span>
             de.regelsuche.mining.RuleStatus.NEW,
             de.regelsuche.validation.CandidateProofStatus.SYMBOLICALLY_VERIFIED,
-<span class="fc" id="L2351">            Integer.toHexString((left + &quot;-&gt;&quot; + right).hashCode()),</span>
-<span class="fc" id="L2352">            List.of()</span>
+<span class="fc" id="L2352">            Integer.toHexString((left + &quot;-&gt;&quot; + right).hashCode()),</span>
+<span class="fc" id="L2353">            List.of()</span>
         );
-<span class="fc" id="L2354">        de.regelsuche.proof.ProofBridgeService.ProofAttemptOutcome outcome =</span>
-<span class="fc" id="L2355">            service.attemptWithDetails(candidate, assumptions);</span>
+<span class="fc" id="L2355">        de.regelsuche.proof.ProofBridgeService.ProofAttemptOutcome outcome =</span>
+<span class="fc" id="L2356">            service.attemptWithDetails(candidate, assumptions);</span>
 
-<span class="fc" id="L2357">        JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2358">        writer.beginObject();</span>
-<span class="fc" id="L2359">        writer.property(&quot;leftPattern&quot;, left);</span>
-<span class="fc" id="L2360">        writer.property(&quot;rightPattern&quot;, right);</span>
-<span class="fc" id="L2361">        writer.property(&quot;tool&quot;, tool);</span>
-<span class="fc" id="L2362">        writer.property(&quot;proofStatus&quot;, outcome.candidate().proofStatus().name());</span>
-<span class="fc bfc" id="L2363" title="All 2 branches covered.">        if (outcome.execution() != null) {</span>
-<span class="fc" id="L2364">            writer.property(&quot;proverStatus&quot;, outcome.execution().status().name());</span>
-<span class="fc" id="L2365">            writer.property(&quot;exitCode&quot;, outcome.execution().exitCode());</span>
-<span class="fc" id="L2366">            writer.property(&quot;stdout&quot;, outcome.execution().stdout());</span>
-<span class="fc" id="L2367">            writer.property(&quot;stderr&quot;, outcome.execution().stderr());</span>
-<span class="fc" id="L2368">            writer.property(&quot;elapsedMillis&quot;, outcome.execution().durationMillis());</span>
+<span class="fc" id="L2358">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2359">        writer.beginObject();</span>
+<span class="fc" id="L2360">        writer.property(&quot;leftPattern&quot;, left);</span>
+<span class="fc" id="L2361">        writer.property(&quot;rightPattern&quot;, right);</span>
+<span class="fc" id="L2362">        writer.property(&quot;tool&quot;, tool);</span>
+<span class="fc" id="L2363">        writer.property(&quot;proofStatus&quot;, outcome.candidate().proofStatus().name());</span>
+<span class="fc bfc" id="L2364" title="All 2 branches covered.">        if (outcome.execution() != null) {</span>
+<span class="fc" id="L2365">            writer.property(&quot;proverStatus&quot;, outcome.execution().status().name());</span>
+<span class="fc" id="L2366">            writer.property(&quot;exitCode&quot;, outcome.execution().exitCode());</span>
+<span class="fc" id="L2367">            writer.property(&quot;stdout&quot;, outcome.execution().stdout());</span>
+<span class="fc" id="L2368">            writer.property(&quot;stderr&quot;, outcome.execution().stderr());</span>
+<span class="fc" id="L2369">            writer.property(&quot;elapsedMillis&quot;, outcome.execution().durationMillis());</span>
         } else {
             // No executor configured — be explicit so the UI can show the
             // &quot;script generated only&quot; state instead of leaving the field
             // absent.
-<span class="fc" id="L2373">            writer.property(&quot;proverStatus&quot;,</span>
-<span class="fc" id="L2374">                de.regelsuche.proof.ProverExecutionResult.Status.SCRIPT_GENERATED.name());</span>
-<span class="fc" id="L2375">            writer.property(&quot;exitCode&quot;, -1);</span>
-<span class="fc" id="L2376">            writer.property(&quot;stdout&quot;, &quot;&quot;);</span>
-<span class="fc" id="L2377">            writer.property(&quot;stderr&quot;, &quot;&quot;);</span>
-<span class="fc" id="L2378">            writer.property(&quot;elapsedMillis&quot;, 0L);</span>
+<span class="fc" id="L2374">            writer.property(&quot;proverStatus&quot;,</span>
+<span class="fc" id="L2375">                de.regelsuche.proof.ProverExecutionResult.Status.SCRIPT_GENERATED.name());</span>
+<span class="fc" id="L2376">            writer.property(&quot;exitCode&quot;, -1);</span>
+<span class="fc" id="L2377">            writer.property(&quot;stdout&quot;, &quot;&quot;);</span>
+<span class="fc" id="L2378">            writer.property(&quot;stderr&quot;, &quot;&quot;);</span>
+<span class="fc" id="L2379">            writer.property(&quot;elapsedMillis&quot;, 0L);</span>
         }
-<span class="pc bpc" id="L2380" title="1 of 2 branches missed.">        if (outcome.attempt() != null) {</span>
-<span class="fc" id="L2381">            writer.property(&quot;artifact&quot;, outcome.attempt().artifact());</span>
-<span class="fc" id="L2382">            writer.property(&quot;artifactTool&quot;, outcome.attempt().tool());</span>
+<span class="pc bpc" id="L2381" title="1 of 2 branches missed.">        if (outcome.attempt() != null) {</span>
+<span class="fc" id="L2382">            writer.property(&quot;artifact&quot;, outcome.attempt().artifact());</span>
+<span class="fc" id="L2383">            writer.property(&quot;artifactTool&quot;, outcome.attempt().tool());</span>
         }
-<span class="fc" id="L2384">        writer.endObject();</span>
-<span class="fc" id="L2385">        sendJson(exchange, 200, writer.toString());</span>
-<span class="fc" id="L2386">    }</span>
+<span class="fc" id="L2385">        writer.endObject();</span>
+<span class="fc" id="L2386">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L2387">    }</span>
 
     // ── Proof Job REST API ─────────────────────────────────────────────────
     //
@@ -2397,271 +2398,271 @@ public class WebWorkbenchServer {
     //   GET    /api/proof/jobs/{id}/artifacts/{name}        → fetch file body
 
     private void handleProofJobs(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L2400" title="1 of 2 branches missed.">        if (proofWorkbenchService == null) {</span>
-<span class="nc" id="L2401">            sendStatus(exchange, 503, &quot;proof workbench disabled &quot;</span>
+<span class="pc bpc" id="L2401" title="1 of 2 branches missed.">        if (proofWorkbenchService == null) {</span>
+<span class="nc" id="L2402">            sendStatus(exchange, 503, &quot;proof workbench disabled &quot;</span>
                 + &quot;(set REGELSUCHE_PROOF_ENABLED=true)&quot;);
-<span class="nc" id="L2403">            return;</span>
+<span class="nc" id="L2404">            return;</span>
         }
-<span class="fc" id="L2405">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc" id="L2406">        String path = exchange.getRequestURI().getPath();</span>
         // Strip &quot;/api/proof/jobs&quot; prefix and split.
-<span class="fc" id="L2407">        String suffix = path.substring(&quot;/api/proof/jobs&quot;.length());</span>
-<span class="fc" id="L2408">        String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);</span>
+<span class="fc" id="L2408">        String suffix = path.substring(&quot;/api/proof/jobs&quot;.length());</span>
+<span class="fc" id="L2409">        String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);</span>
 
-<span class="pc bpc" id="L2410" title="1 of 4 branches missed.">        if (suffix.isEmpty() || &quot;/&quot;.equals(suffix)) {</span>
-<span class="fc bfc" id="L2411" title="All 2 branches covered.">            if (&quot;GET&quot;.equals(method)) {</span>
-<span class="fc" id="L2412">                handleProofJobList(exchange);</span>
-<span class="pc bpc" id="L2413" title="1 of 2 branches missed.">            } else if (&quot;POST&quot;.equals(method)) {</span>
-<span class="fc" id="L2414">                handleProofJobCreate(exchange);</span>
+<span class="pc bpc" id="L2411" title="1 of 4 branches missed.">        if (suffix.isEmpty() || &quot;/&quot;.equals(suffix)) {</span>
+<span class="fc bfc" id="L2412" title="All 2 branches covered.">            if (&quot;GET&quot;.equals(method)) {</span>
+<span class="fc" id="L2413">                handleProofJobList(exchange);</span>
+<span class="pc bpc" id="L2414" title="1 of 2 branches missed.">            } else if (&quot;POST&quot;.equals(method)) {</span>
+<span class="fc" id="L2415">                handleProofJobCreate(exchange);</span>
             } else {
-<span class="nc" id="L2416">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2417">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
             }
-<span class="fc" id="L2418">            return;</span>
+<span class="fc" id="L2419">            return;</span>
         }
 
-<span class="fc" id="L2421">        String[] parts = suffix.substring(1).split(&quot;/&quot;, -1);</span>
-<span class="fc" id="L2422">        String jobId = parts[0];</span>
-<span class="fc bfc" id="L2423" title="All 2 branches covered.">        if (parts.length == 1) {</span>
-<span class="pc bpc" id="L2424" title="1 of 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
-<span class="fc" id="L2425">                handleProofJobGet(exchange, jobId);</span>
+<span class="fc" id="L2422">        String[] parts = suffix.substring(1).split(&quot;/&quot;, -1);</span>
+<span class="fc" id="L2423">        String jobId = parts[0];</span>
+<span class="fc bfc" id="L2424" title="All 2 branches covered.">        if (parts.length == 1) {</span>
+<span class="pc bpc" id="L2425" title="1 of 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
+<span class="fc" id="L2426">                handleProofJobGet(exchange, jobId);</span>
             } else {
-<span class="nc" id="L2427">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2428">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
             }
-<span class="fc" id="L2429">            return;</span>
+<span class="fc" id="L2430">            return;</span>
         }
-<span class="fc bfc" id="L2431" title="All 4 branches covered.">        if (parts.length == 2 &amp;&amp; &quot;cancel&quot;.equals(parts[1])) {</span>
-<span class="pc bpc" id="L2432" title="1 of 2 branches missed.">            if (&quot;POST&quot;.equals(method)) {</span>
-<span class="fc" id="L2433">                handleProofJobCancel(exchange, jobId);</span>
+<span class="fc bfc" id="L2432" title="All 4 branches covered.">        if (parts.length == 2 &amp;&amp; &quot;cancel&quot;.equals(parts[1])) {</span>
+<span class="pc bpc" id="L2433" title="1 of 2 branches missed.">            if (&quot;POST&quot;.equals(method)) {</span>
+<span class="fc" id="L2434">                handleProofJobCancel(exchange, jobId);</span>
             } else {
-<span class="nc" id="L2435">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2436">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
             }
-<span class="fc" id="L2437">            return;</span>
+<span class="fc" id="L2438">            return;</span>
         }
-<span class="pc bpc" id="L2439" title="1 of 4 branches missed.">        if (parts.length == 2 &amp;&amp; &quot;artifacts&quot;.equals(parts[1])) {</span>
-<span class="pc bpc" id="L2440" title="1 of 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
-<span class="fc" id="L2441">                handleProofJobArtifactList(exchange, jobId);</span>
+<span class="pc bpc" id="L2440" title="1 of 4 branches missed.">        if (parts.length == 2 &amp;&amp; &quot;artifacts&quot;.equals(parts[1])) {</span>
+<span class="pc bpc" id="L2441" title="1 of 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
+<span class="fc" id="L2442">                handleProofJobArtifactList(exchange, jobId);</span>
             } else {
-<span class="nc" id="L2443">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2444">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
             }
-<span class="fc" id="L2445">            return;</span>
+<span class="fc" id="L2446">            return;</span>
         }
-<span class="pc bpc" id="L2447" title="3 of 4 branches missed.">        if (parts.length == 3 &amp;&amp; &quot;artifacts&quot;.equals(parts[1])) {</span>
-<span class="nc bnc" id="L2448" title="All 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
-<span class="nc" id="L2449">                handleProofJobArtifactRead(exchange, jobId, parts[2]);</span>
+<span class="pc bpc" id="L2448" title="3 of 4 branches missed.">        if (parts.length == 3 &amp;&amp; &quot;artifacts&quot;.equals(parts[1])) {</span>
+<span class="nc bnc" id="L2449" title="All 2 branches missed.">            if (&quot;GET&quot;.equals(method)) {</span>
+<span class="nc" id="L2450">                handleProofJobArtifactRead(exchange, jobId, parts[2]);</span>
             } else {
-<span class="nc" id="L2451">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2452">                sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
             }
-<span class="nc" id="L2453">            return;</span>
+<span class="nc" id="L2454">            return;</span>
         }
-<span class="fc" id="L2455">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="fc" id="L2456">    }</span>
+<span class="fc" id="L2456">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L2457">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
-<span class="fc" id="L2459">        var jobs = proofWorkbenchService.listJobs();</span>
-<span class="fc" id="L2460">        JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2461">        writer.beginObject();</span>
-<span class="fc" id="L2462">        writer.array(&quot;jobs&quot;, arr -&gt; jobs.forEach(job -&gt;</span>
-<span class="fc" id="L2463">            arr.objectValue(o -&gt; writeProofJobJson(o, job))));</span>
-<span class="fc" id="L2464">        writer.endObject();</span>
-<span class="fc" id="L2465">        sendJson(exchange, 200, writer.toString());</span>
-<span class="fc" id="L2466">    }</span>
+<span class="fc" id="L2460">        var jobs = proofWorkbenchService.listJobs();</span>
+<span class="fc" id="L2461">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2462">        writer.beginObject();</span>
+<span class="fc" id="L2463">        writer.array(&quot;jobs&quot;, arr -&gt; jobs.forEach(job -&gt;</span>
+<span class="fc" id="L2464">            arr.objectValue(o -&gt; writeProofJobJson(o, job))));</span>
+<span class="fc" id="L2465">        writer.endObject();</span>
+<span class="fc" id="L2466">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L2467">    }</span>
 
     private void handleProofJobCreate(HttpExchange exchange) throws IOException {
-<span class="fc" id="L2469">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
-<span class="fc" id="L2470">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;).trim();</span>
-<span class="fc" id="L2471">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;).trim();</span>
-<span class="pc bpc" id="L2472" title="1 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
-<span class="fc" id="L2473">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
-<span class="fc" id="L2474">            return;</span>
+<span class="fc" id="L2470">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
+<span class="fc" id="L2471">        String left = stringValue(body, &quot;leftPattern&quot;, &quot;&quot;).trim();</span>
+<span class="fc" id="L2472">        String right = stringValue(body, &quot;rightPattern&quot;, &quot;&quot;).trim();</span>
+<span class="pc bpc" id="L2473" title="1 of 4 branches missed.">        if (left.isBlank() || right.isBlank()) {</span>
+<span class="fc" id="L2474">            sendStatus(exchange, 400, &quot;leftPattern and rightPattern are required&quot;);</span>
+<span class="fc" id="L2475">            return;</span>
         }
-<span class="fc" id="L2476">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
-<span class="fc bfc" id="L2477" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
-<span class="fc" id="L2478">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
-<span class="fc" id="L2479">            return;</span>
+<span class="fc" id="L2477">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
+<span class="fc bfc" id="L2478" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
+<span class="fc" id="L2479">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
+<span class="fc" id="L2480">            return;</span>
         }
-<span class="fc" id="L2481">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
-<span class="fc bfc" id="L2482" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="fc" id="L2483">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="fc" id="L2484">            return;</span>
+<span class="fc" id="L2482">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
+<span class="fc bfc" id="L2483" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
+<span class="fc" id="L2484">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="fc" id="L2485">            return;</span>
         }
-<span class="fc" id="L2486">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
-<span class="fc" id="L2487">        Object raw = body.get(&quot;assumptions&quot;);</span>
-<span class="pc bpc" id="L2488" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
-<span class="nc bnc" id="L2489" title="All 2 branches missed.">            for (Object item : list) {</span>
-<span class="nc bnc" id="L2490" title="All 2 branches missed.">                if (item == null) {</span>
-<span class="nc" id="L2491">                    continue;</span>
+<span class="fc" id="L2487">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
+<span class="fc" id="L2488">        Object raw = body.get(&quot;assumptions&quot;);</span>
+<span class="pc bpc" id="L2489" title="1 of 2 branches missed.">        if (raw instanceof List&lt;?&gt; list) {</span>
+<span class="nc bnc" id="L2490" title="All 2 branches missed.">            for (Object item : list) {</span>
+<span class="nc bnc" id="L2491" title="All 2 branches missed.">                if (item == null) {</span>
+<span class="nc" id="L2492">                    continue;</span>
                 }
-<span class="nc bnc" id="L2493" title="All 2 branches missed.">                if (item instanceof Map&lt;?, ?&gt; map) {</span>
-<span class="nc" id="L2494">                    Object exprRaw = map.get(&quot;expression&quot;);</span>
-<span class="nc bnc" id="L2495" title="All 2 branches missed.">                    String expr = exprRaw == null ? &quot;&quot; : String.valueOf(exprRaw);</span>
-<span class="nc" id="L2496">                    Object kindObj = map.get(&quot;kind&quot;);</span>
-<span class="nc bnc" id="L2497" title="All 2 branches missed.">                    String kindRaw = kindObj == null ? &quot;CUSTOM&quot; : String.valueOf(kindObj);</span>
+<span class="nc bnc" id="L2494" title="All 2 branches missed.">                if (item instanceof Map&lt;?, ?&gt; map) {</span>
+<span class="nc" id="L2495">                    Object exprRaw = map.get(&quot;expression&quot;);</span>
+<span class="nc bnc" id="L2496" title="All 2 branches missed.">                    String expr = exprRaw == null ? &quot;&quot; : String.valueOf(exprRaw);</span>
+<span class="nc" id="L2497">                    Object kindObj = map.get(&quot;kind&quot;);</span>
+<span class="nc bnc" id="L2498" title="All 2 branches missed.">                    String kindRaw = kindObj == null ? &quot;CUSTOM&quot; : String.valueOf(kindObj);</span>
                     de.regelsuche.assumption.Assumption.Kind kind;
                     try {
-<span class="nc" id="L2500">                        kind = de.regelsuche.assumption.Assumption.Kind.valueOf(</span>
-<span class="nc" id="L2501">                            kindRaw.toUpperCase(Locale.ROOT));</span>
-<span class="nc" id="L2502">                    } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L2503">                        kind = de.regelsuche.assumption.Assumption.Kind.CUSTOM;</span>
-<span class="nc" id="L2504">                    }</span>
-<span class="nc" id="L2505">                    assumptions.add(new de.regelsuche.assumption.Assumption(kind, expr));</span>
-<span class="nc" id="L2506">                } else {</span>
-<span class="nc" id="L2507">                    assumptions.add(new de.regelsuche.assumption.Assumption(</span>
-<span class="nc" id="L2508">                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));</span>
+<span class="nc" id="L2501">                        kind = de.regelsuche.assumption.Assumption.Kind.valueOf(</span>
+<span class="nc" id="L2502">                            kindRaw.toUpperCase(Locale.ROOT));</span>
+<span class="nc" id="L2503">                    } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L2504">                        kind = de.regelsuche.assumption.Assumption.Kind.CUSTOM;</span>
+<span class="nc" id="L2505">                    }</span>
+<span class="nc" id="L2506">                    assumptions.add(new de.regelsuche.assumption.Assumption(kind, expr));</span>
+<span class="nc" id="L2507">                } else {</span>
+<span class="nc" id="L2508">                    assumptions.add(new de.regelsuche.assumption.Assumption(</span>
+<span class="nc" id="L2509">                        de.regelsuche.assumption.Assumption.Kind.CUSTOM, item.toString()));</span>
                 }
-<span class="nc" id="L2510">            }</span>
+<span class="nc" id="L2511">            }</span>
         }
-<span class="fc" id="L2512">        String jobId = proofWorkbenchService.submit(left, right, assumptions, priority);</span>
-<span class="fc" id="L2513">        var job = proofWorkbenchService.getJob(jobId).orElse(null);</span>
-<span class="fc" id="L2514">        JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2515">        writer.beginObject();</span>
-<span class="fc" id="L2516">        writer.property(&quot;jobId&quot;, jobId);</span>
-<span class="pc bpc" id="L2517" title="1 of 2 branches missed.">        if (job != null) {</span>
-<span class="fc" id="L2518">            writer.property(&quot;status&quot;, job.status().name());</span>
-<span class="fc" id="L2519">            writer.property(&quot;workerId&quot;, job.workerType());</span>
+<span class="fc" id="L2513">        String jobId = proofWorkbenchService.submit(left, right, assumptions, priority);</span>
+<span class="fc" id="L2514">        var job = proofWorkbenchService.getJob(jobId).orElse(null);</span>
+<span class="fc" id="L2515">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2516">        writer.beginObject();</span>
+<span class="fc" id="L2517">        writer.property(&quot;jobId&quot;, jobId);</span>
+<span class="pc bpc" id="L2518" title="1 of 2 branches missed.">        if (job != null) {</span>
+<span class="fc" id="L2519">            writer.property(&quot;status&quot;, job.status().name());</span>
+<span class="fc" id="L2520">            writer.property(&quot;workerId&quot;, job.workerType());</span>
         }
-<span class="fc" id="L2521">        writer.endObject();</span>
-<span class="fc" id="L2522">        sendJson(exchange, 201, writer.toString());</span>
-<span class="fc" id="L2523">    }</span>
+<span class="fc" id="L2522">        writer.endObject();</span>
+<span class="fc" id="L2523">        sendJson(exchange, 201, writer.toString());</span>
+<span class="fc" id="L2524">    }</span>
 
     private void handleProofJobGet(HttpExchange exchange, String jobId) throws IOException {
-<span class="fc" id="L2526">        var job = proofWorkbenchService.getJob(jobId);</span>
-<span class="fc bfc" id="L2527" title="All 2 branches covered.">        if (job.isEmpty()) {</span>
-<span class="fc" id="L2528">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
-<span class="fc" id="L2529">            return;</span>
+<span class="fc" id="L2527">        var job = proofWorkbenchService.getJob(jobId);</span>
+<span class="fc bfc" id="L2528" title="All 2 branches covered.">        if (job.isEmpty()) {</span>
+<span class="fc" id="L2529">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
+<span class="fc" id="L2530">            return;</span>
         }
-<span class="fc" id="L2531">        JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2532">        writer.beginObject();</span>
-<span class="fc" id="L2533">        writeProofJobJson(writer, job.get());</span>
-<span class="fc" id="L2534">        writer.endObject();</span>
-<span class="fc" id="L2535">        sendJson(exchange, 200, writer.toString());</span>
-<span class="fc" id="L2536">    }</span>
+<span class="fc" id="L2532">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2533">        writer.beginObject();</span>
+<span class="fc" id="L2534">        writeProofJobJson(writer, job.get());</span>
+<span class="fc" id="L2535">        writer.endObject();</span>
+<span class="fc" id="L2536">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L2537">    }</span>
 
     private void handleProofJobCancel(HttpExchange exchange, String jobId) throws IOException {
-<span class="fc" id="L2539">        var cancelled = proofWorkbenchService.cancel(jobId);</span>
-<span class="pc bpc" id="L2540" title="1 of 2 branches missed.">        if (cancelled.isEmpty()) {</span>
-<span class="nc" id="L2541">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
-<span class="nc" id="L2542">            return;</span>
+<span class="fc" id="L2540">        var cancelled = proofWorkbenchService.cancel(jobId);</span>
+<span class="pc bpc" id="L2541" title="1 of 2 branches missed.">        if (cancelled.isEmpty()) {</span>
+<span class="nc" id="L2542">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
+<span class="nc" id="L2543">            return;</span>
         }
-<span class="fc" id="L2544">        JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2545">        writer.beginObject();</span>
-<span class="fc" id="L2546">        writeProofJobJson(writer, cancelled.get());</span>
-<span class="fc" id="L2547">        writer.endObject();</span>
-<span class="fc" id="L2548">        sendJson(exchange, 200, writer.toString());</span>
-<span class="fc" id="L2549">    }</span>
+<span class="fc" id="L2545">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2546">        writer.beginObject();</span>
+<span class="fc" id="L2547">        writeProofJobJson(writer, cancelled.get());</span>
+<span class="fc" id="L2548">        writer.endObject();</span>
+<span class="fc" id="L2549">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L2550">    }</span>
 
     private void handleProofJobArtifactList(HttpExchange exchange, String jobId) throws IOException {
-<span class="pc bpc" id="L2552" title="1 of 2 branches missed.">        if (proofWorkbenchService.getJob(jobId).isEmpty()) {</span>
-<span class="nc" id="L2553">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
-<span class="nc" id="L2554">            return;</span>
+<span class="pc bpc" id="L2553" title="1 of 2 branches missed.">        if (proofWorkbenchService.getJob(jobId).isEmpty()) {</span>
+<span class="nc" id="L2554">            sendStatus(exchange, 404, &quot;job not found: &quot; + jobId);</span>
+<span class="nc" id="L2555">            return;</span>
         }
-<span class="fc" id="L2556">        var names = proofWorkbenchService.listArtifacts(jobId);</span>
-<span class="fc" id="L2557">        JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2558">        writer.beginObject();</span>
-<span class="fc" id="L2559">        writer.property(&quot;jobId&quot;, jobId);</span>
-<span class="fc" id="L2560">        writer.array(&quot;artifacts&quot;, arr -&gt; names.forEach(arr::value));</span>
-<span class="fc" id="L2561">        writer.endObject();</span>
-<span class="fc" id="L2562">        sendJson(exchange, 200, writer.toString());</span>
-<span class="fc" id="L2563">    }</span>
+<span class="fc" id="L2557">        var names = proofWorkbenchService.listArtifacts(jobId);</span>
+<span class="fc" id="L2558">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2559">        writer.beginObject();</span>
+<span class="fc" id="L2560">        writer.property(&quot;jobId&quot;, jobId);</span>
+<span class="fc" id="L2561">        writer.array(&quot;artifacts&quot;, arr -&gt; names.forEach(arr::value));</span>
+<span class="fc" id="L2562">        writer.endObject();</span>
+<span class="fc" id="L2563">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L2564">    }</span>
 
     private void handleProofJobArtifactRead(HttpExchange exchange, String jobId, String name) throws IOException {
         // Defence-in-depth: refuse traversal even though the artifact repo
         // already validates ids.
-<span class="nc bnc" id="L2568" title="All 6 branches missed.">        if (name.contains(&quot;..&quot;) || name.contains(&quot;/&quot;) || name.contains(&quot;\\&quot;)) {</span>
-<span class="nc" id="L2569">            sendStatus(exchange, 400, &quot;invalid artifact name&quot;);</span>
-<span class="nc" id="L2570">            return;</span>
+<span class="nc bnc" id="L2569" title="All 6 branches missed.">        if (name.contains(&quot;..&quot;) || name.contains(&quot;/&quot;) || name.contains(&quot;\\&quot;)) {</span>
+<span class="nc" id="L2570">            sendStatus(exchange, 400, &quot;invalid artifact name&quot;);</span>
+<span class="nc" id="L2571">            return;</span>
         }
-<span class="nc" id="L2572">        var body = proofWorkbenchService.readArtifact(jobId, name);</span>
-<span class="nc bnc" id="L2573" title="All 2 branches missed.">        if (body.isEmpty()) {</span>
-<span class="nc" id="L2574">            sendStatus(exchange, 404, &quot;artifact not found: &quot; + jobId + &quot;/&quot; + name);</span>
-<span class="nc" id="L2575">            return;</span>
+<span class="nc" id="L2573">        var body = proofWorkbenchService.readArtifact(jobId, name);</span>
+<span class="nc bnc" id="L2574" title="All 2 branches missed.">        if (body.isEmpty()) {</span>
+<span class="nc" id="L2575">            sendStatus(exchange, 404, &quot;artifact not found: &quot; + jobId + &quot;/&quot; + name);</span>
+<span class="nc" id="L2576">            return;</span>
         }
-<span class="nc" id="L2577">        String contentType = &quot;text/plain; charset=utf-8&quot;;</span>
-<span class="nc bnc" id="L2578" title="All 2 branches missed.">        if (name.endsWith(&quot;.json&quot;)) {</span>
-<span class="nc" id="L2579">            contentType = &quot;application/json; charset=utf-8&quot;;</span>
+<span class="nc" id="L2578">        String contentType = &quot;text/plain; charset=utf-8&quot;;</span>
+<span class="nc bnc" id="L2579" title="All 2 branches missed.">        if (name.endsWith(&quot;.json&quot;)) {</span>
+<span class="nc" id="L2580">            contentType = &quot;application/json; charset=utf-8&quot;;</span>
         }
-<span class="nc" id="L2581">        send(exchange, 200, contentType, body.get());</span>
-<span class="nc" id="L2582">    }</span>
+<span class="nc" id="L2582">        send(exchange, 200, contentType, body.get());</span>
+<span class="nc" id="L2583">    }</span>
 
     private void writeProofJobJson(JsonWriter writer, de.regelsuche.proof.ProofJob job) {
-<span class="fc" id="L2585">        writer.property(&quot;id&quot;, job.id());</span>
-<span class="fc" id="L2586">        writer.property(&quot;leftPattern&quot;, job.leftPattern());</span>
-<span class="fc" id="L2587">        writer.property(&quot;rightPattern&quot;, job.rightPattern());</span>
-<span class="fc" id="L2588">        writer.property(&quot;status&quot;, job.status().name());</span>
-<span class="fc" id="L2589">        writer.property(&quot;priority&quot;, job.priority());</span>
-<span class="fc" id="L2590">        writer.property(&quot;retryCount&quot;, job.retryCount());</span>
-<span class="fc" id="L2591">        writer.property(&quot;maxRetries&quot;, job.maxRetries());</span>
-<span class="fc" id="L2592">        writer.property(&quot;workerId&quot;, job.workerType());</span>
-<span class="fc" id="L2593">        writer.property(&quot;createdAt&quot;, job.createdAt().toString());</span>
-<span class="fc" id="L2594">        writer.property(&quot;updatedAt&quot;, job.updatedAt().toString());</span>
-<span class="pc bpc" id="L2595" title="1 of 2 branches missed.">        writer.property(&quot;proofStatus&quot;, job.resultStatus() == null ? &quot;&quot; : job.resultStatus().name());</span>
-<span class="fc" id="L2596">        writer.property(&quot;errorMessage&quot;, job.errorMessage());</span>
-<span class="fc" id="L2597">        writer.array(&quot;assumptions&quot;, arr -&gt; job.assumptions().forEach(a -&gt;</span>
-<span class="nc" id="L2598">            arr.objectValue(o -&gt; {</span>
-<span class="nc" id="L2599">                o.property(&quot;kind&quot;, a.kind().name());</span>
-<span class="nc" id="L2600">                o.property(&quot;expression&quot;, a.expression());</span>
-<span class="nc" id="L2601">            })));</span>
-<span class="fc" id="L2602">    }</span>
+<span class="fc" id="L2586">        writer.property(&quot;id&quot;, job.id());</span>
+<span class="fc" id="L2587">        writer.property(&quot;leftPattern&quot;, job.leftPattern());</span>
+<span class="fc" id="L2588">        writer.property(&quot;rightPattern&quot;, job.rightPattern());</span>
+<span class="fc" id="L2589">        writer.property(&quot;status&quot;, job.status().name());</span>
+<span class="fc" id="L2590">        writer.property(&quot;priority&quot;, job.priority());</span>
+<span class="fc" id="L2591">        writer.property(&quot;retryCount&quot;, job.retryCount());</span>
+<span class="fc" id="L2592">        writer.property(&quot;maxRetries&quot;, job.maxRetries());</span>
+<span class="fc" id="L2593">        writer.property(&quot;workerId&quot;, job.workerType());</span>
+<span class="fc" id="L2594">        writer.property(&quot;createdAt&quot;, job.createdAt().toString());</span>
+<span class="fc" id="L2595">        writer.property(&quot;updatedAt&quot;, job.updatedAt().toString());</span>
+<span class="pc bpc" id="L2596" title="1 of 2 branches missed.">        writer.property(&quot;proofStatus&quot;, job.resultStatus() == null ? &quot;&quot; : job.resultStatus().name());</span>
+<span class="fc" id="L2597">        writer.property(&quot;errorMessage&quot;, job.errorMessage());</span>
+<span class="fc" id="L2598">        writer.array(&quot;assumptions&quot;, arr -&gt; job.assumptions().forEach(a -&gt;</span>
+<span class="nc" id="L2599">            arr.objectValue(o -&gt; {</span>
+<span class="nc" id="L2600">                o.property(&quot;kind&quot;, a.kind().name());</span>
+<span class="nc" id="L2601">                o.property(&quot;expression&quot;, a.expression());</span>
+<span class="nc" id="L2602">            })));</span>
+<span class="fc" id="L2603">    }</span>
 
     private void handleBenchmark(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L2605" title="1 of 2 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L2606">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="nc" id="L2607">            return;</span>
+<span class="pc bpc" id="L2606" title="1 of 2 branches missed.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L2607">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L2608">            return;</span>
         }
-<span class="fc" id="L2609">        long started = System.nanoTime();</span>
-<span class="fc" id="L2610">        var suite = new de.regelsuche.benchmark.BenchmarkSuite();</span>
-<span class="fc" id="L2611">        List&lt;de.regelsuche.benchmark.BenchmarkScenarioResult&gt; results = suite.runAll();</span>
-<span class="fc" id="L2612">        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;</span>
-<span class="fc" id="L2613">        JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2614">        writer.beginObject();</span>
-<span class="fc" id="L2615">        writer.property(&quot;elapsedMillis&quot;, elapsedMillis);</span>
-<span class="fc" id="L2616">        writer.array(&quot;scenarios&quot;, scenarios -&gt; results.forEach(scenario -&gt;</span>
-<span class="fc" id="L2617">            scenarios.objectValue(s -&gt; {</span>
-<span class="fc" id="L2618">                s.property(&quot;name&quot;, scenario.name());</span>
-<span class="fc" id="L2619">                s.array(&quot;results&quot;, rows -&gt; scenario.results().forEach(row -&gt;</span>
-<span class="fc" id="L2620">                    rows.objectValue(r -&gt; {</span>
-<span class="fc" id="L2621">                        r.property(&quot;strategy&quot;, row.strategyName());</span>
-<span class="fc" id="L2622">                        r.property(&quot;expression&quot;, row.expression());</span>
-<span class="fc" id="L2623">                        r.property(&quot;exploredStates&quot;, row.exploredStates());</span>
-<span class="fc" id="L2624">                        r.property(&quot;visitedStates&quot;, row.visitedStates());</span>
-<span class="fc" id="L2625">                        r.property(&quot;bestImprovement&quot;, row.bestImprovement());</span>
-<span class="fc" id="L2626">                        r.property(&quot;shortestImprovingDepth&quot;, row.shortestImprovingDepth());</span>
-<span class="fc" id="L2627">                        r.property(&quot;expandedSteps&quot;, row.expandedSteps());</span>
-<span class="fc" id="L2628">                        r.property(&quot;distinctRules&quot;, row.distinctRules());</span>
-<span class="fc" id="L2629">                        r.property(&quot;elapsedMillis&quot;, row.elapsedMillis());</span>
-<span class="fc" id="L2630">                        r.property(&quot;proofStatus&quot;, row.proofStatus().name());</span>
-<span class="fc" id="L2631">                        r.property(&quot;found&quot;, row.found());</span>
+<span class="fc" id="L2610">        long started = System.nanoTime();</span>
+<span class="fc" id="L2611">        var suite = new de.regelsuche.benchmark.BenchmarkSuite();</span>
+<span class="fc" id="L2612">        List&lt;de.regelsuche.benchmark.BenchmarkScenarioResult&gt; results = suite.runAll();</span>
+<span class="fc" id="L2613">        long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;</span>
+<span class="fc" id="L2614">        JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2615">        writer.beginObject();</span>
+<span class="fc" id="L2616">        writer.property(&quot;elapsedMillis&quot;, elapsedMillis);</span>
+<span class="fc" id="L2617">        writer.array(&quot;scenarios&quot;, scenarios -&gt; results.forEach(scenario -&gt;</span>
+<span class="fc" id="L2618">            scenarios.objectValue(s -&gt; {</span>
+<span class="fc" id="L2619">                s.property(&quot;name&quot;, scenario.name());</span>
+<span class="fc" id="L2620">                s.array(&quot;results&quot;, rows -&gt; scenario.results().forEach(row -&gt;</span>
+<span class="fc" id="L2621">                    rows.objectValue(r -&gt; {</span>
+<span class="fc" id="L2622">                        r.property(&quot;strategy&quot;, row.strategyName());</span>
+<span class="fc" id="L2623">                        r.property(&quot;expression&quot;, row.expression());</span>
+<span class="fc" id="L2624">                        r.property(&quot;exploredStates&quot;, row.exploredStates());</span>
+<span class="fc" id="L2625">                        r.property(&quot;visitedStates&quot;, row.visitedStates());</span>
+<span class="fc" id="L2626">                        r.property(&quot;bestImprovement&quot;, row.bestImprovement());</span>
+<span class="fc" id="L2627">                        r.property(&quot;shortestImprovingDepth&quot;, row.shortestImprovingDepth());</span>
+<span class="fc" id="L2628">                        r.property(&quot;expandedSteps&quot;, row.expandedSteps());</span>
+<span class="fc" id="L2629">                        r.property(&quot;distinctRules&quot;, row.distinctRules());</span>
+<span class="fc" id="L2630">                        r.property(&quot;elapsedMillis&quot;, row.elapsedMillis());</span>
+<span class="fc" id="L2631">                        r.property(&quot;proofStatus&quot;, row.proofStatus().name());</span>
+<span class="fc" id="L2632">                        r.property(&quot;found&quot;, row.found());</span>
                         // Quality metrics (&quot;Ampelstatus&quot; surface).
-<span class="fc bfc" id="L2633" title="All 2 branches covered.">                        if (row.expectedResultMatched() != null) {</span>
-<span class="fc" id="L2634">                            r.property(&quot;expectedResultMatched&quot;, row.expectedResultMatched());</span>
+<span class="fc bfc" id="L2634" title="All 2 branches covered.">                        if (row.expectedResultMatched() != null) {</span>
+<span class="fc" id="L2635">                            r.property(&quot;expectedResultMatched&quot;, row.expectedResultMatched());</span>
                         } else {
-<span class="fc" id="L2636">                            r.nullProperty(&quot;expectedResultMatched&quot;);</span>
+<span class="fc" id="L2637">                            r.nullProperty(&quot;expectedResultMatched&quot;);</span>
                         }
-<span class="fc" id="L2638">                        r.property(&quot;prunedStates&quot;, row.prunedStates());</span>
-<span class="fc" id="L2639">                        r.property(&quot;eGraphClasses&quot;, row.eGraphClasses());</span>
-<span class="fc" id="L2640">                        r.property(&quot;eGraphNodes&quot;, row.eGraphNodes());</span>
-<span class="fc" id="L2641">                        r.property(&quot;classesScanned&quot;, row.classesScanned());</span>
-<span class="fc" id="L2642">                        r.property(&quot;nodesScanned&quot;, row.nodesScanned());</span>
-<span class="fc" id="L2643">                        r.property(&quot;candidateClassesSkipped&quot;, row.candidateClassesSkipped());</span>
-<span class="fc" id="L2644">                        r.property(&quot;matchesFound&quot;, row.matchesFound());</span>
-<span class="fc" id="L2645">                        r.property(&quot;matcherCacheHits&quot;, row.matcherCacheHits());</span>
-<span class="fc" id="L2646">                        r.property(&quot;matcherCacheMisses&quot;, row.matcherCacheMisses());</span>
-<span class="fc" id="L2647">                        r.property(&quot;saturationIterations&quot;, row.saturationIterations());</span>
-<span class="fc" id="L2648">                        r.property(&quot;rulesFired&quot;, row.rulesFired());</span>
-<span class="fc" id="L2649">                        r.property(&quot;saturationSavings&quot;, row.saturationSavings());</span>
-<span class="fc" id="L2650">                        r.property(&quot;learnedRuleUsed&quot;, row.learnedRuleUsed());</span>
-<span class="fc" id="L2651">                        r.property(&quot;exportBundleValid&quot;, row.exportBundleValid());</span>
-<span class="fc" id="L2652">                        r.property(&quot;quality&quot;, row.qualityLabel());</span>
-<span class="fc" id="L2653">                    })));</span>
-<span class="fc" id="L2654">            })));</span>
-<span class="fc" id="L2655">        writer.endObject();</span>
-<span class="fc" id="L2656">        sendJson(exchange, 200, writer.toString());</span>
-<span class="fc" id="L2657">    }</span>
+<span class="fc" id="L2639">                        r.property(&quot;prunedStates&quot;, row.prunedStates());</span>
+<span class="fc" id="L2640">                        r.property(&quot;eGraphClasses&quot;, row.eGraphClasses());</span>
+<span class="fc" id="L2641">                        r.property(&quot;eGraphNodes&quot;, row.eGraphNodes());</span>
+<span class="fc" id="L2642">                        r.property(&quot;classesScanned&quot;, row.classesScanned());</span>
+<span class="fc" id="L2643">                        r.property(&quot;nodesScanned&quot;, row.nodesScanned());</span>
+<span class="fc" id="L2644">                        r.property(&quot;candidateClassesSkipped&quot;, row.candidateClassesSkipped());</span>
+<span class="fc" id="L2645">                        r.property(&quot;matchesFound&quot;, row.matchesFound());</span>
+<span class="fc" id="L2646">                        r.property(&quot;matcherCacheHits&quot;, row.matcherCacheHits());</span>
+<span class="fc" id="L2647">                        r.property(&quot;matcherCacheMisses&quot;, row.matcherCacheMisses());</span>
+<span class="fc" id="L2648">                        r.property(&quot;saturationIterations&quot;, row.saturationIterations());</span>
+<span class="fc" id="L2649">                        r.property(&quot;rulesFired&quot;, row.rulesFired());</span>
+<span class="fc" id="L2650">                        r.property(&quot;saturationSavings&quot;, row.saturationSavings());</span>
+<span class="fc" id="L2651">                        r.property(&quot;learnedRuleUsed&quot;, row.learnedRuleUsed());</span>
+<span class="fc" id="L2652">                        r.property(&quot;exportBundleValid&quot;, row.exportBundleValid());</span>
+<span class="fc" id="L2653">                        r.property(&quot;quality&quot;, row.qualityLabel());</span>
+<span class="fc" id="L2654">                    })));</span>
+<span class="fc" id="L2655">            })));</span>
+<span class="fc" id="L2656">        writer.endObject();</span>
+<span class="fc" id="L2657">        sendJson(exchange, 200, writer.toString());</span>
+<span class="fc" id="L2658">    }</span>
 
     private byte[] buildReportBundleZip() throws IOException {
-<span class="fc" id="L2660">        var report = new de.regelsuche.export.SearchAnalysisReportService();</span>
-<span class="fc" id="L2661">        var ctx = analysisReportContext();</span>
-<span class="fc" id="L2662">        var transformations = graphStore.discoveredTransformations();</span>
-<span class="fc" id="L2663">        var graph = buildSearchGraph();</span>
-<span class="fc" id="L2664">        var semanticGraph = buildSemanticSearchGraph(</span>
+<span class="fc" id="L2661">        var report = new de.regelsuche.export.SearchAnalysisReportService();</span>
+<span class="fc" id="L2662">        var ctx = analysisReportContext();</span>
+<span class="fc" id="L2663">        var transformations = graphStore.discoveredTransformations();</span>
+<span class="fc" id="L2664">        var graph = buildSearchGraph();</span>
+<span class="fc" id="L2665">        var semanticGraph = buildSemanticSearchGraph(</span>
             de.regelsuche.api.searchgraph.semantic.SemanticGraphViewMode.SEMANTIC,
             de.regelsuche.api.searchgraph.semantic.SemanticMacroStepDisplay.COMPACT,
             false,
@@ -2671,235 +2672,235 @@ public class WebWorkbenchServer {
             8,
             &quot;&quot;
         );
-<span class="fc" id="L2674">        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();</span>
-<span class="fc" id="L2675">        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {</span>
-<span class="fc" id="L2676">            putZipEntry(zip, &quot;search-analysis-report.md&quot;, report.renderMarkdown(ctx));</span>
-<span class="fc" id="L2677">            putZipEntry(zip, &quot;search-analysis-report.tex&quot;, report.renderLatex(ctx));</span>
-<span class="fc" id="L2678">            putZipEntry(zip, &quot;search-analysis-report.json&quot;, report.renderJson(ctx));</span>
-<span class="fc" id="L2679">            putZipEntry(zip, &quot;transformations.md&quot;, exportService.exportMarkdown(transformations));</span>
-<span class="fc" id="L2680">            putZipEntry(zip, &quot;transformations.tex&quot;, exportService.exportLatex(transformations));</span>
-<span class="fc" id="L2681">            putZipEntry(zip, &quot;transformations.json&quot;, exportService.exportBundle(exportQuery.bundle()));</span>
-<span class="fc" id="L2682">            putZipEntry(zip, &quot;search-graph.mmd&quot;, exportService.exportSearchGraphMermaid(graph));</span>
-<span class="fc" id="L2683">            putZipEntry(zip, &quot;search-graph.graphml&quot;, exportService.exportSearchGraphGraphMl(graph));</span>
-<span class="fc" id="L2684">            putZipEntry(zip, &quot;search-graph.json&quot;, exportService.exportSearchGraphJson(graph));</span>
-<span class="fc" id="L2685">            putZipEntry(zip, &quot;search-graph-semantic.mmd&quot;,</span>
-<span class="fc" id="L2686">                de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toMermaid(semanticGraph));</span>
-<span class="fc" id="L2687">            putZipEntry(zip, &quot;search-graph-semantic.json&quot;,</span>
-<span class="fc" id="L2688">                de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(semanticGraph));</span>
-<span class="fc" id="L2689">            putZipEntry(zip, &quot;best-path.md&quot;, exportService.exportBestPathMarkdown(transformations));</span>
-<span class="fc" id="L2690">            putZipEntry(zip, &quot;rule-inventory.json&quot;,</span>
-<span class="fc" id="L2691">                exportService.exportJson(List.of(), List.of(), inventoryRepository.findAll()));</span>
-<span class="fc" id="L2692">            putZipEntry(zip, &quot;pruning-decisions.json&quot;, renderPruningDecisionsJson());</span>
+<span class="fc" id="L2675">        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();</span>
+<span class="fc" id="L2676">        try (java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(out)) {</span>
+<span class="fc" id="L2677">            putZipEntry(zip, &quot;search-analysis-report.md&quot;, report.renderMarkdown(ctx));</span>
+<span class="fc" id="L2678">            putZipEntry(zip, &quot;search-analysis-report.tex&quot;, report.renderLatex(ctx));</span>
+<span class="fc" id="L2679">            putZipEntry(zip, &quot;search-analysis-report.json&quot;, report.renderJson(ctx));</span>
+<span class="fc" id="L2680">            putZipEntry(zip, &quot;transformations.md&quot;, exportService.exportMarkdown(transformations));</span>
+<span class="fc" id="L2681">            putZipEntry(zip, &quot;transformations.tex&quot;, exportService.exportLatex(transformations));</span>
+<span class="fc" id="L2682">            putZipEntry(zip, &quot;transformations.json&quot;, exportService.exportBundle(exportQuery.bundle()));</span>
+<span class="fc" id="L2683">            putZipEntry(zip, &quot;search-graph.mmd&quot;, exportService.exportSearchGraphMermaid(graph));</span>
+<span class="fc" id="L2684">            putZipEntry(zip, &quot;search-graph.graphml&quot;, exportService.exportSearchGraphGraphMl(graph));</span>
+<span class="fc" id="L2685">            putZipEntry(zip, &quot;search-graph.json&quot;, exportService.exportSearchGraphJson(graph));</span>
+<span class="fc" id="L2686">            putZipEntry(zip, &quot;search-graph-semantic.mmd&quot;,</span>
+<span class="fc" id="L2687">                de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toMermaid(semanticGraph));</span>
+<span class="fc" id="L2688">            putZipEntry(zip, &quot;search-graph-semantic.json&quot;,</span>
+<span class="fc" id="L2689">                de.regelsuche.api.searchgraph.semantic.SemanticSearchGraphJsonSerializer.toJson(semanticGraph));</span>
+<span class="fc" id="L2690">            putZipEntry(zip, &quot;best-path.md&quot;, exportService.exportBestPathMarkdown(transformations));</span>
+<span class="fc" id="L2691">            putZipEntry(zip, &quot;rule-inventory.json&quot;,</span>
+<span class="fc" id="L2692">                exportService.exportJson(List.of(), List.of(), inventoryRepository.findAll()));</span>
+<span class="fc" id="L2693">            putZipEntry(zip, &quot;pruning-decisions.json&quot;, renderPruningDecisionsJson());</span>
         }
-<span class="fc" id="L2694">        return out.toByteArray();</span>
+<span class="fc" id="L2695">        return out.toByteArray();</span>
     }
 
     private String renderPruningDecisionsJson() {
-<span class="fc" id="L2698">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
-<span class="fc" id="L2699">        w.beginObject();</span>
-<span class="fc" id="L2700">        w.property(&quot;count&quot;, searchMemory.decisions().size());</span>
-<span class="fc" id="L2701">        w.array(&quot;decisions&quot;, arr -&gt; searchMemory.decisions().forEach(d -&gt;</span>
-<span class="fc" id="L2702">            arr.objectValue(inner -&gt; {</span>
-<span class="fc" id="L2703">                inner.property(&quot;expression&quot;, d.expression());</span>
-<span class="fc" id="L2704">                inner.property(&quot;canonicalHash&quot;, d.canonicalHash());</span>
-<span class="fc" id="L2705">                inner.property(&quot;reason&quot;, d.reason().name());</span>
-<span class="fc" id="L2706">                inner.property(&quot;explanation&quot;, d.explanation());</span>
-<span class="fc" id="L2707">            })));</span>
-<span class="fc" id="L2708">        w.endObject();</span>
-<span class="fc" id="L2709">        return w.toString();</span>
+<span class="fc" id="L2699">        de.regelsuche.json.JsonWriter w = new de.regelsuche.json.JsonWriter();</span>
+<span class="fc" id="L2700">        w.beginObject();</span>
+<span class="fc" id="L2701">        w.property(&quot;count&quot;, searchMemory.decisions().size());</span>
+<span class="fc" id="L2702">        w.array(&quot;decisions&quot;, arr -&gt; searchMemory.decisions().forEach(d -&gt;</span>
+<span class="fc" id="L2703">            arr.objectValue(inner -&gt; {</span>
+<span class="fc" id="L2704">                inner.property(&quot;expression&quot;, d.expression());</span>
+<span class="fc" id="L2705">                inner.property(&quot;canonicalHash&quot;, d.canonicalHash());</span>
+<span class="fc" id="L2706">                inner.property(&quot;reason&quot;, d.reason().name());</span>
+<span class="fc" id="L2707">                inner.property(&quot;explanation&quot;, d.explanation());</span>
+<span class="fc" id="L2708">            })));</span>
+<span class="fc" id="L2709">        w.endObject();</span>
+<span class="fc" id="L2710">        return w.toString();</span>
     }
 
     private static void putZipEntry(java.util.zip.ZipOutputStream zip, String name, String content)
         throws IOException {
-<span class="fc" id="L2714">        java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(name);</span>
-<span class="fc" id="L2715">        zip.putNextEntry(entry);</span>
-<span class="pc bpc" id="L2716" title="1 of 2 branches missed.">        if (content != null) {</span>
-<span class="fc" id="L2717">            zip.write(content.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L2715">        java.util.zip.ZipEntry entry = new java.util.zip.ZipEntry(name);</span>
+<span class="fc" id="L2716">        zip.putNextEntry(entry);</span>
+<span class="pc bpc" id="L2717" title="1 of 2 branches missed.">        if (content != null) {</span>
+<span class="fc" id="L2718">            zip.write(content.getBytes(StandardCharsets.UTF_8));</span>
         }
-<span class="fc" id="L2719">        zip.closeEntry();</span>
-<span class="fc" id="L2720">    }</span>
+<span class="fc" id="L2720">        zip.closeEntry();</span>
+<span class="fc" id="L2721">    }</span>
 
     private void handleStatic(HttpExchange exchange) throws IOException {
-<span class="fc" id="L2723">        String path = exchange.getRequestURI().getPath();</span>
-<span class="pc bpc" id="L2724" title="1 of 2 branches missed.">        if (path.contains(&quot;..&quot;)) {</span>
-<span class="nc" id="L2725">            sendStatus(exchange, 400, &quot;bad request&quot;);</span>
-<span class="nc" id="L2726">            return;</span>
+<span class="fc" id="L2724">        String path = exchange.getRequestURI().getPath();</span>
+<span class="pc bpc" id="L2725" title="1 of 2 branches missed.">        if (path.contains(&quot;..&quot;)) {</span>
+<span class="nc" id="L2726">            sendStatus(exchange, 400, &quot;bad request&quot;);</span>
+<span class="nc" id="L2727">            return;</span>
         }
-<span class="pc bpc" id="L2728" title="3 of 4 branches missed.">        if (&quot;/&quot;.equals(path) || &quot;/index.html&quot;.equals(path)) {</span>
-<span class="fc" id="L2729">            sendStaticResource(exchange, &quot;/web/index.html&quot;, &quot;text/html; charset=utf-8&quot;);</span>
-<span class="nc bnc" id="L2730" title="All 2 branches missed.">        } else if (path.startsWith(&quot;/static/&quot;)) {</span>
-<span class="nc" id="L2731">            String resource = &quot;/web&quot; + path.substring(&quot;/static&quot;.length());</span>
-<span class="nc" id="L2732">            sendStaticResource(exchange, resource, mimeFor(resource));</span>
-<span class="nc bnc" id="L2733" title="All 6 branches missed.">        } else if (path.startsWith(&quot;/vendor/&quot;) || path.equals(&quot;/app.js&quot;) || path.equals(&quot;/style.css&quot;)) {</span>
-<span class="nc" id="L2734">            sendStaticResource(exchange, &quot;/web&quot; + path, mimeFor(path));</span>
+<span class="pc bpc" id="L2729" title="3 of 4 branches missed.">        if (&quot;/&quot;.equals(path) || &quot;/index.html&quot;.equals(path)) {</span>
+<span class="fc" id="L2730">            sendStaticResource(exchange, &quot;/web/index.html&quot;, &quot;text/html; charset=utf-8&quot;);</span>
+<span class="nc bnc" id="L2731" title="All 2 branches missed.">        } else if (path.startsWith(&quot;/static/&quot;)) {</span>
+<span class="nc" id="L2732">            String resource = &quot;/web&quot; + path.substring(&quot;/static&quot;.length());</span>
+<span class="nc" id="L2733">            sendStaticResource(exchange, resource, mimeFor(resource));</span>
+<span class="nc bnc" id="L2734" title="All 6 branches missed.">        } else if (path.startsWith(&quot;/vendor/&quot;) || path.equals(&quot;/app.js&quot;) || path.equals(&quot;/style.css&quot;)) {</span>
+<span class="nc" id="L2735">            sendStaticResource(exchange, &quot;/web&quot; + path, mimeFor(path));</span>
         } else {
-<span class="nc" id="L2736">            sendStatus(exchange, 404, &quot;not found&quot;);</span>
+<span class="nc" id="L2737">            sendStatus(exchange, 404, &quot;not found&quot;);</span>
         }
-<span class="fc" id="L2738">    }</span>
+<span class="fc" id="L2739">    }</span>
 
     private String mimeFor(String resource) {
-<span class="nc bnc" id="L2741" title="All 2 branches missed.">        if (resource.endsWith(&quot;.html&quot;)) {</span>
-<span class="nc" id="L2742">            return &quot;text/html; charset=utf-8&quot;;</span>
+<span class="nc bnc" id="L2742" title="All 2 branches missed.">        if (resource.endsWith(&quot;.html&quot;)) {</span>
+<span class="nc" id="L2743">            return &quot;text/html; charset=utf-8&quot;;</span>
         }
-<span class="nc bnc" id="L2744" title="All 2 branches missed.">        if (resource.endsWith(&quot;.js&quot;)) {</span>
-<span class="nc" id="L2745">            return &quot;application/javascript; charset=utf-8&quot;;</span>
+<span class="nc bnc" id="L2745" title="All 2 branches missed.">        if (resource.endsWith(&quot;.js&quot;)) {</span>
+<span class="nc" id="L2746">            return &quot;application/javascript; charset=utf-8&quot;;</span>
         }
-<span class="nc bnc" id="L2747" title="All 2 branches missed.">        if (resource.endsWith(&quot;.css&quot;)) {</span>
-<span class="nc" id="L2748">            return &quot;text/css; charset=utf-8&quot;;</span>
+<span class="nc bnc" id="L2748" title="All 2 branches missed.">        if (resource.endsWith(&quot;.css&quot;)) {</span>
+<span class="nc" id="L2749">            return &quot;text/css; charset=utf-8&quot;;</span>
         }
-<span class="nc bnc" id="L2750" title="All 2 branches missed.">        if (resource.endsWith(&quot;.woff2&quot;)) {</span>
-<span class="nc" id="L2751">            return &quot;font/woff2&quot;;</span>
+<span class="nc bnc" id="L2751" title="All 2 branches missed.">        if (resource.endsWith(&quot;.woff2&quot;)) {</span>
+<span class="nc" id="L2752">            return &quot;font/woff2&quot;;</span>
         }
-<span class="nc bnc" id="L2753" title="All 2 branches missed.">        if (resource.endsWith(&quot;.woff&quot;)) {</span>
-<span class="nc" id="L2754">            return &quot;font/woff&quot;;</span>
+<span class="nc bnc" id="L2754" title="All 2 branches missed.">        if (resource.endsWith(&quot;.woff&quot;)) {</span>
+<span class="nc" id="L2755">            return &quot;font/woff&quot;;</span>
         }
-<span class="nc bnc" id="L2756" title="All 2 branches missed.">        if (resource.endsWith(&quot;.ttf&quot;)) {</span>
-<span class="nc" id="L2757">            return &quot;font/ttf&quot;;</span>
+<span class="nc bnc" id="L2757" title="All 2 branches missed.">        if (resource.endsWith(&quot;.ttf&quot;)) {</span>
+<span class="nc" id="L2758">            return &quot;font/ttf&quot;;</span>
         }
-<span class="nc bnc" id="L2759" title="All 2 branches missed.">        if (resource.endsWith(&quot;.svg&quot;)) {</span>
-<span class="nc" id="L2760">            return &quot;image/svg+xml&quot;;</span>
+<span class="nc bnc" id="L2760" title="All 2 branches missed.">        if (resource.endsWith(&quot;.svg&quot;)) {</span>
+<span class="nc" id="L2761">            return &quot;image/svg+xml&quot;;</span>
         }
-<span class="nc bnc" id="L2762" title="All 4 branches missed.">        if (resource.endsWith(&quot;.json&quot;) || resource.endsWith(&quot;.map&quot;)) {</span>
-<span class="nc" id="L2763">            return &quot;application/json; charset=utf-8&quot;;</span>
+<span class="nc bnc" id="L2763" title="All 4 branches missed.">        if (resource.endsWith(&quot;.json&quot;) || resource.endsWith(&quot;.map&quot;)) {</span>
+<span class="nc" id="L2764">            return &quot;application/json; charset=utf-8&quot;;</span>
         }
-<span class="nc" id="L2765">        return &quot;application/octet-stream&quot;;</span>
+<span class="nc" id="L2766">        return &quot;application/octet-stream&quot;;</span>
     }
 
     private void sendStaticResource(HttpExchange exchange, String resource, String contentType) throws IOException {
-<span class="fc" id="L2769">        try (InputStream stream = WebWorkbenchServer.class.getResourceAsStream(resource)) {</span>
-<span class="pc bpc" id="L2770" title="1 of 2 branches missed.">            if (stream == null) {</span>
-<span class="nc" id="L2771">                sendStatus(exchange, 404, &quot;missing resource: &quot; + resource);</span>
-<span class="nc" id="L2772">                return;</span>
+<span class="fc" id="L2770">        try (InputStream stream = WebWorkbenchServer.class.getResourceAsStream(resource)) {</span>
+<span class="pc bpc" id="L2771" title="1 of 2 branches missed.">            if (stream == null) {</span>
+<span class="nc" id="L2772">                sendStatus(exchange, 404, &quot;missing resource: &quot; + resource);</span>
+<span class="nc" id="L2773">                return;</span>
             }
-<span class="fc" id="L2774">            ByteArrayOutputStream buffer = new ByteArrayOutputStream();</span>
-<span class="fc" id="L2775">            stream.transferTo(buffer);</span>
-<span class="fc" id="L2776">            byte[] bytes = buffer.toByteArray();</span>
-<span class="fc" id="L2777">            exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
-<span class="fc" id="L2778">            exchange.sendResponseHeaders(200, bytes.length);</span>
-<span class="fc" id="L2779">            try (OutputStream body = exchange.getResponseBody()) {</span>
-<span class="fc" id="L2780">                body.write(bytes);</span>
+<span class="fc" id="L2775">            ByteArrayOutputStream buffer = new ByteArrayOutputStream();</span>
+<span class="fc" id="L2776">            stream.transferTo(buffer);</span>
+<span class="fc" id="L2777">            byte[] bytes = buffer.toByteArray();</span>
+<span class="fc" id="L2778">            exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
+<span class="fc" id="L2779">            exchange.sendResponseHeaders(200, bytes.length);</span>
+<span class="fc" id="L2780">            try (OutputStream body = exchange.getResponseBody()) {</span>
+<span class="fc" id="L2781">                body.write(bytes);</span>
             }
-<span class="nc bnc" id="L2782" title="All 2 branches missed.">        }</span>
-<span class="fc" id="L2783">    }</span>
+<span class="nc bnc" id="L2783" title="All 2 branches missed.">        }</span>
+<span class="fc" id="L2784">    }</span>
 
     private String dtoListToJson(String wrapper, List&lt;?&gt; dtos) {
         // Reuse the existing export JSON shape for transformations.
-<span class="fc" id="L2787">        StringBuilder builder = new StringBuilder(&quot;{\&quot;&quot; + wrapper + &quot;\&quot;:[&quot;);</span>
-<span class="fc bfc" id="L2788" title="All 2 branches covered.">        for (int i = 0; i &lt; dtos.size(); i++) {</span>
-<span class="fc bfc" id="L2789" title="All 2 branches covered.">            if (i &gt; 0) {</span>
-<span class="fc" id="L2790">                builder.append(',');</span>
+<span class="fc" id="L2788">        StringBuilder builder = new StringBuilder(&quot;{\&quot;&quot; + wrapper + &quot;\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L2789" title="All 2 branches covered.">        for (int i = 0; i &lt; dtos.size(); i++) {</span>
+<span class="fc bfc" id="L2790" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L2791">                builder.append(',');</span>
             }
-<span class="fc" id="L2792">            builder.append(singleDtoJson(dtos.get(i)));</span>
+<span class="fc" id="L2793">            builder.append(singleDtoJson(dtos.get(i)));</span>
         }
-<span class="fc" id="L2794">        builder.append(&quot;]}&quot;);</span>
-<span class="fc" id="L2795">        return builder.toString();</span>
+<span class="fc" id="L2795">        builder.append(&quot;]}&quot;);</span>
+<span class="fc" id="L2796">        return builder.toString();</span>
     }
 
     private String singleDtoJson(Object dto) {
-<span class="pc bpc" id="L2799" title="1 of 2 branches missed.">        if (dto instanceof de.regelsuche.api.TransformationPathDto pathDto) {</span>
-<span class="fc" id="L2800">            JsonWriter writer = new JsonWriter();</span>
-<span class="fc" id="L2801">            writer.beginObject();</span>
-<span class="fc" id="L2802">            writer.property(&quot;id&quot;, pathDto.id());</span>
-<span class="fc" id="L2803">            writer.property(&quot;originalExpression&quot;, pathDto.originalExpression());</span>
-<span class="fc" id="L2804">            writer.property(&quot;improvedExpression&quot;, pathDto.improvedExpression());</span>
-<span class="fc" id="L2805">            writer.property(&quot;originalScore&quot;, pathDto.originalScore());</span>
-<span class="fc" id="L2806">            writer.property(&quot;improvedScore&quot;, pathDto.improvedScore());</span>
-<span class="fc" id="L2807">            writer.property(&quot;totalImprovement&quot;, pathDto.totalImprovement());</span>
-<span class="fc" id="L2808">            writer.property(&quot;validationStatus&quot;, pathDto.validationStatus());</span>
-<span class="pc bpc" id="L2809" title="1 of 2 branches missed.">            writer.property(&quot;discoveredAt&quot;, pathDto.discoveredAt() == null ? &quot;&quot; : pathDto.discoveredAt().toString());</span>
-<span class="fc" id="L2810">            writer.array(&quot;steps&quot;, w -&gt; pathDto.steps().forEach(step -&gt;</span>
-<span class="fc" id="L2811">                w.objectValue(inner -&gt; {</span>
-<span class="fc" id="L2812">                    inner.property(&quot;index&quot;, step.index());</span>
-<span class="fc" id="L2813">                    inner.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
-<span class="fc" id="L2814">                    inner.property(&quot;afterExpression&quot;, step.afterExpression());</span>
-<span class="fc" id="L2815">                    inner.property(&quot;ruleId&quot;, step.ruleId());</span>
-<span class="fc" id="L2816">                    inner.property(&quot;ruleKind&quot;, step.ruleKind());</span>
-<span class="fc" id="L2817">                    inner.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
-<span class="fc" id="L2818">                    inner.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
-<span class="fc" id="L2819">                    inner.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
-<span class="fc" id="L2820">                })));</span>
-<span class="fc" id="L2821">            writer.endObject();</span>
-<span class="fc" id="L2822">            return writer.toString();</span>
+<span class="pc bpc" id="L2800" title="1 of 2 branches missed.">        if (dto instanceof de.regelsuche.api.TransformationPathDto pathDto) {</span>
+<span class="fc" id="L2801">            JsonWriter writer = new JsonWriter();</span>
+<span class="fc" id="L2802">            writer.beginObject();</span>
+<span class="fc" id="L2803">            writer.property(&quot;id&quot;, pathDto.id());</span>
+<span class="fc" id="L2804">            writer.property(&quot;originalExpression&quot;, pathDto.originalExpression());</span>
+<span class="fc" id="L2805">            writer.property(&quot;improvedExpression&quot;, pathDto.improvedExpression());</span>
+<span class="fc" id="L2806">            writer.property(&quot;originalScore&quot;, pathDto.originalScore());</span>
+<span class="fc" id="L2807">            writer.property(&quot;improvedScore&quot;, pathDto.improvedScore());</span>
+<span class="fc" id="L2808">            writer.property(&quot;totalImprovement&quot;, pathDto.totalImprovement());</span>
+<span class="fc" id="L2809">            writer.property(&quot;validationStatus&quot;, pathDto.validationStatus());</span>
+<span class="pc bpc" id="L2810" title="1 of 2 branches missed.">            writer.property(&quot;discoveredAt&quot;, pathDto.discoveredAt() == null ? &quot;&quot; : pathDto.discoveredAt().toString());</span>
+<span class="fc" id="L2811">            writer.array(&quot;steps&quot;, w -&gt; pathDto.steps().forEach(step -&gt;</span>
+<span class="fc" id="L2812">                w.objectValue(inner -&gt; {</span>
+<span class="fc" id="L2813">                    inner.property(&quot;index&quot;, step.index());</span>
+<span class="fc" id="L2814">                    inner.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="fc" id="L2815">                    inner.property(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="fc" id="L2816">                    inner.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="fc" id="L2817">                    inner.property(&quot;ruleKind&quot;, step.ruleKind());</span>
+<span class="fc" id="L2818">                    inner.property(&quot;scoreBefore&quot;, step.scoreBefore());</span>
+<span class="fc" id="L2819">                    inner.property(&quot;scoreAfter&quot;, step.scoreAfter());</span>
+<span class="fc" id="L2820">                    inner.property(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="fc" id="L2821">                })));</span>
+<span class="fc" id="L2822">            writer.endObject();</span>
+<span class="fc" id="L2823">            return writer.toString();</span>
         }
-<span class="nc" id="L2824">        return &quot;{}&quot;;</span>
+<span class="nc" id="L2825">        return &quot;{}&quot;;</span>
     }
 
     private Map&lt;String, Object&gt; readJsonObject(HttpExchange exchange) throws IOException {
-<span class="fc" id="L2828">        try (InputStream stream = exchange.getRequestBody()) {</span>
-<span class="fc" id="L2829">            int limit = securityConfig.maxRequestBytes();</span>
-<span class="fc" id="L2830">            byte[] buffer = stream.readNBytes(limit + 1);</span>
-<span class="pc bpc" id="L2831" title="1 of 2 branches missed.">            if (buffer.length &gt; limit) {</span>
-<span class="nc" id="L2832">                throw new IOException(&quot;request body exceeds limit of &quot; + limit + &quot; bytes&quot;);</span>
+<span class="fc" id="L2829">        try (InputStream stream = exchange.getRequestBody()) {</span>
+<span class="fc" id="L2830">            int limit = securityConfig.maxRequestBytes();</span>
+<span class="fc" id="L2831">            byte[] buffer = stream.readNBytes(limit + 1);</span>
+<span class="pc bpc" id="L2832" title="1 of 2 branches missed.">            if (buffer.length &gt; limit) {</span>
+<span class="nc" id="L2833">                throw new IOException(&quot;request body exceeds limit of &quot; + limit + &quot; bytes&quot;);</span>
             }
-<span class="fc" id="L2834">            String text = new String(buffer, StandardCharsets.UTF_8);</span>
-<span class="pc bpc" id="L2835" title="1 of 2 branches missed.">            if (text.isBlank()) {</span>
-<span class="nc" id="L2836">                return Map.of();</span>
+<span class="fc" id="L2835">            String text = new String(buffer, StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L2836" title="1 of 2 branches missed.">            if (text.isBlank()) {</span>
+<span class="nc" id="L2837">                return Map.of();</span>
             }
-<span class="fc" id="L2838">            return new JsonReader(text).readObject();</span>
-<span class="nc bnc" id="L2839" title="All 2 branches missed.">        }</span>
+<span class="fc" id="L2839">            return new JsonReader(text).readObject();</span>
+<span class="nc bnc" id="L2840" title="All 2 branches missed.">        }</span>
     }
 
     private String stringValue(Map&lt;String, Object&gt; body, String key, String fallback) {
-<span class="fc" id="L2843">        Object raw = body.get(key);</span>
-<span class="fc bfc" id="L2844" title="All 2 branches covered.">        return raw == null ? fallback : String.valueOf(raw);</span>
+<span class="fc" id="L2844">        Object raw = body.get(key);</span>
+<span class="fc bfc" id="L2845" title="All 2 branches covered.">        return raw == null ? fallback : String.valueOf(raw);</span>
     }
 
     private int intValue(Map&lt;String, Object&gt; body, String key, int fallback) {
-<span class="fc" id="L2848">        Object raw = body.get(key);</span>
-<span class="fc bfc" id="L2849" title="All 2 branches covered.">        if (raw == null) {</span>
-<span class="fc" id="L2850">            return fallback;</span>
+<span class="fc" id="L2849">        Object raw = body.get(key);</span>
+<span class="fc bfc" id="L2850" title="All 2 branches covered.">        if (raw == null) {</span>
+<span class="fc" id="L2851">            return fallback;</span>
         }
-<span class="pc bpc" id="L2852" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
-<span class="fc" id="L2853">            return number.intValue();</span>
+<span class="pc bpc" id="L2853" title="1 of 2 branches missed.">        if (raw instanceof Number number) {</span>
+<span class="fc" id="L2854">            return number.intValue();</span>
         }
         try {
-<span class="nc" id="L2856">            return Integer.parseInt(String.valueOf(raw));</span>
-<span class="nc" id="L2857">        } catch (NumberFormatException ex) {</span>
-<span class="nc" id="L2858">            return fallback;</span>
+<span class="nc" id="L2857">            return Integer.parseInt(String.valueOf(raw));</span>
+<span class="nc" id="L2858">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L2859">            return fallback;</span>
         }
     }
 
     private String queryParam(HttpExchange exchange, String name, String fallback) {
-<span class="fc" id="L2863">        String query = exchange.getRequestURI().getRawQuery();</span>
-<span class="pc bpc" id="L2864" title="1 of 4 branches missed.">        if (query == null || query.isBlank()) {</span>
-<span class="fc" id="L2865">            return fallback;</span>
+<span class="fc" id="L2864">        String query = exchange.getRequestURI().getRawQuery();</span>
+<span class="pc bpc" id="L2865" title="1 of 4 branches missed.">        if (query == null || query.isBlank()) {</span>
+<span class="fc" id="L2866">            return fallback;</span>
         }
-<span class="fc" id="L2867">        Map&lt;String, String&gt; parsed = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L2868" title="All 2 branches covered.">        for (String part : query.split(&quot;&amp;&quot;)) {</span>
-<span class="fc" id="L2869">            int idx = part.indexOf('=');</span>
-<span class="pc bpc" id="L2870" title="1 of 2 branches missed.">            if (idx &gt; 0) {</span>
-<span class="fc" id="L2871">                String rawValue = part.substring(idx + 1);</span>
+<span class="fc" id="L2868">        Map&lt;String, String&gt; parsed = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L2869" title="All 2 branches covered.">        for (String part : query.split(&quot;&amp;&quot;)) {</span>
+<span class="fc" id="L2870">            int idx = part.indexOf('=');</span>
+<span class="pc bpc" id="L2871" title="1 of 2 branches missed.">            if (idx &gt; 0) {</span>
+<span class="fc" id="L2872">                String rawValue = part.substring(idx + 1);</span>
                 String decoded;
                 try {
-<span class="fc" id="L2874">                    decoded = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);</span>
-<span class="nc" id="L2875">                } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L2876">                    decoded = rawValue;</span>
-<span class="fc" id="L2877">                }</span>
-<span class="fc" id="L2878">                parsed.put(part.substring(0, idx), decoded);</span>
+<span class="fc" id="L2875">                    decoded = URLDecoder.decode(rawValue, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L2876">                } catch (IllegalArgumentException ex) {</span>
+<span class="nc" id="L2877">                    decoded = rawValue;</span>
+<span class="fc" id="L2878">                }</span>
+<span class="fc" id="L2879">                parsed.put(part.substring(0, idx), decoded);</span>
             }
         }
-<span class="fc" id="L2881">        return parsed.getOrDefault(name, fallback);</span>
+<span class="fc" id="L2882">        return parsed.getOrDefault(name, fallback);</span>
     }
 
     private void sendJson(HttpExchange exchange, int status, String body) throws IOException {
-<span class="fc" id="L2885">        send(exchange, status, &quot;application/json; charset=utf-8&quot;, body);</span>
-<span class="fc" id="L2886">    }</span>
+<span class="fc" id="L2886">        send(exchange, status, &quot;application/json; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L2887">    }</span>
 
     private void sendText(HttpExchange exchange, int status, String body) throws IOException {
-<span class="fc" id="L2889">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
-<span class="fc" id="L2890">    }</span>
+<span class="fc" id="L2890">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L2891">    }</span>
 
     private void sendStatus(HttpExchange exchange, int status, String body) throws IOException {
-<span class="fc" id="L2893">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
-<span class="fc" id="L2894">    }</span>
+<span class="fc" id="L2894">        send(exchange, status, &quot;text/plain; charset=utf-8&quot;, body);</span>
+<span class="fc" id="L2895">    }</span>
 
     private void send(HttpExchange exchange, int status, String contentType, String body) throws IOException {
-<span class="fc" id="L2897">        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
-<span class="fc" id="L2898">        exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
-<span class="fc" id="L2899">        exchange.sendResponseHeaders(status, bytes.length);</span>
-<span class="fc" id="L2900">        try (OutputStream stream = exchange.getResponseBody()) {</span>
-<span class="fc" id="L2901">            stream.write(bytes);</span>
+<span class="fc" id="L2898">        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L2899">        exchange.getResponseHeaders().add(&quot;Content-Type&quot;, contentType);</span>
+<span class="fc" id="L2900">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L2901">        try (OutputStream stream = exchange.getResponseBody()) {</span>
+<span class="fc" id="L2902">            stream.write(bytes);</span>
         }
-<span class="fc" id="L2903">    }</span>
+<span class="fc" id="L2904">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

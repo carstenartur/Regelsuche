@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CapabilityFrontierExperiment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">CapabilityFrontierExperiment.java</span></div><h1>CapabilityFrontierExperiment.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.strategy.SearchProblem.TargetRelation;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.value.ExprValueFactory;
+import de.regelsuche.value.ExprValueFactory.ExprValue;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Reproducible A/B harness for the goal-conditioned capability frontier.
+ *
+ * &lt;p&gt;The control and guided runs use the same engine, scorer and budgets. The
+ * target changes ordering and early termination only; the report is search
+ * telemetry and never mathematical proof.&lt;/p&gt;
+ */
+<span class="fc" id="L35">public final class CapabilityFrontierExperiment {</span>
+    public static final String SCHEMA = &quot;regelsuche.capability-frontier/v1&quot;;
+
+<span class="fc" id="L38">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L39">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+
+    public FrontierReport run(List&lt;FrontierCase&gt; cases) {
+<span class="fc" id="L42">        Objects.requireNonNull(cases, &quot;cases&quot;);</span>
+<span class="fc" id="L43">        List&lt;CaseResult&gt; results = cases.stream()</span>
+<span class="fc" id="L44">            .sorted(Comparator.comparing(FrontierCase::id))</span>
+<span class="fc" id="L45">            .map(this::runCase)</span>
+<span class="fc" id="L46">            .toList();</span>
+<span class="fc" id="L47">        return new FrontierReport(SCHEMA, results);</span>
+    }
+
+    public Path write(Path output, FrontierReport report) {
+<span class="fc" id="L51">        Objects.requireNonNull(output, &quot;output&quot;);</span>
+<span class="fc" id="L52">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+        try {
+<span class="fc" id="L54">            Path parent = output.toAbsolutePath().normalize().getParent();</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L56">                Files.createDirectories(parent);</span>
+            }
+<span class="fc" id="L58">            Files.writeString(output, report.toJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L59">            return output;</span>
+<span class="nc" id="L60">        } catch (IOException exception) {</span>
+<span class="nc" id="L61">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private CaseResult runCase(FrontierCase frontierCase) {
+<span class="fc" id="L66">        SearchProblem problem = new SearchProblem(</span>
+<span class="fc" id="L67">            frontierCase.rootExpression(),</span>
+<span class="fc" id="L68">            frontierCase.engine(),</span>
+            scorer,
+            canonicalizer,
+<span class="fc" id="L71">            frontierCase.heuristic());</span>
+
+<span class="fc" id="L73">        BaselineEvidence baseline = runBaseline(problem, frontierCase.target());</span>
+<span class="fc" id="L74">        GoalSearchResult guidedResult = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L75">            .searchWithDiagnostics(problem.withTarget(frontierCase.target()));</span>
+<span class="fc" id="L76">        GuidedEvidence guided = GuidedEvidence.from(guidedResult);</span>
+<span class="fc" id="L77">        FrontierOutcome outcome = classify(frontierCase.expectation(), baseline, guided);</span>
+<span class="fc" id="L78">        double reduction = reductionRatio(baseline.statesUntilTarget(), guided.metrics().exploredStates());</span>
+<span class="fc" id="L79">        boolean material = isMaterial(outcome, baseline, guided, reduction);</span>
+
+<span class="fc" id="L81">        return new CaseResult(</span>
+<span class="fc" id="L82">            frontierCase.id(),</span>
+<span class="fc" id="L83">            frontierCase.expectation(),</span>
+            outcome,
+            baseline,
+            guided,
+            reduction,
+            material);
+    }
+
+    private BaselineEvidence runBaseline(SearchProblem problem, SearchTarget target) {
+<span class="fc" id="L92">        List&lt;SearchState&gt; states = new BestFirstSearchStrategy().search(problem);</span>
+<span class="fc" id="L93">        try (TargetMatcher matcher = new TargetMatcher(target, canonicalizer)) {</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            for (int index = 0; index &lt; states.size(); index++) {</span>
+<span class="fc" id="L95">                SearchState state = states.get(index);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                if (matcher.matches(state.expression())) {</span>
+<span class="fc" id="L97">                    return new BaselineEvidence(</span>
+                        true,
+                        index + 1,
+<span class="fc" id="L100">                        state.depth(),</span>
+<span class="fc" id="L101">                        state.path(),</span>
+<span class="fc" id="L102">                        state.appliedRuleIds());</span>
+                }
+            }
+<span class="fc" id="L105">        }</span>
+<span class="fc" id="L106">        return new BaselineEvidence(false, states.size(), -1, List.of(), List.of());</span>
+    }
+
+    private static FrontierOutcome classify(
+        ConnectivityExpectation expectation,
+        BaselineEvidence baseline,
+        GuidedEvidence guided
+    ) {
+<span class="fc bfc" id="L114" title="All 4 branches covered.">        if (guided.reached() &amp;&amp; !baseline.reached()) {</span>
+<span class="fc" id="L115">            return FrontierOutcome.GUIDED_ONLY_REACHED;</span>
+        }
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">        if (guided.reached() &amp;&amp; baseline.reached()</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                &amp;&amp; guided.metrics().exploredStates() &lt; baseline.statesUntilTarget()) {</span>
+<span class="fc" id="L119">            return FrontierOutcome.GUIDED_FEWER_STATES;</span>
+        }
+<span class="pc bpc" id="L121" title="3 of 4 branches missed.">        if (guided.reached() &amp;&amp; baseline.reached()) {</span>
+<span class="nc" id="L122">            return FrontierOutcome.BOTH_REACHED;</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (baseline.reached()) {</span>
+<span class="nc" id="L125">            return FrontierOutcome.GUIDANCE_REGRESSION;</span>
+        }
+<span class="pc bpc" id="L127" title="4 of 7 branches missed.">        return switch (guided.status()) {</span>
+<span class="nc" id="L128">            case STATE_BUDGET -&gt; FrontierOutcome.STATE_BUDGET;</span>
+<span class="fc" id="L129">            case DEPTH_BUDGET -&gt; FrontierOutcome.DEPTH_BUDGET;</span>
+<span class="nc" id="L130">            case CANDIDATE_BUDGET -&gt; FrontierOutcome.CANDIDATE_BUDGET;</span>
+<span class="fc" id="L131">            case NO_TRANSFORMATIONS -&gt; FrontierOutcome.NO_TRANSFORMATIONS;</span>
+<span class="nc" id="L132">            case UNPARSEABLE_TARGET -&gt; FrontierOutcome.UNPARSEABLE_TARGET;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            case FRONTIER_EXHAUSTED -&gt; expectation == ConnectivityExpectation.MISSING_OPERATOR</span>
+<span class="fc" id="L134">                ? FrontierOutcome.MISSING_OPERATOR</span>
+<span class="nc" id="L135">                : FrontierOutcome.CONNECTED_NOT_REACHED;</span>
+<span class="nc" id="L136">            case UNTARGETED, ROOT_ALREADY_TARGET, REACHED -&gt; FrontierOutcome.CONNECTED_NOT_REACHED;</span>
+        };
+    }
+
+    private static double reductionRatio(int baselineStates, int guidedStates) {
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        return baselineStates &lt;= 0</span>
+<span class="nc" id="L142">            ? 0.0</span>
+<span class="fc" id="L143">            : (baselineStates - guidedStates) / (double) baselineStates;</span>
+    }
+
+    private static boolean isMaterial(
+        FrontierOutcome outcome,
+        BaselineEvidence baseline,
+        GuidedEvidence guided,
+        double reduction
+    ) {
+<span class="pc bpc" id="L152" title="1 of 6 branches missed.">        return outcome == FrontierOutcome.GUIDED_ONLY_REACHED</span>
+            || outcome == FrontierOutcome.GUIDED_FEWER_STATES &amp;&amp; reduction &gt;= 0.5
+<span class="pc bpc" id="L154" title="5 of 6 branches missed.">            || baseline.reached() &amp;&amp; guided.reached() &amp;&amp; guided.depth() &lt; baseline.depth();</span>
+    }
+
+<span class="fc" id="L157">    public enum ConnectivityExpectation {</span>
+<span class="fc" id="L158">        CONNECTED,</span>
+<span class="fc" id="L159">        MISSING_OPERATOR</span>
+    }
+
+<span class="fc" id="L162">    public enum FrontierOutcome {</span>
+<span class="fc" id="L163">        GUIDED_ONLY_REACHED,</span>
+<span class="fc" id="L164">        GUIDED_FEWER_STATES,</span>
+<span class="fc" id="L165">        BOTH_REACHED,</span>
+<span class="fc" id="L166">        GUIDANCE_REGRESSION,</span>
+<span class="fc" id="L167">        STATE_BUDGET,</span>
+<span class="fc" id="L168">        DEPTH_BUDGET,</span>
+<span class="fc" id="L169">        CANDIDATE_BUDGET,</span>
+<span class="fc" id="L170">        NO_TRANSFORMATIONS,</span>
+<span class="fc" id="L171">        UNPARSEABLE_TARGET,</span>
+<span class="fc" id="L172">        MISSING_OPERATOR,</span>
+<span class="fc" id="L173">        CONNECTED_NOT_REACHED</span>
+    }
+
+    public record FrontierCase(
+        String id,
+        String rootExpression,
+        SearchTarget target,
+        TransformationEngine engine,
+        SearchHeuristic heuristic,
+        ConnectivityExpectation expectation
+    ) {
+<span class="fc" id="L184">        public FrontierCase {</span>
+<span class="fc" id="L185">            requireText(id, &quot;id&quot;);</span>
+<span class="fc" id="L186">            requireText(rootExpression, &quot;rootExpression&quot;);</span>
+<span class="fc" id="L187">            Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L188">            Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L189">            Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L190">            Objects.requireNonNull(expectation, &quot;expectation&quot;);</span>
+<span class="fc" id="L191">        }</span>
+    }
+
+    public record BaselineEvidence(
+        boolean reached,
+        int statesUntilTarget,
+        int depth,
+        List&lt;String&gt; path,
+        List&lt;String&gt; ruleIds
+    ) {
+<span class="fc" id="L201">        public BaselineEvidence {</span>
+<span class="fc" id="L202">            path = List.copyOf(path);</span>
+<span class="fc" id="L203">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="fc" id="L204">        }</span>
+    }
+
+    public record GuidedEvidence(
+        boolean reached,
+        GoalStatus status,
+        int depth,
+        int bestDistance,
+        List&lt;String&gt; path,
+        List&lt;String&gt; ruleIds,
+        GoalMetrics metrics
+    ) {
+<span class="fc" id="L216">        public GuidedEvidence {</span>
+<span class="fc" id="L217">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L218">            path = List.copyOf(path);</span>
+<span class="fc" id="L219">            ruleIds = List.copyOf(ruleIds);</span>
+<span class="fc" id="L220">            Objects.requireNonNull(metrics, &quot;metrics&quot;);</span>
+<span class="fc" id="L221">        }</span>
+
+        private static GuidedEvidence from(GoalSearchResult result) {
+<span class="fc" id="L224">            SearchState reached = result.reachedState();</span>
+<span class="fc" id="L225">            return new GuidedEvidence(</span>
+<span class="fc" id="L226">                result.reached(),</span>
+<span class="fc" id="L227">                result.status(),</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">                reached == null ? -1 : reached.depth(),</span>
+<span class="fc" id="L229">                result.bestDistance(),</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                reached == null ? List.of() : reached.path(),</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                reached == null ? List.of() : reached.appliedRuleIds(),</span>
+<span class="fc" id="L232">                result.metrics());</span>
+        }
+    }
+
+<span class="fc" id="L236">    public record CaseResult(</span>
+        String id,
+        ConnectivityExpectation expectation,
+        FrontierOutcome outcome,
+        BaselineEvidence baseline,
+        GuidedEvidence guided,
+        double stateReductionRatio,
+        boolean materialSuccess
+    ) {
+    }
+
+    public record FrontierReport(String schema, List&lt;CaseResult&gt; cases) {
+<span class="fc" id="L248">        public FrontierReport {</span>
+<span class="fc" id="L249">            Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L250">            cases = List.copyOf(cases);</span>
+<span class="fc" id="L251">        }</span>
+
+        public long materialSuccesses() {
+<span class="fc" id="L254">            return cases.stream().filter(CaseResult::materialSuccess).count();</span>
+        }
+
+        public String toJson() {
+<span class="fc" id="L258">            JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L259">            writer.property(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L260">            writer.array(&quot;cases&quot;, array -&gt; cases.forEach(result -&gt;</span>
+<span class="fc" id="L261">                array.objectValue(object -&gt; writeCase(object, result))));</span>
+<span class="fc" id="L262">            return writer.endObject().toString();</span>
+        }
+
+        private static void writeCase(JsonWriter writer, CaseResult result) {
+<span class="fc" id="L266">            writer.property(&quot;id&quot;, result.id());</span>
+<span class="fc" id="L267">            writer.property(&quot;expectation&quot;, result.expectation().name());</span>
+<span class="fc" id="L268">            writer.property(&quot;outcome&quot;, result.outcome().name());</span>
+<span class="fc" id="L269">            writer.property(&quot;stateReductionRatio&quot;, result.stateReductionRatio());</span>
+<span class="fc" id="L270">            writer.property(&quot;materialSuccess&quot;, result.materialSuccess());</span>
+<span class="fc" id="L271">            writer.object(&quot;baseline&quot;, baseline -&gt; writeBaseline(baseline, result.baseline()));</span>
+<span class="fc" id="L272">            writer.object(&quot;guided&quot;, guided -&gt; writeGuided(guided, result.guided()));</span>
+<span class="fc" id="L273">        }</span>
+
+        private static void writeBaseline(JsonWriter writer, BaselineEvidence evidence) {
+<span class="fc" id="L276">            writer.property(&quot;reached&quot;, evidence.reached());</span>
+<span class="fc" id="L277">            writer.property(&quot;statesUntilTarget&quot;, evidence.statesUntilTarget());</span>
+<span class="fc" id="L278">            writer.property(&quot;depth&quot;, evidence.depth());</span>
+<span class="fc" id="L279">            writer.stringArray(&quot;path&quot;, evidence.path());</span>
+<span class="fc" id="L280">            writer.stringArray(&quot;ruleIds&quot;, evidence.ruleIds());</span>
+<span class="fc" id="L281">        }</span>
+
+        private static void writeGuided(JsonWriter writer, GuidedEvidence evidence) {
+<span class="fc" id="L284">            writer.property(&quot;reached&quot;, evidence.reached());</span>
+<span class="fc" id="L285">            writer.property(&quot;status&quot;, evidence.status().name());</span>
+<span class="fc" id="L286">            writer.property(&quot;depth&quot;, evidence.depth());</span>
+<span class="fc" id="L287">            writer.property(&quot;bestDistance&quot;, evidence.bestDistance());</span>
+<span class="fc" id="L288">            writer.stringArray(&quot;path&quot;, evidence.path());</span>
+<span class="fc" id="L289">            writer.stringArray(&quot;ruleIds&quot;, evidence.ruleIds());</span>
+<span class="fc" id="L290">            writer.object(&quot;metrics&quot;, metrics -&gt; writeMetrics(metrics, evidence.metrics()));</span>
+<span class="fc" id="L291">        }</span>
+
+        private static void writeMetrics(JsonWriter writer, GoalMetrics metrics) {
+<span class="fc" id="L294">            writer.property(&quot;exploredStates&quot;, metrics.exploredStates());</span>
+<span class="fc" id="L295">            writer.property(&quot;expandedStates&quot;, metrics.expandedStates());</span>
+<span class="fc" id="L296">            writer.property(&quot;generatedTransformations&quot;, metrics.generatedTransformations());</span>
+<span class="fc" id="L297">            writer.property(&quot;enqueuedStates&quot;, metrics.enqueuedStates());</span>
+<span class="fc" id="L298">            writer.property(&quot;skippedTransformations&quot;, metrics.skippedTransformations());</span>
+<span class="fc" id="L299">            writer.property(&quot;duplicatePrunes&quot;, metrics.duplicatePrunes());</span>
+<span class="fc" id="L300">            writer.property(&quot;transpositionPrunes&quot;, metrics.transpositionPrunes());</span>
+<span class="fc" id="L301">            writer.property(&quot;depthPrunes&quot;, metrics.depthPrunes());</span>
+<span class="fc" id="L302">            writer.property(&quot;candidateBudgetPrunes&quot;, metrics.candidateBudgetPrunes());</span>
+<span class="fc" id="L303">            writer.property(&quot;statesWithoutTransformations&quot;, metrics.statesWithoutTransformations());</span>
+<span class="fc" id="L304">            writer.property(&quot;identityCacheHits&quot;, metrics.identityCacheHits());</span>
+<span class="fc" id="L305">            writer.property(&quot;identityCacheMisses&quot;, metrics.identityCacheMisses());</span>
+<span class="fc" id="L306">            writer.property(&quot;cachedExpressions&quot;, metrics.cachedExpressions());</span>
+<span class="fc" id="L307">            writer.property(&quot;internedValues&quot;, metrics.internedValues());</span>
+<span class="fc" id="L308">        }</span>
+    }
+
+    private static final class TargetMatcher implements AutoCloseable {
+        private final SearchTarget target;
+        private final String normalizedTarget;
+<span class="fc" id="L314">        private final ExpressionParser parser = new ExpressionParser();</span>
+        private final ExpressionCanonicalizer canonicalizer;
+<span class="fc" id="L316">        private final ExprValueFactory values = new ExprValueFactory();</span>
+        private final ExprValue targetValue;
+
+<span class="fc" id="L319">        private TargetMatcher(SearchTarget target, ExpressionCanonicalizer canonicalizer) {</span>
+<span class="fc" id="L320">            this.target = Objects.requireNonNull(target, &quot;target&quot;);</span>
+<span class="fc" id="L321">            this.canonicalizer = Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
+<span class="fc" id="L322">            normalizedTarget = normalize(target.targetExpression());</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            targetValue = target.relation() == TargetRelation.VALUE_EQUIVALENT</span>
+<span class="fc" id="L324">                ? value(normalizedTarget)</span>
+<span class="fc" id="L325">                : null;</span>
+<span class="fc" id="L326">        }</span>
+
+        private boolean matches(String expression) {
+<span class="fc bfc" id="L329" title="All 2 branches covered.">            if (target.relation() == TargetRelation.SYNTAX_EXACT) {</span>
+<span class="fc" id="L330">                return normalize(expression).equals(normalizedTarget);</span>
+            }
+<span class="fc" id="L332">            ExprValue candidate = value(expression);</span>
+<span class="pc bpc" id="L333" title="2 of 6 branches missed.">            return candidate != null &amp;&amp; targetValue != null &amp;&amp; candidate.sameValue(targetValue);</span>
+        }
+
+        private ExprValue value(String expression) {
+            try {
+<span class="fc" id="L338">                return values.fromExpr(canonicalizer.canonicalize(parser.parseTerm(expression)));</span>
+<span class="nc" id="L339">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L340">                return null;</span>
+            }
+        }
+
+        @Override
+        public void close() {
+<span class="fc" id="L346">            values.close();</span>
+<span class="fc" id="L347">        }</span>
+    }
+
+    private static String normalize(String expression) {
+<span class="fc" id="L351">        return Objects.requireNonNull(expression, &quot;expression&quot;).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L355" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L356">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L358">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

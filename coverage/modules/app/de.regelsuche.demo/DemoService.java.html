@@ -86,8 +86,8 @@ public final class DemoService {
 <span class="fc" id="L86">        graphStore.saveNode(root, before.weightedTotal());</span>
 
 <span class="fc" id="L88">        SearchProblem problem = new SearchProblem(</span>
-<span class="fc" id="L89">            root, engine, scorer, canonicalizer, demo.profile().heuristic(),</span>
-<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            demo.profile().usesTranspositionTable() ? searchMemory : null);</span>
+<span class="fc" id="L89">            root, engine, scorer, canonicalizer, demo.profile().heuristic())</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            .withMemory(demo.profile().usesTranspositionTable() ? searchMemory : null);</span>
 <span class="fc" id="L91">        List&lt;SearchState&gt; states = demo.profile().newStrategy().search(problem);</span>
 
         // Target expression in canonical form so we can compare on equal terms

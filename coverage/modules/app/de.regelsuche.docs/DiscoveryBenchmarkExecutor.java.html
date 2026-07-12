@@ -334,7 +334,7 @@ public final class DiscoveryBenchmarkExecutor {
                 new SearchHeuristic(maxDepth, maxStates, 1, 4, 80, 12))
 <span class="fc" id="L335">            .withObserver(observer);</span>
 <span class="fc" id="L336">        String normalizedTarget = normalizeExpression(scenario.targetExpression());</span>
-<span class="fc" id="L337">        List&lt;SearchState&gt; explored = new BestFirstSearchStrategy().search(problem.withGoal(TransformationGoal.FACTORIZE));</span>
+<span class="fc" id="L337">        List&lt;SearchState&gt; explored = new BestFirstSearchStrategy().search(problem.withObjective(TransformationGoal.FACTORIZE));</span>
 <span class="fc" id="L338">        return explored.stream()</span>
 <span class="fc bfc" id="L339" title="All 4 branches covered.">                .filter(state -&gt; state.depth() &gt; 0 &amp;&amp; normalizeExpression(state.expression()).equals(normalizedTarget))</span>
 <span class="fc" id="L340">                .sorted(Comparator.comparingInt(state -&gt; pathPreference(state.appliedRuleIds())))</span>
