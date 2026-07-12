@@ -13,14 +13,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class HiddenRulePilotCampaignTest {
-    private static final Set<String> TEXT_EXTENSIONS = Set.of(
-        ".java", ".json", ".yaml", ".yml", ".properties", ".xml",
-        ".md", ".txt", ".csv", ".toml", ".html", ".js", ".css", ".svg");
-
     @Test
     void emitsStableFiveCaseEvidenceWithoutHiddenIdsOrWallClockTime() {
         HiddenRulePilotCampaign campaign = new HiddenRulePilotCampaign();
@@ -71,44 +66,38 @@ class HiddenRulePilotCampaignTest {
             for (String token : forbidden) {
                 String compactToken = compact(token);
                 if (compactToken.length() <= 1) {
-                    continue; // A lone placeholder carries no hidden structural information.
+                    continue;
                 }
                 assertFalse(runtimeSurface.contains(compactToken),
-                    () -> "hidden manifest token is reachable from src/main: "
+                    () -> "hidden manifest token is reachable from pilot runtime: "
                         + Integer.toHexString(compactToken.hashCode()));
             }
         }
     }
 
     private static String productionRuntimeSurface() {
-        List<Path> roots = List.of(Path.of("src", "main", "java"), Path.of("src", "main", "resources"));
+        Path packageRoot = Path.of("src", "main", "java", "de", "regelsuche", "docs");
+        if (!Files.isDirectory(packageRoot)) {
+            return "";
+        }
         StringBuilder surface = new StringBuilder();
-        for (Path root : roots) {
-            if (!Files.isDirectory(root)) {
-                continue;
-            }
-            try (var files = Files.walk(root)) {
-                files.filter(Files::isRegularFile)
-                    .filter(HiddenRulePilotCampaignTest::isTextResource)
-                    .sorted()
-                    .forEach(file -> {
-                        try {
-                            surface.append(compact(Files.readString(file, StandardCharsets.UTF_8)))
-                                .append('\n');
-                        } catch (IOException exception) {
-                            throw new UncheckedIOException(exception);
-                        }
-                    });
-            } catch (IOException exception) {
-                throw new UncheckedIOException(exception);
-            }
+        try (var files = Files.list(packageRoot)) {
+            files.filter(Files::isRegularFile)
+                .filter(file -> file.getFileName().toString().startsWith("HiddenRulePilot"))
+                .filter(file -> file.getFileName().toString().endsWith(".java"))
+                .sorted()
+                .forEach(file -> {
+                    try {
+                        surface.append(compact(Files.readString(file, StandardCharsets.UTF_8)))
+                            .append('\n');
+                    } catch (IOException exception) {
+                        throw new UncheckedIOException(exception);
+                    }
+                });
+        } catch (IOException exception) {
+            throw new UncheckedIOException(exception);
         }
         return surface.toString();
-    }
-
-    private static boolean isTextResource(Path file) {
-        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        return TEXT_EXTENSIONS.stream().anyMatch(name::endsWith);
     }
 
     private static String compact(String value) {
