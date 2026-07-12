@@ -37,7 +37,7 @@ public record ValueKey(String encoded) implements Comparable<ValueKey> {
     static ValueKey ordered(ValueOperator operator, List<ExprValue> operands) {
         StringBuilder encoded = new StringBuilder(PREFIX)
                 .append("O")
-                .append(segment(operator.id()));
+                .append(segment(operator.identityToken()));
         encoded.append(operands.size()).append(':');
         for (ExprValue operand : operands) {
             encoded.append(segment(operand.key().encoded()));
@@ -53,7 +53,7 @@ public record ValueKey(String encoded) implements Comparable<ValueKey> {
 
         StringBuilder encoded = new StringBuilder(PREFIX)
                 .append("A")
-                .append(segment(operator.id()));
+                .append(segment(operator.identityToken()));
         encoded.append(entries.size()).append(':');
         for (Map.Entry<ExprValue, Integer> entry : entries) {
             encoded.append(entry.getValue()).append('*')
