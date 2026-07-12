@@ -16,7 +16,10 @@ import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.DifferenceOfSquaresPreparationOperator;
 import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -103,7 +106,7 @@ class HiddenRulePilotRunnerTest {
     }
 
     @Test
-    void detectsHiddenPatternsInsideInspectablePrimitiveRuleMetadata() {
+    void detectsHiddenPatternsInsideNestedPrimitiveRuleMetadata() {
         PilotFixture fixture = neutralElementFixture("case-leak-check");
         List<RewriteRule> leakedRules = List.of(new de.regelsuche.transform.PatternRewriteRule(
             "opaque_primitive_rule",
@@ -119,7 +122,8 @@ class HiddenRulePilotRunnerTest {
             fixture.task().opaqueCaseId(),
             fixture.task().inputExpression(),
             fixture.task().target(),
-            new AstRewriteTransformationEngine(leakedRules),
+            new HypothesisTransformationEngine(
+                new AstRewriteTransformationEngine(leakedRules), List.of(), 0),
             fixture.task().heuristic(),
             fixture.task().positiveHoldouts(),
             fixture.task().negativeHoldouts());
@@ -131,6 +135,37 @@ class HiddenRulePilotRunnerTest {
         assertFalse(evaluation.leakageViolations().isEmpty());
         assertTrue(evaluation.leakageViolations().stream()
             .anyMatch(violation -> violation.location().equals("PRIMITIVE_RULE_TEMPLATE")));
+        assertFalse(evaluation.pilotAccepted());
+    }
+
+    @Test
+    void rejectsAnOpaquePrimitiveThatSolvesTheTrainingTaskInOneStep() {
+        PilotFixture fixture = neutralElementFixture("case-shortcut-check");
+        TransformationEngine hiddenShortcut = expression -> expression.equals("(x + 0) * 1")
+            ? List.of(new Transformation(
+                "opaque_primitive",
+                "x",
+                RewriteKind.NORMALIZE,
+                false,
+                0,
+                true,
+                "opaque-shortcut"))
+            : List.of();
+        RuntimeTask leakedTask = new RuntimeTask(
+            fixture.task().opaqueCaseId(),
+            fixture.task().inputExpression(),
+            fixture.task().target(),
+            hiddenShortcut,
+            fixture.task().heuristic(),
+            fixture.task().positiveHoldouts(),
+            fixture.task().negativeHoldouts());
+        RuntimeResult runtime = runner.run(fixture.task());
+
+        HiddenRulePilotEvaluator.Evaluation evaluation =
+            evaluator.evaluate(leakedTask, runtime, fixture.reference());
+
+        assertTrue(evaluation.leakageViolations().stream()
+            .anyMatch(violation -> violation.location().equals("TRAIN_DIRECT_PRIMITIVE")));
         assertFalse(evaluation.pilotAccepted());
     }
 
@@ -155,7 +190,7 @@ class HiddenRulePilotRunnerTest {
         return new HiddenReference(id, family, left, right, List.of(), List.of(family));
     }
 
-    private static List<PilotFixture> allFixtures() {
+    static List<PilotFixture> allFixtures() {
         return List.of(
             neutralElementFixture("case-001"),
             sophieGermainFixture(),
@@ -282,6 +317,6 @@ class HiddenRulePilotRunnerTest {
             "(A^2 + 2*A*B + 2*B^2) * (A^2 - 2*A*B + 2*B^2)"));
     }
 
-    private record PilotFixture(RuntimeTask task, HiddenReference reference) {
+    record PilotFixture(RuntimeTask task, HiddenReference reference) {
     }
 }
