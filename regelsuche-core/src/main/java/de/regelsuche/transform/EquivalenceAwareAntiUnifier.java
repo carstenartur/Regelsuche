@@ -21,9 +21,10 @@ public final class EquivalenceAwareAntiUnifier {
         if (examples == null || examples.size() < 2) {
             throw new IllegalArgumentException("at least two examples are required");
         }
-        List<Expr> normalized = examples.stream()
-            .map(expr -> RecognitionNormalizer.normalize(expr, profile))
-            .toList();
+        List<Expr> normalized;
+        try (RecognitionNormalizer.Session session = RecognitionNormalizer.session(profile)) {
+            normalized = examples.stream().map(session::normalize).toList();
+        }
         Counter counter = new Counter();
         PatternExpr result = fromExpr(normalized.get(0));
         for (int i = 1; i < normalized.size(); i++) {
