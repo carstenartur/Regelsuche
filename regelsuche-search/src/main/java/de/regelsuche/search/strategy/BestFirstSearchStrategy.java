@@ -112,7 +112,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     }
 
     private boolean pruneByTransposition(SearchProblem problem, SearchState current, SearchFrame frame) {
-        if (current.depth() == 0 || TranspositionGate.evaluate(
+        if (current.depth() == 0 || problem.memory() == null) {
+            return false;
+        }
+        if (TranspositionGate.evaluate(
                 problem.memory(),
                 current,
                 current.canonicalHash() + "#" + current.depth(),
