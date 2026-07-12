@@ -17,10 +17,8 @@ on:
       - '.github/workflows/benchmark.yml'
   workflow_dispatch:
 
-# ADR #242 needs one uninterrupted PR benchmark. Using the run id avoids the
-# normal pages-publish queue replacing a pending measurement after each PR sync.
 concurrency:
-  group: expression-identity-benchmark-${{ github.run_id }}
+  group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
   cancel-in-progress: false
 
 permissions:
