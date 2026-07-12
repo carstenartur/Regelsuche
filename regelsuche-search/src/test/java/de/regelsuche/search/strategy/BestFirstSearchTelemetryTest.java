@@ -93,6 +93,27 @@ class BestFirstSearchTelemetryTest {
     }
 
     @Test
+    void searchWithoutMemoryDoesNotComputeLegacyHashes() {
+        ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer() {
+            @Override
+            public String stableHash(String expression) {
+                throw new AssertionError("legacy hashing must be skipped when search memory is disabled");
+            }
+        };
+        SearchProblem problem = new SearchProblem(
+            "x",
+            new KnownStateTransformationEngine(),
+            new ExpressionScorer(),
+            canonicalizer,
+            new SearchHeuristic(1, 8, 1, 2, 4, 8)
+        );
+
+        List<SearchState> states = new BestFirstSearchStrategy().search(problem);
+
+        assertEquals(List.of("x", "a"), states.stream().map(SearchState::expression).toList());
+    }
+
+    @Test
     void transpositionPrunedStatesAreNotReportedAsExploredResults() {
         RecordingObserver observer = new RecordingObserver();
         ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
