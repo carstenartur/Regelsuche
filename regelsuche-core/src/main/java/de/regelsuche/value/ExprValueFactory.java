@@ -6,6 +6,8 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -15,11 +17,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Owner-scoped hash-consing factory for immutable mathematical expression values.
+ * Bounded owner-scoped interning for immutable mathematical values.
  *
- * <p>The factory is deliberately not global. Equal values are reference-identical
- * inside one factory scope; {@link ValueKey} remains authoritative across scopes
- * and persistence boundaries.</p>
+ * <p>All supporting value types are nested deliberately: the API separates value,
+ * syntax and occurrence identity without multiplying top-level concepts. Equal
+ * values are reference-identical inside one factory; {@link ValueKey} remains the
+ * stable identity across scopes and persistence.</p>
  */
 public final class ExprValueFactory implements AutoCloseable {
     public static final int DEFAULT_MAXIMUM_ENTRIES = 100_000;
@@ -71,18 +74,17 @@ public final class ExprValueFactory implements AutoCloseable {
         return ordered(ValueOperator.function(name, arguments.size()), arguments);
     }
 
-    /** Projects one syntax expression into this factory scope. */
     public ExprValue fromExpr(Expr expression) {
         Objects.requireNonNull(expression, "expression");
         return fromExprRecursive(expression, null);
     }
 
-    /** Projects a root and retains syntax-object-identity to value links. */
-    public ExprValueProjection project(Expr syntaxRoot) {
+    /** Projects one syntax root and keeps links keyed by syntax-object identity. */
+    public Projection project(Expr syntaxRoot) {
         Objects.requireNonNull(syntaxRoot, "syntaxRoot");
         IdentityHashMap<Expr, ExprValue> valuesBySyntax = new IdentityHashMap<>();
         ExprValue valueRoot = fromExprRecursive(syntaxRoot, valuesBySyntax);
-        return new ExprValueProjection(syntaxRoot, valueRoot, valuesBySyntax);
+        return new Projection(syntaxRoot, valueRoot, valuesBySyntax);
     }
 
     public synchronized Optional<ExprValue> find(ValueKey key) {
@@ -169,9 +171,8 @@ public final class ExprValueFactory implements AutoCloseable {
             ExprValue value = Objects.requireNonNull(operand, "operand");
             if (value instanceof AssociativeCommutativeValue nested
                     && nested.operator().equals(operator)) {
-                for (Map.Entry<ExprValue, Integer> entry : nested.multiplicities().entrySet()) {
-                    multiplicities.merge(entry.getKey(), entry.getValue(), Math::addExact);
-                }
+                nested.multiplicities().forEach(
+                        (nestedValue, count) -> multiplicities.merge(nestedValue, count, Math::addExact));
             } else {
                 multiplicities.merge(value, 1, Math::addExact);
             }
@@ -205,5 +206,364 @@ public final class ExprValueFactory implements AutoCloseable {
         if (closed) {
             throw new IllegalStateException("expression value factory is closed");
         }
+    }
+
+    /** Mathematical value independent of source position and occurrence identity. */
+    public abstract static sealed class ExprValue
+            permits VariableValue, NumberValue, OrderedValue, AssociativeCommutativeValue {
+        private final ValueKey key;
+
+        private ExprValue(ValueKey key) {
+            this.key = Objects.requireNonNull(key, "key");
+        }
+
+        public final ValueKey key() {
+            return key;
+        }
+
+        public final boolean sameValue(ExprValue other) {
+            return other != null && key.equals(other.key);
+        }
+
+        @Override
+        public final boolean equals(Object other) {
+            return this == other || other instanceof ExprValue value && key.equals(value.key);
+        }
+
+        @Override
+        public final int hashCode() {
+            return key.hashCode();
+        }
+    }
+
+    public static final class VariableValue extends ExprValue {
+        private final String name;
+
+        private VariableValue(String name) {
+            super(ValueKey.variable(requireName(name)));
+            this.name = requireName(name);
+        }
+
+        public String name() {
+            return name;
+        }
+
+        private static String requireName(String name) {
+            Objects.requireNonNull(name, "name");
+            if (name.isBlank()) {
+                throw new IllegalArgumentException("variable name must not be blank");
+            }
+            return name;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    public static final class NumberValue extends ExprValue {
+        private final double value;
+
+        private NumberValue(double value) {
+            super(ValueKey.number(normalizeZero(value)));
+            this.value = normalizeZero(value);
+        }
+
+        public double value() {
+            return value;
+        }
+
+        private static double normalizeZero(double value) {
+            return value == 0.0d ? 0.0d : value;
+        }
+
+        @Override
+        public String toString() {
+            return Double.toString(value);
+        }
+    }
+
+    public static final class OrderedValue extends ExprValue {
+        private final ValueOperator operator;
+        private final List<ExprValue> operands;
+
+        private OrderedValue(ValueOperator operator, List<? extends ExprValue> operands) {
+            this(prepareOrdered(operator, operands));
+        }
+
+        private OrderedValue(PreparedOrdered prepared) {
+            super(prepared.key());
+            operator = prepared.operator();
+            operands = prepared.operands();
+        }
+
+        public ValueOperator operator() {
+            return operator;
+        }
+
+        public List<ExprValue> operands() {
+            return operands;
+        }
+
+        @Override
+        public String toString() {
+            return operator.id() + operands;
+        }
+    }
+
+    public static final class AssociativeCommutativeValue extends ExprValue {
+        private final ValueOperator operator;
+        private final Map<ExprValue, Integer> multiplicities;
+        private final int operandCount;
+
+        private AssociativeCommutativeValue(
+                ValueOperator operator,
+                Map<? extends ExprValue, Integer> multiplicities) {
+            this(prepareAssociativeCommutative(operator, multiplicities));
+        }
+
+        private AssociativeCommutativeValue(PreparedAssociativeCommutative prepared) {
+            super(prepared.key());
+            operator = prepared.operator();
+            multiplicities = prepared.multiplicities();
+            operandCount = prepared.operandCount();
+        }
+
+        public ValueOperator operator() {
+            return operator;
+        }
+
+        /** Unordered value-to-count mapping; iteration order is not semantic. */
+        public Map<ExprValue, Integer> multiplicities() {
+            return multiplicities;
+        }
+
+        public int operandCount() {
+            return operandCount;
+        }
+
+        public int multiplicityOf(ExprValue value) {
+            return multiplicities.getOrDefault(value, 0);
+        }
+
+        @Override
+        public String toString() {
+            return operator.id() + multiplicities;
+        }
+    }
+
+    public record OperatorLaws(boolean associative, boolean commutative, boolean idempotent) {
+        public static final OperatorLaws NONE = new OperatorLaws(false, false, false);
+        public static final OperatorLaws ASSOCIATIVE_COMMUTATIVE =
+                new OperatorLaws(true, true, false);
+
+        public boolean supportsUnorderedNaryValue() {
+            return associative && commutative;
+        }
+    }
+
+    public record ValueOperator(
+            String id,
+            int minimumArity,
+            int maximumArity,
+            OperatorLaws laws) {
+        public static final ValueOperator ADD =
+                new ValueOperator("add", 2, Integer.MAX_VALUE, OperatorLaws.ASSOCIATIVE_COMMUTATIVE);
+        public static final ValueOperator SUB =
+                new ValueOperator("sub", 2, 2, OperatorLaws.NONE);
+        public static final ValueOperator MUL =
+                new ValueOperator("mul", 2, Integer.MAX_VALUE, OperatorLaws.ASSOCIATIVE_COMMUTATIVE);
+        public static final ValueOperator DIV =
+                new ValueOperator("div", 2, 2, OperatorLaws.NONE);
+        public static final ValueOperator POW =
+                new ValueOperator("pow", 2, 2, OperatorLaws.NONE);
+
+        public ValueOperator {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(laws, "laws");
+            id = id.trim();
+            if (id.isEmpty()) {
+                throw new IllegalArgumentException("operator id must not be blank");
+            }
+            if (minimumArity < 0 || maximumArity < minimumArity) {
+                throw new IllegalArgumentException("invalid operator arity range");
+            }
+        }
+
+        public static ValueOperator function(String name, int arity) {
+            Objects.requireNonNull(name, "name");
+            String normalized = name.trim();
+            if (normalized.isEmpty() || arity < 0) {
+                throw new IllegalArgumentException("invalid function name or arity");
+            }
+            return new ValueOperator("fn:" + normalized, arity, arity, OperatorLaws.NONE);
+        }
+
+        private String identityToken() {
+            int lawBits = (laws.associative() ? 1 : 0)
+                    | (laws.commutative() ? 2 : 0)
+                    | (laws.idempotent() ? 4 : 0);
+            return id + "|" + minimumArity + "|" + maximumArity + "|" + lawBits;
+        }
+
+        private void requireArity(int actualArity) {
+            if (actualArity < minimumArity || actualArity > maximumArity) {
+                throw new IllegalArgumentException(
+                        "operator " + id + " does not accept arity " + actualArity);
+            }
+        }
+    }
+
+    /** Versioned structural key, authoritative outside one factory scope. */
+    public record ValueKey(String encoded) implements Comparable<ValueKey> {
+        public static final String FORMAT_VERSION = "regelsuche.expr-value/v1";
+        private static final String PREFIX = FORMAT_VERSION + ":";
+
+        public ValueKey {
+            Objects.requireNonNull(encoded, "encoded");
+            if (encoded.isEmpty()) {
+                throw new IllegalArgumentException("encoded value key must not be empty");
+            }
+        }
+
+        private static ValueKey variable(String name) {
+            return new ValueKey(PREFIX + "V" + segment(name));
+        }
+
+        private static ValueKey number(double value) {
+            return new ValueKey(
+                    PREFIX + "N" + Long.toUnsignedString(Double.doubleToLongBits(value), 16));
+        }
+
+        private static ValueKey ordered(ValueOperator operator, List<ExprValue> operands) {
+            StringBuilder encoded = new StringBuilder(PREFIX)
+                    .append('O')
+                    .append(segment(operator.identityToken()))
+                    .append(operands.size())
+                    .append(':');
+            operands.forEach(operand -> encoded.append(segment(operand.key().encoded())));
+            return new ValueKey(encoded.toString());
+        }
+
+        private static ValueKey associativeCommutative(
+                ValueOperator operator,
+                Map<ExprValue, Integer> multiplicities) {
+            List<Map.Entry<ExprValue, Integer>> entries = new ArrayList<>(multiplicities.entrySet());
+            entries.sort(Comparator.comparing(entry -> entry.getKey().key()));
+            StringBuilder encoded = new StringBuilder(PREFIX)
+                    .append('A')
+                    .append(segment(operator.identityToken()))
+                    .append(entries.size())
+                    .append(':');
+            entries.forEach(entry -> encoded.append(entry.getValue())
+                    .append('*')
+                    .append(segment(entry.getKey().key().encoded())));
+            return new ValueKey(encoded.toString());
+        }
+
+        private static String segment(String text) {
+            Objects.requireNonNull(text, "text");
+            return text.length() + ":" + text;
+        }
+
+        @Override
+        public int compareTo(ValueKey other) {
+            return encoded.compareTo(other.encoded);
+        }
+
+        @Override
+        public String toString() {
+            return encoded;
+        }
+    }
+
+    public static final class Projection {
+        private final Expr syntaxRoot;
+        private final ExprValue valueRoot;
+        private final Map<Expr, ExprValue> valuesBySyntaxIdentity;
+
+        private Projection(
+                Expr syntaxRoot,
+                ExprValue valueRoot,
+                IdentityHashMap<Expr, ExprValue> valuesBySyntaxIdentity) {
+            this.syntaxRoot = Objects.requireNonNull(syntaxRoot, "syntaxRoot");
+            this.valueRoot = Objects.requireNonNull(valueRoot, "valueRoot");
+            this.valuesBySyntaxIdentity = Collections.unmodifiableMap(
+                    new IdentityHashMap<>(valuesBySyntaxIdentity));
+        }
+
+        public Expr syntaxRoot() {
+            return syntaxRoot;
+        }
+
+        public ExprValue valueRoot() {
+            return valueRoot;
+        }
+
+        public Optional<ExprValue> valueOf(Expr syntaxOccurrence) {
+            return Optional.ofNullable(valuesBySyntaxIdentity.get(syntaxOccurrence));
+        }
+
+        public Map<Expr, ExprValue> valuesBySyntaxIdentity() {
+            return valuesBySyntaxIdentity;
+        }
+    }
+
+    private static PreparedOrdered prepareOrdered(
+            ValueOperator operator,
+            List<? extends ExprValue> operands) {
+        Objects.requireNonNull(operator, "operator");
+        List<ExprValue> copy = List.copyOf(Objects.requireNonNull(operands, "operands"));
+        if (copy.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("operands must not contain null");
+        }
+        if (operator.laws().supportsUnorderedNaryValue()) {
+            throw new IllegalArgumentException("AC operator requires an unordered value");
+        }
+        operator.requireArity(copy.size());
+        return new PreparedOrdered(operator, copy, ValueKey.ordered(operator, copy));
+    }
+
+    private static PreparedAssociativeCommutative prepareAssociativeCommutative(
+            ValueOperator operator,
+            Map<? extends ExprValue, Integer> multiplicities) {
+        Objects.requireNonNull(operator, "operator");
+        Objects.requireNonNull(multiplicities, "multiplicities");
+        if (!operator.laws().supportsUnorderedNaryValue()) {
+            throw new IllegalArgumentException("operator is not associative and commutative");
+        }
+
+        Map<ExprValue, Integer> copy = new LinkedHashMap<>();
+        int count = 0;
+        for (Map.Entry<? extends ExprValue, Integer> entry : multiplicities.entrySet()) {
+            ExprValue value = Objects.requireNonNull(entry.getKey(), "operand value");
+            int multiplicity = Objects.requireNonNull(entry.getValue(), "operand multiplicity");
+            if (multiplicity < 1) {
+                throw new IllegalArgumentException("operand multiplicity must be positive");
+            }
+            copy.merge(value, multiplicity, Math::addExact);
+            count = Math.addExact(count, multiplicity);
+        }
+        operator.requireArity(count);
+        Map<ExprValue, Integer> immutable = Collections.unmodifiableMap(copy);
+        return new PreparedAssociativeCommutative(
+                operator,
+                immutable,
+                count,
+                ValueKey.associativeCommutative(operator, immutable));
+    }
+
+    private record PreparedOrdered(
+            ValueOperator operator,
+            List<ExprValue> operands,
+            ValueKey key) {
+    }
+
+    private record PreparedAssociativeCommutative(
+            ValueOperator operator,
+            Map<ExprValue, Integer> multiplicities,
+            int operandCount,
+            ValueKey key) {
     }
 }
