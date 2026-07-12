@@ -79,6 +79,15 @@ class AstRewriteTransformationEngineTest {
             AstRewriteTransformationEngine.defaultRules().stream()
                 .filter(rule -> ids.contains(rule.id()))
                 .toList());
+        List<Transformation> firstSteps = occurrenceAware.transform("(x * x) * (x * x)").stream()
+            .filter(transformation -> transformation.rule().equals("ast_product_to_power_two"))
+            .toList();
+        assertEquals(2, firstSteps.size());
+        assertEquals(2, firstSteps.stream().map(Transformation::applicationKey).distinct().count());
+        assertTrue(firstSteps.stream().allMatch(transformation ->
+            transformation.applicationKey().length() < 180
+                && !transformation.applicationKey().contains(transformation.transformedExpression())));
+
         SearchProblem problem = new SearchProblem(
             "(x * x) * (x * x)",
             occurrenceAware,
