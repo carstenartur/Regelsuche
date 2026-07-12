@@ -12,6 +12,7 @@ public record SearchEvent(
     int depth,
     int score,
     String parentCanonicalHash,
+    String parentExpression,
     String ruleId,
     RewriteKind rewriteKind,
     List<String> assumptions,
@@ -27,6 +28,7 @@ public record SearchEvent(
         expression = expression == null ? "" : expression;
         canonicalHash = canonicalHash == null ? "" : canonicalHash;
         parentCanonicalHash = parentCanonicalHash == null ? "" : parentCanonicalHash;
+        parentExpression = parentExpression == null ? "" : parentExpression;
         ruleId = ruleId == null ? "" : ruleId;
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         pruningReason = pruningReason == null ? "" : pruningReason;
