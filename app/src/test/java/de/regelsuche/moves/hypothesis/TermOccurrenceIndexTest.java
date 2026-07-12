@@ -1,22 +1,19 @@
 package de.regelsuche.moves.hypothesis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.VariableExpr;
-import de.regelsuche.moves.hypothesis.TermOccurrenceIndex.ExpressionOccurrence;
-import de.regelsuche.moves.hypothesis.TermOccurrenceIndex.OccurrenceId;
-import de.regelsuche.value.ExprValueFactory;
-import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
-import de.regelsuche.value.ExprValueFactory.ExprValue;
-import de.regelsuche.value.ExprValueFactory.ValueKey;
+import de.regelsuche.moves.RewriteMoveKind;
+import de.regelsuche.moves.apply.LocalRewriteApplier;
+import de.regelsuche.moves.enumerate.Depth1MoveEnumerator.CandidateMove;
+import de.regelsuche.moves.enumerate.TreeLocalMoveEnumerator;
+import de.regelsuche.value.ValueKey;
 import java.util.HashSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -44,53 +41,6 @@ class TermOccurrenceIndexTest {
             second = secondIndex.occurrences();
         }
         assertEquals(first, second);
-    }
-
-    @Test
-    void valueFactoryDefinesAcIdentityMultiplicityAndBoundedScope() {
-        Expr expression = HypothesisExpressions.parseTerm("c + (a + b) + a").orElseThrow();
-        try (ExprValueFactory factory = new ExprValueFactory()) {
-            assertSame(factory.variable("a"), factory.variable("a"));
-
-            ExprValue leftGrouped = factory.fromExpr(
-                    HypothesisExpressions.parseTerm("(a + b) + c").orElseThrow());
-            ExprValue rightGrouped = factory.fromExpr(
-                    HypothesisExpressions.parseTerm("a + (b + c)").orElseThrow());
-            ExprValue permuted = factory.fromExpr(
-                    HypothesisExpressions.parseTerm("c + a + b").orElseThrow());
-            assertSame(leftGrouped, rightGrouped);
-            assertSame(leftGrouped, permuted);
-
-            ExprValue repeated = factory.fromExpr(
-                    HypothesisExpressions.parseTerm("a + a + b").orElseThrow());
-            AssociativeCommutativeValue sum =
-                    assertInstanceOf(AssociativeCommutativeValue.class, repeated);
-            assertEquals(2, sum.multiplicityOf(factory.variable("a")));
-            assertNotEquals(repeated, factory.fromExpr(
-                    HypothesisExpressions.parseTerm("a + b").orElseThrow()));
-            assertNotEquals(
-                    factory.fromExpr(HypothesisExpressions.parseTerm("a - b").orElseThrow()),
-                    factory.fromExpr(HypothesisExpressions.parseTerm("b - a").orElseThrow()));
-
-            ValueKey key = factory.fromExpr(expression).key();
-            assertEquals(key, new ValueKey(key.encoded()));
-            assertTrue(key.encoded().startsWith(ValueKey.FORMAT_VERSION));
-        }
-
-        try (ExprValueFactory first = new ExprValueFactory();
-                ExprValueFactory second = new ExprValueFactory()) {
-            ExprValue firstValue = first.fromExpr(expression);
-            ExprValue secondValue = second.fromExpr(expression);
-            assertNotSame(firstValue, secondValue);
-            assertEquals(firstValue, secondValue);
-            assertEquals(firstValue.key(), secondValue.key());
-        }
-
-        ExprValueFactory bounded = new ExprValueFactory(1);
-        bounded.variable("a");
-        assertThrows(IllegalStateException.class, () -> bounded.variable("b"));
-        bounded.close();
-        assertThrows(IllegalStateException.class, bounded::size);
     }
 
     @Test
@@ -142,6 +92,39 @@ class TermOccurrenceIndexTest {
             assertSame(left.value(), right.value());
             assertNotEquals(left.id(), right.id());
             assertEquals(2, index.occurrencesOf(left.value()).size());
+        }
+    }
+
+    @Test
+    void localRewriteTargetsOneOccurrenceOfASharedValue() {
+        String expression = "(x^2 + 6*x + 5) + (x^2 + 6*x + 5)";
+        Expr root = HypothesisExpressions.parseTerm(expression).orElseThrow();
+        ValueKey originalValueKey;
+        ExpressionOccurrence left;
+        ExpressionOccurrence right;
+        try (TermOccurrenceIndex index = TermOccurrenceIndex.forExpression(root)) {
+            left = index.occurrence(OccurrenceId.expression(List.of(0))).orElseThrow();
+            right = index.occurrence(OccurrenceId.expression(List.of(1))).orElseThrow();
+            assertSame(left.value(), right.value());
+            originalValueKey = left.valueKey();
+        }
+
+        TreeLocalMoveEnumerator enumerator = new TreeLocalMoveEnumerator();
+        List<CandidateMove> candidates = enumerator.enumerate(expression).stream()
+                .filter(candidate -> candidate.position().equals(left.position()))
+                .filter(candidate -> candidate.move().kind() == RewriteMoveKind.COMPLETE_SQUARE)
+                .map(TreeLocalMoveEnumerator.LocalCandidateMove::move)
+                .toList();
+        assertTrue(!candidates.isEmpty(), "no local COMPLETE_SQUARE move for the left occurrence");
+
+        LocalRewriteApplier.LocalRewriteResult result =
+                new LocalRewriteApplier().apply(root, left.position(), candidates);
+        assertTrue(result.success(), result.failureReason());
+
+        Expr rewritten = HypothesisExpressions.parseTerm(result.expressionAfter()).orElseThrow();
+        try (TermOccurrenceIndex rewrittenIndex = TermOccurrenceIndex.forExpression(rewritten)) {
+            assertEquals(1, rewrittenIndex.occurrenceCount(originalValueKey),
+                    "rewriting the left occurrence must leave the right use unchanged");
         }
     }
 
