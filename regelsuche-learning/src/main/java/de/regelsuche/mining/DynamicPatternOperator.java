@@ -111,9 +111,7 @@ public final class DynamicPatternOperator implements HypothesisOperator {
         }
         String formattedOutput = ExpressionFormatter.format(outputExpr);
         String formattedInput = formatted(expression);
-        // A rewrite is an identity only when its parsed syntax is unchanged. Mathematical
-        // canonical equality must not suppress useful simplifications such as (A + 0) * 1 -> A.
-        if (formattedOutput.equals(formattedInput)) {
+        if (suppressesRewrite(formattedInput, formattedOutput)) {
             return List.of();
         }
         String applicationKey = ruleId + ":" + hypothesisRevision + ":"
@@ -132,6 +130,25 @@ public final class DynamicPatternOperator implements HypothesisOperator {
             .toList();
     }
 
+    private boolean suppressesRewrite(String input, String output) {
+        if (output.equals(input)) {
+            return true;
+        }
+        String canonicalInput = canonicalizer.canonicalize(input);
+        String canonicalOutput = canonicalizer.canonicalize(output);
+        if (!canonicalInput.equals(canonicalOutput)) {
+            return false;
+        }
+        if (output.equals(canonicalInput) && !input.equals(canonicalInput)) {
+            return false;
+        }
+        int inputNodes = canonicalizer.astNodeCount(input);
+        int outputNodes = canonicalizer.astNodeCount(output);
+        boolean strictlySimpler = outputNodes < inputNodes
+            || (outputNodes == inputNodes && output.length() < input.length());
+        return !strictlySimpler;
+    }
+
     private String formatted(String expression) {
         try {
             return ExpressionFormatter.format(parser.parseTerm(expression));
@@ -142,9 +159,9 @@ public final class DynamicPatternOperator implements HypothesisOperator {
 
     private static String syntaxHash(String expression) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(expression.getBytes(StandardCharsets.UTF_8));
-            return "syntax-v1:" + HexFormat.of().formatHex(hash);
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                .digest(expression.getBytes(StandardCharsets.UTF_8));
+            return "syntax-v1:" + HexFormat.of().formatHex(hash, 0, 12);
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 unavailable", exception);
         }
