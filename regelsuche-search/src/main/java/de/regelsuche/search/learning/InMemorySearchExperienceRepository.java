@@ -14,8 +14,8 @@ import java.util.Set;
 /** Deterministic in-memory repository for successful choices and failed alternatives. */
 public final class InMemorySearchExperienceRepository implements SearchExperienceRepository {
     private static final Comparator<SearchExperience> RELEVANCE = Comparator
-        .comparing(SearchExperience::successfulChoice).reversed()
-        .thenComparing(SearchExperience::selectedPath).reversed()
+        .comparingInt((SearchExperience experience) -> experience.successfulChoice() ? 0 : 1)
+        .thenComparingInt(experience -> experience.selectedPath() ? 0 : 1)
         .thenComparingInt(SearchExperience::scoreDelta)
         .thenComparingInt(SearchExperience::depth)
         .thenComparing(SearchExperience::ruleId)
