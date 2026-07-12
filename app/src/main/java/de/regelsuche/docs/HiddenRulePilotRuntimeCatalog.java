@@ -32,7 +32,7 @@ public final class HiddenRulePilotRuntimeCatalog {
                 List.of(
                     new NegativeHoldout("n-001", "(y + 1) * 1"),
                     new NegativeHoldout("n-002", "(y + 0) * 2"))),
-            sophieGermainTask(),
+            case002Task(),
             simpleTask(
                 "case-003", "(x * 1) + 0", "x",
                 List.of("ast_multiply_one_right", "ast_add_zero_right"),
@@ -64,7 +64,7 @@ public final class HiddenRulePilotRuntimeCatalog {
                     new NegativeHoldout("n-010", "(y * y) + y"))));
     }
 
-    private static RuntimeTask sophieGermainTask() {
+    private static RuntimeTask case002Task() {
         return new RuntimeTask(
             "case-002",
             "x^4 + 4*y^4",
