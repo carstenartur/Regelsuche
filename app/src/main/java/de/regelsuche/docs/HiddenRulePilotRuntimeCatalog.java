@@ -67,13 +67,14 @@ public final class HiddenRulePilotRuntimeCatalog {
     }
 
     private static RuntimeTask case002Task() {
+        List<RewriteRule> factorRules = rulesById(Set.of("ast_square_difference_factor"));
         return new RuntimeTask(
             "case-002",
             "x^4 + 4*y^4",
             syntaxTarget(
-                "(x^2 + 2*x*y + 2*y^2) * (x^2 - 2*x*y + 2*y^2)"),
+                "(x^2 + 2*y^2 - 2*x*y) * (x^2 + 2*y^2 + 2*x*y)"),
             new HypothesisTransformationEngine(
-                new AstRewriteTransformationEngine(),
+                new AstRewriteTransformationEngine(factorRules),
                 List.of(new DifferenceOfSquaresPreparationOperator()),
                 8),
             new SearchHeuristic(4, 240, 1, 12, 240, 240),
@@ -81,13 +82,13 @@ public final class HiddenRulePilotRuntimeCatalog {
                 new PositiveHoldout(
                     "p-003",
                     "(m + 1)^4 + 4*n^4",
-                    "((m + 1)^2 + 2*(m + 1)*n + 2*n^2)"
-                        + " * ((m + 1)^2 - 2*(m + 1)*n + 2*n^2)"),
+                    "((m + 1)^2 + 2*n^2 - 2*(m + 1)*n)"
+                        + " * ((m + 1)^2 + 2*n^2 + 2*(m + 1)*n)"),
                 new PositiveHoldout(
                     "p-004",
                     "sin(t)^4 + 4*z^4",
-                    "(sin(t)^2 + 2*sin(t)*z + 2*z^2)"
-                        + " * (sin(t)^2 - 2*sin(t)*z + 2*z^2)")),
+                    "(sin(t)^2 + 2*z^2 - 2*sin(t)*z)"
+                        + " * (sin(t)^2 + 2*z^2 + 2*sin(t)*z)")),
             List.of(
                 new NegativeHoldout("n-003", "x^4 + 3*y^4"),
                 new NegativeHoldout("n-004", "x^4 + 4*y^3")));
@@ -101,22 +102,26 @@ public final class HiddenRulePilotRuntimeCatalog {
         List<PositiveHoldout> positives,
         List<NegativeHoldout> negatives
     ) {
-        Set<String> ids = Set.copyOf(primitiveRuleIds);
+        return new RuntimeTask(
+            id,
+            input,
+            syntaxTarget(target),
+            new AstRewriteTransformationEngine(rulesById(Set.copyOf(primitiveRuleIds))),
+            new SearchHeuristic(4, 80, 1, 8, 40, 20),
+            positives,
+            negatives);
+    }
+
+    private static List<RewriteRule> rulesById(Set<String> ids) {
         List<RewriteRule> rules = AstRewriteTransformationEngine.defaultRules().stream()
             .filter(rule -> ids.contains(rule.id()))
             .toList();
         Set<String> actual = rules.stream().map(RewriteRule::id).collect(Collectors.toSet());
         if (!ids.equals(actual)) {
-            throw new IllegalStateException("pilot primitive rule set is incomplete: " + ids + " != " + actual);
+            throw new IllegalStateException(
+                "pilot primitive rule set is incomplete: " + ids + " != " + actual);
         }
-        return new RuntimeTask(
-            id,
-            input,
-            syntaxTarget(target),
-            new AstRewriteTransformationEngine(rules),
-            new SearchHeuristic(4, 80, 1, 8, 40, 20),
-            positives,
-            negatives);
+        return rules;
     }
 
     private static SearchTarget syntaxTarget(String expression) {
