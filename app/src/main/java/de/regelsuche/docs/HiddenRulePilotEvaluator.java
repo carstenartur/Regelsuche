@@ -41,12 +41,14 @@ public final class HiddenRulePilotEvaluator {
         List<LeakageViolation> leakage = leakageViolations(
             runtimeTask, runtimeResult, hiddenReference);
         CandidateRelation relation = relation(runtimeResult, hiddenReference);
+        boolean validationPassed = runtimeResult.validationEvidence().passed();
         boolean holdoutsPassed = runtimeResult.holdouts().allPassed();
         boolean material = runtimeResult.holdouts().materialAblations() > 0;
         boolean rediscovered = relation != CandidateRelation.NONE
             && relation != CandidateRelation.DIFFERENT;
         boolean accepted = leakage.isEmpty()
             && runtimeResult.frozen()
+            && validationPassed
             && holdoutsPassed
             && material
             && rediscovered;
@@ -56,10 +58,12 @@ public final class HiddenRulePilotEvaluator {
             leakage,
             relation,
             runtimeResult.frozen(),
+            validationPassed,
             holdoutsPassed,
             material,
             accepted,
-            blockers(runtimeResult, leakage, relation, material, rediscovered));
+            blockers(
+                runtimeResult, leakage, relation, validationPassed, material, rediscovered));
     }
 
     private List<LeakageViolation> leakageViolations(
@@ -250,22 +254,22 @@ public final class HiddenRulePilotEvaluator {
         RuntimeResult result,
         List<LeakageViolation> leakage,
         CandidateRelation relation,
+        boolean validationPassed,
         boolean material,
         boolean rediscovered
     ) {
         List<String> blockers = new ArrayList<>();
-        if (leakage.stream().anyMatch(violation ->
-                violation.location().contains("TRAIN_")
-                    || violation.location().contains("DUPLICATE_"))) {
+        if (leakage.stream().anyMatch(violation -> isSplitLeakage(violation.location()))) {
             blockers.add("train/holdout split leakage detected");
         }
-        if (leakage.stream().anyMatch(violation ->
-                !violation.location().contains("TRAIN_")
-                    && !violation.location().contains("DUPLICATE_"))) {
+        if (leakage.stream().anyMatch(violation -> !isSplitLeakage(violation.location()))) {
             blockers.add("runtime leakage detected");
         }
         if (!result.frozen()) {
             blockers.add("candidate was not frozen");
+        }
+        if (!validationPassed) {
+            blockers.add("candidate validation evidence failed");
         }
         if (!result.holdouts().allPassed()) {
             blockers.add("holdout validation failed");
@@ -279,6 +283,12 @@ public final class HiddenRulePilotEvaluator {
             blockers.add("candidate differs from hidden reference");
         }
         return List.copyOf(blockers);
+    }
+
+    private static boolean isSplitLeakage(String location) {
+        return location.startsWith("TRAIN_POSITIVE_")
+            || location.startsWith("TRAIN_NEGATIVE_")
+            || location.contains("_DUPLICATE");
     }
 
     private static boolean containsForbidden(String observable, String token) {
@@ -393,7 +403,7 @@ public final class HiddenRulePilotEvaluator {
             requireText(family, "family");
             requireText(leftPattern, "leftPattern");
             requireText(rightPattern, "rightPattern");
-            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
+            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();
             List<String> tokens = new ArrayList<>();
             tokens.add(hiddenRuleId);
             tokens.add(family);
@@ -419,6 +429,7 @@ public final class HiddenRulePilotEvaluator {
         List<LeakageViolation> leakageViolations,
         CandidateRelation candidateRelation,
         boolean candidateFrozen,
+        boolean validationPassed,
         boolean holdoutsPassed,
         boolean materialAblation,
         boolean pilotAccepted,
