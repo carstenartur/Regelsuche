@@ -6,6 +6,7 @@ import de.regelsuche.search.memory.SearchMemory;
 import de.regelsuche.search.memory.TranspositionEntry;
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -42,17 +43,47 @@ public final class TranspositionGate {
      *       matching {@link PruningDecision}.</li>
      * </ul>
      *
-     * @param memory      may be {@code null} – {@link Verdict#KEEP} is
-     *                    returned unconditionally in that case.
-     * @param state       candidate state about to be expanded.
-     * @param pathId      stable identifier of the path leading to {@code state}.
+     * @param memory may be {@code null} – {@link Verdict#KEEP} is returned
+     *               unconditionally in that case.
+     * @param state candidate state about to be expanded.
+     * @param pathId stable identifier of the path leading to {@code state}.
      */
     public static Verdict evaluate(SearchMemory memory, SearchState state, String pathId) {
+        return evaluate(memory, state, pathId, List.of());
+    }
+
+    /**
+     * Migration-aware variant. The state is always recorded under its current
+     * identity hash, while {@code compatibleIdentityHashes} are consulted for
+     * entries persisted by an older identity scheme. Assumption fingerprints
+     * are composed identically for current and compatibility hashes.
+     */
+    public static Verdict evaluate(
+            SearchMemory memory,
+            SearchState state,
+            String pathId,
+            List<String> compatibleIdentityHashes) {
         if (memory == null) {
             return Verdict.KEEP;
         }
-        String identityHash = identityHash(state);
+        String identityHash = identityHash(state.canonicalHash(), state);
         Optional<TranspositionEntry> existingOpt = memory.table().lookup(identityHash);
+        if (existingOpt.isEmpty()) {
+            for (String compatibleHash : compatibleIdentityHashes) {
+                if (compatibleHash == null || compatibleHash.isBlank()) {
+                    continue;
+                }
+                String composed = identityHash(compatibleHash, state);
+                if (composed.equals(identityHash)) {
+                    continue;
+                }
+                existingOpt = memory.table().lookup(composed);
+                if (existingOpt.isPresent()) {
+                    break;
+                }
+            }
+        }
+
         Set<String> ruleIds = new LinkedHashSet<>(state.appliedRuleIds());
         int score = state.score().weightedTotal();
         Instant now = Instant.now();
@@ -98,7 +129,7 @@ public final class TranspositionGate {
                 PruningReason.KEPT_NEW_RULE_COMBO));
             return Verdict.KEEP;
         }
-        // Otherwise: prune, but still update visit count.
+        // Otherwise: prune, but record under the current key so migration is lazy.
         memory.table().record(candidate);
         PruningReason reason = score > existing.bestScore()
             ? PruningReason.ALREADY_KNOWN_BETTER
@@ -108,11 +139,11 @@ public final class TranspositionGate {
         return Verdict.PRUNE;
     }
 
-    private static String identityHash(SearchState state) {
+    private static String identityHash(String baseHash, SearchState state) {
         String assumptions = state.assumptionFingerprint();
         if (assumptions.isBlank()) {
-            return state.canonicalHash();
+            return baseHash;
         }
-        return state.canonicalHash() + "\u0001assumptions:" + assumptions;
+        return baseHash + "\u0001assumptions:" + assumptions;
     }
 }
