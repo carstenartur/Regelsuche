@@ -251,7 +251,8 @@ public final class EquivalenceAwarePatternMatcher {
         }
         PatternExpr.Operation operation = (PatternExpr.Operation) pattern;
         if (profile.inferAlgebraicBindings() && operation.operator() == BinaryOperator.POW) {
-            return Monomial.from(expression).isPresent();
+            return Monomial.from(expression).isPresent()
+                || expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.POW;
         }
         return expression instanceof BinaryExpr binary && binary.operator() == operation.operator();
     }
