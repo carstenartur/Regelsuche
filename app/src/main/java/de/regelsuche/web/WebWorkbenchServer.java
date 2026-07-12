@@ -1905,7 +1905,8 @@ public class WebWorkbenchServer {
             de.regelsuche.search.SearchProfile profile = de.regelsuche.search.SearchProfile.DISCOVERY_PLUS;
             de.regelsuche.search.strategy.SearchProblem problem =
                 new de.regelsuche.search.strategy.SearchProblem(
-                    root, engine, scorer, canonicalizer, profile.heuristic(), searchMemory);
+                    root, engine, scorer, canonicalizer, profile.heuristic())
+                    .withMemory(searchMemory);
             List<de.regelsuche.search.strategy.SearchState> states =
                 profile.newStrategy().search(problem);
             long elapsed = (System.nanoTime() - t0) / 1_000_000L;

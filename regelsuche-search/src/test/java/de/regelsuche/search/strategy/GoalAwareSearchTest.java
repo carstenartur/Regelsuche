@@ -20,15 +20,15 @@ import org.junit.jupiter.api.Test;
 class GoalAwareSearchTest {
 
     @Test
-    void searchProblemWithoutCostModelRetainsLegacyBehaviour() {
-        SearchProblem legacy = new SearchProblem(
+    void searchProblemWithoutCostModelRetainsDefaultBehaviour() {
+        SearchProblem problem = new SearchProblem(
             "(x + 0) * 1",
             new AstRewriteTransformationEngine(),
             new ExpressionScorer(),
             new ExpressionCanonicalizer(),
             new SearchHeuristic(4, 80, 1, 2, 40, 8)
         );
-        assertTrue(new BestFirstSearchStrategy().search(legacy).stream()
+        assertTrue(new BestFirstSearchStrategy().search(problem).stream()
             .anyMatch(state -> state.expression().equals("x")));
     }
 
@@ -48,22 +48,22 @@ class GoalAwareSearchTest {
     }
 
     @Test
-    void everyTransformationGoalCanDriveSearch() {
-        for (TransformationGoal goal : TransformationGoal.values()) {
+    void everyTransformationObjectiveCanDriveSearch() {
+        for (TransformationGoal objective : TransformationGoal.values()) {
             SearchProblem problem = new SearchProblem(
                 "x + 0",
                 new AstRewriteTransformationEngine(),
                 new ExpressionScorer(),
                 new ExpressionCanonicalizer(),
                 new SearchHeuristic(3, 40, 1, 2, 20, 4)
-            ).withGoal(goal);
+            ).withObjective(objective);
             List<SearchState> states = new BestFirstSearchStrategy().search(problem);
-            assertTrue(states.size() >= 1, () -> goal + " produced no states");
+            assertTrue(states.size() >= 1, () -> objective + " produced no states");
         }
     }
 
     @Test
-    void withGoalIsAShortcutForWithCostModel() {
+    void objectiveConvenienceUsesItsDefaultCostModel() {
         SearchProblem base = new SearchProblem(
             "x + 0",
             new AstRewriteTransformationEngine(),
@@ -71,9 +71,9 @@ class GoalAwareSearchTest {
             new ExpressionCanonicalizer(),
             new SearchHeuristic(3, 40, 1, 2, 20, 4)
         );
-        SearchProblem viaGoal = base.withGoal(TransformationGoal.SIMPLIFY);
+        SearchProblem viaObjective = base.withObjective(TransformationGoal.SIMPLIFY);
         SearchProblem viaModel = base.withCostModel(TransformationGoal.SIMPLIFY.defaultCostModel());
-        assertEquals(viaGoal.costModel().id(), viaModel.costModel().id());
+        assertEquals(viaObjective.costModel().id(), viaModel.costModel().id());
     }
 
     @Test
@@ -108,13 +108,13 @@ class GoalAwareSearchTest {
         SearchProblem guided = unguided.withTarget(
             SearchProblem.SearchTarget.syntaxExact("a").withDistanceWeight(20));
 
-        List<String> legacyOrder = new BestFirstSearchStrategy().search(unguided).stream()
+        List<String> defaultOrder = new BestFirstSearchStrategy().search(unguided).stream()
             .map(SearchState::expression)
             .toList();
         BestFirstSearchStrategy.GoalSearchResult guidedResult =
             new BestFirstSearchStrategy().searchWithDiagnostics(guided);
 
-        assertEquals(List.of("x", "z"), legacyOrder,
+        assertEquals(List.of("x", "z"), defaultOrder,
             "without a target, deterministic rule ordering remains unchanged");
         assertEquals(List.of("x", "a"),
             guidedResult.states().stream().map(SearchState::expression).toList());

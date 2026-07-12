@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.capability-frontier/v1",
+  "title": "Regelsuche capability frontier v1",
+  "type": "object",
+  "required": ["schema", "cases"],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.capability-frontier/v1"
+    },
+    "cases": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "required": [
+        "id",
+        "expectation",
+        "outcome",
+        "stateReductionRatio",
+        "materialSuccess",
+        "baseline",
+        "guided"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "expectation": {
+          "enum": ["CONNECTED", "MISSING_OPERATOR"]
+        },
+        "outcome": {
+          "enum": [
+            "GUIDED_ONLY_REACHED",
+            "GUIDED_FEWER_STATES",
+            "BOTH_REACHED",
+            "GUIDANCE_REGRESSION",
+            "STATE_BUDGET",
+            "DEPTH_BUDGET",
+            "CANDIDATE_BUDGET",
+            "NO_TRANSFORMATIONS",
+            "UNPARSEABLE_TARGET",
+            "MISSING_OPERATOR",
+            "CONNECTED_NOT_REACHED"
+          ]
+        },
+        "stateReductionRatio": { "type": "number" },
+        "materialSuccess": { "type": "boolean" },
+        "baseline": { "$ref": "#/$defs/baseline" },
+        "guided": { "$ref": "#/$defs/guided" }
+      },
+      "additionalProperties": false
+    },
+    "baseline": {
+      "type": "object",
+      "required": ["reached", "statesUntilTarget", "depth", "path", "ruleIds"],
+      "properties": {
+        "reached": { "type": "boolean" },
+        "statesUntilTarget": { "type": "integer", "minimum": 0 },
+        "depth": { "type": "integer", "minimum": -1 },
+        "path": { "$ref": "#/$defs/stringArray" },
+        "ruleIds": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "guided": {
+      "type": "object",
+      "required": [
+        "reached",
+        "status",
+        "depth",
+        "bestDistance",
+        "path",
+        "ruleIds",
+        "metrics"
+      ],
+      "properties": {
+        "reached": { "type": "boolean" },
+        "status": {
+          "enum": [
+            "UNTARGETED",
+            "ROOT_ALREADY_TARGET",
+            "REACHED",
+            "STATE_BUDGET",
+            "DEPTH_BUDGET",
+            "CANDIDATE_BUDGET",
+            "NO_TRANSFORMATIONS",
+            "FRONTIER_EXHAUSTED",
+            "UNPARSEABLE_TARGET"
+          ]
+        },
+        "depth": { "type": "integer", "minimum": -1 },
+        "bestDistance": { "type": "integer" },
+        "path": { "$ref": "#/$defs/stringArray" },
+        "ruleIds": { "$ref": "#/$defs/stringArray" },
+        "metrics": { "$ref": "#/$defs/metrics" }
+      },
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "exploredStates",
+        "expandedStates",
+        "generatedTransformations",
+        "enqueuedStates",
+        "skippedTransformations",
+        "duplicatePrunes",
+        "transpositionPrunes",
+        "depthPrunes",
+        "candidateBudgetPrunes",
+        "statesWithoutTransformations",
+        "identityCacheHits",
+        "identityCacheMisses",
+        "cachedExpressions",
+        "internedValues"
+      ],
+      "properties": {
+        "exploredStates": { "$ref": "#/$defs/nonNegativeInteger" },
+        "expandedStates": { "$ref": "#/$defs/nonNegativeInteger" },
+        "generatedTransformations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "enqueuedStates": { "$ref": "#/$defs/nonNegativeInteger" },
+        "skippedTransformations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "duplicatePrunes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "transpositionPrunes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "depthPrunes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "candidateBudgetPrunes": { "$ref": "#/$defs/nonNegativeInteger" },
+        "statesWithoutTransformations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "identityCacheHits": { "$ref": "#/$defs/nonNegativeInteger" },
+        "identityCacheMisses": { "$ref": "#/$defs/nonNegativeInteger" },
+        "cachedExpressions": { "$ref": "#/$defs/nonNegativeInteger" },
+        "internedValues": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

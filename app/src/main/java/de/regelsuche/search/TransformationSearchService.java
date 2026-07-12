@@ -123,7 +123,7 @@ public class TransformationSearchService {
 
     private void explore(String root, TransformationGoal goal) {
         SearchProblem problem = new SearchProblem(root, engine, scorer, canonicalizer, heuristic)
-            .withGoal(goal);
+            .withObjective(goal);
         for (SearchState state : searchStrategy.search(problem)) {
             boolean alreadyVisited = !globallyVisited.add(state.canonicalHash() + ":" + state.appliedRuleApplications());
             if (alreadyVisited && state.improvement() <= 0) {
