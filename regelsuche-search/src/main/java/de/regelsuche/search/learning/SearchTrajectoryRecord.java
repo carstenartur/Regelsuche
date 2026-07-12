@@ -40,15 +40,15 @@ public record SearchTrajectoryRecord(
 
     public SearchTrajectoryRecord {
         schema = schema == null || schema.isBlank() ? SCHEMA : schema;
+        requireText(producerVersion, "producerVersion");
+        requireText(runId, "runId");
+        requireText(family, "family");
+        requireText(ruleInventoryHash, "ruleInventoryHash");
         Objects.requireNonNull(eventType, "eventType");
         Objects.requireNonNull(expression, "expression");
         Objects.requireNonNull(features, "features");
         Objects.requireNonNull(split, "split");
         Objects.requireNonNull(terminalStatus, "terminalStatus");
-        producerVersion = safe(producerVersion);
-        runId = safe(runId);
-        family = safe(family);
-        ruleInventoryHash = safe(ruleInventoryHash);
         ruleId = safe(ruleId);
         applicableRuleIds = applicableRuleIds == null
             ? List.of()
@@ -59,6 +59,12 @@ public record SearchTrajectoryRecord(
 
     public boolean decision() {
         return eventType == SearchEventType.TRANSFORMATION_GENERATED;
+    }
+
+    private static void requireText(String value, String name) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
     }
 
     private static String safe(String value) {
