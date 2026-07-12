@@ -49,7 +49,7 @@ class HiddenRulePilotRunnerTest {
             || evaluation.candidateRelation() == CandidateRelation.SEMANTICALLY_EQUIVALENT,
             evaluation.toString());
         assertTrue(evaluation.materialAblation());
-        assertTrue(evaluation.galleryEvidenceEligible(), evaluation.blockers().toString());
+        assertTrue(evaluation.pilotAccepted(), evaluation.blockers().toString());
     }
 
     @Test
@@ -66,7 +66,7 @@ class HiddenRulePilotRunnerTest {
         HiddenRulePilotEvaluator.Evaluation evaluation = evaluator.evaluate(leaking, runtime, hidden);
 
         assertFalse(evaluation.leakageViolations().isEmpty());
-        assertFalse(evaluation.galleryEvidenceEligible());
+        assertFalse(evaluation.pilotAccepted());
         assertTrue(evaluation.blockers().contains("runtime leakage detected"));
     }
 
