@@ -75,11 +75,10 @@ class AstRewriteTransformationEngineTest {
     @Test
     void transitionIdentityAllowsTheSameRuleOnDistinctOccurrences() {
         Set<String> ids = Set.of("ast_product_to_power_two", "ast_combine_powers");
-        TransformationEngine occurrenceAware = TransformationEngine.withTransitionIdentity(
-            new AstRewriteTransformationEngine(
-                AstRewriteTransformationEngine.defaultRules().stream()
-                    .filter(rule -> ids.contains(rule.id()))
-                    .toList()));
+        TransformationEngine occurrenceAware = new OccurrenceAwareAstRewriteTransformationEngine(
+            AstRewriteTransformationEngine.defaultRules().stream()
+                .filter(rule -> ids.contains(rule.id()))
+                .toList());
         SearchProblem problem = new SearchProblem(
             "(x * x) * (x * x)",
             occurrenceAware,
