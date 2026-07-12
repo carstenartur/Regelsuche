@@ -6,7 +6,7 @@ import de.regelsuche.search.memory.SearchMemory;
 import de.regelsuche.search.memory.TranspositionEntry;
 import java.time.Instant;
 import java.util.LinkedHashSet;
-import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -42,78 +42,136 @@ public final class TranspositionGate {
      *       matching {@link PruningDecision}.&lt;/li&gt;
      * &lt;/ul&gt;
      *
-     * @param memory      may be {@code null} – {@link Verdict#KEEP} is
-     *                    returned unconditionally in that case.
-     * @param state       candidate state about to be expanded.
-     * @param pathId      stable identifier of the path leading to {@code state}.
+     * @param memory may be {@code null} – {@link Verdict#KEEP} is returned
+     *               unconditionally in that case.
+     * @param state candidate state about to be expanded.
+     * @param pathId stable identifier of the path leading to {@code state}.
      */
     public static Verdict evaluate(SearchMemory memory, SearchState state, String pathId) {
-<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (memory == null) {</span>
-<span class="fc" id="L52">            return Verdict.KEEP;</span>
+<span class="fc" id="L51">        return evaluate(memory, state, pathId, List.of());</span>
+    }
+
+    /**
+     * Migration-aware variant. The state is always recorded under its current
+     * identity hash, while {@code compatibleIdentityHashes} are consulted for
+     * entries persisted by an older identity scheme. Assumption fingerprints
+     * are composed identically for current and compatibility hashes.
+     */
+    public static Verdict evaluate(
+            SearchMemory memory,
+            SearchState state,
+            String pathId,
+            List&lt;String&gt; compatibleIdentityHashes) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (memory == null) {</span>
+<span class="fc" id="L66">            return Verdict.KEEP;</span>
         }
-<span class="fc" id="L54">        String identityHash = identityHash(state);</span>
-<span class="fc" id="L55">        Optional&lt;TranspositionEntry&gt; existingOpt = memory.table().lookup(identityHash);</span>
-<span class="fc" id="L56">        Set&lt;String&gt; ruleIds = new LinkedHashSet&lt;&gt;(state.appliedRuleIds());</span>
-<span class="fc" id="L57">        int score = state.score().weightedTotal();</span>
-<span class="fc" id="L58">        Instant now = Instant.now();</span>
-<span class="fc" id="L59">        TranspositionEntry candidate = new TranspositionEntry(</span>
+<span class="fc" id="L68">        String identityHash = identityHash(state.canonicalHash(), state);</span>
+<span class="fc" id="L69">        TranspositionEntry existing = memory.table().lookup(identityHash).orElse(null);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (existing == null) {</span>
+<span class="fc" id="L71">            existing = migrateCompatibleEntry(</span>
+                    memory,
+                    state,
+                    identityHash,
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                    compatibleIdentityHashes == null ? List.of() : compatibleIdentityHashes);</span>
+        }
+
+<span class="fc" id="L78">        Set&lt;String&gt; ruleIds = new LinkedHashSet&lt;&gt;(state.appliedRuleIds());</span>
+<span class="fc" id="L79">        int score = state.score().weightedTotal();</span>
+<span class="fc" id="L80">        Instant now = Instant.now();</span>
+<span class="fc" id="L81">        TranspositionEntry candidate = new TranspositionEntry(</span>
             identityHash,
-<span class="fc" id="L61">            state.expression(),</span>
+<span class="fc" id="L83">            state.expression(),</span>
             score,
-<span class="fc" id="L63">            state.depth(),</span>
-<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            pathId == null ? &quot;&quot; : pathId,</span>
+<span class="fc" id="L85">            state.depth(),</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            pathId == null ? &quot;&quot; : pathId,</span>
             ruleIds,
             1,
             now,
             now
         );
 
-<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (existingOpt.isEmpty()) {</span>
-<span class="fc" id="L72">            memory.table().record(candidate);</span>
-<span class="fc" id="L73">            return Verdict.KEEP;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (existing == null) {</span>
+<span class="fc" id="L94">            memory.table().record(candidate);</span>
+<span class="fc" id="L95">            return Verdict.KEEP;</span>
         }
-<span class="fc" id="L75">        TranspositionEntry existing = existingOpt.get();</span>
         // Better score wins.
-<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (score &lt; existing.bestScore()) {</span>
-<span class="nc" id="L78">            memory.table().record(candidate);</span>
-<span class="nc" id="L79">            memory.recordDecision(new PruningDecision(</span>
-<span class="nc" id="L80">                state.expression(), identityHash,</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (score &lt; existing.bestScore()) {</span>
+<span class="nc" id="L99">            memory.table().record(candidate);</span>
+<span class="nc" id="L100">            memory.recordDecision(new PruningDecision(</span>
+<span class="nc" id="L101">                state.expression(), identityHash,</span>
                 PruningReason.REPLACED_WORSE_PATH));
-<span class="nc" id="L82">            return Verdict.KEEP;</span>
+<span class="nc" id="L103">            return Verdict.KEEP;</span>
         }
         // Same-score, shallower path wins.
-<span class="pc bpc" id="L85" title="2 of 4 branches missed.">        if (score == existing.bestScore() &amp;&amp; state.depth() &lt; existing.minDepthSeen()) {</span>
-<span class="nc" id="L86">            memory.table().record(candidate);</span>
-<span class="nc" id="L87">            memory.recordDecision(new PruningDecision(</span>
-<span class="nc" id="L88">                state.expression(), identityHash,</span>
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">        if (score == existing.bestScore() &amp;&amp; state.depth() &lt; existing.minDepthSeen()) {</span>
+<span class="nc" id="L107">            memory.table().record(candidate);</span>
+<span class="nc" id="L108">            memory.recordDecision(new PruningDecision(</span>
+<span class="nc" id="L109">                state.expression(), identityHash,</span>
                 PruningReason.KEPT_LOWER_DEPTH));
-<span class="nc" id="L90">            return Verdict.KEEP;</span>
+<span class="nc" id="L111">            return Verdict.KEEP;</span>
         }
         // New rule combination is interesting for the miner even at equal score.
-<span class="fc bfc" id="L93" title="All 2 branches covered.">        boolean hasNewRules = !existing.reachedByRuleIds().containsAll(ruleIds);</span>
-<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (hasNewRules) {</span>
-<span class="fc" id="L95">            memory.table().record(candidate);</span>
-<span class="fc" id="L96">            memory.recordDecision(new PruningDecision(</span>
-<span class="fc" id="L97">                state.expression(), identityHash,</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        boolean hasNewRules = !existing.reachedByRuleIds().containsAll(ruleIds);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (hasNewRules) {</span>
+<span class="fc" id="L116">            memory.table().record(candidate);</span>
+<span class="fc" id="L117">            memory.recordDecision(new PruningDecision(</span>
+<span class="fc" id="L118">                state.expression(), identityHash,</span>
                 PruningReason.KEPT_NEW_RULE_COMBO));
-<span class="fc" id="L99">            return Verdict.KEEP;</span>
+<span class="fc" id="L120">            return Verdict.KEEP;</span>
         }
-        // Otherwise: prune, but still update visit count.
-<span class="fc" id="L102">        memory.table().record(candidate);</span>
-<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        PruningReason reason = score &gt; existing.bestScore()</span>
-<span class="nc" id="L104">            ? PruningReason.ALREADY_KNOWN_BETTER</span>
-<span class="fc" id="L105">            : PruningReason.ALREADY_KNOWN_EQUAL;</span>
-<span class="fc" id="L106">        memory.recordDecision(new PruningDecision(</span>
-<span class="fc" id="L107">            state.expression(), identityHash, reason));</span>
-<span class="fc" id="L108">        return Verdict.PRUNE;</span>
+        // Otherwise: prune, but record under the current key so migration is lazy.
+<span class="fc" id="L123">        memory.table().record(candidate);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        PruningReason reason = score &gt; existing.bestScore()</span>
+<span class="fc" id="L125">            ? PruningReason.ALREADY_KNOWN_BETTER</span>
+<span class="fc" id="L126">            : PruningReason.ALREADY_KNOWN_EQUAL;</span>
+<span class="fc" id="L127">        memory.recordDecision(new PruningDecision(</span>
+<span class="fc" id="L128">            state.expression(), identityHash, reason));</span>
+<span class="fc" id="L129">        return Verdict.PRUNE;</span>
     }
 
-    private static String identityHash(SearchState state) {
-<span class="fc" id="L112">        String assumptions = state.assumptionFingerprint();</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (assumptions.isBlank()) {</span>
-<span class="fc" id="L114">            return state.canonicalHash();</span>
+    private static TranspositionEntry migrateCompatibleEntry(
+            SearchMemory memory,
+            SearchState state,
+            String identityHash,
+            List&lt;String&gt; compatibleIdentityHashes) {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (String compatibleHash : compatibleIdentityHashes) {</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">            if (compatibleHash == null || compatibleHash.isBlank()) {</span>
+<span class="nc" id="L139">                continue;</span>
+            }
+<span class="fc" id="L141">            String composed = identityHash(compatibleHash, state);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (composed.equals(identityHash)) {</span>
+<span class="nc" id="L143">                continue;</span>
+            }
+<span class="fc" id="L145">            TranspositionEntry compatible = memory.table().lookup(composed).orElse(null);</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (compatible != null) {</span>
+<span class="fc" id="L147">                return memory.table().record(rekey(compatible, identityHash, state.expression()));</span>
+            }
+<span class="nc" id="L149">        }</span>
+<span class="fc" id="L150">        return null;</span>
+    }
+
+    private static TranspositionEntry rekey(
+            TranspositionEntry existing,
+            String identityHash,
+            String expression) {
+<span class="fc" id="L157">        return new TranspositionEntry(</span>
+                identityHash,
+                expression,
+<span class="fc" id="L160">                existing.bestScore(),</span>
+<span class="fc" id="L161">                existing.minDepthSeen(),</span>
+<span class="fc" id="L162">                existing.bestKnownPathId(),</span>
+<span class="fc" id="L163">                existing.reachedByRuleIds(),</span>
+<span class="fc" id="L164">                existing.visitCount(),</span>
+<span class="fc" id="L165">                existing.firstSeen(),</span>
+<span class="fc" id="L166">                existing.lastSeen());</span>
+    }
+
+    private static String identityHash(String baseHash, SearchState state) {
+<span class="fc" id="L170">        String assumptions = state.assumptionFingerprint();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (assumptions.isBlank()) {</span>
+<span class="fc" id="L172">            return baseHash;</span>
         }
-<span class="fc" id="L116">        return state.canonicalHash() + &quot;\u0001assumptions:&quot; + assumptions;</span>
+<span class="fc" id="L174">        return baseHash + &quot;\u0001assumptions:&quot; + assumptions;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
