@@ -1,5 +1,6 @@
 package de.regelsuche.docs;
 
+import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.docs.HiddenRuleHoldoutPartition.SplitCollision;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
 import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
@@ -94,7 +95,8 @@ public final class HiddenRulePilotEvaluator {
         }
         String hiddenId = normalized(reference.hiddenRuleId());
         String hiddenPattern = RulePatternCanonicalizer.hash(
-            reference.leftPattern(), reference.rightPattern());
+            stripOuterGrouping(reference.leftPattern()),
+            stripOuterGrouping(reference.rightPattern()));
         for (RewriteRule rule : engine.rules()) {
             if (normalized(rule.id()).equals(hiddenId)) {
                 violations.add(new LeakageViolation(
@@ -102,7 +104,8 @@ public final class HiddenRulePilotEvaluator {
             }
             if (rule instanceof PatternRewriteRule patternRule) {
                 String visiblePattern = RulePatternCanonicalizer.hash(
-                    patternText(patternRule.source()), patternText(patternRule.target()));
+                    stripOuterGrouping(patternText(patternRule.source())),
+                    stripOuterGrouping(patternText(patternRule.target())));
                 if (visiblePattern.equals(hiddenPattern)) {
                     violations.add(new LeakageViolation(
                         "PRIMITIVE_RULE_TEMPLATE", fingerprint(hiddenPattern)));
@@ -205,20 +208,16 @@ public final class HiddenRulePilotEvaluator {
         if (identifierLike) {
             return observable.contains(normalizedToken);
         }
-        String compactToken = compact(normalizedToken);
-        return observable.lines().map(HiddenRulePilotEvaluator::compact)
+        String compactToken = stripOuterGrouping(compact(normalizedToken));
+        return observable.lines()
+            .map(HiddenRulePilotEvaluator::compact)
+            .map(HiddenRulePilotEvaluator::stripOuterGrouping)
             .anyMatch(line -> line.equals(compactToken));
     }
 
     private static Set<String> normalizedAssumptions(List<String> assumptions) {
-        Set<String> result = new LinkedHashSet<>();
-        if (assumptions != null) {
-            assumptions.stream()
-                .map(HiddenRulePilotEvaluator::normalized)
-                .filter(value -> !value.isEmpty())
-                .forEach(result::add);
-        }
-        return Set.copyOf(result);
+        return Set.copyOf(new LinkedHashSet<>(
+            AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions()));
     }
 
     private static String patternText(PatternExpr pattern) {
@@ -242,6 +241,36 @@ public final class HiddenRulePilotEvaluator {
             .map(HiddenRulePilotEvaluator::patternText)
             .reduce((left, right) -> left + ", " + right)
             .orElse("") + ")";
+    }
+
+    private static String stripOuterGrouping(String expression) {
+        String result = expression == null ? "" : expression.trim();
+        while (result.length() >= 2
+                && result.charAt(0) == '('
+                && result.charAt(result.length() - 1) == ')'
+                && outerParenthesesEncloseWholeExpression(result)) {
+            result = result.substring(1, result.length() - 1).trim();
+        }
+        return result;
+    }
+
+    private static boolean outerParenthesesEncloseWholeExpression(String expression) {
+        int depth = 0;
+        for (int index = 0; index < expression.length(); index++) {
+            char character = expression.charAt(index);
+            if (character == '(') {
+                depth++;
+            } else if (character == ')') {
+                depth--;
+                if (depth == 0 && index < expression.length() - 1) {
+                    return false;
+                }
+            }
+            if (depth < 0) {
+                return false;
+            }
+        }
+        return depth == 0;
     }
 
     private static String normalized(String value) {
@@ -281,7 +310,7 @@ public final class HiddenRulePilotEvaluator {
             requireText(family, "family");
             requireText(leftPattern, "leftPattern");
             requireText(rightPattern, "rightPattern");
-            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
+            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();
             List<String> tokens = new ArrayList<>();
             tokens.add(hiddenRuleId);
             tokens.add(family);
