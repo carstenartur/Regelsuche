@@ -52,6 +52,40 @@ class SearchTrajectoryDatasetTest {
     }
 
     @Test
+    void labelsOnlyTheConcreteTransitionWhenEquivalentParentsCompete() {
+        Map<String, List<Transformation>> graph = Map.of(
+            "r", List.of(
+                stepWithKey("left-branch", "a + b", "left-branch:r"),
+                stepWithKey("right-branch", "b + a", "right-branch:r")),
+            "a + b", List.of(stepWithKey("finish", "0", "finish:left")),
+            "b + a", List.of(stepWithKey("finish", "0", "finish:right")));
+        SearchTrajectoryCollector collector = new SearchTrajectoryCollector();
+        TransformationEngine engine = expression -> graph.getOrDefault(expression, List.of());
+        SearchProblem problem = new SearchProblem(
+            "r", engine, scorer, canonicalizer, heuristic)
+            .withTarget(SearchTarget.syntaxExact("0").continueAfterReached())
+            .withObserver(collector);
+
+        var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+        SearchTrajectoryRun run = collector.finish(
+            problem, result, context("equivalent-parent-run", "equivalent-parents"));
+        List<SearchTrajectoryRecord> finishDecisions = run.records().stream()
+            .filter(SearchTrajectoryRecord::decision)
+            .filter(record -> record.ruleId().equals("finish"))
+            .toList();
+
+        assertTrue(result.reached());
+        assertEquals(2, finishDecisions.size());
+        assertEquals(1, finishDecisions.stream().filter(SearchTrajectoryRecord::selectedPath).count(),
+            "value-equivalent parent states must not both be labelled as the concrete chosen transition");
+        assertEquals(1, finishDecisions.stream()
+            .map(SearchTrajectoryRecord::parent)
+            .map(ExpressionFingerprint::valueHash)
+            .distinct()
+            .count(), "the competing parents deliberately share one mathematical value");
+    }
+
+    @Test
     void exportsByteIdenticalJsonlAndBalancedThreeFamilySummary() {
         List<SearchTrajectoryRun> firstRuns = List.of(
             neutralRun("neutral-run"),
@@ -194,11 +228,16 @@ class SearchTrajectoryDatasetTest {
             runId,
             family,
             "test-producer-v1",
-            List.of("distractor", "double", "factor", "noise", "remove-one", "remove-zero", "square"),
+            List.of("distractor", "double", "factor", "finish", "left-branch", "noise",
+                "remove-one", "remove-zero", "right-branch", "square"),
             DatasetSplit.UNASSIGNED);
     }
 
     private static Transformation step(String rule, String output) {
+        return stepWithKey(rule, output, rule + ":" + output);
+    }
+
+    private static Transformation stepWithKey(String rule, String output, String applicationKey) {
         return new Transformation(
             rule,
             output,
@@ -206,6 +245,6 @@ class SearchTrajectoryDatasetTest {
             false,
             0,
             true,
-            rule + ":" + output);
+            applicationKey);
     }
 }
