@@ -1,634 +1,423 @@
 # ADR: Define mathematical expression identity
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-12
-- Related: PR #241, `ExpressionCanonicalizer`, `BinaryExpr`, equality saturation
+- Decision date: 2026-07-12
+- Related: PR #241, `ExpressionCanonicalizer`, `BinaryExpr`, `TreePosition`,
+  `TermOccurrenceIndex`, equality saturation
+- Evidence: `docs/architecture/expression-identity-inventory.md`,
+  `docs/architecture/expression-identity-benchmark-results.md`
 
-## Decision to make
+## Decision
 
-The primary architecture decision is:
+Regelsuche adopts **layered expression identity**.
 
-> **When do two representations denote the same expression in Regelsuche, and how
-> is that identity represented in memory?**
+The project will distinguish four kinds of identity and will not encode all four in
+one Java object:
 
-The following questions are consequences of that decision rather than independent
-starting points:
+1. **Syntax/notation identity** — how an expression was written or generated,
+   including grouping, operand order and source position.
+2. **Occurrence/use identity** — one concrete use of an expression inside a syntax
+   root or derivation step.
+3. **Mathematical value identity** — the immutable expression value under the
+   explicitly declared laws of the active domain.
+4. **Equivalence-class identity** — broader, dynamic equivalence under a selected
+   rewrite theory and assumption context.
 
-- whether the core representation is a tree or DAG;
-- whether equal values are interned by a factory;
-- whether syntax and mathematical value use separate node models;
-- whether parent positions belong to nodes or to edges/occurrences;
-- whether canonicalization or an e-graph defines identity;
-- whether rule, search and compiled-execution caches can use `Expr` directly as a
-  stable key.
+The selected representation is:
 
-This ADR must first define the identity domains and their laws. Only then may it
-choose the concrete representation.
+> **The current syntax AST remains the occurrence and notation representation,
+> while a separate, immutable and scoped-interned mathematical value DAG is added.
+> A typed occurrence index links syntax occurrences to value nodes. E-classes remain
+> a broader equivalence layer above ordinary value identity.**
 
-## Context
+This is representation alternative E from the proposal, with one important
+migration refinement: Regelsuche does not introduce a second independent semantic
+*tree*. It introduces shared value nodes and evolves the existing occurrence-index
+concept into the linking layer.
 
-Regelsuche currently represents expressions primarily through the binary `Expr`
-hierarchy. For ordinary addition, expressions such as
+## Exact identity contracts
 
-```text
-(a + b) + c
+### Current `Expr`
 
-a + (b + c)
+During migration, `Expr` continues to denote the existing syntax-shaped node.
 
-c + a + b
-```
+- `Expr.equals` remains structural.
+- Binary grouping and child order remain part of that equality.
+- Existing constructors remain available.
+- Existing exact rules, visitors and local rewrites continue to operate on `Expr`.
+- `Expr` is not globally interned.
 
-are structurally different even though associativity and commutativity make them
-the same mathematical sum in the relevant domain.
+This is required because current code already uses Java reference identity of parsed
+`Expr` nodes as process-local occurrence identity. In particular,
+`AstVisitorContext` stores metadata in an `IdentityHashMap<Expr, ...>`.
 
-The current `ExpressionCanonicalizer` already flattens and groups terms, imposes a
-stable output order and reconstructs a binary expression. Thus Regelsuche already
-uses more than one practical notion of sameness:
+### Mathematical value
 
-- structural equality of the parsed binary tree;
-- equality of canonical output;
-- equality under selected rewrite rules or e-classes;
-- identity of a concrete occurrence used by local rewrites and explanations.
+A new value abstraction, provisionally named `ExprValue`, denotes an immutable
+mathematical expression value.
 
-These notions are useful, but their boundaries are not yet explicit.
+Its equality and stable key:
 
-The discussion leading to this ADR also showed that a Java collection type cannot
-be chosen correctly before identity is defined. A `Set<Expr>` loses two occurrences
-of `a` only if both elements are equal according to the set's equality relation. If
-`Expr` denotes a shared mathematical value and occurrences are separate edge or use
-objects, a normal set of uses may preserve multiplicity while remaining unordered.
-A multiset is another possible implementation, but it is not itself the
-architecture decision.
+- exclude source spans, display order, grouping and occurrence IDs;
+- apply only laws explicitly declared for the operator and domain;
+- preserve multiplicity unless the domain explicitly declares idempotence;
+- remain stable across factory scopes and serialization;
+- do not depend on collection iteration order.
 
-## Identity domains
-
-Regelsuche needs at least four explicitly separated identity domains.
-
-### 1. Mathematical value identity
-
-Answers:
-
-> Do these objects denote the same mathematical expression under the laws selected
-> for this domain?
-
-For ordinary addition this may identify regroupings and permutations while still
-distinguishing
-
-```text
-a + a + b
-```
-
-from
-
-```text
-a + b
-```
-
-Mathematical value identity excludes source spans, formatting and occurrence IDs.
-It must not depend on collection iteration order.
-
-### 2. Representation identity
-
-Answers:
-
-> Are these the same chosen representation of a mathematical value?
-
-An e-class may contain several representations of one value. Conversely, a
-canonical semantic node may choose one representation as the stable value object.
-The architecture must not silently equate representation identity with full
-mathematical equivalence unless the supported theory makes that safe and bounded.
-
-### 3. Occurrence or use identity
-
-Answers:
-
-> Is this the same concrete use of an expression inside a containing expression or
-> derivation step?
-
-In
-
-```text
-(a + b) * (a + b)
-```
-
-there may be one mathematical `a + b` value but two uses. In
-
-```text
-a + a + b
-```
-
-there may be one mathematical variable value `a` with two uses.
-
-Occurrence identity is required for:
-
-- replacing one occurrence rather than all uses;
-- source highlighting;
-- local tree positions;
-- provenance and explanations;
-- preserving multiplicity when several uses point to one value.
-
-### 4. Notation identity
-
-Answers:
-
-> Is this the same written or generated notation?
-
-It includes grouping, operand order, explicit parentheses, source position and
-possibly display-specific choices. Notation identity is not mathematical identity.
-
-## Required invariants
-
-Any accepted architecture must satisfy these invariants.
-
-### Mathematical laws are explicit
-
-Associativity, commutativity, idempotence and other properties are declared per
-operator and domain. They are not inferred from Java collection types.
-
-For an operator declared associative and commutative:
+For ordinary associative and commutative addition:
 
 ```java
 sameValue(sum(a, b, c), sum(c, a, b));
 sameValue(sum(sum(a, b), c), sum(a, sum(b, c)));
-```
-
-Multiplicity remains significant unless a separate law says otherwise:
-
-```java
 !sameValue(sum(a, a, b), sum(a, b));
 ```
 
-Subtraction is not accidentally made commutative.
+Subtraction, division and other non-commutative operators retain operand roles and
+order.
 
-### Values do not have one parent
+### Factory-scoped reference identity
 
-A mathematical expression value may be used several times. Therefore a value node
-must not expose one authoritative mutable `parent()` or one tree position.
-Parent relationships belong to occurrences, uses or graph edges.
-
-### Local replacement is occurrence-based
-
-Replacing one selected occurrence must not replace every use of a shared value.
-Replacing the mathematical value globally must be a different explicit operation.
-
-### Formatting does not define identity
-
-A deterministic formatter may sort operands for stable output, but display order
-must not participate in mathematical equality.
-
-### Construction preserves the chosen identity contract
-
-Parsing, factories, copying and deserialization must produce values that obey the
-same identity rules. Object identity may be used as an optimisation only when a
-factory guarantees it.
-
-## Decision drivers
-
-1. **Mathematical faithfulness** — the model must encode operator laws without
-   adding irrelevant order or grouping information.
-2. **Didactic traceability** — concrete written occurrences and derivation history
-   must remain addressable.
-3. **Search-space control** — equivalent syntactic variants should not create
-   redundant semantic states unless intentionally explored.
-4. **Rule compatibility** — existing exact rules and PR #241's bounded AC-aware
-   recognition need an incremental migration path.
-5. **Performance** — identity should enable safe caching, common-subexpression
-   sharing and potentially compiled execution.
-6. **Cognitive cost** — ordinary rule authors must not manually coordinate values,
-   uses, syntax nodes, projections and e-classes.
-7. **Lifecycle safety** — interning, reverse-use indices and caches must have bounded
-   ownership and memory behaviour.
-8. **Persistence stability** — deserialization must reconstruct the same value and
-   occurrence relations without relying on transient JVM identities.
-
-## Candidate identity policies
-
-Before comparing data structures, the spike must compare these identity policies.
-
-### Policy P1: structural syntax identity
-
-Two expressions are identical only if operator, child order and binary grouping are
-identical.
-
-This matches the current `BinaryExpr` shape but requires canonicalization or
-matching logic elsewhere for mathematical equivalence.
-
-### Policy P2: canonical semantic value identity
-
-Two expressions have the same value identity when a bounded, explicitly defined
-canonical constructor maps them to the same semantic structure.
-
-For AC addition, operand order and grouping are removed from the value identity.
-This can support stable hashing and interning.
-
-### Policy P3: equivalence-class identity
-
-Two representations have the same mathematical identity when they belong to the
-same e-class under an explicitly selected rewrite theory and budget.
-
-This makes equivalence first-class but may be too broad or dynamic to serve as the
-ordinary identity of every `Expr` object.
-
-### Policy P4: layered identity
-
-Use canonical semantic value identity for ordinary immutable values and e-classes
-for broader equivalence among those values. Keep occurrence and notation identity
-separate.
-
-This is the preliminary leading policy, but it must be tested rather than assumed.
-
-## Representation alternatives derived from the identity policy
-
-### A. Binary syntax tree plus external canonicalization
-
-`Expr` remains a syntax-shaped value and mathematical identity remains external.
-
-**Advantages**
-
-- lowest migration cost;
-- existing rules and tree positions remain valid;
-- no new construction discipline.
-
-**Disadvantages**
-
-- identity remains fragmented across subsystems;
-- equivalent groupings and permutations complicate search;
-- common subexpressions are duplicated;
-- `Expr` is a weak cache key for semantic work.
-
-### B. Semantic-only AST
-
-Replace the syntax tree with operation-specific semantic nodes.
-
-**Advantages**
-
-- direct mathematical model;
-- small semantic state space.
-
-**Disadvantages**
-
-- notation and concrete occurrences still need a second mechanism;
-- original input cannot be reconstructed reliably;
-- unsuitable as an immediate replacement for didactic and local-rewrite features.
-
-### C. Syntax AST plus separate semantic AST and projection graph
-
-Maintain two node hierarchies and explicit many-to-many mappings.
-
-**Advantages**
-
-- clean separation of notation and meaning;
-- explicit bidirectional provenance;
-- semantic structure remains navigable.
-
-**Disadvantages**
-
-- duplicated structure and synchronisation cost;
-- equal semantic subexpressions may still be duplicated;
-- large conceptual surface.
-
-### D. Syntax AST plus canonical keys or e-classes
-
-Keep the syntax tree and add non-node semantic identities.
-
-**Advantages**
-
-- lower implementation cost;
-- fits transposition tables and existing e-graph work.
-
-**Disadvantages**
-
-- canonical keys do not expose internal semantic structure;
-- concrete uses and provenance remain underspecified;
-- compiled-expression caches need another stable unit.
-
-### E. Interned semantic value DAG plus occurrence and notation graphs
-
-A central factory creates immutable mathematical values. Equal canonical values may
-be represented by the same Java object. Concrete uses and notation are separate.
-
-Conceptually:
-
-```java
-interface ExprValue {}
-
-record ExprUse(
-    UseId id,
-    ExprValue parent,
-    ExprValue child,
-    OperandRole role,
-    SourceSpan sourceSpan
-) {}
-```
-
-The concrete API may differ. The important boundary is that values and uses are not
-the same objects.
-
-For selected AC operators, the factory key ignores order and grouping while
-preserving multiplicity. The internal collection may be a multiset, coefficient
-map, set of use edges or another immutable structure whose public semantics satisfy
-the invariants.
-
-**Advantages**
-
-- shared common subexpressions;
-- `==` can be a valid fast path inside one factory scope;
-- rule analyses and compiled evaluators can be cached per value;
-- reverse-use indices permit upward context search;
-- occurrence-specific rewrites remain possible;
-- natural basis for DAG evaluation and common-subexpression elimination.
-
-**Disadvantages**
-
-- all value construction must eventually use a trusted factory;
-- pool scope, weak references, concurrency and persistence require design;
-- local versus global replacement must be explicit;
-- canonical constructor correctness becomes foundational.
-
-### F. E-graph as the primary value model
-
-Use e-nodes and e-classes as the ordinary semantic layer.
-
-**Advantages**
-
-- equivalence is first-class;
-- works naturally with equality saturation.
-
-**Disadvantages**
-
-- one e-class is not one chosen representation;
-- extraction policy affects display, compilation and matching;
-- occurrence identity remains separate;
-- may impose equality-saturation complexity on ordinary operations.
-
-## Factory and interning implications
-
-If policy P2 or P4 with representation E is selected, the factory should make these
-properties testable within a declared scope:
+A bounded owner supplies an `ExprValueFactory`. Within that factory scope, equal
+canonical values are interned and may use reference equality as a fast path:
 
 ```java
 ExprValue a1 = factory.variable("a");
 ExprValue a2 = factory.variable("a");
 assert a1 == a2;
-
-assert factory.sum(a, b, c) == factory.sum(c, a, b);
-assert factory.sum(factory.sum(a, b), c)
-    == factory.sum(a, factory.sum(b, c));
-
-assert factory.sum(a, a, b) != factory.sum(a, b);
 ```
 
-Reference identity is then an implementation guarantee inside the factory scope,
-not the persisted definition of mathematical equality. Stable structural keys must
-remain available for persistence and cross-scope comparison.
+The scope is explicit, for example one parse bundle, search session, compilation
+unit or another bounded lifecycle. This ADR rejects an unbounded global intern pool.
 
-## Parent and pattern navigation
+Reference identity is an optimization and sharing guarantee inside one scope. It is
+not the persisted definition of mathematical equality. A stable structural
+`ValueKey` remains authoritative across scopes and deserialization.
 
-A shared value can have several uses. Upward navigation therefore belongs in a
-separate owned index, conceptually:
+### Occurrence/use identity
+
+A concrete occurrence has its own identity independent of the value it references.
+Conceptually:
 
 ```java
-Map<ExprValue, Set<ExprUse>> usesByChild;
+record ExprOccurrence(
+    OccurrenceId id,
+    TreePosition position,
+    Expr syntax,
+    ExprValue value
+) {}
 ```
 
-This can support:
+The final API may differ, but it must support:
 
-- finding all parent contexts of a value;
-- beginning pattern discovery at a selected value and searching outward;
-- reusing one rule analysis at several occurrences;
-- incremental invalidation and impact analysis;
-- finding common subexpressions before evaluation or compilation.
+- two occurrences referencing the same value;
+- local replacement of one occurrence without replacing all uses;
+- forward lookup from syntax occurrence to value;
+- reverse lookup from value to all occurrences in the owned root;
+- source highlighting, provenance and parent/operand roles.
 
-The index must not make otherwise immutable value nodes globally mutable.
+A mathematical value has no single mutable `parent()` and no single tree position.
+Parent relationships belong to occurrences or edges.
 
-## Compiled execution implications
+## Java collection decision
 
-No runtime compiler is required by this ADR. However, value identity may become the
-key for compiled or interpreted execution caches.
+This ADR does **not** reject Java `Set` as a general representation.
 
-For
+A normal
+
+```java
+Set<ExprOccurrence>
+```
+
+is appropriate for an unordered collection of occurrences when occurrence identity
+is explicit. Two occurrences may have different IDs while both reference the same
+interned `ExprValue`.
+
+A bare
+
+```java
+Set<ExprValue>
+```
+
+cannot by itself represent general addition because value equality would collapse
+`a + a + b` to the same members as `a + b`.
+
+The mathematical contract of an AC operation must preserve multiplicity. Its
+internal representation may be any immutable structure satisfying that contract,
+including:
+
+- `Map<ExprValue, Integer>` multiplicities;
+- a multiset;
+- a coefficient map where algebraically valid;
+- a set of explicit use/edge objects plus value-independent semantic equality.
+
+The public semantic contract is more important than the chosen Java collection.
+
+## Why this decision was selected
+
+### Existing architecture already contains the required pieces
+
+The inventory found several partial forms of the selected architecture:
+
+- `TreePosition` identifies a concrete subtree within a syntax root.
+- `AstVisitorContext` distinguishes equal syntax nodes by reference.
+- `TermOccurrenceIndex` already stores every occurrence separately while grouping
+  by a provisional canonical string value.
+- `ExpressionCanonicalizer` already provides bounded mathematical keys used across
+  search and mining.
+- `EGraph` already hash-conses e-nodes and keeps broader equivalence and parent
+  relationships outside the syntax AST.
+
+The selected design aligns these concepts instead of adding a second unrelated
+semantic tree and a new manually synchronized projection subsystem.
+
+### Functional spike results
+
+The bounded addition/repeated-subexpression spike established:
+
+- AC-equivalent syntax trees can share one value identity.
+- Multiplicity remains significant.
+- A normal set preserves two uses of one shared value when its elements are
+  occurrences.
+- One value can have several concrete paths and parent contexts.
+- A local rewrite remains occurrence-based.
+- Stable structural keys preserve equality across factory scopes.
+- A pure evaluator can memoize each shared value once.
+
+For the AC corpus `(a+b)+c`, `a+(b+c)` and `c+a+b`:
+
+- concrete syntax occurrences: 15;
+- non-interned semantic value allocations: 15;
+- distinct scoped-interned values: 7.
+
+For `(a+b)*(a+b)`:
+
+- concrete occurrences: 7;
+- distinct values: 4 (`a`, `b`, `a+b`, and the product).
+
+### Performance evidence
+
+JMH run 479 measured the prototype on Temurin 21.0.11:
+
+| Operation | Mean |
+|---|---:|
+| Non-interned value projection, 256-expression corpus | 77.224 µs/op |
+| Interned projection, fresh scope | 115.989 µs/op |
+| Interned projection, warm scope | 110.636 µs/op |
+| Repeated-subexpression tree evaluation | 1.23194 µs/op |
+| Memoized value-DAG evaluation | 0.178929 µs/op |
+
+The prototype's interning construction was approximately 1.43–1.50× slower than
+plain semantic allocation. The DAG evaluator was approximately 6.88× faster on the
+intentionally repeated pure-expression corpus.
+
+Therefore the decision is **not** to rebuild or re-intern values inside every rule
+match. The value graph is built once per bounded owner and reused. Construction
+cost is accepted only where subsequent search, matching, analysis or evaluation can
+amortize it.
+
+### Cognitive-cost comparison
+
+A permanent dual-AST design requires ordinary code to distinguish and synchronize:
+
+- syntax nodes;
+- semantic-tree nodes;
+- projection links;
+- source occurrences;
+- e-classes.
+
+The selected design reuses existing concepts:
+
+- syntax AST for notation and local positions;
+- an occurrence index evolved from `TermOccurrenceIndex`;
+- shared values for canonical identity and caches;
+- e-classes only for broader equivalence.
+
+Ordinary syntax rules can remain unaware of the value layer. Value-aware rules and
+performance-sensitive services opt into a focused facade rather than maintaining
+links manually.
+
+## Relationship to PR #241
+
+PR #241's recognition profiles remain valid and are not replaced wholesale.
+
+A canonical value layer may later supply the AC-normalized inputs and stable keys
+used by recognition. PR #241 remains responsible for concerns beyond ordinary value
+identity, including:
+
+- exact versus broadened recognition policy;
+- syntax-sensitive patterns;
+- bounded algebraic binding inference;
+- allow-listed equivalence providers;
+- anti-unification across broader representations.
+
+The recognition normalizer should eventually delegate shared AC/value logic rather
+than maintain a competing canonicalization implementation.
+
+## Relationship to the e-graph
+
+An `ExprValue` is one immutable canonical value representation under the ordinary,
+bounded value laws.
+
+An e-class represents one or more values/representations proven equivalent under a
+selected rewrite theory, assumptions and saturation budget. E-class identity can
+change after union/rebuild and therefore is not the ordinary identity of
+`ExprValue`.
+
+The boundary is:
 
 ```text
-(a + b)^2 + sin(a + b)
+syntax occurrence -> ExprValue -> EClassId
 ```
 
-an interned DAG can expose the shared `a + b` value and permit conceptual code such
-as:
+The e-graph may reuse `ValueKey` or value children, but it does not replace concrete
+occurrence identity.
 
-```java
-double t0 = a + b;
-return t0 * t0 + Math.sin(t0);
-```
+## Relationship to compiled execution
 
-Potential caches include:
+Pure analysis, evaluators, method handles or generated bytecode may use
+`ExprValue` as a cache key. Shared value nodes expose common subexpressions without
+requiring a separate compiler-only CSE pass.
 
-```java
-Map<ExprValue, CompiledExpression> compiledExpressions;
-Map<RuleAndValue, MatchProgram> compiledMatchers;
-```
+Mutable runtime state, tracing and explanation metadata must not be attached to a
+shared value. Those remain execution- or occurrence-specific.
 
-This benefit must be measured. It must not determine the architecture by itself.
-Only pure mathematical values may be shared or evaluated this way; tracing and
-explanation remain occurrence-specific.
+This ADR permits compiled execution; it does not require a bytecode library or a
+production compiler.
 
-## Decision process
+## Rejected alternatives
 
-This ADR does not authorize a repository-wide migration. The decision is produced
-through the following gates.
+### Keep only the binary syntax AST
 
-### Gate 1: Specify executable identity laws
+Rejected as the long-term identity model because mathematical identity remains
+fragmented among canonical strings, matchers, search hashes and e-classes. The
+syntax AST remains, but it is no longer expected to carry mathematical value
+identity by itself.
 
-Tests must cover:
+### Replace `Expr` with a semantic-only AST
 
-- structural identity versus mathematical value identity;
-- AC-equivalent additions;
-- significant multiplicity;
-- non-commutative subtraction;
-- one value with several occurrences;
+Rejected because Regelsuche needs original notation, concrete occurrences,
+didactic steps, local paths and syntax-sensitive rules.
+
+### Two independent ASTs plus a general projection graph
+
+Rejected as the primary architecture. It is mathematically viable but duplicates
+equal semantic subexpressions, introduces another complete hierarchy and creates a
+larger synchronization surface than necessary.
+
+A projection *view* or adapter may still exist during migration, but the semantic
+side is a shared value DAG rather than an independently owned tree.
+
+### Canonical strings or hashes only
+
+Rejected as the complete solution because keys do not expose typed substructure,
+use relationships or a suitable compilation/cache graph. Canonical strings remain
+compatibility and persistence tools.
+
+### E-graph as the primary ordinary expression model
+
+Rejected because e-class identity is dynamic, theory- and assumption-dependent, and
+contains multiple representations. Equality saturation remains an optional broader
+reasoning layer.
+
+### Global interning
+
+Rejected because an unbounded global pool creates retention, concurrency and test
+isolation risks. Interning must have an explicit owner and lifecycle.
+
+## Consequences
+
+### Positive
+
+- AC value identity no longer encodes meaningless grouping or order.
+- Equal subexpressions can share analyses, rule results and compiled artifacts.
+- Concrete occurrences remain independently selectable and explainable.
+- Search and transposition keys can migrate from formatted strings to typed stable
+  value keys without breaking existing APIs immediately.
+- The design fits the current e-graph and occurrence-index direction.
+
+### Costs
+
+- A new value hierarchy and factory must be maintained.
+- Every operator needs an explicit law/normalization policy.
+- Value construction adds measurable overhead and must be cached or amortized.
+- Persistence must store stable keys/structure and re-intern on load.
+- Debugging tools must display both value identity and occurrence paths when needed.
+
+## Implementation sequence
+
+The architecture is accepted; production migration proceeds in separate changes.
+
+### Phase 1: Core value model
+
+Introduce in `regelsuche-core`:
+
+- immutable `ExprValue` variants;
+- `ValueKey` with deterministic serialization/hashing;
+- `ExprValueFactory` with explicit bounded scope;
+- operator-law metadata;
+- AC sum/product nodes with multiplicity-preserving semantics;
+- adapters from existing `Expr`.
+
+Do not change `Expr.equals` or remove existing constructors.
+
+### Phase 2: Typed occurrence index
+
+Evolve the existing occurrence concepts rather than adding a parallel general graph:
+
+- add explicit `OccurrenceId`;
+- associate `TreePosition`/source information with `ExprValue`;
+- provide forward and reverse lookup;
+- preserve compatibility with `TermOccurrenceIndex` and local rewrites;
+- migrate plugin metadata from raw `Expr` reference identity when an occurrence
+  context is available.
+
+### Phase 3: Canonicalization and search adapters
+
+- derive stable value hashes from `ValueKey`;
+- keep `ExpressionCanonicalizer` compatibility during migration;
+- build one value graph per search/session and reuse it;
+- migrate transposition and analysis caches incrementally;
+- measure construction and retained-memory costs on representative searches.
+
+### Phase 4: Recognition and e-graph integration
+
+- let recognition reuse value normalization where profiles permit it;
+- retain syntax-sensitive and broader-equivalence matching paths;
+- map `ExprValue` into e-nodes without conflating value and e-class identity;
+- preserve assumption fingerprints.
+
+### Phase 5: Optional compiled execution
+
+Prototype evaluator/matcher caches keyed by `ExprValue`. Adopt generated bytecode or
+method handles only when a separate benchmark demonstrates a production benefit.
+
+## Required safeguards
+
+Production implementation must include tests for:
+
+- AC equality independent of grouping, order and construction order;
+- multiplicity preservation;
+- non-commutative operator roles;
+- two occurrences referencing one value;
 - local replacement of one occurrence;
-- deterministic formatting independent of equality;
-- persistence or reconstruction of stable value keys;
-- interning guarantees where enabled.
-
-### Gate 2: Inventory current identity assumptions
-
-Identify where Regelsuche currently relies on:
-
-- `Expr.equals`;
-- reference identity;
-- formatted canonical strings;
-- tree paths;
-- transposition-table hashes;
-- e-class membership;
-- parent or subtree reconstruction.
-
-Classify each use as value, representation, occurrence or notation identity. This
-inventory is required before migration estimates are trusted.
-
-### Gate 3: Build bounded competing spikes
-
-Implement parsed addition in internal experimental packages without changing public
-rule APIs.
-
-#### Spike C: dual AST and projection
-
-```java
-record ParsedExpression(
-    Expr syntax,
-    SemanticExpr semantic,
-    ProjectionGraph projection
-) {}
-```
-
-#### Spike E: interned values and uses
-
-```java
-record ParsedExpressionGraph(
-    SyntaxView notation,
-    ExprValue valueRoot,
-    UseGraph uses
-) {}
-```
-
-Both must preserve source occurrences and AC value identity. Ordinary rules must
-not maintain mappings manually.
-
-### Gate 4: Measure search and rule behaviour
-
-Using the same corpus, record:
-
-- distinct syntax and value states;
-- construction and parsing time;
-- matching and search runtime;
-- memory and retained-object counts;
-- common-subexpression sharing;
-- analysis-cache hit rates;
-- rule migration count;
-- overlap with PR #241;
-- explanation quality for `a + a + b -> 2*a + b`;
-- correctness of single-occurrence rewrites.
-
-### Gate 5: Test compilation-key value
-
-Build a small pure evaluator or method-handle/interpreter prototype. Compare tree
-and DAG execution, reuse of repeated subexpressions and cache-key simplicity. Full
-bytecode generation is unnecessary if it would obscure the identity question.
-
-### Gate 6: Review cognitive cost
-
-Review representative parser, rule, local rewrite, explanation, persistence,
-search-cache and optional evaluator code. Ordinary rule authors must not need to
-reason about all identity layers simultaneously.
-
-### Gate 7: Select identity policy first
-
-Choose among P1–P4 based on the evidence. Record explicitly:
-
-- what `Expr.equals` means;
-- whether `Expr` denotes a value or occurrence;
-- whether equal values are interned;
-- factory scope and lifecycle;
-- the role of canonical keys;
-- the relationship between values and e-classes.
-
-### Gate 8: Select representation second
-
-Only after Gate 7, select A–F as the representation that best implements the chosen
-identity policy.
-
-### Gate 9: Finalise the ADR
-
-Update this file with:
-
-- `Status: Accepted` or `Rejected`;
-- selected identity policy;
-- selected representation;
-- measurements;
-- rejected alternatives;
-- migration stages and follow-up issues.
-
-No repository-wide migration may start while this ADR remains `Proposed`.
-
-## Preliminary hypothesis
-
-The leading hypothesis is:
-
-- **P4 layered identity**: canonical semantic value identity for ordinary immutable
-  values, separate occurrence and notation identity, and e-classes for broader
-  equivalence;
-- implemented initially by **E**, an interned semantic value DAG with separate use
-  and notation structures;
-- with **C** as fallback if explicit semantic projection is valuable but interning
-  lifecycle and factory complexity are not justified.
-
-This is deliberately a hypothesis, not the decision. The spike must test whether
-one interned value layer genuinely unifies:
-
-- mathematical identity;
-- AC deduplication;
-- common-subexpression sharing;
-- rule and search caching;
-- parent-context navigation;
-- occurrence provenance;
-- future compiled execution.
-
-It must also test whether that apparent unification merely moves excessive
-complexity into canonical construction, pool ownership and use-graph maintenance.
-
-## Provisional boundaries under the leading hypothesis
-
-### Mathematical value layer
-
-Owns immutable operators, operands, declared operator laws, stable structural keys
-and optional factory-scoped reference identity. It has no source span and no single
-parent.
-
-### Occurrence/use layer
-
-Owns parent-child uses, operand roles, multiplicity of uses, source selection,
-reverse context lookup and local replacement identity.
-
-### Notation layer
-
-Owns grouping, written order, explicit parentheses, source spans and exact rewrite
-presentation.
-
-### E-graph layer
-
-Owns broader equivalence among mathematical values or representations. It does not
-replace occurrence identity.
-
-### Cache/compiler layer
-
-May key pure analysis or compiled execution by immutable mathematical value. Mutable
-runtime state must not be attached directly to globally shared values.
-
-## Risks and mitigations
-
-| Risk | Mitigation |
-|------|------------|
-| The word "identity" hides several meanings | Require every API and test to classify value, representation, occurrence or notation identity |
-| Intern pools retain expressions indefinitely | Compare scoped factories, weak interning and search-session ownership |
-| Direct constructors violate factory guarantees | Keep the spike internal and restrict constructors only after acceptance |
-| Sharing values makes local replacement ambiguous | Require an explicit occurrence/use identifier for local rewrites |
-| Mutable parent links corrupt shared values | Keep parent/use relations in a separately owned graph or index |
-| AC canonical construction becomes too aggressive | Declare laws per operator/domain and preserve unsupported distinctions |
-| Persistence loses JVM reference identity | Persist stable structural keys and re-intern on load |
-| PR #241 duplicates canonical AC matching | Measure which syntax-recognition capabilities remain necessary |
-| Bytecode ambitions distort the core decision | Treat compilation as one measured driver, not a mandatory outcome |
-| Layering increases cognitive load | Provide focused syntax-rule and value-rule facades; mappings remain framework-owned |
+- stable keys across factory scopes and serialization;
+- bounded factory lifecycle and release;
+- no occurrence metadata stored on shared values;
+- compatibility with assumption-aware identity;
+- deterministic formatting that does not define equality.
 
 ## Non-goals
 
-This ADR does not yet decide:
+This ADR does not decide:
 
 - that every operator is associative or commutative;
-- that subtraction is unordered;
-- a concrete Java collection type for sums;
-- global versus scoped interning;
-- a bytecode library or requirement to generate bytecode;
-- replacement of equality saturation;
-- a repository-wide rule rewrite;
-- the final persistence format.
+- the final class names or package layout;
+- one mandatory Java collection implementation for sums;
+- a bytecode-generation library;
+- immediate replacement of `ExpressionCanonicalizer`;
+- immediate migration of all existing rules;
+- replacement of equality saturation.
 
-Those decisions follow from measured evidence or later ADRs.
+Those are implementation or follow-up decisions constrained by the identity model
+accepted here.
