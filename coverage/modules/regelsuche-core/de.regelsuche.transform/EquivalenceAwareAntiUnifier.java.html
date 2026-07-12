@@ -21,15 +21,16 @@ import java.util.Objects;
 <span class="pc bpc" id="L21" title="2 of 4 branches missed.">        if (examples == null || examples.size() &lt; 2) {</span>
 <span class="nc" id="L22">            throw new IllegalArgumentException(&quot;at least two examples are required&quot;);</span>
         }
-<span class="fc" id="L24">        List&lt;Expr&gt; normalized = examples.stream()</span>
-<span class="fc" id="L25">            .map(expr -&gt; RecognitionNormalizer.normalize(expr, profile))</span>
-<span class="fc" id="L26">            .toList();</span>
-<span class="fc" id="L27">        Counter counter = new Counter();</span>
-<span class="fc" id="L28">        PatternExpr result = fromExpr(normalized.get(0));</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">        for (int i = 1; i &lt; normalized.size(); i++) {</span>
-<span class="fc" id="L30">            result = generalize(result, normalized.get(i), new HashMap&lt;&gt;(), counter);</span>
+        List&lt;Expr&gt; normalized;
+<span class="fc" id="L25">        try (RecognitionNormalizer.Session session = RecognitionNormalizer.session(profile)) {</span>
+<span class="fc" id="L26">            normalized = examples.stream().map(session::normalize).toList();</span>
         }
-<span class="fc" id="L32">        return result;</span>
+<span class="fc" id="L28">        Counter counter = new Counter();</span>
+<span class="fc" id="L29">        PatternExpr result = fromExpr(normalized.get(0));</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        for (int i = 1; i &lt; normalized.size(); i++) {</span>
+<span class="fc" id="L31">            result = generalize(result, normalized.get(i), new HashMap&lt;&gt;(), counter);</span>
+        }
+<span class="fc" id="L33">        return result;</span>
     }
 
     private PatternExpr generalize(
@@ -38,60 +39,60 @@ import java.util.Objects;
         Map&lt;String, PatternExpr&gt; reused,
         Counter counter
     ) {
-<span class="pc bpc" id="L41" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber number</span>
-<span class="fc" id="L42">            &amp;&amp; expression instanceof NumberExpr other</span>
-<span class="pc bpc" id="L43" title="1 of 2 branches missed.">            &amp;&amp; Double.compare(number.value(), other.value()) == 0) {</span>
-<span class="fc" id="L44">            return pattern;</span>
+<span class="pc bpc" id="L42" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber number</span>
+<span class="fc" id="L43">            &amp;&amp; expression instanceof NumberExpr other</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            &amp;&amp; Double.compare(number.value(), other.value()) == 0) {</span>
+<span class="fc" id="L45">            return pattern;</span>
         }
-<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable</span>
-<span class="fc" id="L47">            &amp;&amp; expression instanceof VariableExpr other</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            &amp;&amp; variable.name().equals(other.name())) {</span>
-<span class="nc" id="L49">            return pattern;</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable</span>
+<span class="fc" id="L48">            &amp;&amp; expression instanceof VariableExpr other</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            &amp;&amp; variable.name().equals(other.name())) {</span>
+<span class="nc" id="L50">            return pattern;</span>
         }
-<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.Operation operation</span>
-<span class="fc" id="L52">            &amp;&amp; expression instanceof BinaryExpr other</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            &amp;&amp; operation.operator() == other.operator()) {</span>
-<span class="fc" id="L54">            return PatternExpr.op(</span>
-<span class="fc" id="L55">                operation.operator(),</span>
-<span class="fc" id="L56">                generalize(operation.left(), other.left(), reused, counter),</span>
-<span class="fc" id="L57">                generalize(operation.right(), other.right(), reused, counter)</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">        if (pattern instanceof PatternExpr.Operation operation</span>
+<span class="fc" id="L53">            &amp;&amp; expression instanceof BinaryExpr other</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            &amp;&amp; operation.operator() == other.operator()) {</span>
+<span class="fc" id="L55">            return PatternExpr.op(</span>
+<span class="fc" id="L56">                operation.operator(),</span>
+<span class="fc" id="L57">                generalize(operation.left(), other.left(), reused, counter),</span>
+<span class="fc" id="L58">                generalize(operation.right(), other.right(), reused, counter)</span>
             );
         }
-<span class="pc bpc" id="L60" title="3 of 4 branches missed.">        if (pattern instanceof PatternExpr.Function function</span>
-<span class="nc" id="L61">            &amp;&amp; expression instanceof FunctionExpr other</span>
-<span class="nc bnc" id="L62" title="All 2 branches missed.">            &amp;&amp; function.name().equals(other.name())</span>
-<span class="nc bnc" id="L63" title="All 2 branches missed.">            &amp;&amp; function.arguments().size() == other.arguments().size()) {</span>
-<span class="nc" id="L64">            List&lt;PatternExpr&gt; args = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L65" title="All 2 branches missed.">            for (int i = 0; i &lt; function.arguments().size(); i++) {</span>
-<span class="nc" id="L66">                args.add(generalize(function.arguments().get(i), other.arguments().get(i), reused, counter));</span>
+<span class="pc bpc" id="L61" title="3 of 4 branches missed.">        if (pattern instanceof PatternExpr.Function function</span>
+<span class="nc" id="L62">            &amp;&amp; expression instanceof FunctionExpr other</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            &amp;&amp; function.name().equals(other.name())</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">            &amp;&amp; function.arguments().size() == other.arguments().size()) {</span>
+<span class="nc" id="L65">            List&lt;PatternExpr&gt; args = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            for (int i = 0; i &lt; function.arguments().size(); i++) {</span>
+<span class="nc" id="L67">                args.add(generalize(function.arguments().get(i), other.arguments().get(i), reused, counter));</span>
             }
-<span class="nc" id="L68">            return new PatternExpr.Function(function.name(), args);</span>
+<span class="nc" id="L69">            return new PatternExpr.Function(function.name(), args);</span>
         }
-<span class="fc" id="L70">        String key = pattern + &quot; :: &quot; + expression;</span>
-<span class="fc" id="L71">        return reused.computeIfAbsent(key, ignored -&gt; PatternExpr.var(&quot;G&quot; + counter.next()));</span>
+<span class="fc" id="L71">        String key = pattern + &quot; :: &quot; + expression;</span>
+<span class="fc" id="L72">        return reused.computeIfAbsent(key, ignored -&gt; PatternExpr.var(&quot;G&quot; + counter.next()));</span>
     }
 
     private static PatternExpr fromExpr(Expr expression) {
-<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
-<span class="fc" id="L76">            return PatternExpr.num(number.value());</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L77">            return PatternExpr.num(number.value());</span>
         }
-<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L79">            return PatternExpr.variable(variable.name());</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L80">            return PatternExpr.variable(variable.name());</span>
         }
-<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
-<span class="fc" id="L82">            return PatternExpr.op(binary.operator(), fromExpr(binary.left()), fromExpr(binary.right()));</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc" id="L83">            return PatternExpr.op(binary.operator(), fromExpr(binary.left()), fromExpr(binary.right()));</span>
         }
-<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="nc" id="L85">            return new PatternExpr.Function(function.name(), function.arguments().stream()</span>
-<span class="nc" id="L86">                .map(EquivalenceAwareAntiUnifier::fromExpr).toList());</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L86">            return new PatternExpr.Function(function.name(), function.arguments().stream()</span>
+<span class="nc" id="L87">                .map(EquivalenceAwareAntiUnifier::fromExpr).toList());</span>
         }
-<span class="nc" id="L88">        throw new IllegalArgumentException(&quot;unsupported expression type: &quot; + expression.getClass().getName());</span>
+<span class="nc" id="L89">        throw new IllegalArgumentException(&quot;unsupported expression type: &quot; + expression.getClass().getName());</span>
     }
 
     private static final class Counter {
         private int value;
         int next() {
-<span class="fc" id="L94">            return ++value;</span>
+<span class="fc" id="L95">            return ++value;</span>
         }
     }
 }

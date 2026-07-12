@@ -1,8 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ENode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-egraph</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.egraph</a> &gt; <span class="el_source">ENode.java</span></div><h1>ENode.java</h1><pre class="source lang-java linenums">package de.regelsuche.egraph;
 
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
+import de.regelsuche.value.ExprValueFactory.ExprValue;
+import de.regelsuche.value.ExprValueFactory.NumberValue;
+import de.regelsuche.value.ExprValueFactory.OrderedValue;
+import de.regelsuche.value.ExprValueFactory.ValueKey;
+import de.regelsuche.value.ExprValueFactory.ValueOperator;
+import de.regelsuche.value.ExprValueFactory.VariableValue;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * One node in an {@link EGraph}: a symbol (operator name, function name,
@@ -22,16 +41,16 @@ import java.util.Objects;
  */
 public record ENode(String symbol, List&lt;EClassId&gt; children) {
 
-<span class="fc" id="L25">    public ENode {</span>
-<span class="pc bpc" id="L26" title="2 of 4 branches missed.">        if (symbol == null || symbol.isEmpty()) {</span>
-<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;symbol must not be empty&quot;);</span>
+<span class="fc" id="L44">    public ENode {</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">        if (symbol == null || symbol.isEmpty()) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;symbol must not be empty&quot;);</span>
         }
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        children = children == null ? List.of() : List.copyOf(children);</span>
-<span class="fc" id="L30">    }</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        children = children == null ? List.of() : List.copyOf(children);</span>
+<span class="fc" id="L49">    }</span>
 
     /** Convenience constructor for leaves (variables, numbers). */
     public static ENode leaf(String symbol) {
-<span class="fc" id="L34">        return new ENode(symbol, List.of());</span>
+<span class="fc" id="L53">        return new ENode(symbol, List.of());</span>
     }
 
     /**
@@ -39,33 +58,170 @@ public record ENode(String symbol, List&lt;EClassId&gt; children) {
      * canonical (find-root) e-class ID under {@code unionFind}.
      */
     public ENode canonicalize(UnionFind unionFind) {
-<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (children.isEmpty()) {</span>
-<span class="fc" id="L43">            return this;</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (children.isEmpty()) {</span>
+<span class="fc" id="L62">            return this;</span>
         }
-<span class="fc" id="L45">        EClassId[] canonical = new EClassId[children.size()];</span>
-<span class="fc" id="L46">        boolean changed = false;</span>
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (int i = 0; i &lt; children.size(); i++) {</span>
-<span class="fc" id="L48">            EClassId before = children.get(i);</span>
-<span class="fc" id="L49">            EClassId after = unionFind.find(before);</span>
-<span class="fc" id="L50">            canonical[i] = after;</span>
-<span class="fc bfc" id="L51" title="All 2 branches covered.">            if (!Objects.equals(before, after)) {</span>
-<span class="fc" id="L52">                changed = true;</span>
+<span class="fc" id="L64">        EClassId[] canonical = new EClassId[children.size()];</span>
+<span class="fc" id="L65">        boolean changed = false;</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (int i = 0; i &lt; children.size(); i++) {</span>
+<span class="fc" id="L67">            EClassId before = children.get(i);</span>
+<span class="fc" id="L68">            EClassId after = unionFind.find(before);</span>
+<span class="fc" id="L69">            canonical[i] = after;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (!Objects.equals(before, after)) {</span>
+<span class="fc" id="L71">                changed = true;</span>
             }
         }
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (!changed) {</span>
-<span class="fc" id="L56">            return this;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (!changed) {</span>
+<span class="fc" id="L75">            return this;</span>
         }
-<span class="fc" id="L58">        return new ENode(symbol, List.of(canonical));</span>
+<span class="fc" id="L77">        return new ENode(symbol, List.of(canonical));</span>
     }
 
     /** {@code true} if this node has no children. */
     public boolean isLeaf() {
-<span class="fc" id="L63">        return children.isEmpty();</span>
+<span class="fc" id="L82">        return children.isEmpty();</span>
     }
 
     /** Read-only view of the child references. */
     public List&lt;EClassId&gt; childView() {
-<span class="nc" id="L68">        return Collections.unmodifiableList(children);</span>
+<span class="nc" id="L87">        return Collections.unmodifiableList(children);</span>
+    }
+
+    /** Owner-scoped bridge; ValueKey caches values while EClassId remains graph identity. */
+    public static final class ExprValueAdapter {
+        private final EGraph graph;
+<span class="fc" id="L93">        private final Map&lt;ValueKey, EClassId&gt; classesByValue = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L95">        public ExprValueAdapter(EGraph graph) {</span>
+<span class="fc" id="L96">            this.graph = Objects.requireNonNull(graph, &quot;graph&quot;);</span>
+<span class="fc" id="L97">        }</span>
+
+        public EClassId add(ExprValue value) {
+<span class="fc" id="L100">            return add(value, List.of());</span>
+        }
+
+        /** Adds a value while preserving the existing assumption-conflict contract. */
+        public EClassId add(ExprValue value, List&lt;String&gt; assumptions) {
+<span class="fc" id="L105">            Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            List&lt;String&gt; safeAssumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L107">            EClassId direct = addValueNodes(value);</span>
+<span class="fc" id="L108">            EClassId checked = graph.addExpression(toExpression(value), safeAssumptions);</span>
+<span class="fc" id="L109">            EClassId directRoot = graph.find(direct);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (!directRoot.equals(graph.find(checked))) {</span>
+<span class="nc" id="L111">                throw new IllegalStateException(&quot;ExprValue and AST insertion produced different e-classes&quot;);</span>
+            }
+<span class="fc" id="L113">            classesByValue.put(value.key(), directRoot);</span>
+<span class="fc" id="L114">            return directRoot;</span>
+        }
+
+        public Optional&lt;EClassId&gt; classFor(ValueKey key) {
+<span class="fc" id="L118">            EClassId id = classesByValue.get(Objects.requireNonNull(key, &quot;key&quot;));</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            return id == null ? Optional.empty() : Optional.of(graph.find(id));</span>
+        }
+
+        public int mappedValueCount() {
+<span class="fc" id="L123">            return classesByValue.size();</span>
+        }
+
+        private EClassId addValueNodes(ExprValue value) {
+<span class="fc" id="L127">            EClassId existing = classesByValue.get(value.key());</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (existing != null) {</span>
+<span class="fc" id="L129">                return graph.find(existing);</span>
+            }
+            EClassId added;
+<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (value instanceof VariableValue variable) {</span>
+<span class="fc" id="L133">                added = graph.add(leaf(&quot;var:&quot; + variable.name()));</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            } else if (value instanceof NumberValue number) {</span>
+<span class="nc" id="L135">                added = graph.add(leaf(&quot;num:&quot; + format(number.value())));</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            } else if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L137">                List&lt;EClassId&gt; childIds = ordered.operands().stream().map(this::addValueNodes).toList();</span>
+<span class="fc" id="L138">                added = graph.add(new ENode(symbol(ordered.operator()), childIds));</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            } else if (value instanceof AssociativeCommutativeValue acValue) {</span>
+<span class="fc" id="L140">                List&lt;ExprValue&gt; operands = expandedOperands(acValue);</span>
+<span class="fc" id="L141">                EClassId result = addValueNodes(operands.getFirst());</span>
+<span class="fc" id="L142">                String nodeSymbol = symbol(acValue.operator());</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                for (int i = 1; i &lt; operands.size(); i++) {</span>
+<span class="fc" id="L144">                    result = graph.add(new ENode(</span>
+                        nodeSymbol,
+<span class="fc" id="L146">                        List.of(result, addValueNodes(operands.get(i)))));</span>
+                }
+<span class="fc" id="L148">                added = result;</span>
+<span class="fc" id="L149">            } else {</span>
+<span class="nc" id="L150">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L151">                    &quot;unsupported ExprValue type: &quot; + value.getClass().getName());</span>
+            }
+<span class="fc" id="L153">            EClassId canonical = graph.find(added);</span>
+<span class="fc" id="L154">            classesByValue.put(value.key(), canonical);</span>
+<span class="fc" id="L155">            return canonical;</span>
+        }
+
+        private Expr toExpression(ExprValue value) {
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (value instanceof VariableValue variable) {</span>
+<span class="fc" id="L160">                return new VariableExpr(variable.name());</span>
+            }
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (value instanceof NumberValue number) {</span>
+<span class="nc" id="L163">                return new NumberExpr(number.value());</span>
+            }
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L166">                List&lt;Expr&gt; operands = ordered.operands().stream().map(this::toExpression).toList();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                if (ordered.operator().id().startsWith(&quot;fn:&quot;)) {</span>
+<span class="nc" id="L168">                    return new FunctionExpr(ordered.operator().id().substring(3), operands);</span>
+                }
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                if (operands.size() != 2) {</span>
+<span class="nc" id="L171">                    throw new IllegalArgumentException(</span>
+                        &quot;ordered non-function value must have exactly two operands: &quot;
+<span class="nc" id="L173">                            + ordered.operator().id());</span>
+                }
+<span class="fc" id="L175">                return new BinaryExpr(</span>
+<span class="fc" id="L176">                    operands.get(0), binaryOperator(ordered.operator()), operands.get(1));</span>
+            }
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (value instanceof AssociativeCommutativeValue acValue) {</span>
+<span class="fc" id="L179">                List&lt;ExprValue&gt; operands = expandedOperands(acValue);</span>
+<span class="fc" id="L180">                Expr result = toExpression(operands.getFirst());</span>
+<span class="fc" id="L181">                BinaryOperator operator = binaryOperator(acValue.operator());</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                for (int i = 1; i &lt; operands.size(); i++) {</span>
+<span class="fc" id="L183">                    result = new BinaryExpr(result, operator, toExpression(operands.get(i)));</span>
+                }
+<span class="fc" id="L185">                return result;</span>
+            }
+<span class="nc" id="L187">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L188">                &quot;unsupported ExprValue type: &quot; + value.getClass().getName());</span>
+        }
+
+        private static List&lt;ExprValue&gt; expandedOperands(AssociativeCommutativeValue value) {
+<span class="fc" id="L192">            List&lt;Map.Entry&lt;ExprValue, Integer&gt;&gt; entries =</span>
+<span class="fc" id="L193">                new ArrayList&lt;&gt;(value.multiplicities().entrySet());</span>
+<span class="fc" id="L194">            entries.sort(Comparator.comparing(entry -&gt; entry.getKey().key()));</span>
+<span class="fc" id="L195">            List&lt;ExprValue&gt; expanded = new ArrayList&lt;&gt;(value.operandCount());</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            for (Map.Entry&lt;ExprValue, Integer&gt; entry : entries) {</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                for (int i = 0; i &lt; entry.getValue(); i++) {</span>
+<span class="fc" id="L198">                    expanded.add(entry.getKey());</span>
+                }
+<span class="fc" id="L200">            }</span>
+<span class="fc" id="L201">            return List.copyOf(expanded);</span>
+        }
+
+        private static String symbol(ValueOperator operator) {
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            return operator.id().startsWith(&quot;fn:&quot;)</span>
+<span class="nc" id="L206">                ? operator.id()</span>
+<span class="fc" id="L207">                : &quot;op:&quot; + binaryOperator(operator).name();</span>
+        }
+
+        private static BinaryOperator binaryOperator(ValueOperator operator) {
+            try {
+<span class="fc" id="L212">                return BinaryOperator.valueOf(operator.id().toUpperCase(Locale.ROOT));</span>
+<span class="nc" id="L213">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L214">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L215">                    &quot;unsupported value operator: &quot; + operator.id(), exception);</span>
+            }
+        }
+
+        private static String format(double value) {
+<span class="nc bnc" id="L220" title="All 4 branches missed.">            if (value == Math.floor(value) &amp;&amp; !Double.isInfinite(value)) {</span>
+<span class="nc" id="L221">                return Long.toString((long) value);</span>
+            }
+<span class="nc" id="L223">            return Double.toString(value);</span>
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
