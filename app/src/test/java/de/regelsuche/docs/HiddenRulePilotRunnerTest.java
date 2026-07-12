@@ -33,6 +33,10 @@ class HiddenRulePilotRunnerTest {
         assertTrue(runtime.primitiveRuleIds().contains("ast_add_zero_right"));
         assertTrue(runtime.primitiveRuleIds().contains("ast_multiply_one_right"));
         assertTrue(runtime.candidate().dynamicRuleId().startsWith("dynamic_hypothesis_"));
+        assertTrue(runtime.validationEvidence().passed(), runtime.validationEvidence().toString());
+        assertEquals("SYMBOLICALLY_VERIFIED", runtime.validationEvidence().proofStatus());
+        assertTrue(runtime.validationEvidence().generatedValidationExamples() > 0);
+        assertEquals(0, runtime.validationEvidence().failedValidationExamples());
         assertTrue(runtime.holdouts().allPassed(), runtime.holdouts().toString());
         assertTrue(runtime.holdouts().materialAblations() >= 1,
             "the learned direct macro must shorten at least one primitive holdout path");
@@ -53,6 +57,7 @@ class HiddenRulePilotRunnerTest {
             DifferenceOfSquaresPreparationOperator.RULE_ID), runtime.toString());
         assertTrue(runtime.primitiveRuleIds().contains("ast_square_difference_factor"),
             runtime.toString());
+        assertTrue(runtime.validationEvidence().passed(), runtime.validationEvidence().toString());
         assertTrue(runtime.holdouts().allPassed(), runtime.holdouts().toString());
         assertTrue(runtime.holdouts().materialAblations() >= 1, runtime.holdouts().toString());
         assertTrue(partition.audit(pilotCase.task()).passed(),
@@ -100,6 +105,7 @@ class HiddenRulePilotRunnerTest {
 
         assertTrue(evaluation.leakageViolations().stream()
             .anyMatch(violation -> violation.location().equals("PRIMITIVE_RULE_TEMPLATE")));
+        assertTrue(evaluation.blockers().contains("runtime leakage detected"));
         assertFalse(evaluation.pilotAccepted());
     }
 
@@ -120,6 +126,8 @@ class HiddenRulePilotRunnerTest {
 
         assertTrue(evaluation.leakageViolations().stream()
             .anyMatch(violation -> violation.location().equals("TRAIN_DIRECT_PRIMITIVE")));
+        assertTrue(evaluation.blockers().contains("runtime leakage detected"));
+        assertFalse(evaluation.blockers().contains("train/holdout split leakage detected"));
         assertFalse(evaluation.pilotAccepted());
     }
 
@@ -153,6 +161,7 @@ class HiddenRulePilotRunnerTest {
             || evaluation.candidateRelation() == CandidateRelation.STRONGER
             || evaluation.candidateRelation() == CandidateRelation.WEAKER,
             evaluation.toString());
+        assertTrue(evaluation.validationPassed(), evaluation.toString());
         assertTrue(evaluation.materialAblation(), evaluation.toString());
         assertTrue(evaluation.pilotAccepted(), evaluation.blockers().toString());
     }
