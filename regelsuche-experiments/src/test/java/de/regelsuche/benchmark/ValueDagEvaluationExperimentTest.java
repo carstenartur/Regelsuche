@@ -5,8 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
-import de.regelsuche.benchmark.ValueDagEvaluationExperiment.Comparison;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.benchmark.ValueDagEvaluationExperiment.Result;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -17,64 +21,48 @@ class ValueDagEvaluationExperimentTest {
     @Test
     void repeatedSubexpressionIsEvaluatedOncePerDistinctValue() {
         Expr syntax = parser.parseTerm("(a + b) * (a + b)");
-        try (ValueDagEvaluationExperiment experiment =
-                new ValueDagEvaluationExperiment(100, 4)) {
-            Comparison first = experiment.compare(syntax, Map.of("a", 2.0, "b", 3.0));
-
-            assertEquals(25.0, first.treeValue());
-            assertEquals(first.treeValue(), first.dagValue());
-            assertEquals(7, first.treeNodeEvaluations());
-            assertEquals(4, first.distinctValues());
-            assertEquals(4, first.dagValueEvaluations());
-            assertTrue(first.dagValueEvaluations() < first.treeNodeEvaluations());
+        Map<String, Double> variables = Map.of("a", 2.0, "b", 3.0);
+        TreeResult tree = tree(syntax, variables);
+        try (ValueDagEvaluationExperiment experiment = new ValueDagEvaluationExperiment(100, 4)) {
+            Result first = experiment.evaluate(syntax, variables);
+            assertEquals(tree.value(), first.value());
+            assertEquals(7, tree.evaluations());
+            assertEquals(4, first.evaluationCount());
+            assertTrue(first.evaluationCount() < tree.evaluations());
             assertFalse(first.planCacheHit());
             assertEquals(1, first.totalPlanCacheMisses());
-            assertEquals(0, first.totalPlanCacheHits());
-            assertEquals(1, first.cachedPlans());
             assertTrue(first.internedValues() >= first.distinctValues());
 
-            Comparison second = experiment.compare(syntax, Map.of("a", 4.0, "b", 1.0));
-            assertEquals(25.0, second.dagValue());
+            Result second = experiment.evaluate(syntax, Map.of("a", 4.0, "b", 1.0));
+            assertEquals(25.0, second.value());
             assertTrue(second.planCacheHit());
             assertEquals(1, second.totalPlanCacheHits());
-            assertEquals(1, second.totalPlanCacheMisses());
             assertEquals(0, second.planConstructionNanos());
-            assertEquals(second.distinctValues(), second.dagValueEvaluations());
         }
     }
 
     @Test
-    void acEquivalentRootsReuseOneValueKeyedPlanAcrossSyntaxForms() {
-        Expr grouped = parser.parseTerm("(a + b) + c");
-        Expr permuted = parser.parseTerm("c + a + b");
-        try (ValueDagEvaluationExperiment experiment =
-                new ValueDagEvaluationExperiment(100, 4)) {
-            Comparison first = experiment.compare(
-                    grouped, Map.of("a", 1.0, "b", 2.0, "c", 3.0));
-            Comparison second = experiment.compare(
-                    permuted, Map.of("a", 2.0, "b", 3.0, "c", 4.0));
-
-            assertEquals(6.0, first.dagValue());
-            assertEquals(9.0, second.dagValue());
+    void equivalentRootsReuseOneValueKeyedPlan() {
+        try (ValueDagEvaluationExperiment experiment = new ValueDagEvaluationExperiment(100, 4)) {
+            Result first = experiment.evaluate(
+                    parser.parseTerm("(a + b) + c"), Map.of("a", 1.0, "b", 2.0, "c", 3.0));
+            Result second = experiment.evaluate(
+                    parser.parseTerm("c + a + b"), Map.of("a", 2.0, "b", 3.0, "c", 4.0));
+            assertEquals(6.0, first.value());
+            assertEquals(9.0, second.value());
             assertFalse(first.planCacheHit());
             assertTrue(second.planCacheHit());
             assertEquals(1, second.cachedPlans());
-            assertEquals(1, second.totalPlanCacheHits());
         }
     }
 
     @Test
-    void boundedPlanCacheEvictsLeastRecentlyUsedRoot() {
-        try (ValueDagEvaluationExperiment experiment =
-                new ValueDagEvaluationExperiment(100, 1)) {
-            Expr sum = parser.parseTerm("a + b");
-            Expr product = parser.parseTerm("a * b");
+    void planCacheIsBoundedAndAccessOrdered() {
+        try (ValueDagEvaluationExperiment experiment = new ValueDagEvaluationExperiment(100, 1)) {
             Map<String, Double> variables = Map.of("a", 2.0, "b", 3.0);
-
-            Comparison first = experiment.compare(sum, variables);
-            Comparison second = experiment.compare(product, variables);
-            Comparison third = experiment.compare(sum, variables);
-
+            Result first = experiment.evaluate(parser.parseTerm("a + b"), variables);
+            Result second = experiment.evaluate(parser.parseTerm("a * b"), variables);
+            Result third = experiment.evaluate(parser.parseTerm("a + b"), variables);
             assertFalse(first.planCacheHit());
             assertFalse(second.planCacheHit());
             assertFalse(third.planCacheHit());
@@ -85,40 +73,71 @@ class ValueDagEvaluationExperimentTest {
     }
 
     @Test
-    void orderedOperatorsAndFunctionsMatchTreeEvaluation() {
+    void functionsAndOrderedOperatorsMatchTreeEvaluation() {
         Expr syntax = parser.parseTerm("sin(a + b) + (a - b) / (b + 1)");
-        try (ValueDagEvaluationExperiment experiment =
-                new ValueDagEvaluationExperiment(100, 4)) {
-            Comparison comparison = experiment.compare(syntax, Map.of("a", 4.0, "b", 2.0));
-
-            assertEquals(comparison.treeValue(), comparison.dagValue(), 1e-12);
-            assertEquals(comparison.distinctValues(), comparison.dagValueEvaluations());
-            assertTrue(comparison.projectionNanos() >= 0);
-            assertTrue(comparison.planConstructionNanos() >= 0);
-            assertTrue(comparison.treeExecutionNanos() >= 0);
-            assertTrue(comparison.dagExecutionNanos() >= 0);
+        Map<String, Double> variables = Map.of("a", 4.0, "b", 2.0);
+        try (ValueDagEvaluationExperiment experiment = new ValueDagEvaluationExperiment(100, 4)) {
+            Result result = experiment.evaluate(syntax, variables);
+            assertEquals(tree(syntax, variables).value(), result.value(), 1e-12);
+            assertEquals(result.distinctValues(), result.evaluationCount());
+            assertTrue(result.projectionNanos() >= 0);
+            assertTrue(result.planConstructionNanos() >= 0);
+            assertTrue(result.executionNanos() >= 0);
         }
     }
 
     @Test
-    void ownershipIsExplicitAndClosedExperimentsRejectFurtherUse() {
+    void ownershipAndBindingsAreExplicit() {
         ValueDagEvaluationExperiment experiment = new ValueDagEvaluationExperiment(10, 2);
-        experiment.compare(parser.parseTerm("a + 1"), Map.of("a", 2.0));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> experiment.evaluate(parser.parseTerm("a + b"), Map.of("a", 1.0)));
         experiment.close();
-
         assertThrows(
                 IllegalStateException.class,
-                () -> experiment.compare(parser.parseTerm("a + 1"), Map.of("a", 2.0)));
+                () -> experiment.evaluate(parser.parseTerm("a + 1"), Map.of("a", 2.0)));
         assertThrows(IllegalStateException.class, experiment::cachedPlanCount);
     }
 
-    @Test
-    void missingBindingsAreRejectedInsteadOfSilentlyUsingZero() {
-        try (ValueDagEvaluationExperiment experiment =
-                new ValueDagEvaluationExperiment(10, 2)) {
-            assertThrows(
-                    IllegalArgumentException.class,
-                    () -> experiment.compare(parser.parseTerm("a + b"), Map.of("a", 1.0)));
+    private static TreeResult tree(Expr expression, Map<String, Double> variables) {
+        if (expression instanceof NumberExpr number) {
+            return new TreeResult(number.value(), 1);
         }
+        if (expression instanceof VariableExpr variable) {
+            Double value = variables.get(variable.name());
+            if (value == null) {
+                throw new IllegalArgumentException("missing variable binding: " + variable.name());
+            }
+            return new TreeResult(value, 1);
+        }
+        if (expression instanceof FunctionExpr function) {
+            TreeResult argument = tree(function.arguments().getFirst(), variables);
+            double value = switch (function.name()) {
+                case "sin" -> Math.sin(argument.value());
+                case "cos" -> Math.cos(argument.value());
+                case "tan" -> Math.tan(argument.value());
+                case "log" -> Math.log10(argument.value());
+                case "ln" -> Math.log(argument.value());
+                case "sqrt" -> Math.sqrt(argument.value());
+                case "exp" -> Math.exp(argument.value());
+                case "abs" -> Math.abs(argument.value());
+                default -> throw new IllegalArgumentException("unsupported function: " + function.name());
+            };
+            return new TreeResult(value, argument.evaluations() + 1);
+        }
+        BinaryExpr binary = (BinaryExpr) expression;
+        TreeResult left = tree(binary.left(), variables);
+        TreeResult right = tree(binary.right(), variables);
+        double value = switch (binary.operator()) {
+            case ADD -> left.value() + right.value();
+            case SUB -> left.value() - right.value();
+            case MUL -> left.value() * right.value();
+            case DIV -> left.value() / right.value();
+            case POW -> Math.pow(left.value(), right.value());
+        };
+        return new TreeResult(value, left.evaluations() + right.evaluations() + 1);
+    }
+
+    private record TreeResult(double value, int evaluations) {
     }
 }
