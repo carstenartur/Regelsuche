@@ -19,7 +19,7 @@ class ExprValueEGraphAdapterTest {
     @Test
     void equalValuesFromDifferentFactoriesReuseOneEClassRepresentation() {
         EGraph graph = new EGraph();
-        ExprValueEGraphAdapter adapter = new ExprValueEGraphAdapter(graph);
+        ENode.ExprValueAdapter adapter = new ENode.ExprValueAdapter(graph);
         try (ExprValueFactory firstFactory = new ExprValueFactory();
                 ExprValueFactory secondFactory = new ExprValueFactory()) {
             ExprValue first = firstFactory.fromExpr(parser.parseTerm("(a + b) + c"));
@@ -40,7 +40,7 @@ class ExprValueEGraphAdapterTest {
     @Test
     void multiplicityRemainsPartOfTheEGraphRepresentation() {
         EGraph graph = new EGraph();
-        ExprValueEGraphAdapter adapter = new ExprValueEGraphAdapter(graph);
+        ENode.ExprValueAdapter adapter = new ENode.ExprValueAdapter(graph);
         try (ExprValueFactory factory = new ExprValueFactory()) {
             ExprValue repeated = factory.fromExpr(parser.parseTerm("a + a + b"));
             ExprValue single = factory.fromExpr(parser.parseTerm("a + b"));
@@ -57,7 +57,7 @@ class ExprValueEGraphAdapterTest {
     @Test
     void existingAstInsertionRemainsCompatibleWithDeterministicValueInsertion() {
         EGraph graph = new EGraph();
-        ExprValueEGraphAdapter adapter = new ExprValueEGraphAdapter(graph);
+        ENode.ExprValueAdapter adapter = new ENode.ExprValueAdapter(graph);
         try (ExprValueFactory factory = new ExprValueFactory()) {
             Expr syntax = parser.parseTerm("a + b + c");
             EClassId fromValue = adapter.add(factory.fromExpr(syntax));
@@ -70,7 +70,7 @@ class ExprValueEGraphAdapterTest {
     @Test
     void adapterPreservesAndChecksAssumptionSignatures() {
         EGraph graph = new EGraph();
-        ExprValueEGraphAdapter adapter = new ExprValueEGraphAdapter(graph);
+        ENode.ExprValueAdapter adapter = new ENode.ExprValueAdapter(graph);
         try (ExprValueFactory factory = new ExprValueFactory()) {
             ExprValue value = factory.fromExpr(parser.parseTerm("x / x"));
             EClassId id = adapter.add(value, List.of("0 != x"));
@@ -84,7 +84,7 @@ class ExprValueEGraphAdapterTest {
     @Test
     void valueKeyAndEClassIdRemainDifferentIdentityDomains() {
         EGraph graph = new EGraph();
-        ExprValueEGraphAdapter adapter = new ExprValueEGraphAdapter(graph);
+        ENode.ExprValueAdapter adapter = new ENode.ExprValueAdapter(graph);
         try (ExprValueFactory factory = new ExprValueFactory()) {
             ExprValue value = factory.fromExpr(parser.parseTerm("a + b"));
             EClassId eClass = adapter.add(value);
