@@ -2,18 +2,28 @@ package de.regelsuche.canonical;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.assumption.AssumptionContext;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.plugin.AstVisitorContext;
 import de.regelsuche.validation.RandomExpressionGenerator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class ExpressionCanonicalizerTest {
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
+    private final ExpressionParser parser = new ExpressionParser();
 
     @Test
     void canonicalizesCommutativeExpressions() {
@@ -32,6 +42,65 @@ class ExpressionCanonicalizerTest {
         // (a*b)*c == a*(b*c) == c*a*b
         assertEquals(canonicalizer.stableHash("(a*b)*c"), canonicalizer.stableHash("a*(b*c)"));
         assertEquals(canonicalizer.stableHash("(a*b)*c"), canonicalizer.stableHash("c*a*b"));
+    }
+
+    @Test
+    void currentExprIdentityIsStructuralAndParserDoesNotInternValues() {
+        Expr first = parser.parseTerm("a");
+        Expr second = parser.parseTerm("a");
+        assertEquals(first, second, "VariableExpr equality is structural");
+        assertNotSame(first, second, "the syntax parser does not intern Expr values");
+
+        Expr leftGrouped = parser.parseTerm("(a + b) + c");
+        Expr rightGrouped = parser.parseTerm("a + (b + c)");
+        assertNotEquals(leftGrouped, rightGrouped,
+            "binary grouping participates in current Expr equality");
+        assertEquals(canonicalizer.stableHash("(a + b) + c"),
+            canonicalizer.stableHash("a + (b + c)"),
+            "canonical value identity removes associative grouping");
+
+        Expr forward = parser.parseTerm("a + b");
+        Expr reversed = parser.parseTerm("b + a");
+        assertNotEquals(forward, reversed,
+            "operand order participates in current Expr equality");
+        assertEquals(canonicalizer.stableHash("a + b"), canonicalizer.stableHash("b + a"));
+    }
+
+    @Test
+    void repeatedSyntaxOccurrencesKeepIndependentReferenceIdentity() {
+        BinaryExpr sum = (BinaryExpr) parser.parseTerm("a + a");
+        assertEquals(sum.left(), sum.right());
+        assertNotSame(sum.left(), sum.right());
+
+        AstVisitorContext context = new AstVisitorContext();
+        context.putMetadata(sum.left(), "side", "left");
+        context.putMetadata(sum.right(), "side", "right");
+
+        assertEquals("left", context.metadata(sum.left()).get("side"));
+        assertEquals("right", context.metadata(sum.right()).get("side"));
+    }
+
+    @Test
+    void normalSetPreservesDistinctOccurrencesThatReferenceOneValue() {
+        Expr value = new VariableExpr("a");
+        Set<Use> uses = new LinkedHashSet<>();
+        uses.add(new Use(1, value));
+        uses.add(new Use(2, value));
+
+        assertEquals(2, uses.size());
+        List<Use> ordered = uses.stream().toList();
+        assertSame(ordered.get(0).value(), ordered.get(1).value(),
+            "occurrence identity and mathematical value identity are independent");
+    }
+
+    @Test
+    void binaryExprMayShareAChildButStructuralEqualityDoesNotExposeSharing() {
+        Expr shared = new VariableExpr("a");
+        BinaryExpr dag = new BinaryExpr(shared, BinaryOperator.ADD, shared);
+
+        assertSame(dag.left(), dag.right());
+        assertEquals(parser.parseTerm("a + a"), dag,
+            "record equality cannot distinguish one shared value from two equal occurrences");
     }
 
     @Test
@@ -155,5 +224,8 @@ class ExpressionCanonicalizerTest {
             String twice = canonicalizer.canonicalize(once);
             assertEquals(once, twice, "canonical form not stable for " + sample);
         }
+    }
+
+    private record Use(long id, Expr value) {
     }
 }
