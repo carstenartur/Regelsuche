@@ -119,18 +119,19 @@ public final class SearchTrajectoryCollector implements SearchObserver {
             : byCanonicalHash.getOrDefault(
                 event.parentCanonicalHash(),
                 ExpressionFingerprint.unknown(event.parentCanonicalHash()));
-        String parentHash = event.parentCanonicalHash();
+        String parentCanonicalHash = event.parentCanonicalHash();
+        String parentValueHash = parent == null ? "" : parent.valueHash();
         boolean transformation = event.type() == SearchEventType.TRANSFORMATION_GENERATED;
         boolean selected = transformation
             ? selectedTransitions.contains(new TransitionKey(
-                parentHash, expression.valueHash(), event.ruleId()))
+                parentValueHash, expression.valueHash(), event.ruleId()))
             : selectedStates.contains(expression.valueHash());
         List<String> applicable = transformation
-            ? applicableByParent.getOrDefault(parentHash, List.of())
+            ? applicableByParent.getOrDefault(parentCanonicalHash, List.of())
             : applicableByParent.getOrDefault(event.canonicalHash(), List.of());
-        int parentScore = event.parentCanonicalHash().isBlank()
+        int parentScore = parentCanonicalHash.isBlank()
             ? event.score()
-            : scoreByCanonicalHash.getOrDefault(event.parentCanonicalHash(), event.score());
+            : scoreByCanonicalHash.getOrDefault(parentCanonicalHash, event.score());
 
         return new SearchTrajectoryRecord(
             SearchTrajectoryRecord.SCHEMA,
