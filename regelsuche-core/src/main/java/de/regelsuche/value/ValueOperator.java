@@ -44,6 +44,14 @@ public record ValueOperator(
         return new ValueOperator("fn:" + normalized, arity, arity, OperatorLaws.NONE);
     }
 
+    /** Stable operator identity used inside {@link ValueKey}. */
+    String identityToken() {
+        int lawBits = (laws.associative() ? 1 : 0)
+                | (laws.commutative() ? 2 : 0)
+                | (laws.idempotent() ? 4 : 0);
+        return id + "|" + minimumArity + "|" + maximumArity + "|" + lawBits;
+    }
+
     public void requireArity(int actualArity) {
         if (actualArity < minimumArity || actualArity > maximumArity) {
             throw new IllegalArgumentException(
