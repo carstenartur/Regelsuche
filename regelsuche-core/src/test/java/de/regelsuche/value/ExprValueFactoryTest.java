@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.parse.ExpressionParser;
@@ -77,7 +79,20 @@ class ExprValueFactoryTest {
             assertNotSame(firstValue, secondValue);
             assertEquals(firstValue, secondValue);
             assertEquals(firstValue.key(), secondValue.key());
+            assertTrue(firstValue.key().encoded().startsWith(ValueKey.FORMAT_VERSION));
         }
+    }
+
+    @Test
+    void valueKeySurvivesJsonPersistenceRoundTrip() throws Exception {
+        ValueKey key;
+        try (ExprValueFactory factory = new ExprValueFactory()) {
+            key = factory.fromExpr(parser.parseTerm("(a + b) * (a + b)")).key();
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        String json = mapper.writeValueAsString(key);
+        assertEquals(key, mapper.readValue(json, ValueKey.class));
     }
 
     @Test
@@ -108,7 +123,7 @@ class ExprValueFactoryTest {
     }
 
     @Test
-    void orderedFactoryRejectsAcOperatorBypassingMultiplicityModel() {
+    void orderedFactoryRoutesAcOperatorsThroughMultiplicityModel() {
         try (ExprValueFactory factory = new ExprValueFactory()) {
             ExprValue a = factory.variable("a");
             ExprValue b = factory.variable("b");
