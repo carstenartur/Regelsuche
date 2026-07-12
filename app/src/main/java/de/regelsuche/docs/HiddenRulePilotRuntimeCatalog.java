@@ -54,16 +54,20 @@ public final class HiddenRulePilotRuntimeCatalog {
                     new NegativeHoldout("n-007", "(y - 1) / 1"),
                     new NegativeHoldout("n-008", "(y - 0) / 2"))),
             simpleTask(
-                "case-005", "(x * x) * x", "x^3",
+                "case-005", "(x * x) * (x * x)", "x^4",
                 List.of("ast_product_to_power_two", "ast_combine_powers"),
                 List.of(
                     new PositiveHoldout(
-                        "p-009", "((y + z) * (y + z)) * (y + z)", "(y + z)^3"),
+                        "p-009",
+                        "((y + z) * (y + z)) * ((y + z) * (y + z))",
+                        "(y + z)^4"),
                     new PositiveHoldout(
-                        "p-010", "(sin(t) * sin(t)) * sin(t)", "sin(t)^3")),
+                        "p-010",
+                        "(sin(t) * sin(t)) * (sin(t) * sin(t))",
+                        "sin(t)^4")),
                 List.of(
-                    new NegativeHoldout("n-009", "(y * y) * z"),
-                    new NegativeHoldout("n-010", "(y * y) + y"))));
+                    new NegativeHoldout("n-009", "(y * y) * (z * z)"),
+                    new NegativeHoldout("n-010", "(y * y) + (y * y)"))));
     }
 
     private static RuntimeTask case002Task() {
