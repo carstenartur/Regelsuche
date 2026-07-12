@@ -20,6 +20,9 @@ class EquivalenceAwarePatternMatcherTest {
         Expr reorderedAndRegrouped = parser.parseTerm("x^2 + a^2 + 2 * a * x");
 
         assertTrue(rule.matches(reorderedAndRegrouped));
+        // The first square fixes X=x before the commutative matcher considers the
+        // remaining terms, so this assertion checks the rewritten form without
+        // relying on a symmetric X/A swap.
         assertEquals(parser.parseTerm("(x + a)^2"), rule.apply(reorderedAndRegrouped));
     }
 
@@ -65,6 +68,24 @@ class EquivalenceAwarePatternMatcherTest {
 
         assertTrue(rule.matches(parser.parseTerm("2 * value + value * 2")));
         assertFalse(rule.matches(parser.parseTerm("2 * value + 3 * value")));
+    }
+
+    @Test
+    void rejectsOversizedCommutativePatternsWithoutThrowing() {
+        PatternExpr pattern = PatternExpr.var("A0");
+        StringBuilder expression = new StringBuilder("a0");
+        for (int i = 1; i < 9; i++) {
+            pattern = PatternExpr.op(ADD, pattern, PatternExpr.var("A" + i));
+            expression.append(" + a").append(i);
+        }
+        PatternRewriteRule rule = new PatternRewriteRule(
+            "too-wide-ac-pattern",
+            pattern,
+            PatternExpr.var("A0"),
+            RecognitionProfile.arithmeticAc()
+        );
+
+        assertFalse(rule.matches(parser.parseTerm(expression.toString())));
     }
 
     @Test
