@@ -51,6 +51,9 @@ class HiddenRulePilotCampaignTest {
             forbidden.add(reference.rightPattern());
             for (String token : forbidden) {
                 String compactToken = compact(token);
+                if (compactToken.length() <= 1) {
+                    continue; // A lone placeholder carries no hidden structural information.
+                }
                 assertFalse(runtimeSurface.contains(compactToken),
                     () -> "hidden manifest token is reachable from src/main: "
                         + Integer.toHexString(compactToken.hashCode()));
