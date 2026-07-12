@@ -37,7 +37,7 @@
         "opaqueCaseId": { "type": "string", "minLength": 1 },
         "family": { "type": "string", "minLength": 1 },
         "runtimeStatus": {
-          "enum": ["SEARCH_FAILED", "LEARNING_REJECTED", "COMPILATION_REJECTED", "HOLDOUT_FAILED", "CANDIDATE_FROZEN"]
+          "enum": ["SEARCH_FAILED", "LEARNING_REJECTED", "COMPILATION_REJECTED", "VALIDATION_FAILED", "HOLDOUT_FAILED", "CANDIDATE_FROZEN"]
         },
         "searchStatus": {
           "enum": ["UNTARGETED", "ROOT_ALREADY_TARGET", "REACHED", "STATE_BUDGET", "DEPTH_BUDGET", "CANDIDATE_BUDGET", "NO_TRANSFORMATIONS", "FRONTIER_EXHAUSTED", "UNPARSEABLE_TARGET"]
