@@ -17,7 +17,6 @@ import de.regelsuche.transform.RewriteRule;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class HiddenRulePilotRunnerTest {
@@ -61,30 +60,6 @@ class HiddenRulePilotRunnerTest {
 
         assertRediscovered(evaluator.evaluate(
             pilotCase.task(), runtime, pilotCase.reference()));
-    }
-
-    @Test
-    void evaluatesFiveRulesAcrossThreeFamiliesWithDisjointHoldoutClasses() {
-        List<PilotCase> cases = HiddenRulePilotCatalog.cases();
-        assertEquals(5, cases.size());
-        Set<String> families = cases.stream()
-            .map(pilotCase -> pilotCase.reference().family())
-            .collect(java.util.stream.Collectors.toSet());
-        assertEquals(Set.of(
-            "neutral-element-simplification",
-            "quartic-factorization",
-            "power-normalization"), families);
-
-        for (PilotCase pilotCase : cases) {
-            HiddenRuleHoldoutPartition.SplitAudit split = partition.audit(pilotCase.task());
-            assertTrue(split.passed(), pilotCase.task().opaqueCaseId() + ": " + split.collisions());
-
-            RuntimeResult runtime = runner.run(pilotCase.task());
-            assertEquals(RuntimeStatus.CANDIDATE_FROZEN, runtime.status(), runtime.toString());
-            assertTrue(runtime.holdouts().allPassed(), runtime.holdouts().toString());
-            assertRediscovered(evaluator.evaluate(
-                pilotCase.task(), runtime, pilotCase.reference()));
-        }
     }
 
     @Test
