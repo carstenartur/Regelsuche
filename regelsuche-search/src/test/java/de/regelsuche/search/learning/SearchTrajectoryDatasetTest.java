@@ -2,6 +2,7 @@ package de.regelsuche.search.learning;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
@@ -99,10 +100,15 @@ class SearchTrajectoryDatasetTest {
 
         TrajectorySplitPlanner.SplitPlan plan =
             new TrajectorySplitPlanner().assignByFamily(List.of(first, second));
+        SearchTrajectoryDataset dataset = SearchTrajectoryDataset.fromPlan(plan);
 
         assertFalse(plan.passed());
         assertTrue(plan.leakageViolations().stream()
             .anyMatch(violation -> violation.kind().equals("ALPHA_TASK")));
+        assertThrows(IllegalStateException.class, dataset::toJsonLines);
+        assertTrue(dataset.summaryJson().contains("\"leakageViolations\":1"));
+        assertEquals(3, dataset.toTabularSummary().lines().count(),
+            "diagnostic TSV remains available even when training export is blocked");
     }
 
     @Test
