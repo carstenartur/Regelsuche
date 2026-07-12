@@ -185,14 +185,14 @@ public final class HiddenRulePilotEvaluator {
     ) {
         String hiddenId = normalized(reference.hiddenRuleId());
         for (Transformation transformation : engine.transform(input)) {
-            if (!hiddenId.isEmpty() && normalized(transformation.ruleId()).equals(hiddenId)) {
+            if (!hiddenId.isEmpty() && normalized(transformation.rule()).equals(hiddenId)) {
                 violations.add(new LeakageViolation(
                     "PRIMITIVE_RULE_ID", fingerprint(hiddenId)));
             }
             if (equivalence.areEquivalent(transformation.transformedExpression(), target)) {
                 violations.add(new LeakageViolation(
                     location,
-                    fingerprint(transformation.ruleId() + ":" + input + "->" + target)));
+                    fingerprint(transformation.rule() + ":" + input + "->" + target)));
             }
         }
     }
@@ -393,7 +393,7 @@ public final class HiddenRulePilotEvaluator {
             requireText(family, "family");
             requireText(leftPattern, "leftPattern");
             requireText(rightPattern, "rightPattern");
-            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();
+            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
             List<String> tokens = new ArrayList<>();
             tokens.add(hiddenRuleId);
             tokens.add(family);
