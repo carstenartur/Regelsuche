@@ -5,9 +5,14 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.value.ExprValueFactory;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 /** Bounded canonicalization used only for recognition and anti-unification. */
 public final class RecognitionNormalizer {
@@ -15,30 +20,75 @@ public final class RecognitionNormalizer {
     }
 
     public static Expr normalize(Expr expression, RecognitionProfile profile) {
-        if (expression instanceof FunctionExpr function) {
-            return new FunctionExpr(function.name(), function.arguments().stream()
-                .map(argument -> normalize(argument, profile)).toList());
+        try (Session session = session(profile)) {
+            return session.normalize(expression);
         }
-        if (!(expression instanceof BinaryExpr binary)) {
-            return expression;
-        }
-        Expr left = normalize(binary.left(), profile);
-        Expr right = normalize(binary.right(), profile);
-        BinaryOperator operator = binary.operator();
+    }
 
-        if (profile.inferAlgebraicBindings() && operator == BinaryOperator.MUL && left.equals(right)) {
-            return new BinaryExpr(left, BinaryOperator.POW, new NumberExpr(2));
+    public static Session session(RecognitionProfile profile) {
+        return new Session(profile);
+    }
+
+    /** Owner-scoped normalization session; not shared between rules or searches. */
+    public static final class Session implements AutoCloseable {
+        private final RecognitionProfile profile;
+        private final ExprValueFactory values = new ExprValueFactory();
+        private boolean closed;
+
+        private Session(RecognitionProfile profile) {
+            this.profile = Objects.requireNonNull(profile, "profile");
         }
-        if (profile.isAssociative(operator)) {
-            List<Expr> operands = new ArrayList<>();
-            flatten(left, operator, operands);
-            flatten(right, operator, operands);
-            if (profile.isCommutative(operator)) {
-                operands.sort(Comparator.comparing(Object::toString));
+
+        public Expr normalize(Expr expression) {
+            ensureOpen();
+            return normalizeInternal(Objects.requireNonNull(expression, "expression"));
+        }
+
+        private Expr normalizeInternal(Expr expression) {
+            if (expression instanceof FunctionExpr function) {
+                return new FunctionExpr(function.name(), function.arguments().stream()
+                    .map(this::normalizeInternal).toList());
             }
-            return rebuild(operands, operator);
+            if (!(expression instanceof BinaryExpr binary)) {
+                return expression;
+            }
+            Expr left = normalizeInternal(binary.left());
+            Expr right = normalizeInternal(binary.right());
+            BinaryOperator operator = binary.operator();
+
+            if (profile.inferAlgebraicBindings() && operator == BinaryOperator.MUL && left.equals(right)) {
+                return new BinaryExpr(left, BinaryOperator.POW, new NumberExpr(2));
+            }
+            if (profile.isAssociative(operator)) {
+                List<Expr> operands = new ArrayList<>();
+                flatten(left, operator, operands);
+                flatten(right, operator, operands);
+                if (profile.isCommutative(operator)) {
+                    Map<Expr, ExprValueFactory.ValueKey> keys = new HashMap<>();
+                    operands.forEach(operand ->
+                        keys.computeIfAbsent(operand, value -> values.fromExpr(value).key()));
+                    operands.sort(Comparator
+                        .comparing((Expr operand) -> keys.get(operand))
+                        .thenComparing(ExpressionFormatter::format));
+                }
+                return rebuild(operands, operator);
+            }
+            return new BinaryExpr(left, operator, right);
         }
-        return new BinaryExpr(left, operator, right);
+
+        @Override
+        public void close() {
+            if (!closed) {
+                values.close();
+                closed = true;
+            }
+        }
+
+        private void ensureOpen() {
+            if (closed) {
+                throw new IllegalStateException("recognition normalization session is closed");
+            }
+        }
     }
 
     private static void flatten(Expr expression, BinaryOperator operator, List<Expr> target) {
