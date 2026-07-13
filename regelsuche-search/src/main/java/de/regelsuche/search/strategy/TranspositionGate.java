@@ -11,6 +11,7 @@ import java.util.Set;
 /**
  * Helper used by {@link SearchStrategy} implementations to consult the
  * {@link SearchMemory transposition table} attached to a {@link SearchProblem}.
+ * Only the state's current ValueKey-derived canonical identity is consulted.
  *
  * <p>Returns a {@link Verdict#KEEP keep verdict} if the state should be
  * expanded, or a {@link Verdict#PRUNE prune verdict} if not. When
