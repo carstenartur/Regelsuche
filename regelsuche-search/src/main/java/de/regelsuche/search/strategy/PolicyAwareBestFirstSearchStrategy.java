@@ -174,7 +174,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                 .comparing((RankedTransformation ranked) -> ranked.transformation().rule())
                 .thenComparing(ranked -> ranked.transformation().transformedExpression())
                 .thenComparing(ranked -> ranked.transformation().applicationKey());
-            List<RankedTransformation> ranked = applicable.stream()
+            List<RankedTransformation> scored = applicable.stream()
                 .map(transformation -> new RankedTransformation(
                     transformation,
                     policy.score(
@@ -184,10 +184,15 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                             distance.enabled(),
                             canonicalizer),
                         transformation)))
-                .sorted(Comparator
-                    .comparingInt((RankedTransformation item) -> item.decision().priority())
-                    .thenComparing(deterministic))
                 .toList();
+            boolean completeFallback = !scored.isEmpty()
+                && scored.stream().allMatch(item -> item.decision().fallback());
+            Comparator<RankedTransformation> order = completeFallback
+                ? staticOrder(deterministic)
+                : Comparator
+                    .comparingInt((RankedTransformation item) -> item.decision().priority())
+                    .thenComparing(deterministic);
+            List<RankedTransformation> ranked = scored.stream().sorted(order).toList();
 
             long group = decisionGroup++;
             for (int index = 0; index < ranked.size(); index++) {
@@ -202,6 +207,18 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             return ranked.stream()
                 .map(RankedTransformation::transformation)
                 .toList();
+        }
+
+        private Comparator<RankedTransformation> staticOrder(
+            Comparator<RankedTransformation> deterministic
+        ) {
+            if (!distance.enabled()) {
+                return deterministic;
+            }
+            return Comparator
+                .comparingInt((RankedTransformation item) ->
+                    distance.distance(item.transformation().transformedExpression()))
+                .thenComparing(deterministic);
         }
 
         @Override
