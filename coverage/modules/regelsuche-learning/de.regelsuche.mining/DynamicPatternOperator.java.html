@@ -7,6 +7,10 @@ import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.transform.HypothesisOperator;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -15,25 +19,9 @@ import java.util.Optional;
  * A quarantined, dynamically compiled hypothesis operator that executes an
  * AST rewrite rule specified entirely by a left-hand pattern and a right-hand
  * template, without requiring a hand-written Java operator class.
- *
- * &lt;p&gt;Safety invariants enforced at execution time:
- * &lt;ul&gt;
- *   &lt;li&gt;Identity rewrites (output == input) are suppressed.&lt;/li&gt;
- *   &lt;li&gt;Structural cycle guards prevent the operator from reproducing itself:
- *       the rule ID is a hypothesis-specific prefix, not a global rule name.&lt;/li&gt;
- *   &lt;li&gt;Operators in CANDIDATE state are not eligible for global activation; only
- *       VALIDATED operators may be promoted by {@link DynamicCandidateRegistry}.&lt;/li&gt;
- *   &lt;li&gt;Every emitted transformation carries the hypothesis revision in its
- *       {@code applicationKey}, satisfying edge provenance requirements.&lt;/li&gt;
- * &lt;/ul&gt;
- * &lt;/p&gt;
- *
- * &lt;p&gt;The operator is deterministic: given the same input expression it always
- * produces the same candidate set.&lt;/p&gt;
  */
 public final class DynamicPatternOperator implements HypothesisOperator {
 
-    /** Prefix used to distinguish dynamically compiled operator IDs from static ones. */
     public static final String RULE_ID_PREFIX = &quot;dynamic_hypothesis_&quot;;
 
     private final String ruleId;
@@ -46,10 +34,10 @@ public final class DynamicPatternOperator implements HypothesisOperator {
     private final RulePatternNode rightPattern;
     private final int maxCandidates;
 
-<span class="fc" id="L49">    private final RulePatternMatcher matcher = new RulePatternMatcher();</span>
-<span class="fc" id="L50">    private final RulePatternInstantiator instantiator = new RulePatternInstantiator();</span>
-<span class="fc" id="L51">    private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L52">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L37">    private final RulePatternMatcher matcher = new RulePatternMatcher();</span>
+<span class="fc" id="L38">    private final RulePatternInstantiator instantiator = new RulePatternInstantiator();</span>
+<span class="fc" id="L39">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L40">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
 
     DynamicPatternOperator(
         String ruleId,
@@ -61,94 +49,74 @@ public final class DynamicPatternOperator implements HypothesisOperator {
         RulePatternNode leftPattern,
         RulePatternNode rightPattern,
         int maxCandidates
-<span class="fc" id="L64">    ) {</span>
-<span class="pc bpc" id="L65" title="2 of 4 branches missed.">        if (ruleId == null || ruleId.isBlank()) {</span>
-<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;ruleId must not be blank&quot;);</span>
+<span class="fc" id="L52">    ) {</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (ruleId == null || ruleId.isBlank()) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;ruleId must not be blank&quot;);</span>
         }
-<span class="pc bpc" id="L68" title="2 of 4 branches missed.">        if (hypothesisId == null || hypothesisId.isBlank()) {</span>
-<span class="nc" id="L69">            throw new IllegalArgumentException(&quot;hypothesisId must not be blank&quot;);</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        if (hypothesisId == null || hypothesisId.isBlank()) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;hypothesisId must not be blank&quot;);</span>
         }
-<span class="pc bpc" id="L71" title="2 of 4 branches missed.">        if (leftPattern == null || rightPattern == null) {</span>
-<span class="nc" id="L72">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">        if (leftPattern == null || rightPattern == null) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;patterns must not be null&quot;);</span>
         }
-<span class="fc" id="L74">        this.ruleId = ruleId;</span>
-<span class="fc" id="L75">        this.hypothesisId = hypothesisId;</span>
-<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        this.hypothesisRevision = hypothesisRevision == null ? &quot;&quot; : hypothesisRevision;</span>
-<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        this.provenanceHash = provenanceHash == null ? &quot;&quot; : provenanceHash;</span>
-<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        this.leftPatternText = leftPatternText == null ? &quot;&quot; : leftPatternText;</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        this.rightPatternText = rightPatternText == null ? &quot;&quot; : rightPatternText;</span>
-<span class="fc" id="L80">        this.leftPattern = leftPattern;</span>
-<span class="fc" id="L81">        this.rightPattern = rightPattern;</span>
-<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        this.maxCandidates = maxCandidates &lt; 1 ? 1 : maxCandidates;</span>
-<span class="fc" id="L83">    }</span>
+<span class="fc" id="L62">        this.ruleId = ruleId;</span>
+<span class="fc" id="L63">        this.hypothesisId = hypothesisId;</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        this.hypothesisRevision = hypothesisRevision == null ? &quot;&quot; : hypothesisRevision;</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        this.provenanceHash = provenanceHash == null ? &quot;&quot; : provenanceHash;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        this.leftPatternText = leftPatternText == null ? &quot;&quot; : leftPatternText;</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        this.rightPatternText = rightPatternText == null ? &quot;&quot; : rightPatternText;</span>
+<span class="fc" id="L68">        this.leftPattern = leftPattern;</span>
+<span class="fc" id="L69">        this.rightPattern = rightPattern;</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        this.maxCandidates = maxCandidates &lt; 1 ? 1 : maxCandidates;</span>
+<span class="fc" id="L71">    }</span>
 
-    /** The unique rule ID for this dynamic operator (includes hypothesis ID). */
     public String ruleId() {
-<span class="fc" id="L87">        return ruleId;</span>
+<span class="fc" id="L74">        return ruleId;</span>
     }
 
-    /** The hypothesis ID this operator was compiled from. */
     public String hypothesisId() {
-<span class="fc" id="L92">        return hypothesisId;</span>
+<span class="fc" id="L78">        return hypothesisId;</span>
     }
 
-    /** The hypothesis revision tag attached to every emitted transformation. */
     public String hypothesisRevision() {
-<span class="fc" id="L97">        return hypothesisRevision;</span>
+<span class="fc" id="L82">        return hypothesisRevision;</span>
     }
 
-    /** A deterministic hash of the compiled patterns, for reproducibility checks. */
     public String provenanceHash() {
-<span class="fc" id="L102">        return provenanceHash;</span>
+<span class="fc" id="L86">        return provenanceHash;</span>
     }
 
-    /** The left (source) pattern as a string, for serialisation and audit. */
     public String leftPatternText() {
-<span class="fc" id="L107">        return leftPatternText;</span>
+<span class="fc" id="L90">        return leftPatternText;</span>
     }
 
-    /** The right (target) template as a string, for serialisation and audit. */
     public String rightPatternText() {
-<span class="fc" id="L112">        return rightPatternText;</span>
+<span class="fc" id="L94">        return rightPatternText;</span>
     }
 
-    /**
-     * Attempts to match the left pattern against {@code expression} and, on
-     * success, instantiates the right template from the captured bindings.
-     *
-     * &lt;p&gt;Returns an empty list when:
-     * &lt;ul&gt;
-     *   &lt;li&gt;the expression cannot be parsed,&lt;/li&gt;
-     *   &lt;li&gt;the left pattern does not match,&lt;/li&gt;
-     *   &lt;li&gt;template instantiation fails, or&lt;/li&gt;
-     *   &lt;li&gt;the resulting expression is identical to the input (identity rewrite).&lt;/li&gt;
-     * &lt;/ul&gt;
-     * &lt;/p&gt;
-     */
     @Override
     public List&lt;Transformation&gt; generateCandidates(String expression) {
-<span class="pc bpc" id="L130" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
-<span class="fc" id="L131">            return List.of();</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L100">            return List.of();</span>
         }
-<span class="fc" id="L133">        Optional&lt;Map&lt;String, Expr&gt;&gt; bindings = matcher.match(leftPattern, expression);</span>
-<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (bindings.isEmpty()) {</span>
-<span class="fc" id="L135">            return List.of();</span>
+<span class="fc" id="L102">        Optional&lt;Map&lt;String, Expr&gt;&gt; bindings = matcher.match(leftPattern, expression);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (bindings.isEmpty()) {</span>
+<span class="fc" id="L104">            return List.of();</span>
         }
         Expr outputExpr;
         try {
-<span class="fc" id="L139">            outputExpr = instantiator.instantiate(rightPattern, bindings.get());</span>
-<span class="nc" id="L140">        } catch (IllegalArgumentException ignored) {</span>
-<span class="nc" id="L141">            return List.of();</span>
-<span class="fc" id="L142">        }</span>
-<span class="fc" id="L143">        String formattedOutput = ExpressionFormatter.format(outputExpr);</span>
-<span class="fc" id="L144">        String formattedInput = normalizeWhitespace(expression);</span>
-        // Suppress identity rewrites
-<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (canonicalKey(formattedOutput).equals(canonicalKey(formattedInput))) {</span>
-<span class="fc" id="L147">            return List.of();</span>
+<span class="fc" id="L108">            outputExpr = instantiator.instantiate(rightPattern, bindings.get());</span>
+<span class="nc" id="L109">        } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L110">            return List.of();</span>
+<span class="fc" id="L111">        }</span>
+<span class="fc" id="L112">        String formattedOutput = ExpressionFormatter.format(outputExpr);</span>
+<span class="fc" id="L113">        String formattedInput = formatted(expression);</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (suppressesRewrite(formattedInput, formattedOutput)) {</span>
+<span class="fc" id="L115">            return List.of();</span>
         }
-<span class="fc" id="L149">        String applicationKey = ruleId + &quot;:&quot; + hypothesisRevision + &quot;:&quot;</span>
-<span class="fc" id="L150">            + canonicalizer.stableHash(formattedInput) + &quot;-&gt;&quot; + canonicalizer.stableHash(formattedOutput);</span>
-<span class="fc" id="L151">        Transformation transformation = new Transformation(</span>
+<span class="fc" id="L117">        String applicationKey = ruleId + &quot;:&quot; + hypothesisRevision + &quot;:&quot;</span>
+<span class="fc" id="L118">            + syntaxHash(formattedInput) + &quot;-&gt;&quot; + syntaxHash(formattedOutput);</span>
+<span class="fc" id="L119">        Transformation transformation = new Transformation(</span>
             ruleId,
             formattedOutput,
             RewriteKind.NORMALIZE,
@@ -157,21 +125,46 @@ public final class DynamicPatternOperator implements HypothesisOperator {
             true,
             applicationKey
         );
-<span class="fc" id="L160">        return List.of(transformation).stream()</span>
-<span class="fc" id="L161">            .limit(maxCandidates)</span>
-<span class="fc" id="L162">            .toList();</span>
+<span class="fc" id="L128">        return List.of(transformation).stream()</span>
+<span class="fc" id="L129">            .limit(maxCandidates)</span>
+<span class="fc" id="L130">            .toList();</span>
     }
 
-    private String canonicalKey(String expression) {
+    private boolean suppressesRewrite(String input, String output) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (output.equals(input)) {</span>
+<span class="nc" id="L135">            return true;</span>
+        }
+<span class="fc" id="L137">        String canonicalInput = canonicalizer.canonicalize(input);</span>
+<span class="fc" id="L138">        String canonicalOutput = canonicalizer.canonicalize(output);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (!canonicalInput.equals(canonicalOutput)) {</span>
+<span class="fc" id="L140">            return false;</span>
+        }
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        if (output.equals(canonicalInput) &amp;&amp; !input.equals(canonicalInput)) {</span>
+<span class="fc" id="L143">            return false;</span>
+        }
+<span class="fc" id="L145">        int inputNodes = canonicalizer.astNodeCount(input);</span>
+<span class="fc" id="L146">        int outputNodes = canonicalizer.astNodeCount(output);</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">        boolean strictlySimpler = outputNodes &lt; inputNodes</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            || (outputNodes == inputNodes &amp;&amp; output.length() &lt; input.length());</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        return !strictlySimpler;</span>
+    }
+
+    private String formatted(String expression) {
         try {
-<span class="fc" id="L167">            return canonicalizer.stableHash(expression);</span>
-<span class="nc" id="L168">        } catch (IllegalArgumentException ignored) {</span>
-<span class="nc" id="L169">            return expression;</span>
+<span class="fc" id="L154">            return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+<span class="nc" id="L155">        } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L156">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
         }
     }
 
-    private static String normalizeWhitespace(String expression) {
-<span class="fc" id="L174">        return expression.trim();</span>
+    private static String syntaxHash(String expression) {
+        try {
+<span class="fc" id="L162">            byte[] hash = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L163">                .digest(expression.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L164">            return &quot;syntax-v1:&quot; + HexFormat.of().formatHex(hash, 0, 12);</span>
+<span class="nc" id="L165">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L166">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

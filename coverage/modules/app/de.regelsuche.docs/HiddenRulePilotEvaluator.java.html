@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HiddenRulePilotEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">HiddenRulePilotEvaluator.java</span></div><h1>HiddenRulePilotEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.docs.HiddenRuleHoldoutPartition.SplitCollision;
+import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeResult;
+import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.mining.RulePatternCanonicalizer;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.HypothesisOperator;
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.PatternRewriteRule;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+
+/** Post-hoc evaluator; hidden references never enter the runtime runner. */
+<span class="fc" id="L27">public final class HiddenRulePilotEvaluator {</span>
+<span class="fc" id="L28">    private final SymPyEquivalenceService equivalence = new SymPyEquivalenceService();</span>
+<span class="fc" id="L29">    private final HiddenRuleHoldoutPartition partition = new HiddenRuleHoldoutPartition();</span>
+
+    public Evaluation evaluate(
+        RuntimeTask runtimeTask,
+        RuntimeResult runtimeResult,
+        HiddenReference hiddenReference
+    ) {
+<span class="fc" id="L36">        Objects.requireNonNull(runtimeTask, &quot;runtimeTask&quot;);</span>
+<span class="fc" id="L37">        Objects.requireNonNull(runtimeResult, &quot;runtimeResult&quot;);</span>
+<span class="fc" id="L38">        Objects.requireNonNull(hiddenReference, &quot;hiddenReference&quot;);</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (!runtimeTask.opaqueCaseId().equals(runtimeResult.opaqueCaseId())) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;runtime task/result case ids differ&quot;);</span>
+        }
+
+<span class="fc" id="L43">        List&lt;LeakageViolation&gt; leakage = leakageViolations(</span>
+            runtimeTask, runtimeResult, hiddenReference);
+<span class="fc" id="L45">        CandidateRelation relation = relation(runtimeResult, hiddenReference);</span>
+<span class="fc" id="L46">        boolean validationPassed = runtimeResult.validationEvidence().passed();</span>
+<span class="fc" id="L47">        boolean holdoutsPassed = runtimeResult.holdouts().allPassed();</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        boolean material = runtimeResult.holdouts().materialAblations() &gt; 0;</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        boolean rediscovered = relation != CandidateRelation.NONE</span>
+            &amp;&amp; relation != CandidateRelation.DIFFERENT;
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        boolean accepted = leakage.isEmpty()</span>
+<span class="pc bpc" id="L52" title="5 of 10 branches missed.">            &amp;&amp; runtimeResult.frozen()</span>
+            &amp;&amp; validationPassed
+            &amp;&amp; holdoutsPassed
+            &amp;&amp; material
+            &amp;&amp; rediscovered;
+<span class="fc" id="L57">        return new Evaluation(</span>
+<span class="fc" id="L58">            runtimeTask.opaqueCaseId(),</span>
+<span class="fc" id="L59">            hiddenReference.family(),</span>
+            leakage,
+            relation,
+<span class="fc" id="L62">            runtimeResult.frozen(),</span>
+            validationPassed,
+            holdoutsPassed,
+            material,
+            accepted,
+<span class="fc" id="L67">            blockers(</span>
+                runtimeResult, leakage, relation, validationPassed, material, rediscovered));
+    }
+
+    private List&lt;LeakageViolation&gt; leakageViolations(
+        RuntimeTask task,
+        RuntimeResult result,
+        HiddenReference reference
+    ) {
+<span class="fc" id="L76">        List&lt;LeakageViolation&gt; violations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L77">        String observable = normalized(task.observableInput());</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (String token : reference.forbiddenRuntimeTokens()) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (containsForbidden(observable, token)) {</span>
+<span class="fc" id="L80">                violations.add(new LeakageViolation(&quot;RUNTIME_INPUT&quot;, fingerprint(token)));</span>
+            }
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        inspectPrimitiveEngine(task.primitiveEngine(), reference, violations);</span>
+<span class="fc" id="L84">        inspectDirectPrimitiveShortcuts(task, reference, violations);</span>
+<span class="fc" id="L85">        String hiddenId = normalized(reference.hiddenRuleId());</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (String primitiveRuleId : result.primitiveRuleIds()) {</span>
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">            if (!hiddenId.isEmpty() &amp;&amp; normalized(primitiveRuleId).equals(hiddenId)) {</span>
+<span class="nc" id="L88">                violations.add(new LeakageViolation(</span>
+<span class="nc" id="L89">                    &quot;PRIMITIVE_RULE_PATH&quot;, fingerprint(hiddenId)));</span>
+            }
+<span class="fc" id="L91">        }</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        for (SplitCollision collision : partition.audit(task).collisions()) {</span>
+<span class="nc" id="L93">            violations.add(new LeakageViolation(</span>
+<span class="nc" id="L94">                collision.kind(), collision.fingerprint()));</span>
+<span class="nc" id="L95">        }</span>
+<span class="fc" id="L96">        return violations.stream().distinct().toList();</span>
+    }
+
+    /** Recursively inspects every engine layer whose inventory is explicitly exposed. */
+    private static void inspectPrimitiveEngine(
+        TransformationEngine engine,
+        HiddenReference reference,
+        List&lt;LeakageViolation&gt; violations
+    ) {
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (engine instanceof AstRewriteTransformationEngine astEngine) {</span>
+<span class="fc" id="L106">            inspectAstRules(astEngine, reference, violations);</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (engine instanceof HypothesisTransformationEngine hypothesisEngine) {</span>
+<span class="fc" id="L109">            inspectPrimitiveEngine(hypothesisEngine.baseEngine(), reference, violations);</span>
+<span class="fc" id="L110">            inspectHypothesisOperators(hypothesisEngine.operators(), reference, violations);</span>
+        }
+<span class="fc" id="L112">    }</span>
+
+    private static void inspectAstRules(
+        AstRewriteTransformationEngine engine,
+        HiddenReference reference,
+        List&lt;LeakageViolation&gt; violations
+    ) {
+<span class="fc" id="L119">        String hiddenId = normalized(reference.hiddenRuleId());</span>
+<span class="fc" id="L120">        String hiddenPattern = RulePatternCanonicalizer.hash(</span>
+<span class="fc" id="L121">            stripOuterGrouping(reference.leftPattern()),</span>
+<span class="fc" id="L122">            stripOuterGrouping(reference.rightPattern()));</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (RewriteRule rule : engine.rules()) {</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (normalized(rule.id()).equals(hiddenId)) {</span>
+<span class="nc" id="L125">                violations.add(new LeakageViolation(</span>
+<span class="nc" id="L126">                    &quot;PRIMITIVE_RULE_ID&quot;, fingerprint(hiddenId)));</span>
+            }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (rule instanceof PatternRewriteRule patternRule) {</span>
+<span class="fc" id="L129">                String visiblePattern = RulePatternCanonicalizer.hash(</span>
+<span class="fc" id="L130">                    stripOuterGrouping(patternText(patternRule.source())),</span>
+<span class="fc" id="L131">                    stripOuterGrouping(patternText(patternRule.target())));</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                if (visiblePattern.equals(hiddenPattern)) {</span>
+<span class="fc" id="L133">                    violations.add(new LeakageViolation(</span>
+<span class="fc" id="L134">                        &quot;PRIMITIVE_RULE_TEMPLATE&quot;, fingerprint(hiddenPattern)));</span>
+                }
+            }
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">    }</span>
+
+    private static void inspectHypothesisOperators(
+        List&lt;HypothesisOperator&gt; operators,
+        HiddenReference reference,
+        List&lt;LeakageViolation&gt; violations
+    ) {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (HypothesisOperator operator : operators) {</span>
+<span class="fc" id="L146">            String className = normalized(operator.getClass().getName());</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            for (String token : reference.forbiddenRuntimeTokens()) {</span>
+<span class="fc" id="L148">                String normalizedToken = normalized(token);</span>
+<span class="pc bpc" id="L149" title="2 of 4 branches missed.">                if (normalizedToken.length() &gt;= 4 &amp;&amp; className.contains(normalizedToken)) {</span>
+<span class="nc" id="L150">                    violations.add(new LeakageViolation(</span>
+<span class="nc" id="L151">                        &quot;PRIMITIVE_OPERATOR_CLASS&quot;, fingerprint(token)));</span>
+                }
+<span class="fc" id="L153">            }</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">    }</span>
+
+    /**
+     * A selected pilot case must require a multi-step primitive path. A single
+     * primitive transformation that produces the concrete syntax endpoint is an
+     * observable high-level shortcut. Mere mathematical equivalence is not enough:
+     * every legitimate primitive step is expected to preserve equivalence.
+     */
+    private void inspectDirectPrimitiveShortcuts(
+        RuntimeTask task,
+        HiddenReference reference,
+        List&lt;LeakageViolation&gt; violations
+    ) {
+<span class="fc" id="L168">        inspectDirectPrimitiveShortcut(</span>
+<span class="fc" id="L169">            task.primitiveEngine(),</span>
+<span class="fc" id="L170">            task.inputExpression(),</span>
+<span class="fc" id="L171">            task.target().targetExpression(),</span>
+            &quot;TRAIN_DIRECT_PRIMITIVE&quot;,
+            reference,
+            violations);
+<span class="fc" id="L175">        task.positiveHoldouts().forEach(holdout -&gt; inspectDirectPrimitiveShortcut(</span>
+<span class="fc" id="L176">            task.primitiveEngine(),</span>
+<span class="fc" id="L177">            holdout.inputExpression(),</span>
+<span class="fc" id="L178">            holdout.targetExpression(),</span>
+            &quot;HOLDOUT_DIRECT_PRIMITIVE&quot;,
+            reference,
+            violations));
+<span class="fc" id="L182">    }</span>
+
+    private static void inspectDirectPrimitiveShortcut(
+        TransformationEngine engine,
+        String input,
+        String target,
+        String location,
+        HiddenReference reference,
+        List&lt;LeakageViolation&gt; violations
+    ) {
+<span class="fc" id="L192">        String hiddenId = normalized(reference.hiddenRuleId());</span>
+<span class="fc" id="L193">        String endpoint = syntaxForm(target);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        for (Transformation transformation : engine.transform(input)) {</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">            if (!hiddenId.isEmpty() &amp;&amp; normalized(transformation.rule()).equals(hiddenId)) {</span>
+<span class="nc" id="L196">                violations.add(new LeakageViolation(</span>
+<span class="nc" id="L197">                    &quot;PRIMITIVE_RULE_ID&quot;, fingerprint(hiddenId)));</span>
+            }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (syntaxForm(transformation.transformedExpression()).equals(endpoint)) {</span>
+<span class="fc" id="L200">                violations.add(new LeakageViolation(</span>
+                    location,
+<span class="fc" id="L202">                    fingerprint(transformation.rule() + &quot;:&quot; + input + &quot;-&gt;&quot; + target)));</span>
+            }
+<span class="fc" id="L204">        }</span>
+<span class="fc" id="L205">    }</span>
+
+    private CandidateRelation relation(RuntimeResult result, HiddenReference reference) {
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (result.candidate() == null) {</span>
+<span class="nc" id="L209">            return CandidateRelation.NONE;</span>
+        }
+<span class="fc" id="L211">        CandidateRelation structural = structuralRelation(</span>
+<span class="fc" id="L212">            result.candidate().leftPattern(),</span>
+<span class="fc" id="L213">            result.candidate().rightPattern(),</span>
+<span class="fc" id="L214">            reference.leftPattern(),</span>
+<span class="fc" id="L215">            reference.rightPattern());</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (structural == CandidateRelation.DIFFERENT) {</span>
+<span class="nc" id="L217">            return structural;</span>
+        }
+
+<span class="fc" id="L220">        Set&lt;String&gt; candidateAssumptions = normalizedAssumptions(</span>
+<span class="fc" id="L221">            result.candidate().assumptions());</span>
+<span class="fc" id="L222">        Set&lt;String&gt; hiddenAssumptions = normalizedAssumptions(reference.assumptions());</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (candidateAssumptions.equals(hiddenAssumptions)) {</span>
+<span class="fc" id="L224">            return structural;</span>
+        }
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (candidateAssumptions.containsAll(hiddenAssumptions)) {</span>
+<span class="nc" id="L227">            return CandidateRelation.WEAKER;</span>
+        }
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (hiddenAssumptions.containsAll(candidateAssumptions)) {</span>
+<span class="nc" id="L230">            return CandidateRelation.STRONGER;</span>
+        }
+<span class="nc" id="L232">        return CandidateRelation.DIFFERENT;</span>
+    }
+
+    private CandidateRelation structuralRelation(
+        String candidateLeft,
+        String candidateRight,
+        String referenceLeft,
+        String referenceRight
+    ) {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (compact(candidateLeft).equals(compact(referenceLeft))</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                &amp;&amp; compact(candidateRight).equals(compact(referenceRight))) {</span>
+<span class="fc" id="L243">            return CandidateRelation.EXACT;</span>
+        }
+<span class="fc" id="L245">        if (RulePatternCanonicalizer.hash(candidateLeft, candidateRight)</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                .equals(RulePatternCanonicalizer.hash(referenceLeft, referenceRight))) {</span>
+<span class="nc" id="L247">            return CandidateRelation.ALPHA_EQUIVALENT;</span>
+        }
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (equivalence.areEquivalent(candidateLeft, referenceLeft)</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                &amp;&amp; equivalence.areEquivalent(candidateRight, referenceRight)) {</span>
+<span class="fc" id="L251">            return CandidateRelation.SEMANTICALLY_EQUIVALENT;</span>
+        }
+<span class="nc" id="L253">        return CandidateRelation.DIFFERENT;</span>
+    }
+
+    private static List&lt;String&gt; blockers(
+        RuntimeResult result,
+        List&lt;LeakageViolation&gt; leakage,
+        CandidateRelation relation,
+        boolean validationPassed,
+        boolean material,
+        boolean rediscovered
+    ) {
+<span class="fc" id="L264">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (leakage.stream().anyMatch(violation -&gt; isSplitLeakage(violation.location()))) {</span>
+<span class="nc" id="L266">            blockers.add(&quot;train/holdout split leakage detected&quot;);</span>
+        }
+<span class="pc bpc" id="L268" title="1 of 4 branches missed.">        if (leakage.stream().anyMatch(violation -&gt; !isSplitLeakage(violation.location()))) {</span>
+<span class="fc" id="L269">            blockers.add(&quot;runtime leakage detected&quot;);</span>
+        }
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (!result.frozen()) {</span>
+<span class="nc" id="L272">            blockers.add(&quot;candidate was not frozen&quot;);</span>
+        }
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (!validationPassed) {</span>
+<span class="nc" id="L275">            blockers.add(&quot;candidate validation evidence failed&quot;);</span>
+        }
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (!result.holdouts().allPassed()) {</span>
+<span class="nc" id="L278">            blockers.add(&quot;holdout validation failed&quot;);</span>
+        }
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (!material) {</span>
+<span class="nc" id="L281">            blockers.add(&quot;paired ablation showed no material benefit&quot;);</span>
+        }
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (relation == CandidateRelation.NONE) {</span>
+<span class="nc" id="L284">            blockers.add(&quot;no candidate was produced&quot;);</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        } else if (!rediscovered) {</span>
+<span class="nc" id="L286">            blockers.add(&quot;candidate differs from hidden reference&quot;);</span>
+        }
+<span class="fc" id="L288">        return List.copyOf(blockers);</span>
+    }
+
+    private static boolean isSplitLeakage(String location) {
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        return location.startsWith(&quot;TRAIN_POSITIVE_&quot;)</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            || location.startsWith(&quot;TRAIN_NEGATIVE_&quot;)</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            || location.contains(&quot;_DUPLICATE&quot;);</span>
+    }
+
+    private static boolean containsForbidden(String observable, String token) {
+<span class="fc" id="L298">        String normalizedToken = normalized(token);</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        if (normalizedToken.isEmpty()) {</span>
+<span class="nc" id="L300">            return false;</span>
+        }
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        boolean identifierLike = normalizedToken.length() &gt;= 4</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            &amp;&amp; normalizedToken.matches(&quot;[a-z0-9_.:-]+&quot;);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (identifierLike) {</span>
+<span class="fc" id="L305">            return observable.contains(normalizedToken);</span>
+        }
+<span class="fc" id="L307">        String compactToken = stripOuterGrouping(compact(normalizedToken));</span>
+<span class="fc" id="L308">        return observable.lines()</span>
+<span class="fc" id="L309">            .map(HiddenRulePilotEvaluator::compact)</span>
+<span class="fc" id="L310">            .map(HiddenRulePilotEvaluator::stripOuterGrouping)</span>
+<span class="fc" id="L311">            .anyMatch(line -&gt; line.equals(compactToken));</span>
+    }
+
+    private static Set&lt;String&gt; normalizedAssumptions(List&lt;String&gt; assumptions) {
+<span class="fc" id="L315">        return Set.copyOf(new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L316">            AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions()));</span>
+    }
+
+    private static String patternText(PatternExpr pattern) {
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="fc" id="L321">            return placeholder.name();</span>
+        }
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        if (pattern instanceof PatternExpr.LiteralNumber number) {</span>
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            return number.value() == Math.rint(number.value())</span>
+<span class="fc" id="L325">                ? Long.toString((long) number.value())</span>
+<span class="nc" id="L326">                : Double.toString(number.value());</span>
+        }
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="nc" id="L329">            return variable.name();</span>
+        }
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="fc" id="L332">            return &quot;(&quot; + patternText(operation.left()) + &quot; &quot; + operation.operator().symbol()</span>
+<span class="fc" id="L333">                + &quot; &quot; + patternText(operation.right()) + &quot;)&quot;;</span>
+        }
+<span class="nc" id="L335">        PatternExpr.Function function = (PatternExpr.Function) pattern;</span>
+<span class="nc" id="L336">        return function.name() + &quot;(&quot; + function.arguments().stream()</span>
+<span class="nc" id="L337">            .map(HiddenRulePilotEvaluator::patternText)</span>
+<span class="nc" id="L338">            .reduce((left, right) -&gt; left + &quot;, &quot; + right)</span>
+<span class="nc" id="L339">            .orElse(&quot;&quot;) + &quot;)&quot;;</span>
+    }
+
+    private static String syntaxForm(String expression) {
+        try {
+<span class="fc" id="L344">            return ExpressionFormatter.format(new ExpressionParser().parseTerm(expression));</span>
+<span class="nc" id="L345">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L346">            return normalized(expression);</span>
+        }
+    }
+
+    private static String stripOuterGrouping(String expression) {
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        String result = expression == null ? &quot;&quot; : expression.trim();</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        while (result.length() &gt;= 2</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                &amp;&amp; result.charAt(0) == '('</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">                &amp;&amp; result.charAt(result.length() - 1) == ')'</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">                &amp;&amp; outerParenthesesEncloseWholeExpression(result)) {</span>
+<span class="fc" id="L356">            result = result.substring(1, result.length() - 1).trim();</span>
+        }
+<span class="fc" id="L358">        return result;</span>
+    }
+
+    private static boolean outerParenthesesEncloseWholeExpression(String expression) {
+<span class="fc" id="L362">        int depth = 0;</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        for (int index = 0; index &lt; expression.length(); index++) {</span>
+<span class="fc" id="L364">            char character = expression.charAt(index);</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">            if (character == '(') {</span>
+<span class="fc" id="L366">                depth++;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">            } else if (character == ')') {</span>
+<span class="fc" id="L368">                depth--;</span>
+<span class="fc bfc" id="L369" title="All 4 branches covered.">                if (depth == 0 &amp;&amp; index &lt; expression.length() - 1) {</span>
+<span class="fc" id="L370">                    return false;</span>
+                }
+            }
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            if (depth &lt; 0) {</span>
+<span class="nc" id="L374">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        return depth == 0;</span>
+    }
+
+    private static String normalized(String value) {
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">        return value == null</span>
+<span class="nc" id="L382">            ? &quot;&quot;</span>
+<span class="fc" id="L383">            : value.toLowerCase(Locale.ROOT).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static String compact(String value) {
+<span class="fc" id="L387">        return normalized(value).replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+
+    private static String fingerprint(String value) {
+<span class="fc" id="L391">        return Integer.toHexString(compact(value).hashCode());</span>
+    }
+
+<span class="fc" id="L394">    public enum CandidateRelation {</span>
+<span class="fc" id="L395">        NONE,</span>
+<span class="fc" id="L396">        EXACT,</span>
+<span class="fc" id="L397">        ALPHA_EQUIVALENT,</span>
+<span class="fc" id="L398">        SEMANTICALLY_EQUIVALENT,</span>
+<span class="fc" id="L399">        STRONGER,</span>
+<span class="fc" id="L400">        WEAKER,</span>
+<span class="fc" id="L401">        DIFFERENT</span>
+    }
+
+    public record HiddenReference(
+        String hiddenRuleId,
+        String family,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; forbiddenRuntimeTokens
+    ) {
+<span class="fc" id="L412">        public HiddenReference {</span>
+<span class="fc" id="L413">            requireText(hiddenRuleId, &quot;hiddenRuleId&quot;);</span>
+<span class="fc" id="L414">            requireText(family, &quot;family&quot;);</span>
+<span class="fc" id="L415">            requireText(leftPattern, &quot;leftPattern&quot;);</span>
+<span class="fc" id="L416">            requireText(rightPattern, &quot;rightPattern&quot;);</span>
+<span class="fc" id="L417">            assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
+<span class="fc" id="L418">            List&lt;String&gt; tokens = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L419">            tokens.add(hiddenRuleId);</span>
+<span class="fc" id="L420">            tokens.add(family);</span>
+<span class="fc" id="L421">            tokens.add(leftPattern);</span>
+<span class="fc" id="L422">            tokens.add(rightPattern);</span>
+<span class="fc" id="L423">            tokens.addAll(assumptions);</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (forbiddenRuntimeTokens != null) {</span>
+<span class="fc" id="L425">                tokens.addAll(forbiddenRuntimeTokens);</span>
+            }
+<span class="fc" id="L427">            forbiddenRuntimeTokens = tokens.stream()</span>
+<span class="pc bpc" id="L428" title="2 of 4 branches missed.">                .filter(token -&gt; token != null &amp;&amp; !token.isBlank())</span>
+<span class="fc" id="L429">                .distinct()</span>
+<span class="fc" id="L430">                .toList();</span>
+<span class="fc" id="L431">        }</span>
+    }
+
+<span class="fc" id="L434">    public record LeakageViolation(String location, String tokenFingerprint) {</span>
+    }
+
+    public record Evaluation(
+        String opaqueCaseId,
+        String family,
+        List&lt;LeakageViolation&gt; leakageViolations,
+        CandidateRelation candidateRelation,
+        boolean candidateFrozen,
+        boolean validationPassed,
+        boolean holdoutsPassed,
+        boolean materialAblation,
+        boolean pilotAccepted,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L449">        public Evaluation {</span>
+<span class="fc" id="L450">            leakageViolations = List.copyOf(leakageViolations);</span>
+<span class="fc" id="L451">            blockers = List.copyOf(blockers);</span>
+<span class="fc" id="L452">        }</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L456" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L457">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L459">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

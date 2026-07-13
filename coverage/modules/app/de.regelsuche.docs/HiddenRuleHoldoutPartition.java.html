@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HiddenRuleHoldoutPartition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">HiddenRuleHoldoutPartition.java</span></div><h1>HiddenRuleHoldoutPartition.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.docs.HiddenRulePilotRunner.NegativeHoldout;
+import de.regelsuche.docs.HiddenRulePilotRunner.PositiveHoldout;
+import de.regelsuche.docs.HiddenRulePilotRunner.RuntimeTask;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.value.ExprValueFactory;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Audits train/holdout separation with both mathematical {@code ValueKey}
+ * identity and syntax-shape alpha equivalence.
+ */
+<span class="fc" id="L29">public final class HiddenRuleHoldoutPartition {</span>
+<span class="fc" id="L30">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    public SplitAudit audit(RuntimeTask task) {
+<span class="fc" id="L33">        Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L34">        PairFingerprint training = pair(</span>
+<span class="fc" id="L35">            task.inputExpression(), task.target().targetExpression());</span>
+<span class="fc" id="L36">        InputFingerprint trainingInput = input(task.inputExpression());</span>
+
+<span class="fc" id="L38">        List&lt;HoldoutFingerprint&gt; positives = task.positiveHoldouts().stream()</span>
+<span class="fc" id="L39">            .map(holdout -&gt; new HoldoutFingerprint(</span>
+<span class="fc" id="L40">                holdout.id(),</span>
+<span class="fc" id="L41">                pair(holdout.inputExpression(), holdout.targetExpression())))</span>
+<span class="fc" id="L42">            .toList();</span>
+<span class="fc" id="L43">        List&lt;NegativeFingerprint&gt; negatives = task.negativeHoldouts().stream()</span>
+<span class="fc" id="L44">            .map(holdout -&gt; new NegativeFingerprint(holdout.id(), input(holdout.inputExpression())))</span>
+<span class="fc" id="L45">            .toList();</span>
+
+<span class="fc" id="L47">        List&lt;SplitCollision&gt; collisions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (HoldoutFingerprint holdout : positives) {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            if (holdout.fingerprint().exactValue().equals(training.exactValue())) {</span>
+<span class="nc" id="L50">                collisions.add(new SplitCollision(</span>
+<span class="nc" id="L51">                    &quot;TRAIN_POSITIVE_VALUE&quot;, holdout.id(), training.exactValue()));</span>
+            }
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (holdout.fingerprint().alphaShape().equals(training.alphaShape())) {</span>
+<span class="nc" id="L54">                collisions.add(new SplitCollision(</span>
+<span class="nc" id="L55">                    &quot;TRAIN_POSITIVE_ALPHA&quot;, holdout.id(), training.alphaShape()));</span>
+            }
+<span class="fc" id="L57">        }</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        for (NegativeFingerprint holdout : negatives) {</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (holdout.fingerprint().exactValue().equals(trainingInput.exactValue())) {</span>
+<span class="nc" id="L60">                collisions.add(new SplitCollision(</span>
+<span class="nc" id="L61">                    &quot;TRAIN_NEGATIVE_VALUE&quot;, holdout.id(), trainingInput.exactValue()));</span>
+            }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (holdout.fingerprint().alphaShape().equals(trainingInput.alphaShape())) {</span>
+<span class="nc" id="L64">                collisions.add(new SplitCollision(</span>
+<span class="nc" id="L65">                    &quot;TRAIN_NEGATIVE_ALPHA&quot;, holdout.id(), trainingInput.alphaShape()));</span>
+            }
+<span class="fc" id="L67">        }</span>
+<span class="fc" id="L68">        duplicatePositiveCollisions(positives, collisions);</span>
+<span class="fc" id="L69">        duplicateNegativeCollisions(negatives, collisions);</span>
+
+<span class="fc" id="L71">        return new SplitAudit(training, positives, negatives, List.copyOf(collisions));</span>
+    }
+
+    private void duplicatePositiveCollisions(
+        List&lt;HoldoutFingerprint&gt; holdouts,
+        List&lt;SplitCollision&gt; collisions
+    ) {
+<span class="fc" id="L78">        Map&lt;String, String&gt; exactOwners = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L79">        Map&lt;String, String&gt; alphaOwners = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (HoldoutFingerprint holdout : holdouts) {</span>
+<span class="fc" id="L81">            recordDuplicate(</span>
+<span class="fc" id="L82">                exactOwners, holdout.fingerprint().exactValue(), holdout.id(),</span>
+                &quot;POSITIVE_VALUE_DUPLICATE&quot;, collisions);
+<span class="fc" id="L84">            recordDuplicate(</span>
+<span class="fc" id="L85">                alphaOwners, holdout.fingerprint().alphaShape(), holdout.id(),</span>
+                &quot;POSITIVE_ALPHA_DUPLICATE&quot;, collisions);
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">    }</span>
+
+    private void duplicateNegativeCollisions(
+        List&lt;NegativeFingerprint&gt; holdouts,
+        List&lt;SplitCollision&gt; collisions
+    ) {
+<span class="fc" id="L94">        Map&lt;String, String&gt; exactOwners = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L95">        Map&lt;String, String&gt; alphaOwners = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (NegativeFingerprint holdout : holdouts) {</span>
+<span class="fc" id="L97">            recordDuplicate(</span>
+<span class="fc" id="L98">                exactOwners, holdout.fingerprint().exactValue(), holdout.id(),</span>
+                &quot;NEGATIVE_VALUE_DUPLICATE&quot;, collisions);
+<span class="fc" id="L100">            recordDuplicate(</span>
+<span class="fc" id="L101">                alphaOwners, holdout.fingerprint().alphaShape(), holdout.id(),</span>
+                &quot;NEGATIVE_ALPHA_DUPLICATE&quot;, collisions);
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">    }</span>
+
+    private static void recordDuplicate(
+        Map&lt;String, String&gt; owners,
+        String fingerprint,
+        String id,
+        String kind,
+        List&lt;SplitCollision&gt; collisions
+    ) {
+<span class="fc" id="L113">        String previous = owners.putIfAbsent(fingerprint, id);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (previous != null) {</span>
+<span class="nc" id="L115">            collisions.add(new SplitCollision(kind, previous + &quot;,&quot; + id, fingerprint));</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    private PairFingerprint pair(String input, String target) {
+<span class="fc" id="L120">        Expr inputExpr = parser.parseTerm(input);</span>
+<span class="fc" id="L121">        Expr targetExpr = parser.parseTerm(target);</span>
+        String exact;
+        String alpha;
+<span class="fc" id="L124">        try (ExprValueFactory factory = new ExprValueFactory()) {</span>
+<span class="fc" id="L125">            exact = factory.fromExpr(inputExpr).key() + &quot;-&gt;&quot; + factory.fromExpr(targetExpr).key();</span>
+        }
+<span class="fc" id="L127">        Map&lt;String, String&gt; variableNames = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L128">        Expr alphaInput = alphaNormalize(inputExpr, variableNames);</span>
+<span class="fc" id="L129">        Expr alphaTarget = alphaNormalize(targetExpr, variableNames);</span>
+<span class="fc" id="L130">        try (ExprValueFactory factory = new ExprValueFactory()) {</span>
+<span class="fc" id="L131">            alpha = factory.fromExpr(alphaInput).key() + &quot;-&gt;&quot; + factory.fromExpr(alphaTarget).key();</span>
+        }
+<span class="fc" id="L133">        return new PairFingerprint(digest(exact), digest(alpha));</span>
+    }
+
+    private InputFingerprint input(String expression) {
+<span class="fc" id="L137">        Expr parsed = parser.parseTerm(expression);</span>
+        String exact;
+        String alpha;
+<span class="fc" id="L140">        try (ExprValueFactory factory = new ExprValueFactory()) {</span>
+<span class="fc" id="L141">            exact = factory.fromExpr(parsed).key().toString();</span>
+        }
+<span class="fc" id="L143">        Expr alphaExpr = alphaNormalize(parsed, new LinkedHashMap&lt;&gt;());</span>
+<span class="fc" id="L144">        try (ExprValueFactory factory = new ExprValueFactory()) {</span>
+<span class="fc" id="L145">            alpha = factory.fromExpr(alphaExpr).key().toString();</span>
+        }
+<span class="fc" id="L147">        return new InputFingerprint(digest(exact), digest(alpha));</span>
+    }
+
+    private Expr alphaNormalize(Expr expression, Map&lt;String, String&gt; variables) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L152">            String renamed = variables.computeIfAbsent(</span>
+<span class="fc" id="L153">                variable.name(), ignored -&gt; &quot;v&quot; + variables.size());</span>
+<span class="fc" id="L154">            return new VariableExpr(renamed);</span>
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
+<span class="fc" id="L157">            return expression;</span>
+        }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L160">            return new FunctionExpr(</span>
+<span class="fc" id="L161">                function.name(),</span>
+<span class="fc" id="L162">                function.arguments().stream()</span>
+<span class="fc" id="L163">                    .map(argument -&gt; alphaNormalize(argument, variables))</span>
+<span class="fc" id="L164">                    .toList());</span>
+        }
+<span class="fc" id="L166">        BinaryExpr binary = (BinaryExpr) expression;</span>
+<span class="fc" id="L167">        return new BinaryExpr(</span>
+<span class="fc" id="L168">            alphaNormalize(binary.left(), variables),</span>
+<span class="fc" id="L169">            binary.operator(),</span>
+<span class="fc" id="L170">            alphaNormalize(binary.right(), variables));</span>
+    }
+
+    private static String digest(String value) {
+        try {
+<span class="fc" id="L175">            byte[] bytes = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L176">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L177">            return java.util.HexFormat.of().formatHex(bytes, 0, 12);</span>
+<span class="nc" id="L178">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L179">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L183">    public record PairFingerprint(String exactValue, String alphaShape) {</span>
+    }
+
+<span class="fc" id="L186">    public record InputFingerprint(String exactValue, String alphaShape) {</span>
+    }
+
+<span class="fc" id="L189">    public record HoldoutFingerprint(String id, PairFingerprint fingerprint) {</span>
+    }
+
+<span class="fc" id="L192">    public record NegativeFingerprint(String id, InputFingerprint fingerprint) {</span>
+    }
+
+<span class="nc" id="L195">    public record SplitCollision(String kind, String holdoutId, String fingerprint) {</span>
+    }
+
+    public record SplitAudit(
+        PairFingerprint training,
+        List&lt;HoldoutFingerprint&gt; positives,
+        List&lt;NegativeFingerprint&gt; negatives,
+        List&lt;SplitCollision&gt; collisions
+    ) {
+<span class="fc" id="L204">        public SplitAudit {</span>
+<span class="fc" id="L205">            positives = List.copyOf(positives);</span>
+<span class="fc" id="L206">            negatives = List.copyOf(negatives);</span>
+<span class="fc" id="L207">            collisions = List.copyOf(collisions);</span>
+<span class="fc" id="L208">        }</span>
+
+        public boolean passed() {
+<span class="fc" id="L211">            return collisions.isEmpty();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
