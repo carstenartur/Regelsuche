@@ -124,7 +124,9 @@ class PolicyFrontierBestFirstSearchStrategyTest {
         SearchProblem problem = new SearchProblem(
             "r",
             expression -> expression.equals("r")
-                ? List.of(step("unseen", "p", 0, "unseen:p"))
+                ? List.of(
+                    step("unseen-a", "p", 0, "unseen-a:p"),
+                    step("unseen-b", "s", 0, "unseen-b:s"))
                 : List.of(),
             new ExpressionScorer(),
             new ExpressionCanonicalizer(),
@@ -132,7 +134,7 @@ class PolicyFrontierBestFirstSearchStrategyTest {
 
         var result = new PolicyFrontierBestFirstSearchStrategy(extreme, 1000)
             .searchWithDiagnostics(problem);
-        FrontierPriorityEvent event = result.policyEvents().getFirst();
+        FrontierPriorityEvent event = event(result.policyEvents(), "unseen-a");
 
         assertEquals(1000, event.frontierAdjustment());
         assertTrue(event.composedFrontierPriority() < Integer.MAX_VALUE);
