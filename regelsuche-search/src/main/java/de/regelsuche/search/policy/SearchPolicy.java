@@ -1,6 +1,7 @@
 package de.regelsuche.search.policy;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.search.learning.TransformationDescriptor;
 import de.regelsuche.transform.Transformation;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -42,7 +43,8 @@ public interface SearchPolicy {
         String parentExpression,
         int targetDistance,
         boolean targeted,
-        ExpressionCanonicalizer canonicalizer
+        ExpressionCanonicalizer canonicalizer,
+        TransformationDescriptor transformationDescriptor
     ) {
         public PolicyContext {
             parentExpression = parentExpression == null ? "" : parentExpression;
