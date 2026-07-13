@@ -113,13 +113,16 @@ final class SearchTelemetry {
 <span class="fc" id="L113">            state.parentExpression(),</span>
 <span class="fc" id="L114">            state.appliedRuleId(),</span>
 <span class="fc" id="L115">            state.appliedRuleKind(),</span>
-<span class="fc" id="L116">            state.assumptions(),</span>
+<span class="fc" id="L116">            state.mayIncreaseComplexity(),</span>
+<span class="fc" id="L117">            state.estimatedCostDelta(),</span>
+<span class="fc" id="L118">            state.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L119">            state.assumptions(),</span>
             frontierSize,
             visitedCount,
             generatedCount,
             pruningReason
         ));
-<span class="fc" id="L122">    }</span>
+<span class="fc" id="L125">    }</span>
 
     private void emitTransformation(
         SearchState state,
@@ -129,35 +132,38 @@ final class SearchTelemetry {
         int generatedCount,
         String pruningReason
     ) {
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (isNoOp()) {</span>
-<span class="fc" id="L133">            return;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (isNoOp()) {</span>
+<span class="fc" id="L136">            return;</span>
         }
-<span class="fc" id="L135">        String expression = transformation.transformedExpression();</span>
-<span class="fc" id="L136">        observer.onEvent(new SearchEvent(</span>
+<span class="fc" id="L138">        String expression = transformation.transformedExpression();</span>
+<span class="fc" id="L139">        observer.onEvent(new SearchEvent(</span>
             sequence++,
             SearchEventType.TRANSFORMATION_GENERATED,
             expression,
-<span class="fc" id="L140">            canonicalizer.stableHash(expression),</span>
-<span class="fc" id="L141">            state.depth() + 1,</span>
-<span class="fc" id="L142">            scorer.score(expression).weightedTotal(),</span>
-<span class="fc" id="L143">            state.canonicalHash(),</span>
-<span class="fc" id="L144">            state.expression(),</span>
-<span class="fc" id="L145">            transformation.rule(),</span>
-<span class="fc" id="L146">            transformation.kind(),</span>
-<span class="fc" id="L147">            transformation.assumptions(),</span>
+<span class="fc" id="L143">            canonicalizer.stableHash(expression),</span>
+<span class="fc" id="L144">            state.depth() + 1,</span>
+<span class="fc" id="L145">            scorer.score(expression).weightedTotal(),</span>
+<span class="fc" id="L146">            state.canonicalHash(),</span>
+<span class="fc" id="L147">            state.expression(),</span>
+<span class="fc" id="L148">            transformation.rule(),</span>
+<span class="fc" id="L149">            transformation.kind(),</span>
+<span class="fc" id="L150">            transformation.mayIncreaseComplexity(),</span>
+<span class="fc" id="L151">            transformation.estimatedCostDelta(),</span>
+<span class="fc" id="L152">            transformation.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L153">            transformation.assumptions(),</span>
             frontierSize,
             visitedCount,
             generatedCount,
             pruningReason
         ));
-<span class="fc" id="L153">    }</span>
+<span class="fc" id="L159">    }</span>
 
     private boolean isNoOp() {
-<span class="fc bfc" id="L156" title="All 2 branches covered.">        return observer == NoOpSearchObserver.INSTANCE;</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        return observer == NoOpSearchObserver.INSTANCE;</span>
     }
 
     private String parentCanonicalHash(SearchState state) {
-<span class="fc bfc" id="L160" title="All 2 branches covered.">        return state.parentExpression() == null ? &quot;&quot; : canonicalizer.stableHash(state.parentExpression());</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        return state.parentExpression() == null ? &quot;&quot; : canonicalizer.stableHash(state.parentExpression());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -42,39 +42,40 @@ public record SearchTrajectoryRun(
 <span class="fc" id="L42">                record.parent(),</span>
 <span class="fc" id="L43">                record.target(),</span>
 <span class="fc" id="L44">                record.features(),</span>
-<span class="fc" id="L45">                record.depth(),</span>
-<span class="fc" id="L46">                record.score(),</span>
-<span class="fc" id="L47">                record.parentScore(),</span>
-<span class="fc" id="L48">                record.frontierSize(),</span>
-<span class="fc" id="L49">                record.visitedCount(),</span>
-<span class="fc" id="L50">                record.generatedCount(),</span>
-<span class="fc" id="L51">                record.ruleId(),</span>
-<span class="fc" id="L52">                record.rewriteKind(),</span>
-<span class="fc" id="L53">                record.applicableRuleIds(),</span>
-<span class="fc" id="L54">                record.assumptions(),</span>
-<span class="fc" id="L55">                record.pruningReason(),</span>
-<span class="fc" id="L56">                record.eventualSuccess(),</span>
-<span class="fc" id="L57">                record.selectedPath(),</span>
-<span class="fc" id="L58">                record.terminalStatus()))</span>
-<span class="fc" id="L59">            .toList();</span>
-<span class="fc" id="L60">        return new SearchTrajectoryRun(</span>
+<span class="fc" id="L45">                record.transformationDescriptor(),</span>
+<span class="fc" id="L46">                record.depth(),</span>
+<span class="fc" id="L47">                record.score(),</span>
+<span class="fc" id="L48">                record.parentScore(),</span>
+<span class="fc" id="L49">                record.frontierSize(),</span>
+<span class="fc" id="L50">                record.visitedCount(),</span>
+<span class="fc" id="L51">                record.generatedCount(),</span>
+<span class="fc" id="L52">                record.ruleId(),</span>
+<span class="fc" id="L53">                record.rewriteKind(),</span>
+<span class="fc" id="L54">                record.applicableRuleIds(),</span>
+<span class="fc" id="L55">                record.assumptions(),</span>
+<span class="fc" id="L56">                record.pruningReason(),</span>
+<span class="fc" id="L57">                record.eventualSuccess(),</span>
+<span class="fc" id="L58">                record.selectedPath(),</span>
+<span class="fc" id="L59">                record.terminalStatus()))</span>
+<span class="fc" id="L60">            .toList();</span>
+<span class="fc" id="L61">        return new SearchTrajectoryRun(</span>
             updated, root, target, taskValueFingerprint, taskAlphaFingerprint,
             terminalStatus, success, updatedRecords);
     }
 
     public int decisionCount() {
-<span class="fc" id="L66">        return (int) records.stream().filter(SearchTrajectoryRecord::decision).count();</span>
+<span class="fc" id="L67">        return (int) records.stream().filter(SearchTrajectoryRecord::decision).count();</span>
     }
 
     public int selectedDecisionCount() {
-<span class="fc" id="L70">        return (int) records.stream()</span>
-<span class="fc" id="L71">            .filter(SearchTrajectoryRecord::decision)</span>
-<span class="fc" id="L72">            .filter(SearchTrajectoryRecord::selectedPath)</span>
-<span class="fc" id="L73">            .count();</span>
+<span class="fc" id="L71">        return (int) records.stream()</span>
+<span class="fc" id="L72">            .filter(SearchTrajectoryRecord::decision)</span>
+<span class="fc" id="L73">            .filter(SearchTrajectoryRecord::selectedPath)</span>
+<span class="fc" id="L74">            .count();</span>
     }
 
     private static String safe(String value) {
-<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

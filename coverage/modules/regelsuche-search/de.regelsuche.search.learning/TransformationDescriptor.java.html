@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransformationDescriptor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.learning</a> &gt; <span class="el_source">TransformationDescriptor.java</span></div><h1>TransformationDescriptor.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.learning;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.strategy.SearchProblem.TargetRelation;
+import de.regelsuche.search.telemetry.SearchEvent;
+import de.regelsuche.search.telemetry.SearchEventType;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.value.ExprValueFactory;
+import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
+import de.regelsuche.value.ExprValueFactory.ExprValue;
+import de.regelsuche.value.ExprValueFactory.OrderedValue;
+import de.regelsuche.value.ExprValueFactory.ValueKey;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+
+/**
+ * Versioned, rule-ID-independent description of one already-applicable transformation.
+ * Every predictive field is available before candidate selection; outcome labels and
+ * hidden-reference metadata are deliberately absent.
+ */
+public record TransformationDescriptor(
+    RewriteKind rewriteKind,
+    boolean equivalencePreserving,
+    boolean mayIncreaseComplexity,
+    int estimatedCostDelta,
+    AstDelta astDelta,
+    RootSignature parentRoot,
+    RootSignature childRoot,
+    int assumptionCount,
+    Map&lt;AssumptionClass, Integer&gt; assumptionClassCounts,
+    boolean targeted,
+    int targetDistanceBefore,
+    int targetDistanceAfter,
+    int targetDistanceDelta,
+    boolean available
+) {
+    public static final String SCHEMA = &quot;regelsuche.transformation-descriptor/v1&quot;;
+
+<span class="fc" id="L59">    public TransformationDescriptor {</span>
+<span class="fc" id="L60">        Objects.requireNonNull(rewriteKind, &quot;rewriteKind&quot;);</span>
+<span class="fc" id="L61">        Objects.requireNonNull(astDelta, &quot;astDelta&quot;);</span>
+<span class="fc" id="L62">        Objects.requireNonNull(parentRoot, &quot;parentRoot&quot;);</span>
+<span class="fc" id="L63">        Objects.requireNonNull(childRoot, &quot;childRoot&quot;);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (assumptionCount &lt; 0) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;assumptionCount must not be negative&quot;);</span>
+        }
+<span class="fc" id="L67">        EnumMap&lt;AssumptionClass, Integer&gt; sorted = new EnumMap&lt;&gt;(AssumptionClass.class);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (assumptionClassCounts != null) {</span>
+<span class="fc" id="L69">            assumptionClassCounts.forEach((kind, count) -&gt; {</span>
+<span class="pc bpc" id="L70" title="3 of 6 branches missed.">                if (kind == null || count == null || count &lt; 1) {</span>
+<span class="nc" id="L71">                    throw new IllegalArgumentException(&quot;assumption class counts must be positive&quot;);</span>
+                }
+<span class="fc" id="L73">                sorted.put(kind, count);</span>
+<span class="fc" id="L74">            });</span>
+        }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (sorted.values().stream().mapToInt(Integer::intValue).sum() != assumptionCount) {</span>
+<span class="nc" id="L77">            throw new IllegalArgumentException(&quot;assumption class counts must match assumptionCount&quot;);</span>
+        }
+<span class="fc" id="L79">        assumptionClassCounts = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(sorted));</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (targeted) {</span>
+<span class="pc bpc" id="L81" title="3 of 6 branches missed.">            if (targetDistanceBefore &lt; 0 || targetDistanceAfter &lt; 0</span>
+                    || targetDistanceDelta != targetDistanceAfter - targetDistanceBefore) {
+<span class="nc" id="L83">                throw new IllegalArgumentException(&quot;invalid target-distance descriptor&quot;);</span>
+            }
+<span class="pc bpc" id="L85" title="3 of 6 branches missed.">        } else if (targetDistanceBefore != -1 || targetDistanceAfter != -1</span>
+                || targetDistanceDelta != 0) {
+<span class="nc" id="L87">            throw new IllegalArgumentException(&quot;untargeted descriptors use -1/-1/0 distances&quot;);</span>
+        }
+<span class="fc" id="L89">    }</span>
+
+    /** Sorted, inspectable linear feature vector; concrete rule IDs never enter this map. */
+    public Map&lt;String, Integer&gt; featureVector() {
+<span class="fc" id="L93">        Map&lt;String, Integer&gt; features = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L94">        features.put(&quot;bias&quot;, 1);</span>
+<span class="fc" id="L95">        features.put(&quot;rewriteKind.&quot; + rewriteKind.name(), 1);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        features.put(&quot;equivalencePreserving&quot;, equivalencePreserving ? 1 : 0);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        features.put(&quot;mayIncreaseComplexity&quot;, mayIncreaseComplexity ? 1 : 0);</span>
+<span class="fc" id="L98">        features.put(&quot;estimatedCostDelta&quot;, estimatedCostDelta);</span>
+<span class="fc" id="L99">        astDelta.addTo(features);</span>
+<span class="fc" id="L100">        features.put(&quot;root.parent.&quot; + parentRoot.kind().name(), 1);</span>
+<span class="fc" id="L101">        features.put(&quot;root.child.&quot; + childRoot.kind().name(), 1);</span>
+<span class="fc" id="L102">        features.put(&quot;root.transition.&quot; + parentRoot.kind().name()</span>
+<span class="fc" id="L103">            + &quot;_TO_&quot; + childRoot.kind().name(), 1);</span>
+<span class="fc" id="L104">        features.put(&quot;root.parentArity&quot;, parentRoot.arity());</span>
+<span class="fc" id="L105">        features.put(&quot;root.childArity&quot;, childRoot.arity());</span>
+<span class="fc" id="L106">        features.put(&quot;root.arityDelta&quot;, childRoot.arity() - parentRoot.arity());</span>
+<span class="fc" id="L107">        features.put(&quot;assumption.count&quot;, assumptionCount);</span>
+<span class="fc" id="L108">        assumptionClassCounts.forEach((kind, count) -&gt;</span>
+<span class="fc" id="L109">            features.put(&quot;assumption.&quot; + kind.name(), count));</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        features.put(&quot;targeted&quot;, targeted ? 1 : 0);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (targeted) {</span>
+<span class="fc" id="L112">            features.put(&quot;target.distanceBefore&quot;, targetDistanceBefore);</span>
+<span class="fc" id="L113">            features.put(&quot;target.distanceAfter&quot;, targetDistanceAfter);</span>
+<span class="fc" id="L114">            features.put(&quot;target.distanceDelta&quot;, targetDistanceDelta);</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        features.put(&quot;available&quot;, available ? 1 : 0);</span>
+<span class="fc" id="L117">        return Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(features));</span>
+    }
+
+    /** Canonical predictive material used for hashes and model training. */
+    public String predictiveMaterial() {
+<span class="fc" id="L122">        StringBuilder material = new StringBuilder(SCHEMA);</span>
+<span class="fc" id="L123">        featureVector().forEach((name, value) -&gt; material</span>
+<span class="fc" id="L124">            .append('\n').append(name).append('=').append(value));</span>
+<span class="fc" id="L125">        return material.toString();</span>
+    }
+
+    public String predictiveFingerprint() {
+<span class="fc" id="L129">        return &quot;sha256:&quot; + sha256(predictiveMaterial());</span>
+    }
+
+<span class="fc" id="L132">    public record AstDelta(</span>
+        int nodeCount,
+        int maxDepth,
+        int variableOccurrences,
+        int distinctVariables,
+        int numericLiterals,
+        int additions,
+        int subtractions,
+        int multiplications,
+        int divisions,
+        int powers,
+        int functions,
+        boolean parseable
+    ) {
+        static AstDelta between(ExpressionFeatures parent, ExpressionFeatures child) {
+<span class="fc" id="L147">            return new AstDelta(</span>
+<span class="fc" id="L148">                child.nodeCount() - parent.nodeCount(),</span>
+<span class="fc" id="L149">                child.maxDepth() - parent.maxDepth(),</span>
+<span class="fc" id="L150">                child.variableOccurrences() - parent.variableOccurrences(),</span>
+<span class="fc" id="L151">                child.distinctVariables() - parent.distinctVariables(),</span>
+<span class="fc" id="L152">                child.numericLiterals() - parent.numericLiterals(),</span>
+<span class="fc" id="L153">                child.additions() - parent.additions(),</span>
+<span class="fc" id="L154">                child.subtractions() - parent.subtractions(),</span>
+<span class="fc" id="L155">                child.multiplications() - parent.multiplications(),</span>
+<span class="fc" id="L156">                child.divisions() - parent.divisions(),</span>
+<span class="fc" id="L157">                child.powers() - parent.powers(),</span>
+<span class="fc" id="L158">                child.functions() - parent.functions(),</span>
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">                parent.parseable() &amp;&amp; child.parseable());</span>
+        }
+
+        private void addTo(Map&lt;String, Integer&gt; features) {
+<span class="fc" id="L163">            features.put(&quot;ast.nodeCountDelta&quot;, nodeCount);</span>
+<span class="fc" id="L164">            features.put(&quot;ast.maxDepthDelta&quot;, maxDepth);</span>
+<span class="fc" id="L165">            features.put(&quot;ast.variableOccurrencesDelta&quot;, variableOccurrences);</span>
+<span class="fc" id="L166">            features.put(&quot;ast.distinctVariablesDelta&quot;, distinctVariables);</span>
+<span class="fc" id="L167">            features.put(&quot;ast.numericLiteralsDelta&quot;, numericLiterals);</span>
+<span class="fc" id="L168">            features.put(&quot;ast.additionsDelta&quot;, additions);</span>
+<span class="fc" id="L169">            features.put(&quot;ast.subtractionsDelta&quot;, subtractions);</span>
+<span class="fc" id="L170">            features.put(&quot;ast.multiplicationsDelta&quot;, multiplications);</span>
+<span class="fc" id="L171">            features.put(&quot;ast.divisionsDelta&quot;, divisions);</span>
+<span class="fc" id="L172">            features.put(&quot;ast.powersDelta&quot;, powers);</span>
+<span class="fc" id="L173">            features.put(&quot;ast.functionsDelta&quot;, functions);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            features.put(&quot;ast.parseable&quot;, parseable ? 1 : 0);</span>
+<span class="fc" id="L175">        }</span>
+    }
+
+    public record RootSignature(RootKind kind, int arity) {
+<span class="fc" id="L179">        public RootSignature {</span>
+<span class="fc" id="L180">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (arity &lt; 0) {</span>
+<span class="nc" id="L182">                throw new IllegalArgumentException(&quot;root arity must not be negative&quot;);</span>
+            }
+<span class="fc" id="L184">        }</span>
+    }
+
+<span class="fc" id="L187">    public enum RootKind {</span>
+<span class="fc" id="L188">        ADD,</span>
+<span class="fc" id="L189">        SUB,</span>
+<span class="fc" id="L190">        MUL,</span>
+<span class="fc" id="L191">        DIV,</span>
+<span class="fc" id="L192">        POW,</span>
+<span class="fc" id="L193">        FUNCTION,</span>
+<span class="fc" id="L194">        VARIABLE,</span>
+<span class="fc" id="L195">        NUMBER,</span>
+<span class="fc" id="L196">        UNPARSEABLE</span>
+    }
+
+<span class="fc" id="L199">    public enum AssumptionClass {</span>
+<span class="fc" id="L200">        NON_ZERO,</span>
+<span class="fc" id="L201">        POSITIVE,</span>
+<span class="fc" id="L202">        NON_NEGATIVE,</span>
+<span class="fc" id="L203">        INTEGER,</span>
+<span class="fc" id="L204">        NATURAL,</span>
+<span class="fc" id="L205">        RATIONAL,</span>
+<span class="fc" id="L206">        REAL,</span>
+<span class="fc" id="L207">        INVERTIBLE,</span>
+<span class="fc" id="L208">        DOMAIN_MEMBERSHIP,</span>
+<span class="fc" id="L209">        CUSTOM</span>
+    }
+
+    /** Bounded owner for deterministic descriptor creation for one search problem. */
+    public static final class Factory implements AutoCloseable {
+        private static final int UNPARSEABLE_DISTANCE = 100_000;
+
+        private final SearchTarget target;
+        private final ExpressionCanonicalizer canonicalizer;
+<span class="fc" id="L218">        private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L219">        private final ExprValueFactory valueFactory = new ExprValueFactory();</span>
+        private final String normalizedTarget;
+        private final ExprValue targetValue;
+        private final Map&lt;ValueKey, Integer&gt; targetOccurrences;
+<span class="fc" id="L223">        private final Map&lt;String, Integer&gt; distanceCache = new LinkedHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L225">        public Factory(SearchTarget target, ExpressionCanonicalizer canonicalizer) {</span>
+<span class="fc" id="L226">            this.target = target;</span>
+<span class="fc" id="L227">            this.canonicalizer = Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            normalizedTarget = target == null ? &quot;&quot; : normalize(target.targetExpression());</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            targetValue = target == null ? null : value(normalizedTarget);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            targetOccurrences = targetValue == null ? Map.of() : occurrenceMultiset(targetValue);</span>
+<span class="fc" id="L231">        }</span>
+
+        public TransformationDescriptor from(SearchEvent event) {
+<span class="fc" id="L234">            Objects.requireNonNull(event, &quot;event&quot;);</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (event.type() != SearchEventType.TRANSFORMATION_GENERATED</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                    || event.parentExpression().isBlank()</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">                    || event.rewriteKind() == null) {</span>
+<span class="nc" id="L238">                throw new IllegalArgumentException(&quot;descriptor requires a transformation decision event&quot;);</span>
+            }
+<span class="fc" id="L240">            ExpressionFeatures parentFeatures = ExpressionFeatures.of(event.parentExpression());</span>
+<span class="fc" id="L241">            ExpressionFeatures childFeatures = ExpressionFeatures.of(event.expression());</span>
+<span class="fc" id="L242">            AstDelta delta = AstDelta.between(parentFeatures, childFeatures);</span>
+<span class="fc" id="L243">            RootSignature parentRoot = rootSignature(event.parentExpression());</span>
+<span class="fc" id="L244">            RootSignature childRoot = rootSignature(event.expression());</span>
+<span class="fc" id="L245">            Map&lt;AssumptionClass, Integer&gt; assumptionClasses = assumptionClasses(event.assumptions());</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            boolean targeted = target != null;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            int before = targeted ? distance(event.parentExpression()) : -1;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            int after = targeted ? distance(event.expression()) : -1;</span>
+<span class="fc" id="L249">            return new TransformationDescriptor(</span>
+<span class="fc" id="L250">                event.rewriteKind(),</span>
+<span class="fc" id="L251">                event.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L252">                event.mayIncreaseComplexity(),</span>
+<span class="fc" id="L253">                event.estimatedCostDelta(),</span>
+                delta,
+                parentRoot,
+                childRoot,
+<span class="fc" id="L257">                event.assumptions().size(),</span>
+                assumptionClasses,
+                targeted,
+                before,
+                after,
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                targeted ? after - before : 0,</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                delta.parseable()</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">                    &amp;&amp; parentRoot.kind() != RootKind.UNPARSEABLE</span>
+<span class="pc bpc" id="L265" title="3 of 8 branches missed.">                    &amp;&amp; childRoot.kind() != RootKind.UNPARSEABLE</span>
+                    &amp;&amp; (!targeted || before &lt; UNPARSEABLE_DISTANCE
+                        &amp;&amp; after &lt; UNPARSEABLE_DISTANCE));
+        }
+
+        private int distance(String expression) {
+<span class="fc" id="L271">            String normalized = normalize(expression);</span>
+<span class="fc" id="L272">            return distanceCache.computeIfAbsent(normalized, this::computeDistance);</span>
+        }
+
+        private int computeDistance(String expression) {
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            if (target.relation() == TargetRelation.SYNTAX_EXACT</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">                    &amp;&amp; expression.equals(normalizedTarget)) {</span>
+<span class="fc" id="L278">                return 0;</span>
+            }
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            if (targetValue == null) {</span>
+<span class="nc" id="L281">                return UNPARSEABLE_DISTANCE;</span>
+            }
+<span class="fc" id="L283">            ExprValue candidate = value(expression);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            if (candidate == null) {</span>
+<span class="fc" id="L285">                return UNPARSEABLE_DISTANCE;</span>
+            }
+<span class="fc" id="L287">            int semantic = semanticDistance(candidate, targetValue, targetOccurrences);</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            if (target.relation() != TargetRelation.SYNTAX_EXACT) {</span>
+<span class="nc" id="L289">                return semantic;</span>
+            }
+<span class="fc" id="L291">            return Math.min(UNPARSEABLE_DISTANCE - 1, semantic + 1);</span>
+        }
+
+        private ExprValue value(String expression) {
+            try {
+<span class="fc" id="L296">                Expr parsed = parser.parseTerm(expression);</span>
+<span class="fc" id="L297">                return valueFactory.fromExpr(canonicalizer.canonicalize(parsed));</span>
+<span class="fc" id="L298">            } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L299">                return null;</span>
+            }
+        }
+
+        private RootSignature rootSignature(String expression) {
+            try {
+<span class="fc" id="L305">                Expr parsed = parser.parseTerm(expression);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                if (parsed instanceof BinaryExpr binary) {</span>
+<span class="pc bpc" id="L307" title="2 of 5 branches missed.">                    RootKind kind = switch (binary.operator()) {</span>
+<span class="fc" id="L308">                        case ADD -&gt; RootKind.ADD;</span>
+<span class="nc" id="L309">                        case SUB -&gt; RootKind.SUB;</span>
+<span class="fc" id="L310">                        case MUL -&gt; RootKind.MUL;</span>
+<span class="nc" id="L311">                        case DIV -&gt; RootKind.DIV;</span>
+<span class="fc" id="L312">                        case POW -&gt; RootKind.POW;</span>
+                    };
+<span class="fc bfc" id="L314" title="All 4 branches covered.">                    int arity = kind == RootKind.ADD || kind == RootKind.MUL</span>
+<span class="fc" id="L315">                        ? flattenedArity(parsed, binary.operator())</span>
+<span class="fc" id="L316">                        : 2;</span>
+<span class="fc" id="L317">                    return new RootSignature(kind, arity);</span>
+                }
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">                if (parsed instanceof FunctionExpr function) {</span>
+<span class="nc" id="L320">                    return new RootSignature(RootKind.FUNCTION, function.arguments().size());</span>
+                }
+<span class="fc bfc" id="L322" title="All 2 branches covered.">                if (parsed instanceof VariableExpr) {</span>
+<span class="fc" id="L323">                    return new RootSignature(RootKind.VARIABLE, 0);</span>
+                }
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                if (parsed instanceof NumberExpr) {</span>
+<span class="fc" id="L326">                    return new RootSignature(RootKind.NUMBER, 0);</span>
+                }
+<span class="nc" id="L328">                return new RootSignature(RootKind.UNPARSEABLE, 0);</span>
+<span class="fc" id="L329">            } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L330">                return new RootSignature(RootKind.UNPARSEABLE, 0);</span>
+            }
+        }
+
+        private static int flattenedArity(
+            Expr expression,
+            BinaryOperator operator
+        ) {
+<span class="fc bfc" id="L338" title="All 4 branches covered.">            if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == operator) {</span>
+<span class="fc" id="L339">                return flattenedArity(binary.left(), operator)</span>
+<span class="fc" id="L340">                    + flattenedArity(binary.right(), operator);</span>
+            }
+<span class="fc" id="L342">            return 1;</span>
+        }
+
+        @Override
+        public void close() {
+<span class="fc" id="L347">            distanceCache.clear();</span>
+<span class="fc" id="L348">            valueFactory.close();</span>
+<span class="fc" id="L349">        }</span>
+    }
+
+    private static Map&lt;AssumptionClass, Integer&gt; assumptionClasses(List&lt;String&gt; assumptions) {
+<span class="fc" id="L353">        EnumMap&lt;AssumptionClass, Integer&gt; counts = new EnumMap&lt;&gt;(AssumptionClass.class);</span>
+<span class="fc" id="L354">        assumptions.forEach(assumption -&gt; counts.merge(classify(assumption), 1, Integer::sum));</span>
+<span class="fc" id="L355">        return counts;</span>
+    }
+
+    private static AssumptionClass classify(String assumption) {
+<span class="fc" id="L359">        String normalized = AssumptionSignature.normalizeExpression(assumption);</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        if (normalized.contains(&quot; != 0&quot;)) {</span>
+<span class="fc" id="L361">            return AssumptionClass.NON_ZERO;</span>
+        }
+<span class="nc bnc" id="L363" title="All 2 branches missed.">        if (normalized.contains(&quot; &gt;= 0&quot;)) {</span>
+<span class="nc" id="L364">            return AssumptionClass.NON_NEGATIVE;</span>
+        }
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        if (normalized.contains(&quot; &gt; 0&quot;)) {</span>
+<span class="nc" id="L367">            return AssumptionClass.POSITIVE;</span>
+        }
+<span class="nc" id="L369">        String lower = normalized.toLowerCase(java.util.Locale.ROOT);</span>
+<span class="nc bnc" id="L370" title="All 4 branches missed.">        if (normalized.contains(&quot;∈ N&quot;) || lower.contains(&quot; in n&quot;)) {</span>
+<span class="nc" id="L371">            return AssumptionClass.NATURAL;</span>
+        }
+<span class="nc bnc" id="L373" title="All 4 branches missed.">        if (normalized.contains(&quot;∈ Z&quot;) || lower.contains(&quot; in z&quot;)) {</span>
+<span class="nc" id="L374">            return AssumptionClass.INTEGER;</span>
+        }
+<span class="nc bnc" id="L376" title="All 4 branches missed.">        if (normalized.contains(&quot;∈ Q&quot;) || lower.contains(&quot; in q&quot;)) {</span>
+<span class="nc" id="L377">            return AssumptionClass.RATIONAL;</span>
+        }
+<span class="nc bnc" id="L379" title="All 4 branches missed.">        if (normalized.contains(&quot;∈ R&quot;) || lower.contains(&quot; in r&quot;)) {</span>
+<span class="nc" id="L380">            return AssumptionClass.REAL;</span>
+        }
+<span class="nc bnc" id="L382" title="All 2 branches missed.">        if (lower.contains(&quot;invertible&quot;)) {</span>
+<span class="nc" id="L383">            return AssumptionClass.INVERTIBLE;</span>
+        }
+<span class="nc bnc" id="L385" title="All 4 branches missed.">        if (normalized.contains(&quot;∈&quot;) || lower.contains(&quot; in &quot;)) {</span>
+<span class="nc" id="L386">            return AssumptionClass.DOMAIN_MEMBERSHIP;</span>
+        }
+<span class="nc" id="L388">        return AssumptionClass.CUSTOM;</span>
+    }
+
+    private static int semanticDistance(
+        ExprValue candidate,
+        ExprValue target,
+        Map&lt;ValueKey, Integer&gt; targetOccurrences
+    ) {
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        if (candidate.sameValue(target)) {</span>
+<span class="fc" id="L397">            return 0;</span>
+        }
+<span class="fc" id="L399">        Map&lt;ValueKey, Integer&gt; candidateOccurrences = occurrenceMultiset(candidate);</span>
+<span class="fc" id="L400">        Set&lt;ValueKey&gt; keys = new HashSet&lt;&gt;(candidateOccurrences.keySet());</span>
+<span class="fc" id="L401">        keys.addAll(targetOccurrences.keySet());</span>
+<span class="fc" id="L402">        long difference = 0;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        for (ValueKey key : keys) {</span>
+<span class="fc" id="L404">            difference += Math.abs(</span>
+<span class="fc" id="L405">                candidateOccurrences.getOrDefault(key, 0)</span>
+<span class="fc" id="L406">                    - targetOccurrences.getOrDefault(key, 0));</span>
+<span class="fc" id="L407">        }</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        if (!valueRootSignature(candidate).equals(valueRootSignature(target))) {</span>
+<span class="fc" id="L409">            difference += 2;</span>
+        }
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">        return difference &gt;= Factory.UNPARSEABLE_DISTANCE</span>
+<span class="nc" id="L412">            ? Factory.UNPARSEABLE_DISTANCE - 1</span>
+<span class="fc" id="L413">            : (int) difference;</span>
+    }
+
+    private static Map&lt;ValueKey, Integer&gt; occurrenceMultiset(ExprValue root) {
+<span class="fc" id="L417">        Map&lt;ValueKey, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L418">        collect(root, 1, counts);</span>
+<span class="fc" id="L419">        return Map.copyOf(counts);</span>
+    }
+
+    private static void collect(
+        ExprValue value,
+        int multiplicity,
+        Map&lt;ValueKey, Integer&gt; counts
+    ) {
+<span class="fc" id="L427">        counts.merge(value.key(), multiplicity, Math::addExact);</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L429">            ordered.operands().forEach(operand -&gt; collect(operand, multiplicity, counts));</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        } else if (value instanceof AssociativeCommutativeValue ac) {</span>
+<span class="fc" id="L431">            ac.multiplicities().forEach((operand, count) -&gt;</span>
+<span class="fc" id="L432">                collect(operand, Math.multiplyExact(multiplicity, count), counts));</span>
+        }
+<span class="fc" id="L434">    }</span>
+
+    private static String valueRootSignature(ExprValue value) {
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L438">            return &quot;ordered:&quot; + ordered.operator().id();</span>
+        }
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (value instanceof AssociativeCommutativeValue ac) {</span>
+<span class="fc" id="L441">            return &quot;ac:&quot; + ac.operator().id();</span>
+        }
+<span class="fc" id="L443">        return value.getClass().getSimpleName();</span>
+    }
+
+    private static String normalize(String expression) {
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L452">            return HexFormat.of().formatHex(</span>
+<span class="fc" id="L453">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L454">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L455">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L456">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

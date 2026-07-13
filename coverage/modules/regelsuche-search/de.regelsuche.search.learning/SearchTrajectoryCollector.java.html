@@ -72,26 +72,31 @@ import java.util.Set;
 <span class="fc" id="L72">        Set&lt;String&gt; selectedStates = selectedStateSyntaxHashes(result);</span>
 <span class="fc" id="L73">        Set&lt;TransitionKey&gt; selectedTransitions = selectedTransitions(result);</span>
 
-<span class="fc" id="L75">        List&lt;SearchTrajectoryRecord&gt; records = events.stream()</span>
-<span class="fc" id="L76">            .map(event -&gt; toRecord(</span>
-                event,
-                context,
-                problem,
-                result,
-                canonicalizer,
-                target,
-                applicableByParent,
-                selectedStates,
-                selectedTransitions))
-<span class="fc" id="L86">            .toList();</span>
-<span class="fc" id="L87">        return new SearchTrajectoryRun(</span>
+        List&lt;SearchTrajectoryRecord&gt; records;
+<span class="fc" id="L76">        try (TransformationDescriptor.Factory descriptors =</span>
+<span class="fc" id="L77">                new TransformationDescriptor.Factory(problem.target(), canonicalizer)) {</span>
+<span class="fc" id="L78">            records = events.stream()</span>
+<span class="fc" id="L79">                .map(event -&gt; toRecord(</span>
+                    event,
+                    context,
+                    problem,
+                    result,
+                    canonicalizer,
+                    target,
+                    applicableByParent,
+                    selectedStates,
+                    selectedTransitions,
+                    descriptors))
+<span class="fc" id="L90">                .toList();</span>
+        }
+<span class="fc" id="L92">        return new SearchTrajectoryRun(</span>
             context,
             root,
             target,
             taskValue,
             taskAlpha,
-<span class="fc" id="L93">            result.status(),</span>
-<span class="fc" id="L94">            result.reached(),</span>
+<span class="fc" id="L98">            result.status(),</span>
+<span class="fc" id="L99">            result.reached(),</span>
             records);
     }
 
@@ -104,107 +109,109 @@ import java.util.Set;
         ExpressionFingerprint target,
         Map&lt;String, List&lt;String&gt;&gt; applicableByParent,
         Set&lt;String&gt; selectedStates,
-        Set&lt;TransitionKey&gt; selectedTransitions
+        Set&lt;TransitionKey&gt; selectedTransitions,
+        TransformationDescriptor.Factory descriptors
     ) {
-<span class="fc" id="L109">        ExpressionFingerprint expression = ExpressionFingerprint.of(</span>
-<span class="fc" id="L110">            event.expression(), canonicalizer);</span>
-<span class="fc bfc" id="L111" title="All 2 branches covered.">        ExpressionFingerprint parent = event.parentExpression().isBlank()</span>
-<span class="fc" id="L112">            ? null</span>
-<span class="fc" id="L113">            : ExpressionFingerprint.of(event.parentExpression(), canonicalizer);</span>
-<span class="fc bfc" id="L114" title="All 2 branches covered.">        boolean transformation = event.type() == SearchEventType.TRANSFORMATION_GENERATED;</span>
-<span class="fc" id="L115">        String eventSyntax = syntaxIdentity(event.expression());</span>
-<span class="fc" id="L116">        String parentSyntax = syntaxIdentity(event.parentExpression());</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">        boolean selected = transformation</span>
-<span class="fc" id="L118">            ? selectedTransitions.contains(new TransitionKey(</span>
-<span class="fc" id="L119">                parentSyntax, eventSyntax, event.ruleId(), event.depth()))</span>
-<span class="fc" id="L120">            : selectedStates.contains(eventSyntax);</span>
-<span class="fc bfc" id="L121" title="All 2 branches covered.">        String applicableKey = transformation ? parentSyntax : eventSyntax;</span>
-<span class="fc" id="L122">        List&lt;String&gt; applicable = applicableByParent.getOrDefault(applicableKey, List.of());</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">        int parentScore = event.parentExpression().isBlank()</span>
-<span class="fc" id="L124">            ? event.score()</span>
-<span class="fc" id="L125">            : problem.scorer().score(event.parentExpression()).weightedTotal();</span>
+<span class="fc" id="L115">        ExpressionFingerprint expression = ExpressionFingerprint.of(</span>
+<span class="fc" id="L116">            event.expression(), canonicalizer);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        ExpressionFingerprint parent = event.parentExpression().isBlank()</span>
+<span class="fc" id="L118">            ? null</span>
+<span class="fc" id="L119">            : ExpressionFingerprint.of(event.parentExpression(), canonicalizer);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        boolean transformation = event.type() == SearchEventType.TRANSFORMATION_GENERATED;</span>
+<span class="fc" id="L121">        String eventSyntax = syntaxIdentity(event.expression());</span>
+<span class="fc" id="L122">        String parentSyntax = syntaxIdentity(event.parentExpression());</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        boolean selected = transformation</span>
+<span class="fc" id="L124">            ? selectedTransitions.contains(new TransitionKey(</span>
+<span class="fc" id="L125">                parentSyntax, eventSyntax, event.ruleId(), event.depth()))</span>
+<span class="fc" id="L126">            : selectedStates.contains(eventSyntax);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        String applicableKey = transformation ? parentSyntax : eventSyntax;</span>
+<span class="fc" id="L128">        List&lt;String&gt; applicable = applicableByParent.getOrDefault(applicableKey, List.of());</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        int parentScore = event.parentExpression().isBlank()</span>
+<span class="fc" id="L130">            ? event.score()</span>
+<span class="fc" id="L131">            : problem.scorer().score(event.parentExpression()).weightedTotal();</span>
 
-<span class="fc" id="L127">        return new SearchTrajectoryRecord(</span>
+<span class="fc" id="L133">        return new SearchTrajectoryRecord(</span>
             SearchTrajectoryRecord.SCHEMA,
-<span class="fc" id="L129">            context.producerVersion(),</span>
-<span class="fc" id="L130">            context.runId(),</span>
-<span class="fc" id="L131">            context.family(),</span>
-<span class="fc" id="L132">            context.split(),</span>
-<span class="fc" id="L133">            context.ruleInventoryHash(),</span>
-<span class="fc" id="L134">            event.sequence(),</span>
-<span class="fc" id="L135">            event.type(),</span>
+<span class="fc" id="L135">            context.producerVersion(),</span>
+<span class="fc" id="L136">            context.runId(),</span>
+<span class="fc" id="L137">            context.family(),</span>
+<span class="fc" id="L138">            context.split(),</span>
+<span class="fc" id="L139">            context.ruleInventoryHash(),</span>
+<span class="fc" id="L140">            event.sequence(),</span>
+<span class="fc" id="L141">            event.type(),</span>
             expression,
             parent,
             target,
-<span class="fc" id="L139">            ExpressionFeatures.of(event.expression()),</span>
-<span class="fc" id="L140">            event.depth(),</span>
-<span class="fc" id="L141">            event.score(),</span>
+<span class="fc" id="L145">            ExpressionFeatures.of(event.expression()),</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            transformation ? descriptors.from(event) : null,</span>
+<span class="fc" id="L147">            event.depth(),</span>
+<span class="fc" id="L148">            event.score(),</span>
             parentScore,
-<span class="fc" id="L143">            event.frontierSize(),</span>
-<span class="fc" id="L144">            event.visitedCount(),</span>
-<span class="fc" id="L145">            event.generatedCount(),</span>
-<span class="fc" id="L146">            event.ruleId(),</span>
-<span class="fc" id="L147">            event.rewriteKind(),</span>
+<span class="fc" id="L150">            event.frontierSize(),</span>
+<span class="fc" id="L151">            event.visitedCount(),</span>
+<span class="fc" id="L152">            event.generatedCount(),</span>
+<span class="fc" id="L153">            event.ruleId(),</span>
+<span class="fc" id="L154">            event.rewriteKind(),</span>
             applicable,
-<span class="fc" id="L149">            event.assumptions(),</span>
-<span class="fc" id="L150">            event.pruningReason(),</span>
-<span class="fc" id="L151">            result.reached(),</span>
+<span class="fc" id="L156">            event.assumptions(),</span>
+<span class="fc" id="L157">            event.pruningReason(),</span>
+<span class="fc" id="L158">            result.reached(),</span>
             selected,
-<span class="fc" id="L153">            result.status());</span>
+<span class="fc" id="L160">            result.status());</span>
     }
 
     private Map&lt;String, List&lt;String&gt;&gt; applicableRulesByParent() {
-<span class="fc" id="L157">        Map&lt;String, Set&lt;String&gt;&gt; mutable = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (SearchEvent event : events) {</span>
-<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (event.type() == SearchEventType.TRANSFORMATION_GENERATED</span>
-<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                    &amp;&amp; !event.parentExpression().isBlank()</span>
-<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                    &amp;&amp; !event.ruleId().isBlank()) {</span>
-<span class="fc" id="L162">                mutable.computeIfAbsent(</span>
-<span class="fc" id="L163">                    syntaxIdentity(event.parentExpression()), ignored -&gt; new LinkedHashSet&lt;&gt;())</span>
-<span class="fc" id="L164">                    .add(event.ruleId());</span>
+<span class="fc" id="L164">        Map&lt;String, Set&lt;String&gt;&gt; mutable = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (SearchEvent event : events) {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (event.type() == SearchEventType.TRANSFORMATION_GENERATED</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                    &amp;&amp; !event.parentExpression().isBlank()</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                    &amp;&amp; !event.ruleId().isBlank()) {</span>
+<span class="fc" id="L169">                mutable.computeIfAbsent(</span>
+<span class="fc" id="L170">                    syntaxIdentity(event.parentExpression()), ignored -&gt; new LinkedHashSet&lt;&gt;())</span>
+<span class="fc" id="L171">                    .add(event.ruleId());</span>
             }
-<span class="fc" id="L166">        }</span>
-<span class="fc" id="L167">        Map&lt;String, List&lt;String&gt;&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L168">        mutable.forEach((key, values) -&gt;</span>
-<span class="fc" id="L169">            result.put(key, values.stream().sorted().toList()));</span>
-<span class="fc" id="L170">        return Map.copyOf(result);</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        Map&lt;String, List&lt;String&gt;&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L175">        mutable.forEach((key, values) -&gt;</span>
+<span class="fc" id="L176">            result.put(key, values.stream().sorted().toList()));</span>
+<span class="fc" id="L177">        return Map.copyOf(result);</span>
     }
 
     private Set&lt;String&gt; selectedStateSyntaxHashes(GoalSearchResult result) {
-<span class="fc" id="L174">        SearchState selected = result.reachedState();</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (selected == null) {</span>
-<span class="fc" id="L176">            return Set.of();</span>
+<span class="fc" id="L181">        SearchState selected = result.reachedState();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (selected == null) {</span>
+<span class="fc" id="L183">            return Set.of();</span>
         }
-<span class="fc" id="L178">        Set&lt;String&gt; hashes = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L179">        selected.path().forEach(expression -&gt; hashes.add(syntaxIdentity(expression)));</span>
-<span class="fc" id="L180">        return Set.copyOf(hashes);</span>
+<span class="fc" id="L185">        Set&lt;String&gt; hashes = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L186">        selected.path().forEach(expression -&gt; hashes.add(syntaxIdentity(expression)));</span>
+<span class="fc" id="L187">        return Set.copyOf(hashes);</span>
     }
 
     private Set&lt;TransitionKey&gt; selectedTransitions(GoalSearchResult result) {
-<span class="fc" id="L184">        SearchState selected = result.reachedState();</span>
-<span class="pc bpc" id="L185" title="1 of 4 branches missed.">        if (selected == null || selected.path().size() &lt; 2) {</span>
-<span class="fc" id="L186">            return Set.of();</span>
+<span class="fc" id="L191">        SearchState selected = result.reachedState();</span>
+<span class="pc bpc" id="L192" title="1 of 4 branches missed.">        if (selected == null || selected.path().size() &lt; 2) {</span>
+<span class="fc" id="L193">            return Set.of();</span>
         }
-<span class="fc" id="L188">        Set&lt;TransitionKey&gt; transitions = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc" id="L189">        int count = Math.min(</span>
-<span class="fc" id="L190">            selected.appliedRuleIds().size(),</span>
-<span class="fc" id="L191">            selected.path().size() - 1);</span>
-<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (int index = 0; index &lt; count; index++) {</span>
-<span class="fc" id="L193">            transitions.add(new TransitionKey(</span>
-<span class="fc" id="L194">                syntaxIdentity(selected.path().get(index)),</span>
-<span class="fc" id="L195">                syntaxIdentity(selected.path().get(index + 1)),</span>
-<span class="fc" id="L196">                selected.appliedRuleIds().get(index),</span>
+<span class="fc" id="L195">        Set&lt;TransitionKey&gt; transitions = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L196">        int count = Math.min(</span>
+<span class="fc" id="L197">            selected.appliedRuleIds().size(),</span>
+<span class="fc" id="L198">            selected.path().size() - 1);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int index = 0; index &lt; count; index++) {</span>
+<span class="fc" id="L200">            transitions.add(new TransitionKey(</span>
+<span class="fc" id="L201">                syntaxIdentity(selected.path().get(index)),</span>
+<span class="fc" id="L202">                syntaxIdentity(selected.path().get(index + 1)),</span>
+<span class="fc" id="L203">                selected.appliedRuleIds().get(index),</span>
                 index + 1));
         }
-<span class="fc" id="L199">        return Set.copyOf(transitions);</span>
+<span class="fc" id="L206">        return Set.copyOf(transitions);</span>
     }
 
     private static String syntaxIdentity(String expression) {
-<span class="fc" id="L203">        return &quot;syntax-transition-v1:&quot; + sha256(normalize(expression));</span>
+<span class="fc" id="L210">        return &quot;syntax-transition-v1:&quot; + sha256(normalize(expression));</span>
     }
 
     private static String normalize(String expression) {
-<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
     private static String pairFingerprint(
@@ -212,20 +219,20 @@ import java.util.Set;
         String right,
         String prefix
     ) {
-<span class="fc" id="L215">        return prefix + sha256(left + &quot;\u0000&quot; + right);</span>
+<span class="fc" id="L222">        return prefix + sha256(left + &quot;\u0000&quot; + right);</span>
     }
 
     private static String sha256(String value) {
         try {
-<span class="fc" id="L220">            return java.util.HexFormat.of().formatHex(</span>
-<span class="fc" id="L221">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L222">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L223">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L224">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L227">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L228">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L229">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L230">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L231">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 
-<span class="fc" id="L228">    private record TransitionKey(</span>
+<span class="fc" id="L235">    private record TransitionKey(</span>
         String parentSyntaxHash,
         String childSyntaxHash,
         String ruleId,

@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DescriptorPolicyModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.policy</a> &gt; <span class="el_source">DescriptorPolicyModel.java</span></div><h1>DescriptorPolicyModel.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.policy;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.search.learning.TransformationDescriptor;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Immutable transparent model trained from rule-ID-independent transformation descriptors.
+ * This contract is behavior-neutral until a descriptor policy explicitly consumes it.
+ */
+public record DescriptorPolicyModel(
+    String modelVersion,
+    String sourceDatasetHash,
+    String predictiveDatasetHash,
+    String featureSchemaVersion,
+    Mode mode,
+    int minimumObservations,
+    Map&lt;String, DescriptorStatistics&gt; descriptors,
+    Map&lt;String, FeatureStatistics&gt; features
+) {
+    public static final String FEATURE_SCHEMA = TransformationDescriptor.SCHEMA;
+    private static final String MODEL_SCHEMA = &quot;regelsuche.transformation-descriptor-model/v1&quot;;
+
+<span class="fc" id="L28">    public DescriptorPolicyModel {</span>
+<span class="fc" id="L29">        requireText(modelVersion, &quot;modelVersion&quot;);</span>
+<span class="fc" id="L30">        requireText(sourceDatasetHash, &quot;sourceDatasetHash&quot;);</span>
+<span class="fc" id="L31">        requireText(predictiveDatasetHash, &quot;predictiveDatasetHash&quot;);</span>
+<span class="fc" id="L32">        requireText(featureSchemaVersion, &quot;featureSchemaVersion&quot;);</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (mode == null) {</span>
+<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;mode must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (minimumObservations &lt; 1) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;minimumObservations must be positive&quot;);</span>
+        }
+<span class="fc" id="L39">        descriptors = immutableSorted(descriptors);</span>
+<span class="fc" id="L40">        features = immutableSorted(features);</span>
+<span class="fc" id="L41">    }</span>
+
+    public boolean compatible() {
+<span class="fc" id="L44">        return FEATURE_SCHEMA.equals(featureSchemaVersion);</span>
+    }
+
+    public String toJson() {
+<span class="fc" id="L48">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L49">            .property(&quot;schema&quot;, MODEL_SCHEMA)</span>
+<span class="fc" id="L50">            .property(&quot;modelVersion&quot;, modelVersion)</span>
+<span class="fc" id="L51">            .property(&quot;sourceDatasetHash&quot;, sourceDatasetHash)</span>
+<span class="fc" id="L52">            .property(&quot;predictiveDatasetHash&quot;, predictiveDatasetHash)</span>
+<span class="fc" id="L53">            .property(&quot;featureSchemaVersion&quot;, featureSchemaVersion)</span>
+<span class="fc" id="L54">            .property(&quot;mode&quot;, mode.name())</span>
+<span class="fc" id="L55">            .property(&quot;minimumObservations&quot;, minimumObservations)</span>
+<span class="fc" id="L56">            .array(&quot;descriptors&quot;, array -&gt; descriptors.forEach((fingerprint, statistics) -&gt;</span>
+<span class="fc" id="L57">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L58">                    .property(&quot;fingerprint&quot;, fingerprint)</span>
+<span class="fc" id="L59">                    .property(&quot;observations&quot;, statistics.observations())</span>
+<span class="fc" id="L60">                    .property(&quot;successfulChoices&quot;, statistics.successfulChoices())</span>
+<span class="fc" id="L61">                    .property(&quot;failedAlternatives&quot;, statistics.failedAlternatives())</span>
+<span class="fc" id="L62">                    .property(&quot;successPermille&quot;, statistics.successPermille())</span>
+<span class="fc" id="L63">                    .property(&quot;meanScoreDelta&quot;, statistics.meanScoreDelta()))))</span>
+<span class="fc" id="L64">            .array(&quot;features&quot;, array -&gt; features.forEach((name, statistics) -&gt;</span>
+<span class="fc" id="L65">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L66">                    .property(&quot;name&quot;, name)</span>
+<span class="fc" id="L67">                    .property(&quot;observations&quot;, statistics.observations())</span>
+<span class="fc" id="L68">                    .property(&quot;successfulChoices&quot;, statistics.successfulChoices())</span>
+<span class="fc" id="L69">                    .property(&quot;failedAlternatives&quot;, statistics.failedAlternatives())</span>
+<span class="fc" id="L70">                    .property(&quot;meanSuccessfulValue&quot;, statistics.meanSuccessfulValue())</span>
+<span class="fc" id="L71">                    .property(&quot;meanFailedValue&quot;, statistics.meanFailedValue())</span>
+<span class="fc" id="L72">                    .property(&quot;minimumValue&quot;, statistics.minimumValue())</span>
+<span class="fc" id="L73">                    .property(&quot;maximumValue&quot;, statistics.maximumValue())</span>
+<span class="fc" id="L74">                    .property(&quot;coefficientPermille&quot;, statistics.coefficientPermille()))))</span>
+<span class="fc" id="L75">            .endObject();</span>
+<span class="fc" id="L76">        return json.toString();</span>
+    }
+
+    /** Deterministic strict format for portable model loading. */
+    public String toPortableText() {
+<span class="fc" id="L81">        StringBuilder text = new StringBuilder(MODEL_SCHEMA).append('\n')</span>
+<span class="fc" id="L82">            .append(encoded(modelVersion)).append('\n')</span>
+<span class="fc" id="L83">            .append(encoded(sourceDatasetHash)).append('\n')</span>
+<span class="fc" id="L84">            .append(encoded(predictiveDatasetHash)).append('\n')</span>
+<span class="fc" id="L85">            .append(encoded(featureSchemaVersion)).append('\n')</span>
+<span class="fc" id="L86">            .append(mode.name()).append('\n')</span>
+<span class="fc" id="L87">            .append(minimumObservations).append('\n')</span>
+<span class="fc" id="L88">            .append(descriptors.size()).append('\n')</span>
+<span class="fc" id="L89">            .append(features.size());</span>
+<span class="fc" id="L90">        descriptors.forEach((fingerprint, statistics) -&gt; text.append('\n')</span>
+<span class="fc" id="L91">            .append('D').append('\t')</span>
+<span class="fc" id="L92">            .append(encoded(fingerprint)).append('\t')</span>
+<span class="fc" id="L93">            .append(statistics.observations()).append('\t')</span>
+<span class="fc" id="L94">            .append(statistics.successfulChoices()).append('\t')</span>
+<span class="fc" id="L95">            .append(statistics.failedAlternatives()).append('\t')</span>
+<span class="fc" id="L96">            .append(statistics.successPermille()).append('\t')</span>
+<span class="fc" id="L97">            .append(statistics.meanScoreDelta()));</span>
+<span class="fc" id="L98">        features.forEach((name, statistics) -&gt; text.append('\n')</span>
+<span class="fc" id="L99">            .append('F').append('\t')</span>
+<span class="fc" id="L100">            .append(encoded(name)).append('\t')</span>
+<span class="fc" id="L101">            .append(statistics.observations()).append('\t')</span>
+<span class="fc" id="L102">            .append(statistics.successfulChoices()).append('\t')</span>
+<span class="fc" id="L103">            .append(statistics.failedAlternatives()).append('\t')</span>
+<span class="fc" id="L104">            .append(statistics.meanSuccessfulValue()).append('\t')</span>
+<span class="fc" id="L105">            .append(statistics.meanFailedValue()).append('\t')</span>
+<span class="fc" id="L106">            .append(statistics.minimumValue()).append('\t')</span>
+<span class="fc" id="L107">            .append(statistics.maximumValue()).append('\t')</span>
+<span class="fc" id="L108">            .append(statistics.coefficientPermille()));</span>
+<span class="fc" id="L109">        return text.toString();</span>
+    }
+
+    public static DescriptorPolicyModel load(String text) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L114">            throw new IllegalArgumentException(&quot;model text must not be null&quot;);</span>
+        }
+<span class="fc" id="L116">        String[] lines = text.split(&quot;\\R&quot;, -1);</span>
+<span class="pc bpc" id="L117" title="2 of 4 branches missed.">        if (lines.length &lt; 9 || !MODEL_SCHEMA.equals(lines[0])) {</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;unsupported descriptor policy model schema&quot;);</span>
+        }
+<span class="fc" id="L120">        int descriptorCount = integer(lines[7], &quot;descriptor count&quot;);</span>
+<span class="fc" id="L121">        int featureCount = integer(lines[8], &quot;feature count&quot;);</span>
+<span class="pc bpc" id="L122" title="3 of 6 branches missed.">        if (descriptorCount &lt; 0 || featureCount &lt; 0</span>
+                || lines.length != 9 + descriptorCount + featureCount) {
+<span class="nc" id="L124">            throw new IllegalArgumentException(&quot;descriptor model row count does not match payload&quot;);</span>
+        }
+<span class="fc" id="L126">        Map&lt;String, DescriptorStatistics&gt; descriptors = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int index = 0; index &lt; descriptorCount; index++) {</span>
+<span class="fc" id="L128">            String[] fields = lines[9 + index].split(&quot;\\t&quot;, -1);</span>
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">            if (fields.length != 7 || !&quot;D&quot;.equals(fields[0])) {</span>
+<span class="nc" id="L130">                throw new IllegalArgumentException(&quot;invalid descriptor row &quot; + index);</span>
+            }
+<span class="fc" id="L132">            String fingerprint = decoded(fields[1]);</span>
+<span class="fc" id="L133">            DescriptorStatistics statistics = new DescriptorStatistics(</span>
+<span class="fc" id="L134">                integer(fields[2], &quot;observations&quot;),</span>
+<span class="fc" id="L135">                integer(fields[3], &quot;successful choices&quot;),</span>
+<span class="fc" id="L136">                integer(fields[4], &quot;failed alternatives&quot;),</span>
+<span class="fc" id="L137">                integer(fields[5], &quot;success permille&quot;),</span>
+<span class="fc" id="L138">                integer(fields[6], &quot;mean score delta&quot;));</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (descriptors.put(fingerprint, statistics) != null) {</span>
+<span class="nc" id="L140">                throw new IllegalArgumentException(&quot;duplicate descriptor &quot; + fingerprint);</span>
+            }
+        }
+<span class="fc" id="L143">        Map&lt;String, FeatureStatistics&gt; features = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L144">        int featureOffset = 9 + descriptorCount;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (int index = 0; index &lt; featureCount; index++) {</span>
+<span class="fc" id="L146">            String[] fields = lines[featureOffset + index].split(&quot;\\t&quot;, -1);</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">            if (fields.length != 10 || !&quot;F&quot;.equals(fields[0])) {</span>
+<span class="nc" id="L148">                throw new IllegalArgumentException(&quot;invalid feature row &quot; + index);</span>
+            }
+<span class="fc" id="L150">            String name = decoded(fields[1]);</span>
+<span class="fc" id="L151">            FeatureStatistics statistics = new FeatureStatistics(</span>
+<span class="fc" id="L152">                integer(fields[2], &quot;observations&quot;),</span>
+<span class="fc" id="L153">                integer(fields[3], &quot;successful choices&quot;),</span>
+<span class="fc" id="L154">                integer(fields[4], &quot;failed alternatives&quot;),</span>
+<span class="fc" id="L155">                integer(fields[5], &quot;mean successful value&quot;),</span>
+<span class="fc" id="L156">                integer(fields[6], &quot;mean failed value&quot;),</span>
+<span class="fc" id="L157">                integer(fields[7], &quot;minimum value&quot;),</span>
+<span class="fc" id="L158">                integer(fields[8], &quot;maximum value&quot;),</span>
+<span class="fc" id="L159">                integer(fields[9], &quot;coefficient permille&quot;));</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (features.put(name, statistics) != null) {</span>
+<span class="nc" id="L161">                throw new IllegalArgumentException(&quot;duplicate feature &quot; + name);</span>
+            }
+        }
+<span class="fc" id="L164">        return new DescriptorPolicyModel(</span>
+<span class="fc" id="L165">            decoded(lines[1]),</span>
+<span class="fc" id="L166">            decoded(lines[2]),</span>
+<span class="fc" id="L167">            decoded(lines[3]),</span>
+<span class="fc" id="L168">            decoded(lines[4]),</span>
+<span class="fc" id="L169">            Mode.valueOf(lines[5]),</span>
+<span class="fc" id="L170">            integer(lines[6], &quot;minimum observations&quot;),</span>
+            descriptors,
+            features);
+    }
+
+<span class="fc" id="L175">    public enum Mode {</span>
+<span class="fc" id="L176">        FREQUENCY,</span>
+<span class="fc" id="L177">        LINEAR</span>
+    }
+
+    public record DescriptorStatistics(
+        int observations,
+        int successfulChoices,
+        int failedAlternatives,
+        int successPermille,
+        int meanScoreDelta
+    ) {
+<span class="fc" id="L187">        public DescriptorStatistics {</span>
+<span class="fc" id="L188">            validateCounts(observations, successfulChoices, failedAlternatives);</span>
+<span class="pc bpc" id="L189" title="2 of 4 branches missed.">            if (successPermille &lt; 0 || successPermille &gt; 1000) {</span>
+<span class="nc" id="L190">                throw new IllegalArgumentException(&quot;successPermille must be in 0..1000&quot;);</span>
+            }
+<span class="fc" id="L192">        }</span>
+    }
+
+    public record FeatureStatistics(
+        int observations,
+        int successfulChoices,
+        int failedAlternatives,
+        int meanSuccessfulValue,
+        int meanFailedValue,
+        int minimumValue,
+        int maximumValue,
+        int coefficientPermille
+    ) {
+<span class="fc" id="L205">        public FeatureStatistics {</span>
+<span class="fc" id="L206">            validateCounts(observations, successfulChoices, failedAlternatives);</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (minimumValue &gt; maximumValue) {</span>
+<span class="nc" id="L208">                throw new IllegalArgumentException(&quot;feature minimum must not exceed maximum&quot;);</span>
+            }
+<span class="pc bpc" id="L210" title="2 of 4 branches missed.">            if (coefficientPermille &lt; -1000 || coefficientPermille &gt; 1000) {</span>
+<span class="nc" id="L211">                throw new IllegalArgumentException(&quot;coefficientPermille must be in -1000..1000&quot;);</span>
+            }
+<span class="fc" id="L213">        }</span>
+    }
+
+    private static void validateCounts(int observations, int successful, int failed) {
+<span class="pc bpc" id="L217" title="4 of 8 branches missed.">        if (observations &lt; 0 || successful &lt; 0 || failed &lt; 0</span>
+                || successful + failed != observations) {
+<span class="nc" id="L219">            throw new IllegalArgumentException(&quot;invalid observation counts&quot;);</span>
+        }
+<span class="fc" id="L221">    }</span>
+
+    private static &lt;T&gt; Map&lt;String, T&gt; immutableSorted(Map&lt;String, T&gt; values) {
+<span class="fc" id="L224">        Map&lt;String, T&gt; sorted = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (values != null) {</span>
+<span class="fc" id="L226">            values.entrySet().stream()</span>
+<span class="pc bpc" id="L227" title="2 of 4 branches missed.">                .filter(entry -&gt; entry.getKey() != null &amp;&amp; entry.getValue() != null)</span>
+<span class="fc" id="L228">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L229">                .forEach(entry -&gt; sorted.put(entry.getKey(), entry.getValue()));</span>
+        }
+<span class="fc" id="L231">        return Collections.unmodifiableMap(sorted);</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L235" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L236">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L238">    }</span>
+
+    private static String encoded(String value) {
+<span class="fc" id="L241">        return Base64.getUrlEncoder().withoutPadding()</span>
+<span class="fc" id="L242">            .encodeToString(value.getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    private static String decoded(String value) {
+        try {
+<span class="fc" id="L247">            return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L248">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L249">            throw new IllegalArgumentException(&quot;invalid descriptor policy model text&quot;, exception);</span>
+        }
+    }
+
+    private static int integer(String value, String name) {
+        try {
+<span class="fc" id="L255">            return Integer.parseInt(value);</span>
+<span class="nc" id="L256">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L257">            throw new IllegalArgumentException(&quot;invalid &quot; + name, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
