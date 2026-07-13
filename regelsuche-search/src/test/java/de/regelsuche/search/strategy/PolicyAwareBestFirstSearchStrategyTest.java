@@ -7,6 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.policy.DescriptorPolicyModel;
+import de.regelsuche.search.policy.DescriptorPolicyModel.FeatureStatistics;
+import de.regelsuche.search.policy.DescriptorPolicyModel.Mode;
+import de.regelsuche.search.policy.DescriptorSearchPolicy;
 import de.regelsuche.search.policy.SearchPolicy;
 import de.regelsuche.search.policy.SearchPolicy.PolicyContext;
 import de.regelsuche.search.policy.SearchPolicy.PolicyDecision;
@@ -21,6 +25,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PolicyAwareBestFirstSearchStrategyTest {
+    private static final String BAD_RULE = "a-bad";
+    private static final String GOOD_RULE = "z-good";
+    private static final String FINISH_RULE = "finish";
+
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final ExpressionScorer scorer = new ExpressionScorer();
 
@@ -129,12 +137,15 @@ class PolicyAwareBestFirstSearchStrategyTest {
 
         PolicySearchResult fallbackResult = run(
             policy(Map.of("a-dead-end", 0, "z-target", 100), true),
-            problem);
+            problem,
+            PolicyAwareBestFirstSearchStrategy.DEFAULT_MAX_FRONTIER_ADJUSTMENT);
 
         assertEquals(staticResult.status(), fallbackResult.search().status());
         assertEquals(staticResult.states(), fallbackResult.search().states());
         assertEquals(staticResult.reachedState(), fallbackResult.search().reachedState());
         assertTrue(fallbackResult.policyEvents().stream().allMatch(RankingEvent::fallback));
+        assertTrue(fallbackResult.policyEvents().stream()
+            .allMatch(ranking -> ranking.frontierAdjustment() == 0));
 
         RankingEvent target = event(fallbackResult, "x", "z-target");
         RankingEvent deadEnd = event(fallbackResult, "x", "a-dead-end");
@@ -146,8 +157,61 @@ class PolicyAwareBestFirstSearchStrategyTest {
         assertEquals("candidate-budget-not-considered", deadEnd.admissionOutcome());
     }
 
+    @Test
+    void descriptorEvidenceChangesDequeuePriorityAfterBothCandidatesAreAdmitted() {
+        DescriptorSearchPolicy descriptorPolicy = descriptorPolicy();
+        SearchProblem problem = contentionProblem();
+        var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+        var candidateOnly = run(descriptorPolicy, problem);
+        var frontier = run(descriptorPolicy, problem, 1_000);
+        var replay = run(descriptorPolicy, problem, 1_000);
+
+        assertFalse(staticResult.reached());
+        assertFalse(candidateOnly.reached());
+        assertTrue(frontier.reached(), frontier.search().toString());
+        assertEquals(List.of(GOOD_RULE, FINISH_RULE),
+            frontier.search().reachedState().appliedRuleIds());
+        assertEquals(frontier, replay);
+
+        RankingEvent good = event(frontier, "r", GOOD_RULE);
+        RankingEvent bad = event(frontier, "r", BAD_RULE);
+        assertTrue(good.admittedToFrontier() && bad.admittedToFrontier());
+        assertTrue(good.frontierAdjustment() < 0);
+        assertTrue(bad.frontierAdjustment() > 0);
+        assertEquals(0, good.dequeueOrder());
+        assertEquals(-1, bad.dequeueOrder());
+        assertTrue(good.composedFrontierPriority() < bad.composedFrontierPriority());
+    }
+
+    @Test
+    void frontierPriorityClampsExtremeEvidenceBeforeNarrowing() {
+        SearchPolicy extreme = policy(
+            Map.of("a", Integer.MAX_VALUE, "b", Integer.MAX_VALUE), false);
+        TransformationEngine engine = expression -> expression.equals("r")
+            ? List.of(step("a", "p", "a:p"), step("b", "s", "b:s"))
+            : List.of();
+        SearchProblem problem = new SearchProblem(
+            "r", engine, scorer, canonicalizer,
+            new SearchHeuristic(1, 4, 1, 2, 4, 8));
+
+        RankingEvent event = event(run(extreme, problem, 1_000), "r", "a");
+
+        assertEquals(1_000, event.frontierAdjustment());
+        assertTrue(event.composedFrontierPriority() > 0);
+        assertTrue(event.composedFrontierPriority() < Integer.MAX_VALUE);
+    }
+
     private PolicySearchResult run(SearchPolicy policy, SearchProblem problem) {
-        return new PolicyAwareBestFirstSearchStrategy(policy).searchWithDiagnostics(problem);
+        return run(policy, problem, 0);
+    }
+
+    private PolicySearchResult run(
+        SearchPolicy policy,
+        SearchProblem problem,
+        int maxFrontierAdjustment
+    ) {
+        return new PolicyAwareBestFirstSearchStrategy(policy, maxFrontierAdjustment)
+            .searchWithDiagnostics(problem);
     }
 
     private SearchProblem problem(
@@ -163,6 +227,34 @@ class PolicyAwareBestFirstSearchStrategyTest {
             canonicalizer,
             new SearchHeuristic(4, 30, 1, 4, candidateBudget, 10))
             .withTarget(target);
+    }
+
+    private SearchProblem contentionProblem() {
+        TransformationEngine engine = expression -> switch (expression) {
+            case "r" -> List.of(
+                descriptorStep(BAD_RULE, "p", 10, "finish:p"),
+                descriptorStep(GOOD_RULE, "p", -10, "good:p"));
+            case "p" -> List.of(descriptorStep(FINISH_RULE, "q", 0, "finish:p"));
+            default -> List.of();
+        };
+        return new SearchProblem(
+            "r", engine, scorer, canonicalizer,
+            new SearchHeuristic(3, 3, 1, 2, 2, 10))
+            .withTarget(SearchTarget.syntaxExact("q"));
+    }
+
+    private static DescriptorSearchPolicy descriptorPolicy() {
+        DescriptorPolicyModel model = new DescriptorPolicyModel(
+            "descriptor-frontier-test/v1",
+            "sha256:train-only-source",
+            "sha256:train-only-predictive",
+            DescriptorPolicyModel.FEATURE_SCHEMA,
+            Mode.LINEAR,
+            1,
+            Map.of(),
+            Map.of("estimatedCostDelta",
+                new FeatureStatistics(4, 2, 2, -10, 10, -10, 10, 1_000)));
+        return new DescriptorSearchPolicy(model);
     }
 
     private static SearchPolicy policy(Map<String, Integer> priorities, boolean fallback) {
@@ -192,19 +284,28 @@ class PolicyAwareBestFirstSearchStrategyTest {
         String ruleId
     ) {
         return result.policyEvents().stream()
-            .filter(event -> event.parentExpression().equals(parentExpression)
-                && event.ruleId().equals(ruleId))
+            .filter(ranking -> ranking.parentExpression().equals(parentExpression)
+                && ranking.ruleId().equals(ruleId))
             .findFirst()
             .orElseThrow();
     }
 
     private static Transformation step(String rule, String output, String applicationKey) {
+        return descriptorStep(rule, output, 0, applicationKey);
+    }
+
+    private static Transformation descriptorStep(
+        String rule,
+        String output,
+        int estimatedCostDelta,
+        String applicationKey
+    ) {
         return new Transformation(
             rule,
             output,
             RewriteKind.NORMALIZE,
             false,
-            0,
+            estimatedCostDelta,
             true,
             applicationKey);
     }
