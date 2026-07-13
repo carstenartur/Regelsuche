@@ -6,7 +6,6 @@ import de.regelsuche.search.memory.SearchMemory;
 import de.regelsuche.search.memory.TranspositionEntry;
 import java.time.Instant;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -48,32 +47,11 @@ public final class TranspositionGate {
      * @param pathId stable identifier of the path leading to {@code state}.
      */
     public static Verdict evaluate(SearchMemory memory, SearchState state, String pathId) {
-        return evaluate(memory, state, pathId, List.of());
-    }
-
-    /**
-     * Migration-aware variant. The state is always recorded under its current
-     * identity hash, while {@code compatibleIdentityHashes} are consulted for
-     * entries persisted by an older identity scheme. Assumption fingerprints
-     * are composed identically for current and compatibility hashes.
-     */
-    public static Verdict evaluate(
-            SearchMemory memory,
-            SearchState state,
-            String pathId,
-            List<String> compatibleIdentityHashes) {
         if (memory == null) {
             return Verdict.KEEP;
         }
         String identityHash = identityHash(state.canonicalHash(), state);
         TranspositionEntry existing = memory.table().lookup(identityHash).orElse(null);
-        if (existing == null) {
-            existing = migrateCompatibleEntry(
-                    memory,
-                    state,
-                    identityHash,
-                    compatibleIdentityHashes == null ? List.of() : compatibleIdentityHashes);
-        }
 
         Set<String> ruleIds = new LinkedHashSet<>(state.appliedRuleIds());
         int score = state.score().weightedTotal();
@@ -94,7 +72,6 @@ public final class TranspositionGate {
             memory.table().record(candidate);
             return Verdict.KEEP;
         }
-        // Better score wins.
         if (score < existing.bestScore()) {
             memory.table().record(candidate);
             memory.recordDecision(new PruningDecision(
@@ -102,7 +79,6 @@ public final class TranspositionGate {
                 PruningReason.REPLACED_WORSE_PATH));
             return Verdict.KEEP;
         }
-        // Same-score, shallower path wins.
         if (score == existing.bestScore() && state.depth() < existing.minDepthSeen()) {
             memory.table().record(candidate);
             memory.recordDecision(new PruningDecision(
@@ -110,7 +86,6 @@ public final class TranspositionGate {
                 PruningReason.KEPT_LOWER_DEPTH));
             return Verdict.KEEP;
         }
-        // New rule combination is interesting for the miner even at equal score.
         boolean hasNewRules = !existing.reachedByRuleIds().containsAll(ruleIds);
         if (hasNewRules) {
             memory.table().record(candidate);
@@ -119,7 +94,6 @@ public final class TranspositionGate {
                 PruningReason.KEPT_NEW_RULE_COMBO));
             return Verdict.KEEP;
         }
-        // Otherwise: prune, but record under the current key so migration is lazy.
         memory.table().record(candidate);
         PruningReason reason = score > existing.bestScore()
             ? PruningReason.ALREADY_KNOWN_BETTER
@@ -127,43 +101,6 @@ public final class TranspositionGate {
         memory.recordDecision(new PruningDecision(
             state.expression(), identityHash, reason));
         return Verdict.PRUNE;
-    }
-
-    private static TranspositionEntry migrateCompatibleEntry(
-            SearchMemory memory,
-            SearchState state,
-            String identityHash,
-            List<String> compatibleIdentityHashes) {
-        for (String compatibleHash : compatibleIdentityHashes) {
-            if (compatibleHash == null || compatibleHash.isBlank()) {
-                continue;
-            }
-            String composed = identityHash(compatibleHash, state);
-            if (composed.equals(identityHash)) {
-                continue;
-            }
-            TranspositionEntry compatible = memory.table().lookup(composed).orElse(null);
-            if (compatible != null) {
-                return memory.table().record(rekey(compatible, identityHash, state.expression()));
-            }
-        }
-        return null;
-    }
-
-    private static TranspositionEntry rekey(
-            TranspositionEntry existing,
-            String identityHash,
-            String expression) {
-        return new TranspositionEntry(
-                identityHash,
-                expression,
-                existing.bestScore(),
-                existing.minDepthSeen(),
-                existing.bestKnownPathId(),
-                existing.reachedByRuleIds(),
-                existing.visitCount(),
-                existing.firstSeen(),
-                existing.lastSeen());
     }
 
     private static String identityHash(String baseHash, SearchState state) {
