@@ -263,7 +263,8 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                     parent,
                     item,
                     rank,
-                    frontierAdjustment(item.decision(), adjustmentLimit),
+                    PolicyAwareBestFirstSearchStrategy.frontierAdjustment(
+                        item.decision(), adjustmentLimit),
                     safeProduct(item.targetDistance(), targetWeight));
                 groupEvents.add(event);
                 events.add(event);
