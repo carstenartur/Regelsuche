@@ -46,6 +46,7 @@ public record TransformationDescriptor(
     AstDelta astDelta,
     RootSignature parentRoot,
     RootSignature childRoot,
+    LocalChange localChange,
     int assumptionCount,
     Map<AssumptionClass, Integer> assumptionClassCounts,
     boolean targeted,
@@ -54,13 +55,14 @@ public record TransformationDescriptor(
     int targetDistanceDelta,
     boolean available
 ) {
-    public static final String SCHEMA = "regelsuche.transformation-descriptor/v1";
+    public static final String SCHEMA = "regelsuche.transformation-descriptor/v2";
 
     public TransformationDescriptor {
         Objects.requireNonNull(rewriteKind, "rewriteKind");
         Objects.requireNonNull(astDelta, "astDelta");
         Objects.requireNonNull(parentRoot, "parentRoot");
         Objects.requireNonNull(childRoot, "childRoot");
+        Objects.requireNonNull(localChange, "localChange");
         if (assumptionCount < 0) {
             throw new IllegalArgumentException("assumptionCount must not be negative");
         }
@@ -96,7 +98,7 @@ public record TransformationDescriptor(
         features.put("equivalencePreserving", equivalencePreserving ? 1 : 0);
         features.put("mayIncreaseComplexity", mayIncreaseComplexity ? 1 : 0);
         features.put("estimatedCostDelta", estimatedCostDelta);
-        astDelta.addTo(features);
+        astDelta.addTo(features, "ast.");
         features.put("root.parent." + parentRoot.kind().name(), 1);
         features.put("root.child." + childRoot.kind().name(), 1);
         features.put("root.transition." + parentRoot.kind().name()
@@ -104,6 +106,7 @@ public record TransformationDescriptor(
         features.put("root.parentArity", parentRoot.arity());
         features.put("root.childArity", childRoot.arity());
         features.put("root.arityDelta", childRoot.arity() - parentRoot.arity());
+        localChange.addTo(features);
         features.put("assumption.count", assumptionCount);
         assumptionClassCounts.forEach((kind, count) ->
             features.put("assumption." + kind.name(), count));
@@ -159,19 +162,124 @@ public record TransformationDescriptor(
                 parent.parseable() && child.parseable());
         }
 
+        private void addTo(Map<String, Integer> features, String prefix) {
+            features.put(prefix + "nodeCountDelta", nodeCount);
+            features.put(prefix + "maxDepthDelta", maxDepth);
+            features.put(prefix + "variableOccurrencesDelta", variableOccurrences);
+            features.put(prefix + "distinctVariablesDelta", distinctVariables);
+            features.put(prefix + "numericLiteralsDelta", numericLiterals);
+            features.put(prefix + "additionsDelta", additions);
+            features.put(prefix + "subtractionsDelta", subtractions);
+            features.put(prefix + "multiplicationsDelta", multiplications);
+            features.put(prefix + "divisionsDelta", divisions);
+            features.put(prefix + "powersDelta", powers);
+            features.put(prefix + "functionsDelta", functions);
+            features.put(prefix + "parseable", parseable ? 1 : 0);
+        }
+
+        private static AstDelta unavailable() {
+            return between(ExpressionFeatures.unavailable(), ExpressionFeatures.unavailable());
+        }
+    }
+
+    /** Conservative local tree-difference inferred without rule or application identifiers. */
+    public record LocalChange(
+        LocalStatus status,
+        int depth,
+        OccurrenceRole role,
+        int argumentIndex,
+        RootSignature contextRoot,
+        RootSignature beforeRoot,
+        RootSignature afterRoot,
+        AstDelta astDelta
+    ) {
+        private static final RootSignature NO_ROOT =
+            new RootSignature(RootKind.UNPARSEABLE, 0);
+
+        public LocalChange {
+            Objects.requireNonNull(status, "status");
+            Objects.requireNonNull(role, "role");
+            Objects.requireNonNull(contextRoot, "contextRoot");
+            Objects.requireNonNull(beforeRoot, "beforeRoot");
+            Objects.requireNonNull(afterRoot, "afterRoot");
+            Objects.requireNonNull(astDelta, "astDelta");
+            if (status == LocalStatus.AVAILABLE) {
+                if (depth < 0 || role == OccurrenceRole.UNAVAILABLE || !astDelta.parseable()) {
+                    throw new IllegalArgumentException("available local change requires a position");
+                }
+                if (role == OccurrenceRole.ARGUMENT && argumentIndex < 0) {
+                    throw new IllegalArgumentException("function argument role requires an index");
+                }
+                if (role != OccurrenceRole.ARGUMENT && argumentIndex != -1) {
+                    throw new IllegalArgumentException("only function arguments carry an index");
+                }
+            } else if (depth != -1 || role != OccurrenceRole.UNAVAILABLE
+                    || argumentIndex != -1) {
+                throw new IllegalArgumentException("unavailable local changes carry no position");
+            }
+        }
+
+        public boolean available() {
+            return status == LocalStatus.AVAILABLE;
+        }
+
+        private static LocalChange available(
+            int depth,
+            OccurrenceRole role,
+            int argumentIndex,
+            RootSignature contextRoot,
+            Expr before,
+            Expr after
+        ) {
+            return new LocalChange(
+                LocalStatus.AVAILABLE,
+                depth,
+                role,
+                argumentIndex,
+                contextRoot,
+                rootSignature(before),
+                rootSignature(after),
+                AstDelta.between(ExpressionFeatures.of(before), ExpressionFeatures.of(after)));
+        }
+
+        private static LocalChange unavailable(LocalStatus status) {
+            if (status == LocalStatus.AVAILABLE) {
+                throw new IllegalArgumentException("unavailable status must not be AVAILABLE");
+            }
+            return new LocalChange(
+                status,
+                -1,
+                OccurrenceRole.UNAVAILABLE,
+                -1,
+                NO_ROOT,
+                NO_ROOT,
+                NO_ROOT,
+                AstDelta.unavailable());
+        }
+
         private void addTo(Map<String, Integer> features) {
-            features.put("ast.nodeCountDelta", nodeCount);
-            features.put("ast.maxDepthDelta", maxDepth);
-            features.put("ast.variableOccurrencesDelta", variableOccurrences);
-            features.put("ast.distinctVariablesDelta", distinctVariables);
-            features.put("ast.numericLiteralsDelta", numericLiterals);
-            features.put("ast.additionsDelta", additions);
-            features.put("ast.subtractionsDelta", subtractions);
-            features.put("ast.multiplicationsDelta", multiplications);
-            features.put("ast.divisionsDelta", divisions);
-            features.put("ast.powersDelta", powers);
-            features.put("ast.functionsDelta", functions);
-            features.put("ast.parseable", parseable ? 1 : 0);
+            features.put("local.status." + status.name(), 1);
+            features.put("local.available", available() ? 1 : 0);
+            if (!available()) {
+                return;
+            }
+            features.put("local.depth", depth);
+            features.put("local.role." + role.name(), 1);
+            if (role == OccurrenceRole.ARGUMENT) {
+                features.put("local.argumentIndex", argumentIndex);
+            }
+            features.put("local.before." + beforeRoot.kind().name(), 1);
+            features.put("local.after." + afterRoot.kind().name(), 1);
+            features.put("local.transition." + beforeRoot.kind().name()
+                + "_TO_" + afterRoot.kind().name(), 1);
+            features.put("local.beforeArity", beforeRoot.arity());
+            features.put("local.afterArity", afterRoot.arity());
+            features.put("local.arityDelta", afterRoot.arity() - beforeRoot.arity());
+            if (role != OccurrenceRole.ROOT) {
+                features.put("local.context." + contextRoot.kind().name(), 1);
+                features.put("local.contextArity", contextRoot.arity());
+            }
+            astDelta.addTo(features, "local.ast.");
         }
     }
 
@@ -194,6 +302,22 @@ public record TransformationDescriptor(
         VARIABLE,
         NUMBER,
         UNPARSEABLE
+    }
+
+    public enum LocalStatus {
+        AVAILABLE,
+        AMBIGUOUS,
+        UNPARSEABLE,
+        IDENTICAL
+    }
+
+    public enum OccurrenceRole {
+        ROOT,
+        LEFT,
+        RIGHT,
+        AC_CHILD,
+        ARGUMENT,
+        UNAVAILABLE
     }
 
     public enum AssumptionClass {
@@ -237,11 +361,18 @@ public record TransformationDescriptor(
                     || event.rewriteKind() == null) {
                 throw new IllegalArgumentException("descriptor requires a transformation decision event");
             }
-            ExpressionFeatures parentFeatures = ExpressionFeatures.of(event.parentExpression());
-            ExpressionFeatures childFeatures = ExpressionFeatures.of(event.expression());
+            Expr parent = parse(event.parentExpression());
+            Expr child = parse(event.expression());
+            ExpressionFeatures parentFeatures = parent == null
+                ? ExpressionFeatures.unavailable()
+                : ExpressionFeatures.of(parent);
+            ExpressionFeatures childFeatures = child == null
+                ? ExpressionFeatures.unavailable()
+                : ExpressionFeatures.of(child);
             AstDelta delta = AstDelta.between(parentFeatures, childFeatures);
-            RootSignature parentRoot = rootSignature(event.parentExpression());
-            RootSignature childRoot = rootSignature(event.expression());
+            RootSignature parentRoot = rootSignature(parent);
+            RootSignature childRoot = rootSignature(child);
+            LocalChange localChange = inferLocalChange(parent, child);
             Map<AssumptionClass, Integer> assumptionClasses = assumptionClasses(event.assumptions());
             boolean targeted = target != null;
             int before = targeted ? distance(event.parentExpression()) : -1;
@@ -254,6 +385,7 @@ public record TransformationDescriptor(
                 delta,
                 parentRoot,
                 childRoot,
+                localChange,
                 event.assumptions().size(),
                 assumptionClasses,
                 targeted,
@@ -265,6 +397,14 @@ public record TransformationDescriptor(
                     && childRoot.kind() != RootKind.UNPARSEABLE
                     && (!targeted || before < UNPARSEABLE_DISTANCE
                         && after < UNPARSEABLE_DISTANCE));
+        }
+
+        private Expr parse(String expression) {
+            try {
+                return parser.parseTerm(expression);
+            } catch (IllegalArgumentException exception) {
+                return null;
+            }
         }
 
         private int distance(String expression) {
@@ -300,53 +440,130 @@ public record TransformationDescriptor(
             }
         }
 
-        private RootSignature rootSignature(String expression) {
-            try {
-                Expr parsed = parser.parseTerm(expression);
-                if (parsed instanceof BinaryExpr binary) {
-                    RootKind kind = switch (binary.operator()) {
-                        case ADD -> RootKind.ADD;
-                        case SUB -> RootKind.SUB;
-                        case MUL -> RootKind.MUL;
-                        case DIV -> RootKind.DIV;
-                        case POW -> RootKind.POW;
-                    };
-                    int arity = kind == RootKind.ADD || kind == RootKind.MUL
-                        ? flattenedArity(parsed, binary.operator())
-                        : 2;
-                    return new RootSignature(kind, arity);
-                }
-                if (parsed instanceof FunctionExpr function) {
-                    return new RootSignature(RootKind.FUNCTION, function.arguments().size());
-                }
-                if (parsed instanceof VariableExpr) {
-                    return new RootSignature(RootKind.VARIABLE, 0);
-                }
-                if (parsed instanceof NumberExpr) {
-                    return new RootSignature(RootKind.NUMBER, 0);
-                }
-                return new RootSignature(RootKind.UNPARSEABLE, 0);
-            } catch (IllegalArgumentException exception) {
-                return new RootSignature(RootKind.UNPARSEABLE, 0);
-            }
-        }
-
-        private static int flattenedArity(
-            Expr expression,
-            BinaryOperator operator
-        ) {
-            if (expression instanceof BinaryExpr binary && binary.operator() == operator) {
-                return flattenedArity(binary.left(), operator)
-                    + flattenedArity(binary.right(), operator);
-            }
-            return 1;
-        }
-
         @Override
         public void close() {
             distanceCache.clear();
             valueFactory.close();
         }
+    }
+
+    private static LocalChange inferLocalChange(Expr parent, Expr child) {
+        if (parent == null || child == null) {
+            return LocalChange.unavailable(LocalStatus.UNPARSEABLE);
+        }
+        if (parent.equals(child)) {
+            return LocalChange.unavailable(LocalStatus.IDENTICAL);
+        }
+        return descendLocalChange(
+            parent,
+            child,
+            0,
+            OccurrenceRole.ROOT,
+            -1,
+            new RootSignature(RootKind.UNPARSEABLE, 0));
+    }
+
+    private static LocalChange descendLocalChange(
+        Expr parent,
+        Expr child,
+        int depth,
+        OccurrenceRole role,
+        int argumentIndex,
+        RootSignature contextRoot
+    ) {
+        if (parent instanceof BinaryExpr parentBinary
+                && child instanceof BinaryExpr childBinary
+                && parentBinary.operator() == childBinary.operator()) {
+            boolean leftSame = parentBinary.left().equals(childBinary.left());
+            boolean rightSame = parentBinary.right().equals(childBinary.right());
+            if (leftSame != rightSame) {
+                boolean leftChanged = !leftSame;
+                OccurrenceRole childRole = associativeCommutative(parentBinary.operator())
+                    ? OccurrenceRole.AC_CHILD
+                    : leftChanged ? OccurrenceRole.LEFT : OccurrenceRole.RIGHT;
+                return descendLocalChange(
+                    leftChanged ? parentBinary.left() : parentBinary.right(),
+                    leftChanged ? childBinary.left() : childBinary.right(),
+                    depth + 1,
+                    childRole,
+                    -1,
+                    rootSignature(parent));
+            }
+            return LocalChange.unavailable(LocalStatus.AMBIGUOUS);
+        }
+        if (parent instanceof FunctionExpr parentFunction
+                && child instanceof FunctionExpr childFunction
+                && parentFunction.name().equals(childFunction.name())
+                && parentFunction.arguments().size() == childFunction.arguments().size()) {
+            int changedIndex = -1;
+            for (int index = 0; index < parentFunction.arguments().size(); index++) {
+                if (!parentFunction.arguments().get(index)
+                        .equals(childFunction.arguments().get(index))) {
+                    if (changedIndex >= 0) {
+                        return LocalChange.unavailable(LocalStatus.AMBIGUOUS);
+                    }
+                    changedIndex = index;
+                }
+            }
+            if (changedIndex < 0) {
+                return LocalChange.unavailable(LocalStatus.IDENTICAL);
+            }
+            return descendLocalChange(
+                parentFunction.arguments().get(changedIndex),
+                childFunction.arguments().get(changedIndex),
+                depth + 1,
+                OccurrenceRole.ARGUMENT,
+                changedIndex,
+                rootSignature(parent));
+        }
+        return LocalChange.available(
+            depth,
+            role,
+            argumentIndex,
+            contextRoot,
+            parent,
+            child);
+    }
+
+    private static boolean associativeCommutative(BinaryOperator operator) {
+        return operator == BinaryOperator.ADD || operator == BinaryOperator.MUL;
+    }
+
+    private static RootSignature rootSignature(Expr expression) {
+        if (expression instanceof BinaryExpr binary) {
+            RootKind kind = switch (binary.operator()) {
+                case ADD -> RootKind.ADD;
+                case SUB -> RootKind.SUB;
+                case MUL -> RootKind.MUL;
+                case DIV -> RootKind.DIV;
+                case POW -> RootKind.POW;
+            };
+            int arity = kind == RootKind.ADD || kind == RootKind.MUL
+                ? flattenedArity(expression, binary.operator())
+                : 2;
+            return new RootSignature(kind, arity);
+        }
+        if (expression instanceof FunctionExpr function) {
+            return new RootSignature(RootKind.FUNCTION, function.arguments().size());
+        }
+        if (expression instanceof VariableExpr) {
+            return new RootSignature(RootKind.VARIABLE, 0);
+        }
+        if (expression instanceof NumberExpr) {
+            return new RootSignature(RootKind.NUMBER, 0);
+        }
+        return new RootSignature(RootKind.UNPARSEABLE, 0);
+    }
+
+    private static int flattenedArity(
+        Expr expression,
+        BinaryOperator operator
+    ) {
+        if (expression instanceof BinaryExpr binary && binary.operator() == operator) {
+            return flattenedArity(binary.left(), operator)
+                + flattenedArity(binary.right(), operator);
+        }
+        return 1;
     }
 
     private static Map<AssumptionClass, Integer> assumptionClasses(List<String> assumptions) {
