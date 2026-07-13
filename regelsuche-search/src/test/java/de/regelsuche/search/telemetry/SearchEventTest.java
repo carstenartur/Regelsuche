@@ -1,5 +1,6 @@
 package de.regelsuche.search.telemetry;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.List;
@@ -17,6 +18,7 @@ class SearchEventTest {
             0,
             0,
             "",
+            null,
             "",
             null,
             List.of(),
@@ -27,5 +29,6 @@ class SearchEventTest {
         );
 
         assertNull(event.rewriteKind());
+        assertEquals("", event.parentExpression());
     }
 }
