@@ -81,6 +81,21 @@ jobs:
         path: app/build/reports/held-out-policy/**
         if-no-files-found: warn
 
+    - name: Require held-out descriptor policy evidence after a successful build
+      if: success()
+      shell: bash
+      run: |
+        test -s app/build/reports/held-out-descriptor-policy/report.json
+        test -s app/build/reports/held-out-descriptor-policy/trajectories.jsonl
+
+    - name: Upload held-out descriptor policy evidence
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: held-out-descriptor-policy-evidence
+        path: app/build/reports/held-out-descriptor-policy/**
+        if-no-files-found: warn
+
   dependency-submission:
 
     runs-on: ubuntu-latest
