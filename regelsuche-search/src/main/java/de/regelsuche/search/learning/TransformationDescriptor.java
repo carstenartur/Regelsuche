@@ -302,7 +302,7 @@ public record TransformationDescriptor(
 
         private RootSignature rootSignature(String expression) {
             try {
-                Expr parsed = canonicalizer.canonicalize(parser.parseTerm(expression));
+                Expr parsed = parser.parseTerm(expression);
                 if (parsed instanceof BinaryExpr binary) {
                     RootKind kind = switch (binary.operator()) {
                         case ADD -> RootKind.ADD;
