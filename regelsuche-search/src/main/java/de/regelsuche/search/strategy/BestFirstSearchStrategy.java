@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 
 public class BestFirstSearchStrategy implements SearchStrategy {
     @Override
@@ -197,15 +198,33 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         SearchState current,
         TargetSession target
     ) {
-        List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
+        return orderTransformations(
+            problem,
+            current,
+            new ArrayList<>(problem.engine().transform(current.expression())),
+            target.enabled(),
+            transformation -> target.distance(transformation.transformedExpression()));
+    }
+
+    /**
+     * Orders all applicable transformations before the ordinary candidate-budget loop.
+     * Subclasses may reorder candidates, but must return the complete list so this
+     * strategy remains the sole owner of skip, duplicate and enqueue accounting.
+     */
+    protected List<Transformation> orderTransformations(
+        SearchProblem problem,
+        SearchState current,
+        List<Transformation> transformations,
+        boolean targetEnabled,
+        ToIntFunction<Transformation> targetDistance
+    ) {
         Comparator<Transformation> deterministic = Comparator
             .comparing(Transformation::rule)
             .thenComparing(Transformation::transformedExpression)
             .thenComparing(Transformation::applicationKey);
-        if (target.enabled()) {
+        if (targetEnabled) {
             transformations.sort(Comparator
-                .comparingInt((Transformation transformation) ->
-                    target.distance(transformation.transformedExpression()))
+                .comparingInt(targetDistance)
                 .thenComparing(deterministic));
         } else {
             transformations.sort(deterministic);
