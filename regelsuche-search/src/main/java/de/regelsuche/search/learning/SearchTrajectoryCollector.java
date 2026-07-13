@@ -72,18 +72,23 @@ public final class SearchTrajectoryCollector implements SearchObserver {
         Set<String> selectedStates = selectedStateSyntaxHashes(result);
         Set<TransitionKey> selectedTransitions = selectedTransitions(result);
 
-        List<SearchTrajectoryRecord> records = events.stream()
-            .map(event -> toRecord(
-                event,
-                context,
-                problem,
-                result,
-                canonicalizer,
-                target,
-                applicableByParent,
-                selectedStates,
-                selectedTransitions))
-            .toList();
+        List<SearchTrajectoryRecord> records;
+        try (TransformationDescriptor.Factory descriptors =
+                new TransformationDescriptor.Factory(problem.target(), canonicalizer)) {
+            records = events.stream()
+                .map(event -> toRecord(
+                    event,
+                    context,
+                    problem,
+                    result,
+                    canonicalizer,
+                    target,
+                    applicableByParent,
+                    selectedStates,
+                    selectedTransitions,
+                    descriptors))
+                .toList();
+        }
         return new SearchTrajectoryRun(
             context,
             root,
@@ -104,7 +109,8 @@ public final class SearchTrajectoryCollector implements SearchObserver {
         ExpressionFingerprint target,
         Map<String, List<String>> applicableByParent,
         Set<String> selectedStates,
-        Set<TransitionKey> selectedTransitions
+        Set<TransitionKey> selectedTransitions,
+        TransformationDescriptor.Factory descriptors
     ) {
         ExpressionFingerprint expression = ExpressionFingerprint.of(
             event.expression(), canonicalizer);
@@ -137,6 +143,7 @@ public final class SearchTrajectoryCollector implements SearchObserver {
             parent,
             target,
             ExpressionFeatures.of(event.expression()),
+            transformation ? descriptors.from(event) : null,
             event.depth(),
             event.score(),
             parentScore,

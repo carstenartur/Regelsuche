@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.search-trajectory/v2",
+  "title": "Regelsuche search trajectory event v2",
+  "type": "object",
+  "required": [
+    "schema", "producerVersion", "runId", "family", "split", "ruleInventoryHash",
+    "sequence", "eventType", "expression", "parent", "target", "features",
+    "transformationDescriptor", "depth", "score", "parentScore", "frontierSize",
+    "visitedCount", "generatedCount", "ruleId", "rewriteKind", "applicableRuleIds",
+    "assumptions", "pruningReason", "eventualSuccess", "selectedPath", "terminalStatus"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.search-trajectory/v2" },
+    "producerVersion": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "family": { "type": "string", "minLength": 1 },
+    "split": { "enum": ["UNASSIGNED", "TRAIN", "VALIDATION", "TEST"] },
+    "ruleInventoryHash": { "type": "string", "minLength": 1 },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "eventType": {
+      "enum": [
+        "SEARCH_STARTED", "STATE_DEQUEUED", "STATE_VISITED", "STATE_PRUNED_DUPLICATE",
+        "STATE_PRUNED_TRANSPOSITION", "STATE_PRUNED_DEPTH", "STATE_PRUNED_BUDGET",
+        "STATE_EXPANDED", "TRANSFORMATION_GENERATED", "STATE_ENQUEUED", "SEARCH_FINISHED"
+      ]
+    },
+    "expression": { "$ref": "#/$defs/fingerprint" },
+    "parent": { "oneOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }] },
+    "target": { "oneOf": [{ "$ref": "#/$defs/fingerprint" }, { "type": "null" }] },
+    "features": { "$ref": "#/$defs/features" },
+    "transformationDescriptor": {
+      "oneOf": [{ "$ref": "#/$defs/transformationDescriptor" }, { "type": "null" }]
+    },
+    "depth": { "type": "integer", "minimum": 0 },
+    "score": { "type": "integer" },
+    "parentScore": { "type": "integer" },
+    "frontierSize": { "type": "integer", "minimum": 0 },
+    "visitedCount": { "type": "integer", "minimum": 0 },
+    "generatedCount": { "type": "integer", "minimum": 0 },
+    "ruleId": { "type": "string" },
+    "rewriteKind": { "type": "string" },
+    "applicableRuleIds": { "$ref": "#/$defs/stringArray" },
+    "assumptions": { "$ref": "#/$defs/stringArray" },
+    "pruningReason": { "type": "string" },
+    "eventualSuccess": { "type": "boolean" },
+    "selectedPath": { "type": "boolean" },
+    "terminalStatus": {
+      "enum": [
+        "UNTARGETED", "ROOT_ALREADY_TARGET", "REACHED", "STATE_BUDGET", "DEPTH_BUDGET",
+        "CANDIDATE_BUDGET", "NO_TRANSFORMATIONS", "FRONTIER_EXHAUSTED", "UNPARSEABLE_TARGET"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "eventType": { "const": "TRANSFORMATION_GENERATED" } } },
+      "then": { "properties": { "transformationDescriptor": { "$ref": "#/$defs/transformationDescriptor" } } },
+      "else": { "properties": { "transformationDescriptor": { "type": "null" } } }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "fingerprint": {
+      "type": "object",
+      "required": ["valueHash", "alphaShapeHash", "parseable"],
+      "properties": {
+        "valueHash": { "type": "string", "minLength": 1 },
+        "alphaShapeHash": { "type": "string", "minLength": 1 },
+        "parseable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "features": {
+      "type": "object",
+      "required": [
+        "nodeCount", "maxDepth", "variableOccurrences", "distinctVariables", "numericLiterals",
+        "additions", "subtractions", "multiplications", "divisions", "powers", "functions", "parseable"
+      ],
+      "properties": {
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "maxDepth": { "type": "integer", "minimum": 0 },
+        "variableOccurrences": { "type": "integer", "minimum": 0 },
+        "distinctVariables": { "type": "integer", "minimum": 0 },
+        "numericLiterals": { "type": "integer", "minimum": 0 },
+        "additions": { "type": "integer", "minimum": 0 },
+        "subtractions": { "type": "integer", "minimum": 0 },
+        "multiplications": { "type": "integer", "minimum": 0 },
+        "divisions": { "type": "integer", "minimum": 0 },
+        "powers": { "type": "integer", "minimum": 0 },
+        "functions": { "type": "integer", "minimum": 0 },
+        "parseable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "transformationDescriptor": {
+      "type": "object",
+      "required": [
+        "schema", "rewriteKind", "equivalencePreserving", "mayIncreaseComplexity",
+        "estimatedCostDelta", "astDelta", "parentRoot", "childRoot", "assumptionCount",
+        "assumptionClassCounts", "targeted", "targetDistanceBefore", "targetDistanceAfter",
+        "targetDistanceDelta", "available", "predictiveFingerprint", "featureVector"
+      ],
+      "properties": {
+        "schema": { "const": "regelsuche.transformation-descriptor/v1" },
+        "rewriteKind": { "type": "string", "minLength": 1 },
+        "equivalencePreserving": { "type": "boolean" },
+        "mayIncreaseComplexity": { "type": "boolean" },
+        "estimatedCostDelta": { "type": "integer" },
+        "astDelta": { "$ref": "#/$defs/astDelta" },
+        "parentRoot": { "$ref": "#/$defs/rootSignature" },
+        "childRoot": { "$ref": "#/$defs/rootSignature" },
+        "assumptionCount": { "type": "integer", "minimum": 0 },
+        "assumptionClassCounts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        },
+        "targeted": { "type": "boolean" },
+        "targetDistanceBefore": { "type": "integer", "minimum": -1 },
+        "targetDistanceAfter": { "type": "integer", "minimum": -1 },
+        "targetDistanceDelta": { "type": "integer" },
+        "available": { "type": "boolean" },
+        "predictiveFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "featureVector": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "astDelta": {
+      "type": "object",
+      "required": [
+        "nodeCount", "maxDepth", "variableOccurrences", "distinctVariables", "numericLiterals",
+        "additions", "subtractions", "multiplications", "divisions", "powers", "functions", "parseable"
+      ],
+      "properties": {
+        "nodeCount": { "type": "integer" },
+        "maxDepth": { "type": "integer" },
+        "variableOccurrences": { "type": "integer" },
+        "distinctVariables": { "type": "integer" },
+        "numericLiterals": { "type": "integer" },
+        "additions": { "type": "integer" },
+        "subtractions": { "type": "integer" },
+        "multiplications": { "type": "integer" },
+        "divisions": { "type": "integer" },
+        "powers": { "type": "integer" },
+        "functions": { "type": "integer" },
+        "parseable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "rootSignature": {
+      "type": "object",
+      "required": ["kind", "arity"],
+      "properties": {
+        "kind": {
+          "enum": ["ADD", "SUB", "MUL", "DIV", "POW", "FUNCTION", "VARIABLE", "NUMBER", "UNPARSEABLE"]
+        },
+        "arity": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

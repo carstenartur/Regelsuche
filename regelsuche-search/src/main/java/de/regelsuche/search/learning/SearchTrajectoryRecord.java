@@ -21,6 +21,7 @@ public record SearchTrajectoryRecord(
     ExpressionFingerprint parent,
     ExpressionFingerprint target,
     ExpressionFeatures features,
+    TransformationDescriptor transformationDescriptor,
     int depth,
     int score,
     int parentScore,
@@ -36,7 +37,7 @@ public record SearchTrajectoryRecord(
     boolean selectedPath,
     GoalStatus terminalStatus
 ) {
-    public static final String SCHEMA = "regelsuche.search-trajectory/v1";
+    public static final String SCHEMA = "regelsuche.search-trajectory/v2";
 
     public SearchTrajectoryRecord {
         schema = schema == null || schema.isBlank() ? SCHEMA : schema;
@@ -55,6 +56,11 @@ public record SearchTrajectoryRecord(
             : applicableRuleIds.stream().filter(Objects::nonNull).distinct().sorted().toList();
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         pruningReason = safe(pruningReason);
+        boolean decision = eventType == SearchEventType.TRANSFORMATION_GENERATED;
+        if (decision != (transformationDescriptor != null)) {
+            throw new IllegalArgumentException(
+                "transformationDescriptor must be present exactly for transformation decisions");
+        }
     }
 
     public boolean decision() {
