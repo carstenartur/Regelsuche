@@ -1,6 +1,7 @@
 package de.regelsuche.search.strategy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -122,6 +123,58 @@ class GoalAwareSearchTest {
         assertNotNull(guidedResult.reachedState());
         assertEquals("a", guidedResult.reachedState().expression());
         assertTrue(guidedResult.metrics().candidateBudgetPrunes() >= 1);
+    }
+
+    @Test
+    void syntaxExactTargetOutranksAnAcEquivalentNonExactCandidate() {
+        TransformationEngine engine = expression -> {
+            if (!"x * (y + z)".equals(expression)) {
+                return List.of();
+            }
+            return List.of(
+                new Transformation(
+                    "a_reordered_equivalent", "x * z + x * y", RewriteKind.NORMALIZE,
+                    false, 0, true, "a_reordered_equivalent"),
+                new Transformation(
+                    "z_exact_target", "x * y + x * z", RewriteKind.NORMALIZE,
+                    false, 0, true, "z_exact_target")
+            );
+        };
+        SearchProblem problem = baseProblem(
+            "x * (y + z)", engine, 1, 8, 1)
+            .withTarget(SearchProblem.SearchTarget
+                .syntaxExact("x * y + x * z")
+                .withDistanceWeight(20));
+
+        BestFirstSearchStrategy.GoalSearchResult result =
+            new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+        assertTrue(result.reached(), result.toString());
+        assertEquals(List.of("x * (y + z)", "x * y + x * z"),
+            result.states().stream().map(SearchState::expression).toList());
+        assertEquals("z_exact_target", result.reachedState().appliedRuleId());
+        assertTrue(result.metrics().candidateBudgetPrunes() >= 1);
+    }
+
+    @Test
+    void syntaxEquivalentButNonExactStateHasPositiveDistance() {
+        TransformationEngine engine = expression -> "x * (y + z)".equals(expression)
+            ? List.of(new Transformation(
+                "reordered_equivalent", "x * z + x * y", RewriteKind.NORMALIZE,
+                false, 0, true, "reordered_equivalent"))
+            : List.of();
+        SearchProblem problem = baseProblem(
+            "x * (y + z)", engine, 1, 8, 1)
+            .withTarget(SearchProblem.SearchTarget
+                .syntaxExact("x * y + x * z")
+                .withDistanceWeight(20));
+
+        BestFirstSearchStrategy.GoalSearchResult result =
+            new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+        assertFalse(result.reached());
+        assertEquals(1, result.bestDistance());
+        assertEquals("x * z + x * y", result.bestState().expression());
     }
 
     @Test
