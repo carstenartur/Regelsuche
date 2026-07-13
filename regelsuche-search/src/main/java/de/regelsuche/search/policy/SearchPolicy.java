@@ -18,6 +18,15 @@ public interface SearchPolicy {
 
     PolicyDecision score(PolicyContext context, Transformation transformation);
 
+    /**
+     * Optional adjustment applied after a successor is admitted to the ordinary
+     * BestFirst frontier. Candidate-only policies return zero. The search strategy
+     * remains the sole owner of guards, duplicate pruning and enqueue budgets.
+     */
+    default int frontierPriorityAdjustment(PolicyDecision decision) {
+        return 0;
+    }
+
     /** Static reference policy matching the pre-learning target-distance ordering. */
     static SearchPolicy staticPolicy() {
         return StaticPolicy.INSTANCE;
