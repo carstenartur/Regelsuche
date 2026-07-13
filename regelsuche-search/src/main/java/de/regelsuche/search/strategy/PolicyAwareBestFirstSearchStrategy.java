@@ -261,7 +261,11 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             if (candidate == null) {
                 return UNPARSEABLE_DISTANCE;
             }
-            return semanticDistance(candidate, targetValue, targetOccurrences);
+            int semantic = semanticDistance(candidate, targetValue, targetOccurrences);
+            if (target.relation() != TargetRelation.SYNTAX_EXACT) {
+                return semantic;
+            }
+            return Math.min(UNPARSEABLE_DISTANCE - 1, semantic + 1);
         }
 
         private ExprValue value(String expression) {
