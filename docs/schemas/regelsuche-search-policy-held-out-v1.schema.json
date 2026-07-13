@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.search-policy-held-out/v1",
+  "title": "Regelsuche held-out search policy evidence v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "producer",
+    "leakageFree",
+    "familyCount",
+    "datasetHash",
+    "featureSchema",
+    "ruleInventoryHash",
+    "noCorrectnessLoss",
+    "materialImprovement",
+    "bestImprovementPermille",
+    "limitingFeature",
+    "models",
+    "evaluations"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.search-policy-held-out/v1" },
+    "producer": { "type": "string", "minLength": 1 },
+    "leakageFree": { "type": "boolean" },
+    "familyCount": { "type": "integer", "minimum": 3 },
+    "datasetHash": { "type": "string", "minLength": 1 },
+    "featureSchema": { "type": "string", "minLength": 1 },
+    "ruleInventoryHash": { "type": "string", "minLength": 1 },
+    "noCorrectnessLoss": { "type": "boolean" },
+    "materialImprovement": { "type": "boolean" },
+    "bestImprovementPermille": { "type": "integer" },
+    "limitingFeature": { "type": "string" },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["variant", "modelVersion", "mode", "minimumObservations"],
+        "properties": {
+          "variant": { "type": "string", "minLength": 1 },
+          "modelVersion": { "type": "string", "minLength": 1 },
+          "mode": { "enum": ["FREQUENCY", "LINEAR", "LINEAR_WITH_EXPERIENCE"] },
+          "minimumObservations": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "evaluations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["caseId", "family", "split", "variants"],
+        "properties": {
+          "caseId": { "type": "string", "minLength": 1 },
+          "family": { "type": "string", "minLength": 1 },
+          "split": { "enum": ["VALIDATION", "TEST"] },
+          "variants": {
+            "type": "array",
+            "minItems": 4,
+            "items": {
+              "type": "object",
+              "required": [
+                "variant", "reached", "terminalStatus", "exploredStates",
+                "expandedStates", "generatedTransformations", "enqueuedStates",
+                "candidatePrunes", "depthPrunes", "duplicatePrunes",
+                "transpositionPrunes", "pathLength", "exploredImprovementPermille",
+                "allPolicyDecisionsFallback", "selectedRuleTrace", "explanations"
+              ],
+              "properties": {
+                "variant": {
+                  "enum": ["static", "frequency", "linear", "linear-with-experience"]
+                },
+                "reached": { "type": "boolean" },
+                "terminalStatus": { "type": "string", "minLength": 1 },
+                "exploredStates": { "type": "integer", "minimum": 0 },
+                "expandedStates": { "type": "integer", "minimum": 0 },
+                "generatedTransformations": { "type": "integer", "minimum": 0 },
+                "enqueuedStates": { "type": "integer", "minimum": 0 },
+                "candidatePrunes": { "type": "integer", "minimum": 0 },
+                "depthPrunes": { "type": "integer", "minimum": 0 },
+                "duplicatePrunes": { "type": "integer", "minimum": 0 },
+                "transpositionPrunes": { "type": "integer", "minimum": 0 },
+                "pathLength": { "type": "integer", "minimum": -1 },
+                "exploredImprovementPermille": { "type": "integer" },
+                "allPolicyDecisionsFallback": { "type": "boolean" },
+                "selectedRuleTrace": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "explanations": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
