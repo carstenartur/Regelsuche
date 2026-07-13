@@ -69,11 +69,13 @@ class ExplainableSearchPolicyTest {
     @Test
     void heldOutRowsDoNotAffectModelIdentityOrWeights() {
         SearchTrajectoryDataset firstDataset = datasetWithHeldOut(
-            "q * 1", "q", "held-out-multiply-one");
+            "q * (r + s)", "q * r + q * s", "held-out-distribute");
         SearchTrajectoryDataset secondDataset = datasetWithHeldOut(
-            "(r - 0) / 1", "r", "held-out-subtract-divide");
+            "(r^2)^3", "r^6", "held-out-power");
         SearchPolicyTrainer trainer = new SearchPolicyTrainer();
 
+        assertTrue(firstDataset.leakageFree(), firstDataset.leakageViolations().toString());
+        assertTrue(secondDataset.leakageFree(), secondDataset.leakageViolations().toString());
         SearchPolicyModel first = trainer.train(firstDataset, Mode.LINEAR, 1);
         SearchPolicyModel second = trainer.train(secondDataset, Mode.LINEAR, 1);
 
