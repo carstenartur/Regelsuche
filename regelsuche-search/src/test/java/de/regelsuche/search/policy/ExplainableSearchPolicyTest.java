@@ -75,9 +75,14 @@ class ExplainableSearchPolicyTest {
         var learnedResult = runPolicy(model, null, problem);
 
         assertFalse(staticResult.reached(), staticResult.toString());
+        assertTrue(staticResult.metrics().candidateBudgetPrunes() >= 1);
         assertTrue(learnedResult.reached(), learnedResult.search().toString());
-        assertTrue(learnedResult.search().metrics().exploredStates()
-            <= staticResult.metrics().exploredStates());
+        assertEquals(List.of(GOOD_RULE, FINISH_RULE),
+            learnedResult.search().reachedState().appliedRuleIds());
+        assertEquals(
+            contribution(learnedResult, BAD_RULE, "targetDistance"),
+            contribution(learnedResult, GOOD_RULE, "targetDistance"),
+            "the learned rule evidence, not target distance, must break the first-step tie");
         assertTrue(learnedResult.policyEvents().stream()
             .anyMatch(event -> event.ruleId().equals(GOOD_RULE)
                 && event.contributions().containsKey("empiricalFailure")
