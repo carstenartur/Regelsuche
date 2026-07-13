@@ -11,9 +11,11 @@ import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 
 /**
@@ -23,45 +25,68 @@ import java.util.function.ToIntFunction;
  * rejection and successful-enqueue budget accounting.
  */
 public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy {
-    private final SearchPolicy policy;
+    public static final int DEFAULT_MAX_FRONTIER_ADJUSTMENT = 1_000;
+    private static final int PRIORITY_CEILING = Integer.MAX_VALUE / 2;
+    private static final int PRIORITY_FLOOR = Integer.MIN_VALUE / 2;
+    private static final long EVIDENCE_LIMIT = Integer.MAX_VALUE;
 
-<span class="fc" id="L28">    public PolicyAwareBestFirstSearchStrategy(SearchPolicy policy) {</span>
-<span class="fc" id="L29">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
-<span class="fc" id="L30">    }</span>
+    private final SearchPolicy policy;
+    private final int maxFrontierAdjustment;
+
+    public PolicyAwareBestFirstSearchStrategy(SearchPolicy policy) {
+<span class="fc" id="L37">        this(policy, 0);</span>
+<span class="fc" id="L38">    }</span>
+
+    /**
+     * Enables a bounded policy contribution to successor frontier priority.
+     * A value of zero preserves the candidate-order-only behavior.
+     */
+    public PolicyAwareBestFirstSearchStrategy(
+        SearchPolicy policy,
+        int maxFrontierAdjustment
+<span class="fc" id="L47">    ) {</span>
+<span class="fc" id="L48">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (maxFrontierAdjustment &lt; 0) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;maxFrontierAdjustment must not be negative&quot;);</span>
+        }
+<span class="fc" id="L52">        this.maxFrontierAdjustment = maxFrontierAdjustment;</span>
+<span class="fc" id="L53">    }</span>
 
     @Override
     public List&lt;SearchState&gt; search(SearchProblem problem) {
-<span class="nc" id="L34">        return execute(problem, null).states();</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        PolicyTrace trace = maxFrontierAdjustment == 0 ? null : new PolicyTrace();</span>
+<span class="nc" id="L58">        return execute(problem, trace).states();</span>
     }
 
     public PolicySearchResult searchWithDiagnostics(SearchProblem problem) {
-<span class="fc" id="L38">        PolicyTrace trace = new PolicyTrace();</span>
-<span class="fc" id="L39">        BestFirstSearchStrategy.GoalSearchResult result = execute(problem, trace);</span>
-<span class="fc" id="L40">        return new PolicySearchResult(result, trace.events());</span>
+<span class="fc" id="L62">        PolicyTrace trace = new PolicyTrace();</span>
+<span class="fc" id="L63">        BestFirstSearchStrategy.GoalSearchResult result = execute(problem, trace);</span>
+<span class="fc" id="L64">        return new PolicySearchResult(result, trace.events());</span>
     }
 
     private BestFirstSearchStrategy.GoalSearchResult execute(
         SearchProblem problem,
         PolicyTrace trace
     ) {
-<span class="fc" id="L47">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        SearchObserver observer = trace == null</span>
-<span class="nc" id="L49">            ? problem.observer()</span>
-<span class="fc" id="L50">            : CompositeSearchObserver.of(trace, problem.observer());</span>
-<span class="fc" id="L51">        SearchProblem rankedProblem = new SearchProblem(</span>
-<span class="fc" id="L52">            problem.rootExpression(),</span>
-<span class="fc" id="L53">            problem.engine(),</span>
-<span class="fc" id="L54">            problem.scorer(),</span>
-<span class="fc" id="L55">            problem.canonicalizer(),</span>
-<span class="fc" id="L56">            problem.heuristic(),</span>
-<span class="fc" id="L57">            problem.memory(),</span>
-<span class="fc" id="L58">            problem.costModel(),</span>
+<span class="fc" id="L71">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        SearchObserver observer = trace == null</span>
+<span class="nc" id="L73">            ? problem.observer()</span>
+<span class="fc" id="L74">            : CompositeSearchObserver.of(trace, problem.observer());</span>
+<span class="fc" id="L75">        SearchProblem rankedProblem = new SearchProblem(</span>
+<span class="fc" id="L76">            problem.rootExpression(),</span>
+<span class="fc" id="L77">            problem.engine(),</span>
+<span class="fc" id="L78">            problem.scorer(),</span>
+<span class="fc" id="L79">            problem.canonicalizer(),</span>
+<span class="fc" id="L80">            problem.heuristic(),</span>
+<span class="fc" id="L81">            problem.memory(),</span>
+<span class="fc" id="L82">            problem.costModel(),</span>
             observer,
-<span class="fc" id="L60">            problem.target());</span>
-<span class="fc" id="L61">        try (TransformationDescriptor.Factory descriptorFactory =</span>
-<span class="fc" id="L62">                new TransformationDescriptor.Factory(problem.target(), problem.canonicalizer())) {</span>
-<span class="fc" id="L63">            return new PolicyBestFirstSearchStrategy(policy, trace, descriptorFactory)</span>
-<span class="fc" id="L64">                .searchWithDiagnostics(rankedProblem);</span>
+<span class="fc" id="L84">            problem.target());</span>
+<span class="fc" id="L85">        try (TransformationDescriptor.Factory descriptorFactory =</span>
+<span class="fc" id="L86">                new TransformationDescriptor.Factory(problem.target(), problem.canonicalizer())) {</span>
+<span class="fc" id="L87">            return new PolicyBestFirstSearchStrategy(</span>
+                policy, trace, descriptorFactory, maxFrontierAdjustment)
+<span class="fc" id="L89">                .searchWithDiagnostics(rankedProblem);</span>
         }
     }
 
@@ -69,16 +94,16 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         BestFirstSearchStrategy.GoalSearchResult search,
         List&lt;RankingEvent&gt; policyEvents
     ) {
-<span class="fc" id="L72">        public PolicySearchResult {</span>
-<span class="fc" id="L73">            policyEvents = List.copyOf(policyEvents);</span>
-<span class="fc" id="L74">        }</span>
+<span class="fc" id="L97">        public PolicySearchResult {</span>
+<span class="fc" id="L98">            policyEvents = List.copyOf(policyEvents);</span>
+<span class="fc" id="L99">        }</span>
 
         public boolean reached() {
-<span class="fc" id="L77">            return search.reached();</span>
+<span class="fc" id="L102">            return search.reached();</span>
         }
     }
 
-    /** One deterministic, explainable candidate-ranking decision and its real search outcome. */
+    /** One deterministic, explainable candidate decision and its real search outcome. */
     public record RankingEvent(
         long decisionGroup,
         String parentExpression,
@@ -91,35 +116,43 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         Map&lt;String, Integer&gt; contributions,
         String explanation,
         int deterministicRank,
+        int frontierAdjustment,
+        int staticStatePriority,
+        int targetPriorityContribution,
+        int composedFrontierPriority,
         boolean consideredBySearch,
         boolean admittedToFrontier,
-        String admissionOutcome
+        String admissionOutcome,
+        int dequeueOrder
     ) {
-<span class="fc" id="L98">        public RankingEvent {</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            parentExpression = parentExpression == null ? &quot;&quot; : parentExpression;</span>
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
-<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            transformedExpression = transformedExpression == null ? &quot;&quot; : transformedExpression;</span>
-<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            policyId = policyId == null ? &quot;&quot; : policyId;</span>
-<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            contributions = contributions == null ? Map.of() : Map.copyOf(contributions);</span>
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
-<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            admissionOutcome = admissionOutcome == null ? &quot;not-considered&quot; : admissionOutcome;</span>
-<span class="fc" id="L106">        }</span>
+<span class="fc" id="L128">        public RankingEvent {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            parentExpression = parentExpression == null ? &quot;&quot; : parentExpression;</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            transformedExpression = transformedExpression == null ? &quot;&quot; : transformedExpression;</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            policyId = policyId == null ? &quot;&quot; : policyId;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            contributions = contributions == null ? Map.of() : Map.copyOf(contributions);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            admissionOutcome = admissionOutcome == null ? &quot;not-considered&quot; : admissionOutcome;</span>
+<span class="fc" id="L136">        }</span>
     }
 
     private static final class PolicyBestFirstSearchStrategy extends BestFirstSearchStrategy {
         private final SearchPolicy policy;
         private final PolicyTrace trace;
         private final TransformationDescriptor.Factory descriptorFactory;
+        private final int maxFrontierAdjustment;
 
         private PolicyBestFirstSearchStrategy(
             SearchPolicy policy,
             PolicyTrace trace,
-            TransformationDescriptor.Factory descriptorFactory
-<span class="fc" id="L118">        ) {</span>
-<span class="fc" id="L119">            this.policy = policy;</span>
-<span class="fc" id="L120">            this.trace = trace;</span>
-<span class="fc" id="L121">            this.descriptorFactory = descriptorFactory;</span>
-<span class="fc" id="L122">        }</span>
+            TransformationDescriptor.Factory descriptorFactory,
+            int maxFrontierAdjustment
+<span class="fc" id="L150">        ) {</span>
+<span class="fc" id="L151">            this.policy = policy;</span>
+<span class="fc" id="L152">            this.trace = trace;</span>
+<span class="fc" id="L153">            this.descriptorFactory = descriptorFactory;</span>
+<span class="fc" id="L154">            this.maxFrontierAdjustment = maxFrontierAdjustment;</span>
+<span class="fc" id="L155">        }</span>
 
         @Override
         protected List&lt;Transformation&gt; orderTransformations(
@@ -129,202 +162,192 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             boolean targetEnabled,
             ToIntFunction&lt;Transformation&gt; targetDistance
         ) {
-<span class="fc" id="L132">            Comparator&lt;RankedTransformation&gt; deterministic = Comparator</span>
-<span class="fc" id="L133">                .comparing((RankedTransformation ranked) -&gt; ranked.transformation().rule())</span>
-<span class="pc" id="L134">                .thenComparing(ranked -&gt; ranked.transformation().transformedExpression())</span>
-<span class="pc" id="L135">                .thenComparing(ranked -&gt; ranked.transformation().applicationKey());</span>
-<span class="fc" id="L136">            List&lt;RankedTransformation&gt; ranked = new ArrayList&lt;&gt;(transformations.stream()</span>
-<span class="fc" id="L137">                .map(transformation -&gt; new RankedTransformation(</span>
-                    transformation,
-<span class="fc" id="L139">                    policy.score(</span>
-                        new PolicyContext(
-<span class="fc" id="L141">                            current.expression(),</span>
-<span class="fc" id="L142">                            targetDistance.applyAsInt(transformation),</span>
-                            targetEnabled,
-<span class="fc" id="L144">                            problem.canonicalizer(),</span>
-<span class="fc" id="L145">                            descriptor(current, transformation)),</span>
-                        transformation)))
-<span class="fc" id="L147">                .toList());</span>
+<span class="fc" id="L165">            Comparator&lt;RankedTransformation&gt; deterministic = Comparator</span>
+<span class="fc" id="L166">                .comparing((RankedTransformation ranked) -&gt; ranked.transformation().rule())</span>
+<span class="pc" id="L167">                .thenComparing(ranked -&gt; ranked.transformation().transformedExpression())</span>
+<span class="pc" id="L168">                .thenComparing(ranked -&gt; ranked.transformation().applicationKey());</span>
+<span class="fc" id="L169">            List&lt;RankedTransformation&gt; ranked = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L171">                int distance = targetDistance.applyAsInt(transformation);</span>
+<span class="fc" id="L172">                PolicyDecision decision = policy.score(</span>
+                    new PolicyContext(
+<span class="fc" id="L174">                        current.expression(), distance, targetEnabled,</span>
+<span class="fc" id="L175">                        problem.canonicalizer(), descriptor(current, transformation)),</span>
+                    transformation);
+<span class="fc" id="L177">                ranked.add(new RankedTransformation(transformation, decision, distance));</span>
+<span class="fc" id="L178">            }</span>
 
-<span class="fc bfc" id="L149" title="All 2 branches covered.">            boolean completeFallback = !ranked.isEmpty()</span>
-<span class="fc bfc" id="L150" title="All 2 branches covered.">                &amp;&amp; ranked.stream().allMatch(item -&gt; item.decision().fallback());</span>
-<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (completeFallback) {</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                if (targetEnabled) {</span>
-<span class="fc" id="L153">                    ranked.sort(Comparator</span>
-<span class="fc" id="L154">                        .comparingInt((RankedTransformation item) -&gt;</span>
-<span class="fc" id="L155">                            targetDistance.applyAsInt(item.transformation()))</span>
-<span class="fc" id="L156">                        .thenComparing(deterministic));</span>
-                } else {
-<span class="nc" id="L158">                    ranked.sort(deterministic);</span>
-                }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            boolean completeFallback = !ranked.isEmpty()</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                &amp;&amp; ranked.stream().allMatch(item -&gt; item.decision().fallback());</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">            if (completeFallback &amp;&amp; targetEnabled) {</span>
+<span class="fc" id="L183">                ranked.sort(Comparator</span>
+<span class="fc" id="L184">                    .comparingInt(RankedTransformation::targetDistance)</span>
+<span class="fc" id="L185">                    .thenComparing(deterministic));</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            } else if (completeFallback) {</span>
+<span class="nc" id="L187">                ranked.sort(deterministic);</span>
             } else {
-<span class="fc" id="L161">                ranked.sort(Comparator</span>
-<span class="fc" id="L162">                    .comparingInt((RankedTransformation item) -&gt; item.decision().priority())</span>
-<span class="fc" id="L163">                    .thenComparing(deterministic));</span>
+<span class="fc" id="L189">                ranked.sort(Comparator</span>
+<span class="fc" id="L190">                    .comparingInt((RankedTransformation item) -&gt; item.decision().priority())</span>
+<span class="fc" id="L191">                    .thenComparing(deterministic));</span>
             }
 
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            if (trace != null) {</span>
-<span class="fc" id="L167">                trace.startGroup(current.expression(), ranked);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (trace != null) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                int targetWeight = targetEnabled ? problem.target().distanceWeight() : 0;</span>
+<span class="fc" id="L196">                trace.startGroup(current, ranked, maxFrontierAdjustment, targetWeight);</span>
             }
-<span class="fc" id="L169">            return ranked.stream().map(RankedTransformation::transformation).toList();</span>
+<span class="fc" id="L198">            return ranked.stream().map(RankedTransformation::transformation).toList();</span>
+        }
+
+        @Override
+        protected int priority(SearchState state, SearchProblem problem) {
+<span class="fc" id="L203">            int base = super.priority(state, problem);</span>
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">            if (trace == null || maxFrontierAdjustment == 0) {</span>
+<span class="fc" id="L205">                return base;</span>
+            }
+<span class="fc" id="L207">            int adjusted = safeAdd(base, trace.frontierAdjustment(state));</span>
+<span class="fc" id="L208">            trace.recordPriority(state, base, adjusted);</span>
+<span class="fc" id="L209">            return adjusted;</span>
         }
 
         private TransformationDescriptor descriptor(
             SearchState current,
             Transformation transformation
         ) {
-<span class="fc" id="L176">            SearchEvent descriptorEvent = new SearchEvent(</span>
+<span class="fc" id="L216">            SearchEvent descriptorEvent = new SearchEvent(</span>
                 -1,
                 SearchEventType.TRANSFORMATION_GENERATED,
-<span class="fc" id="L179">                transformation.transformedExpression(),</span>
+<span class="fc" id="L219">                transformation.transformedExpression(),</span>
                 &quot;&quot;,
-<span class="fc" id="L181">                current.depth() + 1,</span>
+<span class="fc" id="L221">                current.depth() + 1,</span>
                 0,
-<span class="fc" id="L183">                current.canonicalHash(),</span>
-<span class="fc" id="L184">                current.expression(),</span>
-<span class="fc" id="L185">                transformation.rule(),</span>
-<span class="fc" id="L186">                transformation.kind(),</span>
-<span class="fc" id="L187">                transformation.mayIncreaseComplexity(),</span>
-<span class="fc" id="L188">                transformation.estimatedCostDelta(),</span>
-<span class="fc" id="L189">                transformation.equivalencePreservingByConstruction(),</span>
-<span class="fc" id="L190">                transformation.assumptions(),</span>
+<span class="fc" id="L223">                current.canonicalHash(),</span>
+<span class="fc" id="L224">                current.expression(),</span>
+<span class="fc" id="L225">                transformation.rule(),</span>
+<span class="fc" id="L226">                transformation.kind(),</span>
+<span class="fc" id="L227">                transformation.mayIncreaseComplexity(),</span>
+<span class="fc" id="L228">                transformation.estimatedCostDelta(),</span>
+<span class="fc" id="L229">                transformation.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L230">                transformation.assumptions(),</span>
                 0,
                 0,
                 0,
                 &quot;&quot;);
-<span class="fc" id="L195">            return descriptorFactory.from(descriptorEvent);</span>
+<span class="fc" id="L235">            return descriptorFactory.from(descriptorEvent);</span>
         }
     }
 
-<span class="fc" id="L199">    private static final class PolicyTrace implements SearchObserver {</span>
-<span class="fc" id="L200">        private final List&lt;MutableRankingEvent&gt; events = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L239">    private static final class PolicyTrace implements SearchObserver {</span>
+<span class="fc" id="L240">        private final List&lt;MutableRankingEvent&gt; events = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L241">        private final Map&lt;TransitionKey, MutableRankingEvent&gt; byTransition =</span>
+            new LinkedHashMap&lt;&gt;();
         private long nextDecisionGroup;
-        private RankingGroup activeGroup;
+        private int nextDequeueOrder;
 
-        private void startGroup(String parentExpression, List&lt;RankedTransformation&gt; ranked) {
-<span class="fc" id="L205">            finishActive(&quot;not-considered-before-next-expansion&quot;);</span>
-<span class="fc" id="L206">            long group = nextDecisionGroup++;</span>
-<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (ranked.isEmpty()) {</span>
-<span class="fc" id="L208">                return;</span>
-            }
-<span class="fc" id="L210">            List&lt;MutableRankingEvent&gt; groupEvents = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L211" title="All 2 branches covered.">            for (int rank = 0; rank &lt; ranked.size(); rank++) {</span>
-<span class="fc" id="L212">                RankedTransformation item = ranked.get(rank);</span>
-<span class="fc" id="L213">                MutableRankingEvent event = new MutableRankingEvent(</span>
+        private void startGroup(
+            SearchState parent,
+            List&lt;RankedTransformation&gt; ranked,
+            int adjustmentLimit,
+            int targetWeight
+        ) {
+<span class="fc" id="L252">            long group = nextDecisionGroup++;</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for (int rank = 0; rank &lt; ranked.size(); rank++) {</span>
+<span class="fc" id="L254">                RankedTransformation item = ranked.get(rank);</span>
+<span class="fc" id="L255">                MutableRankingEvent event = new MutableRankingEvent(</span>
                     group,
-                    parentExpression,
-<span class="fc" id="L216">                    item.transformation(),</span>
-<span class="fc" id="L217">                    item.decision(),</span>
-                    rank);
-<span class="fc" id="L219">                groupEvents.add(event);</span>
-<span class="fc" id="L220">                events.add(event);</span>
+                    parent,
+                    item,
+                    rank,
+<span class="fc" id="L260">                    PolicyAwareBestFirstSearchStrategy.frontierAdjustment(</span>
+<span class="fc" id="L261">                        item.decision(), adjustmentLimit),</span>
+<span class="fc" id="L262">                    safeProduct(item.targetDistance(), targetWeight));</span>
+<span class="fc" id="L263">                events.add(event);</span>
+<span class="fc" id="L264">                byTransition.putIfAbsent(event.key, event);</span>
             }
-<span class="fc" id="L222">            activeGroup = new RankingGroup(groupEvents);</span>
-<span class="fc" id="L223">        }</span>
+<span class="fc" id="L266">        }</span>
+
+        private int frontierAdjustment(SearchState state) {
+<span class="fc" id="L269">            MutableRankingEvent event = byTransition.get(TransitionKey.from(state));</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            return event == null ? 0 : event.frontierAdjustment;</span>
+        }
+
+        private void recordPriority(SearchState state, int base, int adjusted) {
+<span class="fc" id="L274">            MutableRankingEvent event = byTransition.get(TransitionKey.from(state));</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            if (event != null) {</span>
+<span class="fc" id="L276">                event.staticStatePriority = base;</span>
+<span class="fc" id="L277">                event.composedFrontierPriority = safeAdd(</span>
+                    adjusted, event.targetPriorityContribution);
+            }
+<span class="fc" id="L280">        }</span>
 
         @Override
         public void onEvent(SearchEvent event) {
-<span class="fc bfc" id="L227" title="All 6 branches covered.">            switch (event.type()) {</span>
-<span class="fc" id="L228">                case TRANSFORMATION_GENERATED -&gt; transformationConsidered(event);</span>
-<span class="fc" id="L229">                case STATE_ENQUEUED -&gt; completePending(event, true, &quot;enqueued&quot;);</span>
-<span class="fc" id="L230">                case STATE_PRUNED_DUPLICATE -&gt; completePending(event, false, &quot;duplicate-pruned&quot;);</span>
-<span class="fc" id="L231">                case STATE_PRUNED_BUDGET -&gt; finishActive(&quot;candidate-budget-not-considered&quot;);</span>
-<span class="fc" id="L232">                case SEARCH_FINISHED -&gt; finishActive(&quot;search-finished-not-considered&quot;);</span>
+<span class="fc bfc" id="L284" title="All 6 branches covered.">            switch (event.type()) {</span>
+<span class="fc" id="L285">                case TRANSFORMATION_GENERATED -&gt; considered(event);</span>
+<span class="fc" id="L286">                case STATE_ENQUEUED -&gt; admitted(event, true, &quot;enqueued&quot;);</span>
+<span class="fc" id="L287">                case STATE_PRUNED_DUPLICATE -&gt; admitted(event, false, &quot;duplicate-pruned&quot;);</span>
+<span class="fc" id="L288">                case STATE_PRUNED_BUDGET -&gt; budget(event.expression());</span>
+<span class="fc" id="L289">                case STATE_DEQUEUED -&gt; dequeued(event);</span>
                 default -&gt; {
-                    // Ranking admission is decided only by the events above.
+                    // Other search events do not alter candidate evidence.
                 }
             }
-<span class="fc" id="L237">        }</span>
+<span class="fc" id="L294">        }</span>
 
-        private void transformationConsidered(SearchEvent searchEvent) {
-<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (activeGroup == null) {</span>
-<span class="nc" id="L241">                return;</span>
+        private void considered(SearchEvent event) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            MutableRankingEvent ranking = find(event, candidate -&gt; !candidate.consideredBySearch);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">            if (ranking == null) {</span>
+<span class="nc" id="L299">                return;</span>
             }
-<span class="fc" id="L243">            MutableRankingEvent ranking = activeGroup.next();</span>
-<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            if (ranking == null) {</span>
-<span class="nc" id="L245">                return;</span>
-            }
-<span class="fc" id="L247">            ranking.consideredBySearch = true;</span>
-<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            if (!ranking.matches(searchEvent)) {</span>
-<span class="nc" id="L249">                ranking.admissionOutcome = &quot;telemetry-mismatch&quot;;</span>
-<span class="nc" id="L250">                closeIfComplete();</span>
-<span class="nc" id="L251">                return;</span>
-            }
-<span class="fc bfc" id="L253" title="All 2 branches covered.">            if (!searchEvent.pruningReason().isBlank()) {</span>
-<span class="fc" id="L254">                ranking.admissionOutcome = &quot;skipped:&quot; + searchEvent.pruningReason();</span>
-<span class="fc" id="L255">                closeIfComplete();</span>
-<span class="fc" id="L256">                return;</span>
-            }
-<span class="fc" id="L258">            ranking.admissionOutcome = &quot;generated&quot;;</span>
-<span class="fc" id="L259">            activeGroup.pending = ranking;</span>
-<span class="fc" id="L260">        }</span>
+<span class="fc" id="L301">            ranking.consideredBySearch = true;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">            ranking.admissionOutcome = event.pruningReason().isBlank()</span>
+<span class="fc" id="L303">                ? &quot;generated&quot;</span>
+<span class="fc" id="L304">                : &quot;skipped:&quot; + event.pruningReason();</span>
+<span class="fc" id="L305">        }</span>
 
-        private void completePending(SearchEvent searchEvent, boolean admitted, String outcome) {
-<span class="pc bpc" id="L263" title="2 of 4 branches missed.">            if (activeGroup == null || activeGroup.pending == null) {</span>
-<span class="nc" id="L264">                return;</span>
+        private void admitted(SearchEvent event, boolean admitted, String outcome) {
+<span class="fc" id="L308">            MutableRankingEvent ranking = find(</span>
+                event,
+<span class="pc bpc" id="L310" title="2 of 4 branches missed.">                candidate -&gt; candidate.consideredBySearch</span>
+                    &amp;&amp; !candidate.admissionResolved
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                    &amp;&amp; &quot;generated&quot;.equals(candidate.admissionOutcome));</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            if (ranking == null) {</span>
+<span class="nc" id="L314">                return;</span>
             }
-<span class="fc" id="L266">            MutableRankingEvent pending = activeGroup.pending;</span>
-<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            if (!pending.matches(searchEvent)) {</span>
-<span class="nc" id="L268">                pending.admissionOutcome = &quot;telemetry-mismatch&quot;;</span>
-<span class="nc" id="L269">                activeGroup.pending = null;</span>
-<span class="nc" id="L270">                closeIfComplete();</span>
-<span class="nc" id="L271">                return;</span>
-            }
-<span class="fc" id="L273">            pending.admittedToFrontier = admitted;</span>
-<span class="fc" id="L274">            pending.admissionOutcome = outcome;</span>
-<span class="fc" id="L275">            activeGroup.pending = null;</span>
-<span class="fc" id="L276">            closeIfComplete();</span>
-<span class="fc" id="L277">        }</span>
+<span class="fc" id="L316">            ranking.admissionResolved = true;</span>
+<span class="fc" id="L317">            ranking.admittedToFrontier = admitted;</span>
+<span class="fc" id="L318">            ranking.admissionOutcome = outcome;</span>
+<span class="fc" id="L319">        }</span>
 
-        private void closeIfComplete() {
-<span class="pc bpc" id="L280" title="1 of 4 branches missed.">            if (activeGroup != null &amp;&amp; activeGroup.complete()) {</span>
-<span class="fc" id="L281">                activeGroup = null;</span>
-            }
-<span class="fc" id="L283">        }</span>
+        private void budget(String parentExpression) {
+<span class="fc" id="L322">            events.stream()</span>
+<span class="fc" id="L323">                .filter(event -&gt; event.parentExpression.equals(parentExpression))</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">                .filter(event -&gt; !event.consideredBySearch)</span>
+<span class="fc" id="L325">                .forEach(event -&gt; event.admissionOutcome = &quot;candidate-budget-not-considered&quot;);</span>
+<span class="fc" id="L326">        }</span>
 
-        private void finishActive(String outcome) {
-<span class="fc bfc" id="L286" title="All 2 branches covered.">            if (activeGroup == null) {</span>
-<span class="fc" id="L287">                return;</span>
+        private void dequeued(SearchEvent event) {
+<span class="fc" id="L329">            MutableRankingEvent ranking = find(</span>
+                event,
+<span class="pc bpc" id="L331" title="2 of 4 branches missed.">                candidate -&gt; candidate.admittedToFrontier &amp;&amp; candidate.dequeueOrder &lt; 0);</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            if (ranking != null) {</span>
+<span class="fc" id="L333">                ranking.dequeueOrder = nextDequeueOrder++;</span>
             }
-<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            if (activeGroup.pending != null) {</span>
-<span class="nc" id="L290">                activeGroup.pending.admissionOutcome = &quot;generated-without-admission&quot;;</span>
-<span class="nc" id="L291">                activeGroup.pending = null;</span>
-            }
-<span class="fc" id="L293">            activeGroup.finishRemaining(outcome);</span>
-<span class="fc" id="L294">            activeGroup = null;</span>
-<span class="fc" id="L295">        }</span>
+<span class="fc" id="L335">        }</span>
+
+        private MutableRankingEvent find(
+            SearchEvent event,
+            Predicate&lt;MutableRankingEvent&gt; predicate
+        ) {
+<span class="fc" id="L341">            return events.stream()</span>
+<span class="fc" id="L342">                .filter(candidate -&gt; candidate.matches(event))</span>
+<span class="fc" id="L343">                .filter(predicate)</span>
+<span class="fc" id="L344">                .findFirst()</span>
+<span class="fc" id="L345">                .orElse(null);</span>
+        }
 
         private List&lt;RankingEvent&gt; events() {
-<span class="fc" id="L298">            finishActive(&quot;search-finished-not-considered&quot;);</span>
-<span class="fc" id="L299">            return events.stream().map(MutableRankingEvent::freeze).toList();</span>
+<span class="fc" id="L349">            return events.stream().map(MutableRankingEvent::freeze).toList();</span>
         }
-    }
-
-    private static final class RankingGroup {
-        private final List&lt;MutableRankingEvent&gt; events;
-        private int cursor;
-        private MutableRankingEvent pending;
-
-<span class="fc" id="L308">        private RankingGroup(List&lt;MutableRankingEvent&gt; events) {</span>
-<span class="fc" id="L309">            this.events = events;</span>
-<span class="fc" id="L310">        }</span>
-
-        private MutableRankingEvent next() {
-<span class="pc bpc" id="L313" title="2 of 4 branches missed.">            if (cursor &gt;= events.size() || pending != null) {</span>
-<span class="nc" id="L314">                return null;</span>
-            }
-<span class="fc" id="L316">            return events.get(cursor++);</span>
-        }
-
-        private boolean complete() {
-<span class="pc bpc" id="L320" title="1 of 4 branches missed.">            return cursor &gt;= events.size() &amp;&amp; pending == null;</span>
-        }
-
-        private void finishRemaining(String outcome) {
-<span class="fc bfc" id="L324" title="All 2 branches covered.">            while (cursor &lt; events.size()) {</span>
-<span class="fc" id="L325">                events.get(cursor++).admissionOutcome = outcome;</span>
-            }
-<span class="fc" id="L327">        }</span>
     }
 
     private static final class MutableRankingEvent {
@@ -333,53 +356,123 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         private final Transformation transformation;
         private final PolicyDecision decision;
         private final int deterministicRank;
+        private final TransitionKey key;
+        private final int frontierAdjustment;
+        private final int targetPriorityContribution;
+        private int staticStatePriority;
+        private int composedFrontierPriority;
         private boolean consideredBySearch;
+        private boolean admissionResolved;
         private boolean admittedToFrontier;
-<span class="fc" id="L338">        private String admissionOutcome = &quot;not-considered&quot;;</span>
+<span class="fc" id="L367">        private String admissionOutcome = &quot;not-considered&quot;;</span>
+<span class="fc" id="L368">        private int dequeueOrder = -1;</span>
 
         private MutableRankingEvent(
             long decisionGroup,
-            String parentExpression,
-            Transformation transformation,
-            PolicyDecision decision,
-            int deterministicRank
-<span class="fc" id="L346">        ) {</span>
-<span class="fc" id="L347">            this.decisionGroup = decisionGroup;</span>
-<span class="fc" id="L348">            this.parentExpression = parentExpression;</span>
-<span class="fc" id="L349">            this.transformation = transformation;</span>
-<span class="fc" id="L350">            this.decision = decision;</span>
-<span class="fc" id="L351">            this.deterministicRank = deterministicRank;</span>
-<span class="fc" id="L352">        }</span>
+            SearchState parent,
+            RankedTransformation ranked,
+            int deterministicRank,
+            int frontierAdjustment,
+            int targetPriorityContribution
+<span class="fc" id="L377">        ) {</span>
+<span class="fc" id="L378">            this.decisionGroup = decisionGroup;</span>
+<span class="fc" id="L379">            this.parentExpression = parent.expression();</span>
+<span class="fc" id="L380">            this.transformation = ranked.transformation();</span>
+<span class="fc" id="L381">            this.decision = ranked.decision();</span>
+<span class="fc" id="L382">            this.deterministicRank = deterministicRank;</span>
+<span class="fc" id="L383">            this.key = TransitionKey.from(parent, transformation);</span>
+<span class="fc" id="L384">            this.frontierAdjustment = frontierAdjustment;</span>
+<span class="fc" id="L385">            this.targetPriorityContribution = targetPriorityContribution;</span>
+<span class="fc" id="L386">        }</span>
 
         private boolean matches(SearchEvent event) {
-<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            return parentExpression.equals(event.parentExpression())</span>
-<span class="pc bpc" id="L356" title="1 of 2 branches missed.">                &amp;&amp; transformation.rule().equals(event.ruleId())</span>
-<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                &amp;&amp; transformation.transformedExpression().equals(event.expression());</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            return parentExpression.equals(event.parentExpression())</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">                &amp;&amp; transformation.rule().equals(event.ruleId())</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                &amp;&amp; transformation.transformedExpression().equals(event.expression());</span>
         }
 
         private RankingEvent freeze() {
-<span class="fc" id="L361">            return new RankingEvent(</span>
+<span class="fc" id="L395">            return new RankingEvent(</span>
                 decisionGroup,
                 parentExpression,
-<span class="fc" id="L364">                transformation.rule(),</span>
-<span class="fc" id="L365">                transformation.transformedExpression(),</span>
-<span class="fc" id="L366">                decision.policyId(),</span>
-<span class="fc" id="L367">                decision.priority(),</span>
-<span class="fc" id="L368">                decision.confidencePermille(),</span>
-<span class="fc" id="L369">                decision.fallback(),</span>
-<span class="fc" id="L370">                decision.contributions(),</span>
-<span class="fc" id="L371">                decision.explanation(),</span>
+<span class="fc" id="L398">                transformation.rule(),</span>
+<span class="fc" id="L399">                transformation.transformedExpression(),</span>
+<span class="fc" id="L400">                decision.policyId(),</span>
+<span class="fc" id="L401">                decision.priority(),</span>
+<span class="fc" id="L402">                decision.confidencePermille(),</span>
+<span class="fc" id="L403">                decision.fallback(),</span>
+<span class="fc" id="L404">                decision.contributions(),</span>
+<span class="fc" id="L405">                decision.explanation(),</span>
                 deterministicRank,
+                frontierAdjustment,
+                staticStatePriority,
+                targetPriorityContribution,
+                composedFrontierPriority,
                 consideredBySearch,
                 admittedToFrontier,
-                admissionOutcome);
+                admissionOutcome,
+                dequeueOrder);
         }
     }
 
-<span class="fc" id="L379">    private record RankedTransformation(</span>
+<span class="fc" id="L418">    private record RankedTransformation(</span>
         Transformation transformation,
-        PolicyDecision decision
+        PolicyDecision decision,
+        int targetDistance
     ) {
+    }
+
+    private record TransitionKey(
+        String parentExpression,
+        String ruleId,
+        String childExpression,
+        int childDepth
+    ) {
+<span class="fc" id="L431">        private TransitionKey {</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">            parentExpression = parentExpression == null ? &quot;&quot; : parentExpression;</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">            childExpression = childExpression == null ? &quot;&quot; : childExpression;</span>
+<span class="fc" id="L435">        }</span>
+
+        private static TransitionKey from(SearchState parent, Transformation transformation) {
+<span class="fc" id="L438">            return new TransitionKey(</span>
+<span class="fc" id="L439">                parent.expression(), transformation.rule(),</span>
+<span class="fc" id="L440">                transformation.transformedExpression(), parent.depth() + 1);</span>
+        }
+
+        private static TransitionKey from(SearchState state) {
+<span class="fc" id="L444">            return new TransitionKey(</span>
+<span class="fc" id="L445">                state.parentExpression(), state.appliedRuleId(),</span>
+<span class="fc" id="L446">                state.expression(), state.depth());</span>
+        }
+    }
+
+    private static int frontierAdjustment(PolicyDecision decision, int limit) {
+<span class="pc bpc" id="L451" title="1 of 6 branches missed.">        if (limit == 0 || decision.fallback() || decision.confidencePermille() == 0) {</span>
+<span class="fc" id="L452">            return 0;</span>
+        }
+<span class="fc" id="L454">        long evidence = 0;</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        for (Map.Entry&lt;String, Integer&gt; contribution : decision.contributions().entrySet()) {</span>
+<span class="fc" id="L456">            String name = contribution.getKey();</span>
+<span class="pc bpc" id="L457" title="1 of 4 branches missed.">            if (!&quot;targetDistance&quot;.equals(name) &amp;&amp; !name.startsWith(&quot;unknown&quot;)) {</span>
+<span class="fc" id="L458">                evidence = clamp(</span>
+<span class="fc" id="L459">                    evidence + contribution.getValue(), -EVIDENCE_LIMIT, EVIDENCE_LIMIT);</span>
+            }
+<span class="fc" id="L461">        }</span>
+<span class="fc" id="L462">        return (int) clamp(</span>
+<span class="fc" id="L463">            evidence * decision.confidencePermille() / 1_000L, -limit, limit);</span>
+    }
+
+    private static int safeProduct(int left, int right) {
+<span class="fc" id="L467">        return (int) clamp((long) left * right, PRIORITY_FLOOR, PRIORITY_CEILING);</span>
+    }
+
+    private static int safeAdd(int left, int right) {
+<span class="fc" id="L471">        return (int) clamp((long) left + right, PRIORITY_FLOOR, PRIORITY_CEILING);</span>
+    }
+
+    private static long clamp(long value, long minimum, long maximum) {
+<span class="fc" id="L475">        return Math.max(minimum, Math.min(maximum, value));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -523,8 +523,8 @@ import java.util.function.ToIntFunction;
 <span class="fc bfc" id="L523" title="All 2 branches covered.">                status = progress.reachedState.depth() == 0</span>
 <span class="fc" id="L524">                    ? GoalStatus.ROOT_ALREADY_TARGET</span>
 <span class="fc" id="L525">                    : GoalStatus.REACHED;</span>
-<span class="pc bpc" id="L526" title="1 of 2 branches missed.">            } else if (frame.explored().size() &gt;= problem.heuristic().maxVisitedExpressions()) {</span>
-<span class="nc" id="L527">                status = GoalStatus.STATE_BUDGET;</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">            } else if (frame.explored().size() &gt;= problem.heuristic().maxVisitedExpressions()) {</span>
+<span class="fc" id="L527">                status = GoalStatus.STATE_BUDGET;</span>
 <span class="fc bfc" id="L528" title="All 2 branches covered.">            } else if (progress.candidateBudgetPrunes &gt; 0) {</span>
 <span class="fc" id="L529">                status = GoalStatus.CANDIDATE_BUDGET;</span>
 <span class="fc bfc" id="L530" title="All 2 branches covered.">            } else if (progress.depthPrunes &gt; 0) {</span>
