@@ -94,13 +94,13 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
                 outOfRange++;
                 continue;
             }
-            int span = statistics.maximumValue() - statistics.minimumValue();
+            long span = (long) statistics.maximumValue() - statistics.minimumValue();
             if (span == 0) {
                 continue;
             }
             long centered = 2L * value - statistics.minimumValue() - statistics.maximumValue();
-            int contribution = clamp((int) (statistics.coefficientPermille()
-                * centered / span), -1000, 1000);
+            long rawContribution = statistics.coefficientPermille() * centered / span;
+            int contribution = clamp(rawContribution, -1000, 1000);
             if (contribution != 0) {
                 contributions.put("descriptor." + entry.getKey(), contribution);
             }
@@ -172,7 +172,7 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
             contributions, "fallback to deterministic static ordering: " + reason);
     }
 
-    private static int clamp(int value, int minimum, int maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
+    private static int clamp(long value, int minimum, int maximum) {
+        return (int) Math.max(minimum, Math.min(maximum, value));
     }
 }
