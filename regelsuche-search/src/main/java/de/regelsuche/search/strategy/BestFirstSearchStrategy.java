@@ -151,8 +151,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         if (TranspositionGate.evaluate(
                 problem.memory(),
                 current,
-                current.canonicalHash() + "#" + current.depth(),
-                List.of(frame.identity().legacyHash(current.expression())))
+                current.canonicalHash() + "#" + current.depth())
                 != TranspositionGate.Verdict.PRUNE) {
             return false;
         }
@@ -704,7 +703,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     /** One bounded owner for all mathematical values encountered by one search. */
     static final class ValueIdentitySession implements AutoCloseable {
         static final String HASH_PREFIX = "value-v1:";
-        static final String LEGACY_FALLBACK_PREFIX = "legacy-v1:";
 
         private final ExpressionCanonicalizer canonicalizer;
         private final ExpressionParser parser = new ExpressionParser();
@@ -712,7 +710,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         private final Map<String, String> valueHashesByExpression = new LinkedHashMap<>();
         private final Map<String, ExprValue> valuesByExpression = new LinkedHashMap<>();
         private final Set<String> unparseableExpressions = new HashSet<>();
-        private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>();
         private int cacheHits;
         private int cacheMisses;
 
@@ -728,9 +725,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 return existing;
             }
             cacheMisses++;
-            String hash = value(normalized)
-                .map(value -> HASH_PREFIX + sha256(value.key().encoded()))
-                .orElseGet(() -> LEGACY_FALLBACK_PREFIX + legacyHash(normalized));
+            ExprValue value = value(normalized).orElseThrow(() ->
+                new IllegalArgumentException(
+                    "search expression cannot be represented as ExprValue: " + normalized));
+            String hash = HASH_PREFIX + sha256(value.key().encoded());
             valueHashesByExpression.put(normalized, hash);
             return hash;
         }
@@ -756,11 +754,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             }
         }
 
-        String legacyHash(String expression) {
-            String normalized = normalize(expression);
-            return legacyHashesByExpression.computeIfAbsent(normalized, canonicalizer::stableHash);
-        }
-
         int cacheHits() {
             return cacheHits;
         }
@@ -782,7 +775,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             valueHashesByExpression.clear();
             valuesByExpression.clear();
             unparseableExpressions.clear();
-            legacyHashesByExpression.clear();
             factory.close();
         }
 
