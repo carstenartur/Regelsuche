@@ -2,6 +2,7 @@ package de.regelsuche.search.policy;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -63,6 +64,23 @@ class ExplainableSearchPolicyTest {
         assertTrue(first.toJson().contains("\"featureSchemaVersion\""));
         assertThrows(IllegalArgumentException.class,
             () -> SearchPolicyModel.load("regelsuche.search-policy-model/v0\ninvalid"));
+    }
+
+    @Test
+    void heldOutRowsDoNotAffectModelIdentityOrWeights() {
+        SearchTrajectoryDataset firstDataset = datasetWithHeldOut(
+            "q * 1", "q", "held-out-multiply-one");
+        SearchTrajectoryDataset secondDataset = datasetWithHeldOut(
+            "(r - 0) / 1", "r", "held-out-subtract-divide");
+        SearchPolicyTrainer trainer = new SearchPolicyTrainer();
+
+        SearchPolicyModel first = trainer.train(firstDataset, Mode.LINEAR, 1);
+        SearchPolicyModel second = trainer.train(secondDataset, Mode.LINEAR, 1);
+
+        assertNotEquals(firstDataset.toJsonLines(), secondDataset.toJsonLines(),
+            "the complete experimental datasets should actually differ");
+        assertEquals(first, second,
+            "model identity and weights must depend on TRAIN only");
     }
 
     @Test
@@ -193,6 +211,33 @@ class ExplainableSearchPolicyTest {
                 List.of(BAD_RULE, GOOD_RULE),
                 DatasetSplit.TRAIN));
         return new SearchTrajectoryDataset(List.of(run));
+    }
+
+    private SearchTrajectoryDataset datasetWithHeldOut(
+        String input,
+        String target,
+        String ruleId
+    ) {
+        SearchTrajectoryRun trainingRun = trainingDataset().runs().getFirst();
+        TransformationEngine engine = expression -> expression.equals(input)
+            ? List.of(step(ruleId, target))
+            : List.of();
+        SearchTrajectoryCollector collector = new SearchTrajectoryCollector();
+        SearchProblem problem = problem(
+            input, target, engine,
+            new SearchHeuristic(2, 20, 1, 2, 10, 10), collector);
+        var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+        assertTrue(result.reached());
+        SearchTrajectoryRun heldOutRun = collector.finish(
+            problem,
+            result,
+            new SearchTrajectoryContext(
+                "validation-" + ruleId,
+                "validation-" + ruleId,
+                "policy-test-producer/v1",
+                List.of(ruleId),
+                DatasetSplit.VALIDATION));
+        return new SearchTrajectoryDataset(List.of(trainingRun, heldOutRun));
     }
 
     private InMemorySearchExperienceRepository heldOutExperience() {
