@@ -1,0 +1,44 @@
+name: Apply BestFirst policy-budget fix
+
+on:
+  push:
+    branches:
+      - fix/best-first-policy-budget
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[policy-budget-applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/best-first-policy-budget
+      - name: Preserve authoritative engine candidate ordering
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java')
+          text = path.read_text()
+          needle = '        List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));\n'
+          replacement = needle + '''        if (problem.engine().providesCandidateOrder()) {
+              return transformations;
+          }
+'''
+          if 'problem.engine().providesCandidateOrder()' not in text:
+              if needle not in text:
+                  raise SystemExit('BestFirst transformation-list construction not found')
+              text = text.replace(needle, replacement, 1)
+          path.write_text(text)
+          Path('.github/workflows/apply-best-first-policy-budget-fix.yml').unlink()
+          PY
+      - name: Commit patch and remove temporary workflow
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java .github/workflows/apply-best-first-policy-budget-fix.yml
+          git commit -m 'Respect policy-provided candidate order [policy-budget-applied]'
+          git push origin HEAD:fix/best-first-policy-budget
