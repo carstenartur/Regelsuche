@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.search.strategy.SearchState;
 import de.regelsuche.search.strategy.TranspositionGate;
 import java.util.List;
-import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class TranspositionTableIntegrationTest {
@@ -39,7 +38,6 @@ class TranspositionTableIntegrationTest {
 
     @Test
     void transpositionTablePreventsSimpleCycles() {
-        // Simulate a cycle: the search lands on the SAME canonical state twice.
         SearchMemory memory = new SearchMemory();
         SearchState first = state("hash-cycle", 1, 5, List.of("commute"), "root");
         SearchState second = state("hash-cycle", 3, 5, List.of("commute"), "root");
@@ -60,10 +58,10 @@ class TranspositionTableIntegrationTest {
         InMemoryTranspositionTable table = new InMemoryTranspositionTable();
         java.time.Instant t0 = java.time.Instant.now();
         TranspositionEntry weak = new TranspositionEntry(
-            "h", "expr", /*score*/ 100, /*depth*/ 5, "path-old",
+            "h", "expr", 100, 5, "path-old",
             java.util.Set.of("rule_a"), 1, t0, t0);
         TranspositionEntry strong = new TranspositionEntry(
-            "h", "expr", /*score*/ 40, /*depth*/ 3, "path-new",
+            "h", "expr", 40, 3, "path-new",
             java.util.Set.of("rule_b"), 1, t0, t0.plusSeconds(1));
         table.record(weak);
         TranspositionEntry merged = table.record(strong);
@@ -95,7 +93,8 @@ class TranspositionTableIntegrationTest {
     void assumptionsArePartOfTranspositionIdentity() {
         SearchMemory memory = new SearchMemory();
         SearchState withoutAssumption = state("hash-x-div-x", 1, 5, List.of("r"), "root");
-        SearchState withAssumption = state("hash-x-div-x", 1, 5, List.of("r"), "root", List.of("x != 0"));
+        SearchState withAssumption = state(
+            "hash-x-div-x", 1, 5, List.of("r"), "root", List.of("x != 0"));
 
         assertEquals(TranspositionGate.Verdict.KEEP,
             TranspositionGate.evaluate(memory, withoutAssumption, "p1"));
@@ -106,53 +105,23 @@ class TranspositionTableIntegrationTest {
     }
 
     @Test
-    void legacyIdentityMigrationPreservesBestStateAcrossLaterLookups() {
+    void currentIdentityPreservesBestStateAcrossLaterLookups() {
         SearchMemory memory = new SearchMemory();
-        java.time.Instant firstSeen = java.time.Instant.parse("2026-01-01T00:00:00Z");
-        java.time.Instant lastSeen = java.time.Instant.parse("2026-01-02T00:00:00Z");
-        memory.table().record(new TranspositionEntry(
-            "legacy-hash",
-            "expr",
-            10,
-            2,
-            "legacy-best-path",
-            Set.of("rule_a"),
-            7,
-            firstSeen,
-            lastSeen
-        ));
+        SearchState best = state("value-v1:current", 2, 10, List.of("rule_a"), "root");
+        SearchState worse = state("value-v1:current", 5, 20, List.of("rule_a"), "parent");
+        SearchState later = state("value-v1:current", 4, 15, List.of("rule_a"), "parent");
 
-        SearchState firstRevisit = state("value-v1:new-hash", 5, 20, List.of("rule_a"), "parent");
-        assertEquals(
-            TranspositionGate.Verdict.PRUNE,
-            TranspositionGate.evaluate(
-                memory,
-                firstRevisit,
-                "current-path-1",
-                List.of("legacy-hash")));
+        assertEquals(TranspositionGate.Verdict.KEEP,
+            TranspositionGate.evaluate(memory, best, "best-path"));
+        assertEquals(TranspositionGate.Verdict.PRUNE,
+            TranspositionGate.evaluate(memory, worse, "worse-path"));
+        assertEquals(TranspositionGate.Verdict.PRUNE,
+            TranspositionGate.evaluate(memory, later, "later-path"));
 
-        TranspositionEntry migrated = memory.table().lookup("value-v1:new-hash").orElseThrow();
-        assertEquals(10, migrated.bestScore());
-        assertEquals(2, migrated.minDepthSeen());
-        assertEquals("legacy-best-path", migrated.bestKnownPathId());
-        assertEquals(Set.of("rule_a"), migrated.reachedByRuleIds());
-        assertEquals(8, migrated.visitCount());
-        assertEquals(firstSeen, migrated.firstSeen());
-
-        SearchState laterRevisit = state("value-v1:new-hash", 4, 15, List.of("rule_a"), "parent");
-        assertEquals(
-            TranspositionGate.Verdict.PRUNE,
-            TranspositionGate.evaluate(
-                memory,
-                laterRevisit,
-                "current-path-2",
-                List.of("legacy-hash")),
-            "later lookups must still compare against the legacy best score");
-
-        TranspositionEntry afterLaterVisit = memory.table().lookup("value-v1:new-hash").orElseThrow();
-        assertEquals(10, afterLaterVisit.bestScore());
-        assertEquals(2, afterLaterVisit.minDepthSeen());
-        assertEquals("legacy-best-path", afterLaterVisit.bestKnownPathId());
-        assertEquals(9, afterLaterVisit.visitCount());
+        TranspositionEntry retained = memory.table().lookup("value-v1:current").orElseThrow();
+        assertEquals(10, retained.bestScore());
+        assertEquals(2, retained.minDepthSeen());
+        assertEquals("best-path", retained.bestKnownPathId());
+        assertEquals(3, retained.visitCount());
     }
 }
