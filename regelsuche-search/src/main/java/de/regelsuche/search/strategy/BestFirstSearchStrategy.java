@@ -35,10 +35,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return searchWithDiagnostics(problem).states();
     }
 
-    /**
-     * Executes the same search as {@link #search(SearchProblem)} and additionally
-     * returns deterministic target/failure diagnostics when a target is attached.
-     */
+    /** Executes BestFirst and returns deterministic target/failure diagnostics. */
     public GoalSearchResult searchWithDiagnostics(SearchProblem problem) {
         Objects.requireNonNull(problem, "problem");
         try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer())) {
@@ -47,7 +44,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             SearchFrame frame = createFrame(problem, identity, target);
             frame.frontier().add(rootState);
             frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visited().size());
-
             while (shouldContinue(problem, frame)) {
                 processNextState(problem, frame);
             }
@@ -72,8 +68,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             SearchTelemetry.forProblem(problem),
             identity,
             target,
-            new GoalProgress()
-        );
+            new GoalProgress());
     }
 
     private SearchState createRootState(SearchProblem problem, ValueIdentitySession identity) {
@@ -94,13 +89,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             false,
             0,
             true,
-            0
-        );
+            0);
     }
 
     private Comparator<SearchState> priorityComparator(SearchProblem problem, TargetSession target) {
         return Comparator
-            .comparingInt((SearchState state) -> target.adjustedPriority(priority(state, problem), state.expression()))
+            .comparingInt((SearchState state) ->
+                target.adjustedPriority(priority(state, problem), state.expression()))
             .thenComparingInt(SearchState::depth)
             .thenComparing(SearchState::canonicalHash)
             .thenComparing(SearchState::expression)
@@ -140,7 +135,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             return true;
         }
         frame.progress().duplicatePrunes++;
-        frame.telemetry().statePrunedDuplicate(current, frame.frontier().size(), frame.visited().size(), 0);
+        frame.telemetry().statePrunedDuplicate(
+            current, frame.frontier().size(), frame.visited().size(), 0);
         return false;
     }
 
@@ -151,13 +147,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         if (TranspositionGate.evaluate(
                 problem.memory(),
                 current,
-                current.canonicalHash() + "#" + current.depth(),
-                List.of(frame.identity().legacyHash(current.expression())))
+                current.canonicalHash() + "#" + current.depth())
                 != TranspositionGate.Verdict.PRUNE) {
             return false;
         }
         frame.progress().transpositionPrunes++;
-        frame.telemetry().statePrunedTransposition(current, frame.frontier().size(), frame.visited().size());
+        frame.telemetry().statePrunedTransposition(
+            current, frame.frontier().size(), frame.visited().size());
         return true;
     }
 
@@ -208,8 +204,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
 
     /**
      * Orders all applicable transformations before the ordinary candidate-budget loop.
-     * Subclasses may reorder candidates, but must return the complete list so this
-     * strategy remains the sole owner of skip, duplicate and enqueue accounting.
+     * Subclasses may reorder candidates, but must return the complete list.
      */
     protected List<Transformation> orderTransformations(
         SearchProblem problem,
@@ -338,12 +333,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             equivalenceFlagsWith(
                 current.equivalencePreservingFlags(),
                 transformation.equivalencePreservingByConstruction()),
-            assumptionsWith(current.assumptions(), transformation.assumptions())
-        );
+            assumptionsWith(current.assumptions(), transformation.assumptions()));
     }
 
     private int expandedSteps(SearchState current, Transformation transformation) {
-        return current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);
+        return current.expandedStepCount()
+            + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);
     }
 
     private List<String> pathWith(List<String> path, String nextExpression) {
@@ -364,7 +359,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return nextApplications;
     }
 
-    private List<RewriteKind> rewriteKindsWith(List<RewriteKind> rewriteKinds, RewriteKind rewriteKind) {
+    private List<RewriteKind> rewriteKindsWith(
+        List<RewriteKind> rewriteKinds,
+        RewriteKind rewriteKind
+    ) {
         List<RewriteKind> nextKinds = new ArrayList<>(rewriteKinds);
         nextKinds.add(rewriteKind);
         return nextKinds;
@@ -376,7 +374,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         return nextFlags;
     }
 
-    private List<String> assumptionsWith(List<String> assumptions, List<String> additionalAssumptions) {
+    private List<String> assumptionsWith(
+        List<String> assumptions,
+        List<String> additionalAssumptions
+    ) {
         List<String> nextAssumptions = new ArrayList<>(assumptions);
         nextAssumptions.addAll(additionalAssumptions);
         return nextAssumptions;
@@ -386,13 +387,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         int depthPenalty = state.depth() * 2;
         int expansionPenalty = state.expandedStepCount() * 5;
         int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
-        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;
+        return state.score().weightedTotal()
+            + depthPenalty
+            + expansionPenalty
+            + noImprovementPenalty;
     }
 
-    /**
-     * Transformation-objective-aware priority. Target distance is applied by
-     * the queue wrapper so subclasses such as A* inherit the same target signal.
-     */
+    /** Transformation-objective-aware priority inherited by subclasses such as A*. */
     protected int priority(SearchState state, SearchProblem problem) {
         if (problem.costModel() == null) {
             return priority(state);
@@ -400,7 +401,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         int depthPenalty = state.depth() * 2;
         int expansionPenalty = state.expandedStepCount() * 5;
         int noImprovementPenalty = state.improvement() <= 0 && state.depth() > 0 ? 4 : 0;
-        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());
+        int modelCost = problem.costModel().cost(
+            state.expression(), problem.canonicalizer(), state.score());
         if (modelCost == Integer.MAX_VALUE) {
             return Integer.MAX_VALUE / 2;
         }
@@ -408,7 +410,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     }
 
     private String stateKey(SearchState state) {
-        return state.canonicalHash() + ":" + String.join(",", sortedValues(state.appliedRuleApplications()));
+        return state.canonicalHash() + ":"
+            + String.join(",", sortedValues(state.appliedRuleApplications()));
     }
 
     private List<String> sortedValues(Set<String> values) {
@@ -529,7 +532,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 status = GoalStatus.CANDIDATE_BUDGET;
             } else if (progress.depthPrunes > 0) {
                 status = GoalStatus.DEPTH_BUDGET;
-            } else if (progress.expandedStates > 0 && progress.generatedTransformations == 0) {
+            } else if (progress.expandedStates > 0
+                    && progress.generatedTransformations == 0) {
                 status = GoalStatus.NO_TRANSFORMATIONS;
             } else {
                 status = GoalStatus.FRONTIER_EXHAUSTED;
@@ -556,9 +560,7 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                     frame.identity().cacheHits(),
                     frame.identity().cacheMisses(),
                     frame.identity().cachedExpressionCount(),
-                    frame.identity().internedValueCount()
-                )
-            );
+                    frame.identity().internedValueCount()));
         }
     }
 
@@ -616,7 +618,8 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 return 0;
             }
             String normalized = normalize(expression);
-            return distanceCache.computeIfAbsent(normalized, ignored -> computeDistance(normalized));
+            return distanceCache.computeIfAbsent(
+                normalized, ignored -> computeDistance(normalized));
         }
 
         private int computeDistance(String expression) {
@@ -680,7 +683,11 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             return Map.copyOf(counts);
         }
 
-        private static void collect(ExprValue value, int multiplicity, Map<ValueKey, Integer> counts) {
+        private static void collect(
+            ExprValue value,
+            int multiplicity,
+            Map<ValueKey, Integer> counts
+        ) {
             counts.merge(value.key(), multiplicity, Math::addExact);
             if (value instanceof OrderedValue ordered) {
                 ordered.operands().forEach(operand -> collect(operand, multiplicity, counts));
@@ -704,7 +711,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
     /** One bounded owner for all mathematical values encountered by one search. */
     static final class ValueIdentitySession implements AutoCloseable {
         static final String HASH_PREFIX = "value-v1:";
-        static final String LEGACY_FALLBACK_PREFIX = "legacy-v1:";
 
         private final ExpressionCanonicalizer canonicalizer;
         private final ExpressionParser parser = new ExpressionParser();
@@ -712,7 +718,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         private final Map<String, String> valueHashesByExpression = new LinkedHashMap<>();
         private final Map<String, ExprValue> valuesByExpression = new LinkedHashMap<>();
         private final Set<String> unparseableExpressions = new HashSet<>();
-        private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>();
         private int cacheHits;
         private int cacheMisses;
 
@@ -728,9 +733,10 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 return existing;
             }
             cacheMisses++;
-            String hash = value(normalized)
-                .map(value -> HASH_PREFIX + sha256(value.key().encoded()))
-                .orElseGet(() -> LEGACY_FALLBACK_PREFIX + legacyHash(normalized));
+            ExprValue parsedValue = value(normalized).orElseThrow(() ->
+                new IllegalArgumentException(
+                    "Search state expression is not parseable: " + normalized));
+            String hash = HASH_PREFIX + sha256(parsedValue.key().encoded());
             valueHashesByExpression.put(normalized, hash);
             return hash;
         }
@@ -756,11 +762,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             }
         }
 
-        String legacyHash(String expression) {
-            String normalized = normalize(expression);
-            return legacyHashesByExpression.computeIfAbsent(normalized, canonicalizer::stableHash);
-        }
-
         int cacheHits() {
             return cacheHits;
         }
@@ -782,14 +783,14 @@ public class BestFirstSearchStrategy implements SearchStrategy {
             valueHashesByExpression.clear();
             valuesByExpression.clear();
             unparseableExpressions.clear();
-            legacyHashesByExpression.clear();
             factory.close();
         }
 
         private static String sha256(String value) {
             try {
                 MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+                return HexFormat.of().formatHex(
+                    digest.digest(value.getBytes(StandardCharsets.UTF_8)));
             } catch (NoSuchAlgorithmException exception) {
                 throw new IllegalStateException("SHA-256 unavailable", exception);
             }
