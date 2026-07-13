@@ -24,7 +24,8 @@ class PolicyCandidateBudgetSemanticsTest {
             case "start" -> List.of(step("prepare", "middle", "repeat-key"));
             case "middle" -> List.of(
                 step("blocked", "blocked-state", "repeat-key"),
-                step("goal", "goal", "goal-key"));
+                step("goal", "goal", "goal-key"),
+                step("late", "late-state", "late-key"));
             default -> List.of();
         };
         SearchPolicy policy = new SearchPolicy() {
@@ -35,7 +36,11 @@ class PolicyCandidateBudgetSemanticsTest {
 
             @Override
             public PolicyDecision score(PolicyContext context, Transformation transformation) {
-                int priority = transformation.rule().equals("blocked") ? 0 : 1;
+                int priority = switch (transformation.rule()) {
+                    case "blocked" -> 0;
+                    case "goal" -> 1;
+                    default -> 2;
+                };
                 return new PolicyDecision(
                     id(), priority, 1000, false, Map.of("test", priority), "test ordering");
             }
@@ -54,20 +59,28 @@ class PolicyCandidateBudgetSemanticsTest {
         assertTrue(result.reached(), result.search().toString());
         assertEquals(List.of("prepare", "goal"),
             result.search().reachedState().appliedRuleIds());
-        var blocked = result.policyEvents().stream()
-            .filter(event -> event.parentExpression().equals("middle"))
-            .filter(event -> event.ruleId().equals("blocked"))
-            .findFirst().orElseThrow();
-        var goal = result.policyEvents().stream()
-            .filter(event -> event.parentExpression().equals("middle"))
-            .filter(event -> event.ruleId().equals("goal"))
-            .findFirst().orElseThrow();
+        var blocked = event(result, "blocked");
+        var goal = event(result, "goal");
+        var late = event(result, "late");
         assertTrue(blocked.consideredBySearch());
         assertFalse(blocked.enqueued());
         assertEquals("repeated-rule-application", blocked.pruningReason());
         assertTrue(goal.consideredBySearch());
         assertTrue(goal.enqueued());
         assertTrue(goal.pruningReason().isBlank());
+        assertFalse(late.consideredBySearch());
+        assertFalse(late.enqueued());
+        assertEquals("candidate-budget-not-considered", late.pruningReason());
+    }
+
+    private static PolicyAwareBestFirstSearchStrategy.RankingEvent event(
+        PolicyAwareBestFirstSearchStrategy.PolicySearchResult result,
+        String rule
+    ) {
+        return result.policyEvents().stream()
+            .filter(event -> event.parentExpression().equals("middle"))
+            .filter(event -> event.ruleId().equals(rule))
+            .findFirst().orElseThrow();
     }
 
     private static Transformation step(String rule, String output, String applicationKey) {
