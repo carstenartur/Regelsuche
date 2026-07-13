@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExpressionFeatures.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.learning</a> &gt; <span class="el_source">ExpressionFeatures.java</span></div><h1>ExpressionFeatures.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.learning;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+/** Small deterministic feature vector derived from one expression AST. */
+<span class="fc" id="L14">public record ExpressionFeatures(</span>
+    int nodeCount,
+    int maxDepth,
+    int variableOccurrences,
+    int distinctVariables,
+    int numericLiterals,
+    int additions,
+    int subtractions,
+    int multiplications,
+    int divisions,
+    int powers,
+    int functions,
+    boolean parseable
+) {
+    public static ExpressionFeatures of(String expression) {
+        try {
+<span class="fc" id="L30">            Expr parsed = new ExpressionParser().parseTerm(expression);</span>
+<span class="fc" id="L31">            MutableFeatures features = new MutableFeatures();</span>
+<span class="fc" id="L32">            collect(parsed, 1, features);</span>
+<span class="fc" id="L33">            return features.freeze(true);</span>
+<span class="nc" id="L34">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L35">            return new MutableFeatures().freeze(false);</span>
+        }
+    }
+
+    private static void collect(Expr expression, int depth, MutableFeatures features) {
+<span class="fc" id="L40">        features.nodeCount++;</span>
+<span class="fc" id="L41">        features.maxDepth = Math.max(features.maxDepth, depth);</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L43">            features.variableOccurrences++;</span>
+<span class="fc" id="L44">            features.variables.add(variable.name());</span>
+<span class="fc" id="L45">            return;</span>
+        }
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
+<span class="fc" id="L48">            features.numericLiterals++;</span>
+<span class="fc" id="L49">            return;</span>
+        }
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L52">            features.functions++;</span>
+<span class="nc" id="L53">            function.arguments().forEach(argument -&gt; collect(argument, depth + 1, features));</span>
+<span class="nc" id="L54">            return;</span>
+        }
+<span class="fc" id="L56">        BinaryExpr binary = (BinaryExpr) expression;</span>
+<span class="pc bpc" id="L57" title="3 of 6 branches missed.">        switch (binary.operator()) {</span>
+<span class="fc" id="L58">            case ADD -&gt; features.additions++;</span>
+<span class="nc" id="L59">            case SUB -&gt; features.subtractions++;</span>
+<span class="fc" id="L60">            case MUL -&gt; features.multiplications++;</span>
+<span class="nc" id="L61">            case DIV -&gt; features.divisions++;</span>
+<span class="fc" id="L62">            case POW -&gt; features.powers++;</span>
+        }
+<span class="fc" id="L64">        collect(binary.left(), depth + 1, features);</span>
+<span class="fc" id="L65">        collect(binary.right(), depth + 1, features);</span>
+<span class="fc" id="L66">    }</span>
+
+<span class="fc" id="L68">    private static final class MutableFeatures {</span>
+        private int nodeCount;
+        private int maxDepth;
+        private int variableOccurrences;
+        private int numericLiterals;
+        private int additions;
+        private int subtractions;
+        private int multiplications;
+        private int divisions;
+        private int powers;
+        private int functions;
+<span class="fc" id="L79">        private final Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
+
+        private ExpressionFeatures freeze(boolean parseable) {
+<span class="fc" id="L82">            return new ExpressionFeatures(</span>
+                nodeCount,
+                maxDepth,
+                variableOccurrences,
+<span class="fc" id="L86">                variables.size(),</span>
+                numericLiterals,
+                additions,
+                subtractions,
+                multiplications,
+                divisions,
+                powers,
+                functions,
+                parseable);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

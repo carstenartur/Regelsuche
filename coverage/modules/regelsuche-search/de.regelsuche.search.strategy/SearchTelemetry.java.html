@@ -110,15 +110,16 @@ final class SearchTelemetry {
 <span class="fc" id="L110">            state.depth(),</span>
 <span class="fc" id="L111">            state.score().weightedTotal(),</span>
 <span class="fc" id="L112">            parentCanonicalHash(state),</span>
-<span class="fc" id="L113">            state.appliedRuleId(),</span>
-<span class="fc" id="L114">            state.appliedRuleKind(),</span>
-<span class="fc" id="L115">            state.assumptions(),</span>
+<span class="fc" id="L113">            state.parentExpression(),</span>
+<span class="fc" id="L114">            state.appliedRuleId(),</span>
+<span class="fc" id="L115">            state.appliedRuleKind(),</span>
+<span class="fc" id="L116">            state.assumptions(),</span>
             frontierSize,
             visitedCount,
             generatedCount,
             pruningReason
         ));
-<span class="fc" id="L121">    }</span>
+<span class="fc" id="L122">    }</span>
 
     private void emitTransformation(
         SearchState state,
@@ -128,34 +129,35 @@ final class SearchTelemetry {
         int generatedCount,
         String pruningReason
     ) {
-<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (isNoOp()) {</span>
-<span class="fc" id="L132">            return;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (isNoOp()) {</span>
+<span class="fc" id="L133">            return;</span>
         }
-<span class="fc" id="L134">        String expression = transformation.transformedExpression();</span>
-<span class="fc" id="L135">        observer.onEvent(new SearchEvent(</span>
+<span class="fc" id="L135">        String expression = transformation.transformedExpression();</span>
+<span class="fc" id="L136">        observer.onEvent(new SearchEvent(</span>
             sequence++,
             SearchEventType.TRANSFORMATION_GENERATED,
             expression,
-<span class="fc" id="L139">            canonicalizer.stableHash(expression),</span>
-<span class="fc" id="L140">            state.depth() + 1,</span>
-<span class="fc" id="L141">            scorer.score(expression).weightedTotal(),</span>
-<span class="fc" id="L142">            state.canonicalHash(),</span>
-<span class="fc" id="L143">            transformation.rule(),</span>
-<span class="fc" id="L144">            transformation.kind(),</span>
-<span class="fc" id="L145">            transformation.assumptions(),</span>
+<span class="fc" id="L140">            canonicalizer.stableHash(expression),</span>
+<span class="fc" id="L141">            state.depth() + 1,</span>
+<span class="fc" id="L142">            scorer.score(expression).weightedTotal(),</span>
+<span class="fc" id="L143">            state.canonicalHash(),</span>
+<span class="fc" id="L144">            state.expression(),</span>
+<span class="fc" id="L145">            transformation.rule(),</span>
+<span class="fc" id="L146">            transformation.kind(),</span>
+<span class="fc" id="L147">            transformation.assumptions(),</span>
             frontierSize,
             visitedCount,
             generatedCount,
             pruningReason
         ));
-<span class="fc" id="L151">    }</span>
+<span class="fc" id="L153">    }</span>
 
     private boolean isNoOp() {
-<span class="fc bfc" id="L154" title="All 2 branches covered.">        return observer == NoOpSearchObserver.INSTANCE;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        return observer == NoOpSearchObserver.INSTANCE;</span>
     }
 
     private String parentCanonicalHash(SearchState state) {
-<span class="fc bfc" id="L158" title="All 2 branches covered.">        return state.parentExpression() == null ? &quot;&quot; : canonicalizer.stableHash(state.parentExpression());</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        return state.parentExpression() == null ? &quot;&quot; : canonicalizer.stableHash(state.parentExpression());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

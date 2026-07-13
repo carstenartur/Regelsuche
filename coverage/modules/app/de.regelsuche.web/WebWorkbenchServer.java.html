@@ -1398,8 +1398,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L1399">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1400" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
-<span class="fc" id="L1402">            return;</span>
+<span class="nc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
+<span class="nc" id="L1402">            return;</span>
         }
 <span class="fc" id="L1404">        String selectedPathKey = queryParam(exchange, &quot;selectedPathKey&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1405">        de.regelsuche.ide.RuleInspectionDto dto =</span>
@@ -1649,8 +1649,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1649">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1650">            .findFirst();</span>
 <span class="fc bfc" id="L1651" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="nc" id="L1652">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="nc" id="L1653">            return;</span>
+<span class="fc" id="L1652">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="fc" id="L1653">            return;</span>
         }
 <span class="fc" id="L1655">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1656">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
@@ -2453,8 +2453,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2454">            return;</span>
         }
-<span class="nc" id="L2456">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="nc" id="L2457">    }</span>
+<span class="fc" id="L2456">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L2457">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2460">        var jobs = proofWorkbenchService.listJobs();</span>
@@ -2481,8 +2481,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2482">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2483" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="nc" id="L2484">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="nc" id="L2485">            return;</span>
+<span class="fc" id="L2484">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="fc" id="L2485">            return;</span>
         }
 <span class="fc" id="L2487">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2488">        Object raw = body.get(&quot;assumptions&quot;);</span>

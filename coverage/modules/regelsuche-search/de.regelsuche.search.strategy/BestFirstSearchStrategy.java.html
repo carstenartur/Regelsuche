@@ -111,7 +111,7 @@ import java.util.Set;
     private boolean shouldContinue(SearchProblem problem, SearchFrame frame) {
 <span class="fc bfc" id="L112" title="All 2 branches covered.">        return !frame.frontier().isEmpty()</span>
 <span class="fc bfc" id="L113" title="All 2 branches covered.">            &amp;&amp; frame.explored().size() &lt; problem.heuristic().maxVisitedExpressions()</span>
-<span class="pc bpc" id="L114" title="1 of 4 branches missed.">            &amp;&amp; !(frame.target().stopWhenReached() &amp;&amp; frame.progress().reachedState != null);</span>
+<span class="fc bfc" id="L114" title="All 4 branches covered.">            &amp;&amp; !(frame.target().stopWhenReached() &amp;&amp; frame.progress().reachedState != null);</span>
     }
 
     private void processNextState(SearchProblem problem, SearchFrame frame) {
@@ -124,7 +124,7 @@ import java.util.Set;
 <span class="fc" id="L124">        frame.progress().record(current, frame.target().distance(current.expression()));</span>
 <span class="fc bfc" id="L125" title="All 2 branches covered.">        if (frame.target().reached(current.expression())) {</span>
 <span class="fc" id="L126">            frame.progress().reachedState = current;</span>
-<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (frame.target().stopWhenReached()) {</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (frame.target().stopWhenReached()) {</span>
 <span class="fc" id="L128">                return;</span>
             }
         }
@@ -426,7 +426,7 @@ import java.util.Set;
         private int statesWithoutTransformations;
 
         private void record(SearchState state, int distance) {
-<span class="pc bpc" id="L429" title="1 of 4 branches missed.">            if (distance &lt; bestDistance</span>
+<span class="fc bfc" id="L429" title="All 4 branches covered.">            if (distance &lt; bestDistance</span>
 <span class="pc bpc" id="L430" title="1 of 2 branches missed.">                    || distance == bestDistance &amp;&amp; betterTieBreak(state, bestState)) {</span>
 <span class="fc" id="L431">                bestDistance = distance;</span>
 <span class="fc" id="L432">                bestState = state;</span>
@@ -436,8 +436,8 @@ import java.util.Set;
         private static boolean betterTieBreak(SearchState candidate, SearchState current) {
 <span class="pc bpc" id="L437" title="1 of 2 branches missed.">            return current == null</span>
 <span class="pc bpc" id="L438" title="1 of 2 branches missed.">                || candidate.depth() &lt; current.depth()</span>
-<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                || candidate.depth() == current.depth()</span>
-<span class="pc bnc" id="L440" title="All 2 branches missed.">                    &amp;&amp; candidate.expression().compareTo(current.expression()) &lt; 0;</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                || candidate.depth() == current.depth()</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                    &amp;&amp; candidate.expression().compareTo(current.expression()) &lt; 0;</span>
         }
     }
 
@@ -486,7 +486,7 @@ import java.util.Set;
 <span class="fc" id="L486">        }</span>
 
         public boolean reached() {
-<span class="pc bpc" id="L489" title="2 of 4 branches missed.">            return status == GoalStatus.REACHED || status == GoalStatus.ROOT_ALREADY_TARGET;</span>
+<span class="fc bfc" id="L489" title="All 4 branches covered.">            return status == GoalStatus.REACHED || status == GoalStatus.ROOT_ALREADY_TARGET;</span>
         }
 
         private static GoalSearchResult from(
@@ -510,10 +510,10 @@ import java.util.Set;
 <span class="nc" id="L510">                status = GoalStatus.CANDIDATE_BUDGET;</span>
 <span class="pc bpc" id="L511" title="1 of 2 branches missed.">            } else if (progress.depthPrunes &gt; 0) {</span>
 <span class="nc" id="L512">                status = GoalStatus.DEPTH_BUDGET;</span>
-<span class="pc bpc" id="L513" title="2 of 4 branches missed.">            } else if (progress.expandedStates &gt; 0 &amp;&amp; progress.generatedTransformations == 0) {</span>
+<span class="pc bpc" id="L513" title="1 of 4 branches missed.">            } else if (progress.expandedStates &gt; 0 &amp;&amp; progress.generatedTransformations == 0) {</span>
 <span class="fc" id="L514">                status = GoalStatus.NO_TRANSFORMATIONS;</span>
             } else {
-<span class="nc" id="L516">                status = GoalStatus.FRONTIER_EXHAUSTED;</span>
+<span class="fc" id="L516">                status = GoalStatus.FRONTIER_EXHAUSTED;</span>
             }
 <span class="pc bpc" id="L518" title="1 of 2 branches missed.">            SearchState best = progress.bestState == null ? rootState : progress.bestState;</span>
 <span class="fc bfc" id="L519" title="All 2 branches covered.">            int distance = frame.target().enabled() ? progress.bestDistance : -1;</span>
@@ -577,7 +577,7 @@ import java.util.Set;
         }
 
         private boolean stopWhenReached() {
-<span class="pc bpc" id="L580" title="1 of 4 branches missed.">            return enabled() &amp;&amp; target.stopWhenReached();</span>
+<span class="fc bfc" id="L580" title="All 4 branches covered.">            return enabled() &amp;&amp; target.stopWhenReached();</span>
         }
 
         private boolean reached(String expression) {
@@ -614,14 +614,14 @@ import java.util.Set;
         }
 
         private int adjustedPriority(int basePriority, String expression) {
-<span class="pc bpc" id="L617" title="3 of 4 branches missed.">            if (!enabled() || target.distanceWeight() == 0) {</span>
+<span class="pc bpc" id="L617" title="1 of 4 branches missed.">            if (!enabled() || target.distanceWeight() == 0) {</span>
 <span class="fc" id="L618">                return basePriority;</span>
             }
-<span class="nc" id="L620">            long adjusted = (long) basePriority</span>
-<span class="nc" id="L621">                + (long) target.distanceWeight() * distance(expression);</span>
-<span class="nc bnc" id="L622" title="All 2 branches missed.">            return adjusted &gt;= Integer.MAX_VALUE / 2</span>
+<span class="fc" id="L620">            long adjusted = (long) basePriority</span>
+<span class="fc" id="L621">                + (long) target.distanceWeight() * distance(expression);</span>
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">            return adjusted &gt;= Integer.MAX_VALUE / 2</span>
 <span class="nc" id="L623">                ? Integer.MAX_VALUE / 2</span>
-<span class="nc" id="L624">                : (int) adjusted;</span>
+<span class="fc" id="L624">                : (int) adjusted;</span>
         }
 
         private static int semanticDistance(
@@ -641,8 +641,8 @@ import java.util.Set;
 <span class="fc" id="L641">                    candidateOccurrences.getOrDefault(key, 0)</span>
 <span class="fc" id="L642">                        - targetOccurrences.getOrDefault(key, 0));</span>
 <span class="fc" id="L643">            }</span>
-<span class="pc bpc" id="L644" title="1 of 2 branches missed.">            if (!rootSignature(candidate).equals(rootSignature(target))) {</span>
-<span class="nc" id="L645">                difference += 2;</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">            if (!rootSignature(candidate).equals(rootSignature(target))) {</span>
+<span class="fc" id="L645">                difference += 2;</span>
             }
 <span class="pc bpc" id="L647" title="1 of 2 branches missed.">            return difference &gt;= UNPARSEABLE_DISTANCE</span>
 <span class="nc" id="L648">                ? UNPARSEABLE_DISTANCE - 1</span>
@@ -657,8 +657,8 @@ import java.util.Set;
 
         private static void collect(ExprValue value, int multiplicity, Map&lt;ValueKey, Integer&gt; counts) {
 <span class="fc" id="L659">            counts.merge(value.key(), multiplicity, Math::addExact);</span>
-<span class="pc bpc" id="L660" title="1 of 2 branches missed.">            if (value instanceof OrderedValue ordered) {</span>
-<span class="nc" id="L661">                ordered.operands().forEach(operand -&gt; collect(operand, multiplicity, counts));</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">            if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L661">                ordered.operands().forEach(operand -&gt; collect(operand, multiplicity, counts));</span>
 <span class="fc bfc" id="L662" title="All 2 branches covered.">            } else if (value instanceof AssociativeCommutativeValue ac) {</span>
 <span class="fc" id="L663">                ac.multiplicities().forEach((operand, count) -&gt;</span>
 <span class="fc" id="L664">                    collect(operand, Math.multiplyExact(multiplicity, count), counts));</span>
@@ -666,11 +666,11 @@ import java.util.Set;
 <span class="fc" id="L666">        }</span>
 
         private static String rootSignature(ExprValue value) {
-<span class="pc bpc" id="L669" title="1 of 2 branches missed.">            if (value instanceof OrderedValue ordered) {</span>
-<span class="nc" id="L670">                return &quot;ordered:&quot; + ordered.operator().id();</span>
+<span class="fc bfc" id="L669" title="All 2 branches covered.">            if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L670">                return &quot;ordered:&quot; + ordered.operator().id();</span>
             }
-<span class="pc bpc" id="L672" title="1 of 2 branches missed.">            if (value instanceof AssociativeCommutativeValue ac) {</span>
-<span class="nc" id="L673">                return &quot;ac:&quot; + ac.operator().id();</span>
+<span class="fc bfc" id="L672" title="All 2 branches covered.">            if (value instanceof AssociativeCommutativeValue ac) {</span>
+<span class="fc" id="L673">                return &quot;ac:&quot; + ac.operator().id();</span>
             }
 <span class="fc" id="L675">            return value.getClass().getSimpleName();</span>
         }

@@ -36,7 +36,7 @@ import de.regelsuche.algebra.QuadraticAnalyzer;
 <span class="nc" id="L36">            return 10;</span>
         }
 <span class="fc" id="L38">        if (QuadraticAnalyzer.analyzePolynomial(compact)</span>
-<span class="pc bpc" id="L39" title="4 of 6 branches missed.">            .filter(coefficients -&gt; coefficients.isMonic() &amp;&amp; coefficients.linear() == 0 &amp;&amp; coefficients.constant() &lt; 0)</span>
+<span class="pc bpc" id="L39" title="2 of 6 branches missed.">            .filter(coefficients -&gt; coefficients.isMonic() &amp;&amp; coefficients.linear() == 0 &amp;&amp; coefficients.constant() &lt; 0)</span>
 <span class="pc bpc" id="L40" title="1 of 2 branches missed.">            .isPresent()) {</span>
 <span class="nc" id="L41">            return 5;</span>
         }

@@ -12,6 +12,7 @@ public record SearchEvent(
     int depth,
     int score,
     String parentCanonicalHash,
+    String parentExpression,
     String ruleId,
     RewriteKind rewriteKind,
     List&lt;String&gt; assumptions,
@@ -20,16 +21,17 @@ public record SearchEvent(
     int generatedCount,
     String pruningReason
 ) {
-<span class="fc" id="L23">    public SearchEvent {</span>
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (type == null) {</span>
-<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;type must not be null&quot;);</span>
+<span class="fc" id="L24">    public SearchEvent {</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L26">            throw new IllegalArgumentException(&quot;type must not be null&quot;);</span>
         }
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        expression = expression == null ? &quot;&quot; : expression;</span>
-<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        canonicalHash = canonicalHash == null ? &quot;&quot; : canonicalHash;</span>
-<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        parentCanonicalHash = parentCanonicalHash == null ? &quot;&quot; : parentCanonicalHash;</span>
-<span class="fc bfc" id="L30" title="All 2 branches covered.">        ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
-<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        pruningReason = pruningReason == null ? &quot;&quot; : pruningReason;</span>
-<span class="fc" id="L33">    }</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        expression = expression == null ? &quot;&quot; : expression;</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        canonicalHash = canonicalHash == null ? &quot;&quot; : canonicalHash;</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        parentCanonicalHash = parentCanonicalHash == null ? &quot;&quot; : parentCanonicalHash;</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        parentExpression = parentExpression == null ? &quot;&quot; : parentExpression;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        ruleId = ruleId == null ? &quot;&quot; : ruleId;</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        pruningReason = pruningReason == null ? &quot;&quot; : pruningReason;</span>
+<span class="fc" id="L35">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

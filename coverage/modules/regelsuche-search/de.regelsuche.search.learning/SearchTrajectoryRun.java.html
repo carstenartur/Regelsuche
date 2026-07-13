@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchTrajectoryRun.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.learning</a> &gt; <span class="el_source">SearchTrajectoryRun.java</span></div><h1>SearchTrajectoryRun.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.learning;
+
+import de.regelsuche.search.learning.SearchTrajectoryContext.DatasetSplit;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import java.util.List;
+import java.util.Objects;
+
+/** One complete search run after eventual outcome and selected path are known. */
+public record SearchTrajectoryRun(
+    SearchTrajectoryContext context,
+    ExpressionFingerprint root,
+    ExpressionFingerprint target,
+    String taskValueFingerprint,
+    String taskAlphaFingerprint,
+    GoalStatus terminalStatus,
+    boolean success,
+    List&lt;SearchTrajectoryRecord&gt; records
+) {
+<span class="fc" id="L19">    public SearchTrajectoryRun {</span>
+<span class="fc" id="L20">        Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="fc" id="L21">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="fc" id="L22">        Objects.requireNonNull(terminalStatus, &quot;terminalStatus&quot;);</span>
+<span class="fc" id="L23">        Objects.requireNonNull(records, &quot;records&quot;);</span>
+<span class="fc" id="L24">        taskValueFingerprint = safe(taskValueFingerprint);</span>
+<span class="fc" id="L25">        taskAlphaFingerprint = safe(taskAlphaFingerprint);</span>
+<span class="fc" id="L26">        records = List.copyOf(records);</span>
+<span class="fc" id="L27">    }</span>
+
+    public SearchTrajectoryRun withSplit(DatasetSplit split) {
+<span class="fc" id="L30">        SearchTrajectoryContext updated = context.withSplit(split);</span>
+<span class="fc" id="L31">        List&lt;SearchTrajectoryRecord&gt; updatedRecords = records.stream()</span>
+<span class="fc" id="L32">            .map(record -&gt; new SearchTrajectoryRecord(</span>
+<span class="fc" id="L33">                record.schema(),</span>
+<span class="fc" id="L34">                record.producerVersion(),</span>
+<span class="fc" id="L35">                record.runId(),</span>
+<span class="fc" id="L36">                record.family(),</span>
+                split,
+<span class="fc" id="L38">                record.ruleInventoryHash(),</span>
+<span class="fc" id="L39">                record.sequence(),</span>
+<span class="fc" id="L40">                record.eventType(),</span>
+<span class="fc" id="L41">                record.expression(),</span>
+<span class="fc" id="L42">                record.parent(),</span>
+<span class="fc" id="L43">                record.target(),</span>
+<span class="fc" id="L44">                record.features(),</span>
+<span class="fc" id="L45">                record.depth(),</span>
+<span class="fc" id="L46">                record.score(),</span>
+<span class="fc" id="L47">                record.parentScore(),</span>
+<span class="fc" id="L48">                record.frontierSize(),</span>
+<span class="fc" id="L49">                record.visitedCount(),</span>
+<span class="fc" id="L50">                record.generatedCount(),</span>
+<span class="fc" id="L51">                record.ruleId(),</span>
+<span class="fc" id="L52">                record.rewriteKind(),</span>
+<span class="fc" id="L53">                record.applicableRuleIds(),</span>
+<span class="fc" id="L54">                record.assumptions(),</span>
+<span class="fc" id="L55">                record.pruningReason(),</span>
+<span class="fc" id="L56">                record.eventualSuccess(),</span>
+<span class="fc" id="L57">                record.selectedPath(),</span>
+<span class="fc" id="L58">                record.terminalStatus()))</span>
+<span class="fc" id="L59">            .toList();</span>
+<span class="fc" id="L60">        return new SearchTrajectoryRun(</span>
+            updated, root, target, taskValueFingerprint, taskAlphaFingerprint,
+            terminalStatus, success, updatedRecords);
+    }
+
+    public int decisionCount() {
+<span class="fc" id="L66">        return (int) records.stream().filter(SearchTrajectoryRecord::decision).count();</span>
+    }
+
+    public int selectedDecisionCount() {
+<span class="fc" id="L70">        return (int) records.stream()</span>
+<span class="fc" id="L71">            .filter(SearchTrajectoryRecord::decision)</span>
+<span class="fc" id="L72">            .filter(SearchTrajectoryRecord::selectedPath)</span>
+<span class="fc" id="L73">            .count();</span>
+    }
+
+    private static String safe(String value) {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InMemorySearchExperienceRepository.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.learning</a> &gt; <span class="el_source">InMemorySearchExperienceRepository.java</span></div><h1>InMemorySearchExperienceRepository.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.learning;
+
+import de.regelsuche.search.learning.SearchExperienceRepository.ExperienceSummary;
+import de.regelsuche.search.learning.SearchExperienceRepository.SearchExperience;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Deterministic in-memory repository for successful choices and failed alternatives. */
+<span class="fc" id="L15">public final class InMemorySearchExperienceRepository implements SearchExperienceRepository {</span>
+<span class="fc" id="L16">    private static final Comparator&lt;SearchExperience&gt; RELEVANCE = Comparator</span>
+<span class="fc bfc" id="L17" title="All 2 branches covered.">        .comparingInt((SearchExperience experience) -&gt; experience.successfulChoice() ? 0 : 1)</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        .thenComparingInt(experience -&gt; experience.selectedPath() ? 0 : 1)</span>
+<span class="fc" id="L19">        .thenComparingInt(SearchExperience::scoreDelta)</span>
+<span class="fc" id="L20">        .thenComparingInt(SearchExperience::depth)</span>
+<span class="fc" id="L21">        .thenComparing(SearchExperience::ruleId)</span>
+<span class="fc" id="L22">        .thenComparing(SearchExperience::experienceId);</span>
+
+<span class="fc" id="L24">    private final Map&lt;String, SearchExperience&gt; byId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L25">    private final Map&lt;ShapeKey, List&lt;String&gt;&gt; idsByShape = new LinkedHashMap&lt;&gt;();</span>
+
+    @Override
+    public synchronized void store(SearchExperience experience) {
+<span class="fc" id="L29">        Objects.requireNonNull(experience, &quot;experience&quot;);</span>
+<span class="fc" id="L30">        SearchExperience previous = byId.put(experience.experienceId(), experience);</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (previous != null) {</span>
+<span class="nc" id="L32">            removeFromIndex(previous);</span>
+        }
+<span class="fc" id="L34">        ShapeKey key = new ShapeKey(experience.family(), experience.parentAlphaShapeHash());</span>
+<span class="fc" id="L35">        idsByShape.computeIfAbsent(key, ignored -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L36">            .add(experience.experienceId());</span>
+<span class="fc" id="L37">    }</span>
+
+    @Override
+    public synchronized List&lt;SearchExperience&gt; findByShape(
+        String family,
+        String parentAlphaShapeHash,
+        int limit
+    ) {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (limit &lt; 0) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;limit must not be negative&quot;);</span>
+        }
+<span class="fc" id="L48">        ShapeKey key = new ShapeKey(safe(family), safe(parentAlphaShapeHash));</span>
+<span class="fc" id="L49">        return idsByShape.getOrDefault(key, List.of()).stream()</span>
+<span class="fc" id="L50">            .map(byId::get)</span>
+<span class="fc" id="L51">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L52">            .sorted(RELEVANCE)</span>
+<span class="fc" id="L53">            .limit(limit)</span>
+<span class="fc" id="L54">            .toList();</span>
+    }
+
+    @Override
+    public synchronized ExperienceSummary summary() {
+<span class="fc" id="L59">        int successful = (int) byId.values().stream()</span>
+<span class="fc" id="L60">            .filter(SearchExperience::successfulChoice)</span>
+<span class="fc" id="L61">            .count();</span>
+<span class="fc" id="L62">        Set&lt;String&gt; families = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L63">        Set&lt;ShapeKey&gt; shapes = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L64">        byId.values().forEach(experience -&gt; {</span>
+<span class="fc" id="L65">            families.add(experience.family());</span>
+<span class="fc" id="L66">            shapes.add(new ShapeKey(</span>
+<span class="fc" id="L67">                experience.family(), experience.parentAlphaShapeHash()));</span>
+<span class="fc" id="L68">        });</span>
+<span class="fc" id="L69">        return new ExperienceSummary(</span>
+<span class="fc" id="L70">            byId.size(),</span>
+            successful,
+<span class="fc" id="L72">            byId.size() - successful,</span>
+<span class="fc" id="L73">            families.size(),</span>
+<span class="fc" id="L74">            shapes.size());</span>
+    }
+
+    public synchronized int size() {
+<span class="nc" id="L78">        return byId.size();</span>
+    }
+
+    public synchronized void clear() {
+<span class="nc" id="L82">        byId.clear();</span>
+<span class="nc" id="L83">        idsByShape.clear();</span>
+<span class="nc" id="L84">    }</span>
+
+    private void removeFromIndex(SearchExperience previous) {
+<span class="nc" id="L87">        ShapeKey previousKey = new ShapeKey(</span>
+<span class="nc" id="L88">            previous.family(), previous.parentAlphaShapeHash());</span>
+<span class="nc" id="L89">        List&lt;String&gt; ids = idsByShape.get(previousKey);</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (ids == null) {</span>
+<span class="nc" id="L91">            return;</span>
+        }
+<span class="nc" id="L93">        ids.remove(previous.experienceId());</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (ids.isEmpty()) {</span>
+<span class="nc" id="L95">            idsByShape.remove(previousKey);</span>
+        }
+<span class="nc" id="L97">    }</span>
+
+    private static String safe(String value) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
+    }
+
+<span class="fc" id="L103">    private record ShapeKey(String family, String alphaShapeHash) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchTrajectoryContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.learning</a> &gt; <span class="el_source">SearchTrajectoryContext.java</span></div><h1>SearchTrajectoryContext.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.learning;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/** Stable metadata supplied by a trajectory producer for one search run. */
+public record SearchTrajectoryContext(
+    String runId,
+    String family,
+    String producerVersion,
+    List&lt;String&gt; ruleInventoryIds,
+    DatasetSplit split
+) {
+<span class="fc" id="L18">    public SearchTrajectoryContext {</span>
+<span class="fc" id="L19">        requireText(runId, &quot;runId&quot;);</span>
+<span class="fc" id="L20">        requireText(family, &quot;family&quot;);</span>
+<span class="fc" id="L21">        requireText(producerVersion, &quot;producerVersion&quot;);</span>
+<span class="pc bpc" id="L22" title="1 of 2 branches missed.">        ruleInventoryIds = ruleInventoryIds == null</span>
+<span class="nc" id="L23">            ? List.of()</span>
+<span class="fc" id="L24">            : ruleInventoryIds.stream().filter(Objects::nonNull).distinct().sorted().toList();</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        split = split == null ? DatasetSplit.UNASSIGNED : split;</span>
+<span class="fc" id="L26">    }</span>
+
+    public SearchTrajectoryContext withSplit(DatasetSplit newSplit) {
+<span class="fc" id="L29">        return new SearchTrajectoryContext(</span>
+            runId, family, producerVersion, ruleInventoryIds,
+<span class="fc" id="L31">            Objects.requireNonNull(newSplit, &quot;newSplit&quot;));</span>
+    }
+
+    public String ruleInventoryHash() {
+<span class="fc" id="L35">        return &quot;rules-v1:&quot; + sha256(String.join(&quot;\n&quot;, ruleInventoryIds));</span>
+    }
+
+<span class="fc" id="L38">    public enum DatasetSplit {</span>
+<span class="fc" id="L39">        UNASSIGNED,</span>
+<span class="fc" id="L40">        TRAIN,</span>
+<span class="fc" id="L41">        VALIDATION,</span>
+<span class="fc" id="L42">        TEST</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L49">    }</span>
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L53">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L54">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L55">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L56">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L57">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TrajectorySplitPlanner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.learning</a> &gt; <span class="el_source">TrajectorySplitPlanner.java</span></div><h1>TrajectorySplitPlanner.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.learning;
+
+import de.regelsuche.search.learning.SearchTrajectoryContext.DatasetSplit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Assigns whole mathematical families and rejects exact/alpha leakage across splits. */
+<span class="fc" id="L14">public final class TrajectorySplitPlanner {</span>
+    public SplitPlan assignByFamily(List&lt;SearchTrajectoryRun&gt; runs) {
+<span class="fc" id="L16">        Objects.requireNonNull(runs, &quot;runs&quot;);</span>
+<span class="fc" id="L17">        List&lt;String&gt; families = runs.stream()</span>
+<span class="fc" id="L18">            .map(run -&gt; run.context().family())</span>
+<span class="fc" id="L19">            .distinct()</span>
+<span class="fc" id="L20">            .sorted()</span>
+<span class="fc" id="L21">            .toList();</span>
+<span class="fc" id="L22">        Map&lt;String, DatasetSplit&gt; assignments = assignments(families);</span>
+<span class="fc" id="L23">        List&lt;SearchTrajectoryRun&gt; assigned = runs.stream()</span>
+<span class="fc" id="L24">            .map(run -&gt; run.withSplit(assignments.get(run.context().family())))</span>
+<span class="fc" id="L25">            .sorted(Comparator.comparing(run -&gt; run.context().runId()))</span>
+<span class="fc" id="L26">            .toList();</span>
+<span class="fc" id="L27">        return new SplitPlan(assigned, leakageViolations(assigned));</span>
+    }
+
+    public List&lt;LeakageViolation&gt; leakageViolations(List&lt;SearchTrajectoryRun&gt; runs) {
+<span class="fc" id="L31">        List&lt;LeakageViolation&gt; violations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L32">        collectViolations(runs, true, violations);</span>
+<span class="fc" id="L33">        collectViolations(runs, false, violations);</span>
+<span class="fc" id="L34">        return List.copyOf(violations);</span>
+    }
+
+    private static Map&lt;String, DatasetSplit&gt; assignments(List&lt;String&gt; families) {
+<span class="fc" id="L38">        Map&lt;String, DatasetSplit&gt; assignments = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (families.isEmpty()) {</span>
+<span class="nc" id="L40">            return Map.of();</span>
+        }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (families.size() == 1) {</span>
+<span class="nc" id="L43">            assignments.put(families.getFirst(), DatasetSplit.TRAIN);</span>
+<span class="nc" id="L44">            return Map.copyOf(assignments);</span>
+        }
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (families.size() == 2) {</span>
+<span class="fc" id="L47">            assignments.put(families.getFirst(), DatasetSplit.TRAIN);</span>
+<span class="fc" id="L48">            assignments.put(families.getLast(), DatasetSplit.TEST);</span>
+<span class="fc" id="L49">            return Map.copyOf(assignments);</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (int index = 0; index &lt; families.size(); index++) {</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">            DatasetSplit split = index == families.size() - 1</span>
+<span class="fc" id="L53">                ? DatasetSplit.TEST</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                : index == families.size() - 2</span>
+<span class="fc" id="L55">                    ? DatasetSplit.VALIDATION</span>
+<span class="fc" id="L56">                    : DatasetSplit.TRAIN;</span>
+<span class="fc" id="L57">            assignments.put(families.get(index), split);</span>
+        }
+<span class="fc" id="L59">        return Map.copyOf(assignments);</span>
+    }
+
+    private static void collectViolations(
+        List&lt;SearchTrajectoryRun&gt; runs,
+        boolean exact,
+        List&lt;LeakageViolation&gt; violations
+    ) {
+<span class="fc" id="L67">        Map&lt;String, Map&lt;DatasetSplit, Set&lt;String&gt;&gt;&gt; owners = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (SearchTrajectoryRun run : runs) {</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            String fingerprint = exact</span>
+<span class="fc" id="L70">                ? run.taskValueFingerprint()</span>
+<span class="fc" id="L71">                : run.taskAlphaFingerprint();</span>
+<span class="fc" id="L72">            owners.computeIfAbsent(fingerprint, ignored -&gt; new LinkedHashMap&lt;&gt;())</span>
+<span class="fc" id="L73">                .computeIfAbsent(run.context().split(), ignored -&gt; new LinkedHashSet&lt;&gt;())</span>
+<span class="fc" id="L74">                .add(run.context().runId());</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        owners.forEach((fingerprint, splitOwners) -&gt; {</span>
+<span class="fc" id="L77">            Set&lt;DatasetSplit&gt; materialSplits = new LinkedHashSet&lt;&gt;(splitOwners.keySet());</span>
+<span class="fc" id="L78">            materialSplits.remove(DatasetSplit.UNASSIGNED);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (materialSplits.size() &gt; 1) {</span>
+<span class="fc" id="L80">                List&lt;String&gt; runIds = splitOwners.values().stream()</span>
+<span class="fc" id="L81">                    .flatMap(Set::stream)</span>
+<span class="fc" id="L82">                    .sorted()</span>
+<span class="fc" id="L83">                    .toList();</span>
+<span class="fc" id="L84">                violations.add(new LeakageViolation(</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                    exact ? &quot;EXACT_TASK&quot; : &quot;ALPHA_TASK&quot;,</span>
+                    fingerprint,
+<span class="fc" id="L87">                    materialSplits.stream().sorted().toList(),</span>
+                    runIds));
+            }
+<span class="fc" id="L90">        });</span>
+<span class="fc" id="L91">    }</span>
+
+    public record LeakageViolation(
+        String kind,
+        String fingerprint,
+        List&lt;DatasetSplit&gt; splits,
+        List&lt;String&gt; runIds
+    ) {
+<span class="fc" id="L99">        public LeakageViolation {</span>
+<span class="fc" id="L100">            splits = List.copyOf(splits);</span>
+<span class="fc" id="L101">            runIds = List.copyOf(runIds);</span>
+<span class="fc" id="L102">        }</span>
+    }
+
+    public record SplitPlan(
+        List&lt;SearchTrajectoryRun&gt; runs,
+        List&lt;LeakageViolation&gt; leakageViolations
+    ) {
+<span class="fc" id="L109">        public SplitPlan {</span>
+<span class="fc" id="L110">            runs = List.copyOf(runs);</span>
+<span class="fc" id="L111">            leakageViolations = List.copyOf(leakageViolations);</span>
+<span class="fc" id="L112">        }</span>
+
+        public boolean passed() {
+<span class="fc" id="L115">            return leakageViolations.isEmpty();</span>
+        }
+
+        public Map&lt;DatasetSplit, Long&gt; runCounts() {
+<span class="nc" id="L119">            Map&lt;DatasetSplit, Long&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            for (DatasetSplit split : DatasetSplit.values()) {</span>
+<span class="nc" id="L121">                counts.put(split, runs.stream()</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                    .filter(run -&gt; run.context().split() == split)</span>
+<span class="nc" id="L123">                    .count());</span>
+            }
+<span class="nc" id="L125">            return Map.copyOf(counts);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

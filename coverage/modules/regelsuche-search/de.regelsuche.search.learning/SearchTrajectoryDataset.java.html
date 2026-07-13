@@ -1,0 +1,344 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchTrajectoryDataset.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.learning</a> &gt; <span class="el_source">SearchTrajectoryDataset.java</span></div><h1>SearchTrajectoryDataset.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.learning;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.search.learning.SearchTrajectoryContext.DatasetSplit;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Deterministic, leakage-audited collection of post-labelled search trajectories. */
+public final class SearchTrajectoryDataset {
+    public static final String SCHEMA = &quot;regelsuche.search-trajectory-dataset/v1&quot;;
+
+<span class="fc" id="L23">    private static final Comparator&lt;SearchTrajectoryRun&gt; RUN_ORDER = Comparator</span>
+<span class="fc" id="L24">        .comparing((SearchTrajectoryRun run) -&gt; run.context().split().ordinal())</span>
+<span class="pc" id="L25">        .thenComparing(run -&gt; run.context().family())</span>
+<span class="pc" id="L26">        .thenComparing(run -&gt; run.context().runId());</span>
+
+    private final List&lt;SearchTrajectoryRun&gt; runs;
+    private final List&lt;TrajectorySplitPlanner.LeakageViolation&gt; leakageViolations;
+
+    public SearchTrajectoryDataset(List&lt;SearchTrajectoryRun&gt; runs) {
+<span class="fc" id="L32">        this(runs, new TrajectorySplitPlanner().leakageViolations(runs));</span>
+<span class="fc" id="L33">    }</span>
+
+    public SearchTrajectoryDataset(
+        List&lt;SearchTrajectoryRun&gt; runs,
+        List&lt;TrajectorySplitPlanner.LeakageViolation&gt; leakageViolations
+<span class="fc" id="L38">    ) {</span>
+<span class="fc" id="L39">        Objects.requireNonNull(runs, &quot;runs&quot;);</span>
+<span class="fc" id="L40">        Objects.requireNonNull(leakageViolations, &quot;leakageViolations&quot;);</span>
+<span class="fc" id="L41">        this.runs = runs.stream().sorted(RUN_ORDER).toList();</span>
+<span class="fc" id="L42">        this.leakageViolations = leakageViolations.stream()</span>
+<span class="fc" id="L43">            .sorted(Comparator</span>
+<span class="fc" id="L44">                .comparing(TrajectorySplitPlanner.LeakageViolation::kind)</span>
+<span class="fc" id="L45">                .thenComparing(TrajectorySplitPlanner.LeakageViolation::fingerprint))</span>
+<span class="fc" id="L46">            .toList();</span>
+<span class="fc" id="L47">    }</span>
+
+    public static SearchTrajectoryDataset fromPlan(TrajectorySplitPlanner.SplitPlan plan) {
+<span class="fc" id="L50">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L51">        return new SearchTrajectoryDataset(plan.runs(), plan.leakageViolations());</span>
+    }
+
+    public List&lt;SearchTrajectoryRun&gt; runs() {
+<span class="nc" id="L55">        return runs;</span>
+    }
+
+    public List&lt;TrajectorySplitPlanner.LeakageViolation&gt; leakageViolations() {
+<span class="nc" id="L59">        return leakageViolations;</span>
+    }
+
+    public boolean leakageFree() {
+<span class="fc" id="L63">        return leakageViolations.isEmpty();</span>
+    }
+
+    /** One compact JSON object per deterministic SearchEvent, ordered by split/run/sequence. */
+    public String toJsonLines() {
+<span class="fc" id="L68">        requireLeakageFree();</span>
+<span class="fc" id="L69">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (SearchTrajectoryRun run : runs) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            for (SearchTrajectoryRecord record : run.records().stream()</span>
+<span class="fc" id="L72">                    .sorted(Comparator.comparingLong(SearchTrajectoryRecord::sequence))</span>
+<span class="fc" id="L73">                    .toList()) {</span>
+<span class="fc" id="L74">                result.append(toJson(record)).append('\n');</span>
+<span class="fc" id="L75">            }</span>
+<span class="fc" id="L76">        }</span>
+<span class="fc" id="L77">        return result.toString();</span>
+    }
+
+    /** Compact run-level TSV for quick comparison and shell tooling. */
+    public String toTabularSummary() {
+<span class="fc" id="L82">        StringBuilder tsv = new StringBuilder(</span>
+            &quot;split\trunId\tfamily\tsuccess\tstatus\trecords\tdecisions\tselectedDecisions&quot;
+                + &quot;\ttaskValueClass\ttaskAlphaClass\n&quot;);
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (SearchTrajectoryRun run : runs) {</span>
+<span class="fc" id="L86">            tsv.append(run.context().split()).append('\t')</span>
+<span class="fc" id="L87">                .append(cell(run.context().runId())).append('\t')</span>
+<span class="fc" id="L88">                .append(cell(run.context().family())).append('\t')</span>
+<span class="fc" id="L89">                .append(run.success()).append('\t')</span>
+<span class="fc" id="L90">                .append(run.terminalStatus()).append('\t')</span>
+<span class="fc" id="L91">                .append(run.records().size()).append('\t')</span>
+<span class="fc" id="L92">                .append(run.decisionCount()).append('\t')</span>
+<span class="fc" id="L93">                .append(run.selectedDecisionCount()).append('\t')</span>
+<span class="fc" id="L94">                .append(cell(run.taskValueFingerprint())).append('\t')</span>
+<span class="fc" id="L95">                .append(cell(run.taskAlphaFingerprint())).append('\n');</span>
+<span class="fc" id="L96">        }</span>
+<span class="fc" id="L97">        return tsv.toString();</span>
+    }
+
+    public DatasetSummary summary() {
+<span class="fc" id="L101">        int records = 0;</span>
+<span class="fc" id="L102">        int decisions = 0;</span>
+<span class="fc" id="L103">        int selectedDecisions = 0;</span>
+<span class="fc" id="L104">        int missingTargets = 0;</span>
+<span class="fc" id="L105">        int missingDecisionParents = 0;</span>
+<span class="fc" id="L106">        int missingDecisionRules = 0;</span>
+<span class="fc" id="L107">        int unparseableExpressions = 0;</span>
+<span class="fc" id="L108">        Set&lt;String&gt; families = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L109">        Set&lt;String&gt; taskValueClasses = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L110">        Set&lt;String&gt; taskAlphaClasses = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L111">        Map&lt;DatasetSplit, MutableSplitBalance&gt; splitBalances = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (DatasetSplit split : DatasetSplit.values()) {</span>
+<span class="fc" id="L113">            splitBalances.put(split, new MutableSplitBalance());</span>
+        }
+
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (SearchTrajectoryRun run : runs) {</span>
+<span class="fc" id="L117">            families.add(run.context().family());</span>
+<span class="fc" id="L118">            taskValueClasses.add(run.taskValueFingerprint());</span>
+<span class="fc" id="L119">            taskAlphaClasses.add(run.taskAlphaFingerprint());</span>
+<span class="fc" id="L120">            MutableSplitBalance split = splitBalances.get(run.context().split());</span>
+<span class="fc" id="L121">            split.runs++;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (run.success()) {</span>
+<span class="fc" id="L123">                split.successfulRuns++;</span>
+            }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            for (SearchTrajectoryRecord record : run.records()) {</span>
+<span class="fc" id="L126">                records++;</span>
+<span class="fc" id="L127">                split.records++;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                if (record.decision()) {</span>
+<span class="fc" id="L129">                    decisions++;</span>
+<span class="fc" id="L130">                    split.decisions++;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                    if (record.selectedPath()) {</span>
+<span class="fc" id="L132">                        selectedDecisions++;</span>
+<span class="fc" id="L133">                        split.selectedDecisions++;</span>
+                    }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                    if (record.parent() == null) {</span>
+<span class="nc" id="L136">                        missingDecisionParents++;</span>
+                    }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                    if (record.ruleId().isBlank()) {</span>
+<span class="nc" id="L139">                        missingDecisionRules++;</span>
+                    }
+                }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                if (record.target() == null) {</span>
+<span class="nc" id="L143">                    missingTargets++;</span>
+                }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                if (!record.expression().parseable()) {</span>
+<span class="nc" id="L146">                    unparseableExpressions++;</span>
+                }
+<span class="fc" id="L148">            }</span>
+<span class="fc" id="L149">        }</span>
+
+<span class="fc" id="L151">        Map&lt;DatasetSplit, SplitBalance&gt; immutableBalances = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L152">        splitBalances.forEach((split, value) -&gt; immutableBalances.put(split, value.freeze()));</span>
+<span class="fc" id="L153">        int successfulRuns = (int) runs.stream().filter(SearchTrajectoryRun::success).count();</span>
+<span class="fc" id="L154">        return new DatasetSummary(</span>
+<span class="fc" id="L155">            runs.size(),</span>
+            records,
+            decisions,
+            selectedDecisions,
+            successfulRuns,
+<span class="fc" id="L160">            runs.size() - successfulRuns,</span>
+<span class="fc" id="L161">            families.size(),</span>
+<span class="fc" id="L162">            taskValueClasses.size(),</span>
+<span class="fc" id="L163">            taskAlphaClasses.size(),</span>
+            missingTargets,
+            missingDecisionParents,
+            missingDecisionRules,
+            unparseableExpressions,
+<span class="fc" id="L168">            leakageViolations.size(),</span>
+<span class="fc" id="L169">            Collections.unmodifiableMap(immutableBalances));</span>
+    }
+
+    public Path writeJsonLines(Path output) {
+<span class="nc" id="L173">        return write(output, toJsonLines());</span>
+    }
+
+    public Path writeTabularSummary(Path output) {
+<span class="nc" id="L177">        return write(output, toTabularSummary());</span>
+    }
+
+    public String summaryJson() {
+<span class="fc" id="L181">        DatasetSummary summary = summary();</span>
+<span class="fc" id="L182">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L183">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L184">            .property(&quot;runs&quot;, summary.runs())</span>
+<span class="fc" id="L185">            .property(&quot;records&quot;, summary.records())</span>
+<span class="fc" id="L186">            .property(&quot;decisions&quot;, summary.decisions())</span>
+<span class="fc" id="L187">            .property(&quot;selectedDecisions&quot;, summary.selectedDecisions())</span>
+<span class="fc" id="L188">            .property(&quot;successfulRuns&quot;, summary.successfulRuns())</span>
+<span class="fc" id="L189">            .property(&quot;failedRuns&quot;, summary.failedRuns())</span>
+<span class="fc" id="L190">            .property(&quot;families&quot;, summary.families())</span>
+<span class="fc" id="L191">            .property(&quot;taskValueClasses&quot;, summary.taskValueClasses())</span>
+<span class="fc" id="L192">            .property(&quot;taskAlphaClasses&quot;, summary.taskAlphaClasses())</span>
+<span class="fc" id="L193">            .property(&quot;missingTargets&quot;, summary.missingTargets())</span>
+<span class="fc" id="L194">            .property(&quot;missingDecisionParents&quot;, summary.missingDecisionParents())</span>
+<span class="fc" id="L195">            .property(&quot;missingDecisionRules&quot;, summary.missingDecisionRules())</span>
+<span class="fc" id="L196">            .property(&quot;unparseableExpressions&quot;, summary.unparseableExpressions())</span>
+<span class="fc" id="L197">            .property(&quot;leakageViolations&quot;, summary.leakageViolations())</span>
+<span class="fc" id="L198">            .array(&quot;splits&quot;, array -&gt; summary.splitBalances().entrySet().stream()</span>
+<span class="fc" id="L199">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L200">                .forEach(entry -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L201">                    .property(&quot;split&quot;, entry.getKey().name())</span>
+<span class="fc" id="L202">                    .property(&quot;runs&quot;, entry.getValue().runs())</span>
+<span class="fc" id="L203">                    .property(&quot;records&quot;, entry.getValue().records())</span>
+<span class="fc" id="L204">                    .property(&quot;decisions&quot;, entry.getValue().decisions())</span>
+<span class="fc" id="L205">                    .property(&quot;selectedDecisions&quot;, entry.getValue().selectedDecisions())</span>
+<span class="fc" id="L206">                    .property(&quot;successfulRuns&quot;, entry.getValue().successfulRuns()))))</span>
+<span class="fc" id="L207">            .array(&quot;leakage&quot;, array -&gt; leakageViolations.forEach(violation -&gt;</span>
+<span class="fc" id="L208">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L209">                    .property(&quot;kind&quot;, violation.kind())</span>
+<span class="fc" id="L210">                    .property(&quot;fingerprint&quot;, violation.fingerprint())</span>
+<span class="fc" id="L211">                    .stringArray(&quot;splits&quot;, violation.splits().stream().map(Enum::name).toList())</span>
+<span class="fc" id="L212">                    .stringArray(&quot;runIds&quot;, violation.runIds()))))</span>
+<span class="fc" id="L213">            .endObject();</span>
+<span class="fc" id="L214">        return json.toString();</span>
+    }
+
+    private void requireLeakageFree() {
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (!leakageFree()) {</span>
+<span class="fc" id="L219">            throw new IllegalStateException(</span>
+                &quot;search trajectory export blocked by split leakage: &quot; + leakageViolations);
+        }
+<span class="fc" id="L222">    }</span>
+
+    private static String toJson(SearchTrajectoryRecord record) {
+<span class="fc" id="L225">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L226">            .property(&quot;schema&quot;, record.schema())</span>
+<span class="fc" id="L227">            .property(&quot;producerVersion&quot;, record.producerVersion())</span>
+<span class="fc" id="L228">            .property(&quot;runId&quot;, record.runId())</span>
+<span class="fc" id="L229">            .property(&quot;family&quot;, record.family())</span>
+<span class="fc" id="L230">            .property(&quot;split&quot;, record.split().name())</span>
+<span class="fc" id="L231">            .property(&quot;ruleInventoryHash&quot;, record.ruleInventoryHash())</span>
+<span class="fc" id="L232">            .property(&quot;sequence&quot;, record.sequence())</span>
+<span class="fc" id="L233">            .property(&quot;eventType&quot;, record.eventType().name())</span>
+<span class="fc" id="L234">            .object(&quot;expression&quot;, value -&gt; writeFingerprint(value, record.expression()));</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (record.parent() == null) {</span>
+<span class="fc" id="L236">            json.nullProperty(&quot;parent&quot;);</span>
+        } else {
+<span class="fc" id="L238">            json.object(&quot;parent&quot;, value -&gt; writeFingerprint(value, record.parent()));</span>
+        }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (record.target() == null) {</span>
+<span class="nc" id="L241">            json.nullProperty(&quot;target&quot;);</span>
+        } else {
+<span class="fc" id="L243">            json.object(&quot;target&quot;, value -&gt; writeFingerprint(value, record.target()));</span>
+        }
+<span class="fc" id="L245">        ExpressionFeatures features = record.features();</span>
+<span class="fc" id="L246">        json.object(&quot;features&quot;, value -&gt; value</span>
+<span class="fc" id="L247">                .property(&quot;nodeCount&quot;, features.nodeCount())</span>
+<span class="fc" id="L248">                .property(&quot;maxDepth&quot;, features.maxDepth())</span>
+<span class="fc" id="L249">                .property(&quot;variableOccurrences&quot;, features.variableOccurrences())</span>
+<span class="fc" id="L250">                .property(&quot;distinctVariables&quot;, features.distinctVariables())</span>
+<span class="fc" id="L251">                .property(&quot;numericLiterals&quot;, features.numericLiterals())</span>
+<span class="fc" id="L252">                .property(&quot;additions&quot;, features.additions())</span>
+<span class="fc" id="L253">                .property(&quot;subtractions&quot;, features.subtractions())</span>
+<span class="fc" id="L254">                .property(&quot;multiplications&quot;, features.multiplications())</span>
+<span class="fc" id="L255">                .property(&quot;divisions&quot;, features.divisions())</span>
+<span class="fc" id="L256">                .property(&quot;powers&quot;, features.powers())</span>
+<span class="fc" id="L257">                .property(&quot;functions&quot;, features.functions())</span>
+<span class="fc" id="L258">                .property(&quot;parseable&quot;, features.parseable()))</span>
+<span class="fc" id="L259">            .property(&quot;depth&quot;, record.depth())</span>
+<span class="fc" id="L260">            .property(&quot;score&quot;, record.score())</span>
+<span class="fc" id="L261">            .property(&quot;parentScore&quot;, record.parentScore())</span>
+<span class="fc" id="L262">            .property(&quot;frontierSize&quot;, record.frontierSize())</span>
+<span class="fc" id="L263">            .property(&quot;visitedCount&quot;, record.visitedCount())</span>
+<span class="fc" id="L264">            .property(&quot;generatedCount&quot;, record.generatedCount())</span>
+<span class="fc" id="L265">            .property(&quot;ruleId&quot;, record.ruleId())</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">            .property(&quot;rewriteKind&quot;, record.rewriteKind() == null ? &quot;&quot; : record.rewriteKind().name())</span>
+<span class="fc" id="L267">            .stringArray(&quot;applicableRuleIds&quot;, record.applicableRuleIds())</span>
+<span class="fc" id="L268">            .stringArray(&quot;assumptions&quot;, record.assumptions())</span>
+<span class="fc" id="L269">            .property(&quot;pruningReason&quot;, record.pruningReason())</span>
+<span class="fc" id="L270">            .property(&quot;eventualSuccess&quot;, record.eventualSuccess())</span>
+<span class="fc" id="L271">            .property(&quot;selectedPath&quot;, record.selectedPath())</span>
+<span class="fc" id="L272">            .property(&quot;terminalStatus&quot;, record.terminalStatus().name())</span>
+<span class="fc" id="L273">            .endObject();</span>
+<span class="fc" id="L274">        return json.toString();</span>
+    }
+
+    private static void writeFingerprint(JsonWriter json, ExpressionFingerprint fingerprint) {
+<span class="fc" id="L278">        json.property(&quot;valueHash&quot;, fingerprint.valueHash())</span>
+<span class="fc" id="L279">            .property(&quot;alphaShapeHash&quot;, fingerprint.alphaShapeHash())</span>
+<span class="fc" id="L280">            .property(&quot;parseable&quot;, fingerprint.parseable());</span>
+<span class="fc" id="L281">    }</span>
+
+    private static Path write(Path output, String content) {
+<span class="nc" id="L284">        Objects.requireNonNull(output, &quot;output&quot;);</span>
+        try {
+<span class="nc" id="L286">            Path parent = output.toAbsolutePath().normalize().getParent();</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            if (parent != null) {</span>
+<span class="nc" id="L288">                Files.createDirectories(parent);</span>
+            }
+<span class="nc" id="L290">            Files.writeString(output, content, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L291">            return output;</span>
+<span class="nc" id="L292">        } catch (IOException exception) {</span>
+<span class="nc" id="L293">            throw new UncheckedIOException(exception);</span>
+        }
+    }
+
+    private static String cell(String value) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.replace('\t', ' ').replace('\n', ' ');</span>
+    }
+
+    public record DatasetSummary(
+        int runs,
+        int records,
+        int decisions,
+        int selectedDecisions,
+        int successfulRuns,
+        int failedRuns,
+        int families,
+        int taskValueClasses,
+        int taskAlphaClasses,
+        int missingTargets,
+        int missingDecisionParents,
+        int missingDecisionRules,
+        int unparseableExpressions,
+        int leakageViolations,
+        Map&lt;DatasetSplit, SplitBalance&gt; splitBalances
+    ) {
+<span class="fc" id="L318">        public DatasetSummary {</span>
+<span class="fc" id="L319">            splitBalances = Collections.unmodifiableMap(new LinkedHashMap&lt;&gt;(splitBalances));</span>
+<span class="fc" id="L320">        }</span>
+    }
+
+<span class="fc" id="L323">    public record SplitBalance(</span>
+        int runs,
+        int records,
+        int decisions,
+        int selectedDecisions,
+        int successfulRuns
+    ) {
+    }
+
+    private static final class MutableSplitBalance {
+        private int runs;
+        private int records;
+        private int decisions;
+        private int selectedDecisions;
+        private int successfulRuns;
+
+        private SplitBalance freeze() {
+<span class="fc" id="L340">            return new SplitBalance(runs, records, decisions, selectedDecisions, successfulRuns);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
