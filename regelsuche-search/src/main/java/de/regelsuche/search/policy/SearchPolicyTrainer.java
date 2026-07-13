@@ -3,12 +3,14 @@ package de.regelsuche.search.policy;
 import de.regelsuche.search.learning.SearchTrajectoryContext.DatasetSplit;
 import de.regelsuche.search.learning.SearchTrajectoryDataset;
 import de.regelsuche.search.learning.SearchTrajectoryRecord;
+import de.regelsuche.search.learning.SearchTrajectoryRun;
 import de.regelsuche.search.policy.SearchPolicyModel.Mode;
 import de.regelsuche.search.policy.SearchPolicyModel.RuleStatistics;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
@@ -29,20 +31,21 @@ public final class SearchPolicyTrainer {
             throw new IllegalArgumentException("minimumObservations must be positive");
         }
 
+        List<SearchTrajectoryRun> trainingRuns = dataset.runs().stream()
+            .filter(run -> run.context().split() == DatasetSplit.TRAIN)
+            .toList();
         Map<String, MutableRuleStatistics> mutable = new LinkedHashMap<>();
         TreeSet<String> inventoryHashes = new TreeSet<>();
-        dataset.runs().stream()
-            .filter(run -> run.context().split() == DatasetSplit.TRAIN)
-            .forEach(run -> run.records().stream()
-                .filter(SearchTrajectoryRecord::decision)
-                .filter(record -> !record.ruleId().isBlank())
-                .forEach(record -> {
-                    inventoryHashes.add(record.ruleInventoryHash());
-                    mutable.computeIfAbsent(
-                        record.ruleId(), ignored -> new MutableRuleStatistics())
-                        .record(record.selectedPath() && record.eventualSuccess(),
-                            record.score() - record.parentScore());
-                }));
+        trainingRuns.forEach(run -> run.records().stream()
+            .filter(SearchTrajectoryRecord::decision)
+            .filter(record -> !record.ruleId().isBlank())
+            .forEach(record -> {
+                inventoryHashes.add(record.ruleInventoryHash());
+                mutable.computeIfAbsent(
+                    record.ruleId(), ignored -> new MutableRuleStatistics())
+                    .record(record.selectedPath() && record.eventualSuccess(),
+                        record.score() - record.parentScore());
+            }));
         if (mutable.isEmpty()) {
             throw new IllegalArgumentException("training split contains no search decisions");
         }
@@ -51,7 +54,9 @@ public final class SearchPolicyTrainer {
         mutable.entrySet().stream()
             .sorted(Map.Entry.comparingByKey())
             .forEach(entry -> rules.put(entry.getKey(), entry.getValue().freeze()));
-        String datasetHash = "sha256:" + sha256(dataset.toJsonLines());
+
+        SearchTrajectoryDataset trainingDataset = new SearchTrajectoryDataset(trainingRuns);
+        String datasetHash = "sha256:" + sha256(trainingDataset.toJsonLines());
         String inventoryHash = "sha256:" + sha256(String.join("\n", inventoryHashes));
         String modelMaterial = datasetHash + "\n" + SearchPolicyModel.FEATURE_SCHEMA
             + "\n" + inventoryHash + "\n" + mode + "\n" + minimumObservations
