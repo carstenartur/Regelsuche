@@ -609,7 +609,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 return UNPARSEABLE_DISTANCE;
             }
             return identity.value(expression)
-                .map(value -> semanticDistance(value, targetValue, targetOccurrences))
+                .map(value -> {
+                    int semantic = semanticDistance(value, targetValue, targetOccurrences);
+                    if (target.relation() != TargetRelation.SYNTAX_EXACT) {
+                        return semantic;
+                    }
+                    return Math.min(UNPARSEABLE_DISTANCE - 1, semantic + 1);
+                })
                 .orElse(UNPARSEABLE_DISTANCE);
         }
 
