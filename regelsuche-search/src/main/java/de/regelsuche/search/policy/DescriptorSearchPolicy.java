@@ -24,12 +24,14 @@ import java.util.Objects;
 public final class DescriptorSearchPolicy implements SearchPolicy, AutoCloseable {
     private static final int TARGET_DISTANCE_WEIGHT = 20;
     private static final int FALLBACK_PENALTY = 1000;
+    private static final int PRIORITY_LIMIT = Integer.MAX_VALUE / 4;
 
     private final DescriptorPolicyModel model;
     private final TransformationDescriptor.Factory descriptorFactory;
     private final boolean targeted;
     private final SearchExperienceRepository experiences;
     private final List<String> experienceFamilies;
+    private final Map<ExperienceKey, List<SearchExperience>> experienceCache = new LinkedHashMap<>();
     private boolean closed;
 
     public DescriptorSearchPolicy(DescriptorPolicyModel model, SearchProblem problem) {
@@ -78,7 +80,12 @@ public final class DescriptorSearchPolicy implements SearchPolicy, AutoCloseable
             return fallback(context, "policy target context does not match the search problem");
         }
 
-        TransformationDescriptor descriptor = descriptor(context, transformation);
+        TransformationDescriptor descriptor;
+        try {
+            descriptor = descriptor(context, transformation);
+        } catch (IllegalArgumentException exception) {
+            return fallback(context, "descriptor derivation failed");
+        }
         if (!descriptor.available()) {
             return fallback(context, "descriptor is unavailable");
         }
@@ -225,14 +232,24 @@ public final class DescriptorSearchPolicy implements SearchPolicy, AutoCloseable
         if (experiences == null || experienceFamilies.isEmpty()) {
             return 0;
         }
-        ExpressionFingerprint parent = ExpressionFingerprint.of(
-            context.parentExpression(), context.canonicalizer());
-        ExpressionFingerprint child = ExpressionFingerprint.of(
-            transformation.transformedExpression(), context.canonicalizer());
+        ExpressionFingerprint parent;
+        ExpressionFingerprint child;
+        try {
+            parent = ExpressionFingerprint.of(
+                context.parentExpression(), context.canonicalizer());
+            child = ExpressionFingerprint.of(
+                transformation.transformedExpression(), context.canonicalizer());
+        } catch (IllegalArgumentException exception) {
+            return 0;
+        }
         int contribution = 0;
         for (String family : experienceFamilies) {
-            for (SearchExperience experience : experiences.findByShape(
-                    family, parent.alphaShapeHash(), 100)) {
+            ExperienceKey key = new ExperienceKey(family, parent.alphaShapeHash());
+            List<SearchExperience> matching = experienceCache.computeIfAbsent(
+                key,
+                ignored -> List.copyOf(experiences.findByShape(
+                    family, parent.alphaShapeHash(), 100)));
+            for (SearchExperience experience : matching) {
                 if (!experience.childAlphaShapeHash().equals(child.alphaShapeHash())) {
                     continue;
                 }
@@ -262,14 +279,18 @@ public final class DescriptorSearchPolicy implements SearchPolicy, AutoCloseable
     }
 
     private static int bounded(long value) {
-        return (int) Math.max(-1_000_000L, Math.min(1_000_000L, value));
+        return (int) Math.max(-PRIORITY_LIMIT, Math.min(PRIORITY_LIMIT, value));
     }
 
     @Override
     public void close() {
         if (!closed) {
+            experienceCache.clear();
             descriptorFactory.close();
             closed = true;
         }
+    }
+
+    private record ExperienceKey(String family, String parentAlphaShapeHash) {
     }
 }
