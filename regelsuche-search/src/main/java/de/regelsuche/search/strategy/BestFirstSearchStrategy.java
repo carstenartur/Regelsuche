@@ -198,6 +198,9 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         TargetSession target
     ) {
         List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
+        if (problem.engine().providesCandidateOrder()) {
+            return transformations;
+        }
         Comparator<Transformation> deterministic = Comparator
             .comparing(Transformation::rule)
             .thenComparing(Transformation::transformedExpression)
