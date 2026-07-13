@@ -117,7 +117,7 @@ class PolicyAwareBestFirstSearchStrategyTest {
     }
 
     @Test
-    void completeFallbackPreservesStaticSearchStatusAndExploredStates() {
+    void completeFallbackPreservesStaticSearchAndReportsActualAdmission() {
         TransformationEngine engine = expression -> expression.equals("x")
             ? List.of(
                 step("a-dead-end", "z", "dead"),
@@ -135,6 +135,15 @@ class PolicyAwareBestFirstSearchStrategyTest {
         assertEquals(staticResult.states(), fallbackResult.search().states());
         assertEquals(staticResult.reachedState(), fallbackResult.search().reachedState());
         assertTrue(fallbackResult.policyEvents().stream().allMatch(RankingEvent::fallback));
+
+        RankingEvent target = event(fallbackResult, "x", "z-target");
+        RankingEvent deadEnd = event(fallbackResult, "x", "a-dead-end");
+        assertTrue(target.consideredBySearch());
+        assertTrue(target.admittedToFrontier());
+        assertEquals("enqueued", target.admissionOutcome());
+        assertFalse(deadEnd.consideredBySearch());
+        assertFalse(deadEnd.admittedToFrontier());
+        assertEquals("candidate-budget-not-considered", deadEnd.admissionOutcome());
     }
 
     private PolicySearchResult run(SearchPolicy policy, SearchProblem problem) {
