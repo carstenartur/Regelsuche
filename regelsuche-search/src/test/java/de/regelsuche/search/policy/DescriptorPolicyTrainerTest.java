@@ -21,6 +21,7 @@ import de.regelsuche.search.policy.DescriptorPolicyModel.Mode;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.telemetry.SearchEventType;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
@@ -159,6 +160,35 @@ class DescriptorPolicyTrainerTest {
         assertEquals(1, context.failedAlternatives());
         assertEquals(-1000, context.coefficientPermille());
         assertEquals(-1000, contextRole.coefficientPermille());
+    }
+
+    @Test
+    void pairwiseGroupingIsPartOfPredictiveModelIdentity() {
+        SearchTrajectoryRun competition = contextCompetitionRun();
+        SearchTrajectoryRun withoutExpansionBoundary = new SearchTrajectoryRun(
+            competition.context(),
+            competition.root(),
+            competition.target(),
+            competition.taskValueFingerprint(),
+            competition.taskAlphaFingerprint(),
+            competition.terminalStatus(),
+            competition.success(),
+            competition.records().stream()
+                .filter(record -> record.eventType() != SearchEventType.STATE_EXPANDED)
+                .toList());
+        DescriptorPolicyTrainer trainer = new DescriptorPolicyTrainer();
+
+        DescriptorPolicyModel grouped = trainer.train(
+            new SearchTrajectoryDataset(List.of(competition)), Mode.LINEAR, 1);
+        DescriptorPolicyModel ungrouped = trainer.train(
+            new SearchTrajectoryDataset(List.of(withoutExpansionBoundary)), Mode.LINEAR, 1);
+
+        assertEquals(grouped.descriptors(), ungrouped.descriptors());
+        assertNotEquals(grouped.sourceDatasetHash(), ungrouped.sourceDatasetHash());
+        assertNotEquals(grouped.predictiveDatasetHash(), ungrouped.predictiveDatasetHash());
+        assertNotEquals(grouped.modelVersion(), ungrouped.modelVersion());
+        assertTrue(grouped.features().containsKey("local.contextRole.MUL_AC_CHILD"));
+        assertFalse(ungrouped.features().containsKey("local.contextRole.MUL_AC_CHILD"));
     }
 
     @Test
