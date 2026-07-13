@@ -29,12 +29,23 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
 
     @Override
     public List<SearchState> search(SearchProblem problem) {
-        return searchWithDiagnostics(problem).search().states();
+        return execute(problem, null).states();
     }
 
     public PolicySearchResult searchWithDiagnostics(SearchProblem problem) {
-        Objects.requireNonNull(problem, "problem");
         PolicyTrace trace = new PolicyTrace();
+        BestFirstSearchStrategy.GoalSearchResult result = execute(problem, trace);
+        return new PolicySearchResult(result, trace.events());
+    }
+
+    private BestFirstSearchStrategy.GoalSearchResult execute(
+        SearchProblem problem,
+        PolicyTrace trace
+    ) {
+        Objects.requireNonNull(problem, "problem");
+        SearchObserver observer = trace == null
+            ? problem.observer()
+            : CompositeSearchObserver.of(trace, problem.observer());
         SearchProblem rankedProblem = new SearchProblem(
             problem.rootExpression(),
             problem.engine(),
@@ -43,11 +54,10 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             problem.heuristic(),
             problem.memory(),
             problem.costModel(),
-            CompositeSearchObserver.of(trace, problem.observer()),
+            observer,
             problem.target());
-        BestFirstSearchStrategy.GoalSearchResult result =
-            new PolicyBestFirstSearchStrategy(policy, trace).searchWithDiagnostics(rankedProblem);
-        return new PolicySearchResult(result, trace.events());
+        return new PolicyBestFirstSearchStrategy(policy, trace)
+            .searchWithDiagnostics(rankedProblem);
     }
 
     public record PolicySearchResult(
@@ -146,7 +156,9 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                     .thenComparing(deterministic));
             }
 
-            trace.startGroup(current.expression(), ranked);
+            if (trace != null) {
+                trace.startGroup(current.expression(), ranked);
+            }
             return ranked.stream().map(RankedTransformation::transformation).toList();
         }
     }
