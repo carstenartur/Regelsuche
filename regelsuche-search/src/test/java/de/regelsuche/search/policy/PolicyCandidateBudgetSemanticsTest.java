@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.PolicyAwareBestFirstSearchStrategy;
 import de.regelsuche.search.strategy.PolicyAwareBestFirstSearchStrategy.CandidateOutcome;
 import de.regelsuche.search.strategy.PolicyAwareBestFirstSearchStrategy.RankingEvent;
@@ -55,6 +56,39 @@ class PolicyCandidateBudgetSemanticsTest {
         assertEquals(1, budgeted.deterministicRank());
         assertEquals(CandidateOutcome.NOT_CONSIDERED_BUDGET, budgeted.outcome());
         assertTrue(result.search().metrics().candidateBudgetPrunes() >= 1);
+    }
+
+    @Test
+    void completeFallbackKeepsStaticSearchAndReportsItsActualBudgetPrefix() {
+        TransformationEngine engine = expression -> expression.equals("x")
+            ? List.of(step("a-other", "other"), step(GOOD, "goal"))
+            : List.of();
+        SearchProblem problem = problem(engine, 1);
+        var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+        SearchPolicy fallback = new SearchPolicy() {
+            @Override
+            public String id() {
+                return "fallback-test/v1";
+            }
+
+            @Override
+            public PolicyDecision score(PolicyContext context, Transformation transformation) {
+                return new PolicyDecision(
+                    id(), context.targetDistance(), 0, true,
+                    Map.of("targetDistance", context.targetDistance()),
+                    "forced fallback for budget-trace verification");
+            }
+        };
+        var policyResult = new PolicyAwareBestFirstSearchStrategy(fallback)
+            .searchWithDiagnostics(problem);
+
+        assertEquals(staticResult.status(), policyResult.search().status());
+        assertEquals(staticResult.states(), policyResult.search().states());
+        assertEquals(CandidateOutcome.ENQUEUED, event(policyResult.policyEvents(), GOOD).outcome());
+        assertEquals(
+            CandidateOutcome.NOT_CONSIDERED_BUDGET,
+            event(policyResult.policyEvents(), "a-other").outcome());
     }
 
     private static SearchPolicy policy(String first, String second) {
