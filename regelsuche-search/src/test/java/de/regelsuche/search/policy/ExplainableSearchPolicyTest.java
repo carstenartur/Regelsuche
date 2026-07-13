@@ -31,9 +31,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class ExplainableSearchPolicyTest {
-    private static final String BAD_RULE = "a-reorder";
-    private static final String GOOD_RULE = "z-distribute";
-    private static final String EVALUATION_FAMILY = "distribution-eval";
+    private static final String BAD_RULE = "a-dead-end";
+    private static final String GOOD_RULE = "z-progress";
+    private static final String FINISH_RULE = "finish";
+    private static final String EVALUATION_FAMILY = "two-step-evaluation";
 
     private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
     private final ExpressionScorer scorer = new ExpressionScorer();
@@ -65,10 +66,10 @@ class ExplainableSearchPolicyTest {
     }
 
     @Test
-    void learnedPolicySolvesUnseenFamilyUnderSameBudgetWhereStaticTieBreakFails() {
+    void learnedPolicySolvesControlledHeldOutTaskUnderTheSameBudget() {
         SearchPolicyModel model = new SearchPolicyTrainer().train(
             trainingDataset(), Mode.LINEAR, 1);
-        SearchProblem problem = unseenDistributionProblem();
+        SearchProblem problem = controlledHeldOutProblem();
 
         var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
         var learnedResult = runPolicy(model, null, problem);
@@ -85,11 +86,11 @@ class ExplainableSearchPolicyTest {
     }
 
     @Test
-    void frequencyBaselineAlsoImprovesTheUnseenFamilyTie() {
+    void frequencyBaselineAlsoImprovesTheControlledHeldOutTask() {
         SearchPolicyModel model = new SearchPolicyTrainer().train(
             trainingDataset(), Mode.FREQUENCY, 1);
 
-        var result = runPolicy(model, null, unseenDistributionProblem());
+        var result = runPolicy(model, null, controlledHeldOutProblem());
 
         assertTrue(result.reached(), result.search().toString());
         assertFirstRule(result, GOOD_RULE);
@@ -111,9 +112,9 @@ class ExplainableSearchPolicyTest {
             Map.of(
                 BAD_RULE, new RuleStatistics(2, 1, 1, 500, 0),
                 GOOD_RULE, new RuleStatistics(2, 1, 1, 500, 0)));
-        InMemorySearchExperienceRepository experiences = distributionExperience();
+        InMemorySearchExperienceRepository experiences = heldOutExperience();
 
-        var result = runPolicy(equalModel, experiences, unseenDistributionProblem());
+        var result = runPolicy(equalModel, experiences, controlledHeldOutProblem());
 
         assertTrue(result.reached(), result.search().toString());
         assertFirstRule(result, GOOD_RULE);
@@ -135,7 +136,7 @@ class ExplainableSearchPolicyTest {
             Mode.LINEAR,
             1,
             underObserved.rules());
-        SearchProblem problem = unseenDistributionProblem();
+        SearchProblem problem = controlledHeldOutProblem();
         var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
 
         for (SearchPolicyModel model : List.of(underObserved, incompatible)) {
@@ -152,11 +153,11 @@ class ExplainableSearchPolicyTest {
     void policyNeverMakesAnInapplicableRuleAvailable() {
         SearchPolicyModel model = new SearchPolicyTrainer().train(
             trainingDataset(), Mode.LINEAR, 1);
-        TransformationEngine onlyBad = expression -> expression.equals("x * (y + z)")
-            ? List.of(step(BAD_RULE, "x * z + x * y"))
+        TransformationEngine onlyBad = expression -> expression.equals("(x + 0) * 1")
+            ? List.of(step(BAD_RULE, "x + 0"))
             : List.of();
         SearchProblem problem = problem(
-            "x * (y + z)", "x * y + x * z", onlyBad,
+            "(x + 0) * 1", "x", onlyBad,
             new SearchHeuristic(2, 10, 1, 2, 1, 10), null);
 
         var result = runPolicy(model, null, problem);
@@ -169,7 +170,7 @@ class ExplainableSearchPolicyTest {
         TransformationEngine engine = expression -> Map.of(
             "p + 0", List.of(
                 step(GOOD_RULE, "p"),
-                step(BAD_RULE, "p + 1")))
+                step(BAD_RULE, "p * 1")))
             .getOrDefault(expression, List.of());
         SearchTrajectoryCollector collector = new SearchTrajectoryCollector();
         SearchProblem problem = problem(
@@ -189,22 +190,23 @@ class ExplainableSearchPolicyTest {
         return new SearchTrajectoryDataset(List.of(run));
     }
 
-    private InMemorySearchExperienceRepository distributionExperience() {
+    private InMemorySearchExperienceRepository heldOutExperience() {
         InMemorySearchExperienceRepository repository = new InMemorySearchExperienceRepository();
         ExpressionFingerprint parent = ExpressionFingerprint.of(
-            "x * (y + z)", canonicalizer);
-        ExpressionFingerprint target = ExpressionFingerprint.of(
-            "x * y + x * z", canonicalizer);
+            "(x + 0) * 1", canonicalizer);
+        ExpressionFingerprint target = ExpressionFingerprint.of("x", canonicalizer);
+        ExpressionFingerprint goodChild = ExpressionFingerprint.of("x * 1", canonicalizer);
+        ExpressionFingerprint badChild = ExpressionFingerprint.of("x + 0", canonicalizer);
         repository.store(new SearchExperience(
             "good-experience", "good-run", EVALUATION_FAMILY,
             parent.valueHash(), parent.alphaShapeHash(),
-            target.valueHash(), target.alphaShapeHash(), target.alphaShapeHash(),
+            goodChild.valueHash(), goodChild.alphaShapeHash(), target.alphaShapeHash(),
             GOOD_RULE, RewriteKind.NORMALIZE, List.of(),
             1, 0, 0, 0, true, true, GoalStatus.REACHED, ""));
         repository.store(new SearchExperience(
             "bad-experience", "bad-run", EVALUATION_FAMILY,
             parent.valueHash(), parent.alphaShapeHash(),
-            parent.valueHash(), parent.alphaShapeHash(), target.alphaShapeHash(),
+            badChild.valueHash(), badChild.alphaShapeHash(), target.alphaShapeHash(),
             BAD_RULE, RewriteKind.NORMALIZE, List.of(),
             1, 0, 0, 0, false, false, GoalStatus.FRONTIER_EXHAUSTED, "not-selected"));
         return repository;
@@ -221,17 +223,18 @@ class ExplainableSearchPolicyTest {
         return new PolicyAwareBestFirstSearchStrategy(policy).searchWithDiagnostics(problem);
     }
 
-    private SearchProblem unseenDistributionProblem() {
+    private SearchProblem controlledHeldOutProblem() {
         TransformationEngine engine = expression -> Map.of(
-            "x * (y + z)", List.of(
-                step(BAD_RULE, "x * z + x * y"),
-                step(GOOD_RULE, "x * y + x * z")))
+            "(x + 0) * 1", List.of(
+                step(BAD_RULE, "x + 0"),
+                step(GOOD_RULE, "x * 1")),
+            "x * 1", List.of(step(FINISH_RULE, "x")))
             .getOrDefault(expression, List.of());
         return problem(
-            "x * (y + z)",
-            "x * y + x * z",
+            "(x + 0) * 1",
+            "x",
             engine,
-            new SearchHeuristic(2, 10, 1, 2, 1, 10),
+            new SearchHeuristic(3, 10, 1, 2, 1, 10),
             null);
     }
 
