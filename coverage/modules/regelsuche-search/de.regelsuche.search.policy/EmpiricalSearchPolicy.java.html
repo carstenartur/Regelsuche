@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmpiricalSearchPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.policy</a> &gt; <span class="el_source">EmpiricalSearchPolicy.java</span></div><h1>EmpiricalSearchPolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.policy;
+
+import de.regelsuche.search.learning.ExpressionFingerprint;
+import de.regelsuche.search.learning.SearchExperienceRepository;
+import de.regelsuche.search.learning.SearchExperienceRepository.SearchExperience;
+import de.regelsuche.search.policy.SearchPolicyModel.Mode;
+import de.regelsuche.search.policy.SearchPolicyModel.RuleStatistics;
+import de.regelsuche.transform.Transformation;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Transparent rule-ranking policy learned from trajectory frequencies and score
+ * deltas. It never changes rule applicability and falls back per decision when a
+ * model is incompatible or insufficiently observed.
+ */
+public final class EmpiricalSearchPolicy implements SearchPolicy {
+    private static final int TARGET_DISTANCE_WEIGHT = 20;
+    private static final int UNKNOWN_RULE_PENALTY = 500;
+
+    private final SearchPolicyModel model;
+    private final SearchExperienceRepository experienceRepository;
+    private final String experienceFamily;
+
+    public EmpiricalSearchPolicy(SearchPolicyModel model) {
+<span class="fc" id="L28">        this(model, null, &quot;&quot;);</span>
+<span class="fc" id="L29">    }</span>
+
+    public EmpiricalSearchPolicy(
+        SearchPolicyModel model,
+        SearchExperienceRepository experienceRepository,
+        String experienceFamily
+<span class="fc" id="L35">    ) {</span>
+<span class="fc" id="L36">        this.model = Objects.requireNonNull(model, &quot;model&quot;);</span>
+<span class="fc" id="L37">        this.experienceRepository = experienceRepository;</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        this.experienceFamily = experienceFamily == null ? &quot;&quot; : experienceFamily;</span>
+<span class="fc" id="L39">    }</span>
+
+    @Override
+    public String id() {
+<span class="fc" id="L43">        return &quot;empirical-&quot; + model.mode().name().toLowerCase() + &quot;/&quot; + model.modelVersion();</span>
+    }
+
+    @Override
+    public PolicyDecision score(PolicyContext context, Transformation transformation) {
+<span class="fc" id="L48">        Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="fc" id="L49">        Objects.requireNonNull(transformation, &quot;transformation&quot;);</span>
+<span class="fc" id="L50">        RuleStatistics statistics = model.rules().get(transformation.rule());</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!model.compatible()) {</span>
+<span class="fc" id="L52">            return fallback(context, &quot;incompatible feature schema&quot;);</span>
+        }
+<span class="fc bfc" id="L54" title="All 4 branches covered.">        if (statistics == null || statistics.observations() &lt; model.minimumObservations()) {</span>
+<span class="fc" id="L55">            return fallback(context, &quot;missing or low-confidence rule statistics&quot;);</span>
+        }
+
+<span class="fc" id="L58">        Map&lt;String, Integer&gt; contributions = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        int target = context.targeted() ? context.targetDistance() * TARGET_DISTANCE_WEIGHT : 0;</span>
+<span class="fc" id="L60">        int empiricalFailure = 1000 - statistics.successPermille();</span>
+<span class="fc" id="L61">        contributions.put(&quot;targetDistance&quot;, target);</span>
+<span class="fc" id="L62">        contributions.put(&quot;empiricalFailure&quot;, empiricalFailure);</span>
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (model.mode() != Mode.FREQUENCY) {</span>
+<span class="fc" id="L65">            contributions.put(&quot;meanScoreDelta&quot;, clamp(statistics.meanScoreDelta(), -200, 200));</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            contributions.put(&quot;complexityIncrease&quot;, transformation.mayIncreaseComplexity() ? 150 : 0);</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">            contributions.put(&quot;nonEquivalence&quot;, transformation.equivalencePreservingByConstruction() ? 0 : 300);</span>
+<span class="fc" id="L68">            contributions.put(&quot;estimatedCostDelta&quot;, clamp(transformation.estimatedCostDelta() * 10, -200, 200));</span>
+        }
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (model.mode() == Mode.LINEAR_WITH_EXPERIENCE) {</span>
+<span class="fc" id="L71">            contributions.put(&quot;experience&quot;, experienceContribution(context, transformation.rule()));</span>
+        }
+
+<span class="fc" id="L74">        int priority = contributions.values().stream().mapToInt(Integer::intValue).sum();</span>
+<span class="fc" id="L75">        int confidence = Math.min(1000, statistics.observations() * 250);</span>
+<span class="fc" id="L76">        String explanation = contributions.entrySet().stream()</span>
+<span class="fc" id="L77">            .map(entry -&gt; entry.getKey() + &quot;=&quot; + entry.getValue())</span>
+<span class="fc" id="L78">            .reduce((left, right) -&gt; left + &quot;, &quot; + right)</span>
+<span class="fc" id="L79">            .orElse(&quot;&quot;);</span>
+<span class="fc" id="L80">        return new PolicyDecision(</span>
+<span class="fc" id="L81">            id(), priority, confidence, false, contributions,</span>
+            &quot;transparent empirical score: &quot; + explanation);
+    }
+
+    public SearchPolicyModel model() {
+<span class="nc" id="L86">        return model;</span>
+    }
+
+    private PolicyDecision fallback(PolicyContext context, String reason) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        int target = context.targeted() ? context.targetDistance() * TARGET_DISTANCE_WEIGHT : 0;</span>
+<span class="fc" id="L91">        Map&lt;String, Integer&gt; contributions = Map.of(</span>
+<span class="fc" id="L92">            &quot;targetDistance&quot;, target,</span>
+<span class="fc" id="L93">            &quot;unknownRule&quot;, UNKNOWN_RULE_PENALTY);</span>
+<span class="fc" id="L94">        return new PolicyDecision(</span>
+<span class="fc" id="L95">            id(),</span>
+            target + UNKNOWN_RULE_PENALTY,
+            0,
+            true,
+            contributions,
+            &quot;fallback to deterministic static ordering: &quot; + reason);
+    }
+
+    private int experienceContribution(PolicyContext context, String ruleId) {
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (experienceRepository == null || experienceFamily.isBlank()) {</span>
+<span class="nc" id="L105">            return 0;</span>
+        }
+<span class="fc" id="L107">        String shape = ExpressionFingerprint.of(</span>
+<span class="fc" id="L108">            context.parentExpression(), context.canonicalizer()).alphaShapeHash();</span>
+<span class="fc" id="L109">        List&lt;SearchExperience&gt; experiences = experienceRepository.findByShape(</span>
+            experienceFamily, shape, 100);
+<span class="fc" id="L111">        int contribution = 0;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (SearchExperience experience : experiences) {</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (!experience.ruleId().equals(ruleId)) {</span>
+<span class="fc" id="L114">                continue;</span>
+            }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            contribution += experience.successfulChoice() ? -100 : 60;</span>
+<span class="fc" id="L117">        }</span>
+<span class="fc" id="L118">        return clamp(contribution, -300, 300);</span>
+    }
+
+    private static int clamp(int value, int minimum, int maximum) {
+<span class="fc" id="L122">        return Math.max(minimum, Math.min(maximum, value));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

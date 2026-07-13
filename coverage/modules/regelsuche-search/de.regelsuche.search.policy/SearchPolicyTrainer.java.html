@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchPolicyTrainer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.policy</a> &gt; <span class="el_source">SearchPolicyTrainer.java</span></div><h1>SearchPolicyTrainer.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.policy;
+
+import de.regelsuche.search.learning.SearchTrajectoryContext.DatasetSplit;
+import de.regelsuche.search.learning.SearchTrajectoryDataset;
+import de.regelsuche.search.learning.SearchTrajectoryRecord;
+import de.regelsuche.search.learning.SearchTrajectoryRun;
+import de.regelsuche.search.policy.SearchPolicyModel.Mode;
+import de.regelsuche.search.policy.SearchPolicyModel.RuleStatistics;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
+
+/** Deterministically trains a transparent empirical rule-ranking model. */
+<span class="fc" id="L18">public final class SearchPolicyTrainer {</span>
+    public SearchPolicyModel train(
+        SearchTrajectoryDataset dataset,
+        Mode mode,
+        int minimumObservations
+    ) {
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">        if (dataset == null || mode == null) {</span>
+<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;dataset and mode must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (!dataset.leakageFree()) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;cannot train on a dataset with split leakage&quot;);</span>
+        }
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (minimumObservations &lt; 1) {</span>
+<span class="nc" id="L31">            throw new IllegalArgumentException(&quot;minimumObservations must be positive&quot;);</span>
+        }
+
+<span class="fc" id="L34">        List&lt;SearchTrajectoryRun&gt; trainingRuns = dataset.runs().stream()</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">            .filter(run -&gt; run.context().split() == DatasetSplit.TRAIN)</span>
+<span class="fc" id="L36">            .toList();</span>
+<span class="fc" id="L37">        Map&lt;String, MutableRuleStatistics&gt; mutable = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L38">        TreeSet&lt;String&gt; inventoryHashes = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L39">        trainingRuns.forEach(run -&gt; run.records().stream()</span>
+<span class="fc" id="L40">            .filter(SearchTrajectoryRecord::decision)</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            .filter(record -&gt; !record.ruleId().isBlank())</span>
+<span class="fc" id="L42">            .forEach(record -&gt; {</span>
+<span class="fc" id="L43">                inventoryHashes.add(record.ruleInventoryHash());</span>
+<span class="fc" id="L44">                mutable.computeIfAbsent(</span>
+<span class="fc" id="L45">                    record.ruleId(), ignored -&gt; new MutableRuleStatistics())</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">                    .record(record.selectedPath() &amp;&amp; record.eventualSuccess(),</span>
+<span class="fc" id="L47">                        record.score() - record.parentScore());</span>
+<span class="fc" id="L48">            }));</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (mutable.isEmpty()) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;training split contains no search decisions&quot;);</span>
+        }
+
+<span class="fc" id="L53">        Map&lt;String, RuleStatistics&gt; rules = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L54">        mutable.entrySet().stream()</span>
+<span class="fc" id="L55">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L56">            .forEach(entry -&gt; rules.put(entry.getKey(), entry.getValue().freeze()));</span>
+
+<span class="fc" id="L58">        SearchTrajectoryDataset trainingDataset = new SearchTrajectoryDataset(trainingRuns);</span>
+<span class="fc" id="L59">        String datasetHash = &quot;sha256:&quot; + sha256(trainingDataset.toJsonLines());</span>
+<span class="fc" id="L60">        String inventoryHash = &quot;sha256:&quot; + sha256(String.join(&quot;\n&quot;, inventoryHashes));</span>
+<span class="fc" id="L61">        String modelMaterial = datasetHash + &quot;\n&quot; + SearchPolicyModel.FEATURE_SCHEMA</span>
+            + &quot;\n&quot; + inventoryHash + &quot;\n&quot; + mode + &quot;\n&quot; + minimumObservations
+            + &quot;\n&quot; + rules;
+<span class="fc" id="L64">        String modelVersion = &quot;policy-v1:&quot; + sha256(modelMaterial).substring(0, 24);</span>
+<span class="fc" id="L65">        return new SearchPolicyModel(</span>
+            modelVersion,
+            datasetHash,
+            SearchPolicyModel.FEATURE_SCHEMA,
+            inventoryHash,
+            mode,
+            minimumObservations,
+            rules);
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L77">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L78">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L79">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L80">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L81">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static final class MutableRuleStatistics {
+        private int observations;
+        private int successful;
+        private long scoreDeltaSum;
+
+        private void record(boolean successfulChoice, int scoreDelta) {
+<span class="fc" id="L91">            observations++;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (successfulChoice) {</span>
+<span class="fc" id="L93">                successful++;</span>
+            }
+<span class="fc" id="L95">            scoreDeltaSum += scoreDelta;</span>
+<span class="fc" id="L96">        }</span>
+
+        private RuleStatistics freeze() {
+<span class="fc" id="L99">            int failed = observations - successful;</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            int successPermille = observations == 0 ? 0 : successful * 1000 / observations;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            int meanScoreDelta = observations == 0</span>
+<span class="nc" id="L102">                ? 0</span>
+<span class="fc" id="L103">                : (int) Math.round((double) scoreDeltaSum / observations);</span>
+<span class="fc" id="L104">            return new RuleStatistics(</span>
+                observations, successful, failed, successPermille, meanScoreDelta);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -238,24 +238,24 @@ import java.util.Set;
         SearchFrame frame,
         int generated
     ) {
-<span class="fc" id="L241">        frame.telemetry().transformationGenerated(</span>
-            current,
-            transformation,
-<span class="fc" id="L244">            frame.frontier().size(),</span>
-<span class="fc" id="L245">            frame.visited().size(),</span>
-            generated);
-<span class="fc" id="L247">        String skipReason = skipReason(problem, current, transformation);</span>
-<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (!skipReason.isBlank()) {</span>
-<span class="fc" id="L249">            frame.progress().skippedTransformations++;</span>
-<span class="fc" id="L250">            frame.telemetry().transformationSkipped(</span>
+<span class="fc" id="L241">        String skipReason = skipReason(problem, current, transformation);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (!skipReason.isBlank()) {</span>
+<span class="fc" id="L243">            frame.progress().skippedTransformations++;</span>
+<span class="fc" id="L244">            frame.telemetry().transformationSkipped(</span>
                 current,
                 transformation,
-<span class="fc" id="L253">                frame.frontier().size(),</span>
-<span class="fc" id="L254">                frame.visited().size(),</span>
+<span class="fc" id="L247">                frame.frontier().size(),</span>
+<span class="fc" id="L248">                frame.visited().size(),</span>
                 generated,
                 skipReason);
-<span class="fc" id="L257">            return false;</span>
+<span class="fc" id="L251">            return false;</span>
         }
+<span class="fc" id="L253">        frame.telemetry().transformationGenerated(</span>
+            current,
+            transformation,
+<span class="fc" id="L256">            frame.frontier().size(),</span>
+<span class="fc" id="L257">            frame.visited().size(),</span>
+            generated);
 <span class="fc" id="L259">        SearchState nextState = createNextState(problem, current, transformation, frame.identity());</span>
 <span class="fc bfc" id="L260" title="All 2 branches covered.">        if (frame.visited().contains(stateKey(nextState))) {</span>
 <span class="fc" id="L261">            frame.progress().duplicatePrunes++;</span>
@@ -506,8 +506,8 @@ import java.util.Set;
 <span class="fc" id="L506">                    : GoalStatus.REACHED;</span>
 <span class="pc bpc" id="L507" title="1 of 2 branches missed.">            } else if (frame.explored().size() &gt;= problem.heuristic().maxVisitedExpressions()) {</span>
 <span class="nc" id="L508">                status = GoalStatus.STATE_BUDGET;</span>
-<span class="pc bpc" id="L509" title="1 of 2 branches missed.">            } else if (progress.candidateBudgetPrunes &gt; 0) {</span>
-<span class="nc" id="L510">                status = GoalStatus.CANDIDATE_BUDGET;</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">            } else if (progress.candidateBudgetPrunes &gt; 0) {</span>
+<span class="fc" id="L510">                status = GoalStatus.CANDIDATE_BUDGET;</span>
 <span class="fc bfc" id="L511" title="All 2 branches covered.">            } else if (progress.depthPrunes &gt; 0) {</span>
 <span class="fc" id="L512">                status = GoalStatus.DEPTH_BUDGET;</span>
 <span class="pc bpc" id="L513" title="1 of 4 branches missed.">            } else if (progress.expandedStates &gt; 0 &amp;&amp; progress.generatedTransformations == 0) {</span>

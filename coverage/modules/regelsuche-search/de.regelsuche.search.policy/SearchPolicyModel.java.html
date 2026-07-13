@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchPolicyModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.policy</a> &gt; <span class="el_source">SearchPolicyModel.java</span></div><h1>SearchPolicyModel.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.policy;
+
+import de.regelsuche.json.JsonWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** Immutable transparent model trained from a leakage-free trajectory dataset. */
+public record SearchPolicyModel(
+    String modelVersion,
+    String datasetHash,
+    String featureSchemaVersion,
+    String ruleInventoryHash,
+    Mode mode,
+    int minimumObservations,
+    Map&lt;String, RuleStatistics&gt; rules
+) {
+    public static final String FEATURE_SCHEMA = &quot;regelsuche.search-policy-features/v1&quot;;
+    private static final String MODEL_SCHEMA = &quot;regelsuche.search-policy-model/v1&quot;;
+
+<span class="fc" id="L23">    public SearchPolicyModel {</span>
+<span class="pc bpc" id="L24" title="3 of 6 branches missed.">        if (modelVersion == null || modelVersion.isBlank()</span>
+<span class="pc bpc" id="L25" title="2 of 4 branches missed.">                || datasetHash == null || datasetHash.isBlank()</span>
+<span class="pc bpc" id="L26" title="2 of 4 branches missed.">                || featureSchemaVersion == null || featureSchemaVersion.isBlank()</span>
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">                || ruleInventoryHash == null || ruleInventoryHash.isBlank()</span>
+                || mode == null) {
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;model metadata must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (minimumObservations &lt; 1) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(&quot;minimumObservations must be positive&quot;);</span>
+        }
+<span class="fc" id="L34">        Map&lt;String, RuleStatistics&gt; sorted = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (rules != null) {</span>
+<span class="fc" id="L36">            rules.entrySet().stream()</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">                .filter(entry -&gt; entry.getKey() != null &amp;&amp; entry.getValue() != null)</span>
+<span class="fc" id="L38">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L39">                .forEach(entry -&gt; sorted.put(entry.getKey(), entry.getValue()));</span>
+        }
+<span class="fc" id="L41">        rules = Collections.unmodifiableMap(sorted);</span>
+<span class="fc" id="L42">    }</span>
+
+    public boolean compatible() {
+<span class="fc" id="L45">        return FEATURE_SCHEMA.equals(featureSchemaVersion);</span>
+    }
+
+    public String toJson() {
+<span class="fc" id="L49">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L50">            .property(&quot;schema&quot;, MODEL_SCHEMA)</span>
+<span class="fc" id="L51">            .property(&quot;modelVersion&quot;, modelVersion)</span>
+<span class="fc" id="L52">            .property(&quot;datasetHash&quot;, datasetHash)</span>
+<span class="fc" id="L53">            .property(&quot;featureSchemaVersion&quot;, featureSchemaVersion)</span>
+<span class="fc" id="L54">            .property(&quot;ruleInventoryHash&quot;, ruleInventoryHash)</span>
+<span class="fc" id="L55">            .property(&quot;mode&quot;, mode.name())</span>
+<span class="fc" id="L56">            .property(&quot;minimumObservations&quot;, minimumObservations)</span>
+<span class="fc" id="L57">            .array(&quot;rules&quot;, array -&gt; rules.forEach((ruleId, statistics) -&gt;</span>
+<span class="fc" id="L58">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L59">                    .property(&quot;ruleId&quot;, ruleId)</span>
+<span class="fc" id="L60">                    .property(&quot;observations&quot;, statistics.observations())</span>
+<span class="fc" id="L61">                    .property(&quot;successfulChoices&quot;, statistics.successfulChoices())</span>
+<span class="fc" id="L62">                    .property(&quot;failedAlternatives&quot;, statistics.failedAlternatives())</span>
+<span class="fc" id="L63">                    .property(&quot;successPermille&quot;, statistics.successPermille())</span>
+<span class="fc" id="L64">                    .property(&quot;meanScoreDelta&quot;, statistics.meanScoreDelta()))))</span>
+<span class="fc" id="L65">            .endObject();</span>
+<span class="fc" id="L66">        return json.toString();</span>
+    }
+
+    /** Deterministic line format intended for loading without a permissive JSON mapper. */
+    public String toPortableText() {
+<span class="fc" id="L71">        StringBuilder text = new StringBuilder(MODEL_SCHEMA).append('\n')</span>
+<span class="fc" id="L72">            .append(encoded(modelVersion)).append('\n')</span>
+<span class="fc" id="L73">            .append(encoded(datasetHash)).append('\n')</span>
+<span class="fc" id="L74">            .append(encoded(featureSchemaVersion)).append('\n')</span>
+<span class="fc" id="L75">            .append(encoded(ruleInventoryHash)).append('\n')</span>
+<span class="fc" id="L76">            .append(mode.name()).append('\n')</span>
+<span class="fc" id="L77">            .append(minimumObservations).append('\n')</span>
+<span class="fc" id="L78">            .append(rules.size());</span>
+<span class="fc" id="L79">        rules.forEach((ruleId, statistics) -&gt; text.append('\n')</span>
+<span class="fc" id="L80">            .append(encoded(ruleId)).append('\t')</span>
+<span class="fc" id="L81">            .append(statistics.observations()).append('\t')</span>
+<span class="fc" id="L82">            .append(statistics.successfulChoices()).append('\t')</span>
+<span class="fc" id="L83">            .append(statistics.failedAlternatives()).append('\t')</span>
+<span class="fc" id="L84">            .append(statistics.successPermille()).append('\t')</span>
+<span class="fc" id="L85">            .append(statistics.meanScoreDelta()));</span>
+<span class="fc" id="L86">        return text.toString();</span>
+    }
+
+    public static SearchPolicyModel load(String text) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L91">            throw new IllegalArgumentException(&quot;model text must not be null&quot;);</span>
+        }
+<span class="fc" id="L93">        String[] lines = text.split(&quot;\\R&quot;, -1);</span>
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">        if (lines.length &lt; 8 || !MODEL_SCHEMA.equals(lines[0])) {</span>
+<span class="fc" id="L95">            throw new IllegalArgumentException(&quot;unsupported search policy model schema&quot;);</span>
+        }
+<span class="fc" id="L97">        int ruleCount = integer(lines[7], &quot;rule count&quot;);</span>
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        if (ruleCount &lt; 0 || lines.length != 8 + ruleCount) {</span>
+<span class="nc" id="L99">            throw new IllegalArgumentException(&quot;search policy rule count does not match payload&quot;);</span>
+        }
+<span class="fc" id="L101">        Map&lt;String, RuleStatistics&gt; rules = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (int index = 0; index &lt; ruleCount; index++) {</span>
+<span class="fc" id="L103">            String[] fields = lines[8 + index].split(&quot;\\t&quot;, -1);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (fields.length != 6) {</span>
+<span class="nc" id="L105">                throw new IllegalArgumentException(&quot;invalid search policy rule row &quot; + index);</span>
+            }
+<span class="fc" id="L107">            String ruleId = decoded(fields[0]);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (rules.put(ruleId, new RuleStatistics(</span>
+<span class="fc" id="L109">                    integer(fields[1], &quot;observations&quot;),</span>
+<span class="fc" id="L110">                    integer(fields[2], &quot;successfulChoices&quot;),</span>
+<span class="fc" id="L111">                    integer(fields[3], &quot;failedAlternatives&quot;),</span>
+<span class="fc" id="L112">                    integer(fields[4], &quot;successPermille&quot;),</span>
+<span class="fc" id="L113">                    integer(fields[5], &quot;meanScoreDelta&quot;))) != null) {</span>
+<span class="nc" id="L114">                throw new IllegalArgumentException(&quot;duplicate search policy rule &quot; + ruleId);</span>
+            }
+        }
+<span class="fc" id="L117">        return new SearchPolicyModel(</span>
+<span class="fc" id="L118">            decoded(lines[1]),</span>
+<span class="fc" id="L119">            decoded(lines[2]),</span>
+<span class="fc" id="L120">            decoded(lines[3]),</span>
+<span class="fc" id="L121">            decoded(lines[4]),</span>
+<span class="fc" id="L122">            Mode.valueOf(lines[5]),</span>
+<span class="fc" id="L123">            integer(lines[6], &quot;minimumObservations&quot;),</span>
+            rules);
+    }
+
+    private static String encoded(String value) {
+<span class="fc" id="L128">        return Base64.getUrlEncoder().withoutPadding()</span>
+<span class="fc" id="L129">            .encodeToString(value.getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    private static String decoded(String value) {
+        try {
+<span class="fc" id="L134">            return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L135">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L136">            throw new IllegalArgumentException(&quot;invalid search policy model text&quot;, exception);</span>
+        }
+    }
+
+    private static int integer(String value, String name) {
+        try {
+<span class="fc" id="L142">            return Integer.parseInt(value);</span>
+<span class="nc" id="L143">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L144">            throw new IllegalArgumentException(&quot;invalid &quot; + name, exception);</span>
+        }
+    }
+
+<span class="fc" id="L148">    public enum Mode {</span>
+<span class="fc" id="L149">        FREQUENCY,</span>
+<span class="fc" id="L150">        LINEAR,</span>
+<span class="fc" id="L151">        LINEAR_WITH_EXPERIENCE</span>
+    }
+
+    public record RuleStatistics(
+        int observations,
+        int successfulChoices,
+        int failedAlternatives,
+        int successPermille,
+        int meanScoreDelta
+    ) {
+<span class="fc" id="L161">        public RuleStatistics {</span>
+<span class="pc bpc" id="L162" title="6 of 12 branches missed.">            if (observations &lt; 0 || successfulChoices &lt; 0 || failedAlternatives &lt; 0</span>
+                    || successfulChoices + failedAlternatives != observations
+                    || successPermille &lt; 0 || successPermille &gt; 1000) {
+<span class="nc" id="L165">                throw new IllegalArgumentException(&quot;invalid rule statistics&quot;);</span>
+            }
+<span class="fc" id="L167">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
