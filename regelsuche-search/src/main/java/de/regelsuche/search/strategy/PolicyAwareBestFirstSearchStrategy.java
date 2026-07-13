@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 
 /**
@@ -192,8 +193,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
 
             if (trace != null) {
                 int targetWeight = targetEnabled ? problem.target().distanceWeight() : 0;
-                trace.startGroup(
-                    current, ranked, maxFrontierAdjustment, targetWeight);
+                trace.startGroup(current, ranked, maxFrontierAdjustment, targetWeight);
             }
             return ranked.stream().map(RankedTransformation::transformation).toList();
         }
@@ -242,7 +242,6 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             new LinkedHashMap<>();
         private long nextDecisionGroup;
         private int nextDequeueOrder;
-        private RankingGroup activeGroup;
 
         private void startGroup(
             SearchState parent,
@@ -250,12 +249,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             int adjustmentLimit,
             int targetWeight
         ) {
-            finishActive("not-considered-before-next-expansion");
             long group = nextDecisionGroup++;
-            if (ranked.isEmpty()) {
-                return;
-            }
-            List<MutableRankingEvent> groupEvents = new ArrayList<>();
             for (int rank = 0; rank < ranked.size(); rank++) {
                 RankedTransformation item = ranked.get(rank);
                 MutableRankingEvent event = new MutableRankingEvent(
@@ -266,11 +260,9 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                     PolicyAwareBestFirstSearchStrategy.frontierAdjustment(
                         item.decision(), adjustmentLimit),
                     safeProduct(item.targetDistance(), targetWeight));
-                groupEvents.add(event);
                 events.add(event);
                 byTransition.putIfAbsent(event.key, event);
             }
-            activeGroup = new RankingGroup(groupEvents);
         }
 
         private int frontierAdjustment(SearchState state) {
@@ -290,113 +282,71 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         @Override
         public void onEvent(SearchEvent event) {
             switch (event.type()) {
-                case TRANSFORMATION_GENERATED -> transformationConsidered(event);
-                case STATE_ENQUEUED -> completePending(event, true, "enqueued");
-                case STATE_PRUNED_DUPLICATE -> completePending(event, false, "duplicate-pruned");
-                case STATE_PRUNED_BUDGET -> finishActive("candidate-budget-not-considered");
-                case STATE_DEQUEUED -> recordDequeue(event);
-                case SEARCH_FINISHED -> finishActive("search-finished-not-considered");
+                case TRANSFORMATION_GENERATED -> considered(event);
+                case STATE_ENQUEUED -> admitted(event, true, "enqueued");
+                case STATE_PRUNED_DUPLICATE -> admitted(event, false, "duplicate-pruned");
+                case STATE_PRUNED_BUDGET -> budget(event.expression());
+                case STATE_DEQUEUED -> dequeued(event);
                 default -> {
-                    // Ranking admission is decided only by the events above.
+                    // Other search events do not alter candidate evidence.
                 }
             }
         }
 
-        private void transformationConsidered(SearchEvent searchEvent) {
-            if (activeGroup == null) {
-                return;
-            }
-            MutableRankingEvent ranking = activeGroup.next();
+        private void considered(SearchEvent event) {
+            MutableRankingEvent ranking = find(event, candidate -> !candidate.consideredBySearch);
             if (ranking == null) {
                 return;
             }
             ranking.consideredBySearch = true;
-            if (!ranking.matches(searchEvent)) {
-                ranking.admissionOutcome = "telemetry-mismatch";
-                closeIfComplete();
-                return;
-            }
-            if (!searchEvent.pruningReason().isBlank()) {
-                ranking.admissionOutcome = "skipped:" + searchEvent.pruningReason();
-                closeIfComplete();
-                return;
-            }
-            ranking.admissionOutcome = "generated";
-            activeGroup.pending = ranking;
+            ranking.admissionOutcome = event.pruningReason().isBlank()
+                ? "generated"
+                : "skipped:" + event.pruningReason();
         }
 
-        private void completePending(SearchEvent searchEvent, boolean admitted, String outcome) {
-            if (activeGroup == null || activeGroup.pending == null) {
+        private void admitted(SearchEvent event, boolean admitted, String outcome) {
+            MutableRankingEvent ranking = find(
+                event,
+                candidate -> candidate.consideredBySearch
+                    && !candidate.admissionResolved
+                    && "generated".equals(candidate.admissionOutcome));
+            if (ranking == null) {
                 return;
             }
-            MutableRankingEvent pending = activeGroup.pending;
-            if (!pending.matches(searchEvent)) {
-                pending.admissionOutcome = "telemetry-mismatch";
-                activeGroup.pending = null;
-                closeIfComplete();
-                return;
-            }
-            pending.admittedToFrontier = admitted;
-            pending.admissionOutcome = outcome;
-            activeGroup.pending = null;
-            closeIfComplete();
+            ranking.admissionResolved = true;
+            ranking.admittedToFrontier = admitted;
+            ranking.admissionOutcome = outcome;
         }
 
-        private void recordDequeue(SearchEvent searchEvent) {
-            MutableRankingEvent event = byTransition.get(TransitionKey.from(searchEvent));
-            if (event != null && event.admittedToFrontier && event.dequeueOrder < 0) {
-                event.dequeueOrder = nextDequeueOrder++;
+        private void budget(String parentExpression) {
+            events.stream()
+                .filter(event -> event.parentExpression.equals(parentExpression))
+                .filter(event -> !event.consideredBySearch)
+                .forEach(event -> event.admissionOutcome = "candidate-budget-not-considered");
+        }
+
+        private void dequeued(SearchEvent event) {
+            MutableRankingEvent ranking = find(
+                event,
+                candidate -> candidate.admittedToFrontier && candidate.dequeueOrder < 0);
+            if (ranking != null) {
+                ranking.dequeueOrder = nextDequeueOrder++;
             }
         }
 
-        private void closeIfComplete() {
-            if (activeGroup != null && activeGroup.complete()) {
-                activeGroup = null;
-            }
-        }
-
-        private void finishActive(String outcome) {
-            if (activeGroup == null) {
-                return;
-            }
-            if (activeGroup.pending != null) {
-                activeGroup.pending.admissionOutcome = "generated-without-admission";
-                activeGroup.pending = null;
-            }
-            activeGroup.finishRemaining(outcome);
-            activeGroup = null;
+        private MutableRankingEvent find(
+            SearchEvent event,
+            Predicate<MutableRankingEvent> predicate
+        ) {
+            return events.stream()
+                .filter(candidate -> candidate.matches(event))
+                .filter(predicate)
+                .findFirst()
+                .orElse(null);
         }
 
         private List<RankingEvent> events() {
-            finishActive("search-finished-not-considered");
             return events.stream().map(MutableRankingEvent::freeze).toList();
-        }
-    }
-
-    private static final class RankingGroup {
-        private final List<MutableRankingEvent> events;
-        private int cursor;
-        private MutableRankingEvent pending;
-
-        private RankingGroup(List<MutableRankingEvent> events) {
-            this.events = events;
-        }
-
-        private MutableRankingEvent next() {
-            if (cursor >= events.size() || pending != null) {
-                return null;
-            }
-            return events.get(cursor++);
-        }
-
-        private boolean complete() {
-            return cursor >= events.size() && pending == null;
-        }
-
-        private void finishRemaining(String outcome) {
-            while (cursor < events.size()) {
-                events.get(cursor++).admissionOutcome = outcome;
-            }
         }
     }
 
@@ -412,6 +362,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         private int staticStatePriority;
         private int composedFrontierPriority;
         private boolean consideredBySearch;
+        private boolean admissionResolved;
         private boolean admittedToFrontier;
         private String admissionOutcome = "not-considered";
         private int dequeueOrder = -1;
@@ -493,12 +444,6 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             return new TransitionKey(
                 state.parentExpression(), state.appliedRuleId(),
                 state.expression(), state.depth());
-        }
-
-        private static TransitionKey from(SearchEvent event) {
-            return new TransitionKey(
-                event.parentExpression(), event.ruleId(),
-                event.expression(), event.depth());
         }
     }
 
