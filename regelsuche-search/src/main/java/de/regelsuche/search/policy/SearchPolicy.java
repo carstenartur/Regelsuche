@@ -46,15 +46,6 @@ public interface SearchPolicy {
         ExpressionCanonicalizer canonicalizer,
         TransformationDescriptor transformationDescriptor
     ) {
-        public PolicyContext(
-            String parentExpression,
-            int targetDistance,
-            boolean targeted,
-            ExpressionCanonicalizer canonicalizer
-        ) {
-            this(parentExpression, targetDistance, targeted, canonicalizer, null);
-        }
-
         public PolicyContext {
             parentExpression = parentExpression == null ? "" : parentExpression;
             if (targetDistance < 0 && targeted) {
