@@ -5,6 +5,7 @@ import de.regelsuche.search.learning.SearchTrajectoryDataset;
 import de.regelsuche.search.learning.SearchTrajectoryRecord;
 import de.regelsuche.search.learning.SearchTrajectoryRun;
 import de.regelsuche.search.learning.TransformationDescriptor;
+import de.regelsuche.search.learning.TransformationDescriptor.OccurrenceRole;
 import de.regelsuche.search.policy.DescriptorPolicyModel.DescriptorStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.FeatureStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.Mode;
@@ -116,7 +117,7 @@ public final class DescriptorPolicyTrainer {
             result.put(featureName, mutable.freeze());
         }
 
-        result.keySet().removeIf(DescriptorFeatureVector::pairwiseContextFeature);
+        result.keySet().removeIf(DescriptorPolicyTrainer::pairwiseContextFeature);
         pairwiseContextStatistics(contextComparisons).forEach(result::put);
         return result;
     }
@@ -169,11 +170,11 @@ public final class DescriptorPolicyTrainer {
 
         for (SearchTrajectoryRecord winner : selected) {
             Map<String, Integer> winnerFeatures =
-                DescriptorFeatureVector.of(winner.transformationDescriptor());
+                descriptorFeatures(winner.transformationDescriptor());
             for (SearchTrajectoryRecord alternative : alternatives) {
                 comparisons.add(new ContextComparison(
                     winnerFeatures,
-                    DescriptorFeatureVector.of(alternative.transformationDescriptor())));
+                    descriptorFeatures(alternative.transformationDescriptor())));
             }
         }
     }
@@ -183,8 +184,7 @@ public final class DescriptorPolicyTrainer {
     ) {
         Map<String, MutableFeatureStatistics> mutable = new LinkedHashMap<>();
         for (ContextComparison comparison : comparisons) {
-            TreeSet<String> featureNames = comparison.pairwiseFeatureNames();
-            for (String featureName : featureNames) {
+            for (String featureName : comparison.pairwiseFeatureNames()) {
                 int winnerValue = comparison.winnerFeatures()
                     .getOrDefault(featureName, 0);
                 int alternativeValue = comparison.alternativeFeatures()
@@ -230,6 +230,23 @@ public final class DescriptorPolicyTrainer {
             + String.join("\n---\n", comparisons);
     }
 
+    private static Map<String, Integer> descriptorFeatures(
+        TransformationDescriptor descriptor
+    ) {
+        Map<String, Integer> features = new LinkedHashMap<>(descriptor.featureVector());
+        TransformationDescriptor.LocalChange local = descriptor.localChange();
+        if (local.available() && local.role() != OccurrenceRole.ROOT) {
+            features.put("local.contextRole." + local.contextRoot().kind().name()
+                + "_" + local.role().name(), 1);
+        }
+        return features;
+    }
+
+    private static boolean pairwiseContextFeature(String featureName) {
+        return featureName.startsWith("local.context.")
+            || featureName.startsWith("local.contextRole.");
+    }
+
     private static String sha256(String value) {
         try {
             return java.util.HexFormat.of().formatHex(
@@ -250,7 +267,7 @@ public final class DescriptorPolicyTrainer {
             TransformationDescriptor descriptor = record.transformationDescriptor();
             return new Example(
                 descriptor,
-                DescriptorFeatureVector.of(descriptor),
+                descriptorFeatures(descriptor),
                 record.selectedPath() && record.eventualSuccess(),
                 record.score() - record.parentScore());
         }
@@ -263,10 +280,10 @@ public final class DescriptorPolicyTrainer {
         private TreeSet<String> pairwiseFeatureNames() {
             TreeSet<String> names = new TreeSet<>();
             winnerFeatures.keySet().stream()
-                .filter(DescriptorFeatureVector::pairwiseContextFeature)
+                .filter(DescriptorPolicyTrainer::pairwiseContextFeature)
                 .forEach(names::add);
             alternativeFeatures.keySet().stream()
-                .filter(DescriptorFeatureVector::pairwiseContextFeature)
+                .filter(DescriptorPolicyTrainer::pairwiseContextFeature)
                 .forEach(names::add);
             return names;
         }
