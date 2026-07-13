@@ -385,10 +385,9 @@ class HiddenRulePolicyEvaluationTest {
                 ? 0
                 : (staticResult.metrics().exploredStates() - metrics.exploredStates())
                     * 1000 / staticResult.metrics().exploredStates();
-            List<String> selected = events.stream()
-                .filter(RankingEvent::selectedByCandidateBudget)
-                .map(RankingEvent::ruleId)
-                .toList();
+            List<String> selected = result.reachedState() == null
+                ? List.of()
+                : result.reachedState().appliedRuleIds();
             int fallback = (int) events.stream().filter(RankingEvent::fallback).count();
             return new PolicyOutcome(
                 policy,
