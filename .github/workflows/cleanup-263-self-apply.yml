@@ -5,6 +5,11 @@ on:
     branches: [ "cleanup/263-valuekey-only-search-identity" ]
     paths:
       - '.github/workflows/cleanup-263-self-apply.yml'
+  pull_request:
+    branches: [ "main" ]
+    types: [ opened, synchronize, reopened ]
+    paths:
+      - '.github/workflows/cleanup-263-self-apply.yml'
 
 permissions:
   contents: write
