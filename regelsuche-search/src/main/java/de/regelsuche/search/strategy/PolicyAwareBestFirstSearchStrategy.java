@@ -8,6 +8,9 @@ import de.regelsuche.search.policy.SearchPolicy.PolicyContext;
 import de.regelsuche.search.policy.SearchPolicy.PolicyDecision;
 import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
 import de.regelsuche.search.strategy.SearchProblem.TargetRelation;
+import de.regelsuche.search.telemetry.SearchEvent;
+import de.regelsuche.search.telemetry.SearchEventType;
+import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.value.ExprValueFactory;
@@ -26,14 +29,9 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Applies an explainable policy after rule applicability and before the ordinary
- * per-state candidate budget. The unconfigured default remains
- * {@link BestFirstSearchStrategy}.
- *
- * <p>A confident policy exposes only its ranked budget prefix to the underlying
- * search. If every applicable candidate falls back, the complete original
- * candidate list is delegated so the ordinary static sorting and skip handling are
- * preserved exactly.</p>
+ * Applies an explainable policy after rule applicability while leaving guard,
+ * duplicate and candidate-budget accounting to {@link BestFirstSearchStrategy}.
+ * The unconfigured default remains ordinary Best-First search.
  */
 public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy {
     private final SearchPolicy policy;
@@ -50,6 +48,11 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
     public PolicySearchResult searchWithDiagnostics(SearchProblem problem) {
         Objects.requireNonNull(problem, "problem");
         PolicyTrace trace = new PolicyTrace();
+        SearchObserver originalObserver = problem.observer();
+        SearchObserver combinedObserver = event -> {
+            trace.observe(event);
+            originalObserver.onEvent(event);
+        };
         try (TargetDistance distance = new TargetDistance(
                 problem.target(), problem.canonicalizer())) {
             TransformationEngine rankedEngine = new RankingEngine(
@@ -57,8 +60,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                 policy,
                 trace,
                 distance,
-                problem.canonicalizer(),
-                problem.heuristic().maxCandidatesPerState());
+                problem.canonicalizer());
             SearchProblem rankedProblem = new SearchProblem(
                 problem.rootExpression(),
                 rankedEngine,
@@ -67,7 +69,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                 problem.heuristic(),
                 problem.memory(),
                 problem.costModel(),
-                problem.observer(),
+                combinedObserver,
                 problem.target());
             BestFirstSearchStrategy.GoalSearchResult result =
                 new BestFirstSearchStrategy().searchWithDiagnostics(rankedProblem);
@@ -88,6 +90,14 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         }
     }
 
+    public enum CandidateOutcome {
+        NOT_CONSIDERED_BUDGET,
+        SKIPPED_GUARD,
+        CONSIDERED,
+        PRUNED_DUPLICATE,
+        ENQUEUED
+    }
+
     /** One deterministic, explainable candidate-ranking decision. */
     public record RankingEvent(
         long decisionGroup,
@@ -101,7 +111,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         Map<String, Integer> contributions,
         String explanation,
         int deterministicRank,
-        boolean selectedByCandidateBudget
+        CandidateOutcome outcome
     ) {
         public RankingEvent {
             parentExpression = parentExpression == null ? "" : parentExpression;
@@ -110,16 +120,37 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             policyId = policyId == null ? "" : policyId;
             contributions = contributions == null ? Map.of() : Map.copyOf(contributions);
             explanation = explanation == null ? "" : explanation;
+            outcome = outcome == null ? CandidateOutcome.NOT_CONSIDERED_BUDGET : outcome;
+        }
+
+        private RankingEvent withOutcome(CandidateOutcome updated) {
+            return new RankingEvent(
+                decisionGroup,
+                parentExpression,
+                ruleId,
+                transformedExpression,
+                policyId,
+                priority,
+                confidencePermille,
+                fallback,
+                contributions,
+                explanation,
+                deterministicRank,
+                updated);
         }
     }
 
+    /**
+     * Produces a complete ranked list. Best-First remains the sole owner of the
+     * successful-enqueue budget, so skipped candidates never consume a shadow
+     * policy budget.
+     */
     private static final class RankingEngine implements TransformationEngine {
         private final TransformationEngine delegate;
         private final SearchPolicy policy;
         private final PolicyTrace trace;
         private final TargetDistance distance;
         private final ExpressionCanonicalizer canonicalizer;
-        private final int candidateBudget;
         private long decisionGroup;
 
         private RankingEngine(
@@ -127,15 +158,13 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             SearchPolicy policy,
             PolicyTrace trace,
             TargetDistance distance,
-            ExpressionCanonicalizer canonicalizer,
-            int candidateBudget
+            ExpressionCanonicalizer canonicalizer
         ) {
             this.delegate = delegate;
             this.policy = policy;
             this.trace = trace;
             this.distance = distance;
             this.canonicalizer = canonicalizer;
-            this.candidateBudget = Math.max(1, candidateBudget);
         }
 
         @Override
@@ -160,11 +189,6 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                     .thenComparing(deterministic))
                 .toList();
 
-            boolean completeFallback = !ranked.isEmpty()
-                && ranked.stream().allMatch(item -> item.decision().fallback());
-            int selectedCount = completeFallback
-                ? ranked.size()
-                : Math.min(candidateBudget, ranked.size());
             long group = decisionGroup++;
             for (int index = 0; index < ranked.size(); index++) {
                 RankedTransformation item = ranked.get(index);
@@ -173,16 +197,16 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                     expression,
                     item.transformation(),
                     item.decision(),
-                    index,
-                    index < selectedCount);
-            }
-            if (completeFallback) {
-                return applicable;
+                    index);
             }
             return ranked.stream()
-                .limit(selectedCount)
                 .map(RankedTransformation::transformation)
                 .toList();
+        }
+
+        @Override
+        public boolean providesCandidateOrder() {
+            return true;
         }
     }
 
@@ -194,8 +218,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             String parentExpression,
             Transformation transformation,
             PolicyDecision decision,
-            int deterministicRank,
-            boolean selectedByCandidateBudget
+            int deterministicRank
         ) {
             events.add(new RankingEvent(
                 decisionGroup,
@@ -209,7 +232,47 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                 decision.contributions(),
                 decision.explanation(),
                 deterministicRank,
-                selectedByCandidateBudget));
+                CandidateOutcome.NOT_CONSIDERED_BUDGET));
+        }
+
+        private void observe(SearchEvent event) {
+            CandidateOutcome outcome = switch (event.type()) {
+                case TRANSFORMATION_GENERATED -> event.pruningReason().isBlank()
+                    ? CandidateOutcome.CONSIDERED
+                    : CandidateOutcome.SKIPPED_GUARD;
+                case STATE_PRUNED_DUPLICATE -> CandidateOutcome.PRUNED_DUPLICATE;
+                case STATE_ENQUEUED -> CandidateOutcome.ENQUEUED;
+                default -> null;
+            };
+            if (outcome != null) {
+                update(event, outcome);
+            }
+        }
+
+        private void update(SearchEvent event, CandidateOutcome outcome) {
+            for (int index = 0; index < events.size(); index++) {
+                RankingEvent candidate = events.get(index);
+                if (matches(candidate, event) && canAdvance(candidate.outcome(), outcome)) {
+                    events.set(index, candidate.withOutcome(outcome));
+                    return;
+                }
+            }
+        }
+
+        private static boolean matches(RankingEvent candidate, SearchEvent event) {
+            return candidate.parentExpression().equals(event.parentExpression())
+                && candidate.ruleId().equals(event.ruleId())
+                && candidate.transformedExpression().equals(event.expression());
+        }
+
+        private static boolean canAdvance(CandidateOutcome current, CandidateOutcome next) {
+            return switch (next) {
+                case SKIPPED_GUARD, CONSIDERED ->
+                    current == CandidateOutcome.NOT_CONSIDERED_BUDGET;
+                case PRUNED_DUPLICATE, ENQUEUED ->
+                    current == CandidateOutcome.CONSIDERED;
+                case NOT_CONSIDERED_BUDGET -> false;
+            };
         }
 
         private List<RankingEvent> events() {
