@@ -11,9 +11,11 @@ import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 
 /**
@@ -23,15 +25,37 @@ import java.util.function.ToIntFunction;
  * rejection and successful-enqueue budget accounting.
  */
 public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy {
+    public static final int DEFAULT_MAX_FRONTIER_ADJUSTMENT = 1_000;
+    private static final int PRIORITY_CEILING = Integer.MAX_VALUE / 2;
+    private static final int PRIORITY_FLOOR = Integer.MIN_VALUE / 2;
+    private static final long EVIDENCE_LIMIT = Integer.MAX_VALUE;
+
     private final SearchPolicy policy;
+    private final int maxFrontierAdjustment;
 
     public PolicyAwareBestFirstSearchStrategy(SearchPolicy policy) {
+        this(policy, 0);
+    }
+
+    /**
+     * Enables a bounded policy contribution to successor frontier priority.
+     * A value of zero preserves the candidate-order-only behavior.
+     */
+    public PolicyAwareBestFirstSearchStrategy(
+        SearchPolicy policy,
+        int maxFrontierAdjustment
+    ) {
         this.policy = Objects.requireNonNull(policy, "policy");
+        if (maxFrontierAdjustment < 0) {
+            throw new IllegalArgumentException("maxFrontierAdjustment must not be negative");
+        }
+        this.maxFrontierAdjustment = maxFrontierAdjustment;
     }
 
     @Override
     public List<SearchState> search(SearchProblem problem) {
-        return execute(problem, null).states();
+        PolicyTrace trace = maxFrontierAdjustment == 0 ? null : new PolicyTrace();
+        return execute(problem, trace).states();
     }
 
     public PolicySearchResult searchWithDiagnostics(SearchProblem problem) {
@@ -60,7 +84,8 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             problem.target());
         try (TransformationDescriptor.Factory descriptorFactory =
                 new TransformationDescriptor.Factory(problem.target(), problem.canonicalizer())) {
-            return new PolicyBestFirstSearchStrategy(policy, trace, descriptorFactory)
+            return new PolicyBestFirstSearchStrategy(
+                policy, trace, descriptorFactory, maxFrontierAdjustment)
                 .searchWithDiagnostics(rankedProblem);
         }
     }
@@ -78,7 +103,7 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         }
     }
 
-    /** One deterministic, explainable candidate-ranking decision and its real search outcome. */
+    /** One deterministic, explainable candidate decision and its real search outcome. */
     public record RankingEvent(
         long decisionGroup,
         String parentExpression,
@@ -91,9 +116,14 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         Map<String, Integer> contributions,
         String explanation,
         int deterministicRank,
+        int frontierAdjustment,
+        int staticStatePriority,
+        int targetPriorityContribution,
+        int composedFrontierPriority,
         boolean consideredBySearch,
         boolean admittedToFrontier,
-        String admissionOutcome
+        String admissionOutcome,
+        int dequeueOrder
     ) {
         public RankingEvent {
             parentExpression = parentExpression == null ? "" : parentExpression;
@@ -110,15 +140,18 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         private final SearchPolicy policy;
         private final PolicyTrace trace;
         private final TransformationDescriptor.Factory descriptorFactory;
+        private final int maxFrontierAdjustment;
 
         private PolicyBestFirstSearchStrategy(
             SearchPolicy policy,
             PolicyTrace trace,
-            TransformationDescriptor.Factory descriptorFactory
+            TransformationDescriptor.Factory descriptorFactory,
+            int maxFrontierAdjustment
         ) {
             this.policy = policy;
             this.trace = trace;
             this.descriptorFactory = descriptorFactory;
+            this.maxFrontierAdjustment = maxFrontierAdjustment;
         }
 
         @Override
@@ -133,30 +166,25 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                 .comparing((RankedTransformation ranked) -> ranked.transformation().rule())
                 .thenComparing(ranked -> ranked.transformation().transformedExpression())
                 .thenComparing(ranked -> ranked.transformation().applicationKey());
-            List<RankedTransformation> ranked = new ArrayList<>(transformations.stream()
-                .map(transformation -> new RankedTransformation(
-                    transformation,
-                    policy.score(
-                        new PolicyContext(
-                            current.expression(),
-                            targetDistance.applyAsInt(transformation),
-                            targetEnabled,
-                            problem.canonicalizer(),
-                            descriptor(current, transformation)),
-                        transformation)))
-                .toList());
+            List<RankedTransformation> ranked = new ArrayList<>();
+            for (Transformation transformation : transformations) {
+                int distance = targetDistance.applyAsInt(transformation);
+                PolicyDecision decision = policy.score(
+                    new PolicyContext(
+                        current.expression(), distance, targetEnabled,
+                        problem.canonicalizer(), descriptor(current, transformation)),
+                    transformation);
+                ranked.add(new RankedTransformation(transformation, decision, distance));
+            }
 
             boolean completeFallback = !ranked.isEmpty()
                 && ranked.stream().allMatch(item -> item.decision().fallback());
-            if (completeFallback) {
-                if (targetEnabled) {
-                    ranked.sort(Comparator
-                        .comparingInt((RankedTransformation item) ->
-                            targetDistance.applyAsInt(item.transformation()))
-                        .thenComparing(deterministic));
-                } else {
-                    ranked.sort(deterministic);
-                }
+            if (completeFallback && targetEnabled) {
+                ranked.sort(Comparator
+                    .comparingInt(RankedTransformation::targetDistance)
+                    .thenComparing(deterministic));
+            } else if (completeFallback) {
+                ranked.sort(deterministic);
             } else {
                 ranked.sort(Comparator
                     .comparingInt((RankedTransformation item) -> item.decision().priority())
@@ -164,9 +192,21 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             }
 
             if (trace != null) {
-                trace.startGroup(current.expression(), ranked);
+                int targetWeight = targetEnabled ? problem.target().distanceWeight() : 0;
+                trace.startGroup(current, ranked, maxFrontierAdjustment, targetWeight);
             }
             return ranked.stream().map(RankedTransformation::transformation).toList();
+        }
+
+        @Override
+        protected int priority(SearchState state, SearchProblem problem) {
+            int base = super.priority(state, problem);
+            if (trace == null || maxFrontierAdjustment == 0) {
+                return base;
+            }
+            int adjusted = safeAdd(base, trace.frontierAdjustment(state));
+            trace.recordPriority(state, base, adjusted);
+            return adjusted;
         }
 
         private TransformationDescriptor descriptor(
@@ -198,132 +238,115 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
 
     private static final class PolicyTrace implements SearchObserver {
         private final List<MutableRankingEvent> events = new ArrayList<>();
+        private final Map<TransitionKey, MutableRankingEvent> byTransition =
+            new LinkedHashMap<>();
         private long nextDecisionGroup;
-        private RankingGroup activeGroup;
+        private int nextDequeueOrder;
 
-        private void startGroup(String parentExpression, List<RankedTransformation> ranked) {
-            finishActive("not-considered-before-next-expansion");
+        private void startGroup(
+            SearchState parent,
+            List<RankedTransformation> ranked,
+            int adjustmentLimit,
+            int targetWeight
+        ) {
             long group = nextDecisionGroup++;
-            if (ranked.isEmpty()) {
-                return;
-            }
-            List<MutableRankingEvent> groupEvents = new ArrayList<>();
             for (int rank = 0; rank < ranked.size(); rank++) {
                 RankedTransformation item = ranked.get(rank);
                 MutableRankingEvent event = new MutableRankingEvent(
                     group,
-                    parentExpression,
-                    item.transformation(),
-                    item.decision(),
-                    rank);
-                groupEvents.add(event);
+                    parent,
+                    item,
+                    rank,
+                    PolicyAwareBestFirstSearchStrategy.frontierAdjustment(
+                        item.decision(), adjustmentLimit),
+                    safeProduct(item.targetDistance(), targetWeight));
                 events.add(event);
+                byTransition.putIfAbsent(event.key, event);
             }
-            activeGroup = new RankingGroup(groupEvents);
+        }
+
+        private int frontierAdjustment(SearchState state) {
+            MutableRankingEvent event = byTransition.get(TransitionKey.from(state));
+            return event == null ? 0 : event.frontierAdjustment;
+        }
+
+        private void recordPriority(SearchState state, int base, int adjusted) {
+            MutableRankingEvent event = byTransition.get(TransitionKey.from(state));
+            if (event != null) {
+                event.staticStatePriority = base;
+                event.composedFrontierPriority = safeAdd(
+                    adjusted, event.targetPriorityContribution);
+            }
         }
 
         @Override
         public void onEvent(SearchEvent event) {
             switch (event.type()) {
-                case TRANSFORMATION_GENERATED -> transformationConsidered(event);
-                case STATE_ENQUEUED -> completePending(event, true, "enqueued");
-                case STATE_PRUNED_DUPLICATE -> completePending(event, false, "duplicate-pruned");
-                case STATE_PRUNED_BUDGET -> finishActive("candidate-budget-not-considered");
-                case SEARCH_FINISHED -> finishActive("search-finished-not-considered");
+                case TRANSFORMATION_GENERATED -> considered(event);
+                case STATE_ENQUEUED -> admitted(event, true, "enqueued");
+                case STATE_PRUNED_DUPLICATE -> admitted(event, false, "duplicate-pruned");
+                case STATE_PRUNED_BUDGET -> budget(event.expression());
+                case STATE_DEQUEUED -> dequeued(event);
                 default -> {
-                    // Ranking admission is decided only by the events above.
+                    // Other search events do not alter candidate evidence.
                 }
             }
         }
 
-        private void transformationConsidered(SearchEvent searchEvent) {
-            if (activeGroup == null) {
-                return;
-            }
-            MutableRankingEvent ranking = activeGroup.next();
+        private void considered(SearchEvent event) {
+            MutableRankingEvent ranking = find(event, candidate -> !candidate.consideredBySearch);
             if (ranking == null) {
                 return;
             }
             ranking.consideredBySearch = true;
-            if (!ranking.matches(searchEvent)) {
-                ranking.admissionOutcome = "telemetry-mismatch";
-                closeIfComplete();
-                return;
-            }
-            if (!searchEvent.pruningReason().isBlank()) {
-                ranking.admissionOutcome = "skipped:" + searchEvent.pruningReason();
-                closeIfComplete();
-                return;
-            }
-            ranking.admissionOutcome = "generated";
-            activeGroup.pending = ranking;
+            ranking.admissionOutcome = event.pruningReason().isBlank()
+                ? "generated"
+                : "skipped:" + event.pruningReason();
         }
 
-        private void completePending(SearchEvent searchEvent, boolean admitted, String outcome) {
-            if (activeGroup == null || activeGroup.pending == null) {
+        private void admitted(SearchEvent event, boolean admitted, String outcome) {
+            MutableRankingEvent ranking = find(
+                event,
+                candidate -> candidate.consideredBySearch
+                    && !candidate.admissionResolved
+                    && "generated".equals(candidate.admissionOutcome));
+            if (ranking == null) {
                 return;
             }
-            MutableRankingEvent pending = activeGroup.pending;
-            if (!pending.matches(searchEvent)) {
-                pending.admissionOutcome = "telemetry-mismatch";
-                activeGroup.pending = null;
-                closeIfComplete();
-                return;
-            }
-            pending.admittedToFrontier = admitted;
-            pending.admissionOutcome = outcome;
-            activeGroup.pending = null;
-            closeIfComplete();
+            ranking.admissionResolved = true;
+            ranking.admittedToFrontier = admitted;
+            ranking.admissionOutcome = outcome;
         }
 
-        private void closeIfComplete() {
-            if (activeGroup != null && activeGroup.complete()) {
-                activeGroup = null;
+        private void budget(String parentExpression) {
+            events.stream()
+                .filter(event -> event.parentExpression.equals(parentExpression))
+                .filter(event -> !event.consideredBySearch)
+                .forEach(event -> event.admissionOutcome = "candidate-budget-not-considered");
+        }
+
+        private void dequeued(SearchEvent event) {
+            MutableRankingEvent ranking = find(
+                event,
+                candidate -> candidate.admittedToFrontier && candidate.dequeueOrder < 0);
+            if (ranking != null) {
+                ranking.dequeueOrder = nextDequeueOrder++;
             }
         }
 
-        private void finishActive(String outcome) {
-            if (activeGroup == null) {
-                return;
-            }
-            if (activeGroup.pending != null) {
-                activeGroup.pending.admissionOutcome = "generated-without-admission";
-                activeGroup.pending = null;
-            }
-            activeGroup.finishRemaining(outcome);
-            activeGroup = null;
+        private MutableRankingEvent find(
+            SearchEvent event,
+            Predicate<MutableRankingEvent> predicate
+        ) {
+            return events.stream()
+                .filter(candidate -> candidate.matches(event))
+                .filter(predicate)
+                .findFirst()
+                .orElse(null);
         }
 
         private List<RankingEvent> events() {
-            finishActive("search-finished-not-considered");
             return events.stream().map(MutableRankingEvent::freeze).toList();
-        }
-    }
-
-    private static final class RankingGroup {
-        private final List<MutableRankingEvent> events;
-        private int cursor;
-        private MutableRankingEvent pending;
-
-        private RankingGroup(List<MutableRankingEvent> events) {
-            this.events = events;
-        }
-
-        private MutableRankingEvent next() {
-            if (cursor >= events.size() || pending != null) {
-                return null;
-            }
-            return events.get(cursor++);
-        }
-
-        private boolean complete() {
-            return cursor >= events.size() && pending == null;
-        }
-
-        private void finishRemaining(String outcome) {
-            while (cursor < events.size()) {
-                events.get(cursor++).admissionOutcome = outcome;
-            }
         }
     }
 
@@ -333,22 +356,33 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
         private final Transformation transformation;
         private final PolicyDecision decision;
         private final int deterministicRank;
+        private final TransitionKey key;
+        private final int frontierAdjustment;
+        private final int targetPriorityContribution;
+        private int staticStatePriority;
+        private int composedFrontierPriority;
         private boolean consideredBySearch;
+        private boolean admissionResolved;
         private boolean admittedToFrontier;
         private String admissionOutcome = "not-considered";
+        private int dequeueOrder = -1;
 
         private MutableRankingEvent(
             long decisionGroup,
-            String parentExpression,
-            Transformation transformation,
-            PolicyDecision decision,
-            int deterministicRank
+            SearchState parent,
+            RankedTransformation ranked,
+            int deterministicRank,
+            int frontierAdjustment,
+            int targetPriorityContribution
         ) {
             this.decisionGroup = decisionGroup;
-            this.parentExpression = parentExpression;
-            this.transformation = transformation;
-            this.decision = decision;
+            this.parentExpression = parent.expression();
+            this.transformation = ranked.transformation();
+            this.decision = ranked.decision();
             this.deterministicRank = deterministicRank;
+            this.key = TransitionKey.from(parent, transformation);
+            this.frontierAdjustment = frontierAdjustment;
+            this.targetPriorityContribution = targetPriorityContribution;
         }
 
         private boolean matches(SearchEvent event) {
@@ -370,15 +404,74 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                 decision.contributions(),
                 decision.explanation(),
                 deterministicRank,
+                frontierAdjustment,
+                staticStatePriority,
+                targetPriorityContribution,
+                composedFrontierPriority,
                 consideredBySearch,
                 admittedToFrontier,
-                admissionOutcome);
+                admissionOutcome,
+                dequeueOrder);
         }
     }
 
     private record RankedTransformation(
         Transformation transformation,
-        PolicyDecision decision
+        PolicyDecision decision,
+        int targetDistance
     ) {
+    }
+
+    private record TransitionKey(
+        String parentExpression,
+        String ruleId,
+        String childExpression,
+        int childDepth
+    ) {
+        private TransitionKey {
+            parentExpression = parentExpression == null ? "" : parentExpression;
+            ruleId = ruleId == null ? "" : ruleId;
+            childExpression = childExpression == null ? "" : childExpression;
+        }
+
+        private static TransitionKey from(SearchState parent, Transformation transformation) {
+            return new TransitionKey(
+                parent.expression(), transformation.rule(),
+                transformation.transformedExpression(), parent.depth() + 1);
+        }
+
+        private static TransitionKey from(SearchState state) {
+            return new TransitionKey(
+                state.parentExpression(), state.appliedRuleId(),
+                state.expression(), state.depth());
+        }
+    }
+
+    private static int frontierAdjustment(PolicyDecision decision, int limit) {
+        if (limit == 0 || decision.fallback() || decision.confidencePermille() == 0) {
+            return 0;
+        }
+        long evidence = 0;
+        for (Map.Entry<String, Integer> contribution : decision.contributions().entrySet()) {
+            String name = contribution.getKey();
+            if (!"targetDistance".equals(name) && !name.startsWith("unknown")) {
+                evidence = clamp(
+                    evidence + contribution.getValue(), -EVIDENCE_LIMIT, EVIDENCE_LIMIT);
+            }
+        }
+        return (int) clamp(
+            evidence * decision.confidencePermille() / 1_000L, -limit, limit);
+    }
+
+    private static int safeProduct(int left, int right) {
+        return (int) clamp((long) left * right, PRIORITY_FLOOR, PRIORITY_CEILING);
+    }
+
+    private static int safeAdd(int left, int right) {
+        return (int) clamp((long) left + right, PRIORITY_FLOOR, PRIORITY_CEILING);
+    }
+
+    private static long clamp(long value, long minimum, long maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
     }
 }
