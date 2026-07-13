@@ -66,7 +66,7 @@ class DescriptorSearchPolicyTest {
         Transformation transformation = step("held-out-rule-id", "x");
         TransformationDescriptor descriptor = descriptor("x + 0", transformation);
         DescriptorPolicyModel model = new DescriptorPolicyModel(
-            "descriptor-policy-v1:test-frequency",
+            "descriptor-policy-v2:test-frequency",
             "sha256:source",
             "sha256:predictive",
             DescriptorPolicyModel.FEATURE_SCHEMA,
@@ -97,7 +97,7 @@ class DescriptorSearchPolicyTest {
             "extreme-cost:x");
         TransformationDescriptor descriptor = descriptor("x + 0", transformation);
         DescriptorPolicyModel model = new DescriptorPolicyModel(
-            "descriptor-policy-v1:extreme-range",
+            "descriptor-policy-v2:extreme-range",
             "sha256:source",
             "sha256:predictive",
             DescriptorPolicyModel.FEATURE_SCHEMA,
@@ -117,10 +117,11 @@ class DescriptorSearchPolicyTest {
     }
 
     @Test
-    void incompatibleDescriptorModelReproducesStaticSearchExactly() {
+    void descriptorV1ModelReproducesStaticSearchExactly() {
         SearchProblem problem = controlledProblem();
         var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
-        DescriptorPolicyModel incompatible = linearModel("regelsuche.transformation-descriptor/v0");
+        DescriptorPolicyModel incompatible =
+            linearModel("regelsuche.transformation-descriptor/v1");
 
         var fallback = new PolicyAwareBestFirstSearchStrategy(
             new DescriptorSearchPolicy(incompatible)).searchWithDiagnostics(problem);
@@ -152,7 +153,7 @@ class DescriptorSearchPolicyTest {
             "root.child.ADD", new FeatureStatistics(4, 2, 2, 0, 1, 0, 1, 1000),
             "root.child.MUL", new FeatureStatistics(4, 2, 2, 1, 0, 0, 1, -1000));
         return new DescriptorPolicyModel(
-            "descriptor-policy-v1:test-linear",
+            "descriptor-policy-v2:test-linear",
             "sha256:source",
             "sha256:predictive",
             featureSchema,
