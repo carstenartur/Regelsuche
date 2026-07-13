@@ -3,6 +3,7 @@ package de.regelsuche.search.strategy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
@@ -93,11 +94,11 @@ class BestFirstSearchTelemetryTest {
     }
 
     @Test
-    void searchWithoutMemoryDoesNotComputeLegacyHashes() {
+    void valueIdentityNeverComputesLegacyHashes() {
         ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer() {
             @Override
             public String stableHash(String expression) {
-                throw new AssertionError("legacy hashing must be skipped when search memory is disabled");
+                throw new AssertionError("BestFirst must not enter a legacy hash domain");
             }
         };
         SearchProblem problem = new SearchProblem(
@@ -111,6 +112,31 @@ class BestFirstSearchTelemetryTest {
         List<SearchState> states = new BestFirstSearchStrategy().search(problem);
 
         assertEquals(List.of("x", "a"), states.stream().map(SearchState::expression).toList());
+        assertTrue(states.stream().allMatch(
+            state -> state.canonicalHash().startsWith(BestFirstSearchStrategy.ValueIdentitySession.HASH_PREFIX)));
+    }
+
+    @Test
+    void malformedTransformationOutputFailsExplicitly() {
+        TransformationEngine malformed = expression -> expression.equals("x")
+            ? List.of(new Transformation(
+                "broken-rule", "broken(", RewriteKind.NORMALIZE,
+                false, 0, true, "broken-rule:broken("))
+            : List.of();
+        SearchProblem problem = new SearchProblem(
+            "x",
+            malformed,
+            new ExpressionScorer(),
+            new ExpressionCanonicalizer(),
+            new SearchHeuristic(1, 8, 1, 2, 4, 8)
+        );
+
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> new BestFirstSearchStrategy().search(problem));
+
+        assertTrue(exception.getMessage().contains("ExprValue"));
+        assertTrue(exception.getMessage().contains("broken("));
     }
 
     @Test
@@ -137,7 +163,7 @@ class BestFirstSearchTelemetryTest {
         try (BestFirstSearchStrategy.ValueIdentitySession identity =
                 new BestFirstSearchStrategy.ValueIdentitySession(canonicalizer)) {
             assertTrue(memory.table().lookup(identity.valueHash("a")).isPresent(),
-                "legacy entry must be lazily recorded under the ValueKey-derived identity");
+                "the state must remain recorded under its ValueKey-derived identity");
         }
     }
 
@@ -146,7 +172,11 @@ class BestFirstSearchTelemetryTest {
             ExpressionCanonicalizer canonicalizer,
             ExpressionScorer scorer) {
         String expression = "a";
-        String hash = canonicalizer.stableHash(expression);
+        String hash;
+        try (BestFirstSearchStrategy.ValueIdentitySession identity =
+                new BestFirstSearchStrategy.ValueIdentitySession(canonicalizer)) {
+            hash = identity.valueHash(expression);
+        }
         memory.table().record(new TranspositionEntry(
             hash,
             expression,
