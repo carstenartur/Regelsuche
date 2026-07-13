@@ -42,6 +42,7 @@ public record SearchTrajectoryRun(
                 record.parent(),
                 record.target(),
                 record.features(),
+                record.parentFeatures(),
                 record.depth(),
                 record.score(),
                 record.parentScore(),
