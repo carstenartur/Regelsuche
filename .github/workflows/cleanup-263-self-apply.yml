@@ -32,64 +32,53 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java')
           text = path.read_text(encoding='utf-8')
 
-          def replace_once(old, new):
+          def replace_once(pattern, replacement, flags=0):
               global text
-              count = text.count(old)
+              text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
               if count != 1:
-                  raise SystemExit(f'expected exactly one occurrence, found {count}: {old[:80]!r}')
-              text = text.replace(old, new)
+                  raise SystemExit(f'expected exactly one occurrence, found {count}: {pattern[:100]!r}')
 
           replace_once(
-          '''        if (TranspositionGate.evaluate(
-                          problem.memory(),
-                          current,
-                          current.canonicalHash() + "#" + current.depth(),
-                          List.of(frame.identity().legacyHash(current.expression())))
-                          != TranspositionGate.Verdict.PRUNE) {''',
-          '''        if (TranspositionGate.evaluate(
-                          problem.memory(),
-                          current,
-                          current.canonicalHash() + "#" + current.depth())
-                          != TranspositionGate.Verdict.PRUNE) {''')
+              r'''        if \(TranspositionGate\.evaluate\(\s*
+                  problem\.memory\(\),\s*
+                  current,\s*
+                  current\.canonicalHash\(\) \+ "#" \+ current\.depth\(\),\s*
+                  List\.of\(frame\.identity\(\)\.legacyHash\(current\.expression\(\)\)\)\)\s*
+                  != TranspositionGate\.Verdict\.PRUNE\) \{''',
+              '''        if (TranspositionGate.evaluate(
+                  problem.memory(),
+                  current,
+                  current.canonicalHash() + "#" + current.depth())
+                  != TranspositionGate.Verdict.PRUNE) {''',
+              re.VERBOSE)
 
           replace_once(
-          '''        static final String HASH_PREFIX = "value-v1:";
-                  static final String LEGACY_FALLBACK_PREFIX = "legacy-v1:";''',
-          '''        static final String HASH_PREFIX = "value-v1:";''')
-
+              r'\n\s*static final String LEGACY_FALLBACK_PREFIX = "legacy-v1:";',
+              '')
           replace_once(
-          '''        private final Set<String> unparseableExpressions = new HashSet<>();
-                  private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>();''',
-          '''        private final Set<String> unparseableExpressions = new HashSet<>();''')
-
+              r'\n\s*private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>\(\);',
+              '')
           replace_once(
-          '''            String hash = value(normalized)
-                          .map(value -> HASH_PREFIX + sha256(value.key().encoded()))
-                          .orElseGet(() -> LEGACY_FALLBACK_PREFIX + legacyHash(normalized));''',
-          '''            ExprValue value = value(normalized).orElseThrow(() ->
-                          new IllegalArgumentException(
-                              "search expression cannot be represented as ExprValue: " + normalized));
-                      String hash = HASH_PREFIX + sha256(value.key().encoded());''')
-
+              r'''            String hash = value\(normalized\)\s*
+                  \.map\(value -> HASH_PREFIX \+ sha256\(value\.key\(\)\.encoded\(\)\)\)\s*
+                  \.orElseGet\(\(\) -> LEGACY_FALLBACK_PREFIX \+ legacyHash\(normalized\)\);''',
+              '''            ExprValue value = value(normalized).orElseThrow(() ->
+                  new IllegalArgumentException(
+                      "search expression cannot be represented as ExprValue: " + normalized));
+              String hash = HASH_PREFIX + sha256(value.key().encoded());''',
+              re.VERBOSE)
           replace_once(
-          '''        String legacyHash(String expression) {
-                      String normalized = normalize(expression);
-                      return legacyHashesByExpression.computeIfAbsent(normalized, canonicalizer::stableHash);
-                  }
-          
-          ''',
-          '''''')
-
+              r'''\n        String legacyHash\(String expression\) \{.*?\n        \}\n''',
+              '\n',
+              re.DOTALL)
           replace_once(
-          '''            unparseableExpressions.clear();
-                      legacyHashesByExpression.clear();
-                      factory.close();''',
-          '''            unparseableExpressions.clear();
-                      factory.close();''')
+              r'\n\s*legacyHashesByExpression\.clear\(\);',
+              '')
 
           path.write_text(text, encoding='utf-8')
           PY
