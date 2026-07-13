@@ -8,10 +8,11 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /** Small deterministic feature vector derived from one expression AST. */
-<span class="fc" id="L14">public record ExpressionFeatures(</span>
+<span class="fc" id="L15">public record ExpressionFeatures(</span>
     int nodeCount,
     int maxDepth,
     int variableOccurrences,
@@ -27,45 +28,52 @@ import java.util.Set;
 ) {
     public static ExpressionFeatures of(String expression) {
         try {
-<span class="fc" id="L30">            Expr parsed = new ExpressionParser().parseTerm(expression);</span>
-<span class="fc" id="L31">            MutableFeatures features = new MutableFeatures();</span>
-<span class="fc" id="L32">            collect(parsed, 1, features);</span>
-<span class="fc" id="L33">            return features.freeze(true);</span>
-<span class="fc" id="L34">        } catch (IllegalArgumentException exception) {</span>
-<span class="fc" id="L35">            return new MutableFeatures().freeze(false);</span>
+<span class="fc" id="L31">            return of(new ExpressionParser().parseTerm(expression));</span>
+<span class="nc" id="L32">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L33">            return unavailable();</span>
         }
     }
 
-    private static void collect(Expr expression, int depth, MutableFeatures features) {
-<span class="fc" id="L40">        features.nodeCount++;</span>
-<span class="fc" id="L41">        features.maxDepth = Math.max(features.maxDepth, depth);</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
-<span class="fc" id="L43">            features.variableOccurrences++;</span>
-<span class="fc" id="L44">            features.variables.add(variable.name());</span>
-<span class="fc" id="L45">            return;</span>
-        }
-<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
-<span class="fc" id="L48">            features.numericLiterals++;</span>
-<span class="fc" id="L49">            return;</span>
-        }
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
-<span class="nc" id="L52">            features.functions++;</span>
-<span class="nc" id="L53">            function.arguments().forEach(argument -&gt; collect(argument, depth + 1, features));</span>
-<span class="nc" id="L54">            return;</span>
-        }
-<span class="fc" id="L56">        BinaryExpr binary = (BinaryExpr) expression;</span>
-<span class="pc bpc" id="L57" title="3 of 6 branches missed.">        switch (binary.operator()) {</span>
-<span class="fc" id="L58">            case ADD -&gt; features.additions++;</span>
-<span class="nc" id="L59">            case SUB -&gt; features.subtractions++;</span>
-<span class="fc" id="L60">            case MUL -&gt; features.multiplications++;</span>
-<span class="nc" id="L61">            case DIV -&gt; features.divisions++;</span>
-<span class="fc" id="L62">            case POW -&gt; features.powers++;</span>
-        }
-<span class="fc" id="L64">        collect(binary.left(), depth + 1, features);</span>
-<span class="fc" id="L65">        collect(binary.right(), depth + 1, features);</span>
-<span class="fc" id="L66">    }</span>
+    static ExpressionFeatures of(Expr expression) {
+<span class="fc" id="L38">        MutableFeatures features = new MutableFeatures();</span>
+<span class="fc" id="L39">        collect(Objects.requireNonNull(expression, &quot;expression&quot;), 1, features);</span>
+<span class="fc" id="L40">        return features.freeze(true);</span>
+    }
 
-<span class="fc" id="L68">    private static final class MutableFeatures {</span>
+    static ExpressionFeatures unavailable() {
+<span class="fc" id="L44">        return new MutableFeatures().freeze(false);</span>
+    }
+
+    private static void collect(Expr expression, int depth, MutableFeatures features) {
+<span class="fc" id="L48">        features.nodeCount++;</span>
+<span class="fc" id="L49">        features.maxDepth = Math.max(features.maxDepth, depth);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L51">            features.variableOccurrences++;</span>
+<span class="fc" id="L52">            features.variables.add(variable.name());</span>
+<span class="fc" id="L53">            return;</span>
+        }
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
+<span class="fc" id="L56">            features.numericLiterals++;</span>
+<span class="fc" id="L57">            return;</span>
+        }
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L60">            features.functions++;</span>
+<span class="fc" id="L61">            function.arguments().forEach(argument -&gt; collect(argument, depth + 1, features));</span>
+<span class="fc" id="L62">            return;</span>
+        }
+<span class="fc" id="L64">        BinaryExpr binary = (BinaryExpr) expression;</span>
+<span class="pc bpc" id="L65" title="2 of 6 branches missed.">        switch (binary.operator()) {</span>
+<span class="fc" id="L66">            case ADD -&gt; features.additions++;</span>
+<span class="nc" id="L67">            case SUB -&gt; features.subtractions++;</span>
+<span class="fc" id="L68">            case MUL -&gt; features.multiplications++;</span>
+<span class="fc" id="L69">            case DIV -&gt; features.divisions++;</span>
+<span class="fc" id="L70">            case POW -&gt; features.powers++;</span>
+        }
+<span class="fc" id="L72">        collect(binary.left(), depth + 1, features);</span>
+<span class="fc" id="L73">        collect(binary.right(), depth + 1, features);</span>
+<span class="fc" id="L74">    }</span>
+
+<span class="fc" id="L76">    private static final class MutableFeatures {</span>
         private int nodeCount;
         private int maxDepth;
         private int variableOccurrences;
@@ -76,14 +84,14 @@ import java.util.Set;
         private int divisions;
         private int powers;
         private int functions;
-<span class="fc" id="L79">        private final Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L87">        private final Set&lt;String&gt; variables = new LinkedHashSet&lt;&gt;();</span>
 
         private ExpressionFeatures freeze(boolean parseable) {
-<span class="fc" id="L82">            return new ExpressionFeatures(</span>
+<span class="fc" id="L90">            return new ExpressionFeatures(</span>
                 nodeCount,
                 maxDepth,
                 variableOccurrences,
-<span class="fc" id="L86">                variables.size(),</span>
+<span class="fc" id="L94">                variables.size(),</span>
                 numericLiterals,
                 additions,
                 subtractions,
