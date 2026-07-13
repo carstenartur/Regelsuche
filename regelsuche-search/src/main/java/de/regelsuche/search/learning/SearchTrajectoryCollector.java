@@ -111,6 +111,9 @@ public final class SearchTrajectoryCollector implements SearchObserver {
         ExpressionFingerprint parent = event.parentExpression().isBlank()
             ? null
             : ExpressionFingerprint.of(event.parentExpression(), canonicalizer);
+        ExpressionFeatures parentFeatures = event.parentExpression().isBlank()
+            ? null
+            : ExpressionFeatures.of(event.parentExpression());
         boolean transformation = event.type() == SearchEventType.TRANSFORMATION_GENERATED;
         String eventSyntax = syntaxIdentity(event.expression());
         String parentSyntax = syntaxIdentity(event.parentExpression());
@@ -137,6 +140,7 @@ public final class SearchTrajectoryCollector implements SearchObserver {
             parent,
             target,
             ExpressionFeatures.of(event.expression()),
+            parentFeatures,
             event.depth(),
             event.score(),
             parentScore,
