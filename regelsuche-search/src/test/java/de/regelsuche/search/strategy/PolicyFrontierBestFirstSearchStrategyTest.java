@@ -14,7 +14,7 @@ import de.regelsuche.search.policy.DescriptorSearchPolicy;
 import de.regelsuche.search.policy.SearchPolicy;
 import de.regelsuche.search.policy.SearchPolicy.PolicyContext;
 import de.regelsuche.search.policy.SearchPolicy.PolicyDecision;
-import de.regelsuche.search.strategy.PolicyFrontierBestFirstSearchStrategy.FrontierPriorityEvent;
+import de.regelsuche.search.strategy.PolicyAwareBestFirstSearchStrategy.RankingEvent;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
@@ -35,7 +35,8 @@ class PolicyFrontierBestFirstSearchStrategyTest {
         var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
         var candidateOnly = new PolicyAwareBestFirstSearchStrategy(policy)
             .searchWithDiagnostics(problem);
-        var frontier = new PolicyFrontierBestFirstSearchStrategy(policy)
+        var frontier = new PolicyAwareBestFirstSearchStrategy(
+            policy, PolicyAwareBestFirstSearchStrategy.DEFAULT_MAX_FRONTIER_ADJUSTMENT)
             .searchWithDiagnostics(problem);
 
         assertFalse(staticResult.reached(), staticResult.toString());
@@ -44,15 +45,15 @@ class PolicyFrontierBestFirstSearchStrategyTest {
         assertEquals(List.of(GOOD_RULE, FINISH_RULE),
             frontier.search().reachedState().appliedRuleIds());
 
-        List<FrontierPriorityEvent> rootEvents = frontier.policyEvents().stream()
+        List<RankingEvent> rootEvents = frontier.policyEvents().stream()
             .filter(event -> event.parentExpression().equals("r"))
             .toList();
         assertEquals(2, rootEvents.size());
-        assertTrue(rootEvents.stream().allMatch(FrontierPriorityEvent::consideredBySearch));
-        assertTrue(rootEvents.stream().allMatch(FrontierPriorityEvent::admittedToFrontier));
+        assertTrue(rootEvents.stream().allMatch(RankingEvent::consideredBySearch));
+        assertTrue(rootEvents.stream().allMatch(RankingEvent::admittedToFrontier));
 
-        FrontierPriorityEvent good = event(rootEvents, GOOD_RULE);
-        FrontierPriorityEvent bad = event(rootEvents, BAD_RULE);
+        RankingEvent good = event(rootEvents, GOOD_RULE);
+        RankingEvent bad = event(rootEvents, BAD_RULE);
         assertTrue(good.frontierAdjustment() < 0, good.toString());
         assertTrue(bad.frontierAdjustment() > 0, bad.toString());
         assertEquals(0, good.dequeueOrder());
@@ -74,14 +75,15 @@ class PolicyFrontierBestFirstSearchStrategyTest {
             Map.of(),
             Map.of());
 
-        var fallback = new PolicyFrontierBestFirstSearchStrategy(
-            new DescriptorSearchPolicy(incompatible))
+        var fallback = new PolicyAwareBestFirstSearchStrategy(
+            new DescriptorSearchPolicy(incompatible),
+            PolicyAwareBestFirstSearchStrategy.DEFAULT_MAX_FRONTIER_ADJUSTMENT)
             .searchWithDiagnostics(problem);
 
         assertEquals(staticResult.status(), fallback.search().status());
         assertEquals(staticResult.states(), fallback.search().states());
         assertEquals(staticResult.reachedState(), fallback.search().reachedState());
-        assertTrue(fallback.policyEvents().stream().allMatch(FrontierPriorityEvent::fallback));
+        assertTrue(fallback.policyEvents().stream().allMatch(RankingEvent::fallback));
         assertTrue(fallback.policyEvents().stream()
             .allMatch(event -> event.frontierAdjustment() == 0));
     }
@@ -90,9 +92,9 @@ class PolicyFrontierBestFirstSearchStrategyTest {
     void frontierEvidenceAndDequeueTraceAreByteDeterministic() {
         DescriptorSearchPolicy policy = descriptorPolicy();
 
-        var first = new PolicyFrontierBestFirstSearchStrategy(policy)
+        var first = new PolicyAwareBestFirstSearchStrategy(policy, 1000)
             .searchWithDiagnostics(contentionProblem());
-        var second = new PolicyFrontierBestFirstSearchStrategy(policy)
+        var second = new PolicyAwareBestFirstSearchStrategy(policy, 1000)
             .searchWithDiagnostics(contentionProblem());
 
         assertEquals(first.search(), second.search());
@@ -113,10 +115,7 @@ class PolicyFrontierBestFirstSearchStrategyTest {
                 Transformation transformation
             ) {
                 return new PolicyDecision(
-                    id(),
-                    Integer.MAX_VALUE,
-                    1000,
-                    false,
+                    id(), Integer.MAX_VALUE, 1000, false,
                     Map.of("descriptor.extreme", Integer.MAX_VALUE),
                     "deliberately extreme descriptor evidence");
             }
@@ -132,9 +131,9 @@ class PolicyFrontierBestFirstSearchStrategyTest {
             new ExpressionCanonicalizer(),
             new SearchHeuristic(1, 4, 1, 2, 4, 8));
 
-        var result = new PolicyFrontierBestFirstSearchStrategy(extreme, 1000)
+        var result = new PolicyAwareBestFirstSearchStrategy(extreme, 1000)
             .searchWithDiagnostics(problem);
-        FrontierPriorityEvent event = event(result.policyEvents(), "unseen-a");
+        RankingEvent event = event(result.policyEvents(), "unseen-a");
 
         assertEquals(1000, event.frontierAdjustment());
         assertTrue(event.composedFrontierPriority() < Integer.MAX_VALUE);
@@ -143,14 +142,7 @@ class PolicyFrontierBestFirstSearchStrategyTest {
 
     private static DescriptorSearchPolicy descriptorPolicy() {
         FeatureStatistics estimatedCost = new FeatureStatistics(
-            4,
-            2,
-            2,
-            -10,
-            10,
-            -10,
-            10,
-            1000);
+            4, 2, 2, -10, 10, -10, 10, 1000);
         DescriptorPolicyModel model = new DescriptorPolicyModel(
             "descriptor-frontier-test/v1",
             "sha256:train-only-source",
@@ -180,10 +172,7 @@ class PolicyFrontierBestFirstSearchStrategyTest {
             .withTarget(SearchProblem.SearchTarget.syntaxExact("q"));
     }
 
-    private static FrontierPriorityEvent event(
-        List<FrontierPriorityEvent> events,
-        String ruleId
-    ) {
+    private static RankingEvent event(List<RankingEvent> events, String ruleId) {
         return events.stream()
             .filter(event -> event.ruleId().equals(ruleId))
             .findFirst()
