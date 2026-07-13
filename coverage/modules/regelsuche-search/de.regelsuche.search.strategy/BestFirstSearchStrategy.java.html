@@ -27,11 +27,12 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 
-<span class="fc" id="L31">public class BestFirstSearchStrategy implements SearchStrategy {</span>
+<span class="fc" id="L32">public class BestFirstSearchStrategy implements SearchStrategy {</span>
     @Override
     public List&lt;SearchState&gt; search(SearchProblem problem) {
-<span class="fc" id="L34">        return searchWithDiagnostics(problem).states();</span>
+<span class="fc" id="L35">        return searchWithDiagnostics(problem).states();</span>
     }
 
     /**
@@ -39,23 +40,23 @@ import java.util.Set;
      * returns deterministic target/failure diagnostics when a target is attached.
      */
     public GoalSearchResult searchWithDiagnostics(SearchProblem problem) {
-<span class="fc" id="L42">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
-<span class="fc" id="L43">        try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer())) {</span>
-<span class="fc" id="L44">            TargetSession target = new TargetSession(problem.target(), identity);</span>
-<span class="fc" id="L45">            SearchState rootState = createRootState(problem, identity);</span>
-<span class="fc" id="L46">            SearchFrame frame = createFrame(problem, identity, target);</span>
-<span class="fc" id="L47">            frame.frontier().add(rootState);</span>
-<span class="fc" id="L48">            frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visited().size());</span>
+<span class="fc" id="L43">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="fc" id="L44">        try (ValueIdentitySession identity = new ValueIdentitySession(problem.canonicalizer())) {</span>
+<span class="fc" id="L45">            TargetSession target = new TargetSession(problem.target(), identity);</span>
+<span class="fc" id="L46">            SearchState rootState = createRootState(problem, identity);</span>
+<span class="fc" id="L47">            SearchFrame frame = createFrame(problem, identity, target);</span>
+<span class="fc" id="L48">            frame.frontier().add(rootState);</span>
+<span class="fc" id="L49">            frame.telemetry().searchStarted(rootState, frame.frontier().size(), frame.visited().size());</span>
 
-<span class="fc bfc" id="L50" title="All 2 branches covered.">            while (shouldContinue(problem, frame)) {</span>
-<span class="fc" id="L51">                processNextState(problem, frame);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            while (shouldContinue(problem, frame)) {</span>
+<span class="fc" id="L52">                processNextState(problem, frame);</span>
             }
-<span class="fc" id="L53">            frame.telemetry().searchFinished(</span>
+<span class="fc" id="L54">            frame.telemetry().searchFinished(</span>
                 rootState,
-<span class="fc" id="L55">                frame.frontier().size(),</span>
-<span class="fc" id="L56">                frame.visited().size(),</span>
-<span class="fc" id="L57">                frame.explored().size());</span>
-<span class="fc" id="L58">            return GoalSearchResult.from(problem, frame, rootState);</span>
+<span class="fc" id="L56">                frame.frontier().size(),</span>
+<span class="fc" id="L57">                frame.visited().size(),</span>
+<span class="fc" id="L58">                frame.explored().size());</span>
+<span class="fc" id="L59">            return GoalSearchResult.from(problem, frame, rootState);</span>
         }
     }
 
@@ -64,11 +65,11 @@ import java.util.Set;
         ValueIdentitySession identity,
         TargetSession target
     ) {
-<span class="fc" id="L67">        return new SearchFrame(</span>
-<span class="fc" id="L68">            new PriorityQueue&lt;&gt;(priorityComparator(problem, target)),</span>
+<span class="fc" id="L68">        return new SearchFrame(</span>
+<span class="fc" id="L69">            new PriorityQueue&lt;&gt;(priorityComparator(problem, target)),</span>
             new ArrayList&lt;&gt;(),
             new HashSet&lt;&gt;(),
-<span class="fc" id="L71">            SearchTelemetry.forProblem(problem),</span>
+<span class="fc" id="L72">            SearchTelemetry.forProblem(problem),</span>
             identity,
             target,
             new GoalProgress()
@@ -76,17 +77,17 @@ import java.util.Set;
     }
 
     private SearchState createRootState(SearchProblem problem, ValueIdentitySession identity) {
-<span class="fc" id="L79">        String root = normalize(problem.rootExpression());</span>
-<span class="fc" id="L80">        ExpressionScore rootScore = problem.scorer().score(root);</span>
-<span class="fc" id="L81">        return new SearchState(</span>
+<span class="fc" id="L80">        String root = normalize(problem.rootExpression());</span>
+<span class="fc" id="L81">        ExpressionScore rootScore = problem.scorer().score(root);</span>
+<span class="fc" id="L82">        return new SearchState(</span>
             root,
             0,
             rootScore,
-<span class="fc" id="L85">            List.of(root),</span>
-<span class="fc" id="L86">            List.of(),</span>
-<span class="fc" id="L87">            Set.of(),</span>
+<span class="fc" id="L86">            List.of(root),</span>
+<span class="fc" id="L87">            List.of(),</span>
+<span class="fc" id="L88">            Set.of(),</span>
             0,
-<span class="fc" id="L89">            identity.valueHash(root),</span>
+<span class="fc" id="L90">            identity.valueHash(root),</span>
             null,
             null,
             RewriteKind.NORMALIZE,
@@ -98,119 +99,137 @@ import java.util.Set;
     }
 
     private Comparator&lt;SearchState&gt; priorityComparator(SearchProblem problem, TargetSession target) {
-<span class="fc" id="L101">        return Comparator</span>
-<span class="fc" id="L102">            .comparingInt((SearchState state) -&gt; target.adjustedPriority(priority(state, problem), state.expression()))</span>
-<span class="fc" id="L103">            .thenComparingInt(SearchState::depth)</span>
-<span class="fc" id="L104">            .thenComparing(SearchState::canonicalHash)</span>
-<span class="fc" id="L105">            .thenComparing(SearchState::expression)</span>
-<span class="fc" id="L106">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
-<span class="fc" id="L107">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()))</span>
-<span class="fc" id="L108">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, sortedValues(state.appliedRuleApplications())));</span>
+<span class="fc" id="L102">        return Comparator</span>
+<span class="fc" id="L103">            .comparingInt((SearchState state) -&gt; target.adjustedPriority(priority(state, problem), state.expression()))</span>
+<span class="fc" id="L104">            .thenComparingInt(SearchState::depth)</span>
+<span class="fc" id="L105">            .thenComparing(SearchState::canonicalHash)</span>
+<span class="fc" id="L106">            .thenComparing(SearchState::expression)</span>
+<span class="fc" id="L107">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
+<span class="fc" id="L108">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()))</span>
+<span class="fc" id="L109">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, sortedValues(state.appliedRuleApplications())));</span>
     }
 
     private boolean shouldContinue(SearchProblem problem, SearchFrame frame) {
-<span class="fc bfc" id="L112" title="All 2 branches covered.">        return !frame.frontier().isEmpty()</span>
-<span class="fc bfc" id="L113" title="All 2 branches covered.">            &amp;&amp; frame.explored().size() &lt; problem.heuristic().maxVisitedExpressions()</span>
-<span class="fc bfc" id="L114" title="All 4 branches covered.">            &amp;&amp; !(frame.target().stopWhenReached() &amp;&amp; frame.progress().reachedState != null);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        return !frame.frontier().isEmpty()</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            &amp;&amp; frame.explored().size() &lt; problem.heuristic().maxVisitedExpressions()</span>
+<span class="fc bfc" id="L115" title="All 4 branches covered.">            &amp;&amp; !(frame.target().stopWhenReached() &amp;&amp; frame.progress().reachedState != null);</span>
     }
 
     private void processNextState(SearchProblem problem, SearchFrame frame) {
-<span class="fc" id="L118">        SearchState current = frame.frontier().remove();</span>
-<span class="fc" id="L119">        frame.telemetry().stateDequeued(current, frame.frontier().size(), frame.visited().size());</span>
-<span class="fc bfc" id="L120" title="All 4 branches covered.">        if (!markVisited(current, frame) || pruneByTransposition(problem, current, frame)) {</span>
-<span class="fc" id="L121">            return;</span>
+<span class="fc" id="L119">        SearchState current = frame.frontier().remove();</span>
+<span class="fc" id="L120">        frame.telemetry().stateDequeued(current, frame.frontier().size(), frame.visited().size());</span>
+<span class="fc bfc" id="L121" title="All 4 branches covered.">        if (!markVisited(current, frame) || pruneByTransposition(problem, current, frame)) {</span>
+<span class="fc" id="L122">            return;</span>
         }
-<span class="fc" id="L123">        frame.explored().add(current);</span>
-<span class="fc" id="L124">        frame.progress().record(current, frame.target().distance(current.expression()));</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (frame.target().reached(current.expression())) {</span>
-<span class="fc" id="L126">            frame.progress().reachedState = current;</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (frame.target().stopWhenReached()) {</span>
-<span class="fc" id="L128">                return;</span>
+<span class="fc" id="L124">        frame.explored().add(current);</span>
+<span class="fc" id="L125">        frame.progress().record(current, frame.target().distance(current.expression()));</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (frame.target().reached(current.expression())) {</span>
+<span class="fc" id="L127">            frame.progress().reachedState = current;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (frame.target().stopWhenReached()) {</span>
+<span class="fc" id="L129">                return;</span>
             }
         }
-<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (!pruneByDepth(problem, current, frame)) {</span>
-<span class="fc" id="L132">            expandState(problem, current, frame);</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (!pruneByDepth(problem, current, frame)) {</span>
+<span class="fc" id="L133">            expandState(problem, current, frame);</span>
         }
-<span class="fc" id="L134">    }</span>
+<span class="fc" id="L135">    }</span>
 
     private boolean markVisited(SearchState current, SearchFrame frame) {
-<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (frame.visited().add(stateKey(current))) {</span>
-<span class="fc" id="L138">            frame.telemetry().stateVisited(current, frame.frontier().size(), frame.visited().size());</span>
-<span class="fc" id="L139">            return true;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (frame.visited().add(stateKey(current))) {</span>
+<span class="fc" id="L139">            frame.telemetry().stateVisited(current, frame.frontier().size(), frame.visited().size());</span>
+<span class="fc" id="L140">            return true;</span>
         }
-<span class="fc" id="L141">        frame.progress().duplicatePrunes++;</span>
-<span class="fc" id="L142">        frame.telemetry().statePrunedDuplicate(current, frame.frontier().size(), frame.visited().size(), 0);</span>
-<span class="fc" id="L143">        return false;</span>
+<span class="fc" id="L142">        frame.progress().duplicatePrunes++;</span>
+<span class="fc" id="L143">        frame.telemetry().statePrunedDuplicate(current, frame.frontier().size(), frame.visited().size(), 0);</span>
+<span class="fc" id="L144">        return false;</span>
     }
 
     private boolean pruneByTransposition(SearchProblem problem, SearchState current, SearchFrame frame) {
-<span class="fc bfc" id="L147" title="All 4 branches covered.">        if (current.depth() == 0 || problem.memory() == null) {</span>
-<span class="fc" id="L148">            return false;</span>
+<span class="fc bfc" id="L148" title="All 4 branches covered.">        if (current.depth() == 0 || problem.memory() == null) {</span>
+<span class="fc" id="L149">            return false;</span>
         }
-<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (TranspositionGate.evaluate(</span>
-<span class="fc" id="L151">                problem.memory(),</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (TranspositionGate.evaluate(</span>
+<span class="fc" id="L152">                problem.memory(),</span>
                 current,
-<span class="fc" id="L153">                current.canonicalHash() + &quot;#&quot; + current.depth(),</span>
-<span class="fc" id="L154">                List.of(frame.identity().legacyHash(current.expression())))</span>
+<span class="fc" id="L154">                current.canonicalHash() + &quot;#&quot; + current.depth(),</span>
+<span class="fc" id="L155">                List.of(frame.identity().legacyHash(current.expression())))</span>
                 != TranspositionGate.Verdict.PRUNE) {
-<span class="nc" id="L156">            return false;</span>
+<span class="nc" id="L157">            return false;</span>
         }
-<span class="fc" id="L158">        frame.progress().transpositionPrunes++;</span>
-<span class="fc" id="L159">        frame.telemetry().statePrunedTransposition(current, frame.frontier().size(), frame.visited().size());</span>
-<span class="fc" id="L160">        return true;</span>
+<span class="fc" id="L159">        frame.progress().transpositionPrunes++;</span>
+<span class="fc" id="L160">        frame.telemetry().statePrunedTransposition(current, frame.frontier().size(), frame.visited().size());</span>
+<span class="fc" id="L161">        return true;</span>
     }
 
     private boolean pruneByDepth(SearchProblem problem, SearchState current, SearchFrame frame) {
-<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (current.depth() &lt; problem.heuristic().maxDepth()) {</span>
-<span class="fc" id="L165">            return false;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (current.depth() &lt; problem.heuristic().maxDepth()) {</span>
+<span class="fc" id="L166">            return false;</span>
         }
-<span class="fc" id="L167">        frame.progress().depthPrunes++;</span>
-<span class="fc" id="L168">        frame.telemetry().statePrunedDepth(current, frame.frontier().size(), frame.visited().size());</span>
-<span class="fc" id="L169">        return true;</span>
+<span class="fc" id="L168">        frame.progress().depthPrunes++;</span>
+<span class="fc" id="L169">        frame.telemetry().statePrunedDepth(current, frame.frontier().size(), frame.visited().size());</span>
+<span class="fc" id="L170">        return true;</span>
     }
 
     private void expandState(SearchProblem problem, SearchState current, SearchFrame frame) {
-<span class="fc" id="L173">        List&lt;Transformation&gt; transformations = sortedTransformations(problem, current, frame.target());</span>
-<span class="fc" id="L174">        frame.progress().expandedStates++;</span>
-<span class="fc" id="L175">        frame.progress().generatedTransformations += transformations.size();</span>
-<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (transformations.isEmpty()) {</span>
-<span class="fc" id="L177">            frame.progress().statesWithoutTransformations++;</span>
+<span class="fc" id="L174">        List&lt;Transformation&gt; transformations = sortedTransformations(problem, current, frame.target());</span>
+<span class="fc" id="L175">        frame.progress().expandedStates++;</span>
+<span class="fc" id="L176">        frame.progress().generatedTransformations += transformations.size();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (transformations.isEmpty()) {</span>
+<span class="fc" id="L178">            frame.progress().statesWithoutTransformations++;</span>
         }
-<span class="fc" id="L179">        frame.telemetry().stateExpanded(</span>
+<span class="fc" id="L180">        frame.telemetry().stateExpanded(</span>
             current,
-<span class="fc" id="L181">            frame.frontier().size(),</span>
-<span class="fc" id="L182">            frame.visited().size(),</span>
-<span class="fc" id="L183">            transformations.size());</span>
-<span class="fc" id="L184">        int generated = 0;</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
-<span class="fc bfc" id="L186" title="All 2 branches covered.">            if (candidateBudgetReached(problem, current, frame, generated)) {</span>
-<span class="fc" id="L187">                break;</span>
+<span class="fc" id="L182">            frame.frontier().size(),</span>
+<span class="fc" id="L183">            frame.visited().size(),</span>
+<span class="fc" id="L184">            transformations.size());</span>
+<span class="fc" id="L185">        int generated = 0;</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (candidateBudgetReached(problem, current, frame, generated)) {</span>
+<span class="fc" id="L188">                break;</span>
             }
-<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (tryEnqueueTransformation(problem, current, transformation, frame, generated)) {</span>
-<span class="fc" id="L190">                generated++;</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (tryEnqueueTransformation(problem, current, transformation, frame, generated)) {</span>
+<span class="fc" id="L191">                generated++;</span>
             }
-<span class="fc" id="L192">        }</span>
-<span class="fc" id="L193">    }</span>
+<span class="fc" id="L193">        }</span>
+<span class="fc" id="L194">    }</span>
 
     private List&lt;Transformation&gt; sortedTransformations(
         SearchProblem problem,
         SearchState current,
         TargetSession target
     ) {
-<span class="fc" id="L200">        List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(problem.engine().transform(current.expression()));</span>
-<span class="fc" id="L201">        Comparator&lt;Transformation&gt; deterministic = Comparator</span>
-<span class="fc" id="L202">            .comparing(Transformation::rule)</span>
-<span class="fc" id="L203">            .thenComparing(Transformation::transformedExpression)</span>
-<span class="fc" id="L204">            .thenComparing(Transformation::applicationKey);</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (target.enabled()) {</span>
-<span class="fc" id="L206">            transformations.sort(Comparator</span>
-<span class="fc" id="L207">                .comparingInt((Transformation transformation) -&gt;</span>
-<span class="fc" id="L208">                    target.distance(transformation.transformedExpression()))</span>
-<span class="fc" id="L209">                .thenComparing(deterministic));</span>
+<span class="fc" id="L201">        return orderTransformations(</span>
+            problem,
+            current,
+<span class="fc" id="L204">            new ArrayList&lt;&gt;(problem.engine().transform(current.expression())),</span>
+<span class="fc" id="L205">            target.enabled(),</span>
+<span class="fc" id="L206">            transformation -&gt; target.distance(transformation.transformedExpression()));</span>
+    }
+
+    /**
+     * Orders all applicable transformations before the ordinary candidate-budget loop.
+     * Subclasses may reorder candidates, but must return the complete list so this
+     * strategy remains the sole owner of skip, duplicate and enqueue accounting.
+     */
+    protected List&lt;Transformation&gt; orderTransformations(
+        SearchProblem problem,
+        SearchState current,
+        List&lt;Transformation&gt; transformations,
+        boolean targetEnabled,
+        ToIntFunction&lt;Transformation&gt; targetDistance
+    ) {
+<span class="fc" id="L221">        Comparator&lt;Transformation&gt; deterministic = Comparator</span>
+<span class="fc" id="L222">            .comparing(Transformation::rule)</span>
+<span class="fc" id="L223">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L224">            .thenComparing(Transformation::applicationKey);</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (targetEnabled) {</span>
+<span class="fc" id="L226">            transformations.sort(Comparator</span>
+<span class="fc" id="L227">                .comparingInt(targetDistance)</span>
+<span class="fc" id="L228">                .thenComparing(deterministic));</span>
         } else {
-<span class="fc" id="L211">            transformations.sort(deterministic);</span>
+<span class="fc" id="L230">            transformations.sort(deterministic);</span>
         }
-<span class="fc" id="L213">        return transformations;</span>
+<span class="fc" id="L232">        return transformations;</span>
     }
 
     private boolean candidateBudgetReached(
@@ -219,16 +238,16 @@ import java.util.Set;
         SearchFrame frame,
         int generated
     ) {
-<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (generated &lt; problem.heuristic().maxCandidatesPerState()) {</span>
-<span class="fc" id="L223">            return false;</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (generated &lt; problem.heuristic().maxCandidatesPerState()) {</span>
+<span class="fc" id="L242">            return false;</span>
         }
-<span class="fc" id="L225">        frame.progress().candidateBudgetPrunes++;</span>
-<span class="fc" id="L226">        frame.telemetry().statePrunedBudget(</span>
+<span class="fc" id="L244">        frame.progress().candidateBudgetPrunes++;</span>
+<span class="fc" id="L245">        frame.telemetry().statePrunedBudget(</span>
             current,
-<span class="fc" id="L228">            frame.frontier().size(),</span>
-<span class="fc" id="L229">            frame.visited().size(),</span>
+<span class="fc" id="L247">            frame.frontier().size(),</span>
+<span class="fc" id="L248">            frame.visited().size(),</span>
             generated);
-<span class="fc" id="L231">        return true;</span>
+<span class="fc" id="L250">        return true;</span>
     }
 
     private boolean tryEnqueueTransformation(
@@ -238,56 +257,56 @@ import java.util.Set;
         SearchFrame frame,
         int generated
     ) {
-<span class="fc" id="L241">        String skipReason = skipReason(problem, current, transformation);</span>
-<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (!skipReason.isBlank()) {</span>
-<span class="fc" id="L243">            frame.progress().skippedTransformations++;</span>
-<span class="fc" id="L244">            frame.telemetry().transformationSkipped(</span>
+<span class="fc" id="L260">        String skipReason = skipReason(problem, current, transformation);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (!skipReason.isBlank()) {</span>
+<span class="fc" id="L262">            frame.progress().skippedTransformations++;</span>
+<span class="fc" id="L263">            frame.telemetry().transformationSkipped(</span>
                 current,
                 transformation,
-<span class="fc" id="L247">                frame.frontier().size(),</span>
-<span class="fc" id="L248">                frame.visited().size(),</span>
+<span class="fc" id="L266">                frame.frontier().size(),</span>
+<span class="fc" id="L267">                frame.visited().size(),</span>
                 generated,
                 skipReason);
-<span class="fc" id="L251">            return false;</span>
+<span class="fc" id="L270">            return false;</span>
         }
-<span class="fc" id="L253">        frame.telemetry().transformationGenerated(</span>
+<span class="fc" id="L272">        frame.telemetry().transformationGenerated(</span>
             current,
             transformation,
-<span class="fc" id="L256">            frame.frontier().size(),</span>
-<span class="fc" id="L257">            frame.visited().size(),</span>
+<span class="fc" id="L275">            frame.frontier().size(),</span>
+<span class="fc" id="L276">            frame.visited().size(),</span>
             generated);
-<span class="fc" id="L259">        SearchState nextState = createNextState(problem, current, transformation, frame.identity());</span>
-<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (frame.visited().contains(stateKey(nextState))) {</span>
-<span class="fc" id="L261">            frame.progress().duplicatePrunes++;</span>
-<span class="fc" id="L262">            frame.telemetry().statePrunedDuplicate(</span>
+<span class="fc" id="L278">        SearchState nextState = createNextState(problem, current, transformation, frame.identity());</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (frame.visited().contains(stateKey(nextState))) {</span>
+<span class="fc" id="L280">            frame.progress().duplicatePrunes++;</span>
+<span class="fc" id="L281">            frame.telemetry().statePrunedDuplicate(</span>
                 nextState,
-<span class="fc" id="L264">                frame.frontier().size(),</span>
-<span class="fc" id="L265">                frame.visited().size(),</span>
+<span class="fc" id="L283">                frame.frontier().size(),</span>
+<span class="fc" id="L284">                frame.visited().size(),</span>
                 generated);
-<span class="fc" id="L267">            return false;</span>
+<span class="fc" id="L286">            return false;</span>
         }
-<span class="fc" id="L269">        frame.frontier().add(nextState);</span>
-<span class="fc" id="L270">        frame.progress().enqueuedStates++;</span>
-<span class="fc" id="L271">        frame.telemetry().stateEnqueued(</span>
+<span class="fc" id="L288">        frame.frontier().add(nextState);</span>
+<span class="fc" id="L289">        frame.progress().enqueuedStates++;</span>
+<span class="fc" id="L290">        frame.telemetry().stateEnqueued(</span>
             nextState,
-<span class="fc" id="L273">            frame.frontier().size(),</span>
-<span class="fc" id="L274">            frame.visited().size(),</span>
+<span class="fc" id="L292">            frame.frontier().size(),</span>
+<span class="fc" id="L293">            frame.visited().size(),</span>
             generated + 1);
-<span class="fc" id="L276">        return true;</span>
+<span class="fc" id="L295">        return true;</span>
     }
 
     private String skipReason(SearchProblem problem, SearchState current, Transformation transformation) {
-<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (current.appliedRuleApplications().contains(transformation.applicationKey())) {</span>
-<span class="fc" id="L281">            return &quot;repeated-rule-application&quot;;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (current.appliedRuleApplications().contains(transformation.applicationKey())) {</span>
+<span class="fc" id="L300">            return &quot;repeated-rule-application&quot;;</span>
         }
-<span class="fc" id="L283">        int expandedSteps = expandedSteps(current, transformation);</span>
-<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (expandedSteps &gt; problem.heuristic().maxExpandingSteps()) {</span>
-<span class="nc" id="L285">            return &quot;max-expanding-steps&quot;;</span>
+<span class="fc" id="L302">        int expandedSteps = expandedSteps(current, transformation);</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">        if (expandedSteps &gt; problem.heuristic().maxExpandingSteps()) {</span>
+<span class="nc" id="L304">            return &quot;max-expanding-steps&quot;;</span>
         }
-<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if (transformation.transformedExpression().equals(current.expression())) {</span>
-<span class="nc" id="L288">            return &quot;same-expression&quot;;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (transformation.transformedExpression().equals(current.expression())) {</span>
+<span class="fc" id="L307">            return &quot;same-expression&quot;;</span>
         }
-<span class="fc" id="L290">        return &quot;&quot;;</span>
+<span class="fc" id="L309">        return &quot;&quot;;</span>
     }
 
     private SearchState createNextState(
@@ -296,78 +315,78 @@ import java.util.Set;
         Transformation transformation,
         ValueIdentitySession identity
     ) {
-<span class="fc" id="L299">        String nextExpression = transformation.transformedExpression();</span>
-<span class="fc" id="L300">        ExpressionScore nextScore = problem.scorer().score(nextExpression);</span>
-<span class="fc" id="L301">        int improvement = current.score().weightedTotal() - nextScore.weightedTotal();</span>
-<span class="fc" id="L302">        return new SearchState(</span>
+<span class="fc" id="L318">        String nextExpression = transformation.transformedExpression();</span>
+<span class="fc" id="L319">        ExpressionScore nextScore = problem.scorer().score(nextExpression);</span>
+<span class="fc" id="L320">        int improvement = current.score().weightedTotal() - nextScore.weightedTotal();</span>
+<span class="fc" id="L321">        return new SearchState(</span>
             nextExpression,
-<span class="fc" id="L304">            current.depth() + 1,</span>
+<span class="fc" id="L323">            current.depth() + 1,</span>
             nextScore,
-<span class="fc" id="L306">            pathWith(current.path(), nextExpression),</span>
-<span class="fc" id="L307">            appliedRuleIdsWith(current.appliedRuleIds(), transformation.rule()),</span>
-<span class="fc" id="L308">            appliedApplicationsWith(current.appliedRuleApplications(), transformation.applicationKey()),</span>
-<span class="fc" id="L309">            expandedSteps(current, transformation),</span>
-<span class="fc" id="L310">            identity.valueHash(nextExpression),</span>
-<span class="fc" id="L311">            current.expression(),</span>
-<span class="fc" id="L312">            transformation.rule(),</span>
-<span class="fc" id="L313">            transformation.kind(),</span>
-<span class="fc" id="L314">            transformation.mayIncreaseComplexity(),</span>
-<span class="fc" id="L315">            transformation.estimatedCostDelta(),</span>
-<span class="fc" id="L316">            transformation.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L325">            pathWith(current.path(), nextExpression),</span>
+<span class="fc" id="L326">            appliedRuleIdsWith(current.appliedRuleIds(), transformation.rule()),</span>
+<span class="fc" id="L327">            appliedApplicationsWith(current.appliedRuleApplications(), transformation.applicationKey()),</span>
+<span class="fc" id="L328">            expandedSteps(current, transformation),</span>
+<span class="fc" id="L329">            identity.valueHash(nextExpression),</span>
+<span class="fc" id="L330">            current.expression(),</span>
+<span class="fc" id="L331">            transformation.rule(),</span>
+<span class="fc" id="L332">            transformation.kind(),</span>
+<span class="fc" id="L333">            transformation.mayIncreaseComplexity(),</span>
+<span class="fc" id="L334">            transformation.estimatedCostDelta(),</span>
+<span class="fc" id="L335">            transformation.equivalencePreservingByConstruction(),</span>
             improvement,
-<span class="fc" id="L318">            rewriteKindsWith(current.appliedRuleKinds(), transformation.kind()),</span>
-<span class="fc" id="L319">            equivalenceFlagsWith(</span>
-<span class="fc" id="L320">                current.equivalencePreservingFlags(),</span>
-<span class="fc" id="L321">                transformation.equivalencePreservingByConstruction()),</span>
-<span class="fc" id="L322">            assumptionsWith(current.assumptions(), transformation.assumptions())</span>
+<span class="fc" id="L337">            rewriteKindsWith(current.appliedRuleKinds(), transformation.kind()),</span>
+<span class="fc" id="L338">            equivalenceFlagsWith(</span>
+<span class="fc" id="L339">                current.equivalencePreservingFlags(),</span>
+<span class="fc" id="L340">                transformation.equivalencePreservingByConstruction()),</span>
+<span class="fc" id="L341">            assumptionsWith(current.assumptions(), transformation.assumptions())</span>
         );
     }
 
     private int expandedSteps(SearchState current, Transformation transformation) {
-<span class="fc bfc" id="L327" title="All 2 branches covered.">        return current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        return current.expandedStepCount() + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);</span>
     }
 
     private List&lt;String&gt; pathWith(List&lt;String&gt; path, String nextExpression) {
-<span class="fc" id="L331">        List&lt;String&gt; nextPath = new ArrayList&lt;&gt;(path);</span>
-<span class="fc" id="L332">        nextPath.add(nextExpression);</span>
-<span class="fc" id="L333">        return nextPath;</span>
+<span class="fc" id="L350">        List&lt;String&gt; nextPath = new ArrayList&lt;&gt;(path);</span>
+<span class="fc" id="L351">        nextPath.add(nextExpression);</span>
+<span class="fc" id="L352">        return nextPath;</span>
     }
 
     private List&lt;String&gt; appliedRuleIdsWith(List&lt;String&gt; appliedRuleIds, String ruleId) {
-<span class="fc" id="L337">        List&lt;String&gt; nextRuleIds = new ArrayList&lt;&gt;(appliedRuleIds);</span>
-<span class="fc" id="L338">        nextRuleIds.add(ruleId);</span>
-<span class="fc" id="L339">        return nextRuleIds;</span>
+<span class="fc" id="L356">        List&lt;String&gt; nextRuleIds = new ArrayList&lt;&gt;(appliedRuleIds);</span>
+<span class="fc" id="L357">        nextRuleIds.add(ruleId);</span>
+<span class="fc" id="L358">        return nextRuleIds;</span>
     }
 
     private Set&lt;String&gt; appliedApplicationsWith(Set&lt;String&gt; applications, String applicationKey) {
-<span class="fc" id="L343">        Set&lt;String&gt; nextApplications = new HashSet&lt;&gt;(applications);</span>
-<span class="fc" id="L344">        nextApplications.add(applicationKey);</span>
-<span class="fc" id="L345">        return nextApplications;</span>
+<span class="fc" id="L362">        Set&lt;String&gt; nextApplications = new HashSet&lt;&gt;(applications);</span>
+<span class="fc" id="L363">        nextApplications.add(applicationKey);</span>
+<span class="fc" id="L364">        return nextApplications;</span>
     }
 
     private List&lt;RewriteKind&gt; rewriteKindsWith(List&lt;RewriteKind&gt; rewriteKinds, RewriteKind rewriteKind) {
-<span class="fc" id="L349">        List&lt;RewriteKind&gt; nextKinds = new ArrayList&lt;&gt;(rewriteKinds);</span>
-<span class="fc" id="L350">        nextKinds.add(rewriteKind);</span>
-<span class="fc" id="L351">        return nextKinds;</span>
+<span class="fc" id="L368">        List&lt;RewriteKind&gt; nextKinds = new ArrayList&lt;&gt;(rewriteKinds);</span>
+<span class="fc" id="L369">        nextKinds.add(rewriteKind);</span>
+<span class="fc" id="L370">        return nextKinds;</span>
     }
 
     private List&lt;Boolean&gt; equivalenceFlagsWith(List&lt;Boolean&gt; flags, boolean equivalencePreserving) {
-<span class="fc" id="L355">        List&lt;Boolean&gt; nextFlags = new ArrayList&lt;&gt;(flags);</span>
-<span class="fc" id="L356">        nextFlags.add(equivalencePreserving);</span>
-<span class="fc" id="L357">        return nextFlags;</span>
+<span class="fc" id="L374">        List&lt;Boolean&gt; nextFlags = new ArrayList&lt;&gt;(flags);</span>
+<span class="fc" id="L375">        nextFlags.add(equivalencePreserving);</span>
+<span class="fc" id="L376">        return nextFlags;</span>
     }
 
     private List&lt;String&gt; assumptionsWith(List&lt;String&gt; assumptions, List&lt;String&gt; additionalAssumptions) {
-<span class="fc" id="L361">        List&lt;String&gt; nextAssumptions = new ArrayList&lt;&gt;(assumptions);</span>
-<span class="fc" id="L362">        nextAssumptions.addAll(additionalAssumptions);</span>
-<span class="fc" id="L363">        return nextAssumptions;</span>
+<span class="fc" id="L380">        List&lt;String&gt; nextAssumptions = new ArrayList&lt;&gt;(assumptions);</span>
+<span class="fc" id="L381">        nextAssumptions.addAll(additionalAssumptions);</span>
+<span class="fc" id="L382">        return nextAssumptions;</span>
     }
 
     protected int priority(SearchState state) {
-<span class="fc" id="L367">        int depthPenalty = state.depth() * 2;</span>
-<span class="fc" id="L368">        int expansionPenalty = state.expandedStepCount() * 5;</span>
-<span class="pc bpc" id="L369" title="1 of 4 branches missed.">        int noImprovementPenalty = state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0;</span>
-<span class="fc" id="L370">        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;</span>
+<span class="fc" id="L386">        int depthPenalty = state.depth() * 2;</span>
+<span class="fc" id="L387">        int expansionPenalty = state.expandedStepCount() * 5;</span>
+<span class="pc bpc" id="L388" title="1 of 4 branches missed.">        int noImprovementPenalty = state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0;</span>
+<span class="fc" id="L389">        return state.score().weightedTotal() + depthPenalty + expansionPenalty + noImprovementPenalty;</span>
     }
 
     /**
@@ -375,32 +394,32 @@ import java.util.Set;
      * the queue wrapper so subclasses such as A* inherit the same target signal.
      */
     protected int priority(SearchState state, SearchProblem problem) {
-<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (problem.costModel() == null) {</span>
-<span class="fc" id="L379">            return priority(state);</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (problem.costModel() == null) {</span>
+<span class="fc" id="L398">            return priority(state);</span>
         }
-<span class="fc" id="L381">        int depthPenalty = state.depth() * 2;</span>
-<span class="fc" id="L382">        int expansionPenalty = state.expandedStepCount() * 5;</span>
-<span class="pc bpc" id="L383" title="1 of 4 branches missed.">        int noImprovementPenalty = state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0;</span>
-<span class="fc" id="L384">        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());</span>
-<span class="pc bpc" id="L385" title="1 of 2 branches missed.">        if (modelCost == Integer.MAX_VALUE) {</span>
-<span class="nc" id="L386">            return Integer.MAX_VALUE / 2;</span>
+<span class="fc" id="L400">        int depthPenalty = state.depth() * 2;</span>
+<span class="fc" id="L401">        int expansionPenalty = state.expandedStepCount() * 5;</span>
+<span class="pc bpc" id="L402" title="1 of 4 branches missed.">        int noImprovementPenalty = state.improvement() &lt;= 0 &amp;&amp; state.depth() &gt; 0 ? 4 : 0;</span>
+<span class="fc" id="L403">        int modelCost = problem.costModel().cost(state.expression(), problem.canonicalizer(), state.score());</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">        if (modelCost == Integer.MAX_VALUE) {</span>
+<span class="nc" id="L405">            return Integer.MAX_VALUE / 2;</span>
         }
-<span class="fc" id="L388">        return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;</span>
+<span class="fc" id="L407">        return modelCost + depthPenalty + expansionPenalty + noImprovementPenalty;</span>
     }
 
     private String stateKey(SearchState state) {
-<span class="fc" id="L392">        return state.canonicalHash() + &quot;:&quot; + String.join(&quot;,&quot;, sortedValues(state.appliedRuleApplications()));</span>
+<span class="fc" id="L411">        return state.canonicalHash() + &quot;:&quot; + String.join(&quot;,&quot;, sortedValues(state.appliedRuleApplications()));</span>
     }
 
     private List&lt;String&gt; sortedValues(Set&lt;String&gt; values) {
-<span class="fc" id="L396">        return values.stream().sorted().toList();</span>
+<span class="fc" id="L415">        return values.stream().sorted().toList();</span>
     }
 
     private static String normalize(String expression) {
-<span class="fc" id="L400">        return Objects.requireNonNull(expression, &quot;expression&quot;).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L419">        return Objects.requireNonNull(expression, &quot;expression&quot;).trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
-<span class="fc" id="L403">    private record SearchFrame(</span>
+<span class="fc" id="L422">    private record SearchFrame(</span>
         PriorityQueue&lt;SearchState&gt; frontier,
         List&lt;SearchState&gt; explored,
         Set&lt;String&gt; visited,
@@ -411,10 +430,10 @@ import java.util.Set;
     ) {
     }
 
-<span class="fc" id="L414">    private static final class GoalProgress {</span>
+<span class="fc" id="L433">    private static final class GoalProgress {</span>
         private SearchState reachedState;
         private SearchState bestState;
-<span class="fc" id="L417">        private int bestDistance = Integer.MAX_VALUE;</span>
+<span class="fc" id="L436">        private int bestDistance = Integer.MAX_VALUE;</span>
         private int expandedStates;
         private int generatedTransformations;
         private int enqueuedStates;
@@ -426,35 +445,35 @@ import java.util.Set;
         private int statesWithoutTransformations;
 
         private void record(SearchState state, int distance) {
-<span class="fc bfc" id="L429" title="All 4 branches covered.">            if (distance &lt; bestDistance</span>
-<span class="pc bpc" id="L430" title="1 of 2 branches missed.">                    || distance == bestDistance &amp;&amp; betterTieBreak(state, bestState)) {</span>
-<span class="fc" id="L431">                bestDistance = distance;</span>
-<span class="fc" id="L432">                bestState = state;</span>
+<span class="fc bfc" id="L448" title="All 4 branches covered.">            if (distance &lt; bestDistance</span>
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">                    || distance == bestDistance &amp;&amp; betterTieBreak(state, bestState)) {</span>
+<span class="fc" id="L450">                bestDistance = distance;</span>
+<span class="fc" id="L451">                bestState = state;</span>
             }
-<span class="fc" id="L434">        }</span>
+<span class="fc" id="L453">        }</span>
 
         private static boolean betterTieBreak(SearchState candidate, SearchState current) {
-<span class="pc bpc" id="L437" title="1 of 2 branches missed.">            return current == null</span>
-<span class="pc bpc" id="L438" title="1 of 2 branches missed.">                || candidate.depth() &lt; current.depth()</span>
-<span class="fc bfc" id="L439" title="All 2 branches covered.">                || candidate.depth() == current.depth()</span>
-<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                    &amp;&amp; candidate.expression().compareTo(current.expression()) &lt; 0;</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            return current == null</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">                || candidate.depth() &lt; current.depth()</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">                || candidate.depth() == current.depth()</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">                    &amp;&amp; candidate.expression().compareTo(current.expression()) &lt; 0;</span>
         }
     }
 
     /** Search terminal status; it is diagnostic telemetry, not proof evidence. */
-<span class="fc" id="L445">    public enum GoalStatus {</span>
-<span class="fc" id="L446">        UNTARGETED,</span>
-<span class="fc" id="L447">        ROOT_ALREADY_TARGET,</span>
-<span class="fc" id="L448">        REACHED,</span>
-<span class="fc" id="L449">        STATE_BUDGET,</span>
-<span class="fc" id="L450">        DEPTH_BUDGET,</span>
-<span class="fc" id="L451">        CANDIDATE_BUDGET,</span>
-<span class="fc" id="L452">        NO_TRANSFORMATIONS,</span>
-<span class="fc" id="L453">        FRONTIER_EXHAUSTED,</span>
-<span class="fc" id="L454">        UNPARSEABLE_TARGET</span>
+<span class="fc" id="L464">    public enum GoalStatus {</span>
+<span class="fc" id="L465">        UNTARGETED,</span>
+<span class="fc" id="L466">        ROOT_ALREADY_TARGET,</span>
+<span class="fc" id="L467">        REACHED,</span>
+<span class="fc" id="L468">        STATE_BUDGET,</span>
+<span class="fc" id="L469">        DEPTH_BUDGET,</span>
+<span class="fc" id="L470">        CANDIDATE_BUDGET,</span>
+<span class="fc" id="L471">        NO_TRANSFORMATIONS,</span>
+<span class="fc" id="L472">        FRONTIER_EXHAUSTED,</span>
+<span class="fc" id="L473">        UNPARSEABLE_TARGET</span>
     }
 
-<span class="fc" id="L457">    public record GoalMetrics(</span>
+<span class="fc" id="L476">    public record GoalMetrics(</span>
         int exploredStates,
         int expandedStates,
         int generatedTransformations,
@@ -481,12 +500,12 @@ import java.util.Set;
         GoalStatus status,
         GoalMetrics metrics
     ) {
-<span class="fc" id="L484">        public GoalSearchResult {</span>
-<span class="fc" id="L485">            states = List.copyOf(states);</span>
-<span class="fc" id="L486">        }</span>
+<span class="fc" id="L503">        public GoalSearchResult {</span>
+<span class="fc" id="L504">            states = List.copyOf(states);</span>
+<span class="fc" id="L505">        }</span>
 
         public boolean reached() {
-<span class="fc bfc" id="L489" title="All 4 branches covered.">            return status == GoalStatus.REACHED || status == GoalStatus.ROOT_ALREADY_TARGET;</span>
+<span class="fc bfc" id="L508" title="All 4 branches covered.">            return status == GoalStatus.REACHED || status == GoalStatus.ROOT_ALREADY_TARGET;</span>
         }
 
         private static GoalSearchResult from(
@@ -494,37 +513,37 @@ import java.util.Set;
             SearchFrame frame,
             SearchState rootState
         ) {
-<span class="fc" id="L497">            GoalProgress progress = frame.progress();</span>
+<span class="fc" id="L516">            GoalProgress progress = frame.progress();</span>
             GoalStatus status;
-<span class="fc bfc" id="L499" title="All 2 branches covered.">            if (!frame.target().enabled()) {</span>
-<span class="fc" id="L500">                status = GoalStatus.UNTARGETED;</span>
-<span class="fc bfc" id="L501" title="All 2 branches covered.">            } else if (!frame.target().parseable()) {</span>
-<span class="fc" id="L502">                status = GoalStatus.UNPARSEABLE_TARGET;</span>
-<span class="fc bfc" id="L503" title="All 2 branches covered.">            } else if (progress.reachedState != null) {</span>
-<span class="fc bfc" id="L504" title="All 2 branches covered.">                status = progress.reachedState.depth() == 0</span>
-<span class="fc" id="L505">                    ? GoalStatus.ROOT_ALREADY_TARGET</span>
-<span class="fc" id="L506">                    : GoalStatus.REACHED;</span>
-<span class="pc bpc" id="L507" title="1 of 2 branches missed.">            } else if (frame.explored().size() &gt;= problem.heuristic().maxVisitedExpressions()) {</span>
-<span class="nc" id="L508">                status = GoalStatus.STATE_BUDGET;</span>
-<span class="fc bfc" id="L509" title="All 2 branches covered.">            } else if (progress.candidateBudgetPrunes &gt; 0) {</span>
-<span class="fc" id="L510">                status = GoalStatus.CANDIDATE_BUDGET;</span>
-<span class="fc bfc" id="L511" title="All 2 branches covered.">            } else if (progress.depthPrunes &gt; 0) {</span>
-<span class="fc" id="L512">                status = GoalStatus.DEPTH_BUDGET;</span>
-<span class="pc bpc" id="L513" title="1 of 4 branches missed.">            } else if (progress.expandedStates &gt; 0 &amp;&amp; progress.generatedTransformations == 0) {</span>
-<span class="fc" id="L514">                status = GoalStatus.NO_TRANSFORMATIONS;</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">            if (!frame.target().enabled()) {</span>
+<span class="fc" id="L519">                status = GoalStatus.UNTARGETED;</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">            } else if (!frame.target().parseable()) {</span>
+<span class="fc" id="L521">                status = GoalStatus.UNPARSEABLE_TARGET;</span>
+<span class="fc bfc" id="L522" title="All 2 branches covered.">            } else if (progress.reachedState != null) {</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">                status = progress.reachedState.depth() == 0</span>
+<span class="fc" id="L524">                    ? GoalStatus.ROOT_ALREADY_TARGET</span>
+<span class="fc" id="L525">                    : GoalStatus.REACHED;</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">            } else if (frame.explored().size() &gt;= problem.heuristic().maxVisitedExpressions()) {</span>
+<span class="nc" id="L527">                status = GoalStatus.STATE_BUDGET;</span>
+<span class="fc bfc" id="L528" title="All 2 branches covered.">            } else if (progress.candidateBudgetPrunes &gt; 0) {</span>
+<span class="fc" id="L529">                status = GoalStatus.CANDIDATE_BUDGET;</span>
+<span class="fc bfc" id="L530" title="All 2 branches covered.">            } else if (progress.depthPrunes &gt; 0) {</span>
+<span class="fc" id="L531">                status = GoalStatus.DEPTH_BUDGET;</span>
+<span class="pc bpc" id="L532" title="1 of 4 branches missed.">            } else if (progress.expandedStates &gt; 0 &amp;&amp; progress.generatedTransformations == 0) {</span>
+<span class="fc" id="L533">                status = GoalStatus.NO_TRANSFORMATIONS;</span>
             } else {
-<span class="fc" id="L516">                status = GoalStatus.FRONTIER_EXHAUSTED;</span>
+<span class="fc" id="L535">                status = GoalStatus.FRONTIER_EXHAUSTED;</span>
             }
-<span class="pc bpc" id="L518" title="1 of 2 branches missed.">            SearchState best = progress.bestState == null ? rootState : progress.bestState;</span>
-<span class="fc bfc" id="L519" title="All 2 branches covered.">            int distance = frame.target().enabled() ? progress.bestDistance : -1;</span>
-<span class="fc" id="L520">            return new GoalSearchResult(</span>
-<span class="fc" id="L521">                frame.explored(),</span>
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">            SearchState best = progress.bestState == null ? rootState : progress.bestState;</span>
+<span class="fc bfc" id="L538" title="All 2 branches covered.">            int distance = frame.target().enabled() ? progress.bestDistance : -1;</span>
+<span class="fc" id="L539">            return new GoalSearchResult(</span>
+<span class="fc" id="L540">                frame.explored(),</span>
                 progress.reachedState,
                 best,
                 distance,
                 status,
                 new GoalMetrics(
-<span class="fc" id="L527">                    frame.explored().size(),</span>
+<span class="fc" id="L546">                    frame.explored().size(),</span>
                     progress.expandedStates,
                     progress.generatedTransformations,
                     progress.enqueuedStates,
@@ -534,10 +553,10 @@ import java.util.Set;
                     progress.depthPrunes,
                     progress.candidateBudgetPrunes,
                     progress.statesWithoutTransformations,
-<span class="fc" id="L537">                    frame.identity().cacheHits(),</span>
-<span class="fc" id="L538">                    frame.identity().cacheMisses(),</span>
-<span class="fc" id="L539">                    frame.identity().cachedExpressionCount(),</span>
-<span class="fc" id="L540">                    frame.identity().internedValueCount()</span>
+<span class="fc" id="L556">                    frame.identity().cacheHits(),</span>
+<span class="fc" id="L557">                    frame.identity().cacheMisses(),</span>
+<span class="fc" id="L558">                    frame.identity().cachedExpressionCount(),</span>
+<span class="fc" id="L559">                    frame.identity().internedValueCount()</span>
                 )
             );
         }
@@ -552,82 +571,82 @@ import java.util.Set;
         private final String normalizedTarget;
         private final ExprValue targetValue;
         private final Map&lt;ValueKey, Integer&gt; targetOccurrences;
-<span class="fc" id="L555">        private final Map&lt;String, Integer&gt; distanceCache = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L574">        private final Map&lt;String, Integer&gt; distanceCache = new LinkedHashMap&lt;&gt;();</span>
 
-<span class="fc" id="L557">        private TargetSession(SearchTarget target, ValueIdentitySession identity) {</span>
-<span class="fc" id="L558">            this.target = target;</span>
-<span class="fc" id="L559">            this.identity = identity;</span>
-<span class="fc bfc" id="L560" title="All 2 branches covered.">            normalizedTarget = target == null ? &quot;&quot; : normalize(target.targetExpression());</span>
-<span class="fc bfc" id="L561" title="All 2 branches covered.">            targetValue = target == null</span>
-<span class="fc" id="L562">                ? null</span>
-<span class="fc" id="L563">                : identity.value(normalizedTarget).orElse(null);</span>
-<span class="fc bfc" id="L564" title="All 2 branches covered.">            targetOccurrences = targetValue == null</span>
-<span class="fc" id="L565">                ? Map.of()</span>
-<span class="fc" id="L566">                : occurrenceMultiset(targetValue);</span>
-<span class="fc" id="L567">        }</span>
+<span class="fc" id="L576">        private TargetSession(SearchTarget target, ValueIdentitySession identity) {</span>
+<span class="fc" id="L577">            this.target = target;</span>
+<span class="fc" id="L578">            this.identity = identity;</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">            normalizedTarget = target == null ? &quot;&quot; : normalize(target.targetExpression());</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">            targetValue = target == null</span>
+<span class="fc" id="L581">                ? null</span>
+<span class="fc" id="L582">                : identity.value(normalizedTarget).orElse(null);</span>
+<span class="fc bfc" id="L583" title="All 2 branches covered.">            targetOccurrences = targetValue == null</span>
+<span class="fc" id="L584">                ? Map.of()</span>
+<span class="fc" id="L585">                : occurrenceMultiset(targetValue);</span>
+<span class="fc" id="L586">        }</span>
 
         private boolean enabled() {
-<span class="fc bfc" id="L570" title="All 2 branches covered.">            return target != null;</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">            return target != null;</span>
         }
 
         private boolean parseable() {
-<span class="pc bpc" id="L574" title="1 of 2 branches missed.">            return !enabled()</span>
-<span class="fc bfc" id="L575" title="All 4 branches covered.">                || target.relation() == TargetRelation.SYNTAX_EXACT</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">            return !enabled()</span>
+<span class="fc bfc" id="L594" title="All 4 branches covered.">                || target.relation() == TargetRelation.SYNTAX_EXACT</span>
                 || targetValue != null;
         }
 
         private boolean stopWhenReached() {
-<span class="fc bfc" id="L580" title="All 4 branches covered.">            return enabled() &amp;&amp; target.stopWhenReached();</span>
+<span class="fc bfc" id="L599" title="All 4 branches covered.">            return enabled() &amp;&amp; target.stopWhenReached();</span>
         }
 
         private boolean reached(String expression) {
-<span class="fc bfc" id="L584" title="All 2 branches covered.">            if (!enabled()) {</span>
-<span class="fc" id="L585">                return false;</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">            if (!enabled()) {</span>
+<span class="fc" id="L604">                return false;</span>
             }
-<span class="fc bfc" id="L587" title="All 2 branches covered.">            if (target.relation() == TargetRelation.SYNTAX_EXACT) {</span>
-<span class="fc" id="L588">                return normalize(expression).equals(normalizedTarget);</span>
+<span class="fc bfc" id="L606" title="All 2 branches covered.">            if (target.relation() == TargetRelation.SYNTAX_EXACT) {</span>
+<span class="fc" id="L607">                return normalize(expression).equals(normalizedTarget);</span>
             }
-<span class="fc" id="L590">            return identity.value(expression)</span>
-<span class="fc" id="L591">                .map(value -&gt; value.sameValue(targetValue))</span>
-<span class="fc" id="L592">                .orElse(false);</span>
+<span class="fc" id="L609">            return identity.value(expression)</span>
+<span class="fc" id="L610">                .map(value -&gt; value.sameValue(targetValue))</span>
+<span class="fc" id="L611">                .orElse(false);</span>
         }
 
         private int distance(String expression) {
-<span class="fc bfc" id="L596" title="All 2 branches covered.">            if (!enabled()) {</span>
-<span class="fc" id="L597">                return 0;</span>
+<span class="fc bfc" id="L615" title="All 2 branches covered.">            if (!enabled()) {</span>
+<span class="fc" id="L616">                return 0;</span>
             }
-<span class="fc" id="L599">            String normalized = normalize(expression);</span>
-<span class="fc" id="L600">            return distanceCache.computeIfAbsent(normalized, ignored -&gt; computeDistance(normalized));</span>
+<span class="fc" id="L618">            String normalized = normalize(expression);</span>
+<span class="fc" id="L619">            return distanceCache.computeIfAbsent(normalized, ignored -&gt; computeDistance(normalized));</span>
         }
 
         private int computeDistance(String expression) {
-<span class="fc bfc" id="L604" title="All 2 branches covered.">            if (target.relation() == TargetRelation.SYNTAX_EXACT</span>
-<span class="fc bfc" id="L605" title="All 2 branches covered.">                    &amp;&amp; expression.equals(normalizedTarget)) {</span>
-<span class="fc" id="L606">                return 0;</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">            if (target.relation() == TargetRelation.SYNTAX_EXACT</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">                    &amp;&amp; expression.equals(normalizedTarget)) {</span>
+<span class="fc" id="L625">                return 0;</span>
             }
-<span class="fc bfc" id="L608" title="All 2 branches covered.">            if (targetValue == null) {</span>
-<span class="fc" id="L609">                return UNPARSEABLE_DISTANCE;</span>
+<span class="fc bfc" id="L627" title="All 2 branches covered.">            if (targetValue == null) {</span>
+<span class="fc" id="L628">                return UNPARSEABLE_DISTANCE;</span>
             }
-<span class="fc" id="L611">            return identity.value(expression)</span>
-<span class="fc" id="L612">                .map(value -&gt; {</span>
-<span class="fc" id="L613">                    int semantic = semanticDistance(value, targetValue, targetOccurrences);</span>
-<span class="fc bfc" id="L614" title="All 2 branches covered.">                    if (target.relation() != TargetRelation.SYNTAX_EXACT) {</span>
-<span class="fc" id="L615">                        return semantic;</span>
+<span class="fc" id="L630">            return identity.value(expression)</span>
+<span class="fc" id="L631">                .map(value -&gt; {</span>
+<span class="fc" id="L632">                    int semantic = semanticDistance(value, targetValue, targetOccurrences);</span>
+<span class="fc bfc" id="L633" title="All 2 branches covered.">                    if (target.relation() != TargetRelation.SYNTAX_EXACT) {</span>
+<span class="fc" id="L634">                        return semantic;</span>
                     }
-<span class="fc" id="L617">                    return Math.min(UNPARSEABLE_DISTANCE - 1, semantic + 1);</span>
+<span class="fc" id="L636">                    return Math.min(UNPARSEABLE_DISTANCE - 1, semantic + 1);</span>
                 })
-<span class="fc" id="L619">                .orElse(UNPARSEABLE_DISTANCE);</span>
+<span class="fc" id="L638">                .orElse(UNPARSEABLE_DISTANCE);</span>
         }
 
         private int adjustedPriority(int basePriority, String expression) {
-<span class="pc bpc" id="L623" title="1 of 4 branches missed.">            if (!enabled() || target.distanceWeight() == 0) {</span>
-<span class="fc" id="L624">                return basePriority;</span>
+<span class="pc bpc" id="L642" title="1 of 4 branches missed.">            if (!enabled() || target.distanceWeight() == 0) {</span>
+<span class="fc" id="L643">                return basePriority;</span>
             }
-<span class="fc" id="L626">            long adjusted = (long) basePriority</span>
-<span class="fc" id="L627">                + (long) target.distanceWeight() * distance(expression);</span>
-<span class="pc bpc" id="L628" title="1 of 2 branches missed.">            return adjusted &gt;= Integer.MAX_VALUE / 2</span>
-<span class="nc" id="L629">                ? Integer.MAX_VALUE / 2</span>
-<span class="fc" id="L630">                : (int) adjusted;</span>
+<span class="fc" id="L645">            long adjusted = (long) basePriority</span>
+<span class="fc" id="L646">                + (long) target.distanceWeight() * distance(expression);</span>
+<span class="pc bpc" id="L647" title="1 of 2 branches missed.">            return adjusted &gt;= Integer.MAX_VALUE / 2</span>
+<span class="nc" id="L648">                ? Integer.MAX_VALUE / 2</span>
+<span class="fc" id="L649">                : (int) adjusted;</span>
         }
 
         private static int semanticDistance(
@@ -635,50 +654,50 @@ import java.util.Set;
             ExprValue target,
             Map&lt;ValueKey, Integer&gt; targetOccurrences
         ) {
-<span class="fc bfc" id="L638" title="All 2 branches covered.">            if (candidate.sameValue(target)) {</span>
-<span class="fc" id="L639">                return 0;</span>
+<span class="fc bfc" id="L657" title="All 2 branches covered.">            if (candidate.sameValue(target)) {</span>
+<span class="fc" id="L658">                return 0;</span>
             }
-<span class="fc" id="L641">            Map&lt;ValueKey, Integer&gt; candidateOccurrences = occurrenceMultiset(candidate);</span>
-<span class="fc" id="L642">            Set&lt;ValueKey&gt; keys = new HashSet&lt;&gt;(candidateOccurrences.keySet());</span>
-<span class="fc" id="L643">            keys.addAll(targetOccurrences.keySet());</span>
-<span class="fc" id="L644">            long difference = 0;</span>
-<span class="fc bfc" id="L645" title="All 2 branches covered.">            for (ValueKey key : keys) {</span>
-<span class="fc" id="L646">                difference += Math.abs(</span>
-<span class="fc" id="L647">                    candidateOccurrences.getOrDefault(key, 0)</span>
-<span class="fc" id="L648">                        - targetOccurrences.getOrDefault(key, 0));</span>
-<span class="fc" id="L649">            }</span>
-<span class="fc bfc" id="L650" title="All 2 branches covered.">            if (!rootSignature(candidate).equals(rootSignature(target))) {</span>
-<span class="fc" id="L651">                difference += 2;</span>
+<span class="fc" id="L660">            Map&lt;ValueKey, Integer&gt; candidateOccurrences = occurrenceMultiset(candidate);</span>
+<span class="fc" id="L661">            Set&lt;ValueKey&gt; keys = new HashSet&lt;&gt;(candidateOccurrences.keySet());</span>
+<span class="fc" id="L662">            keys.addAll(targetOccurrences.keySet());</span>
+<span class="fc" id="L663">            long difference = 0;</span>
+<span class="fc bfc" id="L664" title="All 2 branches covered.">            for (ValueKey key : keys) {</span>
+<span class="fc" id="L665">                difference += Math.abs(</span>
+<span class="fc" id="L666">                    candidateOccurrences.getOrDefault(key, 0)</span>
+<span class="fc" id="L667">                        - targetOccurrences.getOrDefault(key, 0));</span>
+<span class="fc" id="L668">            }</span>
+<span class="fc bfc" id="L669" title="All 2 branches covered.">            if (!rootSignature(candidate).equals(rootSignature(target))) {</span>
+<span class="fc" id="L670">                difference += 2;</span>
             }
-<span class="pc bpc" id="L653" title="1 of 2 branches missed.">            return difference &gt;= UNPARSEABLE_DISTANCE</span>
-<span class="nc" id="L654">                ? UNPARSEABLE_DISTANCE - 1</span>
-<span class="fc" id="L655">                : (int) difference;</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">            return difference &gt;= UNPARSEABLE_DISTANCE</span>
+<span class="nc" id="L673">                ? UNPARSEABLE_DISTANCE - 1</span>
+<span class="fc" id="L674">                : (int) difference;</span>
         }
 
         private static Map&lt;ValueKey, Integer&gt; occurrenceMultiset(ExprValue root) {
-<span class="fc" id="L659">            Map&lt;ValueKey, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L660">            collect(root, 1, counts);</span>
-<span class="fc" id="L661">            return Map.copyOf(counts);</span>
+<span class="fc" id="L678">            Map&lt;ValueKey, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L679">            collect(root, 1, counts);</span>
+<span class="fc" id="L680">            return Map.copyOf(counts);</span>
         }
 
         private static void collect(ExprValue value, int multiplicity, Map&lt;ValueKey, Integer&gt; counts) {
-<span class="fc" id="L665">            counts.merge(value.key(), multiplicity, Math::addExact);</span>
-<span class="fc bfc" id="L666" title="All 2 branches covered.">            if (value instanceof OrderedValue ordered) {</span>
-<span class="fc" id="L667">                ordered.operands().forEach(operand -&gt; collect(operand, multiplicity, counts));</span>
-<span class="fc bfc" id="L668" title="All 2 branches covered.">            } else if (value instanceof AssociativeCommutativeValue ac) {</span>
-<span class="fc" id="L669">                ac.multiplicities().forEach((operand, count) -&gt;</span>
-<span class="fc" id="L670">                    collect(operand, Math.multiplyExact(multiplicity, count), counts));</span>
+<span class="fc" id="L684">            counts.merge(value.key(), multiplicity, Math::addExact);</span>
+<span class="fc bfc" id="L685" title="All 2 branches covered.">            if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L686">                ordered.operands().forEach(operand -&gt; collect(operand, multiplicity, counts));</span>
+<span class="fc bfc" id="L687" title="All 2 branches covered.">            } else if (value instanceof AssociativeCommutativeValue ac) {</span>
+<span class="fc" id="L688">                ac.multiplicities().forEach((operand, count) -&gt;</span>
+<span class="fc" id="L689">                    collect(operand, Math.multiplyExact(multiplicity, count), counts));</span>
             }
-<span class="fc" id="L672">        }</span>
+<span class="fc" id="L691">        }</span>
 
         private static String rootSignature(ExprValue value) {
-<span class="fc bfc" id="L675" title="All 2 branches covered.">            if (value instanceof OrderedValue ordered) {</span>
-<span class="fc" id="L676">                return &quot;ordered:&quot; + ordered.operator().id();</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">            if (value instanceof OrderedValue ordered) {</span>
+<span class="fc" id="L695">                return &quot;ordered:&quot; + ordered.operator().id();</span>
             }
-<span class="fc bfc" id="L678" title="All 2 branches covered.">            if (value instanceof AssociativeCommutativeValue ac) {</span>
-<span class="fc" id="L679">                return &quot;ac:&quot; + ac.operator().id();</span>
+<span class="fc bfc" id="L697" title="All 2 branches covered.">            if (value instanceof AssociativeCommutativeValue ac) {</span>
+<span class="fc" id="L698">                return &quot;ac:&quot; + ac.operator().id();</span>
             }
-<span class="fc" id="L681">            return value.getClass().getSimpleName();</span>
+<span class="fc" id="L700">            return value.getClass().getSimpleName();</span>
         }
     }
 
@@ -688,91 +707,91 @@ import java.util.Set;
         static final String LEGACY_FALLBACK_PREFIX = &quot;legacy-v1:&quot;;
 
         private final ExpressionCanonicalizer canonicalizer;
-<span class="fc" id="L691">        private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L692">        private final ExprValueFactory factory = new ExprValueFactory();</span>
-<span class="fc" id="L693">        private final Map&lt;String, String&gt; valueHashesByExpression = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L694">        private final Map&lt;String, ExprValue&gt; valuesByExpression = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L695">        private final Set&lt;String&gt; unparseableExpressions = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L696">        private final Map&lt;String, String&gt; legacyHashesByExpression = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L710">        private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L711">        private final ExprValueFactory factory = new ExprValueFactory();</span>
+<span class="fc" id="L712">        private final Map&lt;String, String&gt; valueHashesByExpression = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L713">        private final Map&lt;String, ExprValue&gt; valuesByExpression = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L714">        private final Set&lt;String&gt; unparseableExpressions = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L715">        private final Map&lt;String, String&gt; legacyHashesByExpression = new LinkedHashMap&lt;&gt;();</span>
         private int cacheHits;
         private int cacheMisses;
 
-<span class="fc" id="L700">        ValueIdentitySession(ExpressionCanonicalizer canonicalizer) {</span>
-<span class="fc" id="L701">            this.canonicalizer = Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
-<span class="fc" id="L702">        }</span>
+<span class="fc" id="L719">        ValueIdentitySession(ExpressionCanonicalizer canonicalizer) {</span>
+<span class="fc" id="L720">            this.canonicalizer = Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
+<span class="fc" id="L721">        }</span>
 
         String valueHash(String expression) {
-<span class="fc" id="L705">            String normalized = normalize(expression);</span>
-<span class="fc" id="L706">            String existing = valueHashesByExpression.get(normalized);</span>
-<span class="fc bfc" id="L707" title="All 2 branches covered.">            if (existing != null) {</span>
-<span class="fc" id="L708">                cacheHits++;</span>
-<span class="fc" id="L709">                return existing;</span>
+<span class="fc" id="L724">            String normalized = normalize(expression);</span>
+<span class="fc" id="L725">            String existing = valueHashesByExpression.get(normalized);</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">            if (existing != null) {</span>
+<span class="fc" id="L727">                cacheHits++;</span>
+<span class="fc" id="L728">                return existing;</span>
             }
-<span class="fc" id="L711">            cacheMisses++;</span>
-<span class="fc" id="L712">            String hash = value(normalized)</span>
-<span class="fc" id="L713">                .map(value -&gt; HASH_PREFIX + sha256(value.key().encoded()))</span>
-<span class="pc" id="L714">                .orElseGet(() -&gt; LEGACY_FALLBACK_PREFIX + legacyHash(normalized));</span>
-<span class="fc" id="L715">            valueHashesByExpression.put(normalized, hash);</span>
-<span class="fc" id="L716">            return hash;</span>
+<span class="fc" id="L730">            cacheMisses++;</span>
+<span class="fc" id="L731">            String hash = value(normalized)</span>
+<span class="fc" id="L732">                .map(value -&gt; HASH_PREFIX + sha256(value.key().encoded()))</span>
+<span class="pc" id="L733">                .orElseGet(() -&gt; LEGACY_FALLBACK_PREFIX + legacyHash(normalized));</span>
+<span class="fc" id="L734">            valueHashesByExpression.put(normalized, hash);</span>
+<span class="fc" id="L735">            return hash;</span>
         }
 
         Optional&lt;ExprValue&gt; value(String expression) {
-<span class="fc" id="L720">            String normalized = normalize(expression);</span>
-<span class="fc" id="L721">            ExprValue existing = valuesByExpression.get(normalized);</span>
-<span class="fc bfc" id="L722" title="All 2 branches covered.">            if (existing != null) {</span>
-<span class="fc" id="L723">                return Optional.of(existing);</span>
+<span class="fc" id="L739">            String normalized = normalize(expression);</span>
+<span class="fc" id="L740">            ExprValue existing = valuesByExpression.get(normalized);</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">            if (existing != null) {</span>
+<span class="fc" id="L742">                return Optional.of(existing);</span>
             }
-<span class="pc bpc" id="L725" title="1 of 2 branches missed.">            if (unparseableExpressions.contains(normalized)) {</span>
-<span class="nc" id="L726">                return Optional.empty();</span>
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">            if (unparseableExpressions.contains(normalized)) {</span>
+<span class="nc" id="L745">                return Optional.empty();</span>
             }
             try {
-<span class="fc" id="L729">                Expr parsed = parser.parseTerm(normalized);</span>
-<span class="fc" id="L730">                Expr canonical = canonicalizer.canonicalize(parsed);</span>
-<span class="fc" id="L731">                ExprValue value = factory.fromExpr(canonical);</span>
-<span class="fc" id="L732">                valuesByExpression.put(normalized, value);</span>
-<span class="fc" id="L733">                return Optional.of(value);</span>
-<span class="fc" id="L734">            } catch (IllegalArgumentException exception) {</span>
-<span class="fc" id="L735">                unparseableExpressions.add(normalized);</span>
-<span class="fc" id="L736">                return Optional.empty();</span>
+<span class="fc" id="L748">                Expr parsed = parser.parseTerm(normalized);</span>
+<span class="fc" id="L749">                Expr canonical = canonicalizer.canonicalize(parsed);</span>
+<span class="fc" id="L750">                ExprValue value = factory.fromExpr(canonical);</span>
+<span class="fc" id="L751">                valuesByExpression.put(normalized, value);</span>
+<span class="fc" id="L752">                return Optional.of(value);</span>
+<span class="fc" id="L753">            } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L754">                unparseableExpressions.add(normalized);</span>
+<span class="fc" id="L755">                return Optional.empty();</span>
             }
         }
 
         String legacyHash(String expression) {
-<span class="fc" id="L741">            String normalized = normalize(expression);</span>
-<span class="fc" id="L742">            return legacyHashesByExpression.computeIfAbsent(normalized, canonicalizer::stableHash);</span>
+<span class="fc" id="L760">            String normalized = normalize(expression);</span>
+<span class="fc" id="L761">            return legacyHashesByExpression.computeIfAbsent(normalized, canonicalizer::stableHash);</span>
         }
 
         int cacheHits() {
-<span class="fc" id="L746">            return cacheHits;</span>
+<span class="fc" id="L765">            return cacheHits;</span>
         }
 
         int cacheMisses() {
-<span class="fc" id="L750">            return cacheMisses;</span>
+<span class="fc" id="L769">            return cacheMisses;</span>
         }
 
         int cachedExpressionCount() {
-<span class="fc" id="L754">            return valueHashesByExpression.size();</span>
+<span class="fc" id="L773">            return valueHashesByExpression.size();</span>
         }
 
         int internedValueCount() {
-<span class="fc" id="L758">            return factory.size();</span>
+<span class="fc" id="L777">            return factory.size();</span>
         }
 
         @Override
         public void close() {
-<span class="fc" id="L763">            valueHashesByExpression.clear();</span>
-<span class="fc" id="L764">            valuesByExpression.clear();</span>
-<span class="fc" id="L765">            unparseableExpressions.clear();</span>
-<span class="fc" id="L766">            legacyHashesByExpression.clear();</span>
-<span class="fc" id="L767">            factory.close();</span>
-<span class="fc" id="L768">        }</span>
+<span class="fc" id="L782">            valueHashesByExpression.clear();</span>
+<span class="fc" id="L783">            valuesByExpression.clear();</span>
+<span class="fc" id="L784">            unparseableExpressions.clear();</span>
+<span class="fc" id="L785">            legacyHashesByExpression.clear();</span>
+<span class="fc" id="L786">            factory.close();</span>
+<span class="fc" id="L787">        }</span>
 
         private static String sha256(String value) {
             try {
-<span class="fc" id="L772">                MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
-<span class="fc" id="L773">                return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L774">            } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L775">                throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L791">                MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L792">                return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L793">            } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L794">                throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
             }
         }
     }
