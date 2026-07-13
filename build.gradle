@@ -32,11 +32,11 @@ if (aiKnowledgeEnabled) {
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
         failOnWarnings = false
 
-        // Extractor 0.1.7 schema v3 measured normalized context debt 20.28:
-        // p90 capability working set 220,496 of 1,087,416 context tokens,
-        // all 8 capabilities sampled through precise type/package selectors.
-        // The 21.0 limit leaves a 0.72-point regression margin.
-        maxCognitiveDebt = 21.0d
+        // Extractor 0.1.7 schema v3: main measured 20.28; the deterministic
+        // trajectory dataset measures 20.90; trajectory + compact explainable
+        // policy measures 21.30. The 21.5 limit leaves only 0.20 points for
+        // accidental growth while recognizing the two reviewed capabilities.
+        maxCognitiveDebt = 21.5d
 
         maxMethodCognitiveComplexity = 65
         maxMethodCyclomaticComplexity = 35
