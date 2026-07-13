@@ -18,7 +18,7 @@ import java.util.Set;
 
 /** Deterministic, leakage-audited collection of post-labelled search trajectories. */
 public final class SearchTrajectoryDataset {
-    public static final String SCHEMA = "regelsuche.search-trajectory-dataset/v1";
+    public static final String SCHEMA = "regelsuche.search-trajectory-dataset/v2";
 
     private static final Comparator<SearchTrajectoryRun> RUN_ORDER = Comparator
         .comparing((SearchTrajectoryRun run) -> run.context().split().ordinal())
@@ -104,6 +104,7 @@ public final class SearchTrajectoryDataset {
         int missingTargets = 0;
         int missingDecisionParents = 0;
         int missingDecisionRules = 0;
+        int unavailableDescriptors = 0;
         int unparseableExpressions = 0;
         Set<String> families = new LinkedHashSet<>();
         Set<String> taskValueClasses = new LinkedHashSet<>();
@@ -138,6 +139,9 @@ public final class SearchTrajectoryDataset {
                     if (record.ruleId().isBlank()) {
                         missingDecisionRules++;
                     }
+                    if (!record.transformationDescriptor().available()) {
+                        unavailableDescriptors++;
+                    }
                 }
                 if (record.target() == null) {
                     missingTargets++;
@@ -164,6 +168,7 @@ public final class SearchTrajectoryDataset {
             missingTargets,
             missingDecisionParents,
             missingDecisionRules,
+            unavailableDescriptors,
             unparseableExpressions,
             leakageViolations.size(),
             Collections.unmodifiableMap(immutableBalances));
@@ -193,6 +198,7 @@ public final class SearchTrajectoryDataset {
             .property("missingTargets", summary.missingTargets())
             .property("missingDecisionParents", summary.missingDecisionParents())
             .property("missingDecisionRules", summary.missingDecisionRules())
+            .property("unavailableDescriptors", summary.unavailableDescriptors())
             .property("unparseableExpressions", summary.unparseableExpressions())
             .property("leakageViolations", summary.leakageViolations())
             .array("splits", array -> summary.splitBalances().entrySet().stream()
@@ -255,8 +261,14 @@ public final class SearchTrajectoryDataset {
                 .property("divisions", features.divisions())
                 .property("powers", features.powers())
                 .property("functions", features.functions())
-                .property("parseable", features.parseable()))
-            .property("depth", record.depth())
+                .property("parseable", features.parseable()));
+        if (record.transformationDescriptor() == null) {
+            json.nullProperty("transformationDescriptor");
+        } else {
+            json.object("transformationDescriptor", value ->
+                writeDescriptor(value, record.transformationDescriptor()));
+        }
+        json.property("depth", record.depth())
             .property("score", record.score())
             .property("parentScore", record.parentScore())
             .property("frontierSize", record.frontierSize())
@@ -272,6 +284,52 @@ public final class SearchTrajectoryDataset {
             .property("terminalStatus", record.terminalStatus().name())
             .endObject();
         return json.toString();
+    }
+
+    private static void writeDescriptor(
+        JsonWriter json,
+        TransformationDescriptor descriptor
+    ) {
+        TransformationDescriptor.AstDelta delta = descriptor.astDelta();
+        json.property("schema", TransformationDescriptor.SCHEMA)
+            .property("rewriteKind", descriptor.rewriteKind().name())
+            .property("equivalencePreserving", descriptor.equivalencePreserving())
+            .property("mayIncreaseComplexity", descriptor.mayIncreaseComplexity())
+            .property("estimatedCostDelta", descriptor.estimatedCostDelta())
+            .object("astDelta", value -> value
+                .property("nodeCount", delta.nodeCount())
+                .property("maxDepth", delta.maxDepth())
+                .property("variableOccurrences", delta.variableOccurrences())
+                .property("distinctVariables", delta.distinctVariables())
+                .property("numericLiterals", delta.numericLiterals())
+                .property("additions", delta.additions())
+                .property("subtractions", delta.subtractions())
+                .property("multiplications", delta.multiplications())
+                .property("divisions", delta.divisions())
+                .property("powers", delta.powers())
+                .property("functions", delta.functions())
+                .property("parseable", delta.parseable()))
+            .object("parentRoot", value -> writeRoot(value, descriptor.parentRoot()))
+            .object("childRoot", value -> writeRoot(value, descriptor.childRoot()))
+            .property("assumptionCount", descriptor.assumptionCount())
+            .object("assumptionClassCounts", value ->
+                descriptor.assumptionClassCounts().forEach((kind, count) ->
+                    value.property(kind.name(), count)))
+            .property("targeted", descriptor.targeted())
+            .property("targetDistanceBefore", descriptor.targetDistanceBefore())
+            .property("targetDistanceAfter", descriptor.targetDistanceAfter())
+            .property("targetDistanceDelta", descriptor.targetDistanceDelta())
+            .property("available", descriptor.available())
+            .property("predictiveFingerprint", descriptor.predictiveFingerprint())
+            .object("featureVector", value -> descriptor.featureVector().forEach(value::property));
+    }
+
+    private static void writeRoot(
+        JsonWriter json,
+        TransformationDescriptor.RootSignature root
+    ) {
+        json.property("kind", root.kind().name())
+            .property("arity", root.arity());
     }
 
     private static void writeFingerprint(JsonWriter json, ExpressionFingerprint fingerprint) {
@@ -311,6 +369,7 @@ public final class SearchTrajectoryDataset {
         int missingTargets,
         int missingDecisionParents,
         int missingDecisionRules,
+        int unavailableDescriptors,
         int unparseableExpressions,
         int leakageViolations,
         Map<DatasetSplit, SplitBalance> splitBalances
