@@ -117,6 +117,60 @@ class DescriptorSearchPolicyTest {
     }
 
     @Test
+    void unseenLocalTransitionSuppressesOnlyLocalWeights() {
+        Transformation transformation = step("unseen-power", "x ^ 2");
+        TransformationDescriptor descriptor = descriptor("x * x", transformation);
+        DescriptorPolicyModel model = new DescriptorPolicyModel(
+            "descriptor-policy-v2:local-support-gate",
+            "sha256:source",
+            "sha256:predictive",
+            DescriptorPolicyModel.FEATURE_SCHEMA,
+            Mode.LINEAR,
+            1,
+            Map.of(),
+            Map.of(
+                "ast.powersDelta", feature(-1000),
+                "local.role.ROOT", feature(-1000),
+                "local.transition.ADD_TO_VARIABLE", feature(-1000)));
+
+        var decision = new DescriptorSearchPolicy(model).score(
+            new PolicyContext("x * x", 0, true, canonicalizer, descriptor),
+            transformation);
+
+        assertFalse(decision.fallback());
+        assertTrue(decision.contributions().containsKey("descriptor.ast.powersDelta"));
+        assertTrue(decision.contributions().keySet().stream()
+            .noneMatch(name -> name.startsWith("descriptor.local.")));
+        assertTrue(decision.explanation().contains("ignoredUnsupportedLocal=2"));
+    }
+
+    @Test
+    void observedLocalTransitionMayContribute() {
+        Transformation transformation = step("observed-neutral", "x");
+        TransformationDescriptor descriptor = descriptor("x + 0", transformation);
+        DescriptorPolicyModel model = new DescriptorPolicyModel(
+            "descriptor-policy-v2:local-support-observed",
+            "sha256:source",
+            "sha256:predictive",
+            DescriptorPolicyModel.FEATURE_SCHEMA,
+            Mode.LINEAR,
+            1,
+            Map.of(),
+            Map.of(
+                "local.role.ROOT", feature(-1000),
+                "local.transition.ADD_TO_VARIABLE", feature(-1000)));
+
+        var decision = new DescriptorSearchPolicy(model).score(
+            new PolicyContext("x + 0", 0, true, canonicalizer, descriptor),
+            transformation);
+
+        assertFalse(decision.fallback());
+        assertTrue(decision.contributions().keySet().stream()
+            .anyMatch(name -> name.startsWith("descriptor.local.")));
+        assertTrue(decision.explanation().contains("ignoredUnsupportedLocal=0"));
+    }
+
+    @Test
     void descriptorV1ModelReproducesStaticSearchExactly() {
         SearchProblem problem = controlledProblem();
         var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
@@ -161,6 +215,11 @@ class DescriptorSearchPolicyTest {
             1,
             Map.of(),
             features);
+    }
+
+    private static FeatureStatistics feature(int coefficientPermille) {
+        return new FeatureStatistics(
+            4, 2, 2, 1, 0, 0, 1, coefficientPermille);
     }
 
     private TransformationDescriptor descriptor(
