@@ -42,10 +42,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import org.junit.jupiter.api.Test;
 
-/** Held-out-family evidence for transferable transformation descriptors from #281. */
+/** Held-out-family evidence for transferable descriptors and frontier priority. */
 class HiddenRuleDescriptorPolicyEvaluationTest {
     private static final String SCHEMA =
-        "regelsuche.hidden-rule-descriptor-policy-evaluation/v1";
+        "regelsuche.hidden-rule-descriptor-policy-evaluation/v2";
     private static final int REQUIRED_IMPROVEMENT_PERMILLE = 200;
     private static final Map<String, FamilySpec> FAMILIES = Map.of(
         "case-001", new FamilySpec("family-a", DatasetSplit.TRAIN),
@@ -74,6 +74,9 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         int nonFallback = cases.stream().flatMap(item -> item.outcomes().stream())
             .filter(item -> item.policy().startsWith("descriptor-linear"))
             .mapToInt(Outcome::nonFallbackEvents).sum();
+        int frontierAdjustments = cases.stream().flatMap(item -> item.outcomes().stream())
+            .filter(item -> item.policy().contains("-frontier"))
+            .mapToInt(Outcome::nonZeroFrontierAdjustments).sum();
         boolean correctnessLoss = cases.stream().flatMap(item -> item.outcomes().stream())
             .anyMatch(Outcome::correctnessLoss);
         int bestImprovement = cases.stream().flatMap(item -> item.outcomes().stream())
@@ -82,20 +85,24 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         String conclusion = bestImprovement >= REQUIRED_IMPROVEMENT_PERMILLE
                 && !correctnessLoss
             ? "POSITIVE_MATERIAL_IMPROVEMENT"
-            : "NEGATIVE_DESCRIPTOR_NO_MATERIAL_IMPROVEMENT";
+            : "NEGATIVE_FRONTIER_NO_MATERIAL_IMPROVEMENT";
         String limitation = conclusion.startsWith("POSITIVE") ? "none"
-            : "shared structural deltas score held-out rules but do not improve the primary metric by 20 percent";
+            : "descriptor evidence changes frontier priority but does not improve the primary metric by 20 percent";
         String report = report(study.dataset(), models, experiences.size(), cases,
-            nonFallback, bestImprovement, correctnessLoss, conclusion, limitation);
+            nonFallback, frontierAdjustments, bestImprovement, correctnessLoss,
+            conclusion, limitation);
         Path directory = Path.of("build", "reports", "held-out-descriptor-policy");
         write(directory.resolve("report.json"), report);
         write(directory.resolve("trajectories.jsonl"), study.dataset().toJsonLines());
 
         assertTrue(study.dataset().leakageFree(), study.dataset().leakageViolations().toString());
         assertTrue(nonFallback > 0, "held-out rules require descriptor-derived scores");
+        assertTrue(frontierAdjustments > 0,
+            "held-out successors require non-zero TRAIN-derived frontier evidence");
         assertFalse(correctnessLoss);
         assertEquals(report, report(study.dataset(), models, experiences.size(), cases,
-            nonFallback, bestImprovement, correctnessLoss, conclusion, limitation));
+            nonFallback, frontierAdjustments, bestImprovement, correctnessLoss,
+            conclusion, limitation));
         assertFalse(report.contains("hidden_"));
         assertTrue(Files.isRegularFile(directory.resolve("report.json")));
         assertTrue(Files.isRegularFile(directory.resolve("trajectories.jsonl")));
@@ -112,7 +119,7 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             GoalSearchResult result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
             assertTrue(result.reached(), task.opaqueCaseId());
             SearchTrajectoryContext context = new SearchTrajectoryContext(
-                task.opaqueCaseId(), family.id(), "descriptor-policy-evaluation/v1",
+                task.opaqueCaseId(), family.id(), "descriptor-policy-evaluation/v2",
                 inventoryIds(task.primitiveEngine()), family.split());
             runs.add(collector.finish(problem, result, context));
             tasks.put(task.opaqueCaseId(), task);
@@ -142,19 +149,35 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         outcomes.add(Outcome.of("static", baseline, List.of(), baseline));
         for (Mode mode : Mode.values()) {
             PolicySearchResult result = run(
-                new DescriptorSearchPolicy(models.get(mode)), task);
+                new DescriptorSearchPolicy(models.get(mode)), task, 0);
             outcomes.add(Outcome.of("descriptor-" + mode.name().toLowerCase(),
                 result.search(), result.policyEvents(), baseline));
         }
-        PolicySearchResult experience = run(new DescriptorSearchPolicy(
-            models.get(Mode.LINEAR), experiences, "family-a"), task);
+        DescriptorSearchPolicy linear = new DescriptorSearchPolicy(models.get(Mode.LINEAR));
+        PolicySearchResult frontier = run(linear, task,
+            PolicyAwareBestFirstSearchStrategy.DEFAULT_MAX_FRONTIER_ADJUSTMENT);
+        outcomes.add(Outcome.of("descriptor-linear-frontier",
+            frontier.search(), frontier.policyEvents(), baseline));
+
+        DescriptorSearchPolicy experienced = new DescriptorSearchPolicy(
+            models.get(Mode.LINEAR), experiences, "family-a");
+        PolicySearchResult experience = run(experienced, task, 0);
         outcomes.add(Outcome.of("descriptor-linear-experience",
             experience.search(), experience.policyEvents(), baseline));
+        PolicySearchResult experienceFrontier = run(experienced, task,
+            PolicyAwareBestFirstSearchStrategy.DEFAULT_MAX_FRONTIER_ADJUSTMENT);
+        outcomes.add(Outcome.of("descriptor-linear-experience-frontier",
+            experienceFrontier.search(), experienceFrontier.policyEvents(), baseline));
         return new CaseEvidence(task.opaqueCaseId(), context.family(), context.split().name(), outcomes);
     }
 
-    private PolicySearchResult run(DescriptorSearchPolicy policy, RuntimeTask task) {
-        return new PolicyAwareBestFirstSearchStrategy(policy).searchWithDiagnostics(problem(task));
+    private PolicySearchResult run(
+        DescriptorSearchPolicy policy,
+        RuntimeTask task,
+        int maxFrontierAdjustment
+    ) {
+        return new PolicyAwareBestFirstSearchStrategy(policy, maxFrontierAdjustment)
+            .searchWithDiagnostics(problem(task));
     }
 
     private SearchProblem problem(RuntimeTask task) {
@@ -186,6 +209,7 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         int storedExperiences,
         List<CaseEvidence> cases,
         int nonFallback,
+        int frontierAdjustments,
         int bestImprovement,
         boolean correctnessLoss,
         String conclusion,
@@ -204,6 +228,9 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             .property("predictiveDatasetHash", models.get(Mode.LINEAR).predictiveDatasetHash())
             .property("storedExperiences", storedExperiences)
             .property("heldOutNonFallbackEvents", nonFallback)
+            .property("heldOutNonZeroFrontierAdjustments", frontierAdjustments)
+            .property("frontierAdjustmentLimit",
+                PolicyAwareBestFirstSearchStrategy.DEFAULT_MAX_FRONTIER_ADJUSTMENT)
             .property("requiredImprovementPermille", REQUIRED_IMPROVEMENT_PERMILLE)
             .property("bestImprovementPermille", bestImprovement)
             .property("correctnessLoss", correctnessLoss)
@@ -287,6 +314,12 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             return (int) events.stream().filter(event -> !event.fallback()).count();
         }
 
+        private int nonZeroFrontierAdjustments() {
+            return (int) events.stream()
+                .filter(event -> !event.fallback() && event.frontierAdjustment() != 0)
+                .count();
+        }
+
         private void writeJson(JsonWriter json) {
             List<String> selected = result.reachedState() == null ? List.of()
                 : result.reachedState().appliedRuleIds();
@@ -297,6 +330,7 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
                 .property("exploredImprovementPermille", improvementPermille)
                 .property("fallbackEvents", events.size() - nonFallbackEvents())
                 .property("nonFallbackEvents", nonFallbackEvents())
+                .property("nonZeroFrontierAdjustments", nonZeroFrontierAdjustments())
                 .property("correctnessLoss", correctnessLoss)
                 .stringArray("selectedRules", selected)
                 .array("decisions", array -> events.forEach(event ->
@@ -306,9 +340,14 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
                         .property("rank", event.deterministicRank())
                         .property("confidencePermille", event.confidencePermille())
                         .property("fallback", event.fallback())
+                        .property("frontierAdjustment", event.frontierAdjustment())
+                        .property("staticStatePriority", event.staticStatePriority())
+                        .property("targetPriorityContribution", event.targetPriorityContribution())
+                        .property("composedFrontierPriority", event.composedFrontierPriority())
                         .property("consideredBySearch", event.consideredBySearch())
                         .property("admittedToFrontier", event.admittedToFrontier())
                         .property("admissionOutcome", event.admissionOutcome())
+                        .property("dequeueOrder", event.dequeueOrder())
                         .stringArray("contributions", event.contributions().entrySet().stream()
                             .map(entry -> entry.getKey() + "=" + entry.getValue()).toList()))));
         }
