@@ -105,6 +105,44 @@ class DescriptorSearchPolicyTest {
         }
     }
 
+    @Test
+    void descriptorDerivationFailureFallsBackInsteadOfAbortingSearch() {
+        DescriptorPolicyModel model = new DescriptorPolicyTrainer().train(
+            new SearchTrajectoryDataset(List.of(trainingRun())), Mode.LINEAR, 1);
+        SearchProblem problem = problem("x + 0", "x", expression -> List.of(), 10);
+        PolicyContext context = new PolicyContext("", 0, true, canonicalizer);
+
+        try (DescriptorSearchPolicy policy = new DescriptorSearchPolicy(model, problem)) {
+            PolicyDecision decision = policy.score(context, step("held-out", "x", -1));
+
+            assertTrue(decision.fallback());
+            assertTrue(decision.explanation().contains("descriptor derivation failed"));
+        }
+    }
+
+    @Test
+    void fallbackPreservesOrderingResolutionForLargeTargetDistances() {
+        DescriptorPolicyModel model = new DescriptorPolicyTrainer().train(
+            new SearchTrajectoryDataset(List.of(trainingRun())), Mode.LINEAR, 1);
+        SearchProblem problem = problem("x + 0", "x", expression -> List.of(), 10);
+        Transformation unparseable = step("unparseable", "broken(", -1);
+
+        try (DescriptorSearchPolicy policy = new DescriptorSearchPolicy(model, problem)) {
+            PolicyDecision nearer = policy.score(
+                new PolicyContext("x + 0", 50_001, true, canonicalizer),
+                unparseable);
+            PolicyDecision farther = policy.score(
+                new PolicyContext("x + 0", 100_000, true, canonicalizer),
+                unparseable);
+
+            assertTrue(nearer.fallback());
+            assertTrue(farther.fallback());
+            assertTrue(nearer.priority() < farther.priority());
+            assertEquals(1_000_020, nearer.contributions().get("targetDistance"));
+            assertEquals(2_000_000, farther.contributions().get("targetDistance"));
+        }
+    }
+
     private SearchTrajectoryRun trainingRun() {
         TransformationEngine engine = expression -> expression.equals("p + 0")
             ? List.of(
