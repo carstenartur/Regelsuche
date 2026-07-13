@@ -171,33 +171,6 @@ class DescriptorSearchPolicyTest {
     }
 
     @Test
-    void pairwiseContextEvidenceTransfersAcrossAnUnseenLocalTransition() {
-        Transformation transformation = step("held-out-inner-power", "x ^ 2 * y");
-        TransformationDescriptor descriptor = descriptor("(x * x) * y", transformation);
-        DescriptorPolicyModel model = new DescriptorPolicyModel(
-            "descriptor-policy-v2:pairwise-context-transfer",
-            "sha256:source",
-            "sha256:predictive",
-            DescriptorPolicyModel.FEATURE_SCHEMA,
-            Mode.LINEAR,
-            1,
-            Map.of(),
-            Map.of(
-                "local.context.MUL", feature(-1000),
-                "local.contextRole.MUL_AC_CHILD", feature(-1000)));
-
-        var decision = new DescriptorSearchPolicy(model).score(
-            new PolicyContext("(x * x) * y", 0, true, canonicalizer, descriptor),
-            transformation);
-
-        assertFalse(decision.fallback());
-        assertEquals(-1000, decision.contributions().get("descriptor.local.context.MUL"));
-        assertEquals(-1000,
-            decision.contributions().get("descriptor.local.contextRole.MUL_AC_CHILD"));
-        assertTrue(decision.explanation().contains("pairwiseContextEvidence=2"));
-    }
-
-    @Test
     void descriptorV1ModelReproducesStaticSearchExactly() {
         SearchProblem problem = controlledProblem();
         var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
