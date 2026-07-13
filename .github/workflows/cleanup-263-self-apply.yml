@@ -32,53 +32,45 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           path = Path('regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java')
           text = path.read_text(encoding='utf-8')
 
-          def replace_once(pattern, replacement, flags=0):
+          def replace_exact(old, new):
               global text
-              text, count = re.subn(pattern, replacement, text, count=1, flags=flags)
+              count = text.count(old)
               if count != 1:
-                  raise SystemExit(f'expected exactly one occurrence, found {count}: {pattern[:100]!r}')
+                  raise SystemExit(f'expected exactly one occurrence, found {count}: {old!r}')
+              text = text.replace(old, new)
 
-          replace_once(
-              r'''        if \(TranspositionGate\.evaluate\(\s*
-                  problem\.memory\(\),\s*
-                  current,\s*
-                  current\.canonicalHash\(\) \+ "#" \+ current\.depth\(\),\s*
-                  List\.of\(frame\.identity\(\)\.legacyHash\(current\.expression\(\)\)\)\)\s*
-                  != TranspositionGate\.Verdict\.PRUNE\) \{''',
-              '''        if (TranspositionGate.evaluate(
-                  problem.memory(),
-                  current,
-                  current.canonicalHash() + "#" + current.depth())
-                  != TranspositionGate.Verdict.PRUNE) {''',
-              re.VERBOSE)
+          replace_exact(
+              'current.canonicalHash() + "#" + current.depth(),\n'
+              '                List.of(frame.identity().legacyHash(current.expression())))',
+              'current.canonicalHash() + "#" + current.depth())')
+          replace_exact(
+              '        static final String LEGACY_FALLBACK_PREFIX = "legacy-v1:";\n',
+              '')
+          replace_exact(
+              '        private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>();\n',
+              '')
 
-          replace_once(
-              r'\n\s*static final String LEGACY_FALLBACK_PREFIX = "legacy-v1:";',
-              '')
-          replace_once(
-              r'\n\s*private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>\(\);',
-              '')
-          replace_once(
-              r'''            String hash = value\(normalized\)\s*
-                  \.map\(value -> HASH_PREFIX \+ sha256\(value\.key\(\)\.encoded\(\)\)\)\s*
-                  \.orElseGet\(\(\) -> LEGACY_FALLBACK_PREFIX \+ legacyHash\(normalized\)\);''',
-              '''            ExprValue value = value(normalized).orElseThrow(() ->
-                  new IllegalArgumentException(
-                      "search expression cannot be represented as ExprValue: " + normalized));
-              String hash = HASH_PREFIX + sha256(value.key().encoded());''',
-              re.VERBOSE)
-          replace_once(
-              r'''\n        String legacyHash\(String expression\) \{.*?\n        \}\n''',
-              '\n',
-              re.DOTALL)
-          replace_once(
-              r'\n\s*legacyHashesByExpression\.clear\(\);',
-              '')
+          hash_start = text.index('            String hash = value(normalized)')
+          hash_end = text.index('            valueHashesByExpression.put', hash_start)
+          old_hash_block = text[hash_start:hash_end]
+          if 'LEGACY_FALLBACK_PREFIX' not in old_hash_block:
+              raise SystemExit('legacy fallback not found in valueHash block')
+          new_hash_block = (
+              '            ExprValue value = value(normalized).orElseThrow(() ->\n'
+              '                new IllegalArgumentException(\n'
+              '                    "search expression cannot be represented as ExprValue: " + normalized));\n'
+              '            String hash = HASH_PREFIX + sha256(value.key().encoded());\n'
+          )
+          text = text[:hash_start] + new_hash_block + text[hash_end:]
+
+          method_start = text.index('        String legacyHash(String expression) {')
+          method_end = text.index('        int cacheHits()', method_start)
+          text = text[:method_start] + text[method_end:]
+          replace_exact('            legacyHashesByExpression.clear();\n', '')
 
           path.write_text(text, encoding='utf-8')
           PY
