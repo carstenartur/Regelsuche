@@ -34,10 +34,9 @@ if (aiKnowledgeEnabled) {
 
         // Extractor 0.1.7 schema v3: main measured 20.28; the deterministic
         // trajectory dataset measures 20.90; trajectory + compact explainable
-        // policy measures 21.30; transferable descriptors measure 21.50; the
-        // bounded frontier-priority channel measures 21.56. The 21.60 limit
-        // retains a narrow 0.04-point margin for this reviewed capability.
-        maxCognitiveDebt = 21.6d
+        // policy measures 21.30. The 21.5 limit leaves only 0.20 points for
+        // accidental growth while recognizing the two reviewed capabilities.
+        maxCognitiveDebt = 21.5d
 
         maxMethodCognitiveComplexity = 65
         maxMethodCyclomaticComplexity = 35
