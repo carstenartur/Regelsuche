@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -9,9 +10,11 @@ import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
 import de.regelsuche.search.strategy.SearchState;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class AstRewriteTransformationEngineTest {
@@ -67,6 +70,41 @@ class AstRewriteTransformationEngineTest {
         List<Transformation> transformations = engine.transform("w + x * (y + z)");
 
         assertHasTransformation(transformations, "ast_distribute_left_add", "w + x * y + x * z");
+    }
+
+    @Test
+    void transitionIdentityAllowsTheSameRuleOnDistinctOccurrences() {
+        Set<String> ids = Set.of("ast_product_to_power_two", "ast_combine_powers");
+        TransformationEngine occurrenceAware = new OccurrenceAwareAstRewriteTransformationEngine(
+            AstRewriteTransformationEngine.defaultRules().stream()
+                .filter(rule -> ids.contains(rule.id()))
+                .toList());
+        List<Transformation> firstSteps = occurrenceAware.transform("(x * x) * (x * x)").stream()
+            .filter(transformation -> transformation.rule().equals("ast_product_to_power_two"))
+            .toList();
+        assertTrue(firstSteps.size() >= 2,
+            "left and right occurrences must both remain available; a whole-root match is also valid");
+        assertEquals((long) firstSteps.size(),
+            firstSteps.stream().map(Transformation::applicationKey).distinct().count());
+        assertTrue(firstSteps.stream().allMatch(transformation ->
+            transformation.applicationKey().length() < 180
+                && !transformation.applicationKey().contains(transformation.transformedExpression())));
+
+        SearchProblem problem = new SearchProblem(
+            "(x * x) * (x * x)",
+            occurrenceAware,
+            new ExpressionScorer(),
+            canonicalizer,
+            new SearchHeuristic(4, 80, 1, 8, 40, 20))
+            .withTarget(SearchTarget.syntaxExact("x ^ 4"));
+
+        var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+        assertTrue(result.reached(), result.toString());
+        assertEquals(2, result.reachedState().appliedRuleIds().stream()
+            .filter("ast_product_to_power_two"::equals)
+            .count());
+        assertTrue(result.reachedState().appliedRuleIds().contains("ast_combine_powers"));
     }
 
     @Test

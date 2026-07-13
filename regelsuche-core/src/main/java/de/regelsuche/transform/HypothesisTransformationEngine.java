@@ -27,6 +27,26 @@ public class HypothesisTransformationEngine implements TransformationEngine {
         this.maxHypothesisCandidates = Math.max(0, maxHypothesisCandidates);
     }
 
+    /**
+     * Returns the wrapped deterministic engine.
+     *
+     * <p>This is intentionally read-only and primarily supports inventory,
+     * provenance, and leakage audits that must inspect the complete active rule
+     * graph instead of treating this wrapper as an opaque boundary.</p>
+     */
+    public TransformationEngine baseEngine() {
+        return baseEngine;
+    }
+
+    /** Returns the immutable hypothesis-operator inventory used by this engine. */
+    public List<HypothesisOperator> operators() {
+        return operators;
+    }
+
+    public int maxHypothesisCandidates() {
+        return maxHypothesisCandidates;
+    }
+
     @Override
     public List<Transformation> transform(String expression) {
         List<Transformation> combined = new ArrayList<>(baseEngine.transform(expression));
