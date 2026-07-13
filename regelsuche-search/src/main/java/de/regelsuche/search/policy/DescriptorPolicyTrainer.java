@@ -227,10 +227,6 @@ public final class DescriptorPolicyTrainer {
         boolean successful,
         int scoreDelta
     ) {
-        private Example {
-            features = Map.copyOf(features);
-        }
-
         private static Example of(SearchTrajectoryRecord record) {
             TransformationDescriptor descriptor = record.transformationDescriptor();
             return new Example(
