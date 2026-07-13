@@ -238,12 +238,6 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         SearchFrame frame,
         int generated
     ) {
-        frame.telemetry().transformationGenerated(
-            current,
-            transformation,
-            frame.frontier().size(),
-            frame.visited().size(),
-            generated);
         String skipReason = skipReason(problem, current, transformation);
         if (!skipReason.isBlank()) {
             frame.progress().skippedTransformations++;
@@ -256,6 +250,12 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 skipReason);
             return false;
         }
+        frame.telemetry().transformationGenerated(
+            current,
+            transformation,
+            frame.frontier().size(),
+            frame.visited().size(),
+            generated);
         SearchState nextState = createNextState(problem, current, transformation, frame.identity());
         if (frame.visited().contains(stateKey(nextState))) {
             frame.progress().duplicatePrunes++;
@@ -609,7 +609,13 @@ public class BestFirstSearchStrategy implements SearchStrategy {
                 return UNPARSEABLE_DISTANCE;
             }
             return identity.value(expression)
-                .map(value -> semanticDistance(value, targetValue, targetOccurrences))
+                .map(value -> {
+                    int semantic = semanticDistance(value, targetValue, targetOccurrences);
+                    if (target.relation() != TargetRelation.SYNTAX_EXACT) {
+                        return semantic;
+                    }
+                    return Math.min(UNPARSEABLE_DISTANCE - 1, semantic + 1);
+                })
                 .orElse(UNPARSEABLE_DISTANCE);
         }
 
