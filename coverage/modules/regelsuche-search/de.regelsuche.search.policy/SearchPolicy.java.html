@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchPolicy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.policy</a> &gt; <span class="el_source">SearchPolicy.java</span></div><h1>SearchPolicy.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.policy;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.search.learning.TransformationDescriptor;
 import de.regelsuche.transform.Transformation;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -19,22 +20,22 @@ public interface SearchPolicy {
 
     /** Static reference policy matching the pre-learning target-distance ordering. */
     static SearchPolicy staticPolicy() {
-<span class="nc" id="L22">        return StaticPolicy.INSTANCE;</span>
+<span class="nc" id="L23">        return StaticPolicy.INSTANCE;</span>
     }
 
-<span class="nc" id="L25">    enum StaticPolicy implements SearchPolicy {</span>
-<span class="nc" id="L26">        INSTANCE;</span>
+<span class="nc" id="L26">    enum StaticPolicy implements SearchPolicy {</span>
+<span class="nc" id="L27">        INSTANCE;</span>
 
         static final String ID = &quot;static-target-distance/v1&quot;;
 
         @Override
         public String id() {
-<span class="nc" id="L32">            return ID;</span>
+<span class="nc" id="L33">            return ID;</span>
         }
 
         @Override
         public PolicyDecision score(PolicyContext context, Transformation transformation) {
-<span class="nc" id="L37">            return PolicyDecision.staticDecision(context.targetDistance(), context.targeted());</span>
+<span class="nc" id="L38">            return PolicyDecision.staticDecision(context.targetDistance(), context.targeted());</span>
         }
     }
 
@@ -42,15 +43,16 @@ public interface SearchPolicy {
         String parentExpression,
         int targetDistance,
         boolean targeted,
-        ExpressionCanonicalizer canonicalizer
+        ExpressionCanonicalizer canonicalizer,
+        TransformationDescriptor transformationDescriptor
     ) {
-<span class="fc" id="L47">        public PolicyContext {</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">            parentExpression = parentExpression == null ? &quot;&quot; : parentExpression;</span>
-<span class="pc bpc" id="L49" title="3 of 4 branches missed.">            if (targetDistance &lt; 0 &amp;&amp; targeted) {</span>
-<span class="nc" id="L50">                throw new IllegalArgumentException(&quot;targetDistance must be non-negative for targeted search&quot;);</span>
+<span class="fc" id="L49">        public PolicyContext {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            parentExpression = parentExpression == null ? &quot;&quot; : parentExpression;</span>
+<span class="pc bpc" id="L51" title="3 of 4 branches missed.">            if (targetDistance &lt; 0 &amp;&amp; targeted) {</span>
+<span class="nc" id="L52">                throw new IllegalArgumentException(&quot;targetDistance must be non-negative for targeted search&quot;);</span>
             }
-<span class="fc" id="L52">            Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
-<span class="fc" id="L53">        }</span>
+<span class="fc" id="L54">            Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
+<span class="fc" id="L55">        }</span>
     }
 
     record PolicyDecision(
@@ -61,33 +63,33 @@ public interface SearchPolicy {
         Map&lt;String, Integer&gt; contributions,
         String explanation
     ) {
-<span class="fc" id="L64">        public PolicyDecision {</span>
-<span class="pc bpc" id="L65" title="2 of 4 branches missed.">            if (policyId == null || policyId.isBlank()) {</span>
-<span class="nc" id="L66">                throw new IllegalArgumentException(&quot;policyId must not be blank&quot;);</span>
+<span class="fc" id="L66">        public PolicyDecision {</span>
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">            if (policyId == null || policyId.isBlank()) {</span>
+<span class="nc" id="L68">                throw new IllegalArgumentException(&quot;policyId must not be blank&quot;);</span>
             }
-<span class="pc bpc" id="L68" title="2 of 4 branches missed.">            if (confidencePermille &lt; 0 || confidencePermille &gt; 1000) {</span>
-<span class="nc" id="L69">                throw new IllegalArgumentException(&quot;confidencePermille must be in 0..1000&quot;);</span>
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">            if (confidencePermille &lt; 0 || confidencePermille &gt; 1000) {</span>
+<span class="nc" id="L71">                throw new IllegalArgumentException(&quot;confidencePermille must be in 0..1000&quot;);</span>
             }
-<span class="fc" id="L71">            Map&lt;String, Integer&gt; sorted = new LinkedHashMap&lt;&gt;();</span>
-<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (contributions != null) {</span>
-<span class="fc" id="L73">                contributions.entrySet().stream()</span>
-<span class="pc bpc" id="L74" title="2 of 4 branches missed.">                    .filter(entry -&gt; entry.getKey() != null &amp;&amp; entry.getValue() != null)</span>
-<span class="fc" id="L75">                    .sorted(Map.Entry.comparingByKey())</span>
-<span class="fc" id="L76">                    .forEach(entry -&gt; sorted.put(entry.getKey(), entry.getValue()));</span>
+<span class="fc" id="L73">            Map&lt;String, Integer&gt; sorted = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (contributions != null) {</span>
+<span class="fc" id="L75">                contributions.entrySet().stream()</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">                    .filter(entry -&gt; entry.getKey() != null &amp;&amp; entry.getValue() != null)</span>
+<span class="fc" id="L77">                    .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L78">                    .forEach(entry -&gt; sorted.put(entry.getKey(), entry.getValue()));</span>
             }
-<span class="fc" id="L78">            contributions = Collections.unmodifiableMap(sorted);</span>
-<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
-<span class="fc" id="L80">        }</span>
+<span class="fc" id="L80">            contributions = Collections.unmodifiableMap(sorted);</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L82">        }</span>
 
         public static PolicyDecision staticDecision(int targetDistance, boolean targeted) {
-<span class="nc bnc" id="L83" title="All 2 branches missed.">            int priority = targeted ? targetDistance : 0;</span>
-<span class="nc" id="L84">            return new PolicyDecision(</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            int priority = targeted ? targetDistance : 0;</span>
+<span class="nc" id="L86">            return new PolicyDecision(</span>
                 StaticPolicy.ID,
                 priority,
                 1000,
                 false,
-<span class="nc" id="L89">                Map.of(&quot;targetDistance&quot;, priority),</span>
-<span class="nc bnc" id="L90" title="All 2 branches missed.">                targeted ? &quot;static target-distance ordering&quot; : &quot;static deterministic ordering&quot;);</span>
+<span class="nc" id="L91">                Map.of(&quot;targetDistance&quot;, priority),</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                targeted ? &quot;static target-distance ordering&quot; : &quot;static deterministic ordering&quot;);</span>
         }
     }
 }
