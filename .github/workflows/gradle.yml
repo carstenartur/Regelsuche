@@ -81,6 +81,21 @@ jobs:
         path: app/build/reports/held-out-policy/**
         if-no-files-found: warn
 
+    - name: Require held-out descriptor-policy evidence after a successful build
+      if: success()
+      shell: bash
+      run: |
+        test -s app/build/reports/held-out-descriptor-policy/report.json
+        test -s app/build/reports/held-out-descriptor-policy/trajectories.jsonl
+
+    - name: Upload held-out descriptor-policy evidence
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: held-out-descriptor-policy-evidence
+        path: app/build/reports/held-out-descriptor-policy/**
+        if-no-files-found: warn
+
   dependency-submission:
 
     runs-on: ubuntu-latest
@@ -96,4 +111,4 @@ jobs:
         distribution: 'temurin'
 
     - name: Generate and submit dependency graph
-      uses: gradle/actions/dependency-submission@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+      uses: gradle/actions/dependency-submission@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e
