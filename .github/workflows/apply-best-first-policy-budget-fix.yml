@@ -1,16 +1,15 @@
 name: Apply BestFirst policy-budget fix
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/best-first-policy-budget
+      - main
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: ${{ !contains(github.event.head_commit.message, '[policy-budget-applied]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
