@@ -1,10 +1,12 @@
 package de.regelsuche.search.strategy;
 
+import de.regelsuche.search.learning.TransformationDescriptor;
 import de.regelsuche.search.policy.SearchPolicy;
 import de.regelsuche.search.policy.SearchPolicy.PolicyContext;
 import de.regelsuche.search.policy.SearchPolicy.PolicyDecision;
 import de.regelsuche.search.telemetry.CompositeSearchObserver;
 import de.regelsuche.search.telemetry.SearchEvent;
+import de.regelsuche.search.telemetry.SearchEventType;
 import de.regelsuche.search.telemetry.SearchObserver;
 import de.regelsuche.transform.Transformation;
 import java.util.ArrayList;
@@ -56,8 +58,11 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             problem.costModel(),
             observer,
             problem.target());
-        return new PolicyBestFirstSearchStrategy(policy, trace)
-            .searchWithDiagnostics(rankedProblem);
+        try (TransformationDescriptor.Factory descriptorFactory =
+                new TransformationDescriptor.Factory(problem.target(), problem.canonicalizer())) {
+            return new PolicyBestFirstSearchStrategy(policy, trace, descriptorFactory)
+                .searchWithDiagnostics(rankedProblem);
+        }
     }
 
     public record PolicySearchResult(
@@ -104,10 +109,16 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
     private static final class PolicyBestFirstSearchStrategy extends BestFirstSearchStrategy {
         private final SearchPolicy policy;
         private final PolicyTrace trace;
+        private final TransformationDescriptor.Factory descriptorFactory;
 
-        private PolicyBestFirstSearchStrategy(SearchPolicy policy, PolicyTrace trace) {
+        private PolicyBestFirstSearchStrategy(
+            SearchPolicy policy,
+            PolicyTrace trace,
+            TransformationDescriptor.Factory descriptorFactory
+        ) {
             this.policy = policy;
             this.trace = trace;
+            this.descriptorFactory = descriptorFactory;
         }
 
         @Override
@@ -130,7 +141,8 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                             current.expression(),
                             targetDistance.applyAsInt(transformation),
                             targetEnabled,
-                            problem.canonicalizer()),
+                            problem.canonicalizer(),
+                            descriptor(current, transformation)),
                         transformation)))
                 .toList());
 
@@ -155,6 +167,32 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
                 trace.startGroup(current.expression(), ranked);
             }
             return ranked.stream().map(RankedTransformation::transformation).toList();
+        }
+
+        private TransformationDescriptor descriptor(
+            SearchState current,
+            Transformation transformation
+        ) {
+            SearchEvent descriptorEvent = new SearchEvent(
+                -1,
+                SearchEventType.TRANSFORMATION_GENERATED,
+                transformation.transformedExpression(),
+                "",
+                current.depth() + 1,
+                0,
+                current.canonicalHash(),
+                current.expression(),
+                transformation.rule(),
+                transformation.kind(),
+                transformation.mayIncreaseComplexity(),
+                transformation.estimatedCostDelta(),
+                transformation.equivalencePreservingByConstruction(),
+                transformation.assumptions(),
+                0,
+                0,
+                0,
+                "");
+            return descriptorFactory.from(descriptorEvent);
         }
     }
 
