@@ -1,0 +1,104 @@
+name: Apply ValueKey-only BestFirst cleanup
+
+on:
+  push:
+    branches: [ "cleanup/263-valuekey-only-search-identity" ]
+    paths:
+      - '.github/workflows/cleanup-263-self-apply.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: cleanup/263-valuekey-only-search-identity
+          fetch-depth: 0
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6.1.0
+      - name: Remove legacy BestFirst identity paths
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java')
+          text = path.read_text(encoding='utf-8')
+
+          def replace_once(old, new):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'expected exactly one occurrence, found {count}: {old[:80]!r}')
+              text = text.replace(old, new)
+
+          replace_once(
+          '''        if (TranspositionGate.evaluate(
+                          problem.memory(),
+                          current,
+                          current.canonicalHash() + "#" + current.depth(),
+                          List.of(frame.identity().legacyHash(current.expression())))
+                          != TranspositionGate.Verdict.PRUNE) {''',
+          '''        if (TranspositionGate.evaluate(
+                          problem.memory(),
+                          current,
+                          current.canonicalHash() + "#" + current.depth())
+                          != TranspositionGate.Verdict.PRUNE) {''')
+
+          replace_once(
+          '''        static final String HASH_PREFIX = "value-v1:";
+                  static final String LEGACY_FALLBACK_PREFIX = "legacy-v1:";''',
+          '''        static final String HASH_PREFIX = "value-v1:";''')
+
+          replace_once(
+          '''        private final Set<String> unparseableExpressions = new HashSet<>();
+                  private final Map<String, String> legacyHashesByExpression = new LinkedHashMap<>();''',
+          '''        private final Set<String> unparseableExpressions = new HashSet<>();''')
+
+          replace_once(
+          '''            String hash = value(normalized)
+                          .map(value -> HASH_PREFIX + sha256(value.key().encoded()))
+                          .orElseGet(() -> LEGACY_FALLBACK_PREFIX + legacyHash(normalized));''',
+          '''            ExprValue value = value(normalized).orElseThrow(() ->
+                          new IllegalArgumentException(
+                              "search expression cannot be represented as ExprValue: " + normalized));
+                      String hash = HASH_PREFIX + sha256(value.key().encoded());''')
+
+          replace_once(
+          '''        String legacyHash(String expression) {
+                      String normalized = normalize(expression);
+                      return legacyHashesByExpression.computeIfAbsent(normalized, canonicalizer::stableHash);
+                  }
+          
+          ''',
+          '''''')
+
+          replace_once(
+          '''            unparseableExpressions.clear();
+                      legacyHashesByExpression.clear();
+                      factory.close();''',
+          '''            unparseableExpressions.clear();
+                      factory.close();''')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+          ! grep -R "LEGACY_FALLBACK_PREFIX\|legacyHash\|compatibleIdentityHashes\|migrateCompatibleEntry" \
+            regelsuche-search/src/main/java/de/regelsuche/search/strategy
+      - name: Run focused search-identity tests
+        run: |
+          ./gradlew :regelsuche-search:test \
+            --tests de.regelsuche.search.strategy.BestFirstSearchTelemetryTest \
+            --tests de.regelsuche.search.memory.TranspositionTableIntegrationTest
+      - name: Commit verified cleanup
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java
+          git commit -m 'Require ValueKey identity for BestFirst states'
+          git push origin HEAD:cleanup/263-valuekey-only-search-identity
