@@ -99,11 +99,6 @@ public final class PolicyAwareBestFirstSearchStrategy implements SearchStrategy 
             explanation = explanation == null ? "" : explanation;
             admissionOutcome = admissionOutcome == null ? "not-considered" : admissionOutcome;
         }
-
-        /** Compatibility alias for the former trace field, now backed by real admission. */
-        public boolean selectedByCandidateBudget() {
-            return admittedToFrontier;
-        }
     }
 
     private static final class PolicyBestFirstSearchStrategy extends BestFirstSearchStrategy {
