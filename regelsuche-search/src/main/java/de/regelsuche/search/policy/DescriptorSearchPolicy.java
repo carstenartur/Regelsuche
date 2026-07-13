@@ -3,7 +3,6 @@ package de.regelsuche.search.policy;
 import de.regelsuche.search.learning.ExpressionFingerprint;
 import de.regelsuche.search.learning.SearchExperienceRepository;
 import de.regelsuche.search.learning.TransformationDescriptor;
-import de.regelsuche.search.learning.TransformationDescriptor.OccurrenceRole;
 import de.regelsuche.search.policy.DescriptorPolicyModel.DescriptorStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.FeatureStatistics;
 import de.regelsuche.transform.Transformation;
@@ -79,7 +78,7 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         Transformation transformation,
         TransformationDescriptor descriptor
     ) {
-        Map<String, Integer> descriptorFeatures = predictiveFeatures(descriptor);
+        Map<String, Integer> descriptorFeatures = DescriptorFeatureVector.of(descriptor);
         Map<String, Integer> contributions = base(context);
         boolean localTransitionSupported = localTransitionSupported(descriptorFeatures);
         int informative = 0;
@@ -95,7 +94,7 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
             }
             String featureName = entry.getKey();
             int value = descriptorFeatures.getOrDefault(featureName, 0);
-            if (pairwiseContextFeature(featureName)) {
+            if (DescriptorFeatureVector.pairwiseContextFeature(featureName)) {
                 if (value == 0) {
                     continue;
                 }
@@ -152,23 +151,6 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
                 && statistics.maximumValue() > 0;
         }
         return false;
-    }
-
-    private static boolean pairwiseContextFeature(String featureName) {
-        return featureName.startsWith("local.context.")
-            || featureName.startsWith("local.contextRole.");
-    }
-
-    private static Map<String, Integer> predictiveFeatures(
-        TransformationDescriptor descriptor
-    ) {
-        Map<String, Integer> features = new LinkedHashMap<>(descriptor.featureVector());
-        TransformationDescriptor.LocalChange local = descriptor.localChange();
-        if (local.available() && local.role() != OccurrenceRole.ROOT) {
-            features.put("local.contextRole." + local.contextRoot().kind().name()
-                + "_" + local.role().name(), 1);
-        }
-        return Map.copyOf(features);
     }
 
     private Map<String, Integer> base(PolicyContext context) {
