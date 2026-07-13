@@ -86,6 +86,37 @@ class DescriptorSearchPolicyTest {
     }
 
     @Test
+    void linearContributionClampsInLongSpaceBeforeNarrowing() {
+        Transformation transformation = new Transformation(
+            "extreme-cost",
+            "x",
+            RewriteKind.NORMALIZE,
+            false,
+            Integer.MAX_VALUE,
+            true,
+            "extreme-cost:x");
+        TransformationDescriptor descriptor = descriptor("x + 0", transformation);
+        DescriptorPolicyModel model = new DescriptorPolicyModel(
+            "descriptor-policy-v1:extreme-range",
+            "sha256:source",
+            "sha256:predictive",
+            DescriptorPolicyModel.FEATURE_SCHEMA,
+            Mode.LINEAR,
+            1,
+            Map.of(),
+            Map.of("estimatedCostDelta", new FeatureStatistics(
+                2, 1, 1, 1, 0,
+                Integer.MIN_VALUE, Integer.MAX_VALUE, 1000)));
+
+        var decision = new DescriptorSearchPolicy(model).score(
+            new PolicyContext("x + 0", 0, true, canonicalizer, descriptor),
+            transformation);
+
+        assertFalse(decision.fallback());
+        assertEquals(1000, decision.contributions().get("descriptor.estimatedCostDelta"));
+    }
+
+    @Test
     void incompatibleDescriptorModelReproducesStaticSearchExactly() {
         SearchProblem problem = controlledProblem();
         var staticResult = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
