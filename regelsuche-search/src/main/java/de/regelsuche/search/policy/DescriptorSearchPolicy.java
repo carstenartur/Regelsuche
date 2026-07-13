@@ -80,8 +80,10 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
     ) {
         Map<String, Integer> descriptorFeatures = descriptor.featureVector();
         Map<String, Integer> contributions = base(context);
+        boolean localEvidenceSupported = localEvidenceSupported(descriptorFeatures);
         int informative = 0;
         int outOfRange = 0;
+        int ignoredUnsupportedLocal = 0;
         int minimumEvidence = Integer.MAX_VALUE;
         for (Map.Entry<String, FeatureStatistics> entry : model.features().entrySet()) {
             FeatureStatistics statistics = entry.getValue();
@@ -89,7 +91,12 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
                     || statistics.coefficientPermille() == 0) {
                 continue;
             }
-            int value = descriptorFeatures.getOrDefault(entry.getKey(), 0);
+            String featureName = entry.getKey();
+            if (featureName.startsWith("local.") && !localEvidenceSupported) {
+                ignoredUnsupportedLocal++;
+                continue;
+            }
+            int value = descriptorFeatures.getOrDefault(featureName, 0);
             if (value < statistics.minimumValue() || value > statistics.maximumValue()) {
                 outOfRange++;
                 continue;
@@ -102,21 +109,41 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
             long rawContribution = statistics.coefficientPermille() * centered / span;
             int contribution = clamp(rawContribution, -1000, 1000);
             if (contribution != 0) {
-                contributions.put("descriptor." + entry.getKey(), contribution);
+                contributions.put("descriptor." + featureName, contribution);
             }
             informative++;
             minimumEvidence = Math.min(minimumEvidence, statistics.observations());
         }
         if (informative == 0) {
-            return fallback(context, outOfRange > 0
-                ? "all informative descriptor features are out of TRAIN range"
-                : "missing or under-observed shared descriptor features");
+            String reason;
+            if (ignoredUnsupportedLocal > 0) {
+                reason = "local transition absent from TRAIN evidence";
+            } else if (outOfRange > 0) {
+                reason = "all informative descriptor features are out of TRAIN range";
+            } else {
+                reason = "missing or under-observed shared descriptor features";
+            }
+            return fallback(context, reason);
         }
         addExperience(contributions, context, transformation);
         return decision(contributions,
             Math.min(1000, minimumEvidence * 100 + informative * 50),
             "transparent linear descriptor evidence from " + informative
-                + " shared features; ignoredOutOfRange=" + outOfRange);
+                + " shared features; ignoredOutOfRange=" + outOfRange
+                + "; ignoredUnsupportedLocal=" + ignoredUnsupportedLocal);
+    }
+
+    private boolean localEvidenceSupported(Map<String, Integer> descriptorFeatures) {
+        for (Map.Entry<String, Integer> feature : descriptorFeatures.entrySet()) {
+            if (!feature.getKey().startsWith("local.transition.") || feature.getValue() == 0) {
+                continue;
+            }
+            FeatureStatistics statistics = model.features().get(feature.getKey());
+            return statistics != null
+                && statistics.observations() >= model.minimumObservations()
+                && statistics.maximumValue() > 0;
+        }
+        return false;
     }
 
     private Map<String, Integer> base(PolicyContext context) {
