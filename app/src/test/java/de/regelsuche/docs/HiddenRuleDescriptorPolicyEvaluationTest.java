@@ -79,17 +79,21 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             .mapToInt(Outcome::nonZeroFrontierAdjustments).sum();
         boolean correctnessLoss = cases.stream().flatMap(item -> item.outcomes().stream())
             .anyMatch(Outcome::correctnessLoss);
-        int bestImprovement = cases.stream().flatMap(item -> item.outcomes().stream())
-            .filter(item -> !item.policy().equals("static"))
-            .mapToInt(Outcome::improvementPermille).max().orElse(0);
-        String conclusion = bestImprovement >= REQUIRED_IMPROVEMENT_PERMILLE
+        int bestCandidateOnlyImprovement = bestImprovement(cases, false);
+        int bestFrontierImprovement = bestImprovement(cases, true);
+        int bestImprovement = Math.max(bestCandidateOnlyImprovement, bestFrontierImprovement);
+        String conclusion = bestFrontierImprovement >= REQUIRED_IMPROVEMENT_PERMILLE
                 && !correctnessLoss
             ? "POSITIVE_MATERIAL_IMPROVEMENT"
             : "NEGATIVE_FRONTIER_NO_MATERIAL_IMPROVEMENT";
         String limitation = conclusion.startsWith("POSITIVE") ? "none"
-            : "descriptor evidence changes frontier priority but does not improve the primary metric by 20 percent";
+            : "frontier priority improves the best held-out case by "
+                + bestFrontierImprovement
+                + " permille, below the required 200; affected occurrence role and depth "
+                + "are the next limiting descriptor";
         String report = report(study.dataset(), models, experiences.size(), cases,
-            nonFallback, frontierAdjustments, bestImprovement, correctnessLoss,
+            nonFallback, frontierAdjustments, bestCandidateOnlyImprovement,
+            bestFrontierImprovement, bestImprovement, correctnessLoss,
             conclusion, limitation);
         Path directory = Path.of("build", "reports", "held-out-descriptor-policy");
         write(directory.resolve("report.json"), report);
@@ -101,11 +105,19 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             "held-out successors require non-zero TRAIN-derived frontier evidence");
         assertFalse(correctnessLoss);
         assertEquals(report, report(study.dataset(), models, experiences.size(), cases,
-            nonFallback, frontierAdjustments, bestImprovement, correctnessLoss,
+            nonFallback, frontierAdjustments, bestCandidateOnlyImprovement,
+            bestFrontierImprovement, bestImprovement, correctnessLoss,
             conclusion, limitation));
         assertFalse(report.contains("hidden_"));
         assertTrue(Files.isRegularFile(directory.resolve("report.json")));
         assertTrue(Files.isRegularFile(directory.resolve("trajectories.jsonl")));
+    }
+
+    private static int bestImprovement(List<CaseEvidence> cases, boolean frontier) {
+        return cases.stream().flatMap(item -> item.outcomes().stream())
+            .filter(item -> !item.policy().equals("static"))
+            .filter(item -> item.policy().contains("-frontier") == frontier)
+            .mapToInt(Outcome::improvementPermille).max().orElse(0);
     }
 
     private Study collectStudy() {
@@ -210,6 +222,8 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         List<CaseEvidence> cases,
         int nonFallback,
         int frontierAdjustments,
+        int bestCandidateOnlyImprovement,
+        int bestFrontierImprovement,
         int bestImprovement,
         boolean correctnessLoss,
         String conclusion,
@@ -232,6 +246,8 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             .property("frontierAdjustmentLimit",
                 PolicyAwareBestFirstSearchStrategy.DEFAULT_MAX_FRONTIER_ADJUSTMENT)
             .property("requiredImprovementPermille", REQUIRED_IMPROVEMENT_PERMILLE)
+            .property("bestCandidateOnlyImprovementPermille", bestCandidateOnlyImprovement)
+            .property("bestFrontierImprovementPermille", bestFrontierImprovement)
             .property("bestImprovementPermille", bestImprovement)
             .property("correctnessLoss", correctnessLoss)
             .property("conclusion", conclusion)
@@ -320,9 +336,25 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
                 .count();
         }
 
+        private boolean selectedPathTransition(RankingEvent event) {
+            if (result.reachedState() == null) {
+                return false;
+            }
+            List<String> path = result.reachedState().path();
+            for (int index = 0; index + 1 < path.size(); index++) {
+                if (path.get(index).equals(event.parentExpression())
+                        && path.get(index + 1).equals(event.transformedExpression())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         private void writeJson(JsonWriter json) {
             List<String> selected = result.reachedState() == null ? List.of()
                 : result.reachedState().appliedRuleIds();
+            List<String> selectedPath = result.reachedState() == null ? List.of()
+                : result.reachedState().path();
             json.property("policy", policy)
                 .property("reached", result.reached())
                 .property("status", result.status().name())
@@ -333,10 +365,14 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
                 .property("nonZeroFrontierAdjustments", nonZeroFrontierAdjustments())
                 .property("correctnessLoss", correctnessLoss)
                 .stringArray("selectedRules", selected)
+                .stringArray("selectedPath", selectedPath)
                 .array("decisions", array -> events.forEach(event ->
                     array.objectValue(object -> object
                         .property("decisionGroup", event.decisionGroup())
+                        .property("parentExpression", event.parentExpression())
                         .property("ruleId", event.ruleId())
+                        .property("transformedExpression", event.transformedExpression())
+                        .property("selectedPathTransition", selectedPathTransition(event))
                         .property("rank", event.deterministicRank())
                         .property("confidencePermille", event.confidencePermille())
                         .property("fallback", event.fallback())
@@ -349,6 +385,7 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
                         .property("admissionOutcome", event.admissionOutcome())
                         .property("dequeueOrder", event.dequeueOrder())
                         .stringArray("contributions", event.contributions().entrySet().stream()
+                            .sorted(Map.Entry.comparingByKey())
                             .map(entry -> entry.getKey() + "=" + entry.getValue()).toList()))));
         }
     }
