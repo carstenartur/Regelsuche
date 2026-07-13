@@ -8,6 +8,7 @@ import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionParser;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /** Small deterministic feature vector derived from one expression AST. */
@@ -27,13 +28,20 @@ public record ExpressionFeatures(
 ) {
     public static ExpressionFeatures of(String expression) {
         try {
-            Expr parsed = new ExpressionParser().parseTerm(expression);
-            MutableFeatures features = new MutableFeatures();
-            collect(parsed, 1, features);
-            return features.freeze(true);
+            return of(new ExpressionParser().parseTerm(expression));
         } catch (IllegalArgumentException exception) {
-            return new MutableFeatures().freeze(false);
+            return unavailable();
         }
+    }
+
+    static ExpressionFeatures of(Expr expression) {
+        MutableFeatures features = new MutableFeatures();
+        collect(Objects.requireNonNull(expression, "expression"), 1, features);
+        return features.freeze(true);
+    }
+
+    static ExpressionFeatures unavailable() {
+        return new MutableFeatures().freeze(false);
     }
 
     private static void collect(Expr expression, int depth, MutableFeatures features) {
