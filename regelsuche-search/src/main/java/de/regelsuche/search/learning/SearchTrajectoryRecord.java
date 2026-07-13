@@ -21,6 +21,7 @@ public record SearchTrajectoryRecord(
     ExpressionFingerprint parent,
     ExpressionFingerprint target,
     ExpressionFeatures features,
+    ExpressionFeatures parentFeatures,
     int depth,
     int score,
     int parentScore,
@@ -49,6 +50,11 @@ public record SearchTrajectoryRecord(
         Objects.requireNonNull(features, "features");
         Objects.requireNonNull(split, "split");
         Objects.requireNonNull(terminalStatus, "terminalStatus");
+        if (eventType == SearchEventType.TRANSFORMATION_GENERATED
+                && parentFeatures == null) {
+            throw new IllegalArgumentException(
+                "transformation decisions require parentFeatures");
+        }
         ruleId = safe(ruleId);
         applicableRuleIds = applicableRuleIds == null
             ? List.of()
