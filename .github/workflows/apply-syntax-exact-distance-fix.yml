@@ -1,0 +1,131 @@
+name: Apply syntax-exact target distance correction
+
+on:
+  push:
+    branches:
+      - fix/syntax-exact-target-distance
+    paths:
+      - .github/workflows/apply-syntax-exact-distance-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: fix/syntax-exact-target-distance
+
+      - name: Apply production and regression-test patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          strategy = Path("regelsuche-search/src/main/java/de/regelsuche/search/strategy/BestFirstSearchStrategy.java")
+          text = strategy.read_text(encoding="utf-8")
+          old = '''            return identity.value(expression)
+              .map(value -> semanticDistance(value, targetValue, targetOccurrences))
+              .orElse(UNPARSEABLE_DISTANCE);
+          '''
+          new = '''            return identity.value(expression)
+              .map(value -> {
+                  int semantic = semanticDistance(value, targetValue, targetOccurrences);
+                  if (target.relation() != TargetRelation.SYNTAX_EXACT) {
+                      return semantic;
+                  }
+                  return Math.min(UNPARSEABLE_DISTANCE - 1, semantic + 1);
+              })
+              .orElse(UNPARSEABLE_DISTANCE);
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("expected one target-distance block")
+          strategy.write_text(text.replace(old, new), encoding="utf-8")
+
+          test = Path("regelsuche-search/src/test/java/de/regelsuche/search/strategy/GoalAwareSearchTest.java")
+          text = test.read_text(encoding="utf-8")
+          import_old = '''import static org.junit.jupiter.api.Assertions.assertEquals;
+          import static org.junit.jupiter.api.Assertions.assertNotNull;
+          '''
+          import_new = '''import static org.junit.jupiter.api.Assertions.assertEquals;
+          import static org.junit.jupiter.api.Assertions.assertFalse;
+          import static org.junit.jupiter.api.Assertions.assertNotNull;
+          '''
+          if text.count(import_old) != 1:
+              raise SystemExit("expected assertion import block")
+          text = text.replace(import_old, import_new)
+
+          marker = '''    @Test
+              void diagnosticsDistinguishNoTransformationsFromGenericExhaustion() {
+          '''
+          tests = '''    @Test
+              void syntaxExactTargetOutranksAnAcEquivalentNonExactCandidate() {
+                  TransformationEngine engine = expression -> {
+                      if (!"x * (y + z)".equals(expression)) {
+                          return List.of();
+                      }
+                      return List.of(
+                          new Transformation(
+                              "a_reordered_equivalent", "x * z + x * y", RewriteKind.NORMALIZE,
+                              false, 0, true, "a_reordered_equivalent"),
+                          new Transformation(
+                              "z_exact_target", "x * y + x * z", RewriteKind.NORMALIZE,
+                              false, 0, true, "z_exact_target")
+                      );
+                  };
+                  SearchProblem problem = baseProblem(
+                      "x * (y + z)", engine, 1, 8, 1)
+                      .withTarget(SearchProblem.SearchTarget
+                          .syntaxExact("x * y + x * z")
+                          .withDistanceWeight(20));
+
+                  BestFirstSearchStrategy.GoalSearchResult result =
+                      new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+                  assertTrue(result.reached(), result.toString());
+                  assertEquals(List.of("x * (y + z)", "x * y + x * z"),
+                      result.states().stream().map(SearchState::expression).toList());
+                  assertEquals("z_exact_target", result.reachedState().appliedRuleId());
+                  assertTrue(result.metrics().candidateBudgetPrunes() >= 1);
+              }
+
+              @Test
+              void syntaxEquivalentButNonExactStateHasPositiveDistance() {
+                  TransformationEngine engine = expression -> "x * (y + z)".equals(expression)
+                      ? List.of(new Transformation(
+                          "reordered_equivalent", "x * z + x * y", RewriteKind.NORMALIZE,
+                          false, 0, true, "reordered_equivalent"))
+                      : List.of();
+                  SearchProblem problem = baseProblem(
+                      "x * (y + z)", engine, 1, 8, 1)
+                      .withTarget(SearchProblem.SearchTarget
+                          .syntaxExact("x * y + x * z")
+                          .withDistanceWeight(20));
+
+                  BestFirstSearchStrategy.GoalSearchResult result =
+                      new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+
+                  assertFalse(result.reached());
+                  assertEquals(1, result.bestDistance());
+                  assertEquals("x * z + x * y", result.bestState().expression());
+              }
+
+          '''
+          if text.count(marker) != 1:
+              raise SystemExit("expected diagnostics test marker")
+          test.write_text(text.replace(marker, tests + marker), encoding="utf-8")
+
+          Path(".github/workflows/apply-syntax-exact-distance-fix.yml").unlink()
+          PY
+
+      - name: Commit corrected baseline
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Prefer exact syntax in syntax-target distance"
+          git push origin HEAD:fix/syntax-exact-target-distance
