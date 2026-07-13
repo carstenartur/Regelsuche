@@ -50,6 +50,8 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         "regelsuche.hidden-rule-descriptor-policy-evaluation/v1";
     private static final String PRODUCER = "hidden-rule-descriptor-policy-evaluation/v1";
     private static final int REQUIRED_IMPROVEMENT_PERMILLE = 200;
+    private static final String NEXT_DESCRIPTOR_BOUNDARY =
+        "normalized local delta shape and affected-occurrence role/depth";
 
     private static final Map<String, FamilySpec> FAMILIES = Map.of(
         "case-001", new FamilySpec("family-a", DatasetSplit.TRAIN),
@@ -64,6 +66,7 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
     @Test
     void evaluatesUnseenRuleIdsWithDeterministicDescriptorEvidence() {
         EvaluationReport report = evaluate();
+        EvaluationReport replay = evaluate();
         String json = report.toJson();
         Path output = Path.of(
             "build", "reports", "held-out-descriptor-policy", "report.json");
@@ -80,8 +83,8 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         assertEquals(1, report.testRuns());
         assertEquals(2, report.cases().size());
         assertFalse(report.correctnessLoss());
-        assertTrue(report.heldOutDescriptorRuleIds() > 0,
-            "at least one unseen rule id must receive descriptor evidence");
+        assertEquals(5, report.heldOutDescriptorRuleIds(),
+            "all five unseen pilot rule ids should receive descriptor evidence");
         assertTrue(report.cases().stream()
             .map(CaseReport::outcome)
             .map(outcomes -> outcomes.get("per-rule-frequency"))
@@ -91,12 +94,17 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             .flatMap(caseReport -> caseReport.outcomes().stream())
             .filter(outcome -> outcome.policy().startsWith("descriptor-linear"))
             .anyMatch(outcome -> outcome.nonFallbackEvents() > 0));
-        assertTrue(report.conclusion().equals("POSITIVE_MATERIAL_IMPROVEMENT")
-            || report.conclusion().equals("NEGATIVE_LIMITING_DESCRIPTOR"));
-        if (report.conclusion().startsWith("NEGATIVE")) {
-            assertFalse(report.limitingFeature().isBlank());
-        }
-        assertEquals(json, report.toJson());
+
+        assertFalse(report.candidatePressureObserved(),
+            "the original pilot budgets admit every candidate and cannot test ordering benefit");
+        assertEquals(0, report.bestImprovementPermille());
+        assertEquals("NEGATIVE_NO_CANDIDATE_PRESSURE", report.conclusion());
+        assertFalse(report.experimentalLimitation().isBlank());
+        assertEquals(NEXT_DESCRIPTOR_BOUNDARY, report.nextDescriptorBoundary());
+
+        assertEquals(json, replay.toJson(), "the report must be byte-deterministic");
+        assertEquals(report.datasetJsonLines(), replay.datasetJsonLines(),
+            "the exported trajectory data must be byte-deterministic");
         assertTrue(Files.isRegularFile(output));
         assertTrue(Files.isRegularFile(datasetOutput));
         assertFalse(json.contains("hidden_"));
@@ -104,33 +112,10 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
     }
 
     private EvaluationReport evaluate() {
-        List<RuntimeTask> tasks = HiddenRulePilotRuntimeCatalog.tasks().stream()
-            .sorted(Comparator.comparing(RuntimeTask::opaqueCaseId))
-            .toList();
-        List<SearchTrajectoryRun> runs = new ArrayList<>();
-        Map<String, RuntimeTask> taskById = new LinkedHashMap<>();
-
-        for (RuntimeTask task : tasks) {
-            FamilySpec family = family(task.opaqueCaseId());
-            SearchTrajectoryCollector collector = new SearchTrajectoryCollector();
-            SearchProblem problem = problem(task).withObserver(collector);
-            GoalSearchResult result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
-            assertTrue(result.reached(), () ->
-                task.opaqueCaseId() + " did not reach its public endpoint");
-            runs.add(collector.finish(
-                problem,
-                result,
-                new SearchTrajectoryContext(
-                    task.opaqueCaseId(),
-                    family.id(),
-                    PRODUCER,
-                    inventoryIds(task.primitiveEngine()),
-                    family.split())));
-            taskById.put(task.opaqueCaseId(), task);
-        }
-
-        SearchTrajectoryDataset dataset = new SearchTrajectoryDataset(runs);
+        Corpus corpus = collectCorpus();
+        SearchTrajectoryDataset dataset = new SearchTrajectoryDataset(corpus.runs());
         assertTrue(dataset.leakageFree(), dataset.leakageViolations().toString());
+
         SearchPolicyModel perRuleFrequency = new SearchPolicyTrainer().train(
             dataset, SearchPolicyModel.Mode.FREQUENCY, 1);
         DescriptorPolicyTrainer descriptorTrainer = new DescriptorPolicyTrainer();
@@ -138,23 +123,14 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             dataset, DescriptorPolicyModel.Mode.FREQUENCY, 1);
         DescriptorPolicyModel descriptorLinear = descriptorTrainer.train(
             dataset, DescriptorPolicyModel.Mode.LINEAR, 1);
+        InMemorySearchExperienceRepository experiences = trainExperiences(corpus.runs());
+        List<String> trainingFamilies = trainingFamilies(corpus.runs());
 
-        InMemorySearchExperienceRepository experiences = new InMemorySearchExperienceRepository();
-        runs.stream()
-            .filter(run -> run.context().split() == DatasetSplit.TRAIN)
-            .forEach(experiences::store);
-        List<String> trainingFamilies = runs.stream()
-            .filter(run -> run.context().split() == DatasetSplit.TRAIN)
-            .map(run -> run.context().family())
-            .distinct()
-            .sorted()
-            .toList();
-
-        List<CaseReport> cases = runs.stream()
+        List<CaseReport> cases = corpus.runs().stream()
             .filter(run -> run.context().split() != DatasetSplit.TRAIN)
             .sorted(Comparator.comparing(run -> run.context().runId()))
             .map(run -> evaluateCase(
-                taskById.get(run.context().runId()),
+                corpus.tasks().get(run.context().runId()),
                 run.context(),
                 perRuleFrequency,
                 descriptorFrequency,
@@ -172,25 +148,26 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         boolean correctnessLoss = cases.stream()
             .flatMap(caseReport -> caseReport.outcomes().stream())
             .anyMatch(PolicyOutcome::correctnessLoss);
-        int descriptorRuleIds = (int) cases.stream()
+        int descriptorRuleIds = heldOutDescriptorRuleIds(cases);
+        boolean candidatePressure = cases.stream()
             .flatMap(caseReport -> caseReport.outcomes().stream())
-            .filter(outcome -> outcome.policy().startsWith("descriptor-"))
-            .flatMap(outcome -> outcome.decisions().stream())
-            .filter(decision -> !decision.fallback())
-            .map(DecisionEvidence::ruleId)
-            .filter(ruleId -> !ruleId.isBlank())
-            .distinct()
-            .count();
+            .anyMatch(outcome -> outcome.candidatePrunes() > 0);
         boolean materialImprovement = bestImprovement >= REQUIRED_IMPROVEMENT_PERMILLE
             && !correctnessLoss;
         String conclusion = materialImprovement
             ? "POSITIVE_MATERIAL_IMPROVEMENT"
-            : "NEGATIVE_LIMITING_DESCRIPTOR";
-        String limitingFeature = materialImprovement
+            : candidatePressure
+                ? "NEGATIVE_LIMITING_DESCRIPTOR"
+                : "NEGATIVE_NO_CANDIDATE_PRESSURE";
+        String experimentalLimitation = candidatePressure
+            ? ""
+            : "all applicable held-out transformations are admitted under the current budgets, "
+                + "so candidate ordering cannot change the explored state set";
+        String nextDescriptorBoundary = materialImprovement
             ? ""
             : descriptorRuleIds == 0
-                ? "available TRAIN descriptor ranges do not cover the held-out transformations"
-                : "neutral-element TRAIN evidence lacks normalized local delta shape and affected-occurrence role/depth needed to distinguish held-out alternatives";
+                ? "broader TRAIN coverage for held-out descriptor ranges"
+                : NEXT_DESCRIPTOR_BOUNDARY;
 
         SearchTrajectoryDataset.DatasetSummary summary = dataset.summary();
         return new EvaluationReport(
@@ -209,12 +186,72 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
             descriptorLinear.modelVersion(),
             experiences.summary().total(),
             descriptorRuleIds,
+            candidatePressure,
             bestImprovement,
             correctnessLoss,
             conclusion,
-            limitingFeature,
+            experimentalLimitation,
+            nextDescriptorBoundary,
             cases,
             dataset.toJsonLines());
+    }
+
+    private Corpus collectCorpus() {
+        List<RuntimeTask> tasks = HiddenRulePilotRuntimeCatalog.tasks().stream()
+            .sorted(Comparator.comparing(RuntimeTask::opaqueCaseId))
+            .toList();
+        List<SearchTrajectoryRun> runs = new ArrayList<>();
+        Map<String, RuntimeTask> taskById = new LinkedHashMap<>();
+        for (RuntimeTask task : tasks) {
+            FamilySpec family = family(task.opaqueCaseId());
+            SearchTrajectoryCollector collector = new SearchTrajectoryCollector();
+            SearchProblem problem = problem(task).withObserver(collector);
+            GoalSearchResult result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+            assertTrue(result.reached(), () ->
+                task.opaqueCaseId() + " did not reach its public endpoint");
+            runs.add(collector.finish(
+                problem,
+                result,
+                new SearchTrajectoryContext(
+                    task.opaqueCaseId(),
+                    family.id(),
+                    PRODUCER,
+                    inventoryIds(task.primitiveEngine()),
+                    family.split())));
+            taskById.put(task.opaqueCaseId(), task);
+        }
+        return new Corpus(runs, taskById);
+    }
+
+    private static InMemorySearchExperienceRepository trainExperiences(
+        List<SearchTrajectoryRun> runs
+    ) {
+        InMemorySearchExperienceRepository experiences = new InMemorySearchExperienceRepository();
+        runs.stream()
+            .filter(run -> run.context().split() == DatasetSplit.TRAIN)
+            .forEach(experiences::store);
+        return experiences;
+    }
+
+    private static List<String> trainingFamilies(List<SearchTrajectoryRun> runs) {
+        return runs.stream()
+            .filter(run -> run.context().split() == DatasetSplit.TRAIN)
+            .map(run -> run.context().family())
+            .distinct()
+            .sorted()
+            .toList();
+    }
+
+    private static int heldOutDescriptorRuleIds(List<CaseReport> cases) {
+        return (int) cases.stream()
+            .flatMap(caseReport -> caseReport.outcomes().stream())
+            .filter(outcome -> outcome.policy().startsWith("descriptor-"))
+            .flatMap(outcome -> outcome.decisions().stream())
+            .filter(decision -> !decision.fallback())
+            .map(DecisionEvidence::ruleId)
+            .filter(ruleId -> !ruleId.isBlank())
+            .distinct()
+            .count();
     }
 
     private CaseReport evaluateCase(
@@ -233,22 +270,11 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         PolicySearchResult baseline = new PolicyAwareBestFirstSearchStrategy(
             new EmpiricalSearchPolicy(perRuleFrequency))
             .searchWithDiagnostics(problem(task));
-        outcomes.add(PolicyOutcome.learned(
-            "per-rule-frequency", baseline, staticResult));
+        outcomes.add(PolicyOutcome.learned("per-rule-frequency", baseline, staticResult));
         outcomes.add(runDescriptor(
-            "descriptor-frequency",
-            task,
-            descriptorFrequency,
-            staticResult,
-            null,
-            List.of()));
+            "descriptor-frequency", task, descriptorFrequency, staticResult, null, List.of()));
         outcomes.add(runDescriptor(
-            "descriptor-linear",
-            task,
-            descriptorLinear,
-            staticResult,
-            null,
-            List.of()));
+            "descriptor-linear", task, descriptorLinear, staticResult, null, List.of()));
         outcomes.add(runDescriptor(
             "descriptor-linear-experience",
             task,
@@ -332,6 +358,16 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
     private record FamilySpec(String id, DatasetSplit split) {
     }
 
+    private record Corpus(
+        List<SearchTrajectoryRun> runs,
+        Map<String, RuntimeTask> tasks
+    ) {
+        private Corpus {
+            runs = List.copyOf(runs);
+            tasks = Map.copyOf(tasks);
+        }
+    }
+
     private record EvaluationReport(
         String schema,
         boolean leakageFree,
@@ -348,10 +384,12 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
         String descriptorLinearModelVersion,
         int storedExperiences,
         int heldOutDescriptorRuleIds,
+        boolean candidatePressureObserved,
         int bestImprovementPermille,
         boolean correctnessLoss,
         String conclusion,
-        String limitingFeature,
+        String experimentalLimitation,
+        String nextDescriptorBoundary,
         List<CaseReport> cases,
         String datasetJsonLines
     ) {
@@ -376,11 +414,13 @@ class HiddenRuleDescriptorPolicyEvaluationTest {
                 .property("descriptorLinearModelVersion", descriptorLinearModelVersion)
                 .property("storedExperiences", storedExperiences)
                 .property("heldOutDescriptorRuleIds", heldOutDescriptorRuleIds)
+                .property("candidatePressureObserved", candidatePressureObserved)
                 .property("requiredImprovementPermille", REQUIRED_IMPROVEMENT_PERMILLE)
                 .property("bestImprovementPermille", bestImprovementPermille)
                 .property("correctnessLoss", correctnessLoss)
                 .property("conclusion", conclusion)
-                .property("limitingFeature", limitingFeature)
+                .property("experimentalLimitation", experimentalLimitation)
+                .property("nextDescriptorBoundary", nextDescriptorBoundary)
                 .array("cases", array -> cases.forEach(caseReport ->
                     array.objectValue(caseReport::writeJson)))
                 .endObject()
