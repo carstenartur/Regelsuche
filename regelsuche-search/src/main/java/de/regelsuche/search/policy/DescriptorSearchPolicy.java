@@ -2,22 +2,15 @@ package de.regelsuche.search.policy;
 
 import de.regelsuche.search.learning.ExpressionFingerprint;
 import de.regelsuche.search.learning.SearchExperienceRepository;
-import de.regelsuche.search.learning.SearchExperienceRepository.SearchExperience;
 import de.regelsuche.search.learning.TransformationDescriptor;
 import de.regelsuche.search.policy.DescriptorPolicyModel.DescriptorStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.FeatureStatistics;
 import de.regelsuche.transform.Transformation;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Transparent ranking policy that transfers through transformation descriptors
- * instead of concrete rule IDs. It only scores transformations that the engine
- * already reported as applicable and falls back safely when descriptor evidence
- * is unavailable, incompatible or insufficient.
- */
+/** Rule-ID-independent, explainable ranking for already-applicable transformations. */
 public final class DescriptorSearchPolicy implements SearchPolicy {
     private static final int TARGET_DISTANCE_WEIGHT = 20;
     private static final int UNKNOWN_DESCRIPTOR_PENALTY = 2_000;
@@ -42,9 +35,9 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
 
     @Override
     public String id() {
-        String experience = experienceRepository == null ? "" : "+experience";
         return "descriptor-" + model.mode().name().toLowerCase()
-            + experience + "/" + model.modelVersion();
+            + (experienceRepository == null ? "" : "+experience")
+            + "/" + model.modelVersion();
     }
 
     @Override
@@ -64,27 +57,19 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         };
     }
 
-    public DescriptorPolicyModel model() {
-        return model;
-    }
-
     private PolicyDecision frequency(
         PolicyContext context,
         Transformation transformation,
         TransformationDescriptor descriptor
     ) {
-        DescriptorStatistics statistics = model.descriptors().get(
-            descriptor.predictiveFingerprint());
+        DescriptorStatistics statistics = model.descriptors().get(descriptor.predictiveFingerprint());
         if (statistics == null || statistics.observations() < model.minimumObservations()) {
             return fallback(context, "missing or low-confidence exact descriptor statistics");
         }
-        Map<String, Integer> contributions = baseContributions(context);
+        Map<String, Integer> contributions = base(context);
         contributions.put("descriptorFailure", 1000 - statistics.successPermille());
-        contributions.put("descriptorMeanScoreDelta", clamp(statistics.meanScoreDelta(), -200, 200));
         addExperience(contributions, context, transformation);
-        return decision(
-            contributions,
-            Math.min(1000, statistics.observations() * 250),
+        return decision(contributions, Math.min(1000, statistics.observations() * 250),
             "exact rule-independent descriptor frequency evidence");
     }
 
@@ -94,18 +79,17 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         TransformationDescriptor descriptor
     ) {
         Map<String, Integer> descriptorFeatures = descriptor.featureVector();
-        Map<String, Integer> contributions = baseContributions(context);
+        Map<String, Integer> contributions = base(context);
         int informative = 0;
         int outOfRange = 0;
         int minimumEvidence = Integer.MAX_VALUE;
         for (Map.Entry<String, FeatureStatistics> entry : model.features().entrySet()) {
-            String name = entry.getKey();
             FeatureStatistics statistics = entry.getValue();
             if (statistics.observations() < model.minimumObservations()
                     || statistics.coefficientPermille() == 0) {
                 continue;
             }
-            int value = descriptorFeatures.getOrDefault(name, 0);
+            int value = descriptorFeatures.getOrDefault(entry.getKey(), 0);
             if (value < statistics.minimumValue() || value > statistics.maximumValue()) {
                 outOfRange++;
                 continue;
@@ -114,38 +98,32 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
             if (span == 0) {
                 continue;
             }
-            long centered = 2L * value
-                - statistics.minimumValue()
-                - statistics.maximumValue();
+            long centered = 2L * value - statistics.minimumValue() - statistics.maximumValue();
             int contribution = clamp((int) (statistics.coefficientPermille()
                 * centered / span), -1000, 1000);
             if (contribution != 0) {
-                contributions.put("descriptor." + name, contribution);
+                contributions.put("descriptor." + entry.getKey(), contribution);
             }
             informative++;
             minimumEvidence = Math.min(minimumEvidence, statistics.observations());
         }
         if (informative == 0) {
-            String reason = outOfRange > 0
+            return fallback(context, outOfRange > 0
                 ? "all informative descriptor features are out of TRAIN range"
-                : "missing or under-observed shared descriptor features";
-            return fallback(context, reason);
+                : "missing or under-observed shared descriptor features");
         }
         addExperience(contributions, context, transformation);
-        int confidence = Math.min(1000,
-            minimumEvidence * 100 + informative * 50);
-        return decision(
-            contributions,
-            confidence,
+        return decision(contributions,
+            Math.min(1000, minimumEvidence * 100 + informative * 50),
             "transparent linear descriptor evidence from " + informative
                 + " shared features; ignoredOutOfRange=" + outOfRange);
     }
 
-    private Map<String, Integer> baseContributions(PolicyContext context) {
-        Map<String, Integer> contributions = new LinkedHashMap<>();
-        contributions.put("targetDistance",
+    private Map<String, Integer> base(PolicyContext context) {
+        Map<String, Integer> result = new LinkedHashMap<>();
+        result.put("targetDistance",
             context.targeted() ? context.targetDistance() * TARGET_DISTANCE_WEIGHT : 0);
-        return contributions;
+        return result;
     }
 
     private void addExperience(
@@ -153,16 +131,13 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         PolicyContext context,
         Transformation transformation
     ) {
-        int experience = experienceContribution(context, transformation);
-        if (experience != 0) {
-            contributions.put("structuralExperience", experience);
+        int contribution = experienceContribution(context, transformation);
+        if (contribution != 0) {
+            contributions.put("structuralExperience", contribution);
         }
     }
 
-    private int experienceContribution(
-        PolicyContext context,
-        Transformation transformation
-    ) {
+    private int experienceContribution(PolicyContext context, Transformation transformation) {
         if (experienceRepository == null || experienceFamily.isBlank()) {
             return 0;
         }
@@ -170,15 +145,11 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
             context.parentExpression(), context.canonicalizer());
         ExpressionFingerprint child = ExpressionFingerprint.of(
             transformation.transformedExpression(), context.canonicalizer());
-        List<SearchExperience> experiences = experienceRepository.findByShape(
-            experienceFamily, parent.alphaShapeHash(), 100);
-        int contribution = 0;
-        for (SearchExperience experience : experiences) {
-            if (!experience.childAlphaShapeHash().equals(child.alphaShapeHash())) {
-                continue;
-            }
-            contribution += experience.successfulChoice() ? -100 : 60;
-        }
+        int contribution = experienceRepository.findByShape(
+                experienceFamily, parent.alphaShapeHash(), 100).stream()
+            .filter(experience -> experience.childAlphaShapeHash().equals(child.alphaShapeHash()))
+            .mapToInt(experience -> experience.successfulChoice() ? -100 : 60)
+            .sum();
         return clamp(contribution, -300, 300);
     }
 
@@ -188,13 +159,8 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         String evidence
     ) {
         int priority = contributions.values().stream().mapToInt(Integer::intValue).sum();
-        String explanation = contributions.entrySet().stream()
-            .map(entry -> entry.getKey() + "=" + entry.getValue())
-            .reduce((left, right) -> left + ", " + right)
-            .orElse("");
-        return new PolicyDecision(
-            id(), priority, confidence, false, contributions,
-            evidence + ": " + explanation);
+        return new PolicyDecision(id(), priority, confidence, false, contributions,
+            evidence + ": " + contributions);
     }
 
     private PolicyDecision fallback(PolicyContext context, String reason) {
@@ -202,9 +168,8 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         Map<String, Integer> contributions = Map.of(
             "targetDistance", target,
             "unknownDescriptor", UNKNOWN_DESCRIPTOR_PENALTY);
-        return new PolicyDecision(
-            id(), target + UNKNOWN_DESCRIPTOR_PENALTY, 0, true, contributions,
-            "fallback to deterministic static ordering: " + reason);
+        return new PolicyDecision(id(), target + UNKNOWN_DESCRIPTOR_PENALTY, 0, true,
+            contributions, "fallback to deterministic static ordering: " + reason);
     }
 
     private static int clamp(int value, int minimum, int maximum) {
