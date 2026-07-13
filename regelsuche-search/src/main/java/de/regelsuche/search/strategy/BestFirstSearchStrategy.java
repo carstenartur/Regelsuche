@@ -8,6 +8,7 @@ import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
 import de.regelsuche.search.strategy.SearchProblem.TargetRelation;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
 import de.regelsuche.value.ExprValueFactory;
 import de.regelsuche.value.ExprValueFactory.AssociativeCommutativeValue;
 import de.regelsuche.value.ExprValueFactory.ExprValue;
@@ -29,6 +30,10 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 public class BestFirstSearchStrategy implements SearchStrategy {
+    /** Engine contract for callers that already provide the complete candidate order. */
+    interface PreorderedTransformationEngine extends TransformationEngine {
+    }
+
     @Override
     public List<SearchState> search(SearchProblem problem) {
         return searchWithDiagnostics(problem).states();
@@ -198,6 +203,9 @@ public class BestFirstSearchStrategy implements SearchStrategy {
         TargetSession target
     ) {
         List<Transformation> transformations = new ArrayList<>(problem.engine().transform(current.expression()));
+        if (problem.engine() instanceof PreorderedTransformationEngine) {
+            return List.copyOf(transformations);
+        }
         Comparator<Transformation> deterministic = Comparator
             .comparing(Transformation::rule)
             .thenComparing(Transformation::transformedExpression)
