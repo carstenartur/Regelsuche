@@ -18,8 +18,7 @@ class OpenTargetConjectureNoveltyCheckerTest {
 
     @Test
     void detectsExactDuplicateInActiveInventory() {
-        KnownRuleRepository inventory = new KnownRuleRepository();
-        inventory.addKnownRule(new KnownRule(
+        KnownRuleRepository inventory = inventoryWith(new KnownRule(
             "known-factor-common",
             "A * B + A * C",
             "A * (B + C)"));
@@ -105,6 +104,16 @@ class OpenTargetConjectureNoveltyCheckerTest {
         assertEquals("", report.alphaSignatureHash());
         assertEquals("NOT_EVALUATED", report.externalNoveltyStatus());
         assertTrue(report.explanation().startsWith("candidate pattern could not be parsed:"));
+    }
+
+    private static KnownRuleRepository inventoryWith(KnownRule... rules) {
+        List<KnownRule> inventory = List.of(rules);
+        return new KnownRuleRepository() {
+            @Override
+            public List<KnownRule> all() {
+                return inventory;
+            }
+        };
     }
 
     private static OpenTargetConjecture factoringConjecture() {
