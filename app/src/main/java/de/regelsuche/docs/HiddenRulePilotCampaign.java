@@ -18,6 +18,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.TreeMap;
 /** Runs the post-hoc hidden-rule benchmark and emits deterministic raw evidence. */
 public final class HiddenRulePilotCampaign {
     public static final String SCHEMA = "regelsuche.hidden-rule-benchmark/v2";
+    public static final String RUNTIME_SCHEMA = "regelsuche.hidden-rule-benchmark-runtime/v1";
 
     private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();
     private final HiddenRulePilotEvaluator evaluator = new HiddenRulePilotEvaluator();
@@ -43,14 +45,22 @@ public final class HiddenRulePilotCampaign {
     }
 
     public Path write(Path output, PilotReport report) {
+        return writeText(output, report.toJson());
+    }
+
+    public Path writeRuntime(Path output, PilotReport report) {
+        return writeText(output, report.runtimeJson());
+    }
+
+    private static Path writeText(Path output, String content) {
         Objects.requireNonNull(output, "output");
-        Objects.requireNonNull(report, "report");
+        Objects.requireNonNull(content, "content");
         try {
             Path parent = output.toAbsolutePath().normalize().getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.writeString(output, report.toJson(), StandardCharsets.UTF_8);
+            Files.writeString(output, content, StandardCharsets.UTF_8);
             return output;
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
@@ -87,7 +97,7 @@ public final class HiddenRulePilotCampaign {
         }
     }
 
-    /** elapsedNanos is intentionally not serialized into the canonical report. */
+    /** elapsedNanos is serialized only into the explicitly non-canonical runtime report. */
     public record CaseReport(
         String opaqueCaseId,
         String family,
@@ -147,11 +157,21 @@ public final class HiddenRulePilotCampaign {
                 .count();
         }
 
+        public int generatedValidationExamples() {
+            return cases.stream().mapToInt(caseReport ->
+                caseReport.runtime().validationEvidence().generatedValidationExamples()).sum();
+        }
+
+        public int counterexampleSearches() {
+            return cases.stream().mapToInt(caseReport ->
+                caseReport.runtime().validationEvidence().counterexampleSearches().size()).sum();
+        }
+
         public Map<String, Integer> failureTaxonomy() {
             Map<String, Integer> failures = new TreeMap<>();
             cases.stream().flatMap(caseReport -> caseReport.blockers().stream())
                 .forEach(blocker -> failures.merge(blocker, 1, Integer::sum));
-            return Map.copyOf(failures);
+            return Collections.unmodifiableMap(failures);
         }
 
         public String toJson() {
@@ -168,13 +188,37 @@ public final class HiddenRulePilotCampaign {
                     .property("negativeHoldouts", negativeHoldouts())
                     .property("falsePositiveHoldouts", falsePositiveHoldouts())
                     .property("falsePositiveRatePermille",
-                        permille(falsePositiveHoldouts(), negativeHoldouts())))
+                        permille(falsePositiveHoldouts(), negativeHoldouts()))
+                    .property("generatedValidationExamples", generatedValidationExamples())
+                    .property("counterexampleSearches", counterexampleSearches()))
                 .object("failureTaxonomy", taxonomy ->
                     failureTaxonomy().forEach(taxonomy::property))
                 .array("cases", array -> cases.forEach(caseReport ->
                     array.objectValue(object -> writeCase(object, caseReport))))
                 .endObject();
             return json.toString();
+        }
+
+        /** Non-canonical wall-clock telemetry; never used for hashes or byte-stability checks. */
+        public String runtimeJson() {
+            long totalElapsedNanos = cases.stream().mapToLong(CaseReport::elapsedNanos).sum();
+            return new JsonWriter().beginObject()
+                .property("schema", RUNTIME_SCHEMA)
+                .property("cases", cases.size())
+                .property("totalElapsedNanos", totalElapsedNanos)
+                .property("generatedValidationExamples", generatedValidationExamples())
+                .property("counterexampleSearches", counterexampleSearches())
+                .array("caseRuntimes", array -> cases.forEach(caseReport ->
+                    array.objectValue(object -> object
+                        .property("opaqueCaseId", caseReport.opaqueCaseId())
+                        .property("elapsedNanos", caseReport.elapsedNanos())
+                        .property("exploredStates",
+                            caseReport.runtime().searchMetrics().exploredStates())
+                        .property("generatedValidationExamples", caseReport.runtime()
+                            .validationEvidence().generatedValidationExamples())
+                        .property("counterexampleSearches", caseReport.runtime()
+                            .validationEvidence().counterexampleSearches().size()))))
+                .endObject().toString();
         }
 
         private static int permille(int numerator, int denominator) {
