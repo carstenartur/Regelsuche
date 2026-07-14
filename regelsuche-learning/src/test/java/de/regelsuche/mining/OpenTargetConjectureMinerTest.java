@@ -3,6 +3,7 @@ package de.regelsuche.mining;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.canonical.ExpressionCanonicalizer;
@@ -44,7 +45,11 @@ class OpenTargetConjectureMinerTest {
         assertFalse(conjecture.rightPattern().isBlank());
         assertEquals("OBSERVED_CONJECTURE", conjecture.candidateStatus());
         assertEquals("EQUIVALENCE_PRESERVING_CONVERGENT_PATHS", conjecture.evidenceStatus());
-        assertTrue(conjecture.evidence().stream().allMatch(item -> item.paths().size() >= 2));
+        assertTrue(conjecture.evidence().stream().allMatch(item ->
+            item.searchStatus() == GoalStatus.UNTARGETED
+                && item.paths().size() == 2
+                && item.paths().stream().allMatch(path ->
+                    path.expressions().getLast().equals(item.outputExpression()))));
     }
 
     @Test
@@ -72,12 +77,19 @@ class OpenTargetConjectureMinerTest {
         var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
         assertEquals(GoalStatus.UNTARGETED, result.status());
 
-        var report = miner.mine(List.of(new OpenTargetConjectureMiner.OpenTargetObservation(
-            "obs-single", "neutral-chain", root, result.states())));
+        var report = miner.mine(List.of(OpenTargetConjectureMiner.OpenTargetObservation.from(
+            "obs-single", "neutral-chain", root, result)));
 
         assertTrue(report.conjectures().isEmpty());
         assertEquals("no-independent-equivalence-preserving-convergence",
             report.rejectedClusters().getFirst().reason());
+    }
+
+    @Test
+    void refusesEvidenceThatClaimsAResolvedTargetedSearch() {
+        assertThrows(IllegalArgumentException.class, () ->
+            new OpenTargetConjectureMiner.OpenTargetObservation(
+                "obs-targeted", "post-hoc-family", "x", GoalStatus.REACHED, List.of()));
     }
 
     private OpenTargetConjectureMiner.OpenTargetObservation convergentObservation(
@@ -107,8 +119,8 @@ class OpenTargetConjectureMinerTest {
         var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
         assertEquals(GoalStatus.UNTARGETED, result.status());
         assertTrue(result.states().stream().anyMatch(state -> state.expression().equals(base)));
-        return new OpenTargetConjectureMiner.OpenTargetObservation(
-            observationId, family, root, result.states());
+        return OpenTargetConjectureMiner.OpenTargetObservation.from(
+            observationId, family, root, result);
     }
 
     private SearchProblem problem(String root, TransformationEngine engine) {
