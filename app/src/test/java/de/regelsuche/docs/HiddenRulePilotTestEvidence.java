@@ -3,7 +3,7 @@ package de.regelsuche.docs;
 import de.regelsuche.docs.HiddenRulePilotCampaign.CaseReport;
 import de.regelsuche.docs.HiddenRulePilotCampaign.PilotReport;
 
-/** One deterministic, JVM-local execution of the expensive five-case pilot. */
+/** One deterministic, JVM-local execution of the expensive twenty-case benchmark. */
 final class HiddenRulePilotTestEvidence {
     private static final PilotReport REPORT =
         new HiddenRulePilotCampaign().run(HiddenRulePilotCatalog.cases());
@@ -20,6 +20,6 @@ final class HiddenRulePilotTestEvidence {
             .filter(report -> report.opaqueCaseId().equals(opaqueCaseId))
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException(
-                "unknown pilot case: " + opaqueCaseId));
+                "unknown benchmark case: " + opaqueCaseId));
     }
 }
