@@ -1,6 +1,7 @@
 package de.regelsuche.docs;
 
 import de.regelsuche.docs.HiddenRuleHoldoutPartition.SplitAudit;
+import de.regelsuche.docs.HiddenRulePilotEvaluator.CandidateRelation;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.Evaluation;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.HiddenReference;
 import de.regelsuche.docs.HiddenRulePilotRunner.AblationEvidence;
@@ -20,11 +21,13 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
-/** Runs the post-hoc hidden-rule pilot and emits deterministic raw evidence. */
+/** Runs the post-hoc hidden-rule benchmark and emits deterministic raw evidence. */
 public final class HiddenRulePilotCampaign {
-    public static final String SCHEMA = "regelsuche.hidden-rule-pilot/v1";
+    public static final String SCHEMA = "regelsuche.hidden-rule-benchmark/v2";
 
     private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();
     private final HiddenRulePilotEvaluator evaluator = new HiddenRulePilotEvaluator();
@@ -123,6 +126,34 @@ public final class HiddenRulePilotCampaign {
             return (int) cases.stream().map(CaseReport::family).distinct().count();
         }
 
+        public int rediscoveredCases() {
+            return (int) cases.stream()
+                .map(caseReport -> caseReport.evaluation().candidateRelation())
+                .filter(relation -> relation != CandidateRelation.NONE
+                    && relation != CandidateRelation.DIFFERENT)
+                .count();
+        }
+
+        public int negativeHoldouts() {
+            return cases.stream()
+                .mapToInt(caseReport -> caseReport.runtime().holdouts().negatives().size())
+                .sum();
+        }
+
+        public int falsePositiveHoldouts() {
+            return (int) cases.stream()
+                .flatMap(caseReport -> caseReport.runtime().holdouts().negatives().stream())
+                .filter(result -> !result.noApplication())
+                .count();
+        }
+
+        public Map<String, Integer> failureTaxonomy() {
+            Map<String, Integer> failures = new TreeMap<>();
+            cases.stream().flatMap(caseReport -> caseReport.blockers().stream())
+                .forEach(blocker -> failures.merge(blocker, 1, Integer::sum));
+            return Map.copyOf(failures);
+        }
+
         public String toJson() {
             JsonWriter json = new JsonWriter().beginObject()
                 .property("schema", schema)
@@ -131,11 +162,23 @@ public final class HiddenRulePilotCampaign {
                     .property("families", familyCount())
                     .property("frozenCandidates", frozenCandidates())
                     .property("materialAblations", materialAblations())
-                    .property("acceptedCases", acceptedCases()))
+                    .property("acceptedCases", acceptedCases())
+                    .property("rediscoveredCases", rediscoveredCases())
+                    .property("rediscoveryRatePermille", permille(rediscoveredCases(), cases.size()))
+                    .property("negativeHoldouts", negativeHoldouts())
+                    .property("falsePositiveHoldouts", falsePositiveHoldouts())
+                    .property("falsePositiveRatePermille",
+                        permille(falsePositiveHoldouts(), negativeHoldouts())))
+                .object("failureTaxonomy", taxonomy ->
+                    failureTaxonomy().forEach(taxonomy::property))
                 .array("cases", array -> cases.forEach(caseReport ->
                     array.objectValue(object -> writeCase(object, caseReport))))
                 .endObject();
             return json.toString();
+        }
+
+        private static int permille(int numerator, int denominator) {
+            return denominator == 0 ? 0 : numerator * 1000 / denominator;
         }
 
         private static void writeCase(JsonWriter json, CaseReport report) {
