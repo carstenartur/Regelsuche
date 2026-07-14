@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-campaign-execution/v1",
+  "title": "Regelsuche autonomous campaign execution v1",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "initialLedgerHash", "planHash",
+    "updatedLedgerHash", "executionIsMathematicalEvidence",
+    "receipts", "nextSnapshots", "runnerRuntimeMillis",
+    "promotionStatus", "publicEvidenceStatus",
+    "logicalContentHash", "runtimeTelemetryHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-campaign-execution/v1" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "initialLedgerHash": { "$ref": "#/$defs/sha256" },
+    "planHash": { "$ref": "#/$defs/sha256" },
+    "updatedLedgerHash": { "$ref": "#/$defs/sha256" },
+    "executionIsMathematicalEvidence": { "const": false },
+    "receipts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/receipt" }
+    },
+    "nextSnapshots": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/snapshot" }
+    },
+    "runnerRuntimeMillis": { "type": "integer", "minimum": 0 },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "logicalContentHash": { "$ref": "#/$defs/sha256" },
+    "runtimeTelemetryHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "required": [
+        "branchId", "branchSnapshotHash", "seedStableKey", "stage",
+        "disposition", "runnerSuccess", "summary", "hypothesisCount",
+        "counterexampleCount", "counterexampleStatus", "discoveryResultKind",
+        "executedResources", "skippedResources", "elapsedMillis",
+        "explanation", "nextSnapshotHash"
+      ],
+      "properties": {
+        "branchId": { "$ref": "#/$defs/nonBlank" },
+        "branchSnapshotHash": { "$ref": "#/$defs/sha256" },
+        "seedStableKey": { "type": "string" },
+        "stage": { "$ref": "#/$defs/stage" },
+        "disposition": {
+          "enum": ["COMPLETED", "INCONCLUSIVE", "DUPLICATE", "DISPROVED", "UNSAFE", "PERSISTENTLY_WEAK", "BACKEND_UNAVAILABLE"]
+        },
+        "runnerSuccess": { "type": "boolean" },
+        "summary": { "type": "string" },
+        "hypothesisCount": { "type": "integer", "minimum": 0 },
+        "counterexampleCount": { "type": "integer", "minimum": 0 },
+        "counterexampleStatus": { "$ref": "#/$defs/nonBlank" },
+        "discoveryResultKind": { "$ref": "#/$defs/nonBlank" },
+        "executedResources": { "$ref": "#/$defs/resources" },
+        "skippedResources": { "$ref": "#/$defs/resources" },
+        "elapsedMillis": { "type": "integer", "minimum": 0 },
+        "explanation": { "type": "string" },
+        "nextSnapshotHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "snapshot": {
+      "type": "object",
+      "required": ["branchId", "familyId", "status", "mandatoryStages", "completedStages", "snapshotHash"],
+      "properties": {
+        "branchId": { "$ref": "#/$defs/nonBlank" },
+        "familyId": { "$ref": "#/$defs/nonBlank" },
+        "status": { "enum": ["NEW", "ELIGIBLE_INCOMPLETE", "COMPLETE_EVIDENCE", "DUPLICATE", "DISPROVED", "UNSAFE", "PERSISTENTLY_WEAK"] },
+        "mandatoryStages": { "$ref": "#/$defs/stages" },
+        "completedStages": { "$ref": "#/$defs/stages" },
+        "snapshotHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["resource", "amount"],
+        "properties": {
+          "resource": { "$ref": "#/$defs/resource" },
+          "amount": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "stage": { "enum": ["GENERATION", "CANDIDATE_FORMATION", "VALIDATION", "COUNTEREXAMPLE_SEARCH", "PROOF"] },
+    "stages": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/stage" } },
+    "resource": { "enum": ["WALL_CLOCK_MILLIS", "GENERATED_STATES", "EXPLORED_STATES", "CANDIDATES", "VALIDATION_CHECKS", "COUNTEREXAMPLE_ATTEMPTS", "PROOF_ATTEMPTS"] },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}
