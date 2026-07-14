@@ -24,18 +24,20 @@ record OpenTargetPromotionProvenance(
     OpenTargetPromotionProvenance {
         requireText(sourceCampaign, "sourceCampaign");
         requireText(discoveryDate, "discoveryDate");
-        requireText(dynamicRuleId, "dynamicRuleId");
         try {
             LocalDate.parse(discoveryDate);
         } catch (DateTimeParseException exception) {
             throw new IllegalArgumentException(
                 "discoveryDate must use ISO-8601 YYYY-MM-DD", exception);
         }
-        requireSha256(evaluationProvenanceHash, "evaluationProvenanceHash");
-        requireSha256(exactSignatureHash, "exactSignatureHash");
-        requireSha256(alphaSignatureHash, "alphaSignatureHash");
-        requireSha256(proofEvidenceHash, "proofEvidenceHash");
-        requireSha256(proofObligationHash, "proofObligationHash");
+        dynamicRuleId = normalize(dynamicRuleId);
+        evaluationProvenanceHash = optionalSha256(
+            evaluationProvenanceHash, "evaluationProvenanceHash");
+        exactSignatureHash = optionalSha256(exactSignatureHash, "exactSignatureHash");
+        alphaSignatureHash = optionalSha256(alphaSignatureHash, "alphaSignatureHash");
+        proofEvidenceHash = optionalSha256(proofEvidenceHash, "proofEvidenceHash");
+        proofObligationHash = optionalSha256(
+            proofObligationHash, "proofObligationHash");
         assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
         rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);
     }
@@ -72,10 +74,16 @@ record OpenTargetPromotionProvenance(
             + "\nfallbackUsed=" + fallbackUsed;
     }
 
-    private static void requireSha256(String value, String name) {
-        if (value == null || !value.matches("sha256:[0-9a-f]{64}")) {
-            throw new IllegalArgumentException(name + " must be a SHA-256 hash");
+    private static String optionalSha256(String value, String name) {
+        String normalized = normalize(value);
+        if (!normalized.isEmpty() && !normalized.matches("sha256:[0-9a-f]{64}")) {
+            throw new IllegalArgumentException(name + " must be empty or a SHA-256 hash");
         }
+        return normalized;
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value;
     }
 
     private static void requireText(String value, String name) {
