@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessCalibrationCorpus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessCalibrationCorpus.java</span></div><h1>InterestingnessCalibrationCorpus.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.InterestingnessEvidence.ControlClassification;
+import de.regelsuche.mining.InterestingnessReviewConsensus.CandidateConsensus;
+import de.regelsuche.mining.InterestingnessReviewConsensus.ConsensusReport;
+import de.regelsuche.mining.InterestingnessReviewConsensus.ConsensusStatus;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+
+/**
+ * Freezes a reviewed calibration/test corpus while keeping labels out of the
+ * predictive corpus identity.
+ */
+<span class="fc" id="L30">public final class InterestingnessCalibrationCorpus {</span>
+    public static final String SCHEMA = &quot;regelsuche.interestingness-calibration-corpus/v1&quot;;
+    public static final int MIN_CASES_PER_SPLIT = 2;
+
+    public CorpusReport freeze(
+        List&lt;CorpusCase&gt; cases,
+        ConsensusReport consensusReport
+    ) {
+<span class="fc" id="L38">        Objects.requireNonNull(consensusReport, &quot;consensusReport&quot;);</span>
+<span class="fc" id="L39">        List&lt;CorpusCase&gt; ordered = orderedCases(cases);</span>
+<span class="fc" id="L40">        validateUniqueCases(ordered);</span>
+<span class="fc" id="L41">        validateSplitSizes(ordered);</span>
+<span class="fc" id="L42">        validateSplitIsolation(ordered);</span>
+
+<span class="fc" id="L44">        List&lt;FrozenCase&gt; frozen = ordered.stream()</span>
+<span class="fc" id="L45">            .map(item -&gt; freezeCase(item, consensusReport))</span>
+<span class="fc" id="L46">            .toList();</span>
+<span class="fc" id="L47">        validateLabelDiversity(frozen);</span>
+<span class="fc" id="L48">        String predictiveHash = hash(predictiveMaterial(frozen));</span>
+<span class="fc" id="L49">        String labeledHash = hash(labeledMaterial(frozen, consensusReport.contentHash()));</span>
+<span class="fc" id="L50">        return new CorpusReport(</span>
+            SCHEMA,
+            CorpusStatus.FROZEN,
+            MIN_CASES_PER_SPLIT,
+            frozen,
+            predictiveHash,
+            labeledHash,
+<span class="fc" id="L57">            consensusReport.contentHash());</span>
+    }
+
+    private static List&lt;CorpusCase&gt; orderedCases(List&lt;CorpusCase&gt; cases) {
+<span class="fc" id="L61">        Objects.requireNonNull(cases, &quot;cases&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (cases.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(&quot;corpus cases must not contain null&quot;);</span>
+        }
+<span class="fc" id="L65">        return cases.stream()</span>
+<span class="fc" id="L66">            .sorted(Comparator.comparing((CorpusCase item) -&gt; item.split().name())</span>
+<span class="fc" id="L67">                .thenComparing(CorpusCase::caseId))</span>
+<span class="fc" id="L68">            .toList();</span>
+    }
+
+    private static void validateUniqueCases(List&lt;CorpusCase&gt; cases) {
+<span class="fc" id="L72">        Set&lt;String&gt; caseIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L73">        Set&lt;String&gt; candidateIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (CorpusCase item : cases) {</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if (!caseIds.add(item.caseId())) {</span>
+<span class="nc" id="L76">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L77">                    &quot;duplicate calibration case ID: &quot; + item.caseId());</span>
+            }
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (!candidateIds.add(item.candidateId())) {</span>
+<span class="nc" id="L80">                throw new IllegalArgumentException(</span>
+                    &quot;candidate appears in more than one corpus case: &quot;
+<span class="nc" id="L82">                        + item.candidateId());</span>
+            }
+<span class="fc" id="L84">        }</span>
+<span class="fc" id="L85">    }</span>
+
+    private static void validateSplitSizes(List&lt;CorpusCase&gt; cases) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (CorpusSplit split : CorpusSplit.values()) {</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            long count = cases.stream().filter(item -&gt; item.split() == split).count();</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (count &lt; MIN_CASES_PER_SPLIT) {</span>
+<span class="nc" id="L91">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L92">                    split.name() + &quot; requires at least &quot; + MIN_CASES_PER_SPLIT + &quot; cases&quot;);</span>
+            }
+        }
+<span class="fc" id="L95">    }</span>
+
+    private static void validateSplitIsolation(List&lt;CorpusCase&gt; cases) {
+<span class="fc" id="L98">        Set&lt;String&gt; calibrationFamilies = values(cases, CorpusSplit.CALIBRATION, true);</span>
+<span class="fc" id="L99">        Set&lt;String&gt; testFamilies = values(cases, CorpusSplit.TEST, true);</span>
+<span class="fc" id="L100">        Set&lt;String&gt; familyOverlap = new TreeSet&lt;&gt;(calibrationFamilies);</span>
+<span class="fc" id="L101">        familyOverlap.retainAll(testFamilies);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (!familyOverlap.isEmpty()) {</span>
+<span class="fc" id="L103">            throw new IllegalArgumentException(</span>
+                &quot;candidate families cross calibration/test: &quot; + familyOverlap);
+        }
+
+<span class="fc" id="L107">        Set&lt;String&gt; calibrationSignatures = values(cases, CorpusSplit.CALIBRATION, false);</span>
+<span class="fc" id="L108">        Set&lt;String&gt; testSignatures = values(cases, CorpusSplit.TEST, false);</span>
+<span class="fc" id="L109">        Set&lt;String&gt; signatureOverlap = new TreeSet&lt;&gt;(calibrationSignatures);</span>
+<span class="fc" id="L110">        signatureOverlap.retainAll(testSignatures);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (!signatureOverlap.isEmpty()) {</span>
+<span class="fc" id="L112">            throw new IllegalArgumentException(</span>
+                &quot;structural signatures cross calibration/test: &quot; + signatureOverlap);
+        }
+<span class="fc" id="L115">    }</span>
+
+    private static Set&lt;String&gt; values(
+        List&lt;CorpusCase&gt; cases,
+        CorpusSplit split,
+        boolean families
+    ) {
+<span class="fc" id="L122">        return cases.stream()</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            .filter(item -&gt; item.split() == split)</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            .map(item -&gt; families ? item.candidateFamily() : item.structuralSignatureHash())</span>
+<span class="fc" id="L125">            .collect(Collectors.toCollection(TreeSet::new));</span>
+    }
+
+    private static FrozenCase freezeCase(
+        CorpusCase item,
+        ConsensusReport consensusReport
+    ) {
+<span class="fc" id="L132">        CandidateConsensus consensus = consensusReport.requireCandidate(item.candidateId());</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (consensus.status() != ConsensusStatus.CONSENSUS) {</span>
+<span class="fc" id="L134">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L135">                &quot;candidate lacks expert consensus: &quot; + item.candidateId()</span>
+<span class="fc" id="L136">                    + &quot; status=&quot; + consensus.status().name());</span>
+        }
+<span class="fc" id="L138">        return new FrozenCase(</span>
+<span class="fc" id="L139">            item.caseId(),</span>
+<span class="fc" id="L140">            item.candidateId(),</span>
+<span class="fc" id="L141">            item.split(),</span>
+<span class="fc" id="L142">            item.candidateFamily(),</span>
+<span class="fc" id="L143">            item.structuralSignatureHash(),</span>
+<span class="fc" id="L144">            item.assessmentContentHash(),</span>
+<span class="fc" id="L145">            item.controlClassification(),</span>
+<span class="fc" id="L146">            consensus.consensusRelevancePermille(),</span>
+<span class="fc" id="L147">            consensus.countedExpertReviews(),</span>
+<span class="fc" id="L148">            consensus.blindExpertReviews(),</span>
+<span class="fc" id="L149">            consensus.spreadPermille(),</span>
+<span class="fc" id="L150">            consensus.meanConfidencePermille(),</span>
+<span class="fc" id="L151">            consensus.rationaleCodes());</span>
+    }
+
+    private static void validateLabelDiversity(List&lt;FrozenCase&gt; cases) {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (CorpusSplit split : CorpusSplit.values()) {</span>
+<span class="fc" id="L156">            long distinctLabels = cases.stream()</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                .filter(item -&gt; item.split() == split)</span>
+<span class="fc" id="L158">                .map(FrozenCase::consensusRelevancePermille)</span>
+<span class="fc" id="L159">                .distinct()</span>
+<span class="fc" id="L160">                .count();</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (distinctLabels &lt; 2) {</span>
+<span class="nc" id="L162">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L163">                    split.name() + &quot; requires relevance-label diversity&quot;);</span>
+            }
+        }
+<span class="fc" id="L166">    }</span>
+
+    private static String predictiveMaterial(List&lt;FrozenCase&gt; cases) {
+<span class="fc" id="L169">        StringBuilder material = new StringBuilder(SCHEMA)</span>
+<span class="fc" id="L170">            .append(&quot;\nminimumCasesPerSplit=&quot;).append(MIN_CASES_PER_SPLIT);</span>
+<span class="fc" id="L171">        cases.forEach(item -&gt; material.append(&quot;\ncase=&quot;)</span>
+<span class="fc" id="L172">            .append(item.predictiveMaterial()));</span>
+<span class="fc" id="L173">        return material.toString();</span>
+    }
+
+    private static String labeledMaterial(
+        List&lt;FrozenCase&gt; cases,
+        String consensusContentHash
+    ) {
+<span class="fc" id="L180">        StringBuilder material = new StringBuilder(predictiveMaterial(cases))</span>
+<span class="fc" id="L181">            .append(&quot;\nconsensusReport=&quot;).append(consensusContentHash);</span>
+<span class="fc" id="L182">        cases.forEach(item -&gt; material.append(&quot;\nlabel=&quot;)</span>
+<span class="fc" id="L183">            .append(item.labelMaterial()));</span>
+<span class="fc" id="L184">        return material.toString();</span>
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L189">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L190">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L191">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L192">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L193">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L197">    public enum CorpusSplit {</span>
+<span class="fc" id="L198">        CALIBRATION,</span>
+<span class="fc" id="L199">        TEST</span>
+    }
+
+<span class="fc" id="L202">    public enum CorpusStatus {</span>
+<span class="fc" id="L203">        FROZEN</span>
+    }
+
+    public record CorpusCase(
+        String caseId,
+        String candidateId,
+        CorpusSplit split,
+        String candidateFamily,
+        String structuralSignatureHash,
+        String assessmentContentHash,
+        ControlClassification controlClassification
+    ) {
+<span class="fc" id="L215">        public CorpusCase {</span>
+<span class="fc" id="L216">            requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L217">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L218">            Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L219">            requireText(candidateFamily, &quot;candidateFamily&quot;);</span>
+<span class="fc" id="L220">            requireSha256(structuralSignatureHash, &quot;structuralSignatureHash&quot;);</span>
+<span class="fc" id="L221">            requireSha256(assessmentContentHash, &quot;assessmentContentHash&quot;);</span>
+<span class="fc" id="L222">            Objects.requireNonNull(controlClassification, &quot;controlClassification&quot;);</span>
+<span class="fc" id="L223">        }</span>
+    }
+
+    public record FrozenCase(
+        String caseId,
+        String candidateId,
+        CorpusSplit split,
+        String candidateFamily,
+        String structuralSignatureHash,
+        String assessmentContentHash,
+        ControlClassification controlClassification,
+        int consensusRelevancePermille,
+        int countedExpertReviews,
+        int blindExpertReviews,
+        int spreadPermille,
+        int meanConfidencePermille,
+        List&lt;String&gt; rationaleCodes
+    ) {
+<span class="fc" id="L241">        public FrozenCase {</span>
+<span class="fc" id="L242">            requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L243">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L244">            Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L245">            requireText(candidateFamily, &quot;candidateFamily&quot;);</span>
+<span class="fc" id="L246">            requireSha256(structuralSignatureHash, &quot;structuralSignatureHash&quot;);</span>
+<span class="fc" id="L247">            requireSha256(assessmentContentHash, &quot;assessmentContentHash&quot;);</span>
+<span class="fc" id="L248">            Objects.requireNonNull(controlClassification, &quot;controlClassification&quot;);</span>
+<span class="fc" id="L249">            requirePermille(consensusRelevancePermille, &quot;consensusRelevancePermille&quot;);</span>
+<span class="fc" id="L250">            requireNonNegative(countedExpertReviews, &quot;countedExpertReviews&quot;);</span>
+<span class="fc" id="L251">            requireNonNegative(blindExpertReviews, &quot;blindExpertReviews&quot;);</span>
+<span class="fc" id="L252">            requirePermille(spreadPermille, &quot;spreadPermille&quot;);</span>
+<span class="fc" id="L253">            requirePermille(meanConfidencePermille, &quot;meanConfidencePermille&quot;);</span>
+<span class="fc" id="L254">            rationaleCodes = orderedStrings(rationaleCodes);</span>
+<span class="fc" id="L255">        }</span>
+
+        String predictiveMaterial() {
+<span class="fc" id="L258">            return caseId + '|'</span>
+                + candidateId + '|'
+<span class="fc" id="L260">                + split.name() + '|'</span>
+                + candidateFamily + '|'
+                + structuralSignatureHash + '|'
+                + assessmentContentHash + '|'
+<span class="fc" id="L264">                + controlClassification.name();</span>
+        }
+
+        String labelMaterial() {
+<span class="fc" id="L268">            return caseId + '|'</span>
+                + consensusRelevancePermille + '|'
+                + countedExpertReviews + '|'
+                + blindExpertReviews + '|'
+                + spreadPermille + '|'
+                + meanConfidencePermille + '|'
+                + rationaleCodes;
+        }
+    }
+
+    public record CorpusReport(
+        String schema,
+        CorpusStatus status,
+        int minimumCasesPerSplit,
+        List&lt;FrozenCase&gt; cases,
+        String predictiveCorpusHash,
+        String labeledEvaluationHash,
+        String consensusReportHash
+    ) {
+<span class="fc" id="L287">        public CorpusReport {</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L289">                throw new IllegalArgumentException(&quot;unsupported calibration-corpus schema&quot;);</span>
+            }
+<span class="fc" id="L291">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (minimumCasesPerSplit != MIN_CASES_PER_SPLIT) {</span>
+<span class="nc" id="L293">                throw new IllegalArgumentException(&quot;unexpected minimumCasesPerSplit&quot;);</span>
+            }
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            cases = cases == null</span>
+<span class="nc" id="L296">                ? List.of()</span>
+<span class="fc" id="L297">                : cases.stream()</span>
+<span class="fc" id="L298">                    .sorted(Comparator.comparing((FrozenCase item) -&gt; item.split().name())</span>
+<span class="fc" id="L299">                        .thenComparing(FrozenCase::caseId))</span>
+<span class="fc" id="L300">                    .toList();</span>
+<span class="fc" id="L301">            requireSha256(predictiveCorpusHash, &quot;predictiveCorpusHash&quot;);</span>
+<span class="fc" id="L302">            requireSha256(labeledEvaluationHash, &quot;labeledEvaluationHash&quot;);</span>
+<span class="fc" id="L303">            requireSha256(consensusReportHash, &quot;consensusReportHash&quot;);</span>
+<span class="fc" id="L304">        }</span>
+
+        public List&lt;FrozenCase&gt; split(CorpusSplit split) {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            return cases.stream().filter(item -&gt; item.split() == split).toList();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L311">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L312">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L313">                .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L314">                .property(&quot;minimumCasesPerSplit&quot;, minimumCasesPerSplit)</span>
+<span class="fc" id="L315">                .property(&quot;predictiveCorpusHash&quot;, predictiveCorpusHash)</span>
+<span class="fc" id="L316">                .property(&quot;labeledEvaluationHash&quot;, labeledEvaluationHash)</span>
+<span class="fc" id="L317">                .property(&quot;consensusReportHash&quot;, consensusReportHash)</span>
+<span class="fc" id="L318">                .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L319">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L320">                        .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L321">                        .property(&quot;candidateId&quot;, item.candidateId())</span>
+<span class="fc" id="L322">                        .property(&quot;split&quot;, item.split().name())</span>
+<span class="fc" id="L323">                        .property(&quot;candidateFamily&quot;, item.candidateFamily())</span>
+<span class="fc" id="L324">                        .property(&quot;structuralSignatureHash&quot;, item.structuralSignatureHash())</span>
+<span class="fc" id="L325">                        .property(&quot;assessmentContentHash&quot;, item.assessmentContentHash())</span>
+<span class="fc" id="L326">                        .property(&quot;controlClassification&quot;,</span>
+<span class="fc" id="L327">                            item.controlClassification().name())</span>
+<span class="fc" id="L328">                        .property(&quot;consensusRelevancePermille&quot;,</span>
+<span class="fc" id="L329">                            item.consensusRelevancePermille())</span>
+<span class="fc" id="L330">                        .property(&quot;countedExpertReviews&quot;, item.countedExpertReviews())</span>
+<span class="fc" id="L331">                        .property(&quot;blindExpertReviews&quot;, item.blindExpertReviews())</span>
+<span class="fc" id="L332">                        .property(&quot;spreadPermille&quot;, item.spreadPermille())</span>
+<span class="fc" id="L333">                        .property(&quot;meanConfidencePermille&quot;,</span>
+<span class="fc" id="L334">                            item.meanConfidencePermille())</span>
+<span class="fc" id="L335">                        .stringArray(&quot;rationaleCodes&quot;, item.rationaleCodes()))))</span>
+<span class="fc" id="L336">                .endObject()</span>
+<span class="fc" id="L337">                .toString();</span>
+        }
+
+        public void write(Path output) {
+            try {
+<span class="fc" id="L342">                Path parent = output.getParent();</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L344">                    Files.createDirectories(parent);</span>
+                }
+<span class="fc" id="L346">                Files.writeString(output, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L347">            } catch (IOException exception) {</span>
+<span class="nc" id="L348">                throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L349">            }</span>
+<span class="fc" id="L350">        }</span>
+    }
+
+    private static List&lt;String&gt; orderedStrings(List&lt;String&gt; values) {
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        return values == null</span>
+<span class="nc" id="L355">            ? List.of()</span>
+<span class="fc" id="L356">            : values.stream()</span>
+<span class="pc bpc" id="L357" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L358">                .distinct()</span>
+<span class="fc" id="L359">                .sorted()</span>
+<span class="fc" id="L360">                .toList();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L364" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L365">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L367">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L370" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L371">            throw new IllegalArgumentException(name + &quot; must be a SHA-256 hash&quot;);</span>
+        }
+<span class="fc" id="L373">    }</span>
+
+    private static void requirePermille(int value, String name) {
+<span class="pc bpc" id="L376" title="2 of 4 branches missed.">        if (value &lt; 0 || value &gt; 1000) {</span>
+<span class="nc" id="L377">            throw new IllegalArgumentException(name + &quot; must be in [0,1000]&quot;);</span>
+        }
+<span class="fc" id="L379">    }</span>
+
+    private static void requireNonNegative(int value, String name) {
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (value &lt; 0) {</span>
+<span class="nc" id="L383">            throw new IllegalArgumentException(name + &quot; must be non-negative&quot;);</span>
+        }
+<span class="fc" id="L385">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

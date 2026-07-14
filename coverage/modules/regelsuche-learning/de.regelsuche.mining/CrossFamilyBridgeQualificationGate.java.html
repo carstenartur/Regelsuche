@@ -1,0 +1,505 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrossFamilyBridgeQualificationGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">CrossFamilyBridgeQualificationGate.java</span></div><h1>CrossFamilyBridgeQualificationGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.CrossFamilyBridgeAblationEvaluator.AblationReport;
+import de.regelsuche.mining.CrossFamilyBridgeAblationEvaluator.AblationStatus;
+import de.regelsuche.mining.CrossFamilyBridgeHypothesisBuilder.BridgeHypothesis;
+import de.regelsuche.mining.CrossFamilyBridgeTransferEvaluator.FamilyResult;
+import de.regelsuche.mining.CrossFamilyBridgeTransferEvaluator.FamilyStatus;
+import de.regelsuche.mining.CrossFamilyBridgeTransferEvaluator.TransferReport;
+import de.regelsuche.mining.InterestingnessAssessment.Eligibility;
+import de.regelsuche.mining.InterestingnessEvidence.ControlClassification;
+import de.regelsuche.mining.InterestingnessEvidence.ProjectNoveltyStatus;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/**
+ * Binds transfer, lifecycle, novelty, proof, ablation and interestingness evidence
+ * for one cross-family bridge without promoting or publishing it.
+ */
+<span class="fc" id="L39">public final class CrossFamilyBridgeQualificationGate {</span>
+    public static final String SCHEMA = &quot;regelsuche.cross-family-bridge-qualification/v1&quot;;
+
+    public QualificationReport evaluate(Input input) {
+<span class="fc" id="L43">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L44">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L45">        addIdentityBlockers(input, blockers);</span>
+<span class="fc" id="L46">        addTransferBlockers(input.transfer(), blockers);</span>
+<span class="fc" id="L47">        addLifecycleBlockers(input, blockers);</span>
+<span class="fc" id="L48">        addNoveltyBlockers(input.novelty(), blockers);</span>
+<span class="fc" id="L49">        addProofBlockers(input, blockers);</span>
+<span class="fc" id="L50">        addAblationBlockers(input, blockers);</span>
+<span class="fc" id="L51">        addInterestingnessBlockers(input, blockers);</span>
+
+<span class="fc" id="L53">        List&lt;String&gt; orderedBlockers = blockers.stream()</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L55">            .distinct()</span>
+<span class="fc" id="L56">            .sorted()</span>
+<span class="fc" id="L57">            .toList();</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        AssumptionStatus assumptionStatus = assumptionsConsistent(input)</span>
+<span class="fc" id="L59">            ? AssumptionStatus.CONSISTENT</span>
+<span class="fc" id="L60">            : AssumptionStatus.MISMATCH;</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (assumptionStatus == AssumptionStatus.MISMATCH</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                &amp;&amp; !orderedBlockers.contains(&quot;assumption evidence mismatch&quot;)) {</span>
+<span class="fc" id="L63">            orderedBlockers = appendSorted(orderedBlockers, &quot;assumption evidence mismatch&quot;);</span>
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        QualificationStatus status = orderedBlockers.isEmpty()</span>
+<span class="fc" id="L66">            ? QualificationStatus.QUALIFIED_FOR_PROMOTION_REVIEW</span>
+<span class="fc" id="L67">            : QualificationStatus.BLOCKED;</span>
+<span class="fc" id="L68">        String contentHash = hash(canonicalMaterial(</span>
+            input, status, assumptionStatus, orderedBlockers));
+<span class="fc" id="L70">        return new QualificationReport(</span>
+            SCHEMA,
+<span class="fc" id="L72">            input.hypothesis().hypothesisId(),</span>
+<span class="fc" id="L73">            input.hypothesis().sourceClusterId(),</span>
+<span class="fc" id="L74">            input.hypothesis().formationHash(),</span>
+<span class="fc" id="L75">            input.transfer().contentHash(),</span>
+<span class="fc" id="L76">            input.ablation().contentHash(),</span>
+<span class="fc" id="L77">            input.novelty().exactSignatureHash(),</span>
+<span class="fc" id="L78">            input.novelty().alphaSignatureHash(),</span>
+<span class="fc" id="L79">            input.proof().evidenceHash(),</span>
+<span class="fc" id="L80">            input.interestingness().contentHash(),</span>
+            status,
+<span class="fc" id="L82">            input.transfer().status().name(),</span>
+<span class="fc" id="L83">            input.novelty().status().name(),</span>
+<span class="fc" id="L84">            input.novelty().externalNoveltyStatus(),</span>
+<span class="fc" id="L85">            input.proof().proofStatus().name(),</span>
+<span class="fc" id="L86">            input.proof().formalProofStatus(),</span>
+            assumptionStatus,
+<span class="fc" id="L88">            input.ablation().status(),</span>
+<span class="fc" id="L89">            input.interestingness().eligibility(),</span>
+<span class="fc" id="L90">            input.interestingness().profile(),</span>
+<span class="fc" id="L91">            input.interestingness().totalPermille(),</span>
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            orderedBlockers,
+            contentHash);
+    }
+
+    private static void addIdentityBlockers(Input input, List&lt;String&gt; blockers) {
+<span class="fc" id="L99">        String id = input.hypothesis().hypothesisId();</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (!id.equals(input.transfer().hypothesisId())) {</span>
+<span class="nc" id="L101">            blockers.add(&quot;transfer identity mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (!id.equals(input.lifecycle().id())) {</span>
+<span class="nc" id="L104">            blockers.add(&quot;lifecycle identity mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!id.equals(input.novelty().conjectureId())) {</span>
+<span class="nc" id="L107">            blockers.add(&quot;novelty identity mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!id.equals(input.proof().conjectureId())) {</span>
+<span class="nc" id="L110">            blockers.add(&quot;proof identity mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (!id.equals(input.ablation().hypothesisId())) {</span>
+<span class="nc" id="L113">            blockers.add(&quot;ablation identity mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (!id.equals(input.interestingness().candidateId())) {</span>
+<span class="nc" id="L116">            blockers.add(&quot;interestingness identity mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (!input.hypothesis().sourceClusterId().equals(</span>
+<span class="fc" id="L119">                input.transfer().sourceClusterId())) {</span>
+<span class="nc" id="L120">            blockers.add(&quot;source cluster mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (!input.hypothesis().formationHash().equals(</span>
+<span class="fc" id="L123">                input.transfer().formationHash())) {</span>
+<span class="nc" id="L124">            blockers.add(&quot;formation hash mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (!input.transfer().contentHash().equals(</span>
+<span class="fc" id="L127">                input.ablation().transferContentHash())) {</span>
+<span class="nc" id="L128">            blockers.add(&quot;ablation/transfer hash mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (!input.transfer().contentHash().equals(</span>
+<span class="fc" id="L131">                input.interestingness().evidence().evidenceId())) {</span>
+<span class="nc" id="L132">            blockers.add(&quot;interestingness evidence is not bound to transfer report&quot;);</span>
+        }
+<span class="fc" id="L134">    }</span>
+
+    private static void addTransferBlockers(
+        TransferReport transfer,
+        List&lt;String&gt; blockers
+    ) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (transfer.targetProvided()) {</span>
+<span class="nc" id="L141">            blockers.add(&quot;targeted transfer evidence is not allowed&quot;);</span>
+        }
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">        if (!transfer.accepted() || !transfer.blockers().isEmpty()) {</span>
+<span class="nc" id="L144">            blockers.add(&quot;cross-family transfer is not accepted&quot;);</span>
+        }
+<span class="fc" id="L146">        int expectedFamilies = transfer.trainingFamilies().size()</span>
+<span class="fc" id="L147">            + transfer.heldOutFamilies().size();</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (transfer.heldOutFamilies().isEmpty()</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                || transfer.familyResults().size() != expectedFamilies) {</span>
+<span class="nc" id="L150">            blockers.add(&quot;family transfer coverage is incomplete&quot;);</span>
+        }
+<span class="fc" id="L152">        transfer.familyResults().stream()</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            .filter(result -&gt; !familyResultComplete(result))</span>
+<span class="pc" id="L154">            .map(result -&gt; &quot;family transfer incomplete: &quot; + result.familyId())</span>
+<span class="fc" id="L155">            .forEach(blockers::add);</span>
+<span class="fc" id="L156">    }</span>
+
+    private static boolean familyResultComplete(FamilyResult result) {
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        return result.status() == FamilyStatus.ACCEPTED</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            &amp;&amp; result.configuredPositiveHoldouts() == result.executedPositiveHoldouts()</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            &amp;&amp; result.skippedPositiveHoldouts() == 0</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            &amp;&amp; result.configuredNegativeHoldouts() == result.executedNegativeHoldouts()</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            &amp;&amp; result.skippedNegativeHoldouts() == 0</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            &amp;&amp; result.failedPositiveHoldouts().isEmpty()</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            &amp;&amp; result.failedNegativeHoldouts().isEmpty()</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            &amp;&amp; CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND.name().equals(</span>
+<span class="fc" id="L167">                result.counterexampleStatus())</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            &amp;&amp; !result.counterexampleAttemptedSources().isEmpty()</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            &amp;&amp; result.inferredAssumptions().isEmpty()</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            &amp;&amp; result.counterexampleAssignments().isEmpty()</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            &amp;&amp; result.blockers().isEmpty()</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            &amp;&amp; isSha256(result.provenanceHash());</span>
+    }
+
+    private static void addLifecycleBlockers(Input input, List&lt;String&gt; blockers) {
+<span class="fc" id="L176">        HypothesisCandidate lifecycle = input.lifecycle();</span>
+<span class="fc" id="L177">        BridgeHypothesis hypothesis = input.hypothesis();</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        boolean patternsMatch = hypothesis.leftPattern().equals(lifecycle.leftPattern())</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            &amp;&amp; hypothesis.rightPattern().equals(lifecycle.rightPattern());</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        boolean evidencePresent = !lifecycle.supportingPaths().isEmpty()</span>
+<span class="fc" id="L181">            &amp;&amp; lifecycle.supportingExpressions().size()</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                &gt;= hypothesis.conjecture().supportCount();</span>
+<span class="fc" id="L183">        boolean validated = lifecycle.proofStatus().atLeast(</span>
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES);
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        boolean counterexampleCleared = lifecycle.counterexampleSearchStatus()</span>
+                == CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            &amp;&amp; Boolean.FALSE.equals(lifecycle.counterexampleStatus());</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        boolean generalizationPreserved = ordered(lifecycle.parameterRelations()).equals(</span>
+<span class="fc" id="L189">                ordered(hypothesis.conjecture().parameterRelations()))</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            &amp;&amp; orderedMap(lifecycle.expressionPlaceholders()).equals(</span>
+<span class="fc" id="L191">                orderedMap(hypothesis.conjecture().expressionPlaceholderValues()));</span>
+<span class="pc bpc" id="L192" title="5 of 10 branches missed.">        if (!patternsMatch || !evidencePresent || !validated</span>
+                || !counterexampleCleared || !generalizationPreserved) {
+<span class="nc" id="L194">            blockers.add(&quot;bridge lifecycle evidence is incomplete or drifted&quot;);</span>
+        }
+<span class="fc" id="L196">    }</span>
+
+    private static void addNoveltyBlockers(
+        NoveltyReport novelty,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (novelty.status() != NoveltyStatus.NOVEL_WITHIN_PROJECT) {</span>
+<span class="fc" id="L203">            blockers.add(&quot;project novelty is not established: &quot; + novelty.status().name());</span>
+        }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (!novelty.matches().isEmpty()</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                || !isSha256(novelty.exactSignatureHash())</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                || !isSha256(novelty.alphaSignatureHash())) {</span>
+<span class="fc" id="L208">            blockers.add(&quot;project novelty evidence is inconsistent&quot;);</span>
+        }
+<span class="fc" id="L210">    }</span>
+
+    private static void addProofBlockers(Input input, List&lt;String&gt; blockers) {
+<span class="fc" id="L213">        ProofReport proof = input.proof();</span>
+<span class="fc" id="L214">        BridgeHypothesis hypothesis = input.hypothesis();</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (proof.eligibility() != EligibilityStatus.ELIGIBLE</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                || proof.proofStatus() != ProofStatus.SYMBOLICALLY_VERIFIED</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                || !proof.blockers().isEmpty()</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                || !proof.proofObligationEmitted()</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                || proof.obligation() == null) {</span>
+<span class="nc" id="L220">            blockers.add(&quot;symbolic proof evidence is not accepted&quot;);</span>
+<span class="nc" id="L221">            return;</span>
+        }
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        boolean obligationMatches = hypothesis.hypothesisId().equals(</span>
+<span class="fc" id="L224">                proof.obligation().conjectureId())</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            &amp;&amp; !proof.obligation().targetProvided()</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            &amp;&amp; hypothesis.leftPattern().equals(proof.obligation().leftExpression())</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            &amp;&amp; hypothesis.rightPattern().equals(proof.obligation().rightExpression())</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            &amp;&amp; ordered(hypothesis.assumptions()).equals(</span>
+<span class="fc" id="L229">                ordered(proof.obligation().assumptions()));</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (!obligationMatches</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                || !isSha256(proof.obligation().obligationHash())</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                || !isSha256(proof.evidenceHash())) {</span>
+<span class="nc" id="L233">            blockers.add(&quot;proof obligation provenance mismatch&quot;);</span>
+        }
+<span class="fc" id="L235">    }</span>
+
+    private static void addAblationBlockers(Input input, List&lt;String&gt; blockers) {
+<span class="fc" id="L238">        AblationReport ablation = input.ablation();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (ablation.status() != AblationStatus.BENEFICIAL_HELD_OUT</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                || !ablation.beneficial()</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                || !ablation.blockers().isEmpty()) {</span>
+<span class="fc" id="L242">            blockers.add(&quot;held-out paired ablation is not beneficial&quot;);</span>
+        }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (!input.transfer().trainingFamilies().equals(ablation.trainingFamilies())</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                || !input.transfer().heldOutFamilies().equals(ablation.heldOutFamilies())) {</span>
+<span class="nc" id="L246">            blockers.add(&quot;ablation family provenance mismatch&quot;);</span>
+        }
+<span class="fc" id="L248">    }</span>
+
+    private static void addInterestingnessBlockers(
+        Input input,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L254">        InterestingnessAssessment assessment = input.interestingness();</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (assessment.eligibility() != Eligibility.RANKABLE_COMPLETE</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">                || !assessment.hardBlockers().isEmpty()</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                || !assessment.warnings().isEmpty()) {</span>
+<span class="nc" id="L258">            blockers.add(&quot;interestingness evidence is not complete and rankable&quot;);</span>
+        }
+<span class="fc" id="L260">        InterestingnessEvidence evidence = assessment.evidence();</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        boolean transferComplete = evidence.heldOutTransferRequired()</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            &amp;&amp; evidence.heldOutFamiliesConfigured() &gt; 0</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            &amp;&amp; evidence.heldOutFamiliesConfigured() == evidence.heldOutFamiliesPassed();</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        boolean utilityComplete = evidence.pairedUtilityEvaluated()</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            &amp;&amp; evidence.pairedUtilityPermille() &gt; 0;</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        boolean noveltyConsistent = evidence.projectNoveltyStatus()</span>
+            == ProjectNoveltyStatus.NOVEL_WITHIN_PROJECT;
+<span class="pc bpc" id="L268" title="2 of 6 branches missed.">        if (!transferComplete || !utilityComplete || !noveltyConsistent</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                || evidence.controlClassification() != ControlClassification.NONE) {</span>
+<span class="fc" id="L270">            blockers.add(&quot;interestingness evidence axes are inconsistent with bridge qualification&quot;);</span>
+        }
+<span class="fc" id="L272">    }</span>
+
+    private static boolean assumptionsConsistent(Input input) {
+<span class="fc" id="L275">        List&lt;String&gt; expected = ordered(input.hypothesis().assumptions());</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        List&lt;String&gt; proofAssumptions = input.proof().obligation() == null</span>
+<span class="nc" id="L277">            ? List.of()</span>
+<span class="fc" id="L278">            : ordered(input.proof().obligation().assumptions());</span>
+<span class="fc" id="L279">        boolean familyAssumptionsClear = input.transfer().familyResults().stream()</span>
+<span class="fc" id="L280">            .allMatch(result -&gt; result.inferredAssumptions().isEmpty());</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        return expected.equals(ordered(input.lifecycle().assumptions()))</span>
+<span class="pc bpc" id="L282" title="2 of 4 branches missed.">            &amp;&amp; expected.equals(proofAssumptions)</span>
+            &amp;&amp; familyAssumptionsClear;
+    }
+
+    private static String canonicalMaterial(
+        Input input,
+        QualificationStatus status,
+        AssumptionStatus assumptionStatus,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L292">        return SCHEMA</span>
+<span class="fc" id="L293">            + &quot;\nhypothesis=&quot; + input.hypothesis().hypothesisId()</span>
+<span class="fc" id="L294">            + &quot;\ncluster=&quot; + input.hypothesis().sourceClusterId()</span>
+<span class="fc" id="L295">            + &quot;\nformation=&quot; + input.hypothesis().formationHash()</span>
+<span class="fc" id="L296">            + &quot;\ntransfer=&quot; + input.transfer().contentHash()</span>
+<span class="fc" id="L297">            + &quot;\nnoveltyExact=&quot; + input.novelty().exactSignatureHash()</span>
+<span class="fc" id="L298">            + &quot;\nnoveltyAlpha=&quot; + input.novelty().alphaSignatureHash()</span>
+<span class="fc" id="L299">            + &quot;\nproof=&quot; + input.proof().evidenceHash()</span>
+<span class="fc" id="L300">            + &quot;\nablation=&quot; + input.ablation().contentHash()</span>
+<span class="fc" id="L301">            + &quot;\ninterestingness=&quot; + input.interestingness().contentHash()</span>
+<span class="fc" id="L302">            + &quot;\nstatus=&quot; + status.name()</span>
+<span class="fc" id="L303">            + &quot;\nassumptions=&quot; + assumptionStatus.name()</span>
+            + &quot;\nblockers=&quot; + blockers;
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L309">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L310">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L311">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L312">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L313">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static List&lt;String&gt; appendSorted(List&lt;String&gt; values, String extra) {
+<span class="fc" id="L318">        List&lt;String&gt; combined = new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L319">        combined.add(extra);</span>
+<span class="fc" id="L320">        return combined.stream().distinct().sorted().toList();</span>
+    }
+
+    private static List&lt;String&gt; ordered(List&lt;String&gt; values) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        return values == null</span>
+<span class="nc" id="L325">            ? List.of()</span>
+<span class="fc" id="L326">            : values.stream()</span>
+<span class="pc bpc" id="L327" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L328">                .map(value -&gt; value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;))</span>
+<span class="fc" id="L329">                .distinct()</span>
+<span class="fc" id="L330">                .sorted()</span>
+<span class="fc" id="L331">                .toList();</span>
+    }
+
+    private static Map&lt;String, List&lt;String&gt;&gt; orderedMap(
+        Map&lt;String, List&lt;String&gt;&gt; values
+    ) {
+<span class="pc bpc" id="L337" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L338">            return Map.of();</span>
+        }
+<span class="fc" id="L340">        Map&lt;String, List&lt;String&gt;&gt; ordered = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L341">        values.forEach((key, entries) -&gt; ordered.put(key, ordered(entries)));</span>
+<span class="fc" id="L342">        return Map.copyOf(ordered);</span>
+    }
+
+    private static boolean isSha256(String value) {
+<span class="pc bpc" id="L346" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+    }
+
+<span class="fc" id="L349">    public enum QualificationStatus {</span>
+<span class="fc" id="L350">        QUALIFIED_FOR_PROMOTION_REVIEW,</span>
+<span class="fc" id="L351">        BLOCKED</span>
+    }
+
+<span class="fc" id="L354">    public enum AssumptionStatus {</span>
+<span class="fc" id="L355">        CONSISTENT,</span>
+<span class="fc" id="L356">        MISMATCH</span>
+    }
+
+    public record Input(
+        BridgeHypothesis hypothesis,
+        TransferReport transfer,
+        HypothesisCandidate lifecycle,
+        NoveltyReport novelty,
+        ProofReport proof,
+        AblationReport ablation,
+        InterestingnessAssessment interestingness
+    ) {
+<span class="fc" id="L368">        public Input {</span>
+<span class="fc" id="L369">            Objects.requireNonNull(hypothesis, &quot;hypothesis&quot;);</span>
+<span class="fc" id="L370">            Objects.requireNonNull(transfer, &quot;transfer&quot;);</span>
+<span class="fc" id="L371">            Objects.requireNonNull(lifecycle, &quot;lifecycle&quot;);</span>
+<span class="fc" id="L372">            Objects.requireNonNull(novelty, &quot;novelty&quot;);</span>
+<span class="fc" id="L373">            Objects.requireNonNull(proof, &quot;proof&quot;);</span>
+<span class="fc" id="L374">            Objects.requireNonNull(ablation, &quot;ablation&quot;);</span>
+<span class="fc" id="L375">            Objects.requireNonNull(interestingness, &quot;interestingness&quot;);</span>
+<span class="fc" id="L376">        }</span>
+    }
+
+    public record QualificationReport(
+        String schema,
+        String hypothesisId,
+        String sourceClusterId,
+        String formationHash,
+        String transferContentHash,
+        String ablationContentHash,
+        String exactSignatureHash,
+        String alphaSignatureHash,
+        String proofEvidenceHash,
+        String interestingnessContentHash,
+        QualificationStatus status,
+        String transferStatus,
+        String projectNoveltyStatus,
+        String externalNoveltyStatus,
+        String symbolicProofStatus,
+        String formalProofStatus,
+        AssumptionStatus assumptionStatus,
+        AblationStatus ablationStatus,
+        Eligibility interestingnessEligibility,
+        InterestingnessProfile interestingnessProfile,
+        int interestingnessTotalPermille,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        List&lt;String&gt; blockers,
+        String contentHash
+    ) {
+<span class="fc" id="L406">        public QualificationReport {</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L408">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported bridge-qualification schema&quot;);
+            }
+<span class="fc" id="L411">            requireText(hypothesisId, &quot;hypothesisId&quot;);</span>
+<span class="fc" id="L412">            requireText(sourceClusterId, &quot;sourceClusterId&quot;);</span>
+<span class="fc" id="L413">            requireSha256(formationHash, &quot;formationHash&quot;);</span>
+<span class="fc" id="L414">            requireSha256(transferContentHash, &quot;transferContentHash&quot;);</span>
+<span class="fc" id="L415">            requireSha256(ablationContentHash, &quot;ablationContentHash&quot;);</span>
+<span class="fc" id="L416">            requireSha256(exactSignatureHash, &quot;exactSignatureHash&quot;);</span>
+<span class="fc" id="L417">            requireSha256(alphaSignatureHash, &quot;alphaSignatureHash&quot;);</span>
+<span class="fc" id="L418">            requireSha256(proofEvidenceHash, &quot;proofEvidenceHash&quot;);</span>
+<span class="fc" id="L419">            requireSha256(interestingnessContentHash, &quot;interestingnessContentHash&quot;);</span>
+<span class="fc" id="L420">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L421">            Objects.requireNonNull(assumptionStatus, &quot;assumptionStatus&quot;);</span>
+<span class="fc" id="L422">            Objects.requireNonNull(ablationStatus, &quot;ablationStatus&quot;);</span>
+<span class="fc" id="L423">            Objects.requireNonNull(interestingnessEligibility, &quot;interestingnessEligibility&quot;);</span>
+<span class="fc" id="L424">            Objects.requireNonNull(interestingnessProfile, &quot;interestingnessProfile&quot;);</span>
+<span class="fc" id="L425">            blockers = ordered(blockers);</span>
+<span class="fc" id="L426">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L427">            externalNoveltyStatus = normalizeStatus(externalNoveltyStatus);</span>
+<span class="fc" id="L428">            formalProofStatus = normalizeStatus(formalProofStatus);</span>
+<span class="fc" id="L429">            promotionStatus = requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L430">            publicEvidenceStatus = requireNotEvaluated(</span>
+                publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);
+<span class="fc" id="L432">        }</span>
+
+        public boolean qualified() {
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            return status == QualificationStatus.QUALIFIED_FOR_PROMOTION_REVIEW;</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L439">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L440">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L441">                .property(&quot;hypothesisId&quot;, hypothesisId)</span>
+<span class="fc" id="L442">                .property(&quot;sourceClusterId&quot;, sourceClusterId)</span>
+<span class="fc" id="L443">                .property(&quot;formationHash&quot;, formationHash)</span>
+<span class="fc" id="L444">                .property(&quot;transferContentHash&quot;, transferContentHash)</span>
+<span class="fc" id="L445">                .property(&quot;ablationContentHash&quot;, ablationContentHash)</span>
+<span class="fc" id="L446">                .property(&quot;exactSignatureHash&quot;, exactSignatureHash)</span>
+<span class="fc" id="L447">                .property(&quot;alphaSignatureHash&quot;, alphaSignatureHash)</span>
+<span class="fc" id="L448">                .property(&quot;proofEvidenceHash&quot;, proofEvidenceHash)</span>
+<span class="fc" id="L449">                .property(&quot;interestingnessContentHash&quot;, interestingnessContentHash)</span>
+<span class="fc" id="L450">                .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L451">                .property(&quot;transferStatus&quot;, transferStatus)</span>
+<span class="fc" id="L452">                .property(&quot;projectNoveltyStatus&quot;, projectNoveltyStatus)</span>
+<span class="fc" id="L453">                .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus)</span>
+<span class="fc" id="L454">                .property(&quot;symbolicProofStatus&quot;, symbolicProofStatus)</span>
+<span class="fc" id="L455">                .property(&quot;formalProofStatus&quot;, formalProofStatus)</span>
+<span class="fc" id="L456">                .property(&quot;assumptionStatus&quot;, assumptionStatus.name())</span>
+<span class="fc" id="L457">                .property(&quot;ablationStatus&quot;, ablationStatus.name())</span>
+<span class="fc" id="L458">                .property(&quot;interestingnessEligibility&quot;, interestingnessEligibility.name())</span>
+<span class="fc" id="L459">                .property(&quot;interestingnessProfile&quot;, interestingnessProfile.name())</span>
+<span class="fc" id="L460">                .property(&quot;interestingnessTotalPermille&quot;, interestingnessTotalPermille)</span>
+<span class="fc" id="L461">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L462">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L463">                .stringArray(&quot;blockers&quot;, blockers)</span>
+<span class="fc" id="L464">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L465">                .endObject()</span>
+<span class="fc" id="L466">                .toString();</span>
+        }
+
+        public void write(Path output) {
+            try {
+<span class="fc" id="L471">                Path parent = output.getParent();</span>
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L473">                    Files.createDirectories(parent);</span>
+                }
+<span class="fc" id="L475">                Files.writeString(output, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L476">            } catch (IOException exception) {</span>
+<span class="nc" id="L477">                throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L478">            }</span>
+<span class="fc" id="L479">        }</span>
+    }
+
+    private static String normalizeStatus(String value) {
+<span class="pc bpc" id="L483" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;NOT_EVALUATED&quot; : value;</span>
+    }
+
+    private static String requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L488">            throw new IllegalArgumentException(name + &quot; must remain NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L490">        return value;</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L494" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L495">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L497">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        if (!isSha256(value)) {</span>
+<span class="nc" id="L501">            throw new IllegalArgumentException(name + &quot; must be a SHA-256 hash&quot;);</span>
+        }
+<span class="fc" id="L503">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

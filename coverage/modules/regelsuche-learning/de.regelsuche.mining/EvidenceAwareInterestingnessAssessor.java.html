@@ -310,8 +310,8 @@ import java.util.Set;
     }
 
     private static int saturatingPositive(double value) {
-<span class="pc bpc" id="L313" title="2 of 4 branches missed.">        if (value &lt;= 0.0 || !Double.isFinite(value)) {</span>
-<span class="nc" id="L314">            return 0;</span>
+<span class="pc bpc" id="L313" title="1 of 4 branches missed.">        if (value &lt;= 0.0 || !Double.isFinite(value)) {</span>
+<span class="fc" id="L314">            return 0;</span>
         }
 <span class="fc" id="L316">        return toPermille(1.0 - Math.exp(-value));</span>
     }

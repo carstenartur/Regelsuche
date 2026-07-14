@@ -1,0 +1,493 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrossFamilyBridgeAblationEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">CrossFamilyBridgeAblationEvaluator.java</span></div><h1>CrossFamilyBridgeAblationEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.CrossFamilyBridgeHypothesisBuilder.BridgeHypothesis;
+import de.regelsuche.mining.CrossFamilyBridgeTransferEvaluator.FamilyRole;
+import de.regelsuche.mining.CrossFamilyBridgeTransferEvaluator.TransferReport;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/**
+ * Computes paired utility evidence for an already validated cross-family bridge.
+ *
+ * &lt;p&gt;The evaluator never changes the bridge relation. It compares the same fresh
+ * family tasks with and without the bridge and requires a material held-out-family
+ * gain without regressions before reporting a beneficial ablation.&lt;/p&gt;
+ */
+<span class="fc" id="L31">public final class CrossFamilyBridgeAblationEvaluator {</span>
+    public static final String SCHEMA = &quot;regelsuche.cross-family-bridge-ablation/v1&quot;;
+
+    public AblationReport evaluate(
+        BridgeHypothesis hypothesis,
+        TransferReport transfer,
+        List&lt;FamilyAblation&gt; observations
+    ) {
+<span class="fc" id="L39">        Objects.requireNonNull(hypothesis, &quot;hypothesis&quot;);</span>
+<span class="fc" id="L40">        Objects.requireNonNull(transfer, &quot;transfer&quot;);</span>
+<span class="fc" id="L41">        List&lt;FamilyAblation&gt; ordered = orderedObservations(observations);</span>
+<span class="fc" id="L42">        ensureUniqueFamilies(ordered);</span>
+
+<span class="fc" id="L44">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;(identityBlockers(hypothesis, transfer));</span>
+<span class="fc" id="L45">        Map&lt;String, FamilyRole&gt; expected = expectedFamilies(transfer, blockers);</span>
+<span class="fc" id="L46">        Map&lt;String, FamilyAblation&gt; supplied = suppliedByFamily(ordered, expected, blockers);</span>
+<span class="fc" id="L47">        List&lt;FamilyAblationResult&gt; results = expected.entrySet().stream()</span>
+<span class="fc" id="L48">            .map(entry -&gt; resultFor(entry.getKey(), entry.getValue(), supplied.get(entry.getKey())))</span>
+<span class="fc" id="L49">            .sorted(Comparator.comparing(FamilyAblationResult::familyId))</span>
+<span class="fc" id="L50">            .toList();</span>
+
+<span class="fc" id="L52">        AblationStatus status = overallStatus(transfer, blockers, results);</span>
+<span class="fc" id="L53">        List&lt;String&gt; orderedBlockers = blockers.stream()</span>
+<span class="pc bnc" id="L54" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L55">            .distinct()</span>
+<span class="fc" id="L56">            .sorted()</span>
+<span class="fc" id="L57">            .toList();</span>
+<span class="fc" id="L58">        String contentHash = hash(canonicalMaterial(</span>
+            hypothesis, transfer, status, results, orderedBlockers));
+<span class="fc" id="L60">        return new AblationReport(</span>
+            SCHEMA,
+<span class="fc" id="L62">            hypothesis.hypothesisId(),</span>
+<span class="fc" id="L63">            hypothesis.formationHash(),</span>
+<span class="fc" id="L64">            transfer.contentHash(),</span>
+<span class="fc" id="L65">            transfer.trainingFamilies(),</span>
+<span class="fc" id="L66">            transfer.heldOutFamilies(),</span>
+            status,
+            results,
+            orderedBlockers,
+            contentHash);
+    }
+
+    private static List&lt;String&gt; identityBlockers(
+        BridgeHypothesis hypothesis,
+        TransferReport transfer
+    ) {
+<span class="fc" id="L77">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (!hypothesis.hypothesisId().equals(transfer.hypothesisId())) {</span>
+<span class="nc" id="L79">            blockers.add(&quot;hypothesis/transfer identity mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (!hypothesis.sourceClusterId().equals(transfer.sourceClusterId())) {</span>
+<span class="nc" id="L82">            blockers.add(&quot;source cluster mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (!hypothesis.formationHash().equals(transfer.formationHash())) {</span>
+<span class="nc" id="L85">            blockers.add(&quot;formation hash mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!hypothesis.trainingFamilies().equals(transfer.trainingFamilies())) {</span>
+<span class="nc" id="L88">            blockers.add(&quot;training-family provenance mismatch&quot;);</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (!transfer.accepted()) {</span>
+<span class="nc" id="L91">            blockers.add(&quot;cross-family transfer is not accepted&quot;);</span>
+        }
+<span class="fc" id="L93">        return List.copyOf(blockers);</span>
+    }
+
+    private static Map&lt;String, FamilyRole&gt; expectedFamilies(
+        TransferReport transfer,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L100">        Map&lt;String, FamilyRole&gt; expected = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L101">        transfer.trainingFamilies().forEach(family -&gt;</span>
+<span class="fc" id="L102">            expected.put(family, FamilyRole.FORMATION));</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (String family : transfer.heldOutFamilies()) {</span>
+<span class="fc" id="L104">            FamilyRole previous = expected.putIfAbsent(family, FamilyRole.HELD_OUT);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (previous != null) {</span>
+<span class="nc" id="L106">                blockers.add(&quot;family occurs in both formation and held-out sets: &quot; + family);</span>
+            }
+<span class="fc" id="L108">        }</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (transfer.heldOutFamilies().isEmpty()) {</span>
+<span class="nc" id="L110">            blockers.add(&quot;held-out family is missing&quot;);</span>
+        }
+<span class="fc" id="L112">        return expected;</span>
+    }
+
+    private static Map&lt;String, FamilyAblation&gt; suppliedByFamily(
+        List&lt;FamilyAblation&gt; observations,
+        Map&lt;String, FamilyRole&gt; expected,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L120">        Map&lt;String, FamilyAblation&gt; supplied = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (FamilyAblation observation : observations) {</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (!expected.containsKey(observation.familyId())) {</span>
+<span class="nc" id="L123">                blockers.add(&quot;unexpected ablation family: &quot; + observation.familyId());</span>
+<span class="nc" id="L124">                continue;</span>
+            }
+<span class="fc" id="L126">            supplied.put(observation.familyId(), observation);</span>
+<span class="fc" id="L127">        }</span>
+<span class="fc" id="L128">        return supplied;</span>
+    }
+
+    private static FamilyAblationResult resultFor(
+        String familyId,
+        FamilyRole expectedRole,
+        FamilyAblation observation
+    ) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (observation == null) {</span>
+<span class="nc" id="L137">            return FamilyAblationResult.incomplete(</span>
+                familyId, expectedRole, &quot;paired family ablation is missing&quot;);
+        }
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (observation.role() != expectedRole) {</span>
+<span class="nc" id="L141">            return FamilyAblationResult.incomplete(</span>
+                familyId, expectedRole, &quot;family role does not match transfer evidence&quot;);
+        }
+<span class="fc" id="L144">        FamilyAblationStatus status = classify(</span>
+<span class="fc" id="L145">            observation.withBridge(), observation.withoutBridge());</span>
+<span class="fc" id="L146">        return new FamilyAblationResult(</span>
+            familyId,
+            expectedRole,
+            status,
+<span class="fc" id="L150">            observation.withBridge(),</span>
+<span class="fc" id="L151">            observation.withoutBridge(),</span>
+<span class="fc" id="L152">            delta(observation.withoutBridge().pathLength(),</span>
+<span class="fc" id="L153">                observation.withBridge().pathLength()),</span>
+<span class="fc" id="L154">            delta(observation.withoutBridge().statesExplored(),</span>
+<span class="fc" id="L155">                observation.withBridge().statesExplored()),</span>
+<span class="fc" id="L156">            explanation(status));</span>
+    }
+
+    private static FamilyAblationStatus classify(
+        RunEvidence withBridge,
+        RunEvidence withoutBridge
+    ) {
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        if (!withBridge.successKnown() || !withoutBridge.successKnown()) {</span>
+<span class="nc" id="L164">            return FamilyAblationStatus.INCOMPLETE;</span>
+        }
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (!withBridge.successful()) {</span>
+<span class="nc" id="L167">            return FamilyAblationStatus.REGRESSION;</span>
+        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (!withoutBridge.successful()) {</span>
+<span class="fc" id="L170">            return FamilyAblationStatus.MATERIAL_GAIN;</span>
+        }
+<span class="pc bpc" id="L172" title="2 of 4 branches missed.">        boolean pathKnown = withBridge.pathLength() &gt;= 0 &amp;&amp; withoutBridge.pathLength() &gt;= 0;</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        boolean statesKnown = withBridge.statesExplored() &gt;= 0</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            &amp;&amp; withoutBridge.statesExplored() &gt;= 0;</span>
+<span class="pc bpc" id="L175" title="3 of 4 branches missed.">        if (!pathKnown &amp;&amp; !statesKnown) {</span>
+<span class="nc" id="L176">            return FamilyAblationStatus.INCOMPLETE;</span>
+        }
+<span class="pc bpc" id="L178" title="2 of 6 branches missed.">        boolean gain = pathKnown &amp;&amp; withBridge.pathLength() &lt; withoutBridge.pathLength()</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            || statesKnown &amp;&amp; withBridge.statesExplored() &lt; withoutBridge.statesExplored();</span>
+<span class="pc bpc" id="L180" title="3 of 6 branches missed.">        boolean loss = pathKnown &amp;&amp; withBridge.pathLength() &gt; withoutBridge.pathLength()</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            || statesKnown &amp;&amp; withBridge.statesExplored() &gt; withoutBridge.statesExplored();</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">        if (gain &amp;&amp; loss) {</span>
+<span class="nc" id="L183">            return FamilyAblationStatus.TRADE_OFF;</span>
+        }
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (gain) {</span>
+<span class="fc" id="L186">            return FamilyAblationStatus.MATERIAL_GAIN;</span>
+        }
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (loss) {</span>
+<span class="nc" id="L189">            return FamilyAblationStatus.REGRESSION;</span>
+        }
+<span class="fc" id="L191">        return FamilyAblationStatus.UNCHANGED;</span>
+    }
+
+    private static AblationStatus overallStatus(
+        TransferReport transfer,
+        List&lt;String&gt; blockers,
+        List&lt;FamilyAblationResult&gt; results
+    ) {
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        if (!transfer.accepted()) {</span>
+<span class="nc" id="L200">            return AblationStatus.NOT_ELIGIBLE_TRANSFER;</span>
+        }
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (!blockers.isEmpty()</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                || results.stream().anyMatch(result -&gt;</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                    result.status() == FamilyAblationStatus.INCOMPLETE)) {</span>
+<span class="nc" id="L205">            return AblationStatus.INCOMPLETE_EVIDENCE;</span>
+        }
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt;</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                result.status() == FamilyAblationStatus.REGRESSION)) {</span>
+<span class="nc" id="L209">            return AblationStatus.REGRESSION;</span>
+        }
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt;</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                result.status() == FamilyAblationStatus.TRADE_OFF)) {</span>
+<span class="nc" id="L213">            return AblationStatus.TRADE_OFF;</span>
+        }
+<span class="fc" id="L215">        boolean heldOutGain = results.stream().anyMatch(result -&gt;</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            result.role() == FamilyRole.HELD_OUT</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                &amp;&amp; result.status() == FamilyAblationStatus.MATERIAL_GAIN);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        return heldOutGain</span>
+<span class="fc" id="L219">            ? AblationStatus.BENEFICIAL_HELD_OUT</span>
+<span class="fc" id="L220">            : AblationStatus.NO_HELD_OUT_GAIN;</span>
+    }
+
+    private static List&lt;FamilyAblation&gt; orderedObservations(
+        List&lt;FamilyAblation&gt; observations
+    ) {
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        return observations == null</span>
+<span class="nc" id="L227">            ? List.of()</span>
+<span class="fc" id="L228">            : observations.stream()</span>
+<span class="fc" id="L229">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L230">                .sorted(Comparator.comparing(FamilyAblation::familyId))</span>
+<span class="fc" id="L231">                .toList();</span>
+    }
+
+    private static void ensureUniqueFamilies(List&lt;FamilyAblation&gt; observations) {
+<span class="fc" id="L235">        Set&lt;String&gt; seen = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (FamilyAblation observation : observations) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (!seen.add(observation.familyId())) {</span>
+<span class="nc" id="L238">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L239">                    &quot;duplicate family ablation: &quot; + observation.familyId());</span>
+            }
+<span class="fc" id="L241">        }</span>
+<span class="fc" id="L242">    }</span>
+
+    private static int delta(int withoutBridge, int withBridge) {
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        return withoutBridge &lt; 0 || withBridge &lt; 0 ? 0 : withoutBridge - withBridge;</span>
+    }
+
+    private static long delta(long withoutBridge, long withBridge) {
+<span class="pc bpc" id="L249" title="1 of 4 branches missed.">        return withoutBridge &lt; 0L || withBridge &lt; 0L ? 0L : withoutBridge - withBridge;</span>
+    }
+
+    private static String explanation(FamilyAblationStatus status) {
+<span class="pc bpc" id="L253" title="3 of 5 branches missed.">        return switch (status) {</span>
+<span class="fc" id="L254">            case MATERIAL_GAIN -&gt; &quot;bridge improves reachability, path length, or explored states&quot;;</span>
+<span class="fc" id="L255">            case UNCHANGED -&gt; &quot;bridge does not materially change the paired run&quot;;</span>
+<span class="nc" id="L256">            case REGRESSION -&gt; &quot;bridge makes the paired run fail or increases measured cost&quot;;</span>
+<span class="nc" id="L257">            case TRADE_OFF -&gt; &quot;bridge improves one measured cost while worsening another&quot;;</span>
+<span class="nc" id="L258">            case INCOMPLETE -&gt; &quot;paired success or comparable cost evidence is incomplete&quot;;</span>
+        };
+    }
+
+    private static String canonicalMaterial(
+        BridgeHypothesis hypothesis,
+        TransferReport transfer,
+        AblationStatus status,
+        List&lt;FamilyAblationResult&gt; results,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L269">        StringBuilder material = new StringBuilder(SCHEMA)</span>
+<span class="fc" id="L270">            .append(&quot;\nhypothesis=&quot;).append(hypothesis.hypothesisId())</span>
+<span class="fc" id="L271">            .append(&quot;\nformationHash=&quot;).append(hypothesis.formationHash())</span>
+<span class="fc" id="L272">            .append(&quot;\ntransferHash=&quot;).append(transfer.contentHash())</span>
+<span class="fc" id="L273">            .append(&quot;\nstatus=&quot;).append(status.name())</span>
+<span class="fc" id="L274">            .append(&quot;\nblockers=&quot;).append(blockers);</span>
+<span class="fc" id="L275">        results.forEach(result -&gt; material.append(&quot;\nfamily=&quot;)</span>
+<span class="fc" id="L276">            .append(result.canonicalMaterial()));</span>
+<span class="fc" id="L277">        return material.toString();</span>
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L282">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L283">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L284">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L285">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L286">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L290">    public enum FamilyAblationStatus {</span>
+<span class="fc" id="L291">        MATERIAL_GAIN,</span>
+<span class="fc" id="L292">        UNCHANGED,</span>
+<span class="fc" id="L293">        REGRESSION,</span>
+<span class="fc" id="L294">        TRADE_OFF,</span>
+<span class="fc" id="L295">        INCOMPLETE</span>
+    }
+
+<span class="fc" id="L298">    public enum AblationStatus {</span>
+<span class="fc" id="L299">        BENEFICIAL_HELD_OUT,</span>
+<span class="fc" id="L300">        NO_HELD_OUT_GAIN,</span>
+<span class="fc" id="L301">        REGRESSION,</span>
+<span class="fc" id="L302">        TRADE_OFF,</span>
+<span class="fc" id="L303">        INCOMPLETE_EVIDENCE,</span>
+<span class="fc" id="L304">        NOT_ELIGIBLE_TRANSFER</span>
+    }
+
+    public record RunEvidence(Boolean success, int pathLength, long statesExplored) {
+<span class="fc" id="L308">        public RunEvidence {</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">            if (pathLength &lt; -1) {</span>
+<span class="nc" id="L310">                throw new IllegalArgumentException(&quot;pathLength must be &gt;= -1&quot;);</span>
+            }
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">            if (statesExplored &lt; -1L) {</span>
+<span class="nc" id="L313">                throw new IllegalArgumentException(&quot;statesExplored must be &gt;= -1&quot;);</span>
+            }
+<span class="fc" id="L315">        }</span>
+
+        public boolean successKnown() {
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            return success != null;</span>
+        }
+
+        public boolean successful() {
+<span class="fc" id="L322">            return Boolean.TRUE.equals(success);</span>
+        }
+
+        String canonicalMaterial() {
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            return (success == null ? &quot;unknown&quot; : success.toString())</span>
+                + ',' + pathLength + ',' + statesExplored;
+        }
+    }
+
+    public record FamilyAblation(
+        String familyId,
+        FamilyRole role,
+        RunEvidence withBridge,
+        RunEvidence withoutBridge
+    ) {
+<span class="fc" id="L337">        public FamilyAblation {</span>
+<span class="fc" id="L338">            requireText(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L339">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L340">            Objects.requireNonNull(withBridge, &quot;withBridge&quot;);</span>
+<span class="fc" id="L341">            Objects.requireNonNull(withoutBridge, &quot;withoutBridge&quot;);</span>
+<span class="fc" id="L342">        }</span>
+    }
+
+    public record FamilyAblationResult(
+        String familyId,
+        FamilyRole role,
+        FamilyAblationStatus status,
+        RunEvidence withBridge,
+        RunEvidence withoutBridge,
+        int pathLengthGain,
+        long statesExploredGain,
+        String explanation
+    ) {
+<span class="fc" id="L355">        public FamilyAblationResult {</span>
+<span class="fc" id="L356">            requireText(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L357">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L358">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L359">            Objects.requireNonNull(withBridge, &quot;withBridge&quot;);</span>
+<span class="fc" id="L360">            Objects.requireNonNull(withoutBridge, &quot;withoutBridge&quot;);</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L362">        }</span>
+
+        static FamilyAblationResult incomplete(
+            String familyId,
+            FamilyRole role,
+            String explanation
+        ) {
+<span class="nc" id="L369">            return new FamilyAblationResult(</span>
+                familyId,
+                role,
+                FamilyAblationStatus.INCOMPLETE,
+                new RunEvidence(null, -1, -1L),
+                new RunEvidence(null, -1, -1L),
+                0,
+                0L,
+                explanation);
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L381">            return familyId + '|'</span>
+<span class="fc" id="L382">                + role.name() + '|'</span>
+<span class="fc" id="L383">                + status.name() + '|'</span>
+<span class="fc" id="L384">                + withBridge.canonicalMaterial() + '|'</span>
+<span class="fc" id="L385">                + withoutBridge.canonicalMaterial() + '|'</span>
+                + pathLengthGain + '|'
+                + statesExploredGain + '|'
+                + explanation;
+        }
+    }
+
+    public record AblationReport(
+        String schema,
+        String hypothesisId,
+        String formationHash,
+        String transferContentHash,
+        List&lt;String&gt; trainingFamilies,
+        List&lt;String&gt; heldOutFamilies,
+        AblationStatus status,
+        List&lt;FamilyAblationResult&gt; familyResults,
+        List&lt;String&gt; blockers,
+        String contentHash
+    ) {
+<span class="fc" id="L404">        public AblationReport {</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L406">                throw new IllegalArgumentException(&quot;unsupported bridge-ablation schema&quot;);</span>
+            }
+<span class="fc" id="L408">            requireText(hypothesisId, &quot;hypothesisId&quot;);</span>
+<span class="fc" id="L409">            requireSha256(formationHash, &quot;formationHash&quot;);</span>
+<span class="fc" id="L410">            requireSha256(transferContentHash, &quot;transferContentHash&quot;);</span>
+<span class="fc" id="L411">            trainingFamilies = sortedDistinct(trainingFamilies);</span>
+<span class="fc" id="L412">            heldOutFamilies = sortedDistinct(heldOutFamilies);</span>
+<span class="fc" id="L413">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">            familyResults = familyResults == null</span>
+<span class="nc" id="L415">                ? List.of()</span>
+<span class="fc" id="L416">                : familyResults.stream()</span>
+<span class="fc" id="L417">                    .sorted(Comparator.comparing(FamilyAblationResult::familyId))</span>
+<span class="fc" id="L418">                    .toList();</span>
+<span class="fc" id="L419">            blockers = sortedDistinct(blockers);</span>
+<span class="fc" id="L420">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L421">        }</span>
+
+        public boolean beneficial() {
+<span class="fc bfc" id="L424" title="All 2 branches covered.">            return status == AblationStatus.BENEFICIAL_HELD_OUT;</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L428">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L429">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L430">                .property(&quot;hypothesisId&quot;, hypothesisId)</span>
+<span class="fc" id="L431">                .property(&quot;formationHash&quot;, formationHash)</span>
+<span class="fc" id="L432">                .property(&quot;transferContentHash&quot;, transferContentHash)</span>
+<span class="fc" id="L433">                .stringArray(&quot;trainingFamilies&quot;, trainingFamilies)</span>
+<span class="fc" id="L434">                .stringArray(&quot;heldOutFamilies&quot;, heldOutFamilies)</span>
+<span class="fc" id="L435">                .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L436">                .stringArray(&quot;blockers&quot;, blockers)</span>
+<span class="fc" id="L437">                .array(&quot;familyResults&quot;, array -&gt; familyResults.forEach(result -&gt;</span>
+<span class="fc" id="L438">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L439">                        .property(&quot;familyId&quot;, result.familyId())</span>
+<span class="fc" id="L440">                        .property(&quot;role&quot;, result.role().name())</span>
+<span class="fc" id="L441">                        .property(&quot;status&quot;, result.status().name())</span>
+<span class="fc" id="L442">                        .object(&quot;withBridge&quot;, run -&gt; writeRun(run, result.withBridge()))</span>
+<span class="fc" id="L443">                        .object(&quot;withoutBridge&quot;, run -&gt; writeRun(run, result.withoutBridge()))</span>
+<span class="fc" id="L444">                        .property(&quot;pathLengthGain&quot;, result.pathLengthGain())</span>
+<span class="fc" id="L445">                        .property(&quot;statesExploredGain&quot;, result.statesExploredGain())</span>
+<span class="fc" id="L446">                        .property(&quot;explanation&quot;, result.explanation()))))</span>
+<span class="fc" id="L447">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L448">                .endObject()</span>
+<span class="fc" id="L449">                .toString();</span>
+        }
+
+        public void write(Path output) {
+            try {
+<span class="fc" id="L454">                Path parent = output.getParent();</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L456">                    Files.createDirectories(parent);</span>
+                }
+<span class="fc" id="L458">                Files.writeString(output, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L459">            } catch (IOException exception) {</span>
+<span class="nc" id="L460">                throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L461">            }</span>
+<span class="fc" id="L462">        }</span>
+
+        private static void writeRun(JsonWriter json, RunEvidence run) {
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">            json.property(&quot;success&quot;, run.success() == null ? &quot;unknown&quot; : run.success().toString())</span>
+<span class="fc" id="L466">                .property(&quot;pathLength&quot;, run.pathLength())</span>
+<span class="fc" id="L467">                .property(&quot;statesExplored&quot;, run.statesExplored());</span>
+<span class="fc" id="L468">        }</span>
+    }
+
+    private static List&lt;String&gt; sortedDistinct(List&lt;String&gt; values) {
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">        return values == null</span>
+<span class="nc" id="L473">            ? List.of()</span>
+<span class="fc" id="L474">            : values.stream()</span>
+<span class="pc bpc" id="L475" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L476">                .distinct()</span>
+<span class="fc" id="L477">                .sorted()</span>
+<span class="fc" id="L478">                .toList();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L482" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L483">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L485">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L488" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L489">            throw new IllegalArgumentException(name + &quot; must be a SHA-256 hash&quot;);</span>
+        }
+<span class="fc" id="L491">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

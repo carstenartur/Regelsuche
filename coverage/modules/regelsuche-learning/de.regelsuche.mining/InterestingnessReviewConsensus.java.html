@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessReviewConsensus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessReviewConsensus.java</span></div><h1>InterestingnessReviewConsensus.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
+/**
+ * Aggregates privacy-preserving, blinded relevance reviews without feeding labels
+ * into candidate formation or interestingness assessment.
+ */
+<span class="fc" id="L25">public final class InterestingnessReviewConsensus {</span>
+    public static final String SCHEMA = &quot;regelsuche.interestingness-review-consensus/v1&quot;;
+    public static final int MIN_EXPERT_REVIEWS = 2;
+    public static final int MAX_CONSENSUS_SPREAD_PERMILLE = 250;
+    public static final int MIN_MEAN_CONFIDENCE_PERMILLE = 500;
+
+    public ConsensusReport evaluate(List&lt;ReviewLabel&gt; labels) {
+<span class="fc" id="L32">        List&lt;ReviewLabel&gt; ordered = orderedLabels(labels);</span>
+<span class="fc" id="L33">        validateUniqueReviewIds(ordered);</span>
+<span class="fc" id="L34">        validateOneExpertReviewPerReviewerAndCandidate(ordered);</span>
+<span class="fc" id="L35">        Map&lt;String, List&lt;ReviewLabel&gt;&gt; byCandidate = ordered.stream()</span>
+<span class="fc" id="L36">            .collect(Collectors.groupingBy(</span>
+                ReviewLabel::candidateId,
+                TreeMap::new,
+<span class="fc" id="L39">                Collectors.toList()));</span>
+<span class="fc" id="L40">        List&lt;CandidateConsensus&gt; candidates = byCandidate.entrySet().stream()</span>
+<span class="fc" id="L41">            .map(entry -&gt; consensus(entry.getKey(), entry.getValue()))</span>
+<span class="fc" id="L42">            .toList();</span>
+<span class="fc" id="L43">        String contentHash = hash(canonicalMaterial(candidates));</span>
+<span class="fc" id="L44">        return new ConsensusReport(SCHEMA, candidates, contentHash);</span>
+    }
+
+    private static List&lt;ReviewLabel&gt; orderedLabels(List&lt;ReviewLabel&gt; labels) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        return labels == null</span>
+<span class="nc" id="L49">            ? List.of()</span>
+<span class="fc" id="L50">            : labels.stream()</span>
+<span class="fc" id="L51">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L52">                .sorted(Comparator.comparing(ReviewLabel::candidateId)</span>
+<span class="fc" id="L53">                    .thenComparing(label -&gt; label.source().name())</span>
+<span class="fc" id="L54">                    .thenComparing(ReviewLabel::reviewerHash)</span>
+<span class="fc" id="L55">                    .thenComparing(ReviewLabel::reviewId))</span>
+<span class="fc" id="L56">                .toList();</span>
+    }
+
+    private static void validateUniqueReviewIds(List&lt;ReviewLabel&gt; labels) {
+<span class="fc" id="L60">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (ReviewLabel label : labels) {</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (!ids.add(label.reviewId())) {</span>
+<span class="nc" id="L63">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L64">                    &quot;duplicate review ID: &quot; + label.reviewId());</span>
+            }
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">    }</span>
+
+    private static void validateOneExpertReviewPerReviewerAndCandidate(
+        List&lt;ReviewLabel&gt; labels
+    ) {
+<span class="fc" id="L72">        Set&lt;String&gt; reviewerCases = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (ReviewLabel label : labels) {</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            if (label.source() != ReviewSource.EXPERT_REVIEW) {</span>
+<span class="fc" id="L75">                continue;</span>
+            }
+<span class="fc" id="L77">            String key = label.candidateId() + &quot;\u0001&quot; + label.reviewerHash();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (!reviewerCases.add(key)) {</span>
+<span class="fc" id="L79">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L80">                    &quot;duplicate expert reviewer for candidate: &quot; + label.candidateId());</span>
+            }
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">    }</span>
+
+    private static CandidateConsensus consensus(
+        String candidateId,
+        List&lt;ReviewLabel&gt; labels
+    ) {
+<span class="fc" id="L89">        List&lt;ReviewLabel&gt; ordered = labels.stream()</span>
+<span class="fc" id="L90">            .sorted(Comparator.comparing(ReviewLabel::reviewId))</span>
+<span class="fc" id="L91">            .toList();</span>
+<span class="fc" id="L92">        List&lt;ReviewLabel&gt; experts = ordered.stream()</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            .filter(label -&gt; label.source() == ReviewSource.EXPERT_REVIEW)</span>
+<span class="fc" id="L94">            .toList();</span>
+<span class="fc" id="L95">        boolean fixturePresent = ordered.stream().anyMatch(label -&gt;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            label.source() == ReviewSource.TEST_FIXTURE);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        int relevance = median((experts.isEmpty() ? ordered : experts).stream()</span>
+<span class="fc" id="L98">            .map(ReviewLabel::relevancePermille)</span>
+<span class="fc" id="L99">            .toList());</span>
+<span class="fc" id="L100">        int spread = spread(experts.stream()</span>
+<span class="fc" id="L101">            .map(ReviewLabel::relevancePermille)</span>
+<span class="fc" id="L102">            .toList());</span>
+<span class="fc" id="L103">        int confidence = mean(experts.stream()</span>
+<span class="fc" id="L104">            .map(ReviewLabel::confidencePermille)</span>
+<span class="fc" id="L105">            .toList());</span>
+<span class="fc" id="L106">        int blindExperts = (int) experts.stream().filter(ReviewLabel::blindReview).count();</span>
+<span class="fc" id="L107">        ConsensusStatus status = status(</span>
+<span class="fc" id="L108">            fixturePresent, experts.size(), blindExperts, spread, confidence);</span>
+<span class="fc" id="L109">        return new CandidateConsensus(</span>
+            candidateId,
+            status,
+<span class="fc" id="L112">            experts.size(),</span>
+            blindExperts,
+            relevance,
+            spread,
+            confidence,
+<span class="fc" id="L117">            ordered.stream().map(ReviewLabel::source).distinct().sorted().toList(),</span>
+<span class="fc" id="L118">            ordered.stream().map(ReviewLabel::reviewerHash).distinct().sorted().toList(),</span>
+<span class="fc" id="L119">            ordered.stream().flatMap(label -&gt; label.rationaleCodes().stream())</span>
+<span class="fc" id="L120">                .distinct().sorted().toList());</span>
+    }
+
+    private static ConsensusStatus status(
+        boolean fixturePresent,
+        int expertCount,
+        int blindExpertCount,
+        int spread,
+        int meanConfidence
+    ) {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (fixturePresent) {</span>
+<span class="fc" id="L131">            return ConsensusStatus.DEVELOPMENT_ONLY;</span>
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (expertCount &lt; MIN_EXPERT_REVIEWS) {</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            return expertCount == 0</span>
+<span class="nc" id="L135">                ? ConsensusStatus.DEVELOPMENT_ONLY</span>
+<span class="fc" id="L136">                : ConsensusStatus.INSUFFICIENT_REVIEWS;</span>
+        }
+<span class="pc bpc" id="L138" title="2 of 6 branches missed.">        if (blindExpertCount != expertCount</span>
+                || spread &gt; MAX_CONSENSUS_SPREAD_PERMILLE
+                || meanConfidence &lt; MIN_MEAN_CONFIDENCE_PERMILLE) {
+<span class="fc" id="L141">            return ConsensusStatus.UNCERTAIN;</span>
+        }
+<span class="fc" id="L143">        return ConsensusStatus.CONSENSUS;</span>
+    }
+
+    private static int median(List&lt;Integer&gt; values) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L148">            return 0;</span>
+        }
+<span class="fc" id="L150">        List&lt;Integer&gt; sorted = values.stream().sorted().toList();</span>
+<span class="fc" id="L151">        int middle = sorted.size() / 2;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        return sorted.size() % 2 == 1</span>
+<span class="fc" id="L153">            ? sorted.get(middle)</span>
+<span class="fc" id="L154">            : (sorted.get(middle - 1) + sorted.get(middle)) / 2;</span>
+    }
+
+    private static int spread(List&lt;Integer&gt; values) {
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (values.size() &lt; 2) {</span>
+<span class="fc" id="L159">            return 0;</span>
+        }
+<span class="fc" id="L161">        int minimum = values.stream().mapToInt(Integer::intValue).min().orElse(0);</span>
+<span class="fc" id="L162">        int maximum = values.stream().mapToInt(Integer::intValue).max().orElse(0);</span>
+<span class="fc" id="L163">        return maximum - minimum;</span>
+    }
+
+    private static int mean(List&lt;Integer&gt; values) {
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        return values.isEmpty()</span>
+<span class="fc" id="L168">            ? 0</span>
+<span class="fc" id="L169">            : (int) Math.round(values.stream().mapToInt(Integer::intValue).average().orElse(0));</span>
+    }
+
+    private static String canonicalMaterial(List&lt;CandidateConsensus&gt; candidates) {
+<span class="fc" id="L173">        StringBuilder material = new StringBuilder(SCHEMA)</span>
+<span class="fc" id="L174">            .append(&quot;\nminExpertReviews=&quot;).append(MIN_EXPERT_REVIEWS)</span>
+<span class="fc" id="L175">            .append(&quot;\nmaxSpread=&quot;).append(MAX_CONSENSUS_SPREAD_PERMILLE)</span>
+<span class="fc" id="L176">            .append(&quot;\nminConfidence=&quot;).append(MIN_MEAN_CONFIDENCE_PERMILLE);</span>
+<span class="fc" id="L177">        candidates.forEach(candidate -&gt; material.append(&quot;\ncandidate=&quot;)</span>
+<span class="fc" id="L178">            .append(candidate.canonicalMaterial()));</span>
+<span class="fc" id="L179">        return material.toString();</span>
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L184">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L185">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L186">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L187">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L188">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L192">    public enum ReviewSource {</span>
+<span class="fc" id="L193">        EXPERT_REVIEW,</span>
+<span class="fc" id="L194">        CONTROL_ASSIGNMENT,</span>
+<span class="fc" id="L195">        TEST_FIXTURE</span>
+    }
+
+<span class="fc" id="L198">    public enum ConsensusStatus {</span>
+<span class="fc" id="L199">        CONSENSUS,</span>
+<span class="fc" id="L200">        UNCERTAIN,</span>
+<span class="fc" id="L201">        INSUFFICIENT_REVIEWS,</span>
+<span class="fc" id="L202">        DEVELOPMENT_ONLY</span>
+    }
+
+    public record ReviewLabel(
+        String reviewId,
+        String candidateId,
+        String reviewerHash,
+        ReviewSource source,
+        boolean blindReview,
+        int relevancePermille,
+        int confidencePermille,
+        List&lt;String&gt; rationaleCodes
+    ) {
+<span class="fc" id="L215">        public ReviewLabel {</span>
+<span class="fc" id="L216">            requireText(reviewId, &quot;reviewId&quot;);</span>
+<span class="fc" id="L217">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L218">            requireSha256(reviewerHash, &quot;reviewerHash&quot;);</span>
+<span class="fc" id="L219">            Objects.requireNonNull(source, &quot;source&quot;);</span>
+<span class="fc" id="L220">            requirePermille(relevancePermille, &quot;relevancePermille&quot;);</span>
+<span class="fc" id="L221">            requirePermille(confidencePermille, &quot;confidencePermille&quot;);</span>
+<span class="fc" id="L222">            rationaleCodes = orderedStrings(rationaleCodes);</span>
+<span class="fc" id="L223">        }</span>
+    }
+
+    public record CandidateConsensus(
+        String candidateId,
+        ConsensusStatus status,
+        int countedExpertReviews,
+        int blindExpertReviews,
+        int consensusRelevancePermille,
+        int spreadPermille,
+        int meanConfidencePermille,
+        List&lt;ReviewSource&gt; sources,
+        List&lt;String&gt; reviewerHashes,
+        List&lt;String&gt; rationaleCodes
+    ) {
+<span class="fc" id="L238">        public CandidateConsensus {</span>
+<span class="fc" id="L239">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L240">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L241">            requireNonNegative(countedExpertReviews, &quot;countedExpertReviews&quot;);</span>
+<span class="fc" id="L242">            requireNonNegative(blindExpertReviews, &quot;blindExpertReviews&quot;);</span>
+<span class="fc" id="L243">            requirePermille(consensusRelevancePermille, &quot;consensusRelevancePermille&quot;);</span>
+<span class="fc" id="L244">            requirePermille(spreadPermille, &quot;spreadPermille&quot;);</span>
+<span class="fc" id="L245">            requirePermille(meanConfidencePermille, &quot;meanConfidencePermille&quot;);</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            sources = sources == null</span>
+<span class="nc" id="L247">                ? List.of()</span>
+<span class="fc" id="L248">                : sources.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L249">            reviewerHashes = orderedStrings(reviewerHashes);</span>
+<span class="fc" id="L250">            rationaleCodes = orderedStrings(rationaleCodes);</span>
+<span class="fc" id="L251">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L254">            return candidateId + '|'</span>
+<span class="fc" id="L255">                + status.name() + '|'</span>
+                + countedExpertReviews + '|'
+                + blindExpertReviews + '|'
+                + consensusRelevancePermille + '|'
+                + spreadPermille + '|'
+                + meanConfidencePermille + '|'
+                + sources + '|'
+                + reviewerHashes + '|'
+                + rationaleCodes;
+        }
+    }
+
+    public record ConsensusReport(
+        String schema,
+        List&lt;CandidateConsensus&gt; candidates,
+        String contentHash
+    ) {
+<span class="fc" id="L272">        public ConsensusReport {</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L274">                throw new IllegalArgumentException(&quot;unsupported review-consensus schema&quot;);</span>
+            }
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            candidates = candidates == null</span>
+<span class="nc" id="L277">                ? List.of()</span>
+<span class="fc" id="L278">                : candidates.stream()</span>
+<span class="fc" id="L279">                    .sorted(Comparator.comparing(CandidateConsensus::candidateId))</span>
+<span class="fc" id="L280">                    .toList();</span>
+<span class="fc" id="L281">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L282">        }</span>
+
+        public CandidateConsensus requireCandidate(String candidateId) {
+<span class="fc" id="L285">            return candidates.stream()</span>
+<span class="fc" id="L286">                .filter(candidate -&gt; candidate.candidateId().equals(candidateId))</span>
+<span class="fc" id="L287">                .findFirst()</span>
+<span class="pc" id="L288">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                    &quot;review consensus missing for candidate: &quot; + candidateId));
+        }
+
+        public long count(ConsensusStatus status) {
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            return candidates.stream().filter(candidate -&gt; candidate.status() == status).count();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L297">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L298">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L299">                .property(&quot;minimumExpertReviews&quot;, MIN_EXPERT_REVIEWS)</span>
+<span class="fc" id="L300">                .property(&quot;maximumConsensusSpreadPermille&quot;, MAX_CONSENSUS_SPREAD_PERMILLE)</span>
+<span class="fc" id="L301">                .property(&quot;minimumMeanConfidencePermille&quot;, MIN_MEAN_CONFIDENCE_PERMILLE)</span>
+<span class="fc" id="L302">                .array(&quot;candidates&quot;, array -&gt; candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L303">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L304">                        .property(&quot;candidateId&quot;, candidate.candidateId())</span>
+<span class="fc" id="L305">                        .property(&quot;status&quot;, candidate.status().name())</span>
+<span class="fc" id="L306">                        .property(&quot;countedExpertReviews&quot;, candidate.countedExpertReviews())</span>
+<span class="fc" id="L307">                        .property(&quot;blindExpertReviews&quot;, candidate.blindExpertReviews())</span>
+<span class="fc" id="L308">                        .property(&quot;consensusRelevancePermille&quot;,</span>
+<span class="fc" id="L309">                            candidate.consensusRelevancePermille())</span>
+<span class="fc" id="L310">                        .property(&quot;spreadPermille&quot;, candidate.spreadPermille())</span>
+<span class="fc" id="L311">                        .property(&quot;meanConfidencePermille&quot;,</span>
+<span class="fc" id="L312">                            candidate.meanConfidencePermille())</span>
+<span class="fc" id="L313">                        .stringArray(&quot;sources&quot;, candidate.sources().stream()</span>
+<span class="fc" id="L314">                            .map(Enum::name).toList())</span>
+<span class="fc" id="L315">                        .stringArray(&quot;reviewerHashes&quot;, candidate.reviewerHashes())</span>
+<span class="fc" id="L316">                        .stringArray(&quot;rationaleCodes&quot;, candidate.rationaleCodes()))))</span>
+<span class="fc" id="L317">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L318">                .endObject()</span>
+<span class="fc" id="L319">                .toString();</span>
+        }
+
+        public void write(Path output) {
+            try {
+<span class="fc" id="L324">                Path parent = output.getParent();</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L326">                    Files.createDirectories(parent);</span>
+                }
+<span class="fc" id="L328">                Files.writeString(output, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L329">            } catch (IOException exception) {</span>
+<span class="nc" id="L330">                throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L331">            }</span>
+<span class="fc" id="L332">        }</span>
+    }
+
+    private static List&lt;String&gt; orderedStrings(List&lt;String&gt; values) {
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        return values == null</span>
+<span class="nc" id="L337">            ? List.of()</span>
+<span class="fc" id="L338">            : values.stream()</span>
+<span class="pc bpc" id="L339" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L340">                .distinct()</span>
+<span class="fc" id="L341">                .sorted()</span>
+<span class="fc" id="L342">                .toList();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L346" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L347">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L349">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L352" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L353">            throw new IllegalArgumentException(name + &quot; must be a SHA-256 hash&quot;);</span>
+        }
+<span class="fc" id="L355">    }</span>
+
+    private static void requirePermille(int value, String name) {
+<span class="pc bpc" id="L358" title="2 of 4 branches missed.">        if (value &lt; 0 || value &gt; 1000) {</span>
+<span class="nc" id="L359">            throw new IllegalArgumentException(name + &quot; must be in [0,1000]&quot;);</span>
+        }
+<span class="fc" id="L361">    }</span>
+
+    private static void requireNonNegative(int value, String name) {
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        if (value &lt; 0) {</span>
+<span class="nc" id="L365">            throw new IllegalArgumentException(name + &quot; must be non-negative&quot;);</span>
+        }
+<span class="fc" id="L367">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
