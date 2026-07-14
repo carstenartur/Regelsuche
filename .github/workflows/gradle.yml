@@ -56,14 +56,16 @@ jobs:
     - name: Require hidden-rule pilot evidence after a successful build
       if: success()
       shell: bash
-      run: test -s app/build/reports/hidden-rule-pilot/report.json
+      run: |
+        test -s app/build/reports/hidden-rule-pilot/report.json
+        test -s app/build/reports/hidden-rule-pilot/runtime.json
 
     - name: Upload hidden-rule pilot evidence
       if: always()
       uses: actions/upload-artifact@v7
       with:
         name: hidden-rule-pilot-evidence
-        path: app/build/reports/hidden-rule-pilot/report.json
+        path: app/build/reports/hidden-rule-pilot/**
         if-no-files-found: warn
 
     - name: Require held-out policy evidence after a successful build
@@ -97,7 +99,6 @@ jobs:
         if-no-files-found: warn
 
   dependency-submission:
-
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -111,4 +112,4 @@ jobs:
         distribution: 'temurin'
 
     - name: Generate and submit dependency graph
-      uses: gradle/actions/dependency-submission@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e
+      uses: gradle/actions/dependency-submission@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0

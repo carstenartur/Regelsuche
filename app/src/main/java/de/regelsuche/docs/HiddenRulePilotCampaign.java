@@ -1,6 +1,7 @@
 package de.regelsuche.docs;
 
 import de.regelsuche.docs.HiddenRuleHoldoutPartition.SplitAudit;
+import de.regelsuche.docs.HiddenRulePilotEvaluator.CandidateRelation;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.Evaluation;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.HiddenReference;
 import de.regelsuche.docs.HiddenRulePilotRunner.AblationEvidence;
@@ -17,14 +18,18 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
-/** Runs the post-hoc hidden-rule pilot and emits deterministic raw evidence. */
+/** Runs the post-hoc hidden-rule benchmark and emits deterministic raw evidence. */
 public final class HiddenRulePilotCampaign {
-    public static final String SCHEMA = "regelsuche.hidden-rule-pilot/v1";
+    public static final String SCHEMA = "regelsuche.hidden-rule-benchmark/v2";
+    public static final String RUNTIME_SCHEMA = "regelsuche.hidden-rule-benchmark-runtime/v1";
 
     private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();
     private final HiddenRulePilotEvaluator evaluator = new HiddenRulePilotEvaluator();
@@ -40,14 +45,22 @@ public final class HiddenRulePilotCampaign {
     }
 
     public Path write(Path output, PilotReport report) {
+        return writeText(output, report.toJson());
+    }
+
+    public Path writeRuntime(Path output, PilotReport report) {
+        return writeText(output, report.runtimeJson());
+    }
+
+    private static Path writeText(Path output, String content) {
         Objects.requireNonNull(output, "output");
-        Objects.requireNonNull(report, "report");
+        Objects.requireNonNull(content, "content");
         try {
             Path parent = output.toAbsolutePath().normalize().getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.writeString(output, report.toJson(), StandardCharsets.UTF_8);
+            Files.writeString(output, content, StandardCharsets.UTF_8);
             return output;
         } catch (IOException exception) {
             throw new UncheckedIOException(exception);
@@ -65,7 +78,14 @@ public final class HiddenRulePilotCampaign {
         if (!split.passed()) {
             blockers.add("train/holdout split collision");
         }
-        boolean accepted = evaluation.pilotAccepted() && split.passed();
+        boolean holdoutsComplete = runtime.holdouts().positives().size()
+                == pilotCase.task().positiveHoldouts().size()
+            && runtime.holdouts().negatives().size()
+                == pilotCase.task().negativeHoldouts().size();
+        if (!holdoutsComplete) {
+            blockers.add("holdout evaluation incomplete");
+        }
+        boolean accepted = evaluation.pilotAccepted() && split.passed() && holdoutsComplete;
         return new CaseReport(
             pilotCase.task().opaqueCaseId(),
             evaluation.family(),
@@ -84,7 +104,7 @@ public final class HiddenRulePilotCampaign {
         }
     }
 
-    /** elapsedNanos is intentionally not serialized into the canonical report. */
+    /** elapsedNanos is serialized only into the explicitly non-canonical runtime report. */
     public record CaseReport(
         String opaqueCaseId,
         String family,
@@ -97,6 +117,15 @@ public final class HiddenRulePilotCampaign {
     ) {
         public CaseReport {
             blockers = List.copyOf(blockers);
+        }
+
+        public boolean holdoutsComplete() {
+            return runtime.holdouts().positives().size() == split.positives().size()
+                && runtime.holdouts().negatives().size() == split.negatives().size();
+        }
+
+        public boolean holdoutsPassed() {
+            return holdoutsComplete() && runtime.holdouts().allPassed();
         }
     }
 
@@ -123,6 +152,54 @@ public final class HiddenRulePilotCampaign {
             return (int) cases.stream().map(CaseReport::family).distinct().count();
         }
 
+        public int rediscoveredCases() {
+            return (int) cases.stream()
+                .map(caseReport -> caseReport.evaluation().candidateRelation())
+                .filter(relation -> relation != CandidateRelation.NONE
+                    && relation != CandidateRelation.DIFFERENT)
+                .count();
+        }
+
+        /** Number of adversarial negative holdouts configured in the audited benchmark. */
+        public int negativeHoldouts() {
+            return cases.stream().mapToInt(caseReport -> caseReport.split().negatives().size()).sum();
+        }
+
+        /** Number of negative holdouts actually executed after a candidate was compiled. */
+        public int evaluatedNegativeHoldouts() {
+            return cases.stream()
+                .mapToInt(caseReport -> caseReport.runtime().holdouts().negatives().size())
+                .sum();
+        }
+
+        public int skippedNegativeHoldouts() {
+            return negativeHoldouts() - evaluatedNegativeHoldouts();
+        }
+
+        public int falsePositiveHoldouts() {
+            return (int) cases.stream()
+                .flatMap(caseReport -> caseReport.runtime().holdouts().negatives().stream())
+                .filter(result -> !result.noApplication())
+                .count();
+        }
+
+        public int generatedValidationExamples() {
+            return cases.stream().mapToInt(caseReport ->
+                caseReport.runtime().validationEvidence().generatedValidationExamples()).sum();
+        }
+
+        public int counterexampleSearches() {
+            return cases.stream().mapToInt(caseReport ->
+                caseReport.runtime().validationEvidence().counterexampleSearches().size()).sum();
+        }
+
+        public Map<String, Integer> failureTaxonomy() {
+            Map<String, Integer> failures = new TreeMap<>();
+            cases.stream().flatMap(caseReport -> caseReport.blockers().stream())
+                .forEach(blocker -> failures.merge(blocker, 1, Integer::sum));
+            return Collections.unmodifiableMap(failures);
+        }
+
         public String toJson() {
             JsonWriter json = new JsonWriter().beginObject()
                 .property("schema", schema)
@@ -131,11 +208,49 @@ public final class HiddenRulePilotCampaign {
                     .property("families", familyCount())
                     .property("frozenCandidates", frozenCandidates())
                     .property("materialAblations", materialAblations())
-                    .property("acceptedCases", acceptedCases()))
+                    .property("acceptedCases", acceptedCases())
+                    .property("rediscoveredCases", rediscoveredCases())
+                    .property("rediscoveryRatePermille", permille(rediscoveredCases(), cases.size()))
+                    .property("negativeHoldouts", negativeHoldouts())
+                    .property("evaluatedNegativeHoldouts", evaluatedNegativeHoldouts())
+                    .property("skippedNegativeHoldouts", skippedNegativeHoldouts())
+                    .property("falsePositiveHoldouts", falsePositiveHoldouts())
+                    .property("falsePositiveRatePermille",
+                        permille(falsePositiveHoldouts(), evaluatedNegativeHoldouts()))
+                    .property("generatedValidationExamples", generatedValidationExamples())
+                    .property("counterexampleSearches", counterexampleSearches()))
+                .object("failureTaxonomy", taxonomy ->
+                    failureTaxonomy().forEach(taxonomy::property))
                 .array("cases", array -> cases.forEach(caseReport ->
                     array.objectValue(object -> writeCase(object, caseReport))))
                 .endObject();
             return json.toString();
+        }
+
+        /** Non-canonical wall-clock telemetry; never used for hashes or byte-stability checks. */
+        public String runtimeJson() {
+            long totalElapsedNanos = cases.stream().mapToLong(CaseReport::elapsedNanos).sum();
+            return new JsonWriter().beginObject()
+                .property("schema", RUNTIME_SCHEMA)
+                .property("cases", cases.size())
+                .property("totalElapsedNanos", totalElapsedNanos)
+                .property("generatedValidationExamples", generatedValidationExamples())
+                .property("counterexampleSearches", counterexampleSearches())
+                .array("caseRuntimes", array -> cases.forEach(caseReport ->
+                    array.objectValue(object -> object
+                        .property("opaqueCaseId", caseReport.opaqueCaseId())
+                        .property("elapsedNanos", caseReport.elapsedNanos())
+                        .property("exploredStates",
+                            caseReport.runtime().searchMetrics().exploredStates())
+                        .property("generatedValidationExamples", caseReport.runtime()
+                            .validationEvidence().generatedValidationExamples())
+                        .property("counterexampleSearches", caseReport.runtime()
+                            .validationEvidence().counterexampleSearches().size()))))
+                .endObject().toString();
+        }
+
+        private static int permille(int numerator, int denominator) {
+            return denominator == 0 ? 0 : numerator * 1000 / denominator;
         }
 
         private static void writeCase(JsonWriter json, CaseReport report) {
@@ -149,7 +264,8 @@ public final class HiddenRulePilotCampaign {
                 .property("candidateFrozen", runtime.frozen())
                 .property("validationPassed", evaluation.validationPassed())
                 .property("splitPassed", report.split().passed())
-                .property("holdoutsPassed", runtime.holdouts().allPassed())
+                .property("holdoutsComplete", report.holdoutsComplete())
+                .property("holdoutsPassed", report.holdoutsPassed())
                 .property("materialAblation", evaluation.materialAblation())
                 .property("accepted", report.accepted())
                 .property("pathLength", Math.max(0, runtime.path().size() - 1))

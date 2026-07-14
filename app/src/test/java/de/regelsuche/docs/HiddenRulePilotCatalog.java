@@ -13,7 +13,7 @@ final class HiddenRulePilotCatalog {
 
     static List<PilotCase> cases() {
         Map<String, HiddenReference> references = references();
-        return HiddenRulePilotRuntimeCatalog.tasks().stream()
+        return HiddenRulePilotRuntimeCatalog.benchmarkTasks().stream()
             .map(task -> {
                 HiddenReference reference = references.get(task.opaqueCaseId());
                 if (reference == null) {
@@ -48,6 +48,66 @@ final class HiddenRulePilotCatalog {
             "hidden_quartic_normalization_macro",
             "power-normalization",
             "(A * A) * (A * A)", "A^4"));
+        references.put("case-006", reference(
+            "hidden_left_add_then_multiply_neutral_macro",
+            "neutral-element-simplification",
+            "(0 + A) * 1", "A"));
+        references.put("case-007", reference(
+            "hidden_left_multiply_then_add_neutral_macro",
+            "neutral-element-simplification",
+            "1 * (A + 0)", "A"));
+        references.put("case-008", reference(
+            "hidden_left_multiply_then_outer_add_macro",
+            "neutral-element-simplification",
+            "(1 * A) + 0", "A"));
+        references.put("case-009", reference(
+            "hidden_subtract_then_add_neutral_macro",
+            "neutral-element-simplification",
+            "(A - 0) + 0", "A"));
+        references.put("case-010", reference(
+            "hidden_divide_then_subtract_neutral_macro",
+            "neutral-element-simplification",
+            "(A / 1) - 0", "A"));
+        references.put("case-011", reference(
+            "hidden_left_add_then_divide_neutral_macro",
+            "neutral-element-simplification",
+            "(0 + A) / 1", "A"));
+        references.put("case-012", reference(
+            "hidden_left_multiply_then_subtract_neutral_macro",
+            "neutral-element-simplification",
+            "1 * (A - 0)", "A"));
+        references.put("case-013", reference(
+            "hidden_three_step_right_neutral_macro",
+            "neutral-element-simplification",
+            "((A + 0) - 0) / 1", "A"));
+        references.put("case-014", reference(
+            "hidden_three_step_mixed_neutral_macro",
+            "neutral-element-simplification",
+            "((1 * A) / 1) + 0", "A"));
+        references.put("case-015", reference(
+            "hidden_right_zero_then_add_macro",
+            "zero-annihilation",
+            "(A * 0) + 0", "0"));
+        references.put("case-016", reference(
+            "hidden_left_zero_then_subtract_macro",
+            "zero-annihilation",
+            "(0 * A) - 0", "0"));
+        references.put("case-017", reference(
+            "hidden_right_zero_then_divide_macro",
+            "zero-annihilation",
+            "(A * 0) / 1", "0"));
+        references.put("case-018", reference(
+            "hidden_nested_left_zero_macro",
+            "zero-annihilation",
+            "(1 * 0) * A", "0"));
+        references.put("case-019", reference(
+            "hidden_product_square_power_macro",
+            "power-normalization",
+            "(A * A)^2", "A^4"));
+        references.put("case-020", reference(
+            "hidden_mixed_product_power_macro",
+            "power-normalization",
+            "A^2 * A * A", "A^4"));
         return Map.copyOf(references);
     }
 

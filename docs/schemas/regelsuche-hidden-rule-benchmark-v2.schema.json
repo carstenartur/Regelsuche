@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.hidden-rule-benchmark/v2",
+  "title": "Regelsuche hidden-rule benchmark evidence v2",
+  "type": "object",
+  "required": ["schema", "summary", "failureTaxonomy", "cases"],
+  "properties": {
+    "schema": { "const": "regelsuche.hidden-rule-benchmark/v2" },
+    "summary": {
+      "type": "object",
+      "required": [
+        "cases", "families", "frozenCandidates", "materialAblations", "acceptedCases",
+        "rediscoveredCases", "rediscoveryRatePermille", "negativeHoldouts",
+        "evaluatedNegativeHoldouts", "skippedNegativeHoldouts",
+        "falsePositiveHoldouts", "falsePositiveRatePermille",
+        "generatedValidationExamples", "counterexampleSearches"
+      ],
+      "properties": {
+        "cases": { "$ref": "#/$defs/nonNegativeInteger" },
+        "families": { "$ref": "#/$defs/nonNegativeInteger" },
+        "frozenCandidates": { "$ref": "#/$defs/nonNegativeInteger" },
+        "materialAblations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "acceptedCases": { "$ref": "#/$defs/nonNegativeInteger" },
+        "rediscoveredCases": { "$ref": "#/$defs/nonNegativeInteger" },
+        "rediscoveryRatePermille": { "$ref": "#/$defs/permille" },
+        "negativeHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "evaluatedNegativeHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "skippedNegativeHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "falsePositiveHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "falsePositiveRatePermille": { "$ref": "#/$defs/permille" },
+        "generatedValidationExamples": { "$ref": "#/$defs/nonNegativeInteger" },
+        "counterexampleSearches": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "failureTaxonomy": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/nonNegativeInteger" }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 20,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "required": [
+        "opaqueCaseId", "family", "runtimeStatus", "searchStatus", "candidateRelation",
+        "candidateFrozen", "validationPassed", "splitPassed", "holdoutsComplete",
+        "holdoutsPassed", "materialAblation", "accepted", "pathLength", "primitiveRuleIds",
+        "assumptions", "stageEvidence", "blockers", "metrics", "split", "candidate",
+        "validation", "holdouts", "leakageViolations"
+      ],
+      "properties": {
+        "opaqueCaseId": { "type": "string", "minLength": 1 },
+        "family": { "type": "string", "minLength": 1 },
+        "runtimeStatus": {
+          "enum": ["SEARCH_FAILED", "LEARNING_REJECTED", "COMPILATION_REJECTED", "VALIDATION_FAILED", "HOLDOUT_FAILED", "CANDIDATE_FROZEN"]
+        },
+        "searchStatus": {
+          "enum": ["UNTARGETED", "ROOT_ALREADY_TARGET", "REACHED", "STATE_BUDGET", "DEPTH_BUDGET", "CANDIDATE_BUDGET", "NO_TRANSFORMATIONS", "FRONTIER_EXHAUSTED", "UNPARSEABLE_TARGET"]
+        },
+        "candidateRelation": {
+          "enum": ["NONE", "EXACT", "ALPHA_EQUIVALENT", "SEMANTICALLY_EQUIVALENT", "STRONGER", "WEAKER", "DIFFERENT"]
+        },
+        "candidateFrozen": { "type": "boolean" },
+        "validationPassed": { "type": "boolean" },
+        "splitPassed": { "type": "boolean" },
+        "holdoutsComplete": { "type": "boolean" },
+        "holdoutsPassed": { "type": "boolean" },
+        "materialAblation": { "type": "boolean" },
+        "accepted": { "type": "boolean" },
+        "pathLength": { "$ref": "#/$defs/nonNegativeInteger" },
+        "primitiveRuleIds": { "$ref": "#/$defs/stringArray" },
+        "assumptions": { "$ref": "#/$defs/stringArray" },
+        "stageEvidence": { "$ref": "#/$defs/stringArray" },
+        "blockers": { "$ref": "#/$defs/stringArray" },
+        "metrics": { "$ref": "#/$defs/metrics" },
+        "split": { "$ref": "#/$defs/split" },
+        "candidate": { "$ref": "#/$defs/candidate" },
+        "validation": { "$ref": "#/$defs/validation" },
+        "holdouts": { "$ref": "#/$defs/holdouts" },
+        "leakageViolations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/leakage" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "metrics": {
+      "type": "object",
+      "required": [
+        "exploredStates", "expandedStates", "generatedTransformations", "enqueuedStates",
+        "duplicatePrunes", "transpositionPrunes", "depthPrunes", "candidateBudgetPrunes",
+        "identityCacheHits", "identityCacheMisses", "internedValues"
+      ],
+      "additionalProperties": { "$ref": "#/$defs/nonNegativeInteger" }
+    },
+    "split": {
+      "type": "object",
+      "required": ["training", "positives", "negatives", "collisions"],
+      "properties": {
+        "training": { "$ref": "#/$defs/fingerprint" },
+        "positives": { "type": "array", "items": { "$ref": "#/$defs/identifiedFingerprint" } },
+        "negatives": { "type": "array", "items": { "$ref": "#/$defs/identifiedFingerprint" } },
+        "collisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "holdoutId", "fingerprint"],
+            "properties": {
+              "kind": { "type": "string" },
+              "holdoutId": { "type": "string" },
+              "fingerprint": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "fingerprint": {
+      "type": "object",
+      "required": ["valueFingerprint", "alphaFingerprint"],
+      "properties": {
+        "valueFingerprint": { "type": "string", "minLength": 1 },
+        "alphaFingerprint": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "identifiedFingerprint": {
+      "type": "object",
+      "required": ["id", "valueFingerprint", "alphaFingerprint"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "valueFingerprint": { "type": "string", "minLength": 1 },
+        "alphaFingerprint": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "candidate": {
+      "type": "object",
+      "required": ["present"],
+      "properties": {
+        "present": { "type": "boolean" },
+        "leftPattern": { "type": "string" },
+        "rightPattern": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "dynamicRuleId": { "type": "string" },
+        "provenanceHash": { "type": "string" },
+        "assumptions": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "validation": {
+      "type": "object",
+      "required": [
+        "proofStatus", "generatedValidationExamples", "failedValidationExamples",
+        "passed", "counterexampleSearches"
+      ],
+      "properties": {
+        "proofStatus": {
+          "enum": ["NONE", "REJECTED", "OBSERVED", "VALIDATED_BY_EXAMPLES", "SYMBOLICALLY_VERIFIED", "FORMALLY_PROVABLE", "FORMALLY_PROVED"]
+        },
+        "generatedValidationExamples": { "$ref": "#/$defs/nonNegativeInteger" },
+        "failedValidationExamples": { "$ref": "#/$defs/nonNegativeInteger" },
+        "passed": { "type": "boolean" },
+        "counterexampleSearches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/counterexampleSearch" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "counterexampleSearch": {
+      "type": "object",
+      "required": ["status", "counterexamplePresent", "attemptedSources", "explanation"],
+      "properties": {
+        "status": { "enum": ["NO_COUNTEREXAMPLE_FOUND", "COUNTEREXAMPLE_FOUND", "INCONCLUSIVE"] },
+        "counterexamplePresent": { "type": "boolean" },
+        "attemptedSources": { "$ref": "#/$defs/stringArray" },
+        "explanation": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "holdouts": {
+      "type": "object",
+      "required": ["positives", "negatives"],
+      "properties": {
+        "positives": { "type": "array", "items": { "$ref": "#/$defs/positiveHoldout" } },
+        "negatives": { "type": "array", "items": { "$ref": "#/$defs/negativeHoldout" } }
+      },
+      "additionalProperties": false
+    },
+    "positiveHoldout": {
+      "type": "object",
+      "required": ["id", "directApplicationEquivalent", "baselineReached", "candidateReached", "ablation"],
+      "properties": {
+        "id": { "type": "string" },
+        "directApplicationEquivalent": { "type": "boolean" },
+        "baselineReached": { "type": "boolean" },
+        "candidateReached": { "type": "boolean" },
+        "ablation": {
+          "type": "object",
+          "required": ["baselineReached", "candidateReached", "baselineExploredStates", "candidateExploredStates", "baselineDepth", "candidateDepth", "stateReduction", "materialBenefit"],
+          "properties": {
+            "baselineReached": { "type": "boolean" },
+            "candidateReached": { "type": "boolean" },
+            "baselineExploredStates": { "$ref": "#/$defs/nonNegativeInteger" },
+            "candidateExploredStates": { "$ref": "#/$defs/nonNegativeInteger" },
+            "baselineDepth": { "type": "integer", "minimum": -1 },
+            "candidateDepth": { "type": "integer", "minimum": -1 },
+            "stateReduction": { "type": "number" },
+            "materialBenefit": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "negativeHoldout": {
+      "type": "object",
+      "required": ["id", "noApplication", "candidateCount"],
+      "properties": {
+        "id": { "type": "string" },
+        "noApplication": { "type": "boolean" },
+        "candidateCount": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "leakage": {
+      "type": "object",
+      "required": ["location", "fingerprint"],
+      "properties": {
+        "location": { "type": "string" },
+        "fingerprint": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "stringArray": { "type": "array", "items": { "type": "string" } },
+    "permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}
