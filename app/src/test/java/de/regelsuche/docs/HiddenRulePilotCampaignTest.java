@@ -30,7 +30,7 @@ class HiddenRulePilotCampaignTest {
 
         assertEquals(HiddenRulePilotCampaign.SCHEMA, report.schema());
         assertEquals(20, report.cases().size());
-        assertTrue(report.familyCount() >= 3);
+        assertTrue(report.familyCount() >= 4);
         assertEquals(40, report.negativeHoldouts());
         assertTrue(report.generatedValidationExamples() > 0);
         assertTrue(report.counterexampleSearches() > 0);
