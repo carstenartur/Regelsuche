@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.interestingness-assessment/v1",
+  "title": "Regelsuche evidence-aware interestingness assessment v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "candidateId",
+    "profile",
+    "profileSchema",
+    "eligibility",
+    "proofStatus",
+    "counterexampleStatus",
+    "projectNoveltyStatus",
+    "externalNoveltyStatus",
+    "publicEvidenceStatus",
+    "knownRuleSimilarityPermille",
+    "evidenceCompletenessPermille",
+    "evidence",
+    "contributions",
+    "penalties",
+    "totalPermille",
+    "hardBlockers",
+    "warnings",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.interestingness-assessment/v1" },
+    "candidateId": { "$ref": "#/$defs/nonBlank" },
+    "profile": {
+      "enum": ["THEORY_DISCOVERY", "SEARCH_REUSE"]
+    },
+    "profileSchema": { "const": "regelsuche.interestingness-profile/v1" },
+    "eligibility": {
+      "enum": ["RANKABLE_COMPLETE", "RANKABLE_INCOMPLETE", "BLOCKED"]
+    },
+    "proofStatus": {
+      "enum": [
+        "REJECTED",
+        "OBSERVED",
+        "VALIDATED_BY_EXAMPLES",
+        "SYMBOLICALLY_VERIFIED",
+        "FORMALLY_PROVABLE",
+        "FORMALLY_PROVED"
+      ]
+    },
+    "counterexampleStatus": {
+      "enum": ["COUNTEREXAMPLE_FOUND", "NO_COUNTEREXAMPLE_FOUND", "INCONCLUSIVE"]
+    },
+    "projectNoveltyStatus": {
+      "enum": ["NOVEL_WITHIN_PROJECT", "DUPLICATE", "ALPHA_EQUIVALENT", "UNKNOWN"]
+    },
+    "externalNoveltyStatus": { "$ref": "#/$defs/nonBlank" },
+    "publicEvidenceStatus": { "$ref": "#/$defs/nonBlank" },
+    "knownRuleSimilarityPermille": { "$ref": "#/$defs/permille" },
+    "evidenceCompletenessPermille": { "$ref": "#/$defs/permille" },
+    "evidence": { "$ref": "#/$defs/evidence" },
+    "contributions": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/contribution" }
+    },
+    "penalties": {
+      "type": "object",
+      "required": ["unresolvedRiskPermille", "controlPermille"],
+      "properties": {
+        "unresolvedRiskPermille": { "$ref": "#/$defs/permille" },
+        "controlPermille": { "$ref": "#/$defs/permille" }
+      },
+      "additionalProperties": false
+    },
+    "totalPermille": {
+      "type": "integer",
+      "minimum": -1000,
+      "maximum": 1000
+    },
+    "hardBlockers": { "$ref": "#/$defs/stringArray" },
+    "warnings": { "$ref": "#/$defs/stringArray" },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": [
+        "evidenceId",
+        "configuredPositiveChecks",
+        "executedPositiveChecks",
+        "skippedPositiveChecks",
+        "failedPositiveChecks",
+        "configuredNegativeChecks",
+        "executedNegativeChecks",
+        "skippedNegativeChecks",
+        "failedNegativeChecks",
+        "counterexampleSourcesAttempted",
+        "oracleDisagreed",
+        "contributingFamilies",
+        "heldOutTransferRequired",
+        "heldOutFamiliesConfigured",
+        "heldOutFamiliesPassed",
+        "pairedUtilityEvaluated",
+        "pairedUtilityPermille",
+        "controlClassification"
+      ],
+      "properties": {
+        "evidenceId": { "$ref": "#/$defs/nonBlank" },
+        "configuredPositiveChecks": { "$ref": "#/$defs/nonNegative" },
+        "executedPositiveChecks": { "$ref": "#/$defs/nonNegative" },
+        "skippedPositiveChecks": { "$ref": "#/$defs/nonNegative" },
+        "failedPositiveChecks": { "$ref": "#/$defs/nonNegative" },
+        "configuredNegativeChecks": { "$ref": "#/$defs/nonNegative" },
+        "executedNegativeChecks": { "$ref": "#/$defs/nonNegative" },
+        "skippedNegativeChecks": { "$ref": "#/$defs/nonNegative" },
+        "failedNegativeChecks": { "$ref": "#/$defs/nonNegative" },
+        "counterexampleSourcesAttempted": { "$ref": "#/$defs/nonNegative" },
+        "oracleDisagreed": { "type": "boolean" },
+        "contributingFamilies": { "$ref": "#/$defs/nonNegative" },
+        "heldOutTransferRequired": { "type": "boolean" },
+        "heldOutFamiliesConfigured": { "$ref": "#/$defs/nonNegative" },
+        "heldOutFamiliesPassed": { "$ref": "#/$defs/nonNegative" },
+        "pairedUtilityEvaluated": { "type": "boolean" },
+        "pairedUtilityPermille": { "$ref": "#/$defs/permille" },
+        "controlClassification": {
+          "enum": ["NONE", "ALPHA_RENAMING_ONLY", "FORMAT_ONLY", "GENERIC_NORMALIZATION"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "contribution": {
+      "type": "object",
+      "required": ["name", "rawPermille", "weightPermille", "weightedPermille"],
+      "properties": {
+        "name": {
+          "enum": [
+            "compression",
+            "generalization",
+            "independentEvidence",
+            "reusability",
+            "structuralSurprise",
+            "crossFamilyTransfer",
+            "assumptionSimplicity",
+            "pairedUtility"
+          ]
+        },
+        "rawPermille": { "$ref": "#/$defs/permille" },
+        "weightPermille": { "$ref": "#/$defs/permille" },
+        "weightedPermille": { "$ref": "#/$defs/permille" }
+      },
+      "additionalProperties": false
+    },
+    "permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "nonNegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
