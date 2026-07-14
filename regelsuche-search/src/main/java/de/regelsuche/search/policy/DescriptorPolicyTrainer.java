@@ -172,7 +172,8 @@ public final class DescriptorPolicyTrainer {
                 TreeSet<String> names = new TreeSet<>(winnerFeatures.keySet());
                 names.addAll(alternativeFeatures.keySet());
                 for (String name : names) {
-                    if (!DescriptorSearchPolicy.pairwiseContextFeature(name)) {
+                    if (!DescriptorSearchPolicy.pairwiseContextFeature(name)
+                            || DescriptorSearchPolicy.PAIRWISE_TARGET_REACHED.equals(name)) {
                         continue;
                     }
                     int winnerValue = winnerFeatures.getOrDefault(name, 0);
@@ -198,6 +199,9 @@ public final class DescriptorPolicyTrainer {
             .filter(record -> !record.selectedPath())
             .filter(record -> record.transformationDescriptor().available())
             .toList();
+        if (alternatives.isEmpty()) {
+            return;
+        }
         for (SearchTrajectoryRecord winner : records) {
             TransformationDescriptor descriptor = winner.transformationDescriptor();
             if (!winner.decision() || !winner.selectedPath() || !winner.eventualSuccess()
