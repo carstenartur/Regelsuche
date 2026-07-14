@@ -13,7 +13,7 @@ import java.util.Objects;
 
 /** Rule-ID-independent, explainable ranking for already-applicable transformations. */
 public final class DescriptorSearchPolicy implements SearchPolicy {
-    private static final String PAIRWISE_TARGET_REACHED = "pairwise.targetReached";
+    static final String PAIRWISE_TARGET_REACHED = "pairwise.targetReached";
     private static final int TARGET_DISTANCE_WEIGHT = 20;
     private static final int UNKNOWN_DESCRIPTOR_PENALTY = 2_000;
 
