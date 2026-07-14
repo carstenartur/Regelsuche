@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 
 class HiddenRulePilotCampaignTest {
     @Test
-    void emitsStableFiveCaseEvidenceWithoutHiddenIdsOrWallClockTime() {
+    void emitsStableTwentyCaseEvidenceWithAggregateRatesAndFailureTaxonomy() {
         HiddenRulePilotCampaign campaign = new HiddenRulePilotCampaign();
         HiddenRulePilotCampaign.PilotReport report = HiddenRulePilotTestEvidence.report();
         String json = report.toJson();
@@ -25,38 +25,33 @@ class HiddenRulePilotCampaignTest {
         campaign.write(output, report);
 
         assertEquals(HiddenRulePilotCampaign.SCHEMA, report.schema());
-        assertEquals(5, report.cases().size());
-        assertEquals(3, report.familyCount());
-        assertEquals(5, report.frozenCandidates());
-        assertEquals(5, report.materialAblations());
-        assertEquals(5, report.acceptedCases());
-        assertTrue(report.cases().stream()
-            .allMatch(caseReport -> caseReport.evaluation().validationPassed()));
-        assertTrue(report.cases().stream()
-            .allMatch(caseReport -> caseReport.runtime()
-                .validationEvidence().generatedValidationExamples() > 0));
-        assertTrue(report.cases().stream()
-            .allMatch(caseReport -> caseReport.runtime()
-                .validationEvidence().failedValidationExamples() == 0));
-        assertTrue(report.cases().stream()
-            .flatMap(caseReport -> caseReport.runtime()
-                .validationEvidence().counterexampleSearches().stream())
-            .noneMatch(search -> search.counterexamplePresent()
-                || search.status().equals("COUNTEREXAMPLE_FOUND")));
+        assertEquals(20, report.cases().size());
+        assertTrue(report.familyCount() >= 3);
+        assertEquals(40, report.negativeHoldouts());
+        assertTrue(report.frozenCandidates() >= 1);
+        assertTrue(report.rediscoveredCases() >= 1);
+        assertTrue(report.acceptedCases() >= 1);
+        assertTrue(report.rediscoveredCases() <= report.cases().size());
+        assertTrue(report.falsePositiveHoldouts() <= report.negativeHoldouts());
+        assertTrue(report.cases().stream().allMatch(caseReport -> caseReport.split().passed()),
+            report.cases().stream()
+                .filter(caseReport -> !caseReport.split().passed())
+                .map(caseReport -> caseReport.opaqueCaseId() + ":" + caseReport.split().collisions())
+                .toList().toString());
         assertEquals(json, report.toJson());
         assertTrue(Files.isRegularFile(output));
-        assertTrue(json.contains("\"schema\":\"regelsuche.hidden-rule-pilot/v1\""));
-        assertTrue(json.contains("\"validationPassed\":true"));
-        assertTrue(json.contains("\"proofStatus\":\"SYMBOLICALLY_VERIFIED\""));
-        assertTrue(json.contains("\"splitPassed\":true"));
-        assertTrue(json.contains("\"materialBenefit\":true"));
-        assertTrue(json.indexOf("case-001") < json.indexOf("case-005"));
+        assertTrue(json.contains("\"schema\":\"regelsuche.hidden-rule-benchmark/v2\""));
+        assertTrue(json.contains("\"rediscoveryRatePermille\""));
+        assertTrue(json.contains("\"falsePositiveRatePermille\""));
+        assertTrue(json.contains("\"failureTaxonomy\""));
+        assertTrue(json.indexOf("case-001") < json.indexOf("case-020"));
         assertFalse(json.contains("hidden_"));
         assertFalse(json.contains("elapsedNanos"));
     }
 
     @Test
     void productionRuntimeContainsNoHiddenManifestIdentifiersOrTemplates() {
+        assertEquals(20, HiddenRulePilotCatalog.references().size());
         String runtimeSurface = productionRuntimeSurface();
         for (HiddenReference reference : HiddenRulePilotCatalog.references().values()) {
             List<String> forbidden = new ArrayList<>(reference.forbiddenRuntimeTokens());
@@ -69,7 +64,7 @@ class HiddenRulePilotCampaignTest {
                     continue;
                 }
                 assertFalse(runtimeSurface.contains(compactToken),
-                    () -> "hidden manifest token is reachable from pilot runtime: "
+                    () -> "hidden manifest token is reachable from benchmark runtime: "
                         + Integer.toHexString(compactToken.hashCode()));
             }
         }
