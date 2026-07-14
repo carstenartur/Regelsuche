@@ -25,8 +25,10 @@ class OpenTargetConjectureMinerTest {
 
     @Test
     void minesParameterizedConjectureFromRealUntargetedAlphaDistinctConvergence() {
-        var variable = convergentObservation("obs-variable", "neutral-chain", "x");
-        var product = convergentObservation("obs-product", "neutral-chain", "a * b");
+        var variable = factoringObservation(
+            "obs-variable", "factor-common", "x", "y", "z");
+        var product = factoringObservation(
+            "obs-product", "factor-common", "a * b", "c", "d");
 
         var report = miner.mine(List.of(variable, product));
         var reversed = miner.mine(List.of(product, variable));
@@ -39,10 +41,12 @@ class OpenTargetConjectureMinerTest {
         assertEquals(2, conjecture.supportCount());
         assertEquals(2, conjecture.distinctAlphaSupport());
         assertEquals(List.of("obs-product", "obs-variable"), conjecture.supportingObservationIds());
-        assertEquals(List.of("neutral-chain"), conjecture.postHocFamilies());
+        assertEquals(List.of("factor-common"), conjecture.postHocFamilies());
         assertNotEquals(conjecture.leftPattern(), conjecture.rightPattern());
-        assertTrue(conjecture.leftPattern().contains("0"), conjecture.leftPattern());
-        assertFalse(conjecture.rightPattern().isBlank());
+        assertTrue(conjecture.leftPattern().contains("+"), conjecture.leftPattern());
+        assertTrue(conjecture.leftPattern().contains("*"), conjecture.leftPattern());
+        assertTrue(conjecture.rightPattern().contains("+"), conjecture.rightPattern());
+        assertTrue(conjecture.rightPattern().contains("*"), conjecture.rightPattern());
         assertEquals("OBSERVED_CONJECTURE", conjecture.candidateStatus());
         assertEquals("EQUIVALENCE_PRESERVING_CONVERGENT_PATHS", conjecture.evidenceStatus());
         assertTrue(conjecture.evidence().stream().allMatch(item ->
@@ -54,10 +58,10 @@ class OpenTargetConjectureMinerTest {
 
     @Test
     void rejectsSupportThatDiffersOnlyByAlphaRenaming() {
-        var x = convergentObservation("obs-x", "neutral-chain", "x");
-        var y = convergentObservation("obs-y", "neutral-chain", "y");
+        var first = factoringObservation("obs-first", "factor-common", "x", "y", "z");
+        var renamed = factoringObservation("obs-renamed", "factor-common", "a", "b", "c");
 
-        var report = miner.mine(List.of(x, y));
+        var report = miner.mine(List.of(first, renamed));
 
         assertTrue(report.conjectures().isEmpty());
         assertTrue(report.rejectedClusters().stream().anyMatch(rejected ->
@@ -69,16 +73,17 @@ class OpenTargetConjectureMinerTest {
 
     @Test
     void rejectsObservationWithoutIndependentConvergentPaths() {
-        String root = "(x + 0) + 0";
+        String root = "x * y + x * z";
+        String output = "x * (y + z)";
         TransformationEngine engine = expression -> expression.equals(root)
-            ? List.of(step("open_target_single", "x", expression))
+            ? List.of(step("open_target_single", output, expression))
             : List.of();
         SearchProblem problem = problem(root, engine);
         var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
         assertEquals(GoalStatus.UNTARGETED, result.status());
 
         var report = miner.mine(List.of(OpenTargetConjectureMiner.OpenTargetObservation.from(
-            "obs-single", "neutral-chain", root, result)));
+            "obs-single", "factor-common", root, result)));
 
         assertTrue(report.conjectures().isEmpty());
         assertEquals("no-independent-equivalence-preserving-convergence",
@@ -92,33 +97,32 @@ class OpenTargetConjectureMinerTest {
                 "obs-targeted", "post-hoc-family", "x", GoalStatus.REACHED, List.of()));
     }
 
-    private OpenTargetConjectureMiner.OpenTargetObservation convergentObservation(
+    private OpenTargetConjectureMiner.OpenTargetObservation factoringObservation(
         String observationId,
         String family,
-        String base
+        String commonFactor,
+        String leftTerm,
+        String rightTerm
     ) {
-        String wrapped = base.contains(" ") ? "(" + base + ")" : base;
-        String root = "(" + wrapped + " + 0) + 0";
-        String rightBranch = wrapped + " + 0";
-        String leftBranch = "0 + " + wrapped;
+        String factor = commonFactor.contains(" ") ? "(" + commonFactor + ")" : commonFactor;
+        String root = factor + " * " + leftTerm + " + " + factor + " * " + rightTerm;
+        String output = factor + " * (" + leftTerm + " + " + rightTerm + ")";
+        String padded = "(" + output + ") + 0";
         TransformationEngine engine = expression -> {
             if (expression.equals(root)) {
                 return List.of(
-                    step("open_target_branch_right", rightBranch, expression),
-                    step("open_target_branch_left", leftBranch, expression));
+                    step("open_target_factor_direct", output, expression),
+                    step("open_target_factor_padded", padded, expression));
             }
-            if (expression.equals(rightBranch)) {
-                return List.of(step("open_target_finish_right", base, expression));
-            }
-            if (expression.equals(leftBranch)) {
-                return List.of(step("open_target_finish_left", base, expression));
+            if (expression.equals(padded)) {
+                return List.of(step("open_target_remove_padding", output, expression));
             }
             return List.of();
         };
         SearchProblem problem = problem(root, engine);
         var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
         assertEquals(GoalStatus.UNTARGETED, result.status());
-        assertTrue(result.states().stream().anyMatch(state -> state.expression().equals(base)));
+        assertTrue(result.states().stream().anyMatch(state -> state.expression().equals(output)));
         return OpenTargetConjectureMiner.OpenTargetObservation.from(
             observationId, family, root, result);
     }
