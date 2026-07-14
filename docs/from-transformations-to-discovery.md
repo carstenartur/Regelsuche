@@ -36,15 +36,15 @@ Interessantheit und Suchnutzen bleiben dabei getrennte Eigenschaften.
 
 ```mermaid
 flowchart LR
-    A[Seeds oder Generatoren] --> B[TransformationEngine\nlegale atomare Züge]
-    B --> C[Search\nPfade und Alternativen]
-    C --> D[Trajektorien\nEntscheidungen, Annahmen, Pruning]
-    D --> E[Mining und Anti-Unifikation\nMuster aus mehreren Pfaden]
-    E --> F[HypothesisCandidate\nRegel, Strategie oder Randbedingung]
-    F --> G[Fresh Holdouts und\nCounterexample Search]
-    G --> H[Symbolische oder\nformale Prüfung]
-    H --> I[Promotion mit Provenance\nReusableRule oder Makro]
-    I --> J[Gepaarte Wiederholungsmessung\nNutzen auf ungesehenen Aufgaben]
+    A[Seeds oder Generatoren] --> B[TransformationEngine<br/>legale atomare Züge]
+    B --> C[Search<br/>Pfade und Alternativen]
+    C --> D[Trajektorien<br/>Entscheidungen, Annahmen, Pruning]
+    D --> E[Mining und Anti-Unifikation<br/>Muster aus mehreren Pfaden]
+    E --> F[HypothesisCandidate<br/>Regel, Strategie oder Randbedingung]
+    F --> G[Fresh Holdouts und<br/>Counterexample Search]
+    G --> H[Symbolische oder<br/>formale Prüfung]
+    H --> I[Promotion mit Provenance<br/>ReusableRule oder Makro]
+    I --> J[Gepaarte Wiederholungsmessung<br/>Nutzen auf ungesehenen Aufgaben]
     J --> B
 ```
 
