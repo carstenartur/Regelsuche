@@ -3,19 +3,14 @@ package de.regelsuche.docs;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.HypothesisCandidate;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
-import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
 import de.regelsuche.mining.OpenTargetConjectureMiner.ConvergenceEvidence;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
 import de.regelsuche.mining.OpenTargetConjectureMiner.PathEvidence;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyMatch;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
-import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.proof.ProofPolicy;
-import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
-import de.regelsuche.validation.CandidateProofStatus;
-import de.regelsuche.validation.CounterexampleSearchService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -46,7 +41,7 @@ final class OpenTargetPromotionGate {
         ProofReport proof = input.proof();
         HypothesisCandidate hypothesis = input.hypothesis();
 
-        List<String> coreBlockers = coreBlockers(
+        List<String> coreBlockers = OpenTargetPromotionEvidenceValidator.validate(
             conjecture, evaluation, novelty, proof, hypothesis);
         List<String> assumptions = assumptions(conjecture);
         List<String> rulePath = representativeRulePath(conjecture);
@@ -126,110 +121,6 @@ final class OpenTargetPromotionGate {
             orderedBlockers,
             publicDecision,
             evidenceHash);
-    }
-
-    private static List<String> coreBlockers(
-        OpenTargetConjecture conjecture,
-        EvaluationReport evaluation,
-        NoveltyReport novelty,
-        ProofReport proof,
-        HypothesisCandidate hypothesis
-    ) {
-        List<String> blockers = new ArrayList<>();
-        String candidateId = conjecture.conjectureId();
-        if (!candidateId.equals(evaluation.conjectureId())) {
-            blockers.add("evaluation-provenance-mismatch");
-        }
-        if (!candidateId.equals(novelty.conjectureId())) {
-            blockers.add("novelty-provenance-mismatch");
-        }
-        if (!candidateId.equals(proof.conjectureId())) {
-            blockers.add("proof-provenance-mismatch");
-        }
-        if (!candidateId.equals(hypothesis.id())) {
-            blockers.add("hypothesis-provenance-mismatch");
-        }
-
-        if (!"OBSERVED_CONJECTURE".equals(conjecture.candidateStatus())
-                || !"EQUIVALENCE_PRESERVING_CONVERGENT_PATHS".equals(
-                    conjecture.evidenceStatus())
-                || conjecture.supportCount() < 2
-                || conjecture.distinctAlphaSupport() < 2
-                || conjecture.evidence().size() != conjecture.supportCount()) {
-            blockers.add("open-target-support-incomplete");
-        }
-        if (conjecture.evidence().stream()
-                .anyMatch(item -> item.searchStatus() != GoalStatus.UNTARGETED)) {
-            blockers.add("targeted-evidence-present");
-        }
-        TreeSet<String> evidenceIds = conjecture.evidence().stream()
-            .map(ConvergenceEvidence::observationId)
-            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
-        TreeSet<String> declaredIds = new TreeSet<>(conjecture.supportingObservationIds());
-        long alphaSupport = conjecture.evidence().stream()
-            .map(ConvergenceEvidence::alphaPairFingerprint)
-            .distinct()
-            .count();
-        if (evidenceIds.size() != conjecture.supportCount()
-                || !evidenceIds.equals(declaredIds)
-                || alphaSupport != conjecture.distinctAlphaSupport()) {
-            blockers.add("open-target-support-metadata-inconsistent");
-        }
-
-        if (evaluation.status() != EvaluationStatus.ACCEPTED_FOR_PROOF
-                || !evaluation.acceptedForProof()
-                || !evaluation.holdoutsComplete()
-                || !evaluation.allHoldoutsPassed()
-                || evaluation.configuredPositiveHoldouts() < 1
-                || evaluation.configuredNegativeHoldouts() < 1
-                || !evaluation.blockers().isEmpty()) {
-            blockers.add("candidate-evaluation-not-accepted");
-        }
-        if (!"COMPILED".equals(evaluation.compilationStatus())
-                || evaluation.dynamicRuleId().isBlank()
-                || evaluation.provenanceHash().isBlank()) {
-            blockers.add("compiled-operator-provenance-missing");
-        }
-        if (!CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND.name().equals(
-                evaluation.counterexample().status())
-                || evaluation.counterexample().attemptedSources().isEmpty()
-                || !evaluation.counterexample().inferredAssumptions().isEmpty()
-                || !evaluation.counterexample().assignments().isEmpty()) {
-            blockers.add("counterexample-evidence-not-cleared");
-        }
-
-        if (!conjecture.leftPattern().equals(hypothesis.leftPattern())
-                || !conjecture.rightPattern().equals(hypothesis.rightPattern())
-                || !hypothesis.proofStatus().atLeast(CandidateProofStatus.VALIDATED_BY_EXAMPLES)
-                || hypothesis.counterexampleSearchStatus()
-                    != CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND
-                || !Boolean.FALSE.equals(hypothesis.counterexampleStatus())
-                || hypothesis.supportingPaths().isEmpty()
-                || hypothesis.supportingExpressions().size() != conjecture.supportCount()) {
-            blockers.add("hypothesis-lifecycle-evidence-incomplete");
-        }
-
-        if (proof.eligibility() != EligibilityStatus.ELIGIBLE
-                || !proof.proofObligationEmitted()
-                || proof.obligation() == null) {
-            blockers.add("proof-obligation-ineligible");
-        } else if (!candidateId.equals(proof.obligation().conjectureId())
-                || proof.obligation().targetProvided()
-                || !conjecture.leftPattern().equals(proof.obligation().leftExpression())
-                || !conjecture.rightPattern().equals(proof.obligation().rightExpression())
-                || !assumptions(conjecture).equals(proof.obligation().assumptions())) {
-            blockers.add("proof-obligation-provenance-mismatch");
-        }
-
-        if (novelty.status()
-                == de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus
-                    .NOVEL_WITHIN_PROJECT
-                && (!novelty.matches().isEmpty()
-                    || novelty.exactSignatureHash().isBlank()
-                    || novelty.alphaSignatureHash().isBlank())) {
-            blockers.add("novelty-evidence-inconsistent");
-        }
-        return List.copyOf(blockers);
     }
 
     private static PromotionStage finalStage(
