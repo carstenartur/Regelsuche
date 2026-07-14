@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.open-target-promotion-gate/v1",
+  "title": "Regelsuche open-target promotion gate decision v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "candidateId",
+    "promotionStage",
+    "promotionEligible",
+    "publicNoveltyStatus",
+    "projectNoveltyStatus",
+    "externalNoveltyStatus",
+    "symbolicProofStatus",
+    "formalProofStatus",
+    "interestingnessStatus",
+    "proofPolicy",
+    "proverExecutionStatus",
+    "provenance",
+    "ablation",
+    "promotionBlockers",
+    "publicEvidence",
+    "evidenceHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.open-target-promotion-gate/v1" },
+    "candidateId": { "$ref": "#/$defs/nonBlankString" },
+    "promotionStage": {
+      "enum": ["OBSERVED", "CANDIDATE", "VALIDATED", "PROMOTED", "REUSED"]
+    },
+    "promotionEligible": { "type": "boolean" },
+    "publicNoveltyStatus": {
+      "enum": [
+        "NEW",
+        "DUPLICATE",
+        "ALPHA_EQUIVALENT",
+        "KNOWN_RULE",
+        "VARIANT",
+        "UNKNOWN"
+      ]
+    },
+    "projectNoveltyStatus": {
+      "enum": [
+        "NOVEL_WITHIN_PROJECT",
+        "EXACT_DUPLICATE",
+        "ALPHA_EQUIVALENT_DUPLICATE",
+        "INCONCLUSIVE_UNPARSEABLE"
+      ]
+    },
+    "externalNoveltyStatus": { "type": "string" },
+    "symbolicProofStatus": {
+      "enum": ["SYMBOLICALLY_VERIFIED", "REFUTED", "INCONCLUSIVE", "NOT_RUN"]
+    },
+    "formalProofStatus": { "type": "string" },
+    "interestingnessStatus": { "type": "string" },
+    "proofPolicy": {
+      "enum": [
+        "PROOF_OPTIONAL",
+        "PROOF_REQUIRED_FOR_PROMOTION",
+        "PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE"
+      ]
+    },
+    "proverExecutionStatus": { "type": "string" },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "ablation": { "$ref": "#/$defs/ablation" },
+    "promotionBlockers": { "$ref": "#/$defs/stringArray" },
+    "publicEvidence": { "$ref": "#/$defs/publicEvidence" },
+    "evidenceHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "provenance": {
+      "type": "object",
+      "required": [
+        "sourceCampaign",
+        "discoveryDate",
+        "dynamicRuleId",
+        "evaluationProvenanceHash",
+        "exactSignatureHash",
+        "alphaSignatureHash",
+        "proofEvidenceHash",
+        "proofObligationHash",
+        "assumptions",
+        "rulePath",
+        "evidenceExists",
+        "curatedPathPresent",
+        "fallbackUsed"
+      ],
+      "properties": {
+        "sourceCampaign": { "$ref": "#/$defs/nonBlankString" },
+        "discoveryDate": { "type": "string", "format": "date" },
+        "dynamicRuleId": { "type": "string" },
+        "evaluationProvenanceHash": { "$ref": "#/$defs/optionalSha256" },
+        "exactSignatureHash": { "$ref": "#/$defs/optionalSha256" },
+        "alphaSignatureHash": { "$ref": "#/$defs/optionalSha256" },
+        "proofEvidenceHash": { "$ref": "#/$defs/optionalSha256" },
+        "proofObligationHash": { "$ref": "#/$defs/optionalSha256" },
+        "assumptions": { "$ref": "#/$defs/stringArray" },
+        "rulePath": { "$ref": "#/$defs/stringArray" },
+        "evidenceExists": { "type": "boolean" },
+        "curatedPathPresent": { "type": "boolean" },
+        "fallbackUsed": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "ablation": {
+      "type": "object",
+      "required": [
+        "status",
+        "improvementRatio",
+        "withCandidate",
+        "withoutCandidate"
+      ],
+      "properties": {
+        "status": { "type": "string" },
+        "improvementRatio": { "type": "number" },
+        "withCandidate": { "$ref": "#/$defs/runEvidence" },
+        "withoutCandidate": { "$ref": "#/$defs/runEvidence" }
+      },
+      "additionalProperties": false
+    },
+    "runEvidence": {
+      "type": "object",
+      "required": ["success", "pathLength", "statesExplored"],
+      "properties": {
+        "success": { "enum": ["true", "false", "unknown"] },
+        "pathLength": { "type": "integer" },
+        "statesExplored": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "publicEvidence": {
+      "type": "object",
+      "required": ["accepted", "rejectionReasons"],
+      "properties": {
+        "accepted": { "type": "boolean" },
+        "rejectionReasons": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "optionalSha256": {
+      "type": "string",
+      "pattern": "^(?:|sha256:[0-9a-f]{64})$"
+    },
+    "nonBlankString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

@@ -6,7 +6,7 @@ Diese Seite fasst den gemessenen Forschungsstand von Regelsuche zusammen. Sie tr
 
 ## Kurzfassung
 
-Regelsuche besitzt inzwischen eine durch Tests und CI abgesicherte Kette von der Suche bis zu einem validierten Open-Target-Kandidaten:
+Regelsuche besitzt inzwischen eine durch Tests und CI abgesicherte Kette von der Suche bis zur kontrollierten Promotion eines Open-Target-Kandidaten:
 
 1. untargetete Suchgraphen und konvergente Pfade,
 2. Generalisierung zu einer parametrisierten Hypothese,
@@ -15,9 +15,10 @@ Regelsuche besitzt inzwischen eine durch Tests und CI abgesicherte Kette von der
 5. deterministische Gegenbeispielsuche,
 6. projektinterne Exact-/Alpha-Neuheitsprüfung,
 7. versionierte symbolische Proof-Obligation,
-8. Übergabe an den bestehenden `HypothesisCandidate`-Lebenszyklus.
+8. Übergabe an den bestehenden `HypothesisCandidate`-Lebenszyklus,
+9. getrennte Promotion- und Public-Evidence-Entscheidung mit Proof-Policy, Ablation und vollständiger Provenienz.
 
-Noch offen ist die vollständige Verbindung von Proof- und Novelty-Evidenz mit Promotion und Public-Evidence-Gate. Cross-Family-Bridge-Clustering wird in #222 weitergeführt.
+Die vollständige Einzelkandidaten-Kette aus #221 ist damit implementiert. Cross-Family-Bridge-Clustering wurde mit #319 begonnen und wird in #222 um Bridge-Hypothesen und familienweise Held-out-Validierung erweitert.
 
 ## Gemessene Ergebnisse
 
@@ -30,6 +31,8 @@ Noch offen ist die vollständige Verbindung von Proof- und Novelty-Evidenz mit P
 | Projektinterne Novelty (#314) | Exact- und Alpha-Vergleich gegen aktives Inventar und frühere Campaigns | Interne Neuheit wird getrennt und reproduzierbar geprüft | Keine Aussage über die mathematische Literatur |
 | Symbolische Prüfung (#315) | Versionierte Proof-Obligation und isoliertes Symbolic-Backend-Ergebnis | Wahrheitsevidenz ist von Mining und Ranking getrennt | Kein formaler Theorem-Prover-Nachweis, sofern nicht explizit ausgewiesen |
 | Lifecycle-Handoff (#316) | Vollständige akzeptierte Open-Target-Evidenz wird konservativ zu `HypothesisCandidate` mit `VALIDATED_BY_EXAMPLES` | Die vorhandene Promotion-Infrastruktur kann den Kandidaten übernehmen | Keine automatische Aktivierung oder Veröffentlichung |
+| Promotion/Public Evidence (#322) | Evaluation, Lifecycle, Projekt-Novelty, Proof, strukturierte Ablation und `ProofPolicy` werden auf dieselbe Kandidatenidentität gebunden und durch die bestehenden Gates entschieden | Nur vollständig belegte Kandidaten erreichen `PROMOTED`; Duplikate oder unvollständige Proof-Evidenz bleiben sichtbar darunter | Public Evidence ist keine automatische Behauptung externer mathematischer Neuheit |
+| Cross-Family-Clustering (#319) | Familien- und Rule-ID-blinde Strukturcluster mit unabhängigen Alpha-/Value-Profilen und sichtbaren Ablehnungsstatus | Wiederkehrende gerichtete Strukturen können post-hoc über Familien hinweg erkannt werden | Ein Cluster ist noch keine übertragene oder bewiesene Bridge-Hypothese |
 
 ## Evidenzstufen
 
@@ -40,7 +43,7 @@ Regelsuche unterscheidet vier Stufen:
 3. **Inventory-new open-target hypothesis:** Ohne Zielausdruck wird eine gegenüber dem Projektinventar neue parametrisierte Hypothese gebildet und unabhängig geprüft.
 4. **Externally novel mathematics:** Zusätzlich sind Literatur-, Datenbank- und fachliche Neuheitsprüfungen erforderlich.
 
-Nur Stufe 4 rechtfertigt einen Anspruch auf weltweit neue Mathematik. Ein internes Novelty-Flag darf nicht als externe Neuheit interpretiert werden.
+Nur Stufe 4 rechtfertigt einen Anspruch auf weltweit neue Mathematik. Ein internes Novelty-Flag oder eine angenommene Public-Evidence-Entscheidung darf nicht als externe Neuheit interpretiert werden.
 
 ## Statusanzeigen richtig lesen
 
@@ -55,26 +58,38 @@ Insbesondere bleiben folgende Achsen getrennt:
 - Suchnutzen,
 - Evidenzvollständigkeit.
 
+## Open-Target-Promotion-Gate
+
+Das Schema [`regelsuche.open-target-promotion-gate/v1`](schemas/regelsuche-open-target-promotion-gate-v1.schema.json) hält die letzte Entscheidung reproduzierbar fest. Es enthält getrennt:
+
+- Projekt-Novelty und externen Novelty-Status,
+- symbolischen und formalen Proof-Status,
+- Proof-Policy und tatsächlichen Prover-Ausführungsstatus,
+- strukturierte gepaarte Ablation,
+- Promotion-Blocker und Public-Evidence-Ablehnungsgründe,
+- Kandidaten-, Evaluation-, Signatur-, Proof-, Pfad- und Annahmen-Provenienz,
+- einen deterministischen Evidence-Hash.
+
+Ein Exact-/Alpha-Duplikat kann mathematisch bestätigt und `VALIDATED` sein, wird aber nicht als projektneue Regel promoted. Ein unentschiedener symbolischer Proof löscht bestandene Beispielvalidierung nicht, blockiert jedoch die Promotion. Verlangt die `ProofPolicy` einen formalen Nachweis, genügt symbolische Übereinstimmung nicht.
+
 ## Aktive Arbeit
-
-### #221 – Open-Target-Conjecture-Generation
-
-Fast vollständig. Offen ist die Integration von Proof- und Novelty-Evidenz in Promotion und Public-Evidence-Gate, ohne Wahrheit, Neuheit und Interessantheit zusammenzufassen. Danach kann #221 geschlossen werden.
 
 ### #222 – Cross-Family Structural Clustering
 
-Der erste aktive Slice gruppiert unabhängig gebildete Open-Target-Kandidaten über familien- und Rule-ID-blinde Struktursignaturen. Ein zulässiger Bridge-Cluster benötigt mehrere Familien sowie unabhängige Alpha- und Value-Evidenz. Per-Family-Holdouts, Bridge-Hypothese, Proof, Novelty und Interestingness bleiben nachgelagerte Prüfungen.
+Der erste Slice aus #319 ist gemergt. Als Nächstes wird aus einem zulässigen Cluster ohne Nutzung der Held-out-Familie eine Bridge-Hypothese gebildet. Frische Positiv-/Negativfälle, konfigurierte/ausgeführte/übersprungene Prüfungen und Gegenbeispiele werden für jede beitragende sowie mindestens eine vollständig zurückgehaltene Familie getrennt ausgewiesen.
+
+### #223 – Interestingness und Surprise
+
+Die Bewertung kann jetzt auf realen, validierten Kandidaten aus #221 und strukturellen Bridge-Kandidaten aus #222 kalibriert werden. Interessantheit bleibt ein Ranking-Signal und kann Wahrheit, Novelty, Proof oder Evidenzvollständigkeit nicht überschreiben.
 
 ## Empfohlene Reihenfolge
 
-1. #319 abschließen und den doppelten Cluster-Entwurf nicht parallel weiterführen.
-2. #221 durch Promotion-/Public-Evidence-Integration schließen.
-3. #222 um Bridge-Hypothese und frische familienweise Validierung erweitern.
-4. #223 auf realen Kandidaten aus #221/#222 kalibrieren.
-5. #225 als budgetierten Open-Target-Autopiloten implementieren.
-6. #233 und #234 für solver-neutrale Obligations-IR und Backend-Orchestrierung bearbeiten.
-7. #235 als informationsparitären Vergleichsbenchmark aufbauen.
-8. #226 als maschinengeprüftes Release-Gate abschließen.
+1. #222 um Bridge-Hypothese und frische familienweise Held-out-Validierung erweitern.
+2. #223 auf realen Kandidaten aus #221/#222 kalibrieren.
+3. #225 als budgetierten Open-Target-Autopiloten implementieren.
+4. #233 und #234 für solver-neutrale Obligations-IR und Backend-Orchestrierung bearbeiten.
+5. #235 als informationsparitären Vergleichsbenchmark aufbauen.
+6. #226 als maschinengeprüftes Release-Gate abschließen.
 
 #220, #224 und #104 bleiben wichtige längerfristige Vorhaben, sollten die aktuelle Discovery-Kette aber nicht unterbrechen.
 
