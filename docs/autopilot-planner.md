@@ -53,16 +53,61 @@ Unterstützte v1-Policies sind:
 
 Duplikate, widerlegte, unsichere oder dauerhaft schwache Branches erhalten keine zusätzliche teure Arbeit. Nicht widerlegte Branches mit fehlender Pflichtevidenz können Validierungs-, Gegenbeispiel- oder Proof-Budget erhalten, auch wenn ihre Interestingness noch `NOT_EVALUATED` ist.
 
-Die geplanten Deltas dürfen die faktisch verbleibenden Ledger-Budgets nicht überschreiten. Der Plan verändert das Ledger noch nicht; erst eine spätere Ausführung bilanziert Arbeit als ausgeführt oder übersprungen.
+Die geplanten Deltas dürfen die faktisch verbleibenden Ledger-Budgets nicht überschreiten. Der Plan verändert das Ledger noch nicht; erst die Ausführung bilanziert Arbeit als ausgeführt oder übersprungen.
+
+## Ausführung durch den vorhandenen Runner
+
+`regelsuche.autonomous-campaign-execution/v1` führt ausschließlich `ALLOCATE`-Entscheidungen aus. Der Adapter verwendet den vorhandenen `DeterministicDiscoveryExperimentRunner` als reproduzierbare Seed-Hülle; die eigentliche stufenspezifische Arbeit wird über einen expliziten `StageSeedEvaluator` bereitgestellt.
+
+Vor der Ausführung werden geprüft:
+
+- Brief-, Ledger- und Planidentität,
+- Branch-ID und Snapshot-Hash,
+- Seed-Stable-Key,
+- erlaubte Domäne und erlaubter Generator,
+- für die Stufe geplante Ressourcen.
+
+Jeder Evaluator liefert ein Receipt mit:
+
+- `COMPLETED`, `INCONCLUSIVE`, `DUPLICATE`, `DISPROVED`, `UNSAFE`, `PERSISTENTLY_WEAK` oder `BACKEND_UNAVAILABLE`,
+- faktisch ausgeführten Ressourcen,
+- explizit übersprungenen Ressourcen,
+- Runner-Ergebnis und Gegenbeispielstatus,
+- nächstem Snapshot-Hash.
+
+Nicht berichtete Werte werden nicht erfunden. Ein fehlender oder unzulässiger Seed verbraucht keine ausgeführte Arbeit; die geplante Zuteilung wird sichtbar als übersprungen bilanziert. Ein Receipt darf die geplanten Deltas nicht überschreiten.
+
+## Feedback- und Reallokationsrunde
+
+`regelsuche.autonomous-campaign-round/v1` verbindet eine Ausführung mit dem anschließend neu berechneten Plan:
+
+```text
+Brief + Ledger + Plan
+→ explizite Stage-Receipts
+→ aktualisiertes Ledger
+→ nächste Branch-Snapshots
+→ neuer deterministischer Plan
+```
+
+Ein `DISPROVED`-, `DUPLICATE`- oder `UNSAFE`-Receipt erzeugt einen terminalen Branch, der in der Folgerunde kein weiteres teures Budget erhält. Ein erfolgreich abgeschlossener Zwischenschritt ergänzt nur die betreffende Evidenzstufe; er ist weder Proof noch Promotion.
+
+Die logische Evidenz trennt sich von Laufzeittelemetrie:
+
+- `logicalContentHash` bindet Entscheidungen, nichtzeitliche Receipts und nächste Snapshots;
+- `runtimeTelemetryHash` bindet tatsächliche Laufzeiten und den faktischen Ledgerstand.
+
+Dadurch kann die semantische Reallokationsentscheidung reproduzierbar bleiben, obwohl reale Laufzeiten schwanken.
 
 ## Wissenschaftliche Grenze
 
-Der Planner darf nur entscheiden, **welche Arbeit als Nächstes ausgeführt werden soll**. Daher bleiben im Plan:
+Planner und Executor dürfen nur entscheiden, **welche Arbeit als Nächstes ausgeführt wird** und **welche Ressourcen tatsächlich verbraucht wurden**. Daher bleiben:
 
 ```text
 plannerDecisionIsMathematicalEvidence = false
+executionIsMathematicalEvidence = false
+roundDecisionIsMathematicalEvidence = false
 promotionStatus = NOT_EVALUATED
 publicEvidenceStatus = NOT_EVALUATED
 ```
 
-Die erste Version erzeugt Brief, Ledger und Plan. Die Anbindung an `DeterministicDiscoveryExperimentRunner` und `ScientificDiscoveryWorkflow` folgt in einem späteren Slice von #225.
+Die Runner-Anbindung wählt keine Solverportfolios und erklärt kein Ergebnis für extern neu. Solverfähigkeiten bleiben Aufgabe von #233/#234; externe mathematische Neuheit benötigt weiterhin eine separate Prüfung.
