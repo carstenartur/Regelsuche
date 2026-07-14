@@ -40,15 +40,17 @@ class HiddenRulePilotCampaignTest {
         assertTrue(report.familyCount() >= 4);
         assertEquals(40, configuredNegativeHoldouts);
         assertEquals(configuredNegativeHoldouts, auditedNegativeHoldouts);
-        assertTrue(report.negativeHoldouts() <= configuredNegativeHoldouts,
-            "only holdouts reached after a candidate is compiled are executable");
+        assertEquals(configuredNegativeHoldouts, report.negativeHoldouts());
+        assertEquals(report.negativeHoldouts(),
+            report.evaluatedNegativeHoldouts() + report.skippedNegativeHoldouts());
+        assertTrue(report.evaluatedNegativeHoldouts() <= report.negativeHoldouts());
         assertTrue(report.generatedValidationExamples() > 0);
         assertTrue(report.counterexampleSearches() > 0);
         assertTrue(report.frozenCandidates() >= 1);
         assertTrue(report.rediscoveredCases() >= 1);
         assertTrue(report.acceptedCases() >= 1);
         assertTrue(report.rediscoveredCases() <= report.cases().size());
-        assertTrue(report.falsePositiveHoldouts() <= report.negativeHoldouts());
+        assertTrue(report.falsePositiveHoldouts() <= report.evaluatedNegativeHoldouts());
         assertTrue(report.cases().stream().allMatch(caseReport -> caseReport.split().passed()),
             report.cases().stream()
                 .filter(caseReport -> !caseReport.split().passed())
@@ -60,6 +62,9 @@ class HiddenRulePilotCampaignTest {
         assertTrue(json.contains("\"schema\":\"regelsuche.hidden-rule-benchmark/v2\""));
         assertTrue(json.contains("\"rediscoveryRatePermille\""));
         assertTrue(json.contains("\"falsePositiveRatePermille\""));
+        assertTrue(json.contains("\"evaluatedNegativeHoldouts\""));
+        assertTrue(json.contains("\"skippedNegativeHoldouts\""));
+        assertTrue(json.contains("\"holdoutsComplete\""));
         assertTrue(json.contains("\"generatedValidationExamples\""));
         assertTrue(json.contains("\"counterexampleSearches\""));
         assertTrue(json.contains("\"failureTaxonomy\""));
