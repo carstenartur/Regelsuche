@@ -349,6 +349,7 @@ class CrossFamilyBridgeQualificationGateTest {
             input,
             output,
             hash(family.charAt(0)),
+            10,
             alpha,
             value,
             "direct||prepare>factor-common",
