@@ -11,7 +11,8 @@
       "required": [
         "cases", "families", "frozenCandidates", "materialAblations", "acceptedCases",
         "rediscoveredCases", "rediscoveryRatePermille", "negativeHoldouts",
-        "falsePositiveHoldouts", "falsePositiveRatePermille"
+        "falsePositiveHoldouts", "falsePositiveRatePermille",
+        "generatedValidationExamples", "counterexampleSearches"
       ],
       "properties": {
         "cases": { "$ref": "#/$defs/nonNegativeInteger" },
@@ -23,7 +24,9 @@
         "rediscoveryRatePermille": { "$ref": "#/$defs/permille" },
         "negativeHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
         "falsePositiveHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
-        "falsePositiveRatePermille": { "$ref": "#/$defs/permille" }
+        "falsePositiveRatePermille": { "$ref": "#/$defs/permille" },
+        "generatedValidationExamples": { "$ref": "#/$defs/nonNegativeInteger" },
+        "counterexampleSearches": { "$ref": "#/$defs/nonNegativeInteger" }
       },
       "additionalProperties": false
     },
