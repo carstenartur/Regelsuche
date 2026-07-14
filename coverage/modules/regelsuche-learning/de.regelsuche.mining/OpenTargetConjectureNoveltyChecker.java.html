@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenTargetConjectureNoveltyChecker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">OpenTargetConjectureNoveltyChecker.java</span></div><h1>OpenTargetConjectureNoveltyChecker.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Strict project-internal novelty check, separate from truth and external novelty. */
+<span class="fc" id="L15">public final class OpenTargetConjectureNoveltyChecker {</span>
+    public static final String SCHEMA = &quot;regelsuche.open-target-conjecture-novelty/v1&quot;;
+
+<span class="fc" id="L18">    private final RulePatternParser parser = new RulePatternParser();</span>
+
+    public NoveltyReport check(
+        OpenTargetConjecture conjecture,
+        KnownRuleRepository activeInventory,
+        List&lt;PriorCandidate&gt; priorCandidates
+    ) {
+<span class="fc" id="L25">        validate(conjecture);</span>
+<span class="fc" id="L26">        Objects.requireNonNull(activeInventory, &quot;activeInventory&quot;);</span>
+<span class="fc" id="L27">        List&lt;KnownRule&gt; activeRules = activeInventory.all().stream()</span>
+<span class="fc" id="L28">            .sorted(Comparator.comparing(KnownRule::name))</span>
+<span class="fc" id="L29">            .toList();</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        List&lt;PriorCandidate&gt; prior = priorCandidates == null</span>
+<span class="nc" id="L31">            ? List.of()</span>
+<span class="fc" id="L32">            : priorCandidates.stream()</span>
+<span class="fc" id="L33">                .sorted(Comparator.comparing(PriorCandidate::source)</span>
+<span class="fc" id="L34">                    .thenComparing(PriorCandidate::candidateId))</span>
+<span class="fc" id="L35">                .toList();</span>
+        Signature candidate;
+        try {
+<span class="fc" id="L38">            candidate = signature(conjecture.leftPattern(), conjecture.rightPattern());</span>
+<span class="fc" id="L39">        } catch (IllegalArgumentException exception) {</span>
+<span class="fc" id="L40">            return new NoveltyReport(</span>
+                SCHEMA,
+<span class="fc" id="L42">                conjecture.conjectureId(),</span>
+                NoveltyStatus.INCONCLUSIVE_UNPARSEABLE,
+                &quot;&quot;,
+                &quot;&quot;,
+<span class="fc" id="L46">                activeRules.size(),</span>
+<span class="fc" id="L47">                prior.size(),</span>
+<span class="fc" id="L48">                List.of(),</span>
+                &quot;NOT_EVALUATED&quot;,
+<span class="fc" id="L50">                &quot;candidate pattern could not be parsed: &quot; + exception.getMessage());</span>
+<span class="fc" id="L51">        }</span>
+
+<span class="fc" id="L53">        List&lt;ReferenceCandidate&gt; references = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L54">        activeRules.forEach(rule -&gt; references.add(new ReferenceCandidate(</span>
+<span class="fc" id="L55">            &quot;ACTIVE_INVENTORY&quot;, rule.name(), rule.leftPattern(), rule.rightPattern())));</span>
+<span class="fc" id="L56">        prior.forEach(item -&gt; references.add(new ReferenceCandidate(</span>
+<span class="fc" id="L57">            item.source(), item.candidateId(), item.leftPattern(), item.rightPattern())));</span>
+
+<span class="fc" id="L59">        List&lt;NoveltyMatch&gt; matches = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (ReferenceCandidate reference : references) {</span>
+            Signature known;
+            try {
+<span class="fc" id="L63">                known = signature(reference.leftPattern(), reference.rightPattern());</span>
+<span class="nc" id="L64">            } catch (IllegalArgumentException ignored) {</span>
+<span class="nc" id="L65">                continue;</span>
+<span class="fc" id="L66">            }</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (candidate.exact().equals(known.exact())) {</span>
+<span class="fc" id="L68">                matches.add(new NoveltyMatch(</span>
+<span class="fc" id="L69">                    reference.source(), reference.candidateId(), MatchRelation.EXACT));</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            } else if (candidate.alpha().equals(known.alpha())) {</span>
+<span class="fc" id="L71">                matches.add(new NoveltyMatch(</span>
+<span class="fc" id="L72">                    reference.source(), reference.candidateId(), MatchRelation.ALPHA_EQUIVALENT));</span>
+            }
+<span class="fc" id="L74">        }</span>
+<span class="fc" id="L75">        List&lt;NoveltyMatch&gt; orderedMatches = matches.stream()</span>
+<span class="fc" id="L76">            .sorted(Comparator.comparing(NoveltyMatch::source)</span>
+<span class="fc" id="L77">                .thenComparing(NoveltyMatch::candidateId)</span>
+<span class="pc" id="L78">                .thenComparing(match -&gt; match.relation().name()))</span>
+<span class="fc" id="L79">            .toList();</span>
+<span class="fc" id="L80">        NoveltyStatus status = orderedMatches.stream()</span>
+<span class="fc bfc" id="L81" title="All 4 branches covered.">            .anyMatch(match -&gt; match.relation() == MatchRelation.EXACT)</span>
+<span class="fc" id="L82">                ? NoveltyStatus.EXACT_DUPLICATE</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                : orderedMatches.isEmpty()</span>
+<span class="fc" id="L84">                    ? NoveltyStatus.NOVEL_WITHIN_PROJECT</span>
+<span class="fc" id="L85">                    : NoveltyStatus.ALPHA_EQUIVALENT_DUPLICATE;</span>
+<span class="fc" id="L86">        return new NoveltyReport(</span>
+            SCHEMA,
+<span class="fc" id="L88">            conjecture.conjectureId(),</span>
+            status,
+<span class="fc" id="L90">            hash(candidate.exact()),</span>
+<span class="fc" id="L91">            hash(candidate.alpha()),</span>
+<span class="fc" id="L92">            activeRules.size(),</span>
+<span class="fc" id="L93">            prior.size(),</span>
+            orderedMatches,
+            &quot;NOT_EVALUATED&quot;,
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            status == NoveltyStatus.NOVEL_WITHIN_PROJECT</span>
+<span class="fc" id="L97">                ? &quot;no exact or alpha-equivalent project candidate was found&quot;</span>
+<span class="fc" id="L98">                : &quot;project-internal duplicate evidence is listed in matches&quot;);</span>
+    }
+
+    private Signature signature(String leftPattern, String rightPattern) {
+<span class="fc" id="L102">        RulePatternNode left = parser.parse(leftPattern);</span>
+<span class="fc" id="L103">        RulePatternNode right = parser.parse(rightPattern);</span>
+<span class="fc" id="L104">        String exact = render(left, new LinkedHashMap&lt;&gt;(), false)</span>
+<span class="fc" id="L105">            + &quot;-&gt;&quot; + render(right, new LinkedHashMap&lt;&gt;(), false);</span>
+<span class="fc" id="L106">        Map&lt;String, String&gt; alphaNames = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L107">        String alpha = render(left, alphaNames, true)</span>
+<span class="fc" id="L108">            + &quot;-&gt;&quot; + render(right, alphaNames, true);</span>
+<span class="fc" id="L109">        return new Signature(exact, alpha);</span>
+    }
+
+    private String render(
+        RulePatternNode node,
+        Map&lt;String, String&gt; alphaNames,
+        boolean alphaNormalize
+    ) {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (node instanceof PatternVariable variable) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            String name = alphaNormalize</span>
+<span class="fc" id="L119">                ? alphaNames.computeIfAbsent(</span>
+<span class="fc" id="L120">                    variable.name(), ignored -&gt; &quot;p&quot; + alphaNames.size())</span>
+<span class="fc" id="L121">                : variable.name();</span>
+<span class="fc" id="L122">            return &quot;P:&quot; + name;</span>
+        }
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (node instanceof PatternNumber number) {</span>
+<span class="fc" id="L125">            return &quot;N:&quot; + number.value();</span>
+        }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (node instanceof PatternFunction function) {</span>
+<span class="nc" id="L128">            return &quot;F:&quot; + function.name() + &quot;(&quot; + function.arguments().stream()</span>
+<span class="nc" id="L129">                .map(argument -&gt; render(argument, alphaNames, alphaNormalize))</span>
+<span class="nc" id="L130">                .reduce((left, right) -&gt; left + &quot;,&quot; + right)</span>
+<span class="nc" id="L131">                .orElse(&quot;&quot;) + &quot;)&quot;;</span>
+        }
+<span class="fc" id="L133">        PatternBinary binary = (PatternBinary) node;</span>
+<span class="fc" id="L134">        return &quot;B:&quot; + binary.op().name() + &quot;(&quot;</span>
+<span class="fc" id="L135">            + render(binary.left(), alphaNames, alphaNormalize) + &quot;,&quot;</span>
+<span class="fc" id="L136">            + render(binary.right(), alphaNames, alphaNormalize) + &quot;)&quot;;</span>
+    }
+
+    private static void validate(OpenTargetConjecture conjecture) {
+<span class="fc" id="L140">        Objects.requireNonNull(conjecture, &quot;conjecture&quot;);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (!&quot;OBSERVED_CONJECTURE&quot;.equals(conjecture.candidateStatus())</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                || !&quot;EQUIVALENCE_PRESERVING_CONVERGENT_PATHS&quot;.equals(</span>
+<span class="fc" id="L143">                    conjecture.evidenceStatus())</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                || conjecture.supportCount() &lt; 2</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                || conjecture.distinctAlphaSupport() &lt; 2) {</span>
+<span class="nc" id="L146">            throw new IllegalArgumentException(</span>
+                &quot;novelty requires an independently supported open-target conjecture&quot;);
+        }
+<span class="fc" id="L149">    }</span>
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L153">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L154">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L155">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L156">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L157">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L161">    public enum NoveltyStatus {</span>
+<span class="fc" id="L162">        NOVEL_WITHIN_PROJECT,</span>
+<span class="fc" id="L163">        EXACT_DUPLICATE,</span>
+<span class="fc" id="L164">        ALPHA_EQUIVALENT_DUPLICATE,</span>
+<span class="fc" id="L165">        INCONCLUSIVE_UNPARSEABLE</span>
+    }
+
+<span class="fc" id="L168">    public enum MatchRelation {</span>
+<span class="fc" id="L169">        EXACT,</span>
+<span class="fc" id="L170">        ALPHA_EQUIVALENT</span>
+    }
+
+    public record PriorCandidate(
+        String source,
+        String candidateId,
+        String leftPattern,
+        String rightPattern
+    ) {
+<span class="fc" id="L179">        public PriorCandidate {</span>
+<span class="fc" id="L180">            requireText(source, &quot;source&quot;);</span>
+<span class="fc" id="L181">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L182">            requireText(leftPattern, &quot;leftPattern&quot;);</span>
+<span class="fc" id="L183">            requireText(rightPattern, &quot;rightPattern&quot;);</span>
+<span class="fc" id="L184">        }</span>
+    }
+
+    public record NoveltyMatch(String source, String candidateId, MatchRelation relation) {
+<span class="fc" id="L188">        public NoveltyMatch {</span>
+<span class="fc" id="L189">            requireText(source, &quot;source&quot;);</span>
+<span class="fc" id="L190">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L191">            Objects.requireNonNull(relation, &quot;relation&quot;);</span>
+<span class="fc" id="L192">        }</span>
+    }
+
+    public record NoveltyReport(
+        String schema,
+        String conjectureId,
+        NoveltyStatus status,
+        String exactSignatureHash,
+        String alphaSignatureHash,
+        int checkedActiveRules,
+        int checkedPriorCandidates,
+        List&lt;NoveltyMatch&gt; matches,
+        String externalNoveltyStatus,
+        String explanation
+    ) {
+<span class="fc" id="L207">        public NoveltyReport {</span>
+<span class="fc" id="L208">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            matches = matches == null ? List.of() : List.copyOf(matches);</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            externalNoveltyStatus = externalNoveltyStatus == null</span>
+<span class="nc" id="L211">                ? &quot;NOT_EVALUATED&quot;</span>
+<span class="fc" id="L212">                : externalNoveltyStatus;</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L214">        }</span>
+    }
+
+<span class="fc" id="L217">    private record ReferenceCandidate(</span>
+        String source,
+        String candidateId,
+        String leftPattern,
+        String rightPattern
+    ) {
+    }
+
+<span class="fc" id="L225">    private record Signature(String exact, String alpha) {</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L229" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L230">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L232">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
