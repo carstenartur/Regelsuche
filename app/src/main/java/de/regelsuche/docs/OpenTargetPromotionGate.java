@@ -23,7 +23,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -82,6 +81,10 @@ final class OpenTargetPromotionGate {
             observation, input.ablationEvidence());
         List<String> blockers = new ArrayList<>(coreBlockers);
         blockers.addAll(baseRecord.promotionBlockers());
+        proof.blockers().stream()
+            .filter(value -> value != null && !value.isBlank())
+            .map(value -> "proof-report=" + value)
+            .forEach(blockers::add);
         if (proof.proofStatus() != ProofStatus.SYMBOLICALLY_VERIFIED) {
             blockers.add("symbolic-proof=" + proof.proofStatus().name());
         }
@@ -208,17 +211,14 @@ final class OpenTargetPromotionGate {
 
         if (proof.eligibility() != EligibilityStatus.ELIGIBLE
                 || !proof.proofObligationEmitted()
-                || proof.obligation() == null
-                || !proof.blockers().isEmpty()) {
+                || proof.obligation() == null) {
             blockers.add("proof-obligation-ineligible");
-        } else {
-            if (!candidateId.equals(proof.obligation().conjectureId())
-                    || proof.obligation().targetProvided()
-                    || !conjecture.leftPattern().equals(proof.obligation().leftExpression())
-                    || !conjecture.rightPattern().equals(proof.obligation().rightExpression())
-                    || !assumptions(conjecture).equals(proof.obligation().assumptions())) {
-                blockers.add("proof-obligation-provenance-mismatch");
-            }
+        } else if (!candidateId.equals(proof.obligation().conjectureId())
+                || proof.obligation().targetProvided()
+                || !conjecture.leftPattern().equals(proof.obligation().leftExpression())
+                || !conjecture.rightPattern().equals(proof.obligation().rightExpression())
+                || !assumptions(conjecture).equals(proof.obligation().assumptions())) {
+            blockers.add("proof-obligation-provenance-mismatch");
         }
 
         if (novelty.status()
@@ -325,8 +325,7 @@ final class OpenTargetPromotionGate {
             .sorted(Comparator.comparing((PathEvidence path) ->
                     String.join("\u0001", path.ruleIds()))
                 .thenComparing(PathEvidence::pathId))
-            .map(PathEvidence::ruleIds)
-            .map(List::copyOf)
+            .map(path -> List.copyOf(path.ruleIds()))
             .findFirst()
             .orElse(List.of());
     }
