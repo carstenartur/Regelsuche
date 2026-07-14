@@ -59,7 +59,28 @@ Zwei Hashes bleiben bewusst getrennt:
 - `predictiveCorpusHash` enthält Fälle, Splits, Strukturen und Assessment-Artefakte, aber keine Relevanzlabels;
 - `labeledEvaluationHash` bindet zusätzlich die nachgelagerten Review-Konsense.
 
-Eine Änderung von TEST-Labels darf deshalb niemals die Identität des prädiktiven Korpus oder eine später auf CALIBRATION gewählte Policy verändern.
+Eine Änderung von TEST-Labels darf deshalb niemals die Identität des prädiktiven Korpus verändern.
+
+## Held-out-Profilwahl
+
+`regelsuche.interestingness-profile-calibration/v1` vergleicht die beiden Profile auf denselben Rohkomponenten.
+
+1. Für jeden Fall müssen `THEORY_DISCOVERY` und `SEARCH_REUSE` dieselbe Evidenz, dieselbe Eligibility, dieselben Rohkomponenten und dieselben Risiko-/Kontrollabzüge verwenden.
+2. Die Profilwahl sieht ausschließlich die Relevanzkonsense im `CALIBRATION`-Split.
+3. Das gewählte Profil wird danach unverändert auf `TEST` angewandt.
+4. `selectionHash` bindet den prädiktiven Korpus, CALIBRATION-Labels und beide CALIBRATION-Assessments, aber keine TEST-Labels.
+5. TEST-Labels beeinflussen nur die nachgelagerte Agreement-Auswertung und den vollständigen Report-Hash.
+
+Der Report enthält außerdem:
+
+- ein TEST-Ranking mit den ausgewählten Assessments,
+- die Label-Agreement-Werte beider Profile getrennt für CALIBRATION und TEST,
+- eine Pareto-Front über strukturelle Überraschung, Cross-Family-Transfer, gepaarten Nutzen und Wiederverwendbarkeit,
+- die Rangordnungsübereinstimmung beider Profile,
+- Leave-one-out-Stabilität der Profilwahl,
+- Stabilität des höchstgerankten TEST-Kandidaten zwischen den Profilen.
+
+Pareto- und Sensitivitätswerte bleiben Diagnoseevidenz. Sie verändern weder Kandidatenbildung noch Proof-, Novelty-, Promotion- oder Public-Evidence-Entscheidungen.
 
 ## Was diese Artefakte nicht behaupten
 
