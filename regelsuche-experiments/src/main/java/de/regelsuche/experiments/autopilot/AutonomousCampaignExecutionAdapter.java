@@ -31,12 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Executes explicit planner allocations through the existing deterministic seed runner.
- *
- * <p>The stage evaluator must return factual resource receipts. Runner success is
- * never interpreted as proof, novelty, promotion or public evidence.</p>
- */
+/** Executes explicit planner allocations through the existing deterministic seed runner. */
 public final class AutonomousCampaignExecutionAdapter {
     public static final String EXECUTION_SCHEMA =
         "regelsuche.autonomous-campaign-execution/v1";
@@ -57,9 +52,8 @@ public final class AutonomousCampaignExecutionAdapter {
             brief, ledger, plan, snapshots, seedCatalog, parallelism, evaluator);
         AllocationPlan nextPlan = Objects.requireNonNull(planner, "planner").plan(
             brief, execution.updatedLedger(), execution.nextSnapshots());
-        String contentHash = AutonomousResearchBrief.hash(
-            ROUND_SCHEMA
-                + "\nbrief=" + brief.contentHash()
+        String hash = AutonomousResearchBrief.hash(
+            ROUND_SCHEMA + "\nbrief=" + brief.contentHash()
                 + "\nexecution=" + execution.logicalContentHash()
                 + "\nnextPlan=" + nextPlan.contentHash());
         return new CampaignRound(
@@ -70,7 +64,7 @@ public final class AutonomousCampaignExecutionAdapter {
             false,
             "NOT_EVALUATED",
             "NOT_EVALUATED",
-            contentHash);
+            hash);
     }
 
     public CampaignExecutionReport execute(
@@ -85,59 +79,52 @@ public final class AutonomousCampaignExecutionAdapter {
         validateIdentity(brief, ledger, plan);
         Map<String, BranchSnapshot> snapshots = indexSnapshots(suppliedSnapshots);
         Map<String, SeedExpression> seeds = indexEligibleSeeds(brief, seedCatalog);
-        Map<String, AllocationDecision> allocations = plan.decisions().stream()
-            .filter(decision -> decision.kind() == DecisionKind.ALLOCATE)
-            .collect(java.util.stream.Collectors.toMap(
-                AllocationDecision::branchId,
-                decision -> decision,
-                (left, right) -> {
-                    throw new IllegalArgumentException(
-                        "duplicate allocation for branch " + left.branchId());
-                },
-                LinkedHashMap::new));
+        Map<String, AllocationDecision> allocations = indexAllocations(plan);
         validateAllocations(allocations, snapshots);
 
-        Map<String, StageExecution> completed = new ConcurrentHashMap<>();
-        List<SeedExpression> runnableSeeds = new ArrayList<>();
-        for (AllocationDecision decision : allocations.values()) {
+        Map<String, StageExecution> results = new ConcurrentHashMap<>();
+        List<SeedExpression> runnable = new ArrayList<>();
+        allocations.values().forEach(decision -> {
             SeedExpression seed = seeds.get(decision.branchId());
             if (seed == null) {
-                completed.put(decision.branchId(), unavailable(decision,
-                    "eligible seed missing from supplied catalog"));
+                results.put(decision.branchId(), unavailable(
+                    decision, "eligible seed missing from supplied catalog"));
             } else {
-                runnableSeeds.add(seed);
+                runnable.add(seed);
             }
-        }
-        runnableSeeds.sort(Comparator.comparing(SeedExpression::stableKey));
+        });
+        runnable.sort(Comparator.comparing(SeedExpression::stableKey));
 
         StageSeedEvaluator safeEvaluator = Objects.requireNonNull(evaluator, "evaluator");
         DeterministicDiscoveryExperimentRunner runner =
             new DeterministicDiscoveryExperimentRunner(
-                runnableSeeds.size(),
+                runnable.size(),
                 Math.max(1, parallelism),
                 seed -> evaluateSafely(
                     seed,
                     allocations.get(seed.stableKey()),
                     safeEvaluator,
-                    completed));
+                    results));
         DeterministicDiscoveryExperimentRunner.DiscoveryReport runnerReport =
-            runner.runDetailed(runnableSeeds);
+            runner.runDetailed(runnable);
 
-        List<ExecutionReceipt> receipts = allocations.values().stream()
-            .map(decision -> receipt(
+        List<Transition> transitions = allocations.values().stream()
+            .map(decision -> transition(
                 decision,
                 snapshots.get(decision.branchId()),
                 seeds.get(decision.branchId()),
-                completed.get(decision.branchId())))
-            .sorted(Comparator.comparing(ExecutionReceipt::branchId))
+                results.get(decision.branchId())))
+            .sorted(Comparator.comparing(item -> item.receipt().branchId()))
+            .toList();
+        List<ExecutionReceipt> receipts = transitions.stream()
+            .map(Transition::receipt)
             .toList();
         CampaignBudgetLedger updatedLedger = updateLedger(ledger, receipts);
-        List<BranchSnapshot> nextSnapshots = nextSnapshots(
-            snapshots, receipts);
+        List<BranchSnapshot> nextSnapshots = nextSnapshots(snapshots, transitions);
         String logicalHash = AutonomousResearchBrief.hash(logicalMaterial(
             brief, plan, receipts, nextSnapshots));
         String runtimeHash = AutonomousResearchBrief.hash(runtimeMaterial(
-            runnerReport, receipts, updatedLedger));
+            runnerReport.wallClockRuntimeMillis(), receipts, updatedLedger));
         return new CampaignExecutionReport(
             EXECUTION_SCHEMA,
             brief.contentHash(),
@@ -146,7 +133,7 @@ public final class AutonomousCampaignExecutionAdapter {
             updatedLedger,
             receipts,
             nextSnapshots,
-            runnerReport.runtimeMillis(),
+            runnerReport.wallClockRuntimeMillis(),
             false,
             "NOT_EVALUATED",
             "NOT_EVALUATED",
@@ -158,11 +145,11 @@ public final class AutonomousCampaignExecutionAdapter {
         SeedExpression seed,
         AllocationDecision decision,
         StageSeedEvaluator evaluator,
-        Map<String, StageExecution> completed
+        Map<String, StageExecution> results
     ) {
-        EvidenceStage stage = parseStage(decision);
         StageExecution execution;
         try {
+            EvidenceStage stage = parseStage(decision);
             execution = evaluator.execute(stage, seed);
             validateExecution(decision, stage, execution);
         } catch (RuntimeException exception) {
@@ -170,7 +157,7 @@ public final class AutonomousCampaignExecutionAdapter {
                 decision,
                 "stage evaluator failed: " + exception.getClass().getSimpleName());
         }
-        completed.put(seed.stableKey(), execution);
+        results.put(seed.stableKey(), execution);
         return execution.runnerOutcome();
     }
 
@@ -180,15 +167,12 @@ public final class AutonomousCampaignExecutionAdapter {
         StageExecution execution
     ) {
         Objects.requireNonNull(execution, "stage execution");
-        Map<ResourceKind, Long> planned = decision.budgetDeltas().stream()
-            .collect(java.util.stream.Collectors.toMap(
-                BudgetDelta::resource,
-                BudgetDelta::amount,
-                Math::addExact,
-                () -> new EnumMap<>(ResourceKind.class)));
-        Set<ResourceKind> allowed = allowedResources(stage);
+        Map<ResourceKind, Long> planned = new EnumMap<>(ResourceKind.class);
+        decision.budgetDeltas().forEach(delta -> planned.merge(
+            delta.resource(), delta.amount(), Math::addExact));
         for (ResourceKind resource : execution.resources()) {
-            if (!allowed.contains(resource) || !planned.containsKey(resource)) {
+            if (!allowedResources(stage).contains(resource)
+                    || !planned.containsKey(resource)) {
                 throw new IllegalArgumentException(
                     "execution reported an unplanned resource: " + resource);
             }
@@ -216,42 +200,77 @@ public final class AutonomousCampaignExecutionAdapter {
             explanation);
     }
 
-    private static ExecutionReceipt receipt(
+    private static Transition transition(
         AllocationDecision decision,
-        BranchSnapshot snapshot,
+        BranchSnapshot current,
         SeedExpression seed,
         StageExecution execution
     ) {
-        if (execution == null) {
-            execution = unavailable(decision, "execution receipt missing");
-        }
+        StageExecution result = execution == null
+            ? unavailable(decision, "execution receipt missing")
+            : execution;
         EvidenceStage stage = parseStage(decision);
-        return new ExecutionReceipt(
+        BranchSnapshot next = nextSnapshot(current, stage, result);
+        SeedRunOutcome outcome = result.runnerOutcome();
+        ExecutionReceipt receipt = new ExecutionReceipt(
             decision.branchId(),
             decision.branchSnapshotHash(),
             seed == null ? "" : seed.stableKey(),
             stage,
-            execution.disposition(),
-            execution.runnerOutcome().success(),
-            execution.runnerOutcome().summary(),
-            execution.runnerOutcome().hypotheses().size(),
-            execution.runnerOutcome().counterexamples().size(),
-            execution.runnerOutcome().counterexampleSearchStatus().name(),
-            execution.runnerOutcome().resultKind().name(),
-            execution.executedResources(),
-            execution.skippedResources(),
-            execution.runnerOutcome().elapsedMillis(),
-            execution.explanation(),
-            nextSnapshot(snapshot, stage, execution).snapshotHash());
+            result.disposition(),
+            outcome.success(),
+            outcome.summary(),
+            outcome.hypotheses().size(),
+            outcome.counterexamples().size(),
+            outcome.counterexampleSearchStatus().name(),
+            outcome.resultKind().name(),
+            result.executedResources(),
+            result.skippedResources(),
+            outcome.elapsedMillis(),
+            result.explanation(),
+            next.snapshotHash());
+        return new Transition(receipt, next);
+    }
+
+    private static BranchSnapshot nextSnapshot(
+        BranchSnapshot current,
+        EvidenceStage stage,
+        StageExecution execution
+    ) {
+        EnumSet<EvidenceStage> completed = EnumSet.noneOf(EvidenceStage.class);
+        completed.addAll(current.completedStages());
+        if (execution.disposition() == ExecutionDisposition.COMPLETED) {
+            completed.add(stage);
+        }
+        BranchStatus status = switch (execution.disposition()) {
+            case DUPLICATE -> BranchStatus.DUPLICATE;
+            case DISPROVED -> BranchStatus.DISPROVED;
+            case UNSAFE -> BranchStatus.UNSAFE;
+            case PERSISTENTLY_WEAK -> BranchStatus.PERSISTENTLY_WEAK;
+            case COMPLETED -> completed.containsAll(current.mandatoryStages())
+                ? BranchStatus.COMPLETE_EVIDENCE
+                : BranchStatus.ELIGIBLE_INCOMPLETE;
+            case INCONCLUSIVE, BACKEND_UNAVAILABLE ->
+                BranchStatus.ELIGIBLE_INCOMPLETE;
+        };
+        return BranchSnapshot.create(
+            current.branchId(),
+            current.familyId(),
+            status,
+            current.mandatoryStages(),
+            completed,
+            current.supportDiversity(),
+            current.counterexampleRiskPermille(),
+            current.interestingnessPermille());
     }
 
     private static CampaignBudgetLedger updateLedger(
-        CampaignBudgetLedger ledger,
+        CampaignBudgetLedger initial,
         List<ExecutionReceipt> receipts
     ) {
-        CampaignBudgetLedger updated = ledger;
+        CampaignBudgetLedger updated = initial;
         for (ExecutionReceipt receipt : receipts) {
-            Set<ResourceKind> resources = EnumSet.noneOf(ResourceKind.class);
+            EnumSet<ResourceKind> resources = EnumSet.noneOf(ResourceKind.class);
             resources.addAll(receipt.executedResources().keySet());
             resources.addAll(receipt.skippedResources().keySet());
             for (ResourceKind resource : resources) {
@@ -266,71 +285,37 @@ public final class AutonomousCampaignExecutionAdapter {
     }
 
     private static List<BranchSnapshot> nextSnapshots(
-        Map<String, BranchSnapshot> snapshots,
-        List<ExecutionReceipt> receipts
+        Map<String, BranchSnapshot> current,
+        List<Transition> transitions
     ) {
-        Map<String, ExecutionReceipt> byBranch = receipts.stream()
-            .collect(java.util.stream.Collectors.toMap(
-                ExecutionReceipt::branchId, receipt -> receipt));
-        return snapshots.values().stream()
-            .map(snapshot -> {
-                ExecutionReceipt receipt = byBranch.get(snapshot.branchId());
-                if (receipt == null) {
-                    return snapshot;
-                }
-                StageExecution execution = new StageExecution(
-                    SeedRunOutcome.fail(receipt.summary()),
-                    receipt.disposition(),
-                    receipt.executedResources(),
-                    receipt.skippedResources(),
-                    receipt.explanation());
-                return nextSnapshot(snapshot, receipt.stage(), execution);
-            })
-            .sorted(Comparator.comparing(BranchSnapshot::branchId))
-            .toList();
+        Map<String, BranchSnapshot> nextById = new TreeMap<>(current);
+        transitions.forEach(item -> nextById.put(
+            item.nextSnapshot().branchId(), item.nextSnapshot()));
+        return List.copyOf(nextById.values());
     }
 
-    private static BranchSnapshot nextSnapshot(
-        BranchSnapshot snapshot,
-        EvidenceStage stage,
-        StageExecution execution
+    private static Map<String, AllocationDecision> indexAllocations(
+        AllocationPlan plan
     ) {
-        EnumSet<EvidenceStage> completed = EnumSet.copyOf(snapshot.completedStages());
-        if (execution.disposition() == ExecutionDisposition.COMPLETED) {
-            completed.add(stage);
-        }
-        BranchStatus status = switch (execution.disposition()) {
-            case DUPLICATE -> BranchStatus.DUPLICATE;
-            case DISPROVED -> BranchStatus.DISPROVED;
-            case UNSAFE -> BranchStatus.UNSAFE;
-            case PERSISTENTLY_WEAK -> BranchStatus.PERSISTENTLY_WEAK;
-            case COMPLETED -> completed.containsAll(snapshot.mandatoryStages())
-                ? BranchStatus.COMPLETE_EVIDENCE
-                : BranchStatus.ELIGIBLE_INCOMPLETE;
-            case INCONCLUSIVE, BACKEND_UNAVAILABLE ->
-                BranchStatus.ELIGIBLE_INCOMPLETE;
-        };
-        return BranchSnapshot.create(
-            snapshot.branchId(),
-            snapshot.familyId(),
-            status,
-            snapshot.mandatoryStages(),
-            completed,
-            snapshot.supportDiversity(),
-            snapshot.counterexampleRiskPermille(),
-            snapshot.interestingnessPermille());
+        Map<String, AllocationDecision> result = new LinkedHashMap<>();
+        plan.decisions().stream()
+            .filter(decision -> decision.kind() == DecisionKind.ALLOCATE)
+            .forEach(decision -> {
+                if (result.putIfAbsent(decision.branchId(), decision) != null) {
+                    throw new IllegalArgumentException(
+                        "duplicate allocation for branch " + decision.branchId());
+                }
+            });
+        return result;
     }
 
     private static Map<String, BranchSnapshot> indexSnapshots(
         List<BranchSnapshot> supplied
     ) {
         Objects.requireNonNull(supplied, "snapshots");
-        Map<String, BranchSnapshot> result = new LinkedHashMap<>();
-        for (BranchSnapshot snapshot : supplied.stream()
-                .sorted(Comparator.comparing(BranchSnapshot::branchId)).toList()) {
-            if (snapshot == null) {
-                throw new IllegalArgumentException("snapshots must not contain null");
-            }
+        Map<String, BranchSnapshot> result = new TreeMap<>();
+        for (BranchSnapshot snapshot : supplied) {
+            Objects.requireNonNull(snapshot, "branch snapshot");
             if (result.putIfAbsent(snapshot.branchId(), snapshot) != null) {
                 throw new IllegalArgumentException(
                     "duplicate branch snapshot: " + snapshot.branchId());
@@ -350,13 +335,9 @@ public final class AutonomousCampaignExecutionAdapter {
         Set<String> generators = Set.copyOf(brief.seedGenerators());
         Map<String, SeedExpression> result = new TreeMap<>();
         for (SeedExpression seed : supplied) {
-            if (seed == null || seed.expression().isBlank()) {
-                continue;
-            }
-            boolean domainAllowed = domains.contains(
-                seed.category().toLowerCase(Locale.ROOT));
-            boolean generatorAllowed = generators.contains(seed.source());
-            if (!domainAllowed || !generatorAllowed) {
+            if (seed == null || seed.expression().isBlank()
+                    || !domains.contains(seed.category().toLowerCase(Locale.ROOT))
+                    || !generators.contains(seed.source())) {
                 continue;
             }
             if (result.putIfAbsent(seed.stableKey(), seed) != null) {
@@ -388,7 +369,7 @@ public final class AutonomousCampaignExecutionAdapter {
         Map<String, AllocationDecision> allocations,
         Map<String, BranchSnapshot> snapshots
     ) {
-        for (AllocationDecision decision : allocations.values()) {
+        allocations.values().forEach(decision -> {
             BranchSnapshot snapshot = snapshots.get(decision.branchId());
             if (snapshot == null) {
                 throw new IllegalArgumentException(
@@ -398,7 +379,7 @@ public final class AutonomousCampaignExecutionAdapter {
                 throw new IllegalArgumentException(
                     "allocation and branch snapshot hash differ: " + decision.branchId());
             }
-        }
+        });
     }
 
     private static EvidenceStage parseStage(AllocationDecision decision) {
@@ -450,12 +431,12 @@ public final class AutonomousCampaignExecutionAdapter {
     }
 
     private static String runtimeMaterial(
-        DeterministicDiscoveryExperimentRunner.DiscoveryReport runnerReport,
+        long runnerRuntimeMillis,
         List<ExecutionReceipt> receipts,
         CampaignBudgetLedger updatedLedger
     ) {
         StringBuilder material = new StringBuilder("regelsuche.autonomous-runtime/v1")
-            .append("\nrunnerMillis=").append(runnerReport.runtimeMillis())
+            .append("\nrunnerMillis=").append(runnerRuntimeMillis)
             .append("\nupdatedLedger=").append(updatedLedger.contentHash());
         receipts.forEach(receipt -> material.append("\nruntime=")
             .append(receipt.branchId()).append('|').append(receipt.elapsedMillis()));
@@ -557,20 +538,24 @@ public final class AutonomousCampaignExecutionAdapter {
         }
 
         String logicalMaterial() {
-            Map<ResourceKind, Long> logicalExecuted = new TreeMap<>(
-                Comparator.comparing(Enum::name));
-            logicalExecuted.putAll(executedResources);
-            logicalExecuted.remove(ResourceKind.WALL_CLOCK_MILLIS);
-            Map<ResourceKind, Long> logicalSkipped = new TreeMap<>(
-                Comparator.comparing(Enum::name));
-            logicalSkipped.putAll(skippedResources);
-            logicalSkipped.remove(ResourceKind.WALL_CLOCK_MILLIS);
+            Map<ResourceKind, Long> executed = logicalResources(executedResources);
+            Map<ResourceKind, Long> skipped = logicalResources(skippedResources);
             return branchId + '|' + branchSnapshotHash + '|' + seedStableKey + '|'
                 + stage.name() + '|' + disposition.name() + '|' + runnerSuccess + '|'
                 + summary + '|' + hypothesisCount + '|' + counterexampleCount + '|'
                 + counterexampleStatus + '|' + discoveryResultKind + '|'
-                + logicalExecuted + '|' + logicalSkipped + '|' + explanation + '|'
+                + executed + '|' + skipped + '|' + explanation + '|'
                 + nextSnapshotHash;
+        }
+
+        private static Map<ResourceKind, Long> logicalResources(
+            Map<ResourceKind, Long> resources
+        ) {
+            Map<ResourceKind, Long> logical = new TreeMap<>(
+                Comparator.comparing(ResourceKind::name));
+            logical.putAll(resources);
+            logical.remove(ResourceKind.WALL_CLOCK_MILLIS);
+            return logical;
         }
     }
 
@@ -607,12 +592,8 @@ public final class AutonomousCampaignExecutionAdapter {
                 : nextSnapshots.stream()
                     .sorted(Comparator.comparing(BranchSnapshot::branchId))
                     .toList();
-            if (runnerRuntimeMillis < 0L) {
-                throw new IllegalArgumentException("runnerRuntimeMillis must be non-negative");
-            }
-            if (executionIsMathematicalEvidence) {
-                throw new IllegalArgumentException(
-                    "execution telemetry cannot be mathematical evidence");
+            if (runnerRuntimeMillis < 0L || executionIsMathematicalEvidence) {
+                throw new IllegalArgumentException("invalid execution telemetry");
             }
             requireNotEvaluated(promotionStatus, "promotionStatus");
             requireNotEvaluated(publicEvidenceStatus, "publicEvidenceStatus");
@@ -653,24 +634,17 @@ public final class AutonomousCampaignExecutionAdapter {
         public void write(Path directory) {
             try {
                 Files.createDirectories(directory);
-                Files.writeString(
-                    directory.resolve("execution.json"),
-                    toCanonicalJson(),
-                    StandardCharsets.UTF_8);
-                Files.writeString(
-                    directory.resolve("updated-ledger.json"),
-                    updatedLedger.toCanonicalJson(),
-                    StandardCharsets.UTF_8);
+                Files.writeString(directory.resolve("execution.json"),
+                    toCanonicalJson(), StandardCharsets.UTF_8);
+                Files.writeString(directory.resolve("updated-ledger.json"),
+                    updatedLedger.toCanonicalJson(), StandardCharsets.UTF_8);
             } catch (IOException exception) {
                 throw new UncheckedIOException(exception);
             }
         }
 
-        private static void writeReceipt(
-            JsonWriter object,
-            ExecutionReceipt receipt
-        ) {
-            object.property("branchId", receipt.branchId())
+        private static void writeReceipt(JsonWriter json, ExecutionReceipt receipt) {
+            json.property("branchId", receipt.branchId())
                 .property("branchSnapshotHash", receipt.branchSnapshotHash())
                 .property("seedStableKey", receipt.seedStableKey())
                 .property("stage", receipt.stage().name())
@@ -681,19 +655,23 @@ public final class AutonomousCampaignExecutionAdapter {
                 .property("counterexampleCount", receipt.counterexampleCount())
                 .property("counterexampleStatus", receipt.counterexampleStatus())
                 .property("discoveryResultKind", receipt.discoveryResultKind())
-                .array("executedResources", resources -> receipt.executedResources()
-                    .entrySet().stream().sorted(Map.Entry.comparingByKey())
-                    .forEach(entry -> resources.objectValue(item -> item
-                        .property("resource", entry.getKey().name())
-                        .property("amount", entry.getValue()))))
-                .array("skippedResources", resources -> receipt.skippedResources()
-                    .entrySet().stream().sorted(Map.Entry.comparingByKey())
-                    .forEach(entry -> resources.objectValue(item -> item
-                        .property("resource", entry.getKey().name())
-                        .property("amount", entry.getValue()))))
+                .array("executedResources", array -> writeResources(
+                    array, receipt.executedResources()))
+                .array("skippedResources", array -> writeResources(
+                    array, receipt.skippedResources()))
                 .property("elapsedMillis", receipt.elapsedMillis())
                 .property("explanation", receipt.explanation())
                 .property("nextSnapshotHash", receipt.nextSnapshotHash());
+        }
+
+        private static void writeResources(
+            JsonWriter.JsonArrayBuilder array,
+            Map<ResourceKind, Long> resources
+        ) {
+            resources.entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> array.objectValue(item -> item
+                    .property("resource", entry.getKey().name())
+                    .property("amount", entry.getValue())));
         }
     }
 
@@ -726,14 +704,10 @@ public final class AutonomousCampaignExecutionAdapter {
         public void write(Path directory) {
             execution.write(directory);
             try {
-                Files.writeString(
-                    directory.resolve("next-plan.json"),
-                    nextPlan.toCanonicalJson(),
-                    StandardCharsets.UTF_8);
-                Files.writeString(
-                    directory.resolve("round.json"),
-                    toCanonicalJson(),
-                    StandardCharsets.UTF_8);
+                Files.writeString(directory.resolve("next-plan.json"),
+                    nextPlan.toCanonicalJson(), StandardCharsets.UTF_8);
+                Files.writeString(directory.resolve("round.json"),
+                    toCanonicalJson(), StandardCharsets.UTF_8);
             } catch (IOException exception) {
                 throw new UncheckedIOException(exception);
             }
@@ -754,6 +728,12 @@ public final class AutonomousCampaignExecutionAdapter {
                 .endObject()
                 .toString();
         }
+    }
+
+    private record Transition(
+        ExecutionReceipt receipt,
+        BranchSnapshot nextSnapshot
+    ) {
     }
 
     private static Map<ResourceKind, Long> immutableResources(
