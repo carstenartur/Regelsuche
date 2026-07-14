@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.interestingness-sensitivity/v1",
+  "title": "Regelsuche interestingness sensitivity report v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "predictiveDatasetHash",
+    "baselineSelectedProfile",
+    "crossProfileTestOrderAgreementPermille",
+    "evaluatedLeaveOneOutScenarios",
+    "selectionStabilityPermille",
+    "topCandidateStabilityPermille",
+    "unstableTestCandidateIds",
+    "leaveOneOutScenarios",
+    "blockers",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.interestingness-sensitivity/v1" },
+    "status": { "enum": ["EVALUATED", "BASELINE_REJECTED"] },
+    "predictiveDatasetHash": { "$ref": "#/$defs/sha256" },
+    "baselineSelectedProfile": { "$ref": "#/$defs/nonBlank" },
+    "crossProfileTestOrderAgreementPermille": { "$ref": "#/$defs/permille" },
+    "evaluatedLeaveOneOutScenarios": { "$ref": "#/$defs/nonNegative" },
+    "selectionStabilityPermille": { "$ref": "#/$defs/permille" },
+    "topCandidateStabilityPermille": { "$ref": "#/$defs/permille" },
+    "unstableTestCandidateIds": { "$ref": "#/$defs/stringArray" },
+    "leaveOneOutScenarios": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/leaveOneOutScenario" }
+    },
+    "blockers": { "$ref": "#/$defs/stringArray" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "leaveOneOutScenario": {
+      "type": "object",
+      "required": [
+        "omittedCalibrationCaseId",
+        "status",
+        "selectedProfile",
+        "topTestCandidateId",
+        "selectionMatchesBaseline",
+        "topCandidateMatchesBaseline",
+        "blockers"
+      ],
+      "properties": {
+        "omittedCalibrationCaseId": { "$ref": "#/$defs/nonBlank" },
+        "status": { "enum": ["EVALUATED", "SPLIT_REJECTED"] },
+        "selectedProfile": { "$ref": "#/$defs/nonBlank" },
+        "topTestCandidateId": { "$ref": "#/$defs/nonBlank" },
+        "selectionMatchesBaseline": { "type": "boolean" },
+        "topCandidateMatchesBaseline": { "type": "boolean" },
+        "blockers": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "nonNegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
