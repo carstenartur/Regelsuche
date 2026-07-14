@@ -39,7 +39,7 @@ class OpenTargetPromotionGateTest {
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             novel(fixture.conjecture().conjectureId()),
-            verifiedProof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            proof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
             materialAblation(),
             ProofPolicy.PROOF_OPTIONAL,
             "SCRIPT_GENERATED"));
@@ -54,13 +54,16 @@ class OpenTargetPromotionGateTest {
         assertEquals("NOT_EVALUATED", decision.formalProofStatus());
         assertEquals("NOT_EVALUATED", decision.interestingnessStatus());
         assertTrue(decision.promotionBlockers().isEmpty());
-        assertTrue(decision.evidenceHash().startsWith("sha256:"));
+        assertTrue(decision.evidenceHash().matches("sha256:[0-9a-f]{64}"));
 
         String json = decision.toCanonicalJson();
         assertEquals(json, decision.toCanonicalJson());
         assertTrue(json.contains("\"promotionEligible\":true"));
         assertTrue(json.contains("\"externalNoveltyStatus\":\"NOT_EVALUATED\""));
         assertTrue(json.contains("\"interestingnessStatus\":\"NOT_EVALUATED\""));
+        assertTrue(json.contains("\"sourceCampaign\":\"open-target-campaign-2026-07\""));
+        assertTrue(json.contains("\"evaluationProvenanceHash\":\"" + hash('e') + "\""));
+        assertTrue(json.contains("\"proofObligationHash\":\"" + hash('o') + "\""));
     }
 
     @Test
@@ -70,8 +73,8 @@ class OpenTargetPromotionGateTest {
             de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.SCHEMA,
             fixture.conjecture().conjectureId(),
             NoveltyStatus.EXACT_DUPLICATE,
-            "sha256:exact",
-            "sha256:alpha",
+            hash('b'),
+            hash('c'),
             7,
             0,
             List.of(new NoveltyMatch(
@@ -84,7 +87,7 @@ class OpenTargetPromotionGateTest {
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             duplicate,
-            verifiedProof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            proof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
             materialAblation(),
             ProofPolicy.PROOF_OPTIONAL,
             "SCRIPT_GENERATED"));
@@ -104,13 +107,13 @@ class OpenTargetPromotionGateTest {
     @Test
     void mandatoryFormalProofCannotBeReplacedBySymbolicAgreement() {
         Fixture fixture = fixture(false);
-        ProofReport proof = verifiedProof(
+        ProofReport symbolic = proof(
             fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED);
 
         OpenTargetPromotionGate.Decision blocked = gate.evaluate(input(
             fixture,
             novel(fixture.conjecture().conjectureId()),
-            proof,
+            symbolic,
             materialAblation(),
             ProofPolicy.PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE,
             "SCRIPT_GENERATED"));
@@ -125,7 +128,7 @@ class OpenTargetPromotionGateTest {
         OpenTargetPromotionGate.Decision confirmed = gate.evaluate(input(
             fixture,
             novel(fixture.conjecture().conjectureId()),
-            proof,
+            symbolic,
             materialAblation(),
             ProofPolicy.PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE,
             "PROVER_CONFIRMED"));
@@ -137,13 +140,11 @@ class OpenTargetPromotionGateTest {
     @Test
     void inconclusiveSymbolicProofLeavesCandidateValidatedButNotPromoted() {
         Fixture fixture = fixture(false);
-        ProofReport inconclusive = verifiedProof(
-            fixture.conjecture(), ProofStatus.INCONCLUSIVE);
 
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             novel(fixture.conjecture().conjectureId()),
-            inconclusive,
+            proof(fixture.conjecture(), ProofStatus.INCONCLUSIVE),
             materialAblation(),
             ProofPolicy.PROOF_OPTIONAL,
             "SCRIPT_GENERATED"));
@@ -159,12 +160,11 @@ class OpenTargetPromotionGateTest {
     @Test
     void evidenceIdentityMismatchCannotEnterPromotion() {
         Fixture fixture = fixture(false);
-        NoveltyReport mismatched = novel("another-candidate");
 
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
-            mismatched,
-            verifiedProof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            novel("another-candidate"),
+            proof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
             materialAblation(),
             ProofPolicy.PROOF_OPTIONAL,
             "SCRIPT_GENERATED"));
@@ -176,6 +176,80 @@ class OpenTargetPromotionGateTest {
     }
 
     @Test
+    void resultCountsCannotMakeAnIncompleteHoldoutSuitePassVacuously() {
+        Fixture fixture = fixture(false);
+        EvaluationReport invalid = new EvaluationReport(
+            fixture.evaluation().schema(),
+            fixture.evaluation().conjectureId(),
+            fixture.evaluation().status(),
+            fixture.evaluation().compilationStatus(),
+            fixture.evaluation().dynamicRuleId(),
+            fixture.evaluation().provenanceHash(),
+            1,
+            1,
+            0,
+            1,
+            1,
+            0,
+            List.of(),
+            fixture.evaluation().negativeResults(),
+            fixture.evaluation().counterexample(),
+            List.of(),
+            "NOT_EVALUATED",
+            "NOT_EVALUATED");
+        Fixture inconsistent = new Fixture(
+            fixture.conjecture(), invalid, fixture.hypothesis());
+
+        OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
+            inconsistent,
+            novel(fixture.conjecture().conjectureId()),
+            proof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            materialAblation(),
+            ProofPolicy.PROOF_OPTIONAL,
+            "SCRIPT_GENERATED"));
+
+        assertFalse(decision.promoted());
+        assertTrue(decision.promotionBlockers().contains(
+            "candidate-evaluation-not-accepted"));
+    }
+
+    @Test
+    void lifecycleMetadataMustMatchTheConjecture() {
+        Fixture fixture = fixture(false);
+        HypothesisCandidate original = fixture.hypothesis();
+        HypothesisCandidate altered = new HypothesisCandidate(
+            original.id(),
+            original.leftPattern(),
+            original.rightPattern(),
+            original.supportingPaths(),
+            original.supportingExpressions(),
+            List.of("unexpectedAssumption"),
+            original.noveltyScore(),
+            original.proofStatus(),
+            original.counterexampleStatus(),
+            original.counterexampleSearchStatus(),
+            original.counterexampleAttemptedSources(),
+            original.counterexampleExplanation(),
+            original.parameterRelations(),
+            original.expressionPlaceholders(),
+            original.createdAt());
+        Fixture inconsistent = new Fixture(
+            fixture.conjecture(), fixture.evaluation(), altered);
+
+        OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
+            inconsistent,
+            novel(fixture.conjecture().conjectureId()),
+            proof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            materialAblation(),
+            ProofPolicy.PROOF_OPTIONAL,
+            "SCRIPT_GENERATED"));
+
+        assertFalse(decision.promoted());
+        assertTrue(decision.promotionBlockers().contains(
+            "hypothesis-lifecycle-evidence-incomplete"));
+    }
+
+    @Test
     void reportIsDeterministicAcrossEvidenceAndPathOrder() {
         Fixture ordered = fixture(false);
         Fixture reversed = fixture(true);
@@ -183,21 +257,21 @@ class OpenTargetPromotionGateTest {
         OpenTargetPromotionGate.Decision first = gate.evaluate(input(
             ordered,
             novel(ordered.conjecture().conjectureId()),
-            verifiedProof(ordered.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            proof(ordered.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
             materialAblation(),
             ProofPolicy.PROOF_OPTIONAL,
             "SCRIPT_GENERATED"));
         OpenTargetPromotionGate.Decision second = gate.evaluate(input(
             reversed,
             novel(reversed.conjecture().conjectureId()),
-            verifiedProof(reversed.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            proof(reversed.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
             materialAblation(),
             ProofPolicy.PROOF_OPTIONAL,
             "SCRIPT_GENERATED"));
 
         assertEquals(first.evidenceHash(), second.evidenceHash());
         assertEquals(first.toCanonicalJson(), second.toCanonicalJson());
-        assertEquals(first.promotionRecord().rulePath(), second.promotionRecord().rulePath());
+        assertEquals(first.provenance(), second.provenance());
     }
 
     private static OpenTargetPromotionGate.Input input(
@@ -284,15 +358,9 @@ class OpenTargetPromotionGateTest {
 
     private static EvaluationReport acceptedEvaluation(String candidateId) {
         PositiveHoldoutResult positive = new PositiveHoldoutResult(
-            "positive-1",
-            1,
-            true,
-            List.of("x * (2 + 3)"));
+            "positive-1", 1, true, List.of("x * (2 + 3)"));
         NegativeHoldoutResult negative = new NegativeHoldoutResult(
-            "negative-1",
-            0,
-            true,
-            List.of());
+            "negative-1", 0, true, List.of());
         CounterexampleEvidence counterexample = new CounterexampleEvidence(
             "NO_COUNTEREXAMPLE_FOUND",
             List.of("boundary", "numeric"),
@@ -307,7 +375,7 @@ class OpenTargetPromotionGateTest {
             EvaluationStatus.ACCEPTED_FOR_PROOF,
             "COMPILED",
             "dynamic-" + candidateId,
-            "sha256:evaluation-provenance",
+            hash('e'),
             1,
             1,
             0,
@@ -327,8 +395,8 @@ class OpenTargetPromotionGateTest {
             de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.SCHEMA,
             candidateId,
             NoveltyStatus.NOVEL_WITHIN_PROJECT,
-            "sha256:exact-signature",
-            "sha256:alpha-signature",
+            hash('b'),
+            hash('c'),
             7,
             3,
             List.of(),
@@ -336,7 +404,7 @@ class OpenTargetPromotionGateTest {
             "no project duplicate found");
     }
 
-    private static ProofReport verifiedProof(
+    private static ProofReport proof(
         OpenTargetConjecture conjecture,
         ProofStatus status
     ) {
@@ -347,7 +415,7 @@ class OpenTargetPromotionGateTest {
             conjecture.leftPattern(),
             conjecture.rightPattern(),
             List.of(),
-            "sha256:proof-obligation");
+            hash('o'));
         List<String> blockers = status == ProofStatus.SYMBOLICALLY_VERIFIED
             ? List.of()
             : List.of("oracle produced no conclusive equivalence result");
@@ -363,7 +431,7 @@ class OpenTargetPromotionGateTest {
                 : "no equivalence evidence found",
             "NOT_EVALUATED",
             blockers,
-            "sha256:proof-evidence");
+            hash('f'));
     }
 
     private static AblationEvidence materialAblation() {
@@ -431,6 +499,10 @@ class OpenTargetPromotionGateTest {
             evidence.valuePairFingerprint(),
             evidence.pathCompetitionSignature(),
             evidence.paths().reversed());
+    }
+
+    private static String hash(char value) {
+        return "sha256:" + String.valueOf(value).repeat(64);
     }
 
     private record Fixture(
