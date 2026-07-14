@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.cross-family-bridge-transfer/v1",
+  "title": "Regelsuche cross-family bridge transfer evidence v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "hypothesisId",
+    "sourceClusterId",
+    "formationHash",
+    "targetProvided",
+    "trainingFamilies",
+    "heldOutFamilies",
+    "status",
+    "noveltyStatus",
+    "proofStatus",
+    "ablationStatus",
+    "interestingnessStatus",
+    "blockers",
+    "familyResults",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.cross-family-bridge-transfer/v1"
+    },
+    "hypothesisId": { "$ref": "#/$defs/nonBlankString" },
+    "sourceClusterId": { "$ref": "#/$defs/nonBlankString" },
+    "formationHash": { "$ref": "#/$defs/sha256" },
+    "targetProvided": { "const": false },
+    "trainingFamilies": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankString" }
+    },
+    "heldOutFamilies": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankString" }
+    },
+    "status": {
+      "enum": [
+        "ACCEPTED_CROSS_FAMILY_TRANSFER",
+        "REJECTED_FORMATION_FAMILY",
+        "REJECTED_HELD_OUT_TRANSFER",
+        "INCOMPLETE_EVIDENCE"
+      ]
+    },
+    "noveltyStatus": { "const": "NOT_EVALUATED" },
+    "proofStatus": { "const": "NOT_EVALUATED" },
+    "ablationStatus": { "const": "NOT_EVALUATED" },
+    "interestingnessStatus": { "const": "NOT_EVALUATED" },
+    "blockers": { "$ref": "#/$defs/stringArray" },
+    "familyResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/familyResult" }
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "familyResult": {
+      "type": "object",
+      "required": [
+        "familyId",
+        "role",
+        "status",
+        "configuredPositiveHoldouts",
+        "executedPositiveHoldouts",
+        "skippedPositiveHoldouts",
+        "configuredNegativeHoldouts",
+        "executedNegativeHoldouts",
+        "skippedNegativeHoldouts",
+        "failedPositiveHoldouts",
+        "failedNegativeHoldouts",
+        "dynamicRuleId",
+        "provenanceHash",
+        "counterexampleStatus",
+        "counterexampleAttemptedSources",
+        "inferredAssumptions",
+        "counterexampleAssignments",
+        "counterexampleLeftValue",
+        "counterexampleRightValue",
+        "counterexampleExplanation",
+        "blockers"
+      ],
+      "properties": {
+        "familyId": { "$ref": "#/$defs/nonBlankString" },
+        "role": { "enum": ["FORMATION", "HELD_OUT"] },
+        "status": {
+          "enum": [
+            "ACCEPTED",
+            "REJECTED",
+            "INCONCLUSIVE",
+            "COMPILATION_REJECTED",
+            "INCOMPLETE_SUITE"
+          ]
+        },
+        "configuredPositiveHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "executedPositiveHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "skippedPositiveHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "configuredNegativeHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "executedNegativeHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "skippedNegativeHoldouts": { "$ref": "#/$defs/nonNegativeInteger" },
+        "failedPositiveHoldouts": { "$ref": "#/$defs/stringArray" },
+        "failedNegativeHoldouts": { "$ref": "#/$defs/stringArray" },
+        "dynamicRuleId": { "type": "string" },
+        "provenanceHash": { "type": "string" },
+        "counterexampleStatus": { "type": "string" },
+        "counterexampleAttemptedSources": { "$ref": "#/$defs/stringArray" },
+        "inferredAssumptions": { "$ref": "#/$defs/stringArray" },
+        "counterexampleAssignments": { "$ref": "#/$defs/stringArray" },
+        "counterexampleLeftValue": { "type": "string" },
+        "counterexampleRightValue": { "type": "string" },
+        "counterexampleExplanation": { "type": "string" },
+        "blockers": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "nonBlankString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

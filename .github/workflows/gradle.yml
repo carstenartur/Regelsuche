@@ -111,6 +111,21 @@ jobs:
         path: regelsuche-learning/build/reports/open-target-conjecture-mining/**
         if-no-files-found: warn
 
+    - name: Require cross-family bridge transfer evidence after a successful build
+      if: success()
+      shell: bash
+      run: |
+        test -s regelsuche-learning/build/reports/cross-family-bridge-transfer/hypothesis.json
+        test -s regelsuche-learning/build/reports/cross-family-bridge-transfer/report.json
+
+    - name: Upload cross-family bridge transfer evidence
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: cross-family-bridge-transfer-evidence
+        path: regelsuche-learning/build/reports/cross-family-bridge-transfer/**
+        if-no-files-found: warn
+
   dependency-submission:
     runs-on: ubuntu-latest
     permissions:
