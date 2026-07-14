@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Adapts a fully evaluated open-target conjecture into the existing hypothesis lifecycle.
@@ -67,15 +69,17 @@ public final class OpenTargetHypothesisCandidateAdapter {
             throw new IllegalArgumentException(
                 "candidate requires two independently recorded observations");
         }
-        long observations = conjecture.evidence().stream()
+        Set<String> evidenceIds = conjecture.evidence().stream()
             .map(ConvergenceEvidence::observationId)
-            .distinct()
-            .count();
+            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));
+        Set<String> declaredIds = new TreeSet<>(conjecture.supportingObservationIds());
         long alphaSupport = conjecture.evidence().stream()
             .map(ConvergenceEvidence::alphaPairFingerprint)
             .distinct()
             .count();
-        if (observations != conjecture.supportCount()
+        if (evidenceIds.size() != conjecture.supportCount()
+                || declaredIds.size() != conjecture.supportCount()
+                || !declaredIds.equals(evidenceIds)
                 || alphaSupport != conjecture.distinctAlphaSupport()) {
             throw new IllegalArgumentException("candidate support metadata is inconsistent");
         }
