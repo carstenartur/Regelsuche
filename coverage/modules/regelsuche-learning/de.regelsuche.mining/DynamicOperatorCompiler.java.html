@@ -99,8 +99,8 @@ import java.util.regex.Pattern;
         RulePatternNode rightNode;
         try {
 <span class="fc" id="L101">            leftNode = patternParser.parse(leftPattern);</span>
-<span class="nc" id="L102">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L103">            return CompilationResult.rejected(hypothesisId, &quot;left-pattern-unparseable: &quot; + ex.getMessage());</span>
+<span class="fc" id="L102">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L103">            return CompilationResult.rejected(hypothesisId, &quot;left-pattern-unparseable: &quot; + ex.getMessage());</span>
 <span class="fc" id="L104">        }</span>
         try {
 <span class="fc" id="L106">            rightNode = patternParser.parse(rightPattern);</span>

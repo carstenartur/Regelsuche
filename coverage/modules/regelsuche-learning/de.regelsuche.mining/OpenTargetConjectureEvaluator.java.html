@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenTargetConjectureEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">OpenTargetConjectureEvaluator.java</span></div><h1>OpenTargetConjectureEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.mining.DynamicOperatorCompiler.CompilationResult;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.validation.CounterexampleSearchService;
+import de.regelsuche.validation.CounterexampleSearchService.CounterexampleBudget;
+import de.regelsuche.validation.CounterexampleSearchService.CounterexampleSearchResult;
+import de.regelsuche.validation.CounterexampleSearchService.HypothesisInput;
+import de.regelsuche.validation.DeterministicCounterexampleSearchService;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Compiles and challenges an already-formed open-target conjecture.
+ *
+ * &lt;p&gt;Validation is deliberately downstream of candidate formation. Holdout targets,
+ * counterexamples and post-hoc outcomes never flow back into the miner.&lt;/p&gt;
+ */
+public final class OpenTargetConjectureEvaluator {
+    public static final String SCHEMA = &quot;regelsuche.open-target-conjecture-evaluation/v1&quot;;
+
+    private final DynamicOperatorCompiler compiler;
+    private final SymPyEquivalenceService equivalence;
+    private final CounterexampleSearchService counterexampleSearch;
+
+    public OpenTargetConjectureEvaluator() {
+<span class="fc" id="L31">        this(</span>
+            new DynamicOperatorCompiler(),
+            new SymPyEquivalenceService(),
+            new DeterministicCounterexampleSearchService());
+<span class="fc" id="L35">    }</span>
+
+    OpenTargetConjectureEvaluator(
+        DynamicOperatorCompiler compiler,
+        SymPyEquivalenceService equivalence,
+        CounterexampleSearchService counterexampleSearch
+<span class="fc" id="L41">    ) {</span>
+<span class="fc" id="L42">        this.compiler = Objects.requireNonNull(compiler, &quot;compiler&quot;);</span>
+<span class="fc" id="L43">        this.equivalence = Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
+<span class="fc" id="L44">        this.counterexampleSearch = Objects.requireNonNull(</span>
+            counterexampleSearch, &quot;counterexampleSearch&quot;);
+<span class="fc" id="L46">    }</span>
+
+    public EvaluationReport evaluate(OpenTargetConjecture conjecture, EvaluationPlan plan) {
+<span class="fc" id="L49">        Objects.requireNonNull(conjecture, &quot;conjecture&quot;);</span>
+<span class="fc" id="L50">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L51">        validateCandidate(conjecture);</span>
+
+<span class="fc" id="L53">        CompilationResult compilation = compiler.compile(</span>
+<span class="fc" id="L54">            conjecture.conjectureId(),</span>
+<span class="fc" id="L55">            plan.revision(),</span>
+<span class="fc" id="L56">            conjecture.leftPattern(),</span>
+<span class="fc" id="L57">            conjecture.rightPattern());</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (!compilation.isSuccess()) {</span>
+<span class="fc" id="L59">            return compilationRejected(conjecture, plan, compilation.rejectionReason());</span>
+        }
+
+<span class="fc" id="L62">        DynamicPatternOperator operator = compilation.operator().orElseThrow();</span>
+<span class="fc" id="L63">        List&lt;PositiveHoldoutResult&gt; positives = plan.positiveHoldouts().stream()</span>
+<span class="fc" id="L64">            .map(holdout -&gt; evaluatePositive(operator, holdout))</span>
+<span class="fc" id="L65">            .toList();</span>
+<span class="fc" id="L66">        List&lt;NegativeHoldoutResult&gt; negatives = plan.negativeHoldouts().stream()</span>
+<span class="fc" id="L67">            .map(holdout -&gt; evaluateNegative(operator, holdout))</span>
+<span class="fc" id="L68">            .toList();</span>
+<span class="fc" id="L69">        CounterexampleSearchResult counterexample = counterexampleSearch.search(</span>
+            new HypothesisInput(
+<span class="fc" id="L71">                conjecture.conjectureId(),</span>
+<span class="fc" id="L72">                conjecture.leftPattern(),</span>
+<span class="fc" id="L73">                conjecture.rightPattern(),</span>
+<span class="fc" id="L74">                pathAssumptions(conjecture)),</span>
+<span class="fc" id="L75">            plan.counterexampleBudget());</span>
+
+<span class="fc" id="L77">        LinkedHashSet&lt;String&gt; blockers = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L78">        List&lt;String&gt; failedPositiveIds = positives.stream()</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            .filter(result -&gt; !result.passed())</span>
+<span class="fc" id="L80">            .map(PositiveHoldoutResult::id)</span>
+<span class="fc" id="L81">            .toList();</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (!failedPositiveIds.isEmpty()) {</span>
+<span class="nc" id="L83">            blockers.add(&quot;positive holdouts failed: &quot; + String.join(&quot;,&quot;, failedPositiveIds));</span>
+        }
+<span class="fc" id="L85">        List&lt;String&gt; failedNegativeIds = negatives.stream()</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            .filter(result -&gt; !result.passed())</span>
+<span class="fc" id="L87">            .map(NegativeHoldoutResult::id)</span>
+<span class="fc" id="L88">            .toList();</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (!failedNegativeIds.isEmpty()) {</span>
+<span class="nc" id="L90">            blockers.add(&quot;negative holdouts failed: &quot; + String.join(&quot;,&quot;, failedNegativeIds));</span>
+        }
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (counterexample.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {</span>
+<span class="fc" id="L93">            blockers.add(&quot;counterexample found&quot;);</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!counterexample.inferredAssumptions().isEmpty()) {</span>
+<span class="nc" id="L96">            blockers.add(&quot;counterexample search inferred assumptions&quot;);</span>
+        }
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (counterexample.status() == CounterexampleSearchService.Status.INCONCLUSIVE) {</span>
+<span class="nc" id="L99">            blockers.add(&quot;counterexample search inconclusive&quot;);</span>
+        }
+
+<span class="pc bpc" id="L102" title="2 of 4 branches missed.">        boolean holdoutFailure = !failedPositiveIds.isEmpty() || !failedNegativeIds.isEmpty();</span>
+        EvaluationStatus status;
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (holdoutFailure</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                || counterexample.status() == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {</span>
+<span class="fc" id="L106">            status = EvaluationStatus.REJECTED;</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        } else if (counterexample.status() == CounterexampleSearchService.Status.INCONCLUSIVE</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                || !counterexample.inferredAssumptions().isEmpty()) {</span>
+<span class="nc" id="L109">            status = EvaluationStatus.INCONCLUSIVE;</span>
+        } else {
+<span class="fc" id="L111">            status = EvaluationStatus.ACCEPTED_FOR_PROOF;</span>
+        }
+<span class="fc" id="L113">        return new EvaluationReport(</span>
+            SCHEMA,
+<span class="fc" id="L115">            conjecture.conjectureId(),</span>
+            status,
+            &quot;COMPILED&quot;,
+<span class="fc" id="L118">            operator.ruleId(),</span>
+<span class="fc" id="L119">            operator.provenanceHash(),</span>
+<span class="fc" id="L120">            plan.positiveHoldouts().size(),</span>
+<span class="fc" id="L121">            positives.size(),</span>
+            0,
+<span class="fc" id="L123">            plan.negativeHoldouts().size(),</span>
+<span class="fc" id="L124">            negatives.size(),</span>
+            0,
+            positives,
+            negatives,
+<span class="fc" id="L128">            CounterexampleEvidence.from(counterexample),</span>
+<span class="fc" id="L129">            List.copyOf(blockers),</span>
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;);
+    }
+
+    private PositiveHoldoutResult evaluatePositive(
+        DynamicPatternOperator operator,
+        PositiveHoldout holdout
+    ) {
+<span class="fc" id="L138">        List&lt;String&gt; candidates = operator.generateCandidates(holdout.inputExpression()).stream()</span>
+<span class="fc" id="L139">            .map(transformation -&gt; transformation.transformedExpression())</span>
+<span class="fc" id="L140">            .sorted()</span>
+<span class="fc" id="L141">            .toList();</span>
+<span class="fc" id="L142">        boolean equivalent = candidates.stream().anyMatch(candidate -&gt;</span>
+<span class="fc" id="L143">            equivalence.areEquivalent(candidate, holdout.targetExpression()));</span>
+<span class="fc" id="L144">        return new PositiveHoldoutResult(</span>
+<span class="fc" id="L145">            holdout.id(), candidates.size(), equivalent, candidates);</span>
+    }
+
+    private NegativeHoldoutResult evaluateNegative(
+        DynamicPatternOperator operator,
+        NegativeHoldout holdout
+    ) {
+<span class="fc" id="L152">        List&lt;String&gt; candidates = operator.generateCandidates(holdout.inputExpression()).stream()</span>
+<span class="pc" id="L153">            .map(transformation -&gt; transformation.transformedExpression())</span>
+<span class="fc" id="L154">            .sorted()</span>
+<span class="fc" id="L155">            .toList();</span>
+<span class="fc" id="L156">        return new NegativeHoldoutResult(</span>
+<span class="fc" id="L157">            holdout.id(), candidates.size(), candidates.isEmpty(), candidates);</span>
+    }
+
+    private EvaluationReport compilationRejected(
+        OpenTargetConjecture conjecture,
+        EvaluationPlan plan,
+        String reason
+    ) {
+<span class="fc" id="L165">        return new EvaluationReport(</span>
+            SCHEMA,
+<span class="fc" id="L167">            conjecture.conjectureId(),</span>
+            EvaluationStatus.COMPILATION_REJECTED,
+            &quot;REJECTED&quot;,
+            &quot;&quot;,
+            &quot;&quot;,
+<span class="fc" id="L172">            plan.positiveHoldouts().size(),</span>
+            0,
+<span class="fc" id="L174">            plan.positiveHoldouts().size(),</span>
+<span class="fc" id="L175">            plan.negativeHoldouts().size(),</span>
+            0,
+<span class="fc" id="L177">            plan.negativeHoldouts().size(),</span>
+<span class="fc" id="L178">            List.of(),</span>
+<span class="fc" id="L179">            List.of(),</span>
+<span class="fc" id="L180">            CounterexampleEvidence.notRun(),</span>
+<span class="fc" id="L181">            List.of(&quot;compilation rejected: &quot; + reason),</span>
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;);
+    }
+
+    private static List&lt;String&gt; pathAssumptions(OpenTargetConjecture conjecture) {
+<span class="fc" id="L187">        return conjecture.evidence().stream()</span>
+<span class="pc" id="L188">            .flatMap(evidence -&gt; evidence.paths().stream())</span>
+<span class="pc" id="L189">            .flatMap(path -&gt; path.assumptions().stream())</span>
+<span class="pc bnc" id="L190" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L191">            .distinct()</span>
+<span class="fc" id="L192">            .sorted()</span>
+<span class="fc" id="L193">            .toList();</span>
+    }
+
+    private static void validateCandidate(OpenTargetConjecture conjecture) {
+<span class="fc" id="L197">        requireText(conjecture.conjectureId(), &quot;conjectureId&quot;);</span>
+<span class="fc" id="L198">        requireText(conjecture.leftPattern(), &quot;leftPattern&quot;);</span>
+<span class="fc" id="L199">        requireText(conjecture.rightPattern(), &quot;rightPattern&quot;);</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (conjecture.leftPattern().equals(conjecture.rightPattern())) {</span>
+<span class="nc" id="L201">            throw new IllegalArgumentException(&quot;candidate patterns must differ&quot;);</span>
+        }
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">        if (conjecture.supportCount() &lt; 2 || conjecture.distinctAlphaSupport() &lt; 2) {</span>
+<span class="nc" id="L204">            throw new IllegalArgumentException(</span>
+                &quot;candidate requires two independently supported observations&quot;);
+        }
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (!&quot;OBSERVED_CONJECTURE&quot;.equals(conjecture.candidateStatus())</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">                || !&quot;EQUIVALENCE_PRESERVING_CONVERGENT_PATHS&quot;.equals(</span>
+<span class="fc" id="L209">                    conjecture.evidenceStatus())) {</span>
+<span class="nc" id="L210">            throw new IllegalArgumentException(&quot;candidate lacks open-target convergence evidence&quot;);</span>
+        }
+<span class="fc" id="L212">    }</span>
+
+<span class="fc" id="L214">    public enum EvaluationStatus {</span>
+<span class="fc" id="L215">        ACCEPTED_FOR_PROOF,</span>
+<span class="fc" id="L216">        INCONCLUSIVE,</span>
+<span class="fc" id="L217">        REJECTED,</span>
+<span class="fc" id="L218">        COMPILATION_REJECTED</span>
+    }
+
+    public record EvaluationPlan(
+        String revision,
+        List&lt;PositiveHoldout&gt; positiveHoldouts,
+        List&lt;NegativeHoldout&gt; negativeHoldouts,
+        CounterexampleBudget counterexampleBudget
+    ) {
+<span class="fc" id="L227">        public EvaluationPlan {</span>
+<span class="fc" id="L228">            requireText(revision, &quot;revision&quot;);</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            positiveHoldouts = positiveHoldouts == null ? List.of() : positiveHoldouts.stream()</span>
+<span class="fc" id="L230">                .sorted(java.util.Comparator.comparing(PositiveHoldout::id))</span>
+<span class="fc" id="L231">                .toList();</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            negativeHoldouts = negativeHoldouts == null ? List.of() : negativeHoldouts.stream()</span>
+<span class="fc" id="L233">                .sorted(java.util.Comparator.comparing(NegativeHoldout::id))</span>
+<span class="fc" id="L234">                .toList();</span>
+<span class="pc bpc" id="L235" title="2 of 4 branches missed.">            if (positiveHoldouts.isEmpty() || negativeHoldouts.isEmpty()) {</span>
+<span class="nc" id="L236">                throw new IllegalArgumentException(</span>
+                    &quot;fresh positive and negative holdouts are both required&quot;);
+            }
+<span class="fc" id="L239">            Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L240">            positiveHoldouts.forEach(holdout -&gt; {</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                if (!ids.add(holdout.id())) {</span>
+<span class="nc" id="L242">                    throw new IllegalArgumentException(&quot;duplicate holdout ID: &quot; + holdout.id());</span>
+                }
+<span class="fc" id="L244">            });</span>
+<span class="fc" id="L245">            negativeHoldouts.forEach(holdout -&gt; {</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                if (!ids.add(holdout.id())) {</span>
+<span class="nc" id="L247">                    throw new IllegalArgumentException(&quot;duplicate holdout ID: &quot; + holdout.id());</span>
+                }
+<span class="fc" id="L249">            });</span>
+<span class="fc" id="L250">            Objects.requireNonNull(counterexampleBudget, &quot;counterexampleBudget&quot;);</span>
+<span class="fc" id="L251">        }</span>
+    }
+
+    public record PositiveHoldout(String id, String inputExpression, String targetExpression) {
+<span class="fc" id="L255">        public PositiveHoldout {</span>
+<span class="fc" id="L256">            requireText(id, &quot;positive holdout id&quot;);</span>
+<span class="fc" id="L257">            requireText(inputExpression, &quot;positive holdout input&quot;);</span>
+<span class="fc" id="L258">            requireText(targetExpression, &quot;positive holdout target&quot;);</span>
+<span class="fc" id="L259">        }</span>
+    }
+
+    public record NegativeHoldout(String id, String inputExpression) {
+<span class="fc" id="L263">        public NegativeHoldout {</span>
+<span class="fc" id="L264">            requireText(id, &quot;negative holdout id&quot;);</span>
+<span class="fc" id="L265">            requireText(inputExpression, &quot;negative holdout input&quot;);</span>
+<span class="fc" id="L266">        }</span>
+    }
+
+    public record PositiveHoldoutResult(
+        String id,
+        int candidateCount,
+        boolean equivalentCandidate,
+        List&lt;String&gt; candidateExpressions
+    ) {
+<span class="fc" id="L275">        public PositiveHoldoutResult {</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            candidateExpressions = candidateExpressions == null</span>
+<span class="nc" id="L277">                ? List.of()</span>
+<span class="fc" id="L278">                : List.copyOf(candidateExpressions);</span>
+<span class="fc" id="L279">        }</span>
+
+        public boolean passed() {
+<span class="fc" id="L282">            return equivalentCandidate;</span>
+        }
+    }
+
+    public record NegativeHoldoutResult(
+        String id,
+        int candidateCount,
+        boolean noApplication,
+        List&lt;String&gt; candidateExpressions
+    ) {
+<span class="fc" id="L292">        public NegativeHoldoutResult {</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            candidateExpressions = candidateExpressions == null</span>
+<span class="nc" id="L294">                ? List.of()</span>
+<span class="fc" id="L295">                : List.copyOf(candidateExpressions);</span>
+<span class="fc" id="L296">        }</span>
+
+        public boolean passed() {
+<span class="fc" id="L299">            return noApplication;</span>
+        }
+    }
+
+    public record CounterexampleEvidence(
+        String status,
+        List&lt;String&gt; attemptedSources,
+        List&lt;String&gt; inferredAssumptions,
+        List&lt;String&gt; assignments,
+        String leftValue,
+        String rightValue,
+        String explanation
+    ) {
+<span class="fc" id="L312">        public CounterexampleEvidence {</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            attemptedSources = attemptedSources == null ? List.of() : List.copyOf(attemptedSources);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">            inferredAssumptions = inferredAssumptions == null</span>
+<span class="nc" id="L315">                ? List.of()</span>
+<span class="fc" id="L316">                : List.copyOf(inferredAssumptions);</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">            assignments = assignments == null ? List.of() : List.copyOf(assignments);</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            leftValue = leftValue == null ? &quot;&quot; : leftValue;</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">            rightValue = rightValue == null ? &quot;&quot; : rightValue;</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            explanation = explanation == null ? &quot;&quot; : explanation;</span>
+<span class="fc" id="L321">        }</span>
+
+        static CounterexampleEvidence from(CounterexampleSearchResult result) {
+<span class="fc" id="L324">            List&lt;String&gt; assignments = result.counterexample()</span>
+<span class="fc" id="L325">                .map(CounterexampleSearchService.Counterexample::assignments)</span>
+<span class="fc" id="L326">                .orElse(List.of());</span>
+<span class="fc" id="L327">            String left = result.counterexample()</span>
+<span class="fc" id="L328">                .map(CounterexampleSearchService.Counterexample::leftValue)</span>
+<span class="fc" id="L329">                .orElse(&quot;&quot;);</span>
+<span class="fc" id="L330">            String right = result.counterexample()</span>
+<span class="fc" id="L331">                .map(CounterexampleSearchService.Counterexample::rightValue)</span>
+<span class="fc" id="L332">                .orElse(&quot;&quot;);</span>
+<span class="fc" id="L333">            return new CounterexampleEvidence(</span>
+<span class="fc" id="L334">                result.status().name(),</span>
+<span class="fc" id="L335">                result.attemptedSources(),</span>
+<span class="fc" id="L336">                result.inferredAssumptions(),</span>
+                assignments,
+                left,
+                right,
+<span class="fc" id="L340">                result.explanation());</span>
+        }
+
+        static CounterexampleEvidence notRun() {
+<span class="fc" id="L344">            return new CounterexampleEvidence(</span>
+<span class="fc" id="L345">                &quot;NOT_RUN&quot;, List.of(), List.of(), List.of(), &quot;&quot;, &quot;&quot;, &quot;compilation failed&quot;);</span>
+        }
+    }
+
+    public record EvaluationReport(
+        String schema,
+        String conjectureId,
+        EvaluationStatus status,
+        String compilationStatus,
+        String dynamicRuleId,
+        String provenanceHash,
+        int configuredPositiveHoldouts,
+        int executedPositiveHoldouts,
+        int skippedPositiveHoldouts,
+        int configuredNegativeHoldouts,
+        int executedNegativeHoldouts,
+        int skippedNegativeHoldouts,
+        List&lt;PositiveHoldoutResult&gt; positiveResults,
+        List&lt;NegativeHoldoutResult&gt; negativeResults,
+        CounterexampleEvidence counterexample,
+        List&lt;String&gt; blockers,
+        String proofStatus,
+        String noveltyStatus
+    ) {
+<span class="fc" id="L369">        public EvaluationReport {</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            positiveResults = positiveResults == null ? List.of() : List.copyOf(positiveResults);</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            negativeResults = negativeResults == null ? List.of() : List.copyOf(negativeResults);</span>
+<span class="fc" id="L372">            counterexample = Objects.requireNonNull(counterexample, &quot;counterexample&quot;);</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : List.copyOf(blockers);</span>
+<span class="fc" id="L374">        }</span>
+
+        public boolean holdoutsComplete() {
+<span class="pc bpc" id="L377" title="3 of 8 branches missed.">            return configuredPositiveHoldouts == executedPositiveHoldouts</span>
+                &amp;&amp; configuredNegativeHoldouts == executedNegativeHoldouts
+                &amp;&amp; skippedPositiveHoldouts == 0
+                &amp;&amp; skippedNegativeHoldouts == 0;
+        }
+
+        public boolean allHoldoutsPassed() {
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            return holdoutsComplete()</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">                &amp;&amp; positiveResults.stream().allMatch(PositiveHoldoutResult::passed)</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                &amp;&amp; negativeResults.stream().allMatch(NegativeHoldoutResult::passed);</span>
+        }
+
+        public boolean acceptedForProof() {
+<span class="fc bfc" id="L390" title="All 2 branches covered.">            return status == EvaluationStatus.ACCEPTED_FOR_PROOF;</span>
+        }
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L395" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L396">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L398">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

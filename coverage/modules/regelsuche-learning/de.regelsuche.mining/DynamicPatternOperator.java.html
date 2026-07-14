@@ -145,8 +145,8 @@ public final class DynamicPatternOperator implements HypothesisOperator {
 <span class="fc" id="L145">        int inputNodes = canonicalizer.astNodeCount(input);</span>
 <span class="fc" id="L146">        int outputNodes = canonicalizer.astNodeCount(output);</span>
 <span class="pc bpc" id="L147" title="2 of 4 branches missed.">        boolean strictlySimpler = outputNodes &lt; inputNodes</span>
-<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            || (outputNodes == inputNodes &amp;&amp; output.length() &lt; input.length());</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        return !strictlySimpler;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            || (outputNodes == inputNodes &amp;&amp; output.length() &lt; input.length());</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        return !strictlySimpler;</span>
     }
 
     private String formatted(String expression) {

@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenTargetConjectureProofGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">OpenTargetConjectureProofGate.java</span></div><h1>OpenTargetConjectureProofGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.equivalence.EquivalenceService;
+import de.regelsuche.equivalence.SymPyEquivalenceService;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+
+/**
+ * Emits and checks a proof obligation only after an open-target candidate passed
+ * compilation, fresh holdouts and counterexample search.
+ *
+ * &lt;p&gt;The oracle receives an already-formed relation. It cannot construct the
+ * search path, conjecture or ranking, and its result never flows back into mining.&lt;/p&gt;
+ */
+public final class OpenTargetConjectureProofGate {
+    public static final String REPORT_SCHEMA = &quot;regelsuche.open-target-conjecture-proof/v1&quot;;
+    public static final String OBLIGATION_SCHEMA =
+        &quot;regelsuche.open-target-conjecture-proof-obligation/v1&quot;;
+
+    private final EquivalenceService oracle;
+    private final String backendId;
+
+    public OpenTargetConjectureProofGate() {
+<span class="nc" id="L34">        this(new SymPyEquivalenceService(), &quot;sympy-equivalence-v1&quot;);</span>
+<span class="nc" id="L35">    }</span>
+
+<span class="fc" id="L37">    OpenTargetConjectureProofGate(EquivalenceService oracle, String backendId) {</span>
+<span class="fc" id="L38">        this.oracle = Objects.requireNonNull(oracle, &quot;oracle&quot;);</span>
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">        if (backendId == null || backendId.isBlank()) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;backendId must not be blank&quot;);</span>
+        }
+<span class="fc" id="L42">        this.backendId = backendId;</span>
+<span class="fc" id="L43">    }</span>
+
+    public ProofReport evaluate(
+        OpenTargetConjecture conjecture,
+        EvaluationReport evaluation
+    ) {
+<span class="fc" id="L49">        Objects.requireNonNull(conjecture, &quot;conjecture&quot;);</span>
+<span class="fc" id="L50">        Objects.requireNonNull(evaluation, &quot;evaluation&quot;);</span>
+<span class="fc" id="L51">        List&lt;String&gt; blockers = eligibilityBlockers(conjecture, evaluation);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (!blockers.isEmpty()) {</span>
+<span class="fc" id="L53">            return report(</span>
+<span class="fc" id="L54">                conjecture.conjectureId(),</span>
+                EligibilityStatus.NOT_ELIGIBLE,
+                ProofStatus.NOT_RUN,
+                null,
+                &quot;&quot;,
+                blockers,
+                &quot;NOT_EVALUATED&quot;);
+        }
+
+<span class="fc" id="L63">        List&lt;String&gt; assumptions = conjecture.evidence().stream()</span>
+<span class="fc" id="L64">            .flatMap(item -&gt; item.paths().stream())</span>
+<span class="fc" id="L65">            .flatMap(path -&gt; path.assumptions().stream())</span>
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L67">            .distinct()</span>
+<span class="fc" id="L68">            .sorted()</span>
+<span class="fc" id="L69">            .toList();</span>
+<span class="fc" id="L70">        ProofObligation obligation = new ProofObligation(</span>
+            OBLIGATION_SCHEMA,
+<span class="fc" id="L72">            conjecture.conjectureId(),</span>
+            false,
+<span class="fc" id="L74">            conjecture.leftPattern(),</span>
+<span class="fc" id="L75">            conjecture.rightPattern(),</span>
+            assumptions,
+<span class="fc" id="L77">            obligationHash(conjecture.leftPattern(), conjecture.rightPattern(), assumptions));</span>
+
+<span class="fc" id="L79">        boolean equivalent = oracle.areEquivalent(</span>
+<span class="fc" id="L80">            obligation.leftExpression(), obligation.rightExpression());</span>
+<span class="fc" id="L81">        String backendEvidence = oracle.evidence(</span>
+<span class="fc" id="L82">            obligation.leftExpression(), obligation.rightExpression());</span>
+<span class="fc" id="L83">        ProofStatus status = classify(equivalent, backendEvidence);</span>
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        List&lt;String&gt; resultBlockers = switch (status) {</span>
+<span class="fc" id="L85">            case SYMBOLICALLY_VERIFIED -&gt; List.of();</span>
+<span class="fc" id="L86">            case REFUTED -&gt; List.of(&quot;oracle refuted the conjecture&quot;);</span>
+<span class="fc" id="L87">            case INCONCLUSIVE -&gt; List.of(&quot;oracle produced no conclusive equivalence result&quot;);</span>
+<span class="pc" id="L88">            case NOT_RUN -&gt; throw new IllegalStateException(&quot;eligible proof must run the oracle&quot;);</span>
+        };
+<span class="fc" id="L90">        return report(</span>
+<span class="fc" id="L91">            conjecture.conjectureId(),</span>
+            EligibilityStatus.ELIGIBLE,
+            status,
+            obligation,
+            backendEvidence,
+            resultBlockers,
+            &quot;NOT_EVALUATED&quot;);
+    }
+
+    private ProofReport report(
+        String conjectureId,
+        EligibilityStatus eligibility,
+        ProofStatus status,
+        ProofObligation obligation,
+        String backendEvidence,
+        List&lt;String&gt; blockers,
+        String formalProofStatus
+    ) {
+<span class="fc" id="L109">        List&lt;String&gt; orderedBlockers = blockers.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L110">        String evidenceMaterial = REPORT_SCHEMA</span>
+            + &quot;\nconjecture=&quot; + conjectureId
+            + &quot;\neligibility=&quot; + eligibility
+            + &quot;\nproof=&quot; + status
+            + &quot;\nbackend=&quot; + backendId
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            + &quot;\nobligation=&quot; + (obligation == null ? &quot;&quot; : obligation.obligationHash())</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            + &quot;\nevidence=&quot; + (backendEvidence == null ? &quot;&quot; : backendEvidence)</span>
+            + &quot;\nformal=&quot; + formalProofStatus
+<span class="fc" id="L118">            + &quot;\nblockers=&quot; + String.join(&quot;\u0001&quot;, orderedBlockers);</span>
+<span class="fc" id="L119">        return new ProofReport(</span>
+            REPORT_SCHEMA,
+            conjectureId,
+            eligibility,
+            status,
+            obligation,
+            backendId,
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            backendEvidence == null ? &quot;&quot; : backendEvidence,</span>
+            formalProofStatus,
+            orderedBlockers,
+<span class="fc" id="L129">            hash(evidenceMaterial));</span>
+    }
+
+    private static List&lt;String&gt; eligibilityBlockers(
+        OpenTargetConjecture conjecture,
+        EvaluationReport evaluation
+    ) {
+<span class="fc" id="L136">        LinkedHashSet&lt;String&gt; blockers = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (!conjecture.conjectureId().equals(evaluation.conjectureId())) {</span>
+<span class="nc" id="L138">            blockers.add(&quot;candidate/evaluation provenance mismatch&quot;);</span>
+        }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (evaluation.status() != EvaluationStatus.ACCEPTED_FOR_PROOF) {</span>
+<span class="fc" id="L141">            blockers.add(&quot;candidate is not accepted for proof&quot;);</span>
+        }
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (!evaluation.holdoutsComplete()) {</span>
+<span class="nc" id="L144">            blockers.add(&quot;holdout evaluation is incomplete&quot;);</span>
+        }
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (!evaluation.allHoldoutsPassed()) {</span>
+<span class="nc" id="L147">            blockers.add(&quot;one or more holdouts failed&quot;);</span>
+        }
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!&quot;NO_COUNTEREXAMPLE_FOUND&quot;.equals(evaluation.counterexample().status())) {</span>
+<span class="nc" id="L150">            blockers.add(&quot;counterexample search did not clear the candidate&quot;);</span>
+        }
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (!evaluation.blockers().isEmpty()) {</span>
+<span class="fc" id="L153">            blockers.add(&quot;candidate evaluation contains blockers&quot;);</span>
+        }
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (!&quot;OBSERVED_CONJECTURE&quot;.equals(conjecture.candidateStatus())</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                || !&quot;EQUIVALENCE_PRESERVING_CONVERGENT_PATHS&quot;.equals(</span>
+<span class="fc" id="L157">                    conjecture.evidenceStatus())</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                || conjecture.supportCount() &lt; 2</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                || conjecture.distinctAlphaSupport() &lt; 2) {</span>
+<span class="nc" id="L160">            blockers.add(&quot;candidate lacks independent open-target convergence evidence&quot;);</span>
+        }
+<span class="fc" id="L162">        return List.copyOf(blockers);</span>
+    }
+
+    private static ProofStatus classify(boolean equivalent, String evidence) {
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (equivalent) {</span>
+<span class="fc" id="L167">            return ProofStatus.SYMBOLICALLY_VERIFIED;</span>
+        }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        String normalized = evidence == null ? &quot;&quot; : evidence.toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (normalized.contains(&quot;not equivalent&quot;)</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                || normalized.contains(&quot;counterexample&quot;)</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                || normalized.contains(&quot;refut&quot;)) {</span>
+<span class="fc" id="L173">            return ProofStatus.REFUTED;</span>
+        }
+<span class="fc" id="L175">        return ProofStatus.INCONCLUSIVE;</span>
+    }
+
+    private static String obligationHash(
+        String leftExpression,
+        String rightExpression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L183">        return hash(OBLIGATION_SCHEMA</span>
+            + &quot;\ntargetProvided=false&quot;
+<span class="fc" id="L185">            + &quot;\nleft=&quot; + leftExpression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;)</span>
+<span class="fc" id="L186">            + &quot;\nright=&quot; + rightExpression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;)</span>
+<span class="fc" id="L187">            + &quot;\nassumptions=&quot; + String.join(&quot;\u0001&quot;, assumptions));</span>
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L192">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L193">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L194">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L195">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L196">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L200">    public enum EligibilityStatus {</span>
+<span class="fc" id="L201">        ELIGIBLE,</span>
+<span class="fc" id="L202">        NOT_ELIGIBLE</span>
+    }
+
+<span class="fc" id="L205">    public enum ProofStatus {</span>
+<span class="fc" id="L206">        SYMBOLICALLY_VERIFIED,</span>
+<span class="fc" id="L207">        REFUTED,</span>
+<span class="fc" id="L208">        INCONCLUSIVE,</span>
+<span class="fc" id="L209">        NOT_RUN</span>
+    }
+
+    public record ProofObligation(
+        String schema,
+        String conjectureId,
+        boolean targetProvided,
+        String leftExpression,
+        String rightExpression,
+        List&lt;String&gt; assumptions,
+        String obligationHash
+    ) {
+<span class="fc" id="L221">        public ProofObligation {</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (!OBLIGATION_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L223">                throw new IllegalArgumentException(&quot;unsupported proof-obligation schema&quot;);</span>
+            }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (targetProvided) {</span>
+<span class="nc" id="L226">                throw new IllegalArgumentException(&quot;open-target proof obligation must not contain a target&quot;);</span>
+            }
+<span class="pc bpc" id="L228" title="3 of 6 branches missed.">            if (conjectureId == null || conjectureId.isBlank()</span>
+<span class="pc bpc" id="L229" title="2 of 4 branches missed.">                    || leftExpression == null || leftExpression.isBlank()</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                    || rightExpression == null || rightExpression.isBlank()) {</span>
+<span class="nc" id="L231">                throw new IllegalArgumentException(&quot;proof obligation fields must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : assumptions.stream()</span>
+<span class="pc bpc" id="L234" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L235">                .distinct()</span>
+<span class="fc" id="L236">                .sorted()</span>
+<span class="fc" id="L237">                .toList();</span>
+<span class="pc bpc" id="L238" title="2 of 4 branches missed.">            if (obligationHash == null || !obligationHash.startsWith(&quot;sha256:&quot;)) {</span>
+<span class="nc" id="L239">                throw new IllegalArgumentException(&quot;obligationHash must be SHA-256&quot;);</span>
+            }
+<span class="fc" id="L241">        }</span>
+    }
+
+    public record ProofReport(
+        String schema,
+        String conjectureId,
+        EligibilityStatus eligibility,
+        ProofStatus proofStatus,
+        ProofObligation obligation,
+        String backendId,
+        String backendEvidence,
+        String formalProofStatus,
+        List&lt;String&gt; blockers,
+        String evidenceHash
+    ) {
+<span class="fc" id="L256">        public ProofReport {</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            if (!REPORT_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L258">                throw new IllegalArgumentException(&quot;unsupported proof-report schema&quot;);</span>
+            }
+<span class="fc" id="L260">            Objects.requireNonNull(eligibility, &quot;eligibility&quot;);</span>
+<span class="fc" id="L261">            Objects.requireNonNull(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : List.copyOf(blockers);</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            backendEvidence = backendEvidence == null ? &quot;&quot; : backendEvidence;</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            formalProofStatus = formalProofStatus == null ? &quot;NOT_EVALUATED&quot; : formalProofStatus;</span>
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">            if (evidenceHash == null || !evidenceHash.startsWith(&quot;sha256:&quot;)) {</span>
+<span class="nc" id="L266">                throw new IllegalArgumentException(&quot;evidenceHash must be SHA-256&quot;);</span>
+            }
+<span class="fc" id="L268">        }</span>
+
+        public boolean proofObligationEmitted() {
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            return obligation != null;</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L275">            JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L276">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L277">                .property(&quot;conjectureId&quot;, conjectureId)</span>
+<span class="fc" id="L278">                .property(&quot;eligibility&quot;, eligibility.name())</span>
+<span class="fc" id="L279">                .property(&quot;proofStatus&quot;, proofStatus.name())</span>
+<span class="fc" id="L280">                .property(&quot;proofObligationEmitted&quot;, proofObligationEmitted())</span>
+<span class="fc" id="L281">                .property(&quot;backendId&quot;, backendId)</span>
+<span class="fc" id="L282">                .property(&quot;backendEvidence&quot;, backendEvidence)</span>
+<span class="fc" id="L283">                .property(&quot;formalProofStatus&quot;, formalProofStatus)</span>
+<span class="fc" id="L284">                .stringArray(&quot;blockers&quot;, blockers)</span>
+<span class="fc" id="L285">                .property(&quot;evidenceHash&quot;, evidenceHash);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            if (obligation == null) {</span>
+<span class="fc" id="L287">                json.nullProperty(&quot;obligation&quot;);</span>
+            } else {
+<span class="fc" id="L289">                json.object(&quot;obligation&quot;, object -&gt; object</span>
+<span class="fc" id="L290">                    .property(&quot;schema&quot;, obligation.schema())</span>
+<span class="fc" id="L291">                    .property(&quot;conjectureId&quot;, obligation.conjectureId())</span>
+<span class="fc" id="L292">                    .property(&quot;targetProvided&quot;, obligation.targetProvided())</span>
+<span class="fc" id="L293">                    .property(&quot;leftExpression&quot;, obligation.leftExpression())</span>
+<span class="fc" id="L294">                    .property(&quot;rightExpression&quot;, obligation.rightExpression())</span>
+<span class="fc" id="L295">                    .stringArray(&quot;assumptions&quot;, obligation.assumptions())</span>
+<span class="fc" id="L296">                    .property(&quot;obligationHash&quot;, obligation.obligationHash()));</span>
+            }
+<span class="fc" id="L298">            return json.endObject().toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
