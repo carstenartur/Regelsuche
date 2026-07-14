@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.interestingness-calibration/v1",
+  "title": "Regelsuche held-out interestingness profile calibration v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "selectedProfile",
+    "predictiveDatasetHash",
+    "labeledEvaluationHash",
+    "calibrationFamilies",
+    "testFamilies",
+    "profileMetrics",
+    "calibrationResults",
+    "testResults",
+    "calibrationAgreementPermille",
+    "testAgreementPermille",
+    "testParetoFront",
+    "blockers",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.interestingness-calibration/v1" },
+    "status": { "enum": ["EVALUATED", "SPLIT_REJECTED"] },
+    "selectedProfile": { "$ref": "#/$defs/nonBlank" },
+    "predictiveDatasetHash": { "$ref": "#/$defs/sha256" },
+    "labeledEvaluationHash": { "$ref": "#/$defs/sha256" },
+    "calibrationFamilies": { "$ref": "#/$defs/stringArray" },
+    "testFamilies": { "$ref": "#/$defs/stringArray" },
+    "profileMetrics": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/profileMetric" }
+    },
+    "calibrationResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/caseResult" }
+    },
+    "testResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/caseResult" }
+    },
+    "calibrationAgreementPermille": { "$ref": "#/$defs/permille" },
+    "testAgreementPermille": { "$ref": "#/$defs/permille" },
+    "testParetoFront": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/paretoPoint" }
+    },
+    "blockers": { "$ref": "#/$defs/stringArray" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "profileMetric": {
+      "type": "object",
+      "required": [
+        "profile",
+        "calibrationAgreementPermille",
+        "rankableComplete",
+        "rankableIncomplete",
+        "blocked"
+      ],
+      "properties": {
+        "profile": { "enum": ["THEORY_DISCOVERY", "SEARCH_REUSE"] },
+        "calibrationAgreementPermille": { "$ref": "#/$defs/permille" },
+        "rankableComplete": { "$ref": "#/$defs/nonNegative" },
+        "rankableIncomplete": { "$ref": "#/$defs/nonNegative" },
+        "blocked": { "$ref": "#/$defs/nonNegative" }
+      },
+      "additionalProperties": false
+    },
+    "caseResult": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "structuralFamily",
+        "split",
+        "relevanceLabel",
+        "eligibility",
+        "totalPermille",
+        "unresolvedRiskPenaltyPermille",
+        "controlPenaltyPermille",
+        "assessmentHash",
+        "contributions"
+      ],
+      "properties": {
+        "caseId": { "$ref": "#/$defs/nonBlank" },
+        "structuralFamily": { "$ref": "#/$defs/nonBlank" },
+        "split": { "enum": ["CALIBRATION", "TEST"] },
+        "relevanceLabel": { "enum": ["CONTROL", "LOW", "MEDIUM", "HIGH"] },
+        "eligibility": {
+          "enum": ["RANKABLE_COMPLETE", "RANKABLE_INCOMPLETE", "BLOCKED"]
+        },
+        "totalPermille": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "unresolvedRiskPenaltyPermille": { "$ref": "#/$defs/permille" },
+        "controlPenaltyPermille": { "$ref": "#/$defs/permille" },
+        "assessmentHash": { "$ref": "#/$defs/sha256" },
+        "contributions": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/contribution" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "contribution": {
+      "type": "object",
+      "required": ["name", "rawPermille", "weightPermille", "weightedPermille"],
+      "properties": {
+        "name": {
+          "enum": [
+            "compression",
+            "generalization",
+            "independentEvidence",
+            "reusability",
+            "structuralSurprise",
+            "crossFamilyTransfer",
+            "assumptionSimplicity",
+            "pairedUtility"
+          ]
+        },
+        "rawPermille": { "$ref": "#/$defs/permille" },
+        "weightPermille": { "$ref": "#/$defs/permille" },
+        "weightedPermille": { "$ref": "#/$defs/permille" }
+      },
+      "additionalProperties": false
+    },
+    "paretoPoint": {
+      "type": "object",
+      "required": ["caseId", "paretoOptimal", "dominatedBy"],
+      "properties": {
+        "caseId": { "$ref": "#/$defs/nonBlank" },
+        "paretoOptimal": { "type": "boolean" },
+        "dominatedBy": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "nonNegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
