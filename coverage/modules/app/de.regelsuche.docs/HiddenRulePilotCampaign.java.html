@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HiddenRulePilotCampaign.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">HiddenRulePilotCampaign.java</span></div><h1>HiddenRulePilotCampaign.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
 
 import de.regelsuche.docs.HiddenRuleHoldoutPartition.SplitAudit;
+import de.regelsuche.docs.HiddenRulePilotEvaluator.CandidateRelation;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.Evaluation;
 import de.regelsuche.docs.HiddenRulePilotEvaluator.HiddenReference;
 import de.regelsuche.docs.HiddenRulePilotRunner.AblationEvidence;
@@ -17,74 +18,93 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
-/** Runs the post-hoc hidden-rule pilot and emits deterministic raw evidence. */
-<span class="fc" id="L26">public final class HiddenRulePilotCampaign {</span>
-    public static final String SCHEMA = &quot;regelsuche.hidden-rule-pilot/v1&quot;;
+/** Runs the post-hoc hidden-rule benchmark and emits deterministic raw evidence. */
+<span class="fc" id="L30">public final class HiddenRulePilotCampaign {</span>
+    public static final String SCHEMA = &quot;regelsuche.hidden-rule-benchmark/v2&quot;;
+    public static final String RUNTIME_SCHEMA = &quot;regelsuche.hidden-rule-benchmark-runtime/v1&quot;;
 
-<span class="fc" id="L29">    private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();</span>
-<span class="fc" id="L30">    private final HiddenRulePilotEvaluator evaluator = new HiddenRulePilotEvaluator();</span>
-<span class="fc" id="L31">    private final HiddenRuleHoldoutPartition partition = new HiddenRuleHoldoutPartition();</span>
+<span class="fc" id="L34">    private final HiddenRulePilotRunner runner = new HiddenRulePilotRunner();</span>
+<span class="fc" id="L35">    private final HiddenRulePilotEvaluator evaluator = new HiddenRulePilotEvaluator();</span>
+<span class="fc" id="L36">    private final HiddenRuleHoldoutPartition partition = new HiddenRuleHoldoutPartition();</span>
 
     public PilotReport run(List&lt;PilotCase&gt; cases) {
-<span class="fc" id="L34">        Objects.requireNonNull(cases, &quot;cases&quot;);</span>
-<span class="fc" id="L35">        List&lt;CaseReport&gt; reports = cases.stream()</span>
-<span class="fc" id="L36">            .sorted(Comparator.comparing(pilotCase -&gt; pilotCase.task().opaqueCaseId()))</span>
-<span class="fc" id="L37">            .map(this::runCase)</span>
-<span class="fc" id="L38">            .toList();</span>
-<span class="fc" id="L39">        return new PilotReport(SCHEMA, reports);</span>
+<span class="fc" id="L39">        Objects.requireNonNull(cases, &quot;cases&quot;);</span>
+<span class="fc" id="L40">        List&lt;CaseReport&gt; reports = cases.stream()</span>
+<span class="fc" id="L41">            .sorted(Comparator.comparing(pilotCase -&gt; pilotCase.task().opaqueCaseId()))</span>
+<span class="fc" id="L42">            .map(this::runCase)</span>
+<span class="fc" id="L43">            .toList();</span>
+<span class="fc" id="L44">        return new PilotReport(SCHEMA, reports);</span>
     }
 
     public Path write(Path output, PilotReport report) {
-<span class="fc" id="L43">        Objects.requireNonNull(output, &quot;output&quot;);</span>
-<span class="fc" id="L44">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc" id="L48">        return writeText(output, report.toJson());</span>
+    }
+
+    public Path writeRuntime(Path output, PilotReport report) {
+<span class="fc" id="L52">        return writeText(output, report.runtimeJson());</span>
+    }
+
+    private static Path writeText(Path output, String content) {
+<span class="fc" id="L56">        Objects.requireNonNull(output, &quot;output&quot;);</span>
+<span class="fc" id="L57">        Objects.requireNonNull(content, &quot;content&quot;);</span>
         try {
-<span class="fc" id="L46">            Path parent = output.toAbsolutePath().normalize().getParent();</span>
-<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (parent != null) {</span>
-<span class="fc" id="L48">                Files.createDirectories(parent);</span>
+<span class="fc" id="L59">            Path parent = output.toAbsolutePath().normalize().getParent();</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L61">                Files.createDirectories(parent);</span>
             }
-<span class="fc" id="L50">            Files.writeString(output, report.toJson(), StandardCharsets.UTF_8);</span>
-<span class="fc" id="L51">            return output;</span>
-<span class="nc" id="L52">        } catch (IOException exception) {</span>
-<span class="nc" id="L53">            throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L63">            Files.writeString(output, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L64">            return output;</span>
+<span class="nc" id="L65">        } catch (IOException exception) {</span>
+<span class="nc" id="L66">            throw new UncheckedIOException(exception);</span>
         }
     }
 
     private CaseReport runCase(PilotCase pilotCase) {
-<span class="fc" id="L58">        SplitAudit split = partition.audit(pilotCase.task());</span>
-<span class="fc" id="L59">        long started = System.nanoTime();</span>
-<span class="fc" id="L60">        RuntimeResult runtime = runner.run(pilotCase.task());</span>
-<span class="fc" id="L61">        long elapsedNanos = System.nanoTime() - started;</span>
-<span class="fc" id="L62">        Evaluation evaluation = evaluator.evaluate(</span>
-<span class="fc" id="L63">            pilotCase.task(), runtime, pilotCase.reference());</span>
-<span class="fc" id="L64">        LinkedHashSet&lt;String&gt; blockers = new LinkedHashSet&lt;&gt;(evaluation.blockers());</span>
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (!split.passed()) {</span>
-<span class="nc" id="L66">            blockers.add(&quot;train/holdout split collision&quot;);</span>
+<span class="fc" id="L71">        SplitAudit split = partition.audit(pilotCase.task());</span>
+<span class="fc" id="L72">        long started = System.nanoTime();</span>
+<span class="fc" id="L73">        RuntimeResult runtime = runner.run(pilotCase.task());</span>
+<span class="fc" id="L74">        long elapsedNanos = System.nanoTime() - started;</span>
+<span class="fc" id="L75">        Evaluation evaluation = evaluator.evaluate(</span>
+<span class="fc" id="L76">            pilotCase.task(), runtime, pilotCase.reference());</span>
+<span class="fc" id="L77">        LinkedHashSet&lt;String&gt; blockers = new LinkedHashSet&lt;&gt;(evaluation.blockers());</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (!split.passed()) {</span>
+<span class="nc" id="L79">            blockers.add(&quot;train/holdout split collision&quot;);</span>
         }
-<span class="pc bpc" id="L68" title="2 of 4 branches missed.">        boolean accepted = evaluation.pilotAccepted() &amp;&amp; split.passed();</span>
-<span class="fc" id="L69">        return new CaseReport(</span>
-<span class="fc" id="L70">            pilotCase.task().opaqueCaseId(),</span>
-<span class="fc" id="L71">            evaluation.family(),</span>
+<span class="fc" id="L81">        boolean holdoutsComplete = runtime.holdouts().positives().size()</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                == pilotCase.task().positiveHoldouts().size()</span>
+<span class="fc" id="L83">            &amp;&amp; runtime.holdouts().negatives().size()</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                == pilotCase.task().negativeHoldouts().size();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (!holdoutsComplete) {</span>
+<span class="fc" id="L86">            blockers.add(&quot;holdout evaluation incomplete&quot;);</span>
+        }
+<span class="pc bpc" id="L88" title="2 of 6 branches missed.">        boolean accepted = evaluation.pilotAccepted() &amp;&amp; split.passed() &amp;&amp; holdoutsComplete;</span>
+<span class="fc" id="L89">        return new CaseReport(</span>
+<span class="fc" id="L90">            pilotCase.task().opaqueCaseId(),</span>
+<span class="fc" id="L91">            evaluation.family(),</span>
             runtime,
             split,
             evaluation,
             elapsedNanos,
             accepted,
-<span class="fc" id="L77">            List.copyOf(blockers));</span>
+<span class="fc" id="L97">            List.copyOf(blockers));</span>
     }
 
     public record PilotCase(RuntimeTask task, HiddenReference reference) {
-<span class="fc" id="L81">        public PilotCase {</span>
-<span class="fc" id="L82">            Objects.requireNonNull(task, &quot;task&quot;);</span>
-<span class="fc" id="L83">            Objects.requireNonNull(reference, &quot;reference&quot;);</span>
-<span class="fc" id="L84">        }</span>
+<span class="fc" id="L101">        public PilotCase {</span>
+<span class="fc" id="L102">            Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L103">            Objects.requireNonNull(reference, &quot;reference&quot;);</span>
+<span class="fc" id="L104">        }</span>
     }
 
-    /** elapsedNanos is intentionally not serialized into the canonical report. */
+    /** elapsedNanos is serialized only into the explicitly non-canonical runtime report. */
     public record CaseReport(
         String opaqueCaseId,
         String family,
@@ -95,183 +115,279 @@ import java.util.Objects;
         boolean accepted,
         List&lt;String&gt; blockers
     ) {
-<span class="fc" id="L98">        public CaseReport {</span>
-<span class="fc" id="L99">            blockers = List.copyOf(blockers);</span>
-<span class="fc" id="L100">        }</span>
+<span class="fc" id="L118">        public CaseReport {</span>
+<span class="fc" id="L119">            blockers = List.copyOf(blockers);</span>
+<span class="fc" id="L120">        }</span>
+
+        public boolean holdoutsComplete() {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            return runtime.holdouts().positives().size() == split.positives().size()</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">                &amp;&amp; runtime.holdouts().negatives().size() == split.negatives().size();</span>
+        }
+
+        public boolean holdoutsPassed() {
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">            return holdoutsComplete() &amp;&amp; runtime.holdouts().allPassed();</span>
+        }
     }
 
     public record PilotReport(String schema, List&lt;CaseReport&gt; cases) {
-<span class="fc" id="L104">        public PilotReport {</span>
-<span class="fc" id="L105">            cases = List.copyOf(cases);</span>
-<span class="fc" id="L106">        }</span>
+<span class="fc" id="L133">        public PilotReport {</span>
+<span class="fc" id="L134">            cases = List.copyOf(cases);</span>
+<span class="fc" id="L135">        }</span>
 
         public int acceptedCases() {
-<span class="fc" id="L109">            return (int) cases.stream().filter(CaseReport::accepted).count();</span>
+<span class="fc" id="L138">            return (int) cases.stream().filter(CaseReport::accepted).count();</span>
         }
 
         public int frozenCandidates() {
-<span class="fc" id="L113">            return (int) cases.stream().filter(caseReport -&gt; caseReport.runtime().frozen()).count();</span>
+<span class="fc" id="L142">            return (int) cases.stream().filter(caseReport -&gt; caseReport.runtime().frozen()).count();</span>
         }
 
         public int materialAblations() {
-<span class="fc" id="L117">            return (int) cases.stream()</span>
-<span class="fc" id="L118">                .filter(caseReport -&gt; caseReport.evaluation().materialAblation())</span>
-<span class="fc" id="L119">                .count();</span>
+<span class="fc" id="L146">            return (int) cases.stream()</span>
+<span class="fc" id="L147">                .filter(caseReport -&gt; caseReport.evaluation().materialAblation())</span>
+<span class="fc" id="L148">                .count();</span>
         }
 
         public int familyCount() {
-<span class="fc" id="L123">            return (int) cases.stream().map(CaseReport::family).distinct().count();</span>
+<span class="fc" id="L152">            return (int) cases.stream().map(CaseReport::family).distinct().count();</span>
+        }
+
+        public int rediscoveredCases() {
+<span class="fc" id="L156">            return (int) cases.stream()</span>
+<span class="fc" id="L157">                .map(caseReport -&gt; caseReport.evaluation().candidateRelation())</span>
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">                .filter(relation -&gt; relation != CandidateRelation.NONE</span>
+                    &amp;&amp; relation != CandidateRelation.DIFFERENT)
+<span class="fc" id="L160">                .count();</span>
+        }
+
+        /** Number of adversarial negative holdouts configured in the audited benchmark. */
+        public int negativeHoldouts() {
+<span class="fc" id="L165">            return cases.stream().mapToInt(caseReport -&gt; caseReport.split().negatives().size()).sum();</span>
+        }
+
+        /** Number of negative holdouts actually executed after a candidate was compiled. */
+        public int evaluatedNegativeHoldouts() {
+<span class="fc" id="L170">            return cases.stream()</span>
+<span class="fc" id="L171">                .mapToInt(caseReport -&gt; caseReport.runtime().holdouts().negatives().size())</span>
+<span class="fc" id="L172">                .sum();</span>
+        }
+
+        public int skippedNegativeHoldouts() {
+<span class="fc" id="L176">            return negativeHoldouts() - evaluatedNegativeHoldouts();</span>
+        }
+
+        public int falsePositiveHoldouts() {
+<span class="fc" id="L180">            return (int) cases.stream()</span>
+<span class="fc" id="L181">                .flatMap(caseReport -&gt; caseReport.runtime().holdouts().negatives().stream())</span>
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">                .filter(result -&gt; !result.noApplication())</span>
+<span class="fc" id="L183">                .count();</span>
+        }
+
+        public int generatedValidationExamples() {
+<span class="fc" id="L187">            return cases.stream().mapToInt(caseReport -&gt;</span>
+<span class="fc" id="L188">                caseReport.runtime().validationEvidence().generatedValidationExamples()).sum();</span>
+        }
+
+        public int counterexampleSearches() {
+<span class="fc" id="L192">            return cases.stream().mapToInt(caseReport -&gt;</span>
+<span class="fc" id="L193">                caseReport.runtime().validationEvidence().counterexampleSearches().size()).sum();</span>
+        }
+
+        public Map&lt;String, Integer&gt; failureTaxonomy() {
+<span class="fc" id="L197">            Map&lt;String, Integer&gt; failures = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L198">            cases.stream().flatMap(caseReport -&gt; caseReport.blockers().stream())</span>
+<span class="fc" id="L199">                .forEach(blocker -&gt; failures.merge(blocker, 1, Integer::sum));</span>
+<span class="fc" id="L200">            return Collections.unmodifiableMap(failures);</span>
         }
 
         public String toJson() {
-<span class="fc" id="L127">            JsonWriter json = new JsonWriter().beginObject()</span>
-<span class="fc" id="L128">                .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L129">                .object(&quot;summary&quot;, summary -&gt; summary</span>
-<span class="fc" id="L130">                    .property(&quot;cases&quot;, cases.size())</span>
-<span class="fc" id="L131">                    .property(&quot;families&quot;, familyCount())</span>
-<span class="fc" id="L132">                    .property(&quot;frozenCandidates&quot;, frozenCandidates())</span>
-<span class="fc" id="L133">                    .property(&quot;materialAblations&quot;, materialAblations())</span>
-<span class="fc" id="L134">                    .property(&quot;acceptedCases&quot;, acceptedCases()))</span>
-<span class="fc" id="L135">                .array(&quot;cases&quot;, array -&gt; cases.forEach(caseReport -&gt;</span>
-<span class="fc" id="L136">                    array.objectValue(object -&gt; writeCase(object, caseReport))))</span>
-<span class="fc" id="L137">                .endObject();</span>
-<span class="fc" id="L138">            return json.toString();</span>
+<span class="fc" id="L204">            JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L205">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L206">                .object(&quot;summary&quot;, summary -&gt; summary</span>
+<span class="fc" id="L207">                    .property(&quot;cases&quot;, cases.size())</span>
+<span class="fc" id="L208">                    .property(&quot;families&quot;, familyCount())</span>
+<span class="fc" id="L209">                    .property(&quot;frozenCandidates&quot;, frozenCandidates())</span>
+<span class="fc" id="L210">                    .property(&quot;materialAblations&quot;, materialAblations())</span>
+<span class="fc" id="L211">                    .property(&quot;acceptedCases&quot;, acceptedCases())</span>
+<span class="fc" id="L212">                    .property(&quot;rediscoveredCases&quot;, rediscoveredCases())</span>
+<span class="fc" id="L213">                    .property(&quot;rediscoveryRatePermille&quot;, permille(rediscoveredCases(), cases.size()))</span>
+<span class="fc" id="L214">                    .property(&quot;negativeHoldouts&quot;, negativeHoldouts())</span>
+<span class="fc" id="L215">                    .property(&quot;evaluatedNegativeHoldouts&quot;, evaluatedNegativeHoldouts())</span>
+<span class="fc" id="L216">                    .property(&quot;skippedNegativeHoldouts&quot;, skippedNegativeHoldouts())</span>
+<span class="fc" id="L217">                    .property(&quot;falsePositiveHoldouts&quot;, falsePositiveHoldouts())</span>
+<span class="fc" id="L218">                    .property(&quot;falsePositiveRatePermille&quot;,</span>
+<span class="fc" id="L219">                        permille(falsePositiveHoldouts(), evaluatedNegativeHoldouts()))</span>
+<span class="fc" id="L220">                    .property(&quot;generatedValidationExamples&quot;, generatedValidationExamples())</span>
+<span class="fc" id="L221">                    .property(&quot;counterexampleSearches&quot;, counterexampleSearches()))</span>
+<span class="fc" id="L222">                .object(&quot;failureTaxonomy&quot;, taxonomy -&gt;</span>
+<span class="fc" id="L223">                    failureTaxonomy().forEach(taxonomy::property))</span>
+<span class="fc" id="L224">                .array(&quot;cases&quot;, array -&gt; cases.forEach(caseReport -&gt;</span>
+<span class="fc" id="L225">                    array.objectValue(object -&gt; writeCase(object, caseReport))))</span>
+<span class="fc" id="L226">                .endObject();</span>
+<span class="fc" id="L227">            return json.toString();</span>
+        }
+
+        /** Non-canonical wall-clock telemetry; never used for hashes or byte-stability checks. */
+        public String runtimeJson() {
+<span class="fc" id="L232">            long totalElapsedNanos = cases.stream().mapToLong(CaseReport::elapsedNanos).sum();</span>
+<span class="fc" id="L233">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L234">                .property(&quot;schema&quot;, RUNTIME_SCHEMA)</span>
+<span class="fc" id="L235">                .property(&quot;cases&quot;, cases.size())</span>
+<span class="fc" id="L236">                .property(&quot;totalElapsedNanos&quot;, totalElapsedNanos)</span>
+<span class="fc" id="L237">                .property(&quot;generatedValidationExamples&quot;, generatedValidationExamples())</span>
+<span class="fc" id="L238">                .property(&quot;counterexampleSearches&quot;, counterexampleSearches())</span>
+<span class="fc" id="L239">                .array(&quot;caseRuntimes&quot;, array -&gt; cases.forEach(caseReport -&gt;</span>
+<span class="fc" id="L240">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L241">                        .property(&quot;opaqueCaseId&quot;, caseReport.opaqueCaseId())</span>
+<span class="fc" id="L242">                        .property(&quot;elapsedNanos&quot;, caseReport.elapsedNanos())</span>
+<span class="fc" id="L243">                        .property(&quot;exploredStates&quot;,</span>
+<span class="fc" id="L244">                            caseReport.runtime().searchMetrics().exploredStates())</span>
+<span class="fc" id="L245">                        .property(&quot;generatedValidationExamples&quot;, caseReport.runtime()</span>
+<span class="fc" id="L246">                            .validationEvidence().generatedValidationExamples())</span>
+<span class="fc" id="L247">                        .property(&quot;counterexampleSearches&quot;, caseReport.runtime()</span>
+<span class="fc" id="L248">                            .validationEvidence().counterexampleSearches().size()))))</span>
+<span class="fc" id="L249">                .endObject().toString();</span>
+        }
+
+        private static int permille(int numerator, int denominator) {
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">            return denominator == 0 ? 0 : numerator * 1000 / denominator;</span>
         }
 
         private static void writeCase(JsonWriter json, CaseReport report) {
-<span class="fc" id="L142">            RuntimeResult runtime = report.runtime();</span>
-<span class="fc" id="L143">            Evaluation evaluation = report.evaluation();</span>
-<span class="fc" id="L144">            json.property(&quot;opaqueCaseId&quot;, report.opaqueCaseId())</span>
-<span class="fc" id="L145">                .property(&quot;family&quot;, report.family())</span>
-<span class="fc" id="L146">                .property(&quot;runtimeStatus&quot;, runtime.status().name())</span>
-<span class="fc" id="L147">                .property(&quot;searchStatus&quot;, runtime.searchStatus().name())</span>
-<span class="fc" id="L148">                .property(&quot;candidateRelation&quot;, evaluation.candidateRelation().name())</span>
-<span class="fc" id="L149">                .property(&quot;candidateFrozen&quot;, runtime.frozen())</span>
-<span class="fc" id="L150">                .property(&quot;validationPassed&quot;, evaluation.validationPassed())</span>
-<span class="fc" id="L151">                .property(&quot;splitPassed&quot;, report.split().passed())</span>
-<span class="fc" id="L152">                .property(&quot;holdoutsPassed&quot;, runtime.holdouts().allPassed())</span>
-<span class="fc" id="L153">                .property(&quot;materialAblation&quot;, evaluation.materialAblation())</span>
-<span class="fc" id="L154">                .property(&quot;accepted&quot;, report.accepted())</span>
-<span class="fc" id="L155">                .property(&quot;pathLength&quot;, Math.max(0, runtime.path().size() - 1))</span>
-<span class="fc" id="L156">                .stringArray(&quot;primitiveRuleIds&quot;, runtime.primitiveRuleIds())</span>
-<span class="fc" id="L157">                .stringArray(&quot;assumptions&quot;, runtime.assumptions())</span>
-<span class="fc" id="L158">                .stringArray(&quot;stageEvidence&quot;, runtime.stageEvidence())</span>
-<span class="fc" id="L159">                .stringArray(&quot;blockers&quot;, report.blockers())</span>
-<span class="fc" id="L160">                .object(&quot;metrics&quot;, metrics -&gt; writeMetrics(metrics, runtime.searchMetrics()))</span>
-<span class="fc" id="L161">                .object(&quot;split&quot;, split -&gt; writeSplit(split, report.split()))</span>
-<span class="fc" id="L162">                .object(&quot;candidate&quot;, candidate -&gt; writeCandidate(candidate, runtime))</span>
-<span class="fc" id="L163">                .object(&quot;validation&quot;, validation -&gt; writeValidation(</span>
-<span class="fc" id="L164">                    validation, runtime.validationEvidence()))</span>
-<span class="fc" id="L165">                .object(&quot;holdouts&quot;, holdouts -&gt; writeHoldouts(holdouts, runtime))</span>
-<span class="fc" id="L166">                .array(&quot;leakageViolations&quot;, leakage -&gt; evaluation.leakageViolations().forEach(</span>
-<span class="nc" id="L167">                    violation -&gt; leakage.objectValue(object -&gt; object</span>
-<span class="nc" id="L168">                        .property(&quot;location&quot;, violation.location())</span>
-<span class="nc" id="L169">                        .property(&quot;fingerprint&quot;, violation.tokenFingerprint()))));</span>
-<span class="fc" id="L170">        }</span>
+<span class="fc" id="L257">            RuntimeResult runtime = report.runtime();</span>
+<span class="fc" id="L258">            Evaluation evaluation = report.evaluation();</span>
+<span class="fc" id="L259">            json.property(&quot;opaqueCaseId&quot;, report.opaqueCaseId())</span>
+<span class="fc" id="L260">                .property(&quot;family&quot;, report.family())</span>
+<span class="fc" id="L261">                .property(&quot;runtimeStatus&quot;, runtime.status().name())</span>
+<span class="fc" id="L262">                .property(&quot;searchStatus&quot;, runtime.searchStatus().name())</span>
+<span class="fc" id="L263">                .property(&quot;candidateRelation&quot;, evaluation.candidateRelation().name())</span>
+<span class="fc" id="L264">                .property(&quot;candidateFrozen&quot;, runtime.frozen())</span>
+<span class="fc" id="L265">                .property(&quot;validationPassed&quot;, evaluation.validationPassed())</span>
+<span class="fc" id="L266">                .property(&quot;splitPassed&quot;, report.split().passed())</span>
+<span class="fc" id="L267">                .property(&quot;holdoutsComplete&quot;, report.holdoutsComplete())</span>
+<span class="fc" id="L268">                .property(&quot;holdoutsPassed&quot;, report.holdoutsPassed())</span>
+<span class="fc" id="L269">                .property(&quot;materialAblation&quot;, evaluation.materialAblation())</span>
+<span class="fc" id="L270">                .property(&quot;accepted&quot;, report.accepted())</span>
+<span class="fc" id="L271">                .property(&quot;pathLength&quot;, Math.max(0, runtime.path().size() - 1))</span>
+<span class="fc" id="L272">                .stringArray(&quot;primitiveRuleIds&quot;, runtime.primitiveRuleIds())</span>
+<span class="fc" id="L273">                .stringArray(&quot;assumptions&quot;, runtime.assumptions())</span>
+<span class="fc" id="L274">                .stringArray(&quot;stageEvidence&quot;, runtime.stageEvidence())</span>
+<span class="fc" id="L275">                .stringArray(&quot;blockers&quot;, report.blockers())</span>
+<span class="fc" id="L276">                .object(&quot;metrics&quot;, metrics -&gt; writeMetrics(metrics, runtime.searchMetrics()))</span>
+<span class="fc" id="L277">                .object(&quot;split&quot;, split -&gt; writeSplit(split, report.split()))</span>
+<span class="fc" id="L278">                .object(&quot;candidate&quot;, candidate -&gt; writeCandidate(candidate, runtime))</span>
+<span class="fc" id="L279">                .object(&quot;validation&quot;, validation -&gt; writeValidation(</span>
+<span class="fc" id="L280">                    validation, runtime.validationEvidence()))</span>
+<span class="fc" id="L281">                .object(&quot;holdouts&quot;, holdouts -&gt; writeHoldouts(holdouts, runtime))</span>
+<span class="fc" id="L282">                .array(&quot;leakageViolations&quot;, leakage -&gt; evaluation.leakageViolations().forEach(</span>
+<span class="nc" id="L283">                    violation -&gt; leakage.objectValue(object -&gt; object</span>
+<span class="nc" id="L284">                        .property(&quot;location&quot;, violation.location())</span>
+<span class="nc" id="L285">                        .property(&quot;fingerprint&quot;, violation.tokenFingerprint()))));</span>
+<span class="fc" id="L286">        }</span>
 
         private static void writeMetrics(JsonWriter json, GoalMetrics metrics) {
-<span class="fc" id="L173">            json.property(&quot;exploredStates&quot;, metrics.exploredStates())</span>
-<span class="fc" id="L174">                .property(&quot;expandedStates&quot;, metrics.expandedStates())</span>
-<span class="fc" id="L175">                .property(&quot;generatedTransformations&quot;, metrics.generatedTransformations())</span>
-<span class="fc" id="L176">                .property(&quot;enqueuedStates&quot;, metrics.enqueuedStates())</span>
-<span class="fc" id="L177">                .property(&quot;duplicatePrunes&quot;, metrics.duplicatePrunes())</span>
-<span class="fc" id="L178">                .property(&quot;transpositionPrunes&quot;, metrics.transpositionPrunes())</span>
-<span class="fc" id="L179">                .property(&quot;depthPrunes&quot;, metrics.depthPrunes())</span>
-<span class="fc" id="L180">                .property(&quot;candidateBudgetPrunes&quot;, metrics.candidateBudgetPrunes())</span>
-<span class="fc" id="L181">                .property(&quot;identityCacheHits&quot;, metrics.identityCacheHits())</span>
-<span class="fc" id="L182">                .property(&quot;identityCacheMisses&quot;, metrics.identityCacheMisses())</span>
-<span class="fc" id="L183">                .property(&quot;internedValues&quot;, metrics.internedValues());</span>
-<span class="fc" id="L184">        }</span>
+<span class="fc" id="L289">            json.property(&quot;exploredStates&quot;, metrics.exploredStates())</span>
+<span class="fc" id="L290">                .property(&quot;expandedStates&quot;, metrics.expandedStates())</span>
+<span class="fc" id="L291">                .property(&quot;generatedTransformations&quot;, metrics.generatedTransformations())</span>
+<span class="fc" id="L292">                .property(&quot;enqueuedStates&quot;, metrics.enqueuedStates())</span>
+<span class="fc" id="L293">                .property(&quot;duplicatePrunes&quot;, metrics.duplicatePrunes())</span>
+<span class="fc" id="L294">                .property(&quot;transpositionPrunes&quot;, metrics.transpositionPrunes())</span>
+<span class="fc" id="L295">                .property(&quot;depthPrunes&quot;, metrics.depthPrunes())</span>
+<span class="fc" id="L296">                .property(&quot;candidateBudgetPrunes&quot;, metrics.candidateBudgetPrunes())</span>
+<span class="fc" id="L297">                .property(&quot;identityCacheHits&quot;, metrics.identityCacheHits())</span>
+<span class="fc" id="L298">                .property(&quot;identityCacheMisses&quot;, metrics.identityCacheMisses())</span>
+<span class="fc" id="L299">                .property(&quot;internedValues&quot;, metrics.internedValues());</span>
+<span class="fc" id="L300">        }</span>
 
         private static void writeSplit(JsonWriter json, SplitAudit split) {
-<span class="fc" id="L187">            json.object(&quot;training&quot;, training -&gt; training</span>
-<span class="fc" id="L188">                    .property(&quot;valueFingerprint&quot;, split.training().exactValue())</span>
-<span class="fc" id="L189">                    .property(&quot;alphaFingerprint&quot;, split.training().alphaShape()))</span>
-<span class="fc" id="L190">                .array(&quot;positives&quot;, positives -&gt; split.positives().forEach(holdout -&gt;</span>
-<span class="fc" id="L191">                    positives.objectValue(object -&gt; object</span>
-<span class="fc" id="L192">                        .property(&quot;id&quot;, holdout.id())</span>
-<span class="fc" id="L193">                        .property(&quot;valueFingerprint&quot;, holdout.fingerprint().exactValue())</span>
-<span class="fc" id="L194">                        .property(&quot;alphaFingerprint&quot;, holdout.fingerprint().alphaShape()))))</span>
-<span class="fc" id="L195">                .array(&quot;negatives&quot;, negatives -&gt; split.negatives().forEach(holdout -&gt;</span>
-<span class="fc" id="L196">                    negatives.objectValue(object -&gt; object</span>
-<span class="fc" id="L197">                        .property(&quot;id&quot;, holdout.id())</span>
-<span class="fc" id="L198">                        .property(&quot;valueFingerprint&quot;, holdout.fingerprint().exactValue())</span>
-<span class="fc" id="L199">                        .property(&quot;alphaFingerprint&quot;, holdout.fingerprint().alphaShape()))))</span>
-<span class="fc" id="L200">                .array(&quot;collisions&quot;, collisions -&gt; split.collisions().forEach(collision -&gt;</span>
-<span class="nc" id="L201">                    collisions.objectValue(object -&gt; object</span>
-<span class="nc" id="L202">                        .property(&quot;kind&quot;, collision.kind())</span>
-<span class="nc" id="L203">                        .property(&quot;holdoutId&quot;, collision.holdoutId())</span>
-<span class="nc" id="L204">                        .property(&quot;fingerprint&quot;, collision.fingerprint()))));</span>
-<span class="fc" id="L205">        }</span>
+<span class="fc" id="L303">            json.object(&quot;training&quot;, training -&gt; training</span>
+<span class="fc" id="L304">                    .property(&quot;valueFingerprint&quot;, split.training().exactValue())</span>
+<span class="fc" id="L305">                    .property(&quot;alphaFingerprint&quot;, split.training().alphaShape()))</span>
+<span class="fc" id="L306">                .array(&quot;positives&quot;, positives -&gt; split.positives().forEach(holdout -&gt;</span>
+<span class="fc" id="L307">                    positives.objectValue(object -&gt; object</span>
+<span class="fc" id="L308">                        .property(&quot;id&quot;, holdout.id())</span>
+<span class="fc" id="L309">                        .property(&quot;valueFingerprint&quot;, holdout.fingerprint().exactValue())</span>
+<span class="fc" id="L310">                        .property(&quot;alphaFingerprint&quot;, holdout.fingerprint().alphaShape()))))</span>
+<span class="fc" id="L311">                .array(&quot;negatives&quot;, negatives -&gt; split.negatives().forEach(holdout -&gt;</span>
+<span class="fc" id="L312">                    negatives.objectValue(object -&gt; object</span>
+<span class="fc" id="L313">                        .property(&quot;id&quot;, holdout.id())</span>
+<span class="fc" id="L314">                        .property(&quot;valueFingerprint&quot;, holdout.fingerprint().exactValue())</span>
+<span class="fc" id="L315">                        .property(&quot;alphaFingerprint&quot;, holdout.fingerprint().alphaShape()))))</span>
+<span class="fc" id="L316">                .array(&quot;collisions&quot;, collisions -&gt; split.collisions().forEach(collision -&gt;</span>
+<span class="nc" id="L317">                    collisions.objectValue(object -&gt; object</span>
+<span class="nc" id="L318">                        .property(&quot;kind&quot;, collision.kind())</span>
+<span class="nc" id="L319">                        .property(&quot;holdoutId&quot;, collision.holdoutId())</span>
+<span class="nc" id="L320">                        .property(&quot;fingerprint&quot;, collision.fingerprint()))));</span>
+<span class="fc" id="L321">        }</span>
 
         private static void writeCandidate(JsonWriter json, RuntimeResult runtime) {
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (runtime.candidate() == null) {</span>
-<span class="nc" id="L209">                json.property(&quot;present&quot;, false);</span>
-<span class="nc" id="L210">                return;</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            if (runtime.candidate() == null) {</span>
+<span class="fc" id="L325">                json.property(&quot;present&quot;, false);</span>
+<span class="fc" id="L326">                return;</span>
             }
-<span class="fc" id="L212">            json.property(&quot;present&quot;, true)</span>
-<span class="fc" id="L213">                .property(&quot;leftPattern&quot;, runtime.candidate().leftPattern())</span>
-<span class="fc" id="L214">                .property(&quot;rightPattern&quot;, runtime.candidate().rightPattern())</span>
-<span class="fc" id="L215">                .property(&quot;confidence&quot;, runtime.candidate().confidence())</span>
-<span class="fc" id="L216">                .property(&quot;dynamicRuleId&quot;, runtime.candidate().dynamicRuleId())</span>
-<span class="fc" id="L217">                .property(&quot;provenanceHash&quot;, runtime.candidate().provenanceHash())</span>
-<span class="fc" id="L218">                .stringArray(&quot;assumptions&quot;, runtime.candidate().assumptions());</span>
-<span class="fc" id="L219">        }</span>
+<span class="fc" id="L328">            json.property(&quot;present&quot;, true)</span>
+<span class="fc" id="L329">                .property(&quot;leftPattern&quot;, runtime.candidate().leftPattern())</span>
+<span class="fc" id="L330">                .property(&quot;rightPattern&quot;, runtime.candidate().rightPattern())</span>
+<span class="fc" id="L331">                .property(&quot;confidence&quot;, runtime.candidate().confidence())</span>
+<span class="fc" id="L332">                .property(&quot;dynamicRuleId&quot;, runtime.candidate().dynamicRuleId())</span>
+<span class="fc" id="L333">                .property(&quot;provenanceHash&quot;, runtime.candidate().provenanceHash())</span>
+<span class="fc" id="L334">                .stringArray(&quot;assumptions&quot;, runtime.candidate().assumptions());</span>
+<span class="fc" id="L335">        }</span>
 
         private static void writeValidation(
             JsonWriter json,
             CandidateValidationEvidence evidence
         ) {
-<span class="fc" id="L225">            json.property(&quot;proofStatus&quot;, evidence.proofStatus())</span>
-<span class="fc" id="L226">                .property(&quot;generatedValidationExamples&quot;, evidence.generatedValidationExamples())</span>
-<span class="fc" id="L227">                .property(&quot;failedValidationExamples&quot;, evidence.failedValidationExamples())</span>
-<span class="fc" id="L228">                .property(&quot;passed&quot;, evidence.passed())</span>
-<span class="fc" id="L229">                .array(&quot;counterexampleSearches&quot;, searches -&gt;</span>
-<span class="fc" id="L230">                    evidence.counterexampleSearches().forEach(search -&gt;</span>
-<span class="fc" id="L231">                        searches.objectValue(object -&gt; writeCounterexample(object, search))));</span>
-<span class="fc" id="L232">        }</span>
+<span class="fc" id="L341">            json.property(&quot;proofStatus&quot;, evidence.proofStatus())</span>
+<span class="fc" id="L342">                .property(&quot;generatedValidationExamples&quot;, evidence.generatedValidationExamples())</span>
+<span class="fc" id="L343">                .property(&quot;failedValidationExamples&quot;, evidence.failedValidationExamples())</span>
+<span class="fc" id="L344">                .property(&quot;passed&quot;, evidence.passed())</span>
+<span class="fc" id="L345">                .array(&quot;counterexampleSearches&quot;, searches -&gt;</span>
+<span class="fc" id="L346">                    evidence.counterexampleSearches().forEach(search -&gt;</span>
+<span class="fc" id="L347">                        searches.objectValue(object -&gt; writeCounterexample(object, search))));</span>
+<span class="fc" id="L348">        }</span>
 
         private static void writeCounterexample(
             JsonWriter json,
             CounterexampleEvidence evidence
         ) {
-<span class="fc" id="L238">            json.property(&quot;status&quot;, evidence.status())</span>
-<span class="fc" id="L239">                .property(&quot;counterexamplePresent&quot;, evidence.counterexamplePresent())</span>
-<span class="fc" id="L240">                .stringArray(&quot;attemptedSources&quot;, evidence.attemptedSources())</span>
-<span class="fc" id="L241">                .property(&quot;explanation&quot;, evidence.explanation());</span>
-<span class="fc" id="L242">        }</span>
+<span class="fc" id="L354">            json.property(&quot;status&quot;, evidence.status())</span>
+<span class="fc" id="L355">                .property(&quot;counterexamplePresent&quot;, evidence.counterexamplePresent())</span>
+<span class="fc" id="L356">                .stringArray(&quot;attemptedSources&quot;, evidence.attemptedSources())</span>
+<span class="fc" id="L357">                .property(&quot;explanation&quot;, evidence.explanation());</span>
+<span class="fc" id="L358">        }</span>
 
         private static void writeHoldouts(JsonWriter json, RuntimeResult runtime) {
-<span class="fc" id="L245">            json.array(&quot;positives&quot;, positives -&gt; runtime.holdouts().positives().forEach(result -&gt;</span>
-<span class="fc" id="L246">                    positives.objectValue(object -&gt; writePositive(object, result))))</span>
-<span class="fc" id="L247">                .array(&quot;negatives&quot;, negatives -&gt; runtime.holdouts().negatives().forEach(result -&gt;</span>
-<span class="fc" id="L248">                    negatives.objectValue(object -&gt; writeNegative(object, result))));</span>
-<span class="fc" id="L249">        }</span>
+<span class="fc" id="L361">            json.array(&quot;positives&quot;, positives -&gt; runtime.holdouts().positives().forEach(result -&gt;</span>
+<span class="fc" id="L362">                    positives.objectValue(object -&gt; writePositive(object, result))))</span>
+<span class="fc" id="L363">                .array(&quot;negatives&quot;, negatives -&gt; runtime.holdouts().negatives().forEach(result -&gt;</span>
+<span class="fc" id="L364">                    negatives.objectValue(object -&gt; writeNegative(object, result))));</span>
+<span class="fc" id="L365">        }</span>
 
         private static void writePositive(JsonWriter json, PositiveHoldoutResult result) {
-<span class="fc" id="L252">            json.property(&quot;id&quot;, result.id())</span>
-<span class="fc" id="L253">                .property(&quot;directApplicationEquivalent&quot;, result.directApplicationEquivalent())</span>
-<span class="fc" id="L254">                .property(&quot;baselineReached&quot;, result.baselineReached())</span>
-<span class="fc" id="L255">                .property(&quot;candidateReached&quot;, result.candidateReached())</span>
-<span class="fc" id="L256">                .object(&quot;ablation&quot;, ablation -&gt; writeAblation(ablation, result.ablation()));</span>
-<span class="fc" id="L257">        }</span>
+<span class="fc" id="L368">            json.property(&quot;id&quot;, result.id())</span>
+<span class="fc" id="L369">                .property(&quot;directApplicationEquivalent&quot;, result.directApplicationEquivalent())</span>
+<span class="fc" id="L370">                .property(&quot;baselineReached&quot;, result.baselineReached())</span>
+<span class="fc" id="L371">                .property(&quot;candidateReached&quot;, result.candidateReached())</span>
+<span class="fc" id="L372">                .object(&quot;ablation&quot;, ablation -&gt; writeAblation(ablation, result.ablation()));</span>
+<span class="fc" id="L373">        }</span>
 
         private static void writeAblation(JsonWriter json, AblationEvidence evidence) {
-<span class="fc" id="L260">            json.property(&quot;baselineReached&quot;, evidence.baselineReached())</span>
-<span class="fc" id="L261">                .property(&quot;candidateReached&quot;, evidence.candidateReached())</span>
-<span class="fc" id="L262">                .property(&quot;baselineExploredStates&quot;, evidence.baselineExploredStates())</span>
-<span class="fc" id="L263">                .property(&quot;candidateExploredStates&quot;, evidence.candidateExploredStates())</span>
-<span class="fc" id="L264">                .property(&quot;baselineDepth&quot;, evidence.baselineDepth())</span>
-<span class="fc" id="L265">                .property(&quot;candidateDepth&quot;, evidence.candidateDepth())</span>
-<span class="fc" id="L266">                .property(&quot;stateReduction&quot;, evidence.stateReduction())</span>
-<span class="fc" id="L267">                .property(&quot;materialBenefit&quot;, evidence.materialBenefit());</span>
-<span class="fc" id="L268">        }</span>
+<span class="fc" id="L376">            json.property(&quot;baselineReached&quot;, evidence.baselineReached())</span>
+<span class="fc" id="L377">                .property(&quot;candidateReached&quot;, evidence.candidateReached())</span>
+<span class="fc" id="L378">                .property(&quot;baselineExploredStates&quot;, evidence.baselineExploredStates())</span>
+<span class="fc" id="L379">                .property(&quot;candidateExploredStates&quot;, evidence.candidateExploredStates())</span>
+<span class="fc" id="L380">                .property(&quot;baselineDepth&quot;, evidence.baselineDepth())</span>
+<span class="fc" id="L381">                .property(&quot;candidateDepth&quot;, evidence.candidateDepth())</span>
+<span class="fc" id="L382">                .property(&quot;stateReduction&quot;, evidence.stateReduction())</span>
+<span class="fc" id="L383">                .property(&quot;materialBenefit&quot;, evidence.materialBenefit());</span>
+<span class="fc" id="L384">        }</span>
 
         private static void writeNegative(JsonWriter json, NegativeHoldoutResult result) {
-<span class="fc" id="L271">            json.property(&quot;id&quot;, result.id())</span>
-<span class="fc" id="L272">                .property(&quot;noApplication&quot;, result.noApplication())</span>
-<span class="fc" id="L273">                .property(&quot;candidateCount&quot;, result.candidateCount());</span>
-<span class="fc" id="L274">        }</span>
+<span class="fc" id="L387">            json.property(&quot;id&quot;, result.id())</span>
+<span class="fc" id="L388">                .property(&quot;noApplication&quot;, result.noApplication())</span>
+<span class="fc" id="L389">                .property(&quot;candidateCount&quot;, result.candidateCount());</span>
+<span class="fc" id="L390">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

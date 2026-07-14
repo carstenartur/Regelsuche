@@ -45,11 +45,11 @@ import java.util.Set;
 <span class="fc" id="L45">        CandidateRelation relation = relation(runtimeResult, hiddenReference);</span>
 <span class="fc" id="L46">        boolean validationPassed = runtimeResult.validationEvidence().passed();</span>
 <span class="fc" id="L47">        boolean holdoutsPassed = runtimeResult.holdouts().allPassed();</span>
-<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        boolean material = runtimeResult.holdouts().materialAblations() &gt; 0;</span>
-<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        boolean rediscovered = relation != CandidateRelation.NONE</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        boolean material = runtimeResult.holdouts().materialAblations() &gt; 0;</span>
+<span class="pc bpc" id="L49" title="1 of 4 branches missed.">        boolean rediscovered = relation != CandidateRelation.NONE</span>
             &amp;&amp; relation != CandidateRelation.DIFFERENT;
 <span class="fc bfc" id="L51" title="All 2 branches covered.">        boolean accepted = leakage.isEmpty()</span>
-<span class="pc bpc" id="L52" title="5 of 10 branches missed.">            &amp;&amp; runtimeResult.frozen()</span>
+<span class="pc bpc" id="L52" title="4 of 10 branches missed.">            &amp;&amp; runtimeResult.frozen()</span>
             &amp;&amp; validationPassed
             &amp;&amp; holdoutsPassed
             &amp;&amp; material
@@ -205,8 +205,8 @@ import java.util.Set;
 <span class="fc" id="L205">    }</span>
 
     private CandidateRelation relation(RuntimeResult result, HiddenReference reference) {
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (result.candidate() == null) {</span>
-<span class="nc" id="L209">            return CandidateRelation.NONE;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (result.candidate() == null) {</span>
+<span class="fc" id="L209">            return CandidateRelation.NONE;</span>
         }
 <span class="fc" id="L211">        CandidateRelation structural = structuralRelation(</span>
 <span class="fc" id="L212">            result.candidate().leftPattern(),</span>
@@ -268,20 +268,20 @@ import java.util.Set;
 <span class="pc bpc" id="L268" title="1 of 4 branches missed.">        if (leakage.stream().anyMatch(violation -&gt; !isSplitLeakage(violation.location()))) {</span>
 <span class="fc" id="L269">            blockers.add(&quot;runtime leakage detected&quot;);</span>
         }
-<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (!result.frozen()) {</span>
-<span class="nc" id="L272">            blockers.add(&quot;candidate was not frozen&quot;);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (!result.frozen()) {</span>
+<span class="fc" id="L272">            blockers.add(&quot;candidate was not frozen&quot;);</span>
         }
-<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (!validationPassed) {</span>
-<span class="nc" id="L275">            blockers.add(&quot;candidate validation evidence failed&quot;);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (!validationPassed) {</span>
+<span class="fc" id="L275">            blockers.add(&quot;candidate validation evidence failed&quot;);</span>
         }
 <span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (!result.holdouts().allPassed()) {</span>
 <span class="nc" id="L278">            blockers.add(&quot;holdout validation failed&quot;);</span>
         }
-<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (!material) {</span>
-<span class="nc" id="L281">            blockers.add(&quot;paired ablation showed no material benefit&quot;);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (!material) {</span>
+<span class="fc" id="L281">            blockers.add(&quot;paired ablation showed no material benefit&quot;);</span>
         }
-<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (relation == CandidateRelation.NONE) {</span>
-<span class="nc" id="L284">            blockers.add(&quot;no candidate was produced&quot;);</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (relation == CandidateRelation.NONE) {</span>
+<span class="fc" id="L284">            blockers.add(&quot;no candidate was produced&quot;);</span>
 <span class="pc bpc" id="L285" title="1 of 2 branches missed.">        } else if (!rediscovered) {</span>
 <span class="nc" id="L286">            blockers.add(&quot;candidate differs from hidden reference&quot;);</span>
         }
