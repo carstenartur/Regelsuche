@@ -13,6 +13,7 @@ import java.util.Objects;
 
 /** Rule-ID-independent, explainable ranking for already-applicable transformations. */
 public final class DescriptorSearchPolicy implements SearchPolicy {
+    static final String PAIRWISE_TARGET_REACHED = &quot;pairwise.targetReached&quot;;
     private static final int TARGET_DISTANCE_WEIGHT = 20;
     private static final int UNKNOWN_DESCRIPTOR_PENALTY = 2_000;
 
@@ -21,40 +22,40 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
     private final String experienceFamily;
 
     public DescriptorSearchPolicy(DescriptorPolicyModel model) {
-<span class="fc" id="L24">        this(model, null, &quot;&quot;);</span>
-<span class="fc" id="L25">    }</span>
+<span class="fc" id="L25">        this(model, null, &quot;&quot;);</span>
+<span class="fc" id="L26">    }</span>
 
     public DescriptorSearchPolicy(
         DescriptorPolicyModel model,
         SearchExperienceRepository experienceRepository,
         String experienceFamily
-<span class="fc" id="L31">    ) {</span>
-<span class="fc" id="L32">        this.model = Objects.requireNonNull(model, &quot;model&quot;);</span>
-<span class="fc" id="L33">        this.experienceRepository = experienceRepository;</span>
-<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        this.experienceFamily = experienceFamily == null ? &quot;&quot; : experienceFamily;</span>
-<span class="fc" id="L35">    }</span>
+<span class="fc" id="L32">    ) {</span>
+<span class="fc" id="L33">        this.model = Objects.requireNonNull(model, &quot;model&quot;);</span>
+<span class="fc" id="L34">        this.experienceRepository = experienceRepository;</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        this.experienceFamily = experienceFamily == null ? &quot;&quot; : experienceFamily;</span>
+<span class="fc" id="L36">    }</span>
 
     @Override
     public String id() {
-<span class="fc" id="L39">        return &quot;descriptor-&quot; + model.mode().name().toLowerCase()</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            + (experienceRepository == null ? &quot;&quot; : &quot;+experience&quot;)</span>
-<span class="fc" id="L41">            + &quot;/&quot; + model.modelVersion();</span>
+<span class="fc" id="L40">        return &quot;descriptor-&quot; + model.mode().name().toLowerCase()</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            + (experienceRepository == null ? &quot;&quot; : &quot;+experience&quot;)</span>
+<span class="fc" id="L42">            + &quot;/&quot; + model.modelVersion();</span>
     }
 
     @Override
     public PolicyDecision score(PolicyContext context, Transformation transformation) {
-<span class="fc" id="L46">        Objects.requireNonNull(context, &quot;context&quot;);</span>
-<span class="fc" id="L47">        Objects.requireNonNull(transformation, &quot;transformation&quot;);</span>
-<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (!model.compatible()) {</span>
-<span class="fc" id="L49">            return fallback(context, &quot;incompatible descriptor schema&quot;);</span>
+<span class="fc" id="L47">        Objects.requireNonNull(context, &quot;context&quot;);</span>
+<span class="fc" id="L48">        Objects.requireNonNull(transformation, &quot;transformation&quot;);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!model.compatible()) {</span>
+<span class="fc" id="L50">            return fallback(context, &quot;incompatible descriptor schema&quot;);</span>
         }
-<span class="fc" id="L51">        TransformationDescriptor descriptor = context.transformationDescriptor();</span>
-<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        if (descriptor == null || !descriptor.available()) {</span>
-<span class="nc" id="L53">            return fallback(context, &quot;descriptor unavailable&quot;);</span>
+<span class="fc" id="L52">        TransformationDescriptor descriptor = context.transformationDescriptor();</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (descriptor == null || !descriptor.available()) {</span>
+<span class="nc" id="L54">            return fallback(context, &quot;descriptor unavailable&quot;);</span>
         }
-<span class="fc bfc" id="L55" title="All 2 branches covered.">        return switch (model.mode()) {</span>
-<span class="fc" id="L56">            case FREQUENCY -&gt; frequency(context, transformation, descriptor);</span>
-<span class="fc" id="L57">            case LINEAR -&gt; linear(context, transformation, descriptor);</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        return switch (model.mode()) {</span>
+<span class="fc" id="L57">            case FREQUENCY -&gt; frequency(context, transformation, descriptor);</span>
+<span class="fc" id="L58">            case LINEAR -&gt; linear(context, transformation, descriptor);</span>
         };
     }
 
@@ -63,14 +64,14 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         Transformation transformation,
         TransformationDescriptor descriptor
     ) {
-<span class="fc" id="L66">        DescriptorStatistics statistics = model.descriptors().get(descriptor.predictiveFingerprint());</span>
-<span class="pc bpc" id="L67" title="2 of 4 branches missed.">        if (statistics == null || statistics.observations() &lt; model.minimumObservations()) {</span>
-<span class="nc" id="L68">            return fallback(context, &quot;missing or low-confidence exact descriptor statistics&quot;);</span>
+<span class="fc" id="L67">        DescriptorStatistics statistics = model.descriptors().get(descriptor.predictiveFingerprint());</span>
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">        if (statistics == null || statistics.observations() &lt; model.minimumObservations()) {</span>
+<span class="nc" id="L69">            return fallback(context, &quot;missing or low-confidence exact descriptor statistics&quot;);</span>
         }
-<span class="fc" id="L70">        Map&lt;String, Integer&gt; contributions = base(context);</span>
-<span class="fc" id="L71">        contributions.put(&quot;descriptorFailure&quot;, 1000 - statistics.successPermille());</span>
-<span class="fc" id="L72">        addExperience(contributions, context, transformation);</span>
-<span class="fc" id="L73">        return decision(contributions, Math.min(1000, statistics.observations() * 250),</span>
+<span class="fc" id="L71">        Map&lt;String, Integer&gt; contributions = base(context);</span>
+<span class="fc" id="L72">        contributions.put(&quot;descriptorFailure&quot;, 1000 - statistics.successPermille());</span>
+<span class="fc" id="L73">        addExperience(contributions, context, transformation);</span>
+<span class="fc" id="L74">        return decision(contributions, Math.min(1000, statistics.observations() * 250),</span>
             &quot;exact rule-independent descriptor frequency evidence&quot;);
     }
 
@@ -79,101 +80,118 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         Transformation transformation,
         TransformationDescriptor descriptor
     ) {
-<span class="fc" id="L82">        Map&lt;String, Integer&gt; descriptorFeatures = descriptorFeatures(descriptor);</span>
-<span class="fc" id="L83">        Map&lt;String, Integer&gt; contributions = base(context);</span>
-<span class="fc" id="L84">        boolean localTransitionSupported = localTransitionSupported(descriptorFeatures);</span>
-<span class="fc" id="L85">        int informative = 0;</span>
-<span class="fc" id="L86">        int pairwiseContextEvidence = 0;</span>
-<span class="fc" id="L87">        int outOfRange = 0;</span>
-<span class="fc" id="L88">        int ignoredUnsupportedLocal = 0;</span>
-<span class="fc" id="L89">        int minimumEvidence = Integer.MAX_VALUE;</span>
-<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (Map.Entry&lt;String, FeatureStatistics&gt; entry : model.features().entrySet()) {</span>
-<span class="fc" id="L91">            FeatureStatistics statistics = entry.getValue();</span>
-<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (statistics.observations() &lt; model.minimumObservations()</span>
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                    || statistics.coefficientPermille() == 0) {</span>
-<span class="nc" id="L94">                continue;</span>
+<span class="fc" id="L83">        Map&lt;String, Integer&gt; descriptorFeatures = descriptorFeatures(descriptor);</span>
+<span class="fc" id="L84">        Map&lt;String, Integer&gt; contributions = base(context);</span>
+<span class="fc" id="L85">        boolean localTransitionSupported = localTransitionSupported(descriptorFeatures);</span>
+<span class="fc" id="L86">        boolean targetCompetitionSupported = targetCompetitionSupported(descriptorFeatures);</span>
+<span class="fc" id="L87">        int informative = 0;</span>
+<span class="fc" id="L88">        int pairwiseContextEvidence = 0;</span>
+<span class="fc" id="L89">        int outOfRange = 0;</span>
+<span class="fc" id="L90">        int ignoredUnsupportedLocal = 0;</span>
+<span class="fc" id="L91">        int minimumEvidence = Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (Map.Entry&lt;String, FeatureStatistics&gt; entry : model.features().entrySet()) {</span>
+<span class="fc" id="L93">            FeatureStatistics statistics = entry.getValue();</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (statistics.observations() &lt; model.minimumObservations()</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                    || statistics.coefficientPermille() == 0) {</span>
+<span class="nc" id="L96">                continue;</span>
             }
-<span class="fc" id="L96">            String featureName = entry.getKey();</span>
-<span class="fc" id="L97">            int value = descriptorFeatures.getOrDefault(featureName, 0);</span>
-<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (pairwiseContextFeature(featureName)) {</span>
-<span class="nc bnc" id="L99" title="All 2 branches missed.">                if (value == 0) {</span>
-<span class="nc" id="L100">                    continue;</span>
+<span class="fc" id="L98">            String featureName = entry.getKey();</span>
+<span class="fc bfc" id="L99" title="All 4 branches covered.">            if (targetCompetitionSupported &amp;&amp; !pairwiseContextFeature(featureName)) {</span>
+<span class="fc" id="L100">                continue;</span>
+            }
+<span class="fc" id="L102">            int value = descriptorFeatures.getOrDefault(featureName, 0);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (pairwiseContextFeature(featureName)) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                if (value == 0) {</span>
+<span class="fc" id="L105">                    continue;</span>
                 }
-<span class="nc" id="L102">                pairwiseContextEvidence++;</span>
-<span class="fc bfc" id="L103" title="All 4 branches covered.">            } else if (featureName.startsWith(&quot;local.&quot;) &amp;&amp; !localTransitionSupported) {</span>
-<span class="fc" id="L104">                ignoredUnsupportedLocal++;</span>
-<span class="fc" id="L105">                continue;</span>
+<span class="fc" id="L107">                pairwiseContextEvidence++;</span>
+<span class="fc bfc" id="L108" title="All 4 branches covered.">            } else if (featureName.startsWith(&quot;local.&quot;) &amp;&amp; !localTransitionSupported) {</span>
+<span class="fc" id="L109">                ignoredUnsupportedLocal++;</span>
+<span class="fc" id="L110">                continue;</span>
             }
-<span class="pc bpc" id="L107" title="2 of 4 branches missed.">            if (value &lt; statistics.minimumValue() || value &gt; statistics.maximumValue()) {</span>
-<span class="nc" id="L108">                outOfRange++;</span>
-<span class="nc" id="L109">                continue;</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">            if (value &lt; statistics.minimumValue() || value &gt; statistics.maximumValue()) {</span>
+<span class="nc" id="L113">                outOfRange++;</span>
+<span class="nc" id="L114">                continue;</span>
             }
-<span class="fc" id="L111">            long span = (long) statistics.maximumValue() - statistics.minimumValue();</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (span == 0) {</span>
-<span class="nc" id="L113">                continue;</span>
+<span class="fc" id="L116">            long span = (long) statistics.maximumValue() - statistics.minimumValue();</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (span == 0) {</span>
+<span class="nc" id="L118">                continue;</span>
             }
-<span class="fc" id="L115">            long centered = 2L * value - statistics.minimumValue() - statistics.maximumValue();</span>
-<span class="fc" id="L116">            long rawContribution = statistics.coefficientPermille() * centered / span;</span>
-<span class="fc" id="L117">            int contribution = clamp(rawContribution, -1000, 1000);</span>
-<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (contribution != 0) {</span>
-<span class="fc" id="L119">                contributions.put(&quot;descriptor.&quot; + featureName, contribution);</span>
+<span class="fc" id="L120">            long centered = 2L * value - statistics.minimumValue() - statistics.maximumValue();</span>
+<span class="fc" id="L121">            long rawContribution = statistics.coefficientPermille() * centered / span;</span>
+<span class="fc" id="L122">            int contribution = clamp(rawContribution, -1000, 1000);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (contribution != 0) {</span>
+<span class="fc" id="L124">                contributions.put(&quot;descriptor.&quot; + featureName, contribution);</span>
             }
-<span class="fc" id="L121">            informative++;</span>
-<span class="fc" id="L122">            minimumEvidence = Math.min(minimumEvidence, statistics.observations());</span>
-<span class="fc" id="L123">        }</span>
-<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (informative == 0) {</span>
+<span class="fc" id="L126">            informative++;</span>
+<span class="fc" id="L127">            minimumEvidence = Math.min(minimumEvidence, statistics.observations());</span>
+<span class="fc" id="L128">        }</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (informative == 0) {</span>
             String reason;
-<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (ignoredUnsupportedLocal &gt; 0) {</span>
-<span class="nc" id="L127">                reason = &quot;local transition absent from TRAIN evidence&quot;;</span>
-<span class="nc bnc" id="L128" title="All 2 branches missed.">            } else if (outOfRange &gt; 0) {</span>
-<span class="nc" id="L129">                reason = &quot;all informative descriptor features are out of TRAIN range&quot;;</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            if (ignoredUnsupportedLocal &gt; 0) {</span>
+<span class="nc" id="L132">                reason = &quot;local transition absent from TRAIN evidence&quot;;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            } else if (outOfRange &gt; 0) {</span>
+<span class="nc" id="L134">                reason = &quot;all informative descriptor features are out of TRAIN range&quot;;</span>
             } else {
-<span class="nc" id="L131">                reason = &quot;missing or under-observed shared descriptor features&quot;;</span>
+<span class="fc" id="L136">                reason = &quot;missing or under-observed shared descriptor features&quot;;</span>
             }
-<span class="nc" id="L133">            return fallback(context, reason);</span>
+<span class="fc" id="L138">            return fallback(context, reason);</span>
         }
-<span class="fc" id="L135">        addExperience(contributions, context, transformation);</span>
-<span class="fc" id="L136">        return decision(contributions,</span>
-<span class="fc" id="L137">            Math.min(1000, minimumEvidence * 100 + informative * 50),</span>
+<span class="fc" id="L140">        addExperience(contributions, context, transformation);</span>
+<span class="fc" id="L141">        return decision(contributions,</span>
+<span class="fc" id="L142">            Math.min(1000, minimumEvidence * 100 + informative * 50),</span>
             &quot;transparent linear descriptor evidence from &quot; + informative
                 + &quot; shared features; pairwiseContextEvidence=&quot; + pairwiseContextEvidence
+                + &quot;; targetCompetitionSupported=&quot; + targetCompetitionSupported
                 + &quot;; ignoredOutOfRange=&quot; + outOfRange
                 + &quot;; ignoredUnsupportedLocal=&quot; + ignoredUnsupportedLocal);
     }
 
     private boolean localTransitionSupported(Map&lt;String, Integer&gt; descriptorFeatures) {
-<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        for (Map.Entry&lt;String, Integer&gt; feature : descriptorFeatures.entrySet()) {</span>
-<span class="pc bpc" id="L146" title="1 of 4 branches missed.">            if (!feature.getKey().startsWith(&quot;local.transition.&quot;) || feature.getValue() == 0) {</span>
-<span class="nc" id="L147">                continue;</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        for (Map.Entry&lt;String, Integer&gt; feature : descriptorFeatures.entrySet()) {</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">            if (!feature.getKey().startsWith(&quot;local.transition.&quot;) || feature.getValue() == 0) {</span>
+<span class="nc" id="L153">                continue;</span>
             }
-<span class="fc" id="L149">            FeatureStatistics statistics = model.features().get(feature.getKey());</span>
-<span class="fc bfc" id="L150" title="All 2 branches covered.">            return statistics != null</span>
-<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                &amp;&amp; statistics.observations() &gt;= model.minimumObservations()</span>
-<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                &amp;&amp; statistics.maximumValue() &gt; 0;</span>
+<span class="fc" id="L155">            FeatureStatistics statistics = model.features().get(feature.getKey());</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            return statistics != null</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                &amp;&amp; statistics.observations() &gt;= model.minimumObservations()</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                &amp;&amp; statistics.maximumValue() &gt; 0;</span>
         }
-<span class="nc" id="L154">        return false;</span>
+<span class="nc" id="L160">        return false;</span>
+    }
+
+    private boolean targetCompetitionSupported(Map&lt;String, Integer&gt; descriptorFeatures) {
+<span class="fc" id="L164">        FeatureStatistics statistics = model.features().get(PAIRWISE_TARGET_REACHED);</span>
+<span class="fc bfc" id="L165" title="All 4 branches covered.">        return descriptorFeatures.getOrDefault(PAIRWISE_TARGET_REACHED, 0) == 1</span>
+            &amp;&amp; statistics != null
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            &amp;&amp; statistics.observations() &gt;= model.minimumObservations()</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            &amp;&amp; statistics.maximumValue() &gt; 0;</span>
     }
 
     static Map&lt;String, Integer&gt; descriptorFeatures(TransformationDescriptor descriptor) {
-<span class="fc" id="L158">        Map&lt;String, Integer&gt; features = new LinkedHashMap&lt;&gt;(descriptor.featureVector());</span>
-<span class="fc" id="L159">        TransformationDescriptor.LocalChange local = descriptor.localChange();</span>
-<span class="pc bpc" id="L160" title="1 of 4 branches missed.">        if (local.available() &amp;&amp; local.role() != OccurrenceRole.ROOT) {</span>
-<span class="fc" id="L161">            features.put(&quot;local.contextRole.&quot; + local.contextRoot().kind().name()</span>
-<span class="fc" id="L162">                + &quot;_&quot; + local.role().name(), 1);</span>
+<span class="fc" id="L172">        Map&lt;String, Integer&gt; features = new LinkedHashMap&lt;&gt;(descriptor.featureVector());</span>
+<span class="fc" id="L173">        TransformationDescriptor.LocalChange local = descriptor.localChange();</span>
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">        if (local.available() &amp;&amp; local.role() != OccurrenceRole.ROOT) {</span>
+<span class="fc" id="L175">            features.put(&quot;local.contextRole.&quot; + local.contextRoot().kind().name()</span>
+<span class="fc" id="L176">                + &quot;_&quot; + local.role().name(), 1);</span>
         }
-<span class="fc" id="L164">        return features;</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (descriptor.targeted()) {</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            features.put(PAIRWISE_TARGET_REACHED, descriptor.targetDistanceAfter() == 0 ? 1 : 0);</span>
+        }
+<span class="fc" id="L181">        return features;</span>
     }
 
     static boolean pairwiseContextFeature(String featureName) {
-<span class="fc bfc" id="L168" title="All 2 branches covered.">        return featureName.startsWith(&quot;local.context.&quot;)</span>
-<span class="fc bfc" id="L169" title="All 2 branches covered.">            || featureName.startsWith(&quot;local.contextRole.&quot;);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        return PAIRWISE_TARGET_REACHED.equals(featureName)</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            || featureName.startsWith(&quot;local.context.&quot;)</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            || featureName.startsWith(&quot;local.contextRole.&quot;);</span>
     }
 
     private Map&lt;String, Integer&gt; base(PolicyContext context) {
-<span class="fc" id="L173">        Map&lt;String, Integer&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L174">        result.put(&quot;targetDistance&quot;,</span>
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            context.targeted() ? context.targetDistance() * TARGET_DISTANCE_WEIGHT : 0);</span>
-<span class="fc" id="L176">        return result;</span>
+<span class="fc" id="L191">        Map&lt;String, Integer&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L192">        result.put(&quot;targetDistance&quot;,</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            context.targeted() ? context.targetDistance() * TARGET_DISTANCE_WEIGHT : 0);</span>
+<span class="fc" id="L194">        return result;</span>
     }
 
     private void addExperience(
@@ -181,26 +199,26 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         PolicyContext context,
         Transformation transformation
     ) {
-<span class="fc" id="L184">        int contribution = experienceContribution(context, transformation);</span>
-<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (contribution != 0) {</span>
-<span class="nc" id="L186">            contributions.put(&quot;structuralExperience&quot;, contribution);</span>
+<span class="fc" id="L202">        int contribution = experienceContribution(context, transformation);</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (contribution != 0) {</span>
+<span class="nc" id="L204">            contributions.put(&quot;structuralExperience&quot;, contribution);</span>
         }
-<span class="fc" id="L188">    }</span>
+<span class="fc" id="L206">    }</span>
 
     private int experienceContribution(PolicyContext context, Transformation transformation) {
-<span class="pc bpc" id="L191" title="3 of 4 branches missed.">        if (experienceRepository == null || experienceFamily.isBlank()) {</span>
-<span class="fc" id="L192">            return 0;</span>
+<span class="pc bpc" id="L209" title="3 of 4 branches missed.">        if (experienceRepository == null || experienceFamily.isBlank()) {</span>
+<span class="fc" id="L210">            return 0;</span>
         }
-<span class="nc" id="L194">        ExpressionFingerprint parent = ExpressionFingerprint.of(</span>
-<span class="nc" id="L195">            context.parentExpression(), context.canonicalizer());</span>
-<span class="nc" id="L196">        ExpressionFingerprint child = ExpressionFingerprint.of(</span>
-<span class="nc" id="L197">            transformation.transformedExpression(), context.canonicalizer());</span>
-<span class="nc" id="L198">        int contribution = experienceRepository.findByShape(</span>
-<span class="nc" id="L199">                experienceFamily, parent.alphaShapeHash(), 100).stream()</span>
-<span class="nc" id="L200">            .filter(experience -&gt; experience.childAlphaShapeHash().equals(child.alphaShapeHash()))</span>
-<span class="nc bnc" id="L201" title="All 2 branches missed.">            .mapToInt(experience -&gt; experience.successfulChoice() ? -100 : 60)</span>
-<span class="nc" id="L202">            .sum();</span>
-<span class="nc" id="L203">        return clamp(contribution, -300, 300);</span>
+<span class="nc" id="L212">        ExpressionFingerprint parent = ExpressionFingerprint.of(</span>
+<span class="nc" id="L213">            context.parentExpression(), context.canonicalizer());</span>
+<span class="nc" id="L214">        ExpressionFingerprint child = ExpressionFingerprint.of(</span>
+<span class="nc" id="L215">            transformation.transformedExpression(), context.canonicalizer());</span>
+<span class="nc" id="L216">        int contribution = experienceRepository.findByShape(</span>
+<span class="nc" id="L217">                experienceFamily, parent.alphaShapeHash(), 100).stream()</span>
+<span class="nc" id="L218">            .filter(experience -&gt; experience.childAlphaShapeHash().equals(child.alphaShapeHash()))</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">            .mapToInt(experience -&gt; experience.successfulChoice() ? -100 : 60)</span>
+<span class="nc" id="L220">            .sum();</span>
+<span class="nc" id="L221">        return clamp(contribution, -300, 300);</span>
     }
 
     private PolicyDecision decision(
@@ -208,22 +226,22 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         int confidence,
         String evidence
     ) {
-<span class="fc" id="L211">        int priority = contributions.values().stream().mapToInt(Integer::intValue).sum();</span>
-<span class="fc" id="L212">        return new PolicyDecision(id(), priority, confidence, false, contributions,</span>
+<span class="fc" id="L229">        int priority = contributions.values().stream().mapToInt(Integer::intValue).sum();</span>
+<span class="fc" id="L230">        return new PolicyDecision(id(), priority, confidence, false, contributions,</span>
             evidence + &quot;: &quot; + contributions);
     }
 
     private PolicyDecision fallback(PolicyContext context, String reason) {
-<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        int target = context.targeted() ? context.targetDistance() * TARGET_DISTANCE_WEIGHT : 0;</span>
-<span class="fc" id="L218">        Map&lt;String, Integer&gt; contributions = Map.of(</span>
-<span class="fc" id="L219">            &quot;targetDistance&quot;, target,</span>
-<span class="fc" id="L220">            &quot;unknownDescriptor&quot;, UNKNOWN_DESCRIPTOR_PENALTY);</span>
-<span class="fc" id="L221">        return new PolicyDecision(id(), target + UNKNOWN_DESCRIPTOR_PENALTY, 0, true,</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        int target = context.targeted() ? context.targetDistance() * TARGET_DISTANCE_WEIGHT : 0;</span>
+<span class="fc" id="L236">        Map&lt;String, Integer&gt; contributions = Map.of(</span>
+<span class="fc" id="L237">            &quot;targetDistance&quot;, target,</span>
+<span class="fc" id="L238">            &quot;unknownDescriptor&quot;, UNKNOWN_DESCRIPTOR_PENALTY);</span>
+<span class="fc" id="L239">        return new PolicyDecision(id(), target + UNKNOWN_DESCRIPTOR_PENALTY, 0, true,</span>
             contributions, &quot;fallback to deterministic static ordering: &quot; + reason);
     }
 
     private static int clamp(long value, int minimum, int maximum) {
-<span class="fc" id="L226">        return (int) Math.max(minimum, Math.min(maximum, value));</span>
+<span class="fc" id="L244">        return (int) Math.max(minimum, Math.min(maximum, value));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
