@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessProfile.java</span></div><h1>InterestingnessProfile.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** Explicit, versioned weight profiles for the rankable interestingness components. */
+<span class="fc" id="L7">public enum InterestingnessProfile {</span>
+<span class="fc" id="L8">    THEORY_DISCOVERY(100, 190, 100, 70, 250, 190, 50, 50),</span>
+<span class="fc" id="L9">    SEARCH_REUSE(230, 100, 100, 230, 60, 100, 60, 120);</span>
+
+    public static final String WEIGHT_SCHEMA = &quot;regelsuche.interestingness-profile/v1&quot;;
+
+    private final int compression;
+    private final int generalization;
+    private final int independentEvidence;
+    private final int reusability;
+    private final int structuralSurprise;
+    private final int crossFamilyTransfer;
+    private final int assumptionSimplicity;
+    private final int pairedUtility;
+
+    InterestingnessProfile(
+        int compression,
+        int generalization,
+        int independentEvidence,
+        int reusability,
+        int structuralSurprise,
+        int crossFamilyTransfer,
+        int assumptionSimplicity,
+        int pairedUtility
+<span class="fc" id="L31">    ) {</span>
+<span class="fc" id="L32">        this.compression = compression;</span>
+<span class="fc" id="L33">        this.generalization = generalization;</span>
+<span class="fc" id="L34">        this.independentEvidence = independentEvidence;</span>
+<span class="fc" id="L35">        this.reusability = reusability;</span>
+<span class="fc" id="L36">        this.structuralSurprise = structuralSurprise;</span>
+<span class="fc" id="L37">        this.crossFamilyTransfer = crossFamilyTransfer;</span>
+<span class="fc" id="L38">        this.assumptionSimplicity = assumptionSimplicity;</span>
+<span class="fc" id="L39">        this.pairedUtility = pairedUtility;</span>
+<span class="fc" id="L40">        int total = compression + generalization + independentEvidence + reusability</span>
+            + structuralSurprise + crossFamilyTransfer + assumptionSimplicity + pairedUtility;
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (total != 1000) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;interestingness profile weights must sum to 1000&quot;);</span>
+        }
+<span class="fc" id="L45">    }</span>
+
+    public int weight(String component) {
+<span class="pc bpc" id="L48" title="1 of 9 branches missed.">        return switch (component) {</span>
+<span class="fc" id="L49">            case &quot;compression&quot; -&gt; compression;</span>
+<span class="fc" id="L50">            case &quot;generalization&quot; -&gt; generalization;</span>
+<span class="fc" id="L51">            case &quot;independentEvidence&quot; -&gt; independentEvidence;</span>
+<span class="fc" id="L52">            case &quot;reusability&quot; -&gt; reusability;</span>
+<span class="fc" id="L53">            case &quot;structuralSurprise&quot; -&gt; structuralSurprise;</span>
+<span class="fc" id="L54">            case &quot;crossFamilyTransfer&quot; -&gt; crossFamilyTransfer;</span>
+<span class="fc" id="L55">            case &quot;assumptionSimplicity&quot; -&gt; assumptionSimplicity;</span>
+<span class="fc" id="L56">            case &quot;pairedUtility&quot; -&gt; pairedUtility;</span>
+<span class="nc" id="L57">            default -&gt; throw new IllegalArgumentException(&quot;unknown interestingness component: &quot; + component);</span>
+        };
+    }
+
+    public Map&lt;String, Integer&gt; weights() {
+<span class="fc" id="L62">        LinkedHashMap&lt;String, Integer&gt; weights = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L63">        weights.put(&quot;compression&quot;, compression);</span>
+<span class="fc" id="L64">        weights.put(&quot;generalization&quot;, generalization);</span>
+<span class="fc" id="L65">        weights.put(&quot;independentEvidence&quot;, independentEvidence);</span>
+<span class="fc" id="L66">        weights.put(&quot;reusability&quot;, reusability);</span>
+<span class="fc" id="L67">        weights.put(&quot;structuralSurprise&quot;, structuralSurprise);</span>
+<span class="fc" id="L68">        weights.put(&quot;crossFamilyTransfer&quot;, crossFamilyTransfer);</span>
+<span class="fc" id="L69">        weights.put(&quot;assumptionSimplicity&quot;, assumptionSimplicity);</span>
+<span class="fc" id="L70">        weights.put(&quot;pairedUtility&quot;, pairedUtility);</span>
+<span class="fc" id="L71">        return java.util.Collections.unmodifiableMap(weights);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

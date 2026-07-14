@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvidenceAwareInterestingnessAssessor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">EvidenceAwareInterestingnessAssessor.java</span></div><h1>EvidenceAwareInterestingnessAssessor.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.mining.InterestingnessAssessment.ComponentContribution;
+import de.regelsuche.mining.InterestingnessAssessment.Eligibility;
+import de.regelsuche.mining.InterestingnessEvidence.ControlClassification;
+import de.regelsuche.mining.InterestingnessEvidence.ProjectNoveltyStatus;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Applies hard scientific gates before computing a decomposable interestingness rank.
+ *
+ * &lt;p&gt;Proof and counterexample outcomes are never positive ranking contributions. They
+ * remain independent blockers or evidence-completeness signals. The legacy
+ * {@link InterestingnessScore} is reused only for non-gating structural components.&lt;/p&gt;
+ */
+<span class="fc" id="L24">public final class EvidenceAwareInterestingnessAssessor {</span>
+<span class="fc" id="L25">    private static final List&lt;String&gt; COMPONENTS = List.of(</span>
+        &quot;compression&quot;,
+        &quot;generalization&quot;,
+        &quot;independentEvidence&quot;,
+        &quot;reusability&quot;,
+        &quot;structuralSurprise&quot;,
+        &quot;crossFamilyTransfer&quot;,
+        &quot;assumptionSimplicity&quot;,
+        &quot;pairedUtility&quot;);
+
+    public InterestingnessAssessment assess(
+        HypothesisCandidate candidate,
+        double knownRuleSimilarity,
+        Set&lt;String&gt; domainTags,
+        InterestingnessEvidence evidence,
+        InterestingnessProfile profile
+    ) {
+<span class="fc" id="L42">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        Set&lt;String&gt; safeDomains = domainTags == null ? Set.of() : Set.copyOf(domainTags);</span>
+<span class="fc" id="L46">        int similarityPermille = toPermille(</span>
+<span class="fc" id="L47">            Math.max(0.0, Math.min(1.0, knownRuleSimilarity)));</span>
+
+<span class="fc" id="L49">        List&lt;String&gt; blockers = hardBlockers(candidate, evidence);</span>
+<span class="fc" id="L50">        List&lt;String&gt; warnings = warnings(candidate, evidence);</span>
+<span class="fc" id="L51">        int completeness = evidenceCompleteness(candidate, evidence);</span>
+<span class="fc" id="L52">        Eligibility eligibility = eligibility(blockers, completeness);</span>
+
+<span class="fc" id="L54">        InterestingnessScore legacy = InterestingnessScore.from(</span>
+            candidate, similarityPermille / 1000.0, safeDomains);
+<span class="fc" id="L56">        List&lt;ComponentContribution&gt; contributions = contributions(</span>
+            legacy, evidence, profile, similarityPermille);
+<span class="fc" id="L58">        int baseTotal = contributions.stream()</span>
+<span class="fc" id="L59">            .mapToInt(ComponentContribution::weightedPermille)</span>
+<span class="fc" id="L60">            .sum();</span>
+<span class="fc" id="L61">        int unresolvedRisk = unresolvedRiskPenalty(evidence, completeness);</span>
+<span class="fc" id="L62">        int controlPenalty = controlPenalty(evidence.controlClassification());</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        int total = eligibility == Eligibility.BLOCKED</span>
+<span class="fc" id="L64">            ? -1000</span>
+<span class="fc" id="L65">            : clamp(baseTotal - unresolvedRisk - controlPenalty, -1000, 1000);</span>
+
+<span class="fc" id="L67">        String contentHash = hash(canonicalMaterial(</span>
+            candidate,
+            evidence,
+            profile,
+            similarityPermille,
+            completeness,
+            contributions,
+            unresolvedRisk,
+            controlPenalty,
+            total,
+            blockers,
+            warnings));
+<span class="fc" id="L79">        return new InterestingnessAssessment(</span>
+            InterestingnessAssessment.SCHEMA,
+<span class="fc" id="L81">            candidate.id(),</span>
+            profile,
+            eligibility,
+            evidence,
+<span class="fc" id="L85">            candidate.proofStatus(),</span>
+<span class="fc" id="L86">            evidence.counterexampleStatus(),</span>
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            similarityPermille,
+            completeness,
+            contributions,
+            unresolvedRisk,
+            controlPenalty,
+            total,
+            blockers,
+            warnings,
+            contentHash);
+    }
+
+    private static List&lt;String&gt; hardBlockers(
+        HypothesisCandidate candidate,
+        InterestingnessEvidence evidence
+    ) {
+<span class="fc" id="L104">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (candidate.proofStatus() == CandidateProofStatus.REJECTED) {</span>
+<span class="nc" id="L106">            blockers.add(&quot;proof-status=REJECTED&quot;);</span>
+        }
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (candidate.counterexampleSearchStatus()</span>
+                == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                || Boolean.TRUE.equals(candidate.counterexampleStatus())</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                || evidence.counterexampleStatus()</span>
+                    == CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND) {
+<span class="fc" id="L113">            blockers.add(&quot;counterexample-found&quot;);</span>
+        }
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (evidence.oracleDisagreed()) {</span>
+<span class="nc" id="L116">            blockers.add(&quot;oracle=DISAGREE&quot;);</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (evidence.failedPositiveChecks() &gt; 0) {</span>
+<span class="nc" id="L119">            blockers.add(&quot;positive-checks-failed=&quot; + evidence.failedPositiveChecks());</span>
+        }
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (evidence.failedNegativeChecks() &gt; 0) {</span>
+<span class="nc" id="L122">            blockers.add(&quot;negative-checks-failed=&quot; + evidence.failedNegativeChecks());</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (!evidence.positiveAccountingComplete()) {</span>
+<span class="nc" id="L125">            blockers.add(&quot;positive-check-accounting-inconsistent&quot;);</span>
+        }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (!evidence.negativeAccountingComplete()) {</span>
+<span class="nc" id="L128">            blockers.add(&quot;negative-check-accounting-inconsistent&quot;);</span>
+        }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (!evidence.heldOutAccountingComplete()) {</span>
+<span class="nc" id="L131">            blockers.add(&quot;held-out-family-accounting-inconsistent&quot;);</span>
+        }
+<span class="fc" id="L133">        return ordered(blockers);</span>
+    }
+
+    private static List&lt;String&gt; warnings(
+        HypothesisCandidate candidate,
+        InterestingnessEvidence evidence
+    ) {
+<span class="fc" id="L140">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L141">        if (candidate.proofStatus().ordinal()</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                &lt; CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()) {</span>
+<span class="nc" id="L143">            warnings.add(&quot;proof-evidence-incomplete&quot;);</span>
+        }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (evidence.configuredPositiveChecks() == 0) {</span>
+<span class="nc" id="L146">            warnings.add(&quot;positive-suite-missing&quot;);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        } else if (evidence.skippedPositiveChecks() &gt; 0) {</span>
+<span class="fc" id="L148">            warnings.add(&quot;positive-checks-skipped=&quot; + evidence.skippedPositiveChecks());</span>
+        }
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (evidence.configuredNegativeChecks() == 0) {</span>
+<span class="nc" id="L151">            warnings.add(&quot;negative-suite-missing&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        } else if (evidence.skippedNegativeChecks() &gt; 0) {</span>
+<span class="nc" id="L153">            warnings.add(&quot;negative-checks-skipped=&quot; + evidence.skippedNegativeChecks());</span>
+        }
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (evidence.counterexampleStatus() == CounterexampleSearchService.Status.INCONCLUSIVE) {</span>
+<span class="nc" id="L156">            warnings.add(&quot;counterexample-search-inconclusive&quot;);</span>
+        }
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (evidence.counterexampleSourcesAttempted() == 0) {</span>
+<span class="nc" id="L159">            warnings.add(&quot;counterexample-sources-missing&quot;);</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (evidence.projectNoveltyStatus() == ProjectNoveltyStatus.UNKNOWN) {</span>
+<span class="nc" id="L162">            warnings.add(&quot;project-novelty-unknown&quot;);</span>
+        }
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (evidence.heldOutTransferRequired()) {</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            if (evidence.heldOutFamiliesConfigured() == 0) {</span>
+<span class="nc" id="L166">                warnings.add(&quot;held-out-family-suite-missing&quot;);</span>
+<span class="fc" id="L167">            } else if (evidence.heldOutFamiliesPassed()</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                    &lt; evidence.heldOutFamiliesConfigured()) {</span>
+<span class="fc" id="L169">                warnings.add(&quot;held-out-transfer-incomplete&quot;);</span>
+            }
+        }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (!evidence.pairedUtilityEvaluated()) {</span>
+<span class="fc" id="L173">            warnings.add(&quot;paired-utility-not-evaluated&quot;);</span>
+        }
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (evidence.controlClassification() != ControlClassification.NONE) {</span>
+<span class="fc" id="L176">            warnings.add(&quot;control=&quot; + evidence.controlClassification().name());</span>
+        }
+<span class="fc" id="L178">        return ordered(warnings);</span>
+    }
+
+    private static int evidenceCompleteness(
+        HypothesisCandidate candidate,
+        InterestingnessEvidence evidence
+    ) {
+<span class="fc" id="L185">        int positive = executedRatio(</span>
+<span class="fc" id="L186">            evidence.configuredPositiveChecks(),</span>
+<span class="fc" id="L187">            evidence.executedPositiveChecks(),</span>
+<span class="fc" id="L188">            evidence.positiveAccountingComplete());</span>
+<span class="fc" id="L189">        int negative = executedRatio(</span>
+<span class="fc" id="L190">            evidence.configuredNegativeChecks(),</span>
+<span class="fc" id="L191">            evidence.executedNegativeChecks(),</span>
+<span class="fc" id="L192">            evidence.negativeAccountingComplete());</span>
+<span class="pc bpc" id="L193" title="1 of 3 branches missed.">        int counterexample = switch (evidence.counterexampleStatus()) {</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            case NO_COUNTEREXAMPLE_FOUND -&gt; evidence.counterexampleSourcesAttempted() &gt; 0 ? 1000 : 0;</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            case INCONCLUSIVE -&gt; evidence.counterexampleSourcesAttempted() &gt; 0 ? 250 : 0;</span>
+<span class="fc" id="L196">            case COUNTEREXAMPLE_FOUND -&gt; 0;</span>
+        };
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        int heldOut = !evidence.heldOutTransferRequired()</span>
+<span class="fc" id="L199">            ? 1000</span>
+<span class="fc" id="L200">            : ratio(evidence.heldOutFamiliesPassed(), evidence.heldOutFamiliesConfigured());</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        int utility = evidence.pairedUtilityEvaluated() ? 1000 : 0;</span>
+<span class="fc" id="L202">        int proof = candidate.proofStatus().ordinal()</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                &gt;= CandidateProofStatus.VALIDATED_BY_EXAMPLES.ordinal()</span>
+<span class="fc" id="L204">            ? 1000</span>
+<span class="pc" id="L205">            : 250;</span>
+<span class="fc" id="L206">        return (positive * 200</span>
+            + negative * 250
+            + counterexample * 200
+            + heldOut * 150
+            + utility * 100
+            + proof * 100) / 1000;
+    }
+
+    private static Eligibility eligibility(List&lt;String&gt; blockers, int completeness) {
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (!blockers.isEmpty()) {</span>
+<span class="fc" id="L216">            return Eligibility.BLOCKED;</span>
+        }
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        return completeness == 1000</span>
+<span class="fc" id="L219">            ? Eligibility.RANKABLE_COMPLETE</span>
+<span class="fc" id="L220">            : Eligibility.RANKABLE_INCOMPLETE;</span>
+    }
+
+    private static List&lt;ComponentContribution&gt; contributions(
+        InterestingnessScore legacy,
+        InterestingnessEvidence evidence,
+        InterestingnessProfile profile,
+        int similarityPermille
+    ) {
+<span class="fc" id="L229">        List&lt;Integer&gt; raw = List.of(</span>
+<span class="fc" id="L230">            saturatingPositive(legacy.compressionGain()),</span>
+<span class="fc" id="L231">            saturatingPositive(legacy.generality()),</span>
+<span class="fc" id="L232">            evidenceCountPermille(legacy.independentEvidenceCount()),</span>
+<span class="fc" id="L233">            saturatingPositive(legacy.macroReusability()),</span>
+<span class="fc" id="L234">            structuralSurprise(evidence.projectNoveltyStatus(), similarityPermille),</span>
+<span class="fc" id="L235">            crossFamilyTransfer(evidence),</span>
+<span class="fc" id="L236">            saturatingUnit(legacy.minimalAssumptions()),</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            evidence.pairedUtilityEvaluated() ? evidence.pairedUtilityPermille() : 0);</span>
+<span class="fc" id="L238">        List&lt;ComponentContribution&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        for (int index = 0; index &lt; COMPONENTS.size(); index++) {</span>
+<span class="fc" id="L240">            String name = COMPONENTS.get(index);</span>
+<span class="fc" id="L241">            int weight = profile.weight(name);</span>
+<span class="fc" id="L242">            int value = raw.get(index);</span>
+<span class="fc" id="L243">            result.add(new ComponentContribution(</span>
+                name,
+                value,
+                weight,
+                (value * weight + 500) / 1000));
+        }
+<span class="fc" id="L249">        return List.copyOf(result);</span>
+    }
+
+    private static int structuralSurprise(
+        ProjectNoveltyStatus novelty,
+        int similarityPermille
+    ) {
+<span class="fc" id="L256">        int raw = 1000 - similarityPermille;</span>
+<span class="pc bpc" id="L257" title="3 of 4 branches missed.">        return switch (novelty) {</span>
+<span class="fc" id="L258">            case NOVEL_WITHIN_PROJECT -&gt; raw;</span>
+<span class="nc" id="L259">            case ALPHA_EQUIVALENT -&gt; Math.min(raw, 200);</span>
+<span class="nc" id="L260">            case DUPLICATE -&gt; Math.min(raw, 100);</span>
+<span class="nc" id="L261">            case UNKNOWN -&gt; Math.min(raw, 400);</span>
+        };
+    }
+
+    private static int crossFamilyTransfer(InterestingnessEvidence evidence) {
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        if (evidence.heldOutFamiliesConfigured() == 0) {</span>
+<span class="fc" id="L267">            return 0;</span>
+        }
+<span class="fc" id="L269">        return ratio(</span>
+<span class="fc" id="L270">            evidence.heldOutFamiliesPassed(), evidence.heldOutFamiliesConfigured());</span>
+    }
+
+    private static int unresolvedRiskPenalty(
+        InterestingnessEvidence evidence,
+        int completeness
+    ) {
+<span class="fc" id="L277">        int penalty = ((1000 - completeness) * 650 + 500) / 1000;</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (evidence.projectNoveltyStatus() == ProjectNoveltyStatus.UNKNOWN) {</span>
+<span class="nc" id="L279">            penalty += 100;</span>
+        }
+<span class="fc" id="L281">        return clamp(penalty, 0, 1000);</span>
+    }
+
+    private static int controlPenalty(ControlClassification classification) {
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">        return switch (classification) {</span>
+<span class="fc" id="L286">            case NONE -&gt; 0;</span>
+<span class="nc" id="L287">            case ALPHA_RENAMING_ONLY -&gt; 800;</span>
+<span class="nc" id="L288">            case FORMAT_ONLY -&gt; 750;</span>
+<span class="fc" id="L289">            case GENERIC_NORMALIZATION -&gt; 650;</span>
+        };
+    }
+
+    private static int executedRatio(int configured, int executed, boolean accountingValid) {
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        return accountingValid ? ratio(executed, configured) : 0;</span>
+    }
+
+    private static int ratio(int numerator, int denominator) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (denominator &lt;= 0) {</span>
+<span class="nc" id="L299">            return 0;</span>
+        }
+<span class="fc" id="L301">        return clamp((numerator * 1000) / denominator, 0, 1000);</span>
+    }
+
+    private static int evidenceCountPermille(double count) {
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (count &lt;= 0.0) {</span>
+<span class="nc" id="L306">            return 0;</span>
+        }
+<span class="fc" id="L308">        double normalized = Math.log1p(count) / Math.log(6.0);</span>
+<span class="fc" id="L309">        return toPermille(Math.min(1.0, normalized));</span>
+    }
+
+    private static int saturatingPositive(double value) {
+<span class="pc bpc" id="L313" title="2 of 4 branches missed.">        if (value &lt;= 0.0 || !Double.isFinite(value)) {</span>
+<span class="nc" id="L314">            return 0;</span>
+        }
+<span class="fc" id="L316">        return toPermille(1.0 - Math.exp(-value));</span>
+    }
+
+    private static int saturatingUnit(double value) {
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
+<span class="nc" id="L321">            return 0;</span>
+        }
+<span class="fc" id="L323">        return toPermille(Math.max(0.0, Math.min(1.0, value)));</span>
+    }
+
+    private static int toPermille(double value) {
+<span class="fc" id="L327">        return clamp((int) Math.round(value * 1000.0), 0, 1000);</span>
+    }
+
+    private static String canonicalMaterial(
+        HypothesisCandidate candidate,
+        InterestingnessEvidence evidence,
+        InterestingnessProfile profile,
+        int similarityPermille,
+        int completeness,
+        List&lt;ComponentContribution&gt; contributions,
+        int unresolvedRisk,
+        int controlPenalty,
+        int total,
+        List&lt;String&gt; blockers,
+        List&lt;String&gt; warnings
+    ) {
+<span class="fc" id="L343">        StringBuilder material = new StringBuilder(InterestingnessAssessment.SCHEMA)</span>
+<span class="fc" id="L344">            .append(&quot;\ncandidate=&quot;).append(candidate.id())</span>
+<span class="fc" id="L345">            .append(&quot;\nrelation=&quot;).append(normalize(candidate.leftPattern()))</span>
+<span class="fc" id="L346">            .append(&quot;-&gt;&quot;).append(normalize(candidate.rightPattern()))</span>
+<span class="fc" id="L347">            .append(&quot;\nassumptions=&quot;).append(candidate.assumptions())</span>
+<span class="fc" id="L348">            .append(&quot;\nproof=&quot;).append(candidate.proofStatus())</span>
+<span class="fc" id="L349">            .append(&quot;\nprofile=&quot;).append(profile.name())</span>
+<span class="fc" id="L350">            .append(&quot;\nweights=&quot;).append(profile.weights())</span>
+<span class="fc" id="L351">            .append(&quot;\nevidence=&quot;).append(evidence)</span>
+<span class="fc" id="L352">            .append(&quot;\nsimilarity=&quot;).append(similarityPermille)</span>
+<span class="fc" id="L353">            .append(&quot;\ncompleteness=&quot;).append(completeness)</span>
+<span class="fc" id="L354">            .append(&quot;\nrisk=&quot;).append(unresolvedRisk)</span>
+<span class="fc" id="L355">            .append(&quot;\ncontrol=&quot;).append(controlPenalty)</span>
+<span class="fc" id="L356">            .append(&quot;\ntotal=&quot;).append(total)</span>
+<span class="fc" id="L357">            .append(&quot;\nblockers=&quot;).append(blockers)</span>
+<span class="fc" id="L358">            .append(&quot;\nwarnings=&quot;).append(warnings);</span>
+<span class="fc" id="L359">        contributions.forEach(contribution -&gt; material.append(&quot;\ncomponent=&quot;)</span>
+<span class="fc" id="L360">            .append(contribution.name()).append('|')</span>
+<span class="fc" id="L361">            .append(contribution.rawPermille()).append('|')</span>
+<span class="fc" id="L362">            .append(contribution.weightPermille()).append('|')</span>
+<span class="fc" id="L363">            .append(contribution.weightedPermille()));</span>
+<span class="fc" id="L364">        return material.toString();</span>
+    }
+
+    private static String normalize(String value) {
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static List&lt;String&gt; ordered(List&lt;String&gt; values) {
+<span class="fc" id="L372">        return values.stream().distinct().sorted().toList();</span>
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L377">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L378">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L379">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L380">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L381">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static int clamp(int value, int minimum, int maximum) {
+<span class="fc" id="L386">        return Math.max(minimum, Math.min(maximum, value));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

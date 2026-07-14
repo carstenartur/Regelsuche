@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessEvidence.java</span></div><h1>InterestingnessEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.validation.CounterexampleSearchService;
+import java.util.Objects;
+
+/**
+ * Independent post-formation evidence consumed by interestingness assessment.
+ *
+ * &lt;p&gt;The contract deliberately contains no relevance label and no hidden expected
+ * answer. Truth, novelty and evidence completeness remain inspectable inputs rather
+ * than being inferred from the final rank.&lt;/p&gt;
+ */
+public record InterestingnessEvidence(
+    String evidenceId,
+    int configuredPositiveChecks,
+    int executedPositiveChecks,
+    int skippedPositiveChecks,
+    int failedPositiveChecks,
+    int configuredNegativeChecks,
+    int executedNegativeChecks,
+    int skippedNegativeChecks,
+    int failedNegativeChecks,
+    CounterexampleSearchService.Status counterexampleStatus,
+    int counterexampleSourcesAttempted,
+    boolean oracleDisagreed,
+    ProjectNoveltyStatus projectNoveltyStatus,
+    int contributingFamilies,
+    boolean heldOutTransferRequired,
+    int heldOutFamiliesConfigured,
+    int heldOutFamiliesPassed,
+    boolean pairedUtilityEvaluated,
+    int pairedUtilityPermille,
+    ControlClassification controlClassification
+) {
+<span class="fc" id="L35">    public InterestingnessEvidence {</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">        if (evidenceId == null || evidenceId.isBlank()) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;evidenceId must not be blank&quot;);</span>
+        }
+<span class="fc" id="L39">        requireNonNegative(configuredPositiveChecks, &quot;configuredPositiveChecks&quot;);</span>
+<span class="fc" id="L40">        requireNonNegative(executedPositiveChecks, &quot;executedPositiveChecks&quot;);</span>
+<span class="fc" id="L41">        requireNonNegative(skippedPositiveChecks, &quot;skippedPositiveChecks&quot;);</span>
+<span class="fc" id="L42">        requireNonNegative(failedPositiveChecks, &quot;failedPositiveChecks&quot;);</span>
+<span class="fc" id="L43">        requireNonNegative(configuredNegativeChecks, &quot;configuredNegativeChecks&quot;);</span>
+<span class="fc" id="L44">        requireNonNegative(executedNegativeChecks, &quot;executedNegativeChecks&quot;);</span>
+<span class="fc" id="L45">        requireNonNegative(skippedNegativeChecks, &quot;skippedNegativeChecks&quot;);</span>
+<span class="fc" id="L46">        requireNonNegative(failedNegativeChecks, &quot;failedNegativeChecks&quot;);</span>
+<span class="fc" id="L47">        requireNonNegative(counterexampleSourcesAttempted, &quot;counterexampleSourcesAttempted&quot;);</span>
+<span class="fc" id="L48">        requireNonNegative(contributingFamilies, &quot;contributingFamilies&quot;);</span>
+<span class="fc" id="L49">        requireNonNegative(heldOutFamiliesConfigured, &quot;heldOutFamiliesConfigured&quot;);</span>
+<span class="fc" id="L50">        requireNonNegative(heldOutFamiliesPassed, &quot;heldOutFamiliesPassed&quot;);</span>
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        if (pairedUtilityPermille &lt; 0 || pairedUtilityPermille &gt; 1000) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(&quot;pairedUtilityPermille must be in [0,1000]&quot;);</span>
+        }
+<span class="fc" id="L54">        counterexampleStatus = Objects.requireNonNull(</span>
+            counterexampleStatus, &quot;counterexampleStatus&quot;);
+<span class="fc" id="L56">        projectNoveltyStatus = Objects.requireNonNull(</span>
+            projectNoveltyStatus, &quot;projectNoveltyStatus&quot;);
+<span class="fc" id="L58">        controlClassification = Objects.requireNonNull(</span>
+            controlClassification, &quot;controlClassification&quot;);
+<span class="fc" id="L60">    }</span>
+
+    public boolean positiveAccountingComplete() {
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        return configuredPositiveChecks == executedPositiveChecks + skippedPositiveChecks</span>
+            &amp;&amp; failedPositiveChecks &lt;= executedPositiveChecks;
+    }
+
+    public boolean negativeAccountingComplete() {
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">        return configuredNegativeChecks == executedNegativeChecks + skippedNegativeChecks</span>
+            &amp;&amp; failedNegativeChecks &lt;= executedNegativeChecks;
+    }
+
+    public boolean heldOutAccountingComplete() {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        return heldOutFamiliesPassed &lt;= heldOutFamiliesConfigured;</span>
+    }
+
+<span class="fc" id="L76">    public enum ProjectNoveltyStatus {</span>
+<span class="fc" id="L77">        NOVEL_WITHIN_PROJECT,</span>
+<span class="fc" id="L78">        DUPLICATE,</span>
+<span class="fc" id="L79">        ALPHA_EQUIVALENT,</span>
+<span class="fc" id="L80">        UNKNOWN</span>
+    }
+
+<span class="fc" id="L83">    public enum ControlClassification {</span>
+<span class="fc" id="L84">        NONE,</span>
+<span class="fc" id="L85">        ALPHA_RENAMING_ONLY,</span>
+<span class="fc" id="L86">        FORMAT_ONLY,</span>
+<span class="fc" id="L87">        GENERIC_NORMALIZATION</span>
+    }
+
+    private static void requireNonNegative(int value, String name) {
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (value &lt; 0) {</span>
+<span class="nc" id="L92">            throw new IllegalArgumentException(name + &quot; must be non-negative&quot;);</span>
+        }
+<span class="fc" id="L94">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

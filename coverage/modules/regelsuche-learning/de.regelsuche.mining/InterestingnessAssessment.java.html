@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessAssessment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessAssessment.java</span></div><h1>InterestingnessAssessment.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Versioned interestingness decision with independent eligibility and evidence axes.
+ */
+public record InterestingnessAssessment(
+    String schema,
+    String candidateId,
+    InterestingnessProfile profile,
+    Eligibility eligibility,
+    InterestingnessEvidence evidence,
+    CandidateProofStatus proofStatus,
+    CounterexampleSearchService.Status counterexampleStatus,
+    String externalNoveltyStatus,
+    String publicEvidenceStatus,
+    int knownRuleSimilarityPermille,
+    int evidenceCompletenessPermille,
+    List&lt;ComponentContribution&gt; contributions,
+    int unresolvedRiskPenaltyPermille,
+    int controlPenaltyPermille,
+    int totalPermille,
+    List&lt;String&gt; hardBlockers,
+    List&lt;String&gt; warnings,
+    String contentHash
+) implements Comparable&lt;InterestingnessAssessment&gt; {
+    public static final String SCHEMA = &quot;regelsuche.interestingness-assessment/v1&quot;;
+
+<span class="fc" id="L35">    public InterestingnessAssessment {</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;unsupported interestingness schema&quot;);</span>
+        }
+<span class="pc bpc" id="L39" title="2 of 4 branches missed.">        if (candidateId == null || candidateId.isBlank()) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;candidateId must not be blank&quot;);</span>
+        }
+<span class="fc" id="L42">        profile = Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L43">        eligibility = Objects.requireNonNull(eligibility, &quot;eligibility&quot;);</span>
+<span class="fc" id="L44">        evidence = Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L45">        proofStatus = Objects.requireNonNull(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L46">        counterexampleStatus = Objects.requireNonNull(</span>
+            counterexampleStatus, &quot;counterexampleStatus&quot;);
+<span class="fc" id="L48">        externalNoveltyStatus = normalizeStatus(externalNoveltyStatus);</span>
+<span class="fc" id="L49">        publicEvidenceStatus = normalizeStatus(publicEvidenceStatus);</span>
+<span class="fc" id="L50">        requirePermille(knownRuleSimilarityPermille, &quot;knownRuleSimilarityPermille&quot;);</span>
+<span class="fc" id="L51">        requirePermille(evidenceCompletenessPermille, &quot;evidenceCompletenessPermille&quot;);</span>
+<span class="fc" id="L52">        requirePermille(unresolvedRiskPenaltyPermille, &quot;unresolvedRiskPenaltyPermille&quot;);</span>
+<span class="fc" id="L53">        requirePermille(controlPenaltyPermille, &quot;controlPenaltyPermille&quot;);</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (totalPermille &lt; -1000 || totalPermille &gt; 1000) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;totalPermille must be in [-1000,1000]&quot;);</span>
+        }
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        contributions = contributions == null</span>
+<span class="nc" id="L58">            ? List.of()</span>
+<span class="fc" id="L59">            : contributions.stream()</span>
+<span class="fc" id="L60">                .sorted(Comparator.comparing(ComponentContribution::name))</span>
+<span class="fc" id="L61">                .toList();</span>
+<span class="fc" id="L62">        hardBlockers = ordered(hardBlockers);</span>
+<span class="fc" id="L63">        warnings = ordered(warnings);</span>
+<span class="pc bpc" id="L64" title="2 of 4 branches missed.">        if (contentHash == null || !contentHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;contentHash must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L67">    }</span>
+
+    @Override
+    public int compareTo(InterestingnessAssessment other) {
+<span class="fc" id="L71">        int eligibilityOrder = Integer.compare(</span>
+<span class="fc" id="L72">            eligibility.rankOrder(), other.eligibility.rankOrder());</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (eligibilityOrder != 0) {</span>
+<span class="fc" id="L74">            return eligibilityOrder;</span>
+        }
+<span class="nc" id="L76">        int scoreOrder = Integer.compare(other.totalPermille, totalPermille);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        return scoreOrder != 0 ? scoreOrder : candidateId.compareTo(other.candidateId);</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L81">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L82">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L83">            .property(&quot;candidateId&quot;, candidateId)</span>
+<span class="fc" id="L84">            .property(&quot;profile&quot;, profile.name())</span>
+<span class="fc" id="L85">            .property(&quot;profileSchema&quot;, InterestingnessProfile.WEIGHT_SCHEMA)</span>
+<span class="fc" id="L86">            .property(&quot;eligibility&quot;, eligibility.name())</span>
+<span class="fc" id="L87">            .property(&quot;proofStatus&quot;, proofStatus.name())</span>
+<span class="fc" id="L88">            .property(&quot;counterexampleStatus&quot;, counterexampleStatus.name())</span>
+<span class="fc" id="L89">            .property(&quot;projectNoveltyStatus&quot;, evidence.projectNoveltyStatus().name())</span>
+<span class="fc" id="L90">            .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus)</span>
+<span class="fc" id="L91">            .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L92">            .property(&quot;knownRuleSimilarityPermille&quot;, knownRuleSimilarityPermille)</span>
+<span class="fc" id="L93">            .property(&quot;evidenceCompletenessPermille&quot;, evidenceCompletenessPermille)</span>
+<span class="fc" id="L94">            .object(&quot;evidence&quot;, this::writeEvidence)</span>
+<span class="fc" id="L95">            .array(&quot;contributions&quot;, array -&gt; contributions.forEach(contribution -&gt;</span>
+<span class="fc" id="L96">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L97">                    .property(&quot;name&quot;, contribution.name())</span>
+<span class="fc" id="L98">                    .property(&quot;rawPermille&quot;, contribution.rawPermille())</span>
+<span class="fc" id="L99">                    .property(&quot;weightPermille&quot;, contribution.weightPermille())</span>
+<span class="fc" id="L100">                    .property(&quot;weightedPermille&quot;, contribution.weightedPermille()))))</span>
+<span class="fc" id="L101">            .object(&quot;penalties&quot;, object -&gt; object</span>
+<span class="fc" id="L102">                .property(&quot;unresolvedRiskPermille&quot;, unresolvedRiskPenaltyPermille)</span>
+<span class="fc" id="L103">                .property(&quot;controlPermille&quot;, controlPenaltyPermille))</span>
+<span class="fc" id="L104">            .property(&quot;totalPermille&quot;, totalPermille)</span>
+<span class="fc" id="L105">            .stringArray(&quot;hardBlockers&quot;, hardBlockers)</span>
+<span class="fc" id="L106">            .stringArray(&quot;warnings&quot;, warnings)</span>
+<span class="fc" id="L107">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L108">            .endObject()</span>
+<span class="fc" id="L109">            .toString();</span>
+    }
+
+    private void writeEvidence(JsonWriter json) {
+<span class="fc" id="L113">        json.property(&quot;evidenceId&quot;, evidence.evidenceId())</span>
+<span class="fc" id="L114">            .property(&quot;configuredPositiveChecks&quot;, evidence.configuredPositiveChecks())</span>
+<span class="fc" id="L115">            .property(&quot;executedPositiveChecks&quot;, evidence.executedPositiveChecks())</span>
+<span class="fc" id="L116">            .property(&quot;skippedPositiveChecks&quot;, evidence.skippedPositiveChecks())</span>
+<span class="fc" id="L117">            .property(&quot;failedPositiveChecks&quot;, evidence.failedPositiveChecks())</span>
+<span class="fc" id="L118">            .property(&quot;configuredNegativeChecks&quot;, evidence.configuredNegativeChecks())</span>
+<span class="fc" id="L119">            .property(&quot;executedNegativeChecks&quot;, evidence.executedNegativeChecks())</span>
+<span class="fc" id="L120">            .property(&quot;skippedNegativeChecks&quot;, evidence.skippedNegativeChecks())</span>
+<span class="fc" id="L121">            .property(&quot;failedNegativeChecks&quot;, evidence.failedNegativeChecks())</span>
+<span class="fc" id="L122">            .property(&quot;counterexampleSourcesAttempted&quot;, evidence.counterexampleSourcesAttempted())</span>
+<span class="fc" id="L123">            .property(&quot;oracleDisagreed&quot;, evidence.oracleDisagreed())</span>
+<span class="fc" id="L124">            .property(&quot;contributingFamilies&quot;, evidence.contributingFamilies())</span>
+<span class="fc" id="L125">            .property(&quot;heldOutTransferRequired&quot;, evidence.heldOutTransferRequired())</span>
+<span class="fc" id="L126">            .property(&quot;heldOutFamiliesConfigured&quot;, evidence.heldOutFamiliesConfigured())</span>
+<span class="fc" id="L127">            .property(&quot;heldOutFamiliesPassed&quot;, evidence.heldOutFamiliesPassed())</span>
+<span class="fc" id="L128">            .property(&quot;pairedUtilityEvaluated&quot;, evidence.pairedUtilityEvaluated())</span>
+<span class="fc" id="L129">            .property(&quot;pairedUtilityPermille&quot;, evidence.pairedUtilityPermille())</span>
+<span class="fc" id="L130">            .property(&quot;controlClassification&quot;, evidence.controlClassification().name());</span>
+<span class="fc" id="L131">    }</span>
+
+<span class="fc" id="L133">    public enum Eligibility {</span>
+<span class="fc" id="L134">        RANKABLE_COMPLETE(0),</span>
+<span class="fc" id="L135">        RANKABLE_INCOMPLETE(1),</span>
+<span class="fc" id="L136">        BLOCKED(2);</span>
+
+        private final int rankOrder;
+
+<span class="fc" id="L140">        Eligibility(int rankOrder) {</span>
+<span class="fc" id="L141">            this.rankOrder = rankOrder;</span>
+<span class="fc" id="L142">        }</span>
+
+        int rankOrder() {
+<span class="fc" id="L145">            return rankOrder;</span>
+        }
+    }
+
+    public record ComponentContribution(
+        String name,
+        int rawPermille,
+        int weightPermille,
+        int weightedPermille
+    ) {
+<span class="fc" id="L155">        public ComponentContribution {</span>
+<span class="pc bpc" id="L156" title="2 of 4 branches missed.">            if (name == null || name.isBlank()) {</span>
+<span class="nc" id="L157">                throw new IllegalArgumentException(&quot;contribution name must not be blank&quot;);</span>
+            }
+<span class="fc" id="L159">            requirePermille(rawPermille, &quot;rawPermille&quot;);</span>
+<span class="fc" id="L160">            requirePermille(weightPermille, &quot;weightPermille&quot;);</span>
+<span class="fc" id="L161">            requirePermille(weightedPermille, &quot;weightedPermille&quot;);</span>
+<span class="fc" id="L162">        }</span>
+    }
+
+    private static List&lt;String&gt; ordered(List&lt;String&gt; values) {
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        return values == null</span>
+<span class="nc" id="L167">            ? List.of()</span>
+<span class="fc" id="L168">            : values.stream()</span>
+<span class="pc bpc" id="L169" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L170">                .distinct()</span>
+<span class="fc" id="L171">                .sorted()</span>
+<span class="fc" id="L172">                .toList();</span>
+    }
+
+    private static String normalizeStatus(String value) {
+<span class="pc bpc" id="L176" title="2 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;NOT_EVALUATED&quot; : value;</span>
+    }
+
+    private static void requirePermille(int value, String name) {
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">        if (value &lt; 0 || value &gt; 1000) {</span>
+<span class="nc" id="L181">            throw new IllegalArgumentException(name + &quot; must be in [0,1000]&quot;);</span>
+        }
+<span class="fc" id="L183">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
