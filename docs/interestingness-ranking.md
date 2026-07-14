@@ -83,9 +83,25 @@ Der Report enthält außerdem:
 
 Pareto- und Sensitivitätswerte bleiben Diagnoseevidenz. Sie verändern weder Kandidatenbildung noch Proof-, Novelty-, Promotion- oder Public-Evidence-Entscheidungen.
 
+## Vorab festgelegtes Akzeptanzgate
+
+`regelsuche.interestingness-acceptance/v1` interpretiert erst den vollständig erzeugten Calibration-/TEST-Report. Die Schwellen werden vor der TEST-Auswertung festgelegt und sind Bestandteil des kanonischen Artefakts.
+
+Das Gate kann Mindestwerte verlangen für:
+
+- Zahl der TEST-Fälle,
+- Agreement auf `CALIBRATION`,
+- Agreement auf `TEST`,
+- profilübergreifende Rangordnungsstabilität,
+- Leave-one-out-Stabilität der Profilwahl,
+- Stabilität des höchstgerankten Kandidaten,
+- eine nicht leere Pareto-Front.
+
+Unterschreitungen bleiben als konkrete Blocker sichtbar. Das Gate darf weder Profilwahl, Scores, Labels noch TEST-Rangfolge verändern und lässt Promotion sowie Public Evidence auf `NOT_EVALUATED`.
+
 ## Was diese Artefakte nicht behaupten
 
-Auch ein hoch gerankter, konsensuell relevanter Kandidat ist nicht automatisch:
+Auch ein hoch gerankter, konsensuell relevanter oder nach den vorab festgelegten Schwellen akzeptierter Kandidat ist nicht automatisch:
 
 - mathematisch wahr,
 - projektintern oder extern neu,
