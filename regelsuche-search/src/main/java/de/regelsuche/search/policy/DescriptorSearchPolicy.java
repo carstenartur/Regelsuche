@@ -154,9 +154,7 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         return false;
     }
 
-    private static Map<String, Integer> descriptorFeatures(
-        TransformationDescriptor descriptor
-    ) {
+    static Map<String, Integer> descriptorFeatures(TransformationDescriptor descriptor) {
         Map<String, Integer> features = new LinkedHashMap<>(descriptor.featureVector());
         TransformationDescriptor.LocalChange local = descriptor.localChange();
         if (local.available() && local.role() != OccurrenceRole.ROOT) {
@@ -166,7 +164,7 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         return features;
     }
 
-    private static boolean pairwiseContextFeature(String featureName) {
+    static boolean pairwiseContextFeature(String featureName) {
         return featureName.startsWith("local.context.")
             || featureName.startsWith("local.contextRole.");
     }
