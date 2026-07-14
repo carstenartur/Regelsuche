@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrossFamilyBridgeHypothesisBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">CrossFamilyBridgeHypothesisBuilder.java</span></div><h1>CrossFamilyBridgeHypothesisBuilder.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.CrossFamilyStructuralClusterer.BridgeCluster;
+import de.regelsuche.mining.CrossFamilyStructuralClusterer.ClusterStatus;
+import de.regelsuche.mining.OpenTargetConjectureMiner.ConvergenceEvidence;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.mining.OpenTargetConjectureMiner.PathEvidence;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/**
+ * Forms one target-free bridge hypothesis from an already eligible structural cluster.
+ *
+ * &lt;p&gt;The builder accepts formation conjectures only. Held-out families, validation
+ * examples and outcomes are deliberately absent from this API.&lt;/p&gt;
+ */
+<span class="fc" id="L26">public final class CrossFamilyBridgeHypothesisBuilder {</span>
+    public static final String SCHEMA = &quot;regelsuche.cross-family-bridge-hypothesis/v1&quot;;
+
+<span class="fc" id="L29">    private final CrossFamilyStructuralClusterer clusterer =</span>
+        new CrossFamilyStructuralClusterer();
+
+    public BridgeHypothesis form(
+        BridgeCluster cluster,
+        List&lt;OpenTargetConjecture&gt; formationConjectures
+    ) {
+<span class="fc" id="L36">        validateCluster(cluster);</span>
+<span class="fc" id="L37">        List&lt;OpenTargetConjecture&gt; ordered = orderedConjectures(formationConjectures);</span>
+<span class="fc" id="L38">        validateFormationMembership(cluster, ordered);</span>
+
+<span class="fc" id="L40">        BridgeCluster recomputed = recomputeCluster(cluster, ordered);</span>
+<span class="fc" id="L41">        validateRecomputedCluster(cluster, recomputed);</span>
+
+<span class="fc" id="L43">        List&lt;ConvergenceEvidence&gt; evidence = ordered.stream()</span>
+<span class="fc" id="L44">            .flatMap(conjecture -&gt; conjecture.evidence().stream())</span>
+<span class="fc" id="L45">            .map(CrossFamilyBridgeHypothesisBuilder::orderedEvidence)</span>
+<span class="fc" id="L46">            .sorted(Comparator.comparing(ConvergenceEvidence::observationId))</span>
+<span class="fc" id="L47">            .toList();</span>
+<span class="fc" id="L48">        TreeSet&lt;String&gt; observationIds = evidence.stream()</span>
+<span class="fc" id="L49">            .map(ConvergenceEvidence::observationId)</span>
+<span class="fc" id="L50">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (observationIds.size() != evidence.size()) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(</span>
+                &quot;formation conjectures reuse an observation ID&quot;);
+        }
+<span class="fc" id="L55">        int distinctAlphaSupport = (int) evidence.stream()</span>
+<span class="fc" id="L56">            .map(ConvergenceEvidence::alphaPairFingerprint)</span>
+<span class="fc" id="L57">            .distinct()</span>
+<span class="fc" id="L58">            .count();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (distinctAlphaSupport &lt; 2) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(</span>
+                &quot;bridge hypothesis requires alpha-distinct formation evidence&quot;);
+        }
+
+<span class="fc" id="L64">        OpenTargetConjecture representative = ordered.getFirst();</span>
+<span class="fc" id="L65">        List&lt;String&gt; families = List.copyOf(new TreeSet&lt;&gt;(cluster.postHocFamilies()));</span>
+<span class="fc" id="L66">        List&lt;String&gt; conjectureIds = ordered.stream()</span>
+<span class="fc" id="L67">            .map(OpenTargetConjecture::conjectureId)</span>
+<span class="fc" id="L68">            .toList();</span>
+<span class="fc" id="L69">        List&lt;String&gt; assumptions = cluster.assumptions().stream()</span>
+<span class="pc bnc" id="L70" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L71">            .distinct()</span>
+<span class="fc" id="L72">            .sorted()</span>
+<span class="fc" id="L73">            .toList();</span>
+<span class="fc" id="L74">        List&lt;String&gt; parameterRelations = representative.parameterRelations().stream()</span>
+<span class="pc bnc" id="L75" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L76">            .distinct()</span>
+<span class="fc" id="L77">            .sorted()</span>
+<span class="fc" id="L78">            .toList();</span>
+<span class="fc" id="L79">        Map&lt;String, List&lt;String&gt;&gt; placeholderValues = orderedPlaceholderValues(</span>
+<span class="fc" id="L80">            representative.expressionPlaceholderValues());</span>
+
+<span class="fc" id="L82">        String hypothesisId = &quot;bridge-hypothesis-&quot; + sha256(</span>
+<span class="fc" id="L83">            cluster.clusterId()</span>
+<span class="fc" id="L84">                + &quot;\n&quot; + representative.leftPattern()</span>
+<span class="fc" id="L85">                + &quot;-&gt;&quot; + representative.rightPattern()</span>
+<span class="fc" id="L86">                + &quot;\n&quot; + String.join(&quot;\u0001&quot;, families)</span>
+<span class="fc" id="L87">                + &quot;\n&quot; + String.join(&quot;\u0001&quot;, conjectureIds))</span>
+<span class="fc" id="L88">            .substring(0, 24);</span>
+<span class="fc" id="L89">        OpenTargetConjecture conjecture = new OpenTargetConjecture(</span>
+            hypothesisId,
+<span class="fc" id="L91">            representative.leftPattern(),</span>
+<span class="fc" id="L92">            representative.rightPattern(),</span>
+<span class="fc" id="L93">            evidence.size(),</span>
+            distinctAlphaSupport,
+            families,
+<span class="fc" id="L96">            List.copyOf(observationIds),</span>
+            evidence,
+            parameterRelations,
+            placeholderValues,
+            &quot;OBSERVED_CONJECTURE&quot;,
+            &quot;EQUIVALENCE_PRESERVING_CONVERGENT_PATHS&quot;);
+
+<span class="fc" id="L103">        String formationHash = hash(formationMaterial(</span>
+            cluster,
+            hypothesisId,
+<span class="fc" id="L106">            representative.leftPattern(),</span>
+<span class="fc" id="L107">            representative.rightPattern(),</span>
+            families,
+            conjectureIds,
+<span class="fc" id="L110">            List.copyOf(observationIds),</span>
+            assumptions,
+            parameterRelations,
+            placeholderValues,
+            evidence));
+<span class="fc" id="L115">        return new BridgeHypothesis(</span>
+            SCHEMA,
+            hypothesisId,
+<span class="fc" id="L118">            cluster.clusterId(),</span>
+<span class="fc" id="L119">            cluster.structuralSignatureHash(),</span>
+            false,
+<span class="fc" id="L121">            representative.leftPattern(),</span>
+<span class="fc" id="L122">            representative.rightPattern(),</span>
+            families,
+            conjectureIds,
+<span class="fc" id="L125">            List.copyOf(observationIds),</span>
+            assumptions,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            formationHash,
+            conjecture);
+    }
+
+    private static void validateCluster(BridgeCluster cluster) {
+<span class="fc" id="L137">        Objects.requireNonNull(cluster, &quot;cluster&quot;);</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (cluster.status() != ClusterStatus.ELIGIBLE_BRIDGE) {</span>
+<span class="nc" id="L139">            throw new IllegalArgumentException(</span>
+                &quot;bridge hypothesis requires an ELIGIBLE_BRIDGE cluster&quot;);
+        }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (cluster.postHocFamilies().size() &lt; 2</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                || cluster.candidateIds().size() &lt; 2) {</span>
+<span class="nc" id="L144">            throw new IllegalArgumentException(</span>
+                &quot;bridge hypothesis requires two families and two candidates&quot;);
+        }
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(cluster.validationStatus())</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(cluster.proofStatus())</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(cluster.noveltyStatus())</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(cluster.interestingnessStatus())) {</span>
+<span class="nc" id="L151">            throw new IllegalArgumentException(</span>
+                &quot;bridge formation must not consume downstream outcomes&quot;);
+        }
+<span class="fc" id="L154">    }</span>
+
+    private static List&lt;OpenTargetConjecture&gt; orderedConjectures(
+        List&lt;OpenTargetConjecture&gt; conjectures
+    ) {
+<span class="fc" id="L159">        Objects.requireNonNull(conjectures, &quot;formationConjectures&quot;);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (conjectures.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L161">            throw new IllegalArgumentException(</span>
+                &quot;formation conjectures must not contain null&quot;);
+        }
+<span class="fc" id="L164">        List&lt;OpenTargetConjecture&gt; ordered = conjectures.stream()</span>
+<span class="fc" id="L165">            .sorted(Comparator.comparing(OpenTargetConjecture::conjectureId))</span>
+<span class="fc" id="L166">            .toList();</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (ordered.size() &lt; 2) {</span>
+<span class="nc" id="L168">            throw new IllegalArgumentException(</span>
+                &quot;bridge formation requires at least two conjectures&quot;);
+        }
+<span class="fc" id="L171">        return ordered;</span>
+    }
+
+    private static void validateFormationMembership(
+        BridgeCluster cluster,
+        List&lt;OpenTargetConjecture&gt; conjectures
+    ) {
+<span class="fc" id="L178">        TreeSet&lt;String&gt; expectedIds = new TreeSet&lt;&gt;(cluster.candidateIds());</span>
+<span class="fc" id="L179">        TreeSet&lt;String&gt; suppliedIds = conjectures.stream()</span>
+<span class="fc" id="L180">            .map(OpenTargetConjecture::conjectureId)</span>
+<span class="fc" id="L181">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (!expectedIds.equals(suppliedIds)</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">                || suppliedIds.size() != conjectures.size()) {</span>
+<span class="fc" id="L184">            throw new IllegalArgumentException(</span>
+                &quot;formation conjectures must match the source cluster exactly&quot;);
+        }
+<span class="fc" id="L187">        TreeSet&lt;String&gt; suppliedFamilies = conjectures.stream()</span>
+<span class="fc" id="L188">            .flatMap(conjecture -&gt; conjecture.postHocFamilies().stream())</span>
+<span class="pc bpc" id="L189" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L190">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (!new TreeSet&lt;&gt;(cluster.postHocFamilies()).equals(suppliedFamilies)) {</span>
+<span class="nc" id="L192">            throw new IllegalArgumentException(</span>
+                &quot;formation family metadata does not match the source cluster&quot;);
+        }
+<span class="fc" id="L195">    }</span>
+
+    private BridgeCluster recomputeCluster(
+        BridgeCluster cluster,
+        List&lt;OpenTargetConjecture&gt; conjectures
+    ) {
+<span class="fc" id="L201">        return clusterer.cluster(conjectures).clusters().stream()</span>
+<span class="fc" id="L202">            .filter(candidate -&gt; candidate.clusterId().equals(cluster.clusterId()))</span>
+<span class="fc" id="L203">            .findFirst()</span>
+<span class="pc" id="L204">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;formation conjectures do not reproduce the source cluster&quot;));
+    }
+
+    private static void validateRecomputedCluster(
+        BridgeCluster expected,
+        BridgeCluster actual
+    ) {
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (actual.status() != ClusterStatus.ELIGIBLE_BRIDGE</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                || !expected.structuralSignatureHash().equals(</span>
+<span class="fc" id="L214">                    actual.structuralSignatureHash())</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                || !expected.structuralSignature().equals(actual.structuralSignature())</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                || !new TreeSet&lt;&gt;(expected.assumptions()).equals(</span>
+<span class="fc" id="L217">                    new TreeSet&lt;&gt;(actual.assumptions()))</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                || !new TreeSet&lt;&gt;(expected.candidateIds()).equals(</span>
+<span class="fc" id="L219">                    new TreeSet&lt;&gt;(actual.candidateIds()))</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                || !new TreeSet&lt;&gt;(expected.postHocFamilies()).equals(</span>
+<span class="fc" id="L221">                    new TreeSet&lt;&gt;(actual.postHocFamilies()))) {</span>
+<span class="nc" id="L222">            throw new IllegalArgumentException(</span>
+                &quot;recomputed bridge cluster differs from supplied provenance&quot;);
+        }
+<span class="fc" id="L225">    }</span>
+
+    private static ConvergenceEvidence orderedEvidence(ConvergenceEvidence source) {
+<span class="fc" id="L228">        List&lt;PathEvidence&gt; paths = source.paths().stream()</span>
+<span class="fc" id="L229">            .sorted(Comparator.comparing(PathEvidence::pathId)</span>
+<span class="pc" id="L230">                .thenComparing(path -&gt; String.join(&quot;\u0001&quot;, path.ruleIds())))</span>
+<span class="fc" id="L231">            .toList();</span>
+<span class="fc" id="L232">        return new ConvergenceEvidence(</span>
+<span class="fc" id="L233">            source.observationId(),</span>
+<span class="fc" id="L234">            source.family(),</span>
+<span class="fc" id="L235">            source.searchStatus(),</span>
+<span class="fc" id="L236">            source.inputExpression(),</span>
+<span class="fc" id="L237">            source.outputExpression(),</span>
+<span class="fc" id="L238">            source.canonicalOutputHash(),</span>
+<span class="fc" id="L239">            source.scoreImprovement(),</span>
+<span class="fc" id="L240">            source.alphaPairFingerprint(),</span>
+<span class="fc" id="L241">            source.valuePairFingerprint(),</span>
+<span class="fc" id="L242">            source.pathCompetitionSignature(),</span>
+            paths);
+    }
+
+    private static Map&lt;String, List&lt;String&gt;&gt; orderedPlaceholderValues(
+        Map&lt;String, List&lt;String&gt;&gt; values
+    ) {
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="fc" id="L250">            return Map.of();</span>
+        }
+<span class="nc" id="L252">        Map&lt;String, List&lt;String&gt;&gt; ordered = new TreeMap&lt;&gt;();</span>
+<span class="nc" id="L253">        values.forEach((key, entries) -&gt; {</span>
+<span class="nc bnc" id="L254" title="All 4 branches missed.">            if (key != null &amp;&amp; !key.isBlank()) {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                List&lt;String&gt; normalized = entries == null</span>
+<span class="nc" id="L256">                    ? List.of()</span>
+<span class="nc" id="L257">                    : entries.stream()</span>
+<span class="nc bnc" id="L258" title="All 4 branches missed.">                        .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="nc" id="L259">                        .distinct()</span>
+<span class="nc" id="L260">                        .sorted()</span>
+<span class="nc" id="L261">                        .toList();</span>
+<span class="nc" id="L262">                ordered.put(key, normalized);</span>
+            }
+<span class="nc" id="L264">        });</span>
+<span class="nc" id="L265">        return java.util.Collections.unmodifiableMap(</span>
+            new LinkedHashMap&lt;&gt;(ordered));
+    }
+
+    private static String formationMaterial(
+        BridgeCluster cluster,
+        String hypothesisId,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; families,
+        List&lt;String&gt; conjectureIds,
+        List&lt;String&gt; observationIds,
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; parameterRelations,
+        Map&lt;String, List&lt;String&gt;&gt; placeholderValues,
+        List&lt;ConvergenceEvidence&gt; evidence
+    ) {
+<span class="fc" id="L282">        StringBuilder material = new StringBuilder(SCHEMA)</span>
+<span class="fc" id="L283">            .append(&quot;\nhypothesis=&quot;).append(hypothesisId)</span>
+<span class="fc" id="L284">            .append(&quot;\ncluster=&quot;).append(cluster.clusterId())</span>
+<span class="fc" id="L285">            .append(&quot;\nclusterSignature=&quot;).append(cluster.structuralSignatureHash())</span>
+<span class="fc" id="L286">            .append(&quot;\ntargetProvided=false&quot;)</span>
+<span class="fc" id="L287">            .append(&quot;\nrelation=&quot;).append(leftPattern).append(&quot;-&gt;&quot;).append(rightPattern)</span>
+<span class="fc" id="L288">            .append(&quot;\nfamilies=&quot;).append(families)</span>
+<span class="fc" id="L289">            .append(&quot;\nconjectures=&quot;).append(conjectureIds)</span>
+<span class="fc" id="L290">            .append(&quot;\nobservations=&quot;).append(observationIds)</span>
+<span class="fc" id="L291">            .append(&quot;\nassumptions=&quot;).append(assumptions)</span>
+<span class="fc" id="L292">            .append(&quot;\nparameterRelations=&quot;).append(parameterRelations)</span>
+<span class="fc" id="L293">            .append(&quot;\nplaceholderValues=&quot;)</span>
+<span class="fc" id="L294">            .append(new TreeMap&lt;&gt;(placeholderValues));</span>
+<span class="fc" id="L295">        evidence.forEach(item -&gt; material.append(&quot;\nevidence=&quot;)</span>
+<span class="fc" id="L296">            .append(item.observationId()).append('|')</span>
+<span class="fc" id="L297">            .append(item.alphaPairFingerprint()).append('|')</span>
+<span class="fc" id="L298">            .append(item.valuePairFingerprint()).append('|')</span>
+<span class="fc" id="L299">            .append(item.pathCompetitionSignature()).append('|')</span>
+<span class="fc" id="L300">            .append(item.paths().stream()</span>
+<span class="fc" id="L301">                .map(path -&gt; path.pathId() + ':' + String.join(&quot;&gt;&quot;, path.ruleIds()))</span>
+<span class="fc" id="L302">                .toList()));</span>
+<span class="fc" id="L303">        return material.toString();</span>
+    }
+
+    private static String hash(String material) {
+<span class="fc" id="L307">        return &quot;sha256:&quot; + sha256(material);</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L312">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L313">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L314">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L315">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L316">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    public record BridgeHypothesis(
+        String schema,
+        String hypothesisId,
+        String sourceClusterId,
+        String sourceClusterSignatureHash,
+        boolean targetProvided,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; trainingFamilies,
+        List&lt;String&gt; sourceConjectureIds,
+        List&lt;String&gt; supportingObservationIds,
+        List&lt;String&gt; assumptions,
+        String validationStatus,
+        String proofStatus,
+        String noveltyStatus,
+        String ablationStatus,
+        String interestingnessStatus,
+        String formationHash,
+        OpenTargetConjecture conjecture
+    ) {
+<span class="fc" id="L340">        public BridgeHypothesis {</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L342">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported bridge-hypothesis schema&quot;);
+            }
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">            if (targetProvided) {</span>
+<span class="nc" id="L346">                throw new IllegalArgumentException(</span>
+                    &quot;cross-family bridge formation must be target-free&quot;);
+            }
+<span class="fc" id="L349">            requireText(hypothesisId, &quot;hypothesisId&quot;);</span>
+<span class="fc" id="L350">            requireText(sourceClusterId, &quot;sourceClusterId&quot;);</span>
+<span class="fc" id="L351">            requireSha256(sourceClusterSignatureHash, &quot;sourceClusterSignatureHash&quot;);</span>
+<span class="fc" id="L352">            requireText(leftPattern, &quot;leftPattern&quot;);</span>
+<span class="fc" id="L353">            requireText(rightPattern, &quot;rightPattern&quot;);</span>
+<span class="fc" id="L354">            trainingFamilies = sortedDistinct(trainingFamilies);</span>
+<span class="fc" id="L355">            sourceConjectureIds = sortedDistinct(sourceConjectureIds);</span>
+<span class="fc" id="L356">            supportingObservationIds = sortedDistinct(supportingObservationIds);</span>
+<span class="fc" id="L357">            assumptions = sortedDistinct(assumptions);</span>
+<span class="pc bpc" id="L358" title="2 of 4 branches missed.">            if (trainingFamilies.size() &lt; 2 || sourceConjectureIds.size() &lt; 2) {</span>
+<span class="nc" id="L359">                throw new IllegalArgumentException(</span>
+                    &quot;bridge hypothesis requires two training families and conjectures&quot;);
+            }
+<span class="fc" id="L362">            requireNotEvaluated(validationStatus, &quot;validationStatus&quot;);</span>
+<span class="fc" id="L363">            requireNotEvaluated(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L364">            requireNotEvaluated(noveltyStatus, &quot;noveltyStatus&quot;);</span>
+<span class="fc" id="L365">            requireNotEvaluated(ablationStatus, &quot;ablationStatus&quot;);</span>
+<span class="fc" id="L366">            requireNotEvaluated(interestingnessStatus, &quot;interestingnessStatus&quot;);</span>
+<span class="fc" id="L367">            requireSha256(formationHash, &quot;formationHash&quot;);</span>
+<span class="fc" id="L368">            Objects.requireNonNull(conjecture, &quot;conjecture&quot;);</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            if (!hypothesisId.equals(conjecture.conjectureId())</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">                    || !leftPattern.equals(conjecture.leftPattern())</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                    || !rightPattern.equals(conjecture.rightPattern())</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                    || !trainingFamilies.equals(</span>
+<span class="fc" id="L373">                        sortedDistinct(conjecture.postHocFamilies()))</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">                    || !supportingObservationIds.equals(</span>
+<span class="fc" id="L375">                        sortedDistinct(conjecture.supportingObservationIds()))) {</span>
+<span class="nc" id="L376">                throw new IllegalArgumentException(</span>
+                    &quot;bridge hypothesis and executable conjecture differ&quot;);
+            }
+<span class="fc" id="L379">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L382">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L383">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L384">                .property(&quot;hypothesisId&quot;, hypothesisId)</span>
+<span class="fc" id="L385">                .property(&quot;sourceClusterId&quot;, sourceClusterId)</span>
+<span class="fc" id="L386">                .property(&quot;sourceClusterSignatureHash&quot;, sourceClusterSignatureHash)</span>
+<span class="fc" id="L387">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L388">                .property(&quot;leftPattern&quot;, leftPattern)</span>
+<span class="fc" id="L389">                .property(&quot;rightPattern&quot;, rightPattern)</span>
+<span class="fc" id="L390">                .stringArray(&quot;trainingFamilies&quot;, trainingFamilies)</span>
+<span class="fc" id="L391">                .stringArray(&quot;sourceConjectureIds&quot;, sourceConjectureIds)</span>
+<span class="fc" id="L392">                .stringArray(&quot;supportingObservationIds&quot;, supportingObservationIds)</span>
+<span class="fc" id="L393">                .stringArray(&quot;assumptions&quot;, assumptions)</span>
+<span class="fc" id="L394">                .property(&quot;validationStatus&quot;, validationStatus)</span>
+<span class="fc" id="L395">                .property(&quot;proofStatus&quot;, proofStatus)</span>
+<span class="fc" id="L396">                .property(&quot;noveltyStatus&quot;, noveltyStatus)</span>
+<span class="fc" id="L397">                .property(&quot;ablationStatus&quot;, ablationStatus)</span>
+<span class="fc" id="L398">                .property(&quot;interestingnessStatus&quot;, interestingnessStatus)</span>
+<span class="fc" id="L399">                .property(&quot;formationHash&quot;, formationHash)</span>
+<span class="fc" id="L400">                .endObject()</span>
+<span class="fc" id="L401">                .toString();</span>
+        }
+    }
+
+    private static List&lt;String&gt; sortedDistinct(List&lt;String&gt; values) {
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">        return values == null</span>
+<span class="nc" id="L407">            ? List.of()</span>
+<span class="fc" id="L408">            : values.stream()</span>
+<span class="pc bpc" id="L409" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L410">                .distinct()</span>
+<span class="fc" id="L411">                .sorted()</span>
+<span class="fc" id="L412">                .toList();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L416" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L417">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L419">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L422" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L423">            throw new IllegalArgumentException(name + &quot; must be a SHA-256 hash&quot;);</span>
+        }
+<span class="fc" id="L425">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L429">            throw new IllegalArgumentException(</span>
+                name + &quot; must remain NOT_EVALUATED during formation&quot;);
+        }
+<span class="fc" id="L432">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

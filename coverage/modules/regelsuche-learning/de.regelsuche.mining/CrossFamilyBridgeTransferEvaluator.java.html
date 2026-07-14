@@ -1,0 +1,677 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrossFamilyBridgeTransferEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">CrossFamilyBridgeTransferEvaluator.java</span></div><h1>CrossFamilyBridgeTransferEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.CrossFamilyBridgeHypothesisBuilder.BridgeHypothesis;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.CounterexampleEvidence;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationPlan;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.NegativeHoldout;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.NegativeHoldoutResult;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.PositiveHoldout;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.PositiveHoldoutResult;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.validation.CounterexampleSearchService.CounterexampleBudget;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Evaluates an already formed bridge hypothesis on fresh per-family suites.
+ *
+ * &lt;p&gt;Formation and validation are separate APIs. This evaluator cannot alter the
+ * bridge relation and reports each family independently, including incomplete
+ * suites, counterexamples and inferred assumptions.&lt;/p&gt;
+ */
+public final class CrossFamilyBridgeTransferEvaluator {
+    public static final String SCHEMA = &quot;regelsuche.cross-family-bridge-transfer/v1&quot;;
+
+    private final FamilyEvaluator familyEvaluator;
+
+<span class="fc" id="L42">    public CrossFamilyBridgeTransferEvaluator() {</span>
+<span class="fc" id="L43">        OpenTargetConjectureEvaluator evaluator = new OpenTargetConjectureEvaluator();</span>
+<span class="fc" id="L44">        this.familyEvaluator = evaluator::evaluate;</span>
+<span class="fc" id="L45">    }</span>
+
+<span class="fc" id="L47">    CrossFamilyBridgeTransferEvaluator(FamilyEvaluator familyEvaluator) {</span>
+<span class="fc" id="L48">        this.familyEvaluator = Objects.requireNonNull(familyEvaluator, &quot;familyEvaluator&quot;);</span>
+<span class="fc" id="L49">    }</span>
+
+    public TransferReport evaluate(
+        BridgeHypothesis hypothesis,
+        List&lt;FamilySuite&gt; suites
+    ) {
+<span class="fc" id="L55">        Objects.requireNonNull(hypothesis, &quot;hypothesis&quot;);</span>
+<span class="fc" id="L56">        List&lt;FamilySuite&gt; orderedSuites = orderedSuites(suites);</span>
+<span class="fc" id="L57">        ensureUniqueFamilies(orderedSuites);</span>
+
+<span class="fc" id="L59">        TreeSet&lt;String&gt; trainingFamilies = new TreeSet&lt;&gt;(hypothesis.trainingFamilies());</span>
+<span class="fc" id="L60">        List&lt;FamilyResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (FamilySuite suite : orderedSuites) {</span>
+<span class="fc" id="L62">            results.add(evaluateSuite(hypothesis, trainingFamilies, suite));</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">        addMissingFormationFamilies(trainingFamilies, orderedSuites, results);</span>
+<span class="fc" id="L65">        results.sort(Comparator.comparing(FamilyResult::familyId)</span>
+<span class="pc" id="L66">            .thenComparing(result -&gt; result.role().name()));</span>
+
+<span class="fc" id="L68">        List&lt;String&gt; heldOutFamilies = orderedSuites.stream()</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            .filter(suite -&gt; suite.role() == FamilyRole.HELD_OUT)</span>
+<span class="fc" id="L70">            .map(FamilySuite::familyId)</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            .filter(family -&gt; !trainingFamilies.contains(family))</span>
+<span class="fc" id="L72">            .distinct()</span>
+<span class="fc" id="L73">            .sorted()</span>
+<span class="fc" id="L74">            .toList();</span>
+<span class="fc" id="L75">        List&lt;String&gt; blockers = aggregateBlockers(</span>
+            trainingFamilies, heldOutFamilies, results);
+<span class="fc" id="L77">        TransferStatus status = transferStatus(</span>
+            trainingFamilies, heldOutFamilies, results, blockers);
+<span class="fc" id="L79">        String contentHash = hash(canonicalMaterial(</span>
+            hypothesis,
+            heldOutFamilies,
+            status,
+            results,
+            blockers));
+<span class="fc" id="L85">        return new TransferReport(</span>
+            SCHEMA,
+<span class="fc" id="L87">            hypothesis.hypothesisId(),</span>
+<span class="fc" id="L88">            hypothesis.sourceClusterId(),</span>
+<span class="fc" id="L89">            hypothesis.formationHash(),</span>
+            false,
+<span class="fc" id="L91">            hypothesis.trainingFamilies(),</span>
+            heldOutFamilies,
+            status,
+            results,
+            blockers,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    private FamilyResult evaluateSuite(
+        BridgeHypothesis hypothesis,
+        Set&lt;String&gt; trainingFamilies,
+        FamilySuite suite
+    ) {
+<span class="fc" id="L108">        List&lt;String&gt; planBlockers = planBlockers(trainingFamilies, suite);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (!planBlockers.isEmpty()) {</span>
+<span class="fc" id="L110">            return FamilyResult.incomplete(suite, planBlockers);</span>
+        }
+<span class="fc" id="L112">        EvaluationPlan plan = new EvaluationPlan(</span>
+<span class="fc" id="L113">            suite.revision(),</span>
+<span class="fc" id="L114">            suite.positiveHoldouts(),</span>
+<span class="fc" id="L115">            suite.negativeHoldouts(),</span>
+<span class="fc" id="L116">            suite.counterexampleBudget());</span>
+<span class="fc" id="L117">        EvaluationReport report = familyEvaluator.evaluate(</span>
+<span class="fc" id="L118">            hypothesis.conjecture(), plan);</span>
+<span class="fc" id="L119">        return FamilyResult.from(suite, report);</span>
+    }
+
+    private static List&lt;String&gt; planBlockers(
+        Set&lt;String&gt; trainingFamilies,
+        FamilySuite suite
+    ) {
+<span class="fc" id="L126">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (suite.role() == FamilyRole.FORMATION</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                &amp;&amp; !trainingFamilies.contains(suite.familyId())) {</span>
+<span class="nc" id="L129">            blockers.add(&quot;formation suite is not part of the hypothesis training families&quot;);</span>
+        }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (suite.role() == FamilyRole.HELD_OUT</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                &amp;&amp; trainingFamilies.contains(suite.familyId())) {</span>
+<span class="nc" id="L133">            blockers.add(&quot;held-out suite reuses a hypothesis training family&quot;);</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (suite.positiveHoldouts().isEmpty()) {</span>
+<span class="nc" id="L136">            blockers.add(&quot;positive holdouts missing&quot;);</span>
+        }
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (suite.negativeHoldouts().isEmpty()) {</span>
+<span class="fc" id="L139">            blockers.add(&quot;negative holdouts missing&quot;);</span>
+        }
+<span class="fc" id="L141">        return List.copyOf(blockers);</span>
+    }
+
+    private static void addMissingFormationFamilies(
+        Set&lt;String&gt; trainingFamilies,
+        List&lt;FamilySuite&gt; suites,
+        List&lt;FamilyResult&gt; results
+    ) {
+<span class="fc" id="L149">        Set&lt;String&gt; suppliedFormation = suites.stream()</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            .filter(suite -&gt; suite.role() == FamilyRole.FORMATION)</span>
+<span class="fc" id="L151">            .map(FamilySuite::familyId)</span>
+<span class="fc" id="L152">            .collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc" id="L153">        trainingFamilies.stream()</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            .filter(family -&gt; !suppliedFormation.contains(family))</span>
+<span class="pc" id="L155">            .forEach(family -&gt; results.add(FamilyResult.missingFormation(family)));</span>
+<span class="fc" id="L156">    }</span>
+
+    private static List&lt;String&gt; aggregateBlockers(
+        Set&lt;String&gt; trainingFamilies,
+        List&lt;String&gt; heldOutFamilies,
+        List&lt;FamilyResult&gt; results
+    ) {
+<span class="fc" id="L163">        LinkedHashSet&lt;String&gt; blockers = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (heldOutFamilies.isEmpty()) {</span>
+<span class="nc" id="L165">            blockers.add(&quot;held-out family suite missing&quot;);</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (String family : trainingFamilies) {</span>
+<span class="fc" id="L168">            boolean present = results.stream().anyMatch(result -&gt;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                result.familyId().equals(family)</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                    &amp;&amp; result.role() == FamilyRole.FORMATION);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (!present) {</span>
+<span class="nc" id="L172">                blockers.add(&quot;formation family suite missing: &quot; + family);</span>
+            }
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">        results.stream()</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            .filter(result -&gt; !result.accepted())</span>
+<span class="fc" id="L177">            .forEach(result -&gt; {</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                if (result.blockers().isEmpty()) {</span>
+<span class="nc" id="L179">                    blockers.add(result.familyId() + &quot;: status=&quot; + result.status().name());</span>
+                } else {
+<span class="fc" id="L181">                    result.blockers().forEach(blocker -&gt;</span>
+<span class="fc" id="L182">                        blockers.add(result.familyId() + &quot;: &quot; + blocker));</span>
+                }
+<span class="fc" id="L184">            });</span>
+<span class="fc" id="L185">        return blockers.stream().sorted().toList();</span>
+    }
+
+    private static TransferStatus transferStatus(
+        Set&lt;String&gt; trainingFamilies,
+        List&lt;String&gt; heldOutFamilies,
+        List&lt;FamilyResult&gt; results,
+        List&lt;String&gt; blockers
+    ) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        boolean incomplete = heldOutFamilies.isEmpty()</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            || results.stream().anyMatch(result -&gt;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                result.status() == FamilyStatus.INCOMPLETE_SUITE);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (incomplete) {</span>
+<span class="fc" id="L198">            return TransferStatus.INCOMPLETE_EVIDENCE;</span>
+        }
+<span class="fc" id="L200">        boolean formationAccepted = trainingFamilies.stream().allMatch(family -&gt;</span>
+<span class="fc" id="L201">            results.stream().anyMatch(result -&gt;</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                result.familyId().equals(family)</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                    &amp;&amp; result.role() == FamilyRole.FORMATION</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                    &amp;&amp; result.accepted()));</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (!formationAccepted) {</span>
+<span class="nc" id="L206">            return TransferStatus.REJECTED_FORMATION_FAMILY;</span>
+        }
+<span class="fc" id="L208">        boolean heldOutAccepted = heldOutFamilies.stream().allMatch(family -&gt;</span>
+<span class="fc" id="L209">            results.stream().anyMatch(result -&gt;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">                result.familyId().equals(family)</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                    &amp;&amp; result.role() == FamilyRole.HELD_OUT</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                    &amp;&amp; result.accepted()));</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (!heldOutAccepted) {</span>
+<span class="fc" id="L214">            return TransferStatus.REJECTED_HELD_OUT_TRANSFER;</span>
+        }
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        return blockers.isEmpty()</span>
+<span class="fc" id="L217">            ? TransferStatus.ACCEPTED_CROSS_FAMILY_TRANSFER</span>
+<span class="nc" id="L218">            : TransferStatus.INCOMPLETE_EVIDENCE;</span>
+    }
+
+    private static List&lt;FamilySuite&gt; orderedSuites(List&lt;FamilySuite&gt; suites) {
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        return suites == null</span>
+<span class="nc" id="L223">            ? List.of()</span>
+<span class="fc" id="L224">            : suites.stream()</span>
+<span class="fc" id="L225">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L226">                .sorted(Comparator.comparing(FamilySuite::familyId)</span>
+<span class="pc" id="L227">                    .thenComparing(suite -&gt; suite.role().name()))</span>
+<span class="fc" id="L228">                .toList();</span>
+    }
+
+    private static void ensureUniqueFamilies(List&lt;FamilySuite&gt; suites) {
+<span class="fc" id="L232">        Set&lt;String&gt; families = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (FamilySuite suite : suites) {</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (!families.add(suite.familyId())) {</span>
+<span class="nc" id="L235">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L236">                    &quot;duplicate family suite: &quot; + suite.familyId());</span>
+            }
+<span class="fc" id="L238">        }</span>
+<span class="fc" id="L239">    }</span>
+
+    private static String canonicalMaterial(
+        BridgeHypothesis hypothesis,
+        List&lt;String&gt; heldOutFamilies,
+        TransferStatus status,
+        List&lt;FamilyResult&gt; results,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L248">        StringBuilder material = new StringBuilder(SCHEMA)</span>
+<span class="fc" id="L249">            .append(&quot;\nhypothesis=&quot;).append(hypothesis.hypothesisId())</span>
+<span class="fc" id="L250">            .append(&quot;\ncluster=&quot;).append(hypothesis.sourceClusterId())</span>
+<span class="fc" id="L251">            .append(&quot;\nformationHash=&quot;).append(hypothesis.formationHash())</span>
+<span class="fc" id="L252">            .append(&quot;\ntargetProvided=false&quot;)</span>
+<span class="fc" id="L253">            .append(&quot;\ntrainingFamilies=&quot;).append(hypothesis.trainingFamilies())</span>
+<span class="fc" id="L254">            .append(&quot;\nheldOutFamilies=&quot;).append(heldOutFamilies)</span>
+<span class="fc" id="L255">            .append(&quot;\nstatus=&quot;).append(status.name())</span>
+<span class="fc" id="L256">            .append(&quot;\nblockers=&quot;).append(blockers);</span>
+<span class="fc" id="L257">        results.forEach(result -&gt; material.append(&quot;\nfamily=&quot;)</span>
+<span class="fc" id="L258">            .append(result.canonicalMaterial()));</span>
+<span class="fc" id="L259">        return material.toString();</span>
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L264">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L265">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L266">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L267">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L268">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    @FunctionalInterface
+    interface FamilyEvaluator {
+        EvaluationReport evaluate(OpenTargetConjecture conjecture, EvaluationPlan plan);
+    }
+
+<span class="fc" id="L277">    public enum FamilyRole {</span>
+<span class="fc" id="L278">        FORMATION,</span>
+<span class="fc" id="L279">        HELD_OUT</span>
+    }
+
+<span class="fc" id="L282">    public enum FamilyStatus {</span>
+<span class="fc" id="L283">        ACCEPTED,</span>
+<span class="fc" id="L284">        REJECTED,</span>
+<span class="fc" id="L285">        INCONCLUSIVE,</span>
+<span class="fc" id="L286">        COMPILATION_REJECTED,</span>
+<span class="fc" id="L287">        INCOMPLETE_SUITE</span>
+    }
+
+<span class="fc" id="L290">    public enum TransferStatus {</span>
+<span class="fc" id="L291">        ACCEPTED_CROSS_FAMILY_TRANSFER,</span>
+<span class="fc" id="L292">        REJECTED_FORMATION_FAMILY,</span>
+<span class="fc" id="L293">        REJECTED_HELD_OUT_TRANSFER,</span>
+<span class="fc" id="L294">        INCOMPLETE_EVIDENCE</span>
+    }
+
+    public record FamilySuite(
+        String familyId,
+        FamilyRole role,
+        String revision,
+        List&lt;PositiveHoldout&gt; positiveHoldouts,
+        List&lt;NegativeHoldout&gt; negativeHoldouts,
+        CounterexampleBudget counterexampleBudget
+    ) {
+<span class="fc" id="L305">        public FamilySuite {</span>
+<span class="fc" id="L306">            requireText(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L307">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L308">            requireText(revision, &quot;revision&quot;);</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">            positiveHoldouts = positiveHoldouts == null</span>
+<span class="nc" id="L310">                ? List.of()</span>
+<span class="fc" id="L311">                : positiveHoldouts.stream()</span>
+<span class="fc" id="L312">                    .sorted(Comparator.comparing(PositiveHoldout::id))</span>
+<span class="fc" id="L313">                    .toList();</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">            negativeHoldouts = negativeHoldouts == null</span>
+<span class="nc" id="L315">                ? List.of()</span>
+<span class="fc" id="L316">                : negativeHoldouts.stream()</span>
+<span class="fc" id="L317">                    .sorted(Comparator.comparing(NegativeHoldout::id))</span>
+<span class="fc" id="L318">                    .toList();</span>
+<span class="fc" id="L319">            Objects.requireNonNull(counterexampleBudget, &quot;counterexampleBudget&quot;);</span>
+<span class="fc" id="L320">            Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L321">            positiveHoldouts.forEach(holdout -&gt; addHoldoutId(ids, holdout.id()));</span>
+<span class="fc" id="L322">            negativeHoldouts.forEach(holdout -&gt; addHoldoutId(ids, holdout.id()));</span>
+<span class="fc" id="L323">        }</span>
+
+        private static void addHoldoutId(Set&lt;String&gt; ids, String id) {
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            if (!ids.add(id)) {</span>
+<span class="nc" id="L327">                throw new IllegalArgumentException(&quot;duplicate holdout ID: &quot; + id);</span>
+            }
+<span class="fc" id="L329">        }</span>
+    }
+
+    public record FamilyResult(
+        String familyId,
+        FamilyRole role,
+        FamilyStatus status,
+        int configuredPositiveHoldouts,
+        int executedPositiveHoldouts,
+        int skippedPositiveHoldouts,
+        int configuredNegativeHoldouts,
+        int executedNegativeHoldouts,
+        int skippedNegativeHoldouts,
+        List&lt;String&gt; failedPositiveHoldouts,
+        List&lt;String&gt; failedNegativeHoldouts,
+        String dynamicRuleId,
+        String provenanceHash,
+        String counterexampleStatus,
+        List&lt;String&gt; counterexampleAttemptedSources,
+        List&lt;String&gt; inferredAssumptions,
+        List&lt;String&gt; counterexampleAssignments,
+        String counterexampleLeftValue,
+        String counterexampleRightValue,
+        String counterexampleExplanation,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L355">        public FamilyResult {</span>
+<span class="fc" id="L356">            requireText(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L357">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc" id="L358">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L359">            failedPositiveHoldouts = sortedDistinct(failedPositiveHoldouts);</span>
+<span class="fc" id="L360">            failedNegativeHoldouts = sortedDistinct(failedNegativeHoldouts);</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">            dynamicRuleId = dynamicRuleId == null ? &quot;&quot; : dynamicRuleId;</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">            provenanceHash = provenanceHash == null ? &quot;&quot; : provenanceHash;</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">            counterexampleStatus = counterexampleStatus == null</span>
+<span class="nc" id="L364">                ? &quot;NOT_RUN&quot;</span>
+<span class="fc" id="L365">                : counterexampleStatus;</span>
+<span class="fc" id="L366">            counterexampleAttemptedSources = sortedDistinct(</span>
+                counterexampleAttemptedSources);
+<span class="fc" id="L368">            inferredAssumptions = sortedDistinct(inferredAssumptions);</span>
+<span class="fc" id="L369">            counterexampleAssignments = sortedDistinct(counterexampleAssignments);</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">            counterexampleLeftValue = counterexampleLeftValue == null</span>
+<span class="nc" id="L371">                ? &quot;&quot;</span>
+<span class="fc" id="L372">                : counterexampleLeftValue;</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            counterexampleRightValue = counterexampleRightValue == null</span>
+<span class="nc" id="L374">                ? &quot;&quot;</span>
+<span class="fc" id="L375">                : counterexampleRightValue;</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            counterexampleExplanation = counterexampleExplanation == null</span>
+<span class="nc" id="L377">                ? &quot;&quot;</span>
+<span class="fc" id="L378">                : counterexampleExplanation;</span>
+<span class="fc" id="L379">            blockers = sortedDistinct(blockers);</span>
+<span class="fc" id="L380">        }</span>
+
+        static FamilyResult from(FamilySuite suite, EvaluationReport report) {
+<span class="fc" id="L383">            List&lt;String&gt; accountingBlockers = accountingBlockers(suite, report);</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">            FamilyStatus status = accountingBlockers.isEmpty()</span>
+<span class="fc" id="L385">                ? mapStatus(report.status())</span>
+<span class="pc" id="L386">                : FamilyStatus.INCOMPLETE_SUITE;</span>
+<span class="fc" id="L387">            List&lt;String&gt; blockers = new ArrayList&lt;&gt;(report.blockers());</span>
+<span class="fc" id="L388">            blockers.addAll(accountingBlockers);</span>
+<span class="pc bpc" id="L389" title="1 of 4 branches missed.">            if (status != FamilyStatus.ACCEPTED &amp;&amp; blockers.isEmpty()) {</span>
+<span class="nc" id="L390">                blockers.add(&quot;evaluation-status=&quot; + report.status().name());</span>
+            }
+<span class="fc" id="L392">            CounterexampleEvidence counterexample = report.counterexample();</span>
+<span class="fc" id="L393">            return new FamilyResult(</span>
+<span class="fc" id="L394">                suite.familyId(),</span>
+<span class="fc" id="L395">                suite.role(),</span>
+                status,
+<span class="fc" id="L397">                report.configuredPositiveHoldouts(),</span>
+<span class="fc" id="L398">                report.executedPositiveHoldouts(),</span>
+<span class="fc" id="L399">                report.skippedPositiveHoldouts(),</span>
+<span class="fc" id="L400">                report.configuredNegativeHoldouts(),</span>
+<span class="fc" id="L401">                report.executedNegativeHoldouts(),</span>
+<span class="fc" id="L402">                report.skippedNegativeHoldouts(),</span>
+<span class="fc" id="L403">                report.positiveResults().stream()</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                    .filter(result -&gt; !result.passed())</span>
+<span class="fc" id="L405">                    .map(PositiveHoldoutResult::id)</span>
+<span class="fc" id="L406">                    .toList(),</span>
+<span class="fc" id="L407">                report.negativeResults().stream()</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                    .filter(result -&gt; !result.passed())</span>
+<span class="fc" id="L409">                    .map(NegativeHoldoutResult::id)</span>
+<span class="fc" id="L410">                    .toList(),</span>
+<span class="fc" id="L411">                report.dynamicRuleId(),</span>
+<span class="fc" id="L412">                report.provenanceHash(),</span>
+<span class="fc" id="L413">                counterexample.status(),</span>
+<span class="fc" id="L414">                counterexample.attemptedSources(),</span>
+<span class="fc" id="L415">                counterexample.inferredAssumptions(),</span>
+<span class="fc" id="L416">                counterexample.assignments(),</span>
+<span class="fc" id="L417">                counterexample.leftValue(),</span>
+<span class="fc" id="L418">                counterexample.rightValue(),</span>
+<span class="fc" id="L419">                counterexample.explanation(),</span>
+                blockers);
+        }
+
+        static FamilyResult incomplete(FamilySuite suite, List&lt;String&gt; blockers) {
+<span class="fc" id="L424">            return new FamilyResult(</span>
+<span class="fc" id="L425">                suite.familyId(),</span>
+<span class="fc" id="L426">                suite.role(),</span>
+                FamilyStatus.INCOMPLETE_SUITE,
+<span class="fc" id="L428">                suite.positiveHoldouts().size(),</span>
+                0,
+<span class="fc" id="L430">                suite.positiveHoldouts().size(),</span>
+<span class="fc" id="L431">                suite.negativeHoldouts().size(),</span>
+                0,
+<span class="fc" id="L433">                suite.negativeHoldouts().size(),</span>
+<span class="fc" id="L434">                List.of(),</span>
+<span class="fc" id="L435">                List.of(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;NOT_RUN&quot;,
+<span class="fc" id="L439">                List.of(),</span>
+<span class="fc" id="L440">                List.of(),</span>
+<span class="fc" id="L441">                List.of(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;family suite was not executed&quot;,
+                blockers);
+        }
+
+        static FamilyResult missingFormation(String familyId) {
+<span class="nc" id="L449">            return new FamilyResult(</span>
+                familyId,
+                FamilyRole.FORMATION,
+                FamilyStatus.INCOMPLETE_SUITE,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+<span class="nc" id="L459">                List.of(),</span>
+<span class="nc" id="L460">                List.of(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;NOT_RUN&quot;,
+<span class="nc" id="L464">                List.of(),</span>
+<span class="nc" id="L465">                List.of(),</span>
+<span class="nc" id="L466">                List.of(),</span>
+                &quot;&quot;,
+                &quot;&quot;,
+                &quot;formation family suite was not supplied&quot;,
+<span class="nc" id="L470">                List.of(&quot;formation family suite missing&quot;));</span>
+        }
+
+        public boolean accepted() {
+<span class="fc bfc" id="L474" title="All 2 branches covered.">            return status == FamilyStatus.ACCEPTED;</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L478">            return familyId + '|'</span>
+<span class="fc" id="L479">                + role.name() + '|'</span>
+<span class="fc" id="L480">                + status.name() + '|'</span>
+                + configuredPositiveHoldouts + '|'
+                + executedPositiveHoldouts + '|'
+                + skippedPositiveHoldouts + '|'
+                + configuredNegativeHoldouts + '|'
+                + executedNegativeHoldouts + '|'
+                + skippedNegativeHoldouts + '|'
+                + failedPositiveHoldouts + '|'
+                + failedNegativeHoldouts + '|'
+                + dynamicRuleId + '|'
+                + provenanceHash + '|'
+                + counterexampleStatus + '|'
+                + counterexampleAttemptedSources + '|'
+                + inferredAssumptions + '|'
+                + counterexampleAssignments + '|'
+                + counterexampleLeftValue + '|'
+                + counterexampleRightValue + '|'
+                + counterexampleExplanation + '|'
+                + blockers;
+        }
+
+        private static List&lt;String&gt; accountingBlockers(
+            FamilySuite suite,
+            EvaluationReport report
+        ) {
+<span class="fc" id="L505">            List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L506">            if (report.configuredPositiveHoldouts()</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">                    != suite.positiveHoldouts().size()</span>
+<span class="fc" id="L508">                    || report.configuredNegativeHoldouts()</span>
+<span class="pc bpc" id="L509" title="1 of 2 branches missed.">                    != suite.negativeHoldouts().size()) {</span>
+<span class="nc" id="L510">                blockers.add(&quot;configured holdout counts differ from the family suite&quot;);</span>
+            }
+<span class="fc" id="L512">            if (report.executedPositiveHoldouts()</span>
+<span class="fc" id="L513">                    + report.skippedPositiveHoldouts()</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">                    != report.configuredPositiveHoldouts()</span>
+<span class="fc" id="L515">                    || report.executedNegativeHoldouts()</span>
+<span class="fc" id="L516">                    + report.skippedNegativeHoldouts()</span>
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">                    != report.configuredNegativeHoldouts()) {</span>
+<span class="nc" id="L518">                blockers.add(&quot;executed/skipped holdout accounting is incomplete&quot;);</span>
+            }
+<span class="pc bpc" id="L520" title="1 of 2 branches missed.">            if (report.executedPositiveHoldouts() != report.positiveResults().size()</span>
+<span class="fc" id="L521">                    || report.executedNegativeHoldouts()</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                    != report.negativeResults().size()) {</span>
+<span class="nc" id="L523">                blockers.add(&quot;executed holdout counts differ from result lists&quot;);</span>
+            }
+<span class="fc" id="L525">            return List.copyOf(blockers);</span>
+        }
+
+        private static FamilyStatus mapStatus(EvaluationStatus status) {
+<span class="pc bpc" id="L529" title="2 of 4 branches missed.">            return switch (status) {</span>
+<span class="fc" id="L530">                case ACCEPTED_FOR_PROOF -&gt; FamilyStatus.ACCEPTED;</span>
+<span class="fc" id="L531">                case REJECTED -&gt; FamilyStatus.REJECTED;</span>
+<span class="nc" id="L532">                case INCONCLUSIVE -&gt; FamilyStatus.INCONCLUSIVE;</span>
+<span class="nc" id="L533">                case COMPILATION_REJECTED -&gt; FamilyStatus.COMPILATION_REJECTED;</span>
+            };
+        }
+    }
+
+    public record TransferReport(
+        String schema,
+        String hypothesisId,
+        String sourceClusterId,
+        String formationHash,
+        boolean targetProvided,
+        List&lt;String&gt; trainingFamilies,
+        List&lt;String&gt; heldOutFamilies,
+        TransferStatus status,
+        List&lt;FamilyResult&gt; familyResults,
+        List&lt;String&gt; blockers,
+        String noveltyStatus,
+        String proofStatus,
+        String ablationStatus,
+        String interestingnessStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L555">        public TransferReport {</span>
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L557">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported bridge-transfer schema&quot;);
+            }
+<span class="fc" id="L560">            requireText(hypothesisId, &quot;hypothesisId&quot;);</span>
+<span class="fc" id="L561">            requireText(sourceClusterId, &quot;sourceClusterId&quot;);</span>
+<span class="fc" id="L562">            requireSha256(formationHash, &quot;formationHash&quot;);</span>
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">            if (targetProvided) {</span>
+<span class="nc" id="L564">                throw new IllegalArgumentException(</span>
+                    &quot;bridge transfer evidence must remain target-free&quot;);
+            }
+<span class="fc" id="L567">            trainingFamilies = sortedDistinct(trainingFamilies);</span>
+<span class="fc" id="L568">            heldOutFamilies = sortedDistinct(heldOutFamilies);</span>
+<span class="fc" id="L569">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">            familyResults = familyResults == null</span>
+<span class="nc" id="L571">                ? List.of()</span>
+<span class="fc" id="L572">                : familyResults.stream()</span>
+<span class="fc" id="L573">                    .sorted(Comparator.comparing(FamilyResult::familyId)</span>
+<span class="pc" id="L574">                        .thenComparing(result -&gt; result.role().name()))</span>
+<span class="fc" id="L575">                    .toList();</span>
+<span class="fc" id="L576">            blockers = sortedDistinct(blockers);</span>
+<span class="fc" id="L577">            requireNotEvaluated(noveltyStatus, &quot;noveltyStatus&quot;);</span>
+<span class="fc" id="L578">            requireNotEvaluated(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L579">            requireNotEvaluated(ablationStatus, &quot;ablationStatus&quot;);</span>
+<span class="fc" id="L580">            requireNotEvaluated(interestingnessStatus, &quot;interestingnessStatus&quot;);</span>
+<span class="fc" id="L581">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L582">        }</span>
+
+        public boolean accepted() {
+<span class="fc bfc" id="L585" title="All 2 branches covered.">            return status == TransferStatus.ACCEPTED_CROSS_FAMILY_TRANSFER;</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L589">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L590">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L591">                .property(&quot;hypothesisId&quot;, hypothesisId)</span>
+<span class="fc" id="L592">                .property(&quot;sourceClusterId&quot;, sourceClusterId)</span>
+<span class="fc" id="L593">                .property(&quot;formationHash&quot;, formationHash)</span>
+<span class="fc" id="L594">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L595">                .stringArray(&quot;trainingFamilies&quot;, trainingFamilies)</span>
+<span class="fc" id="L596">                .stringArray(&quot;heldOutFamilies&quot;, heldOutFamilies)</span>
+<span class="fc" id="L597">                .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L598">                .property(&quot;noveltyStatus&quot;, noveltyStatus)</span>
+<span class="fc" id="L599">                .property(&quot;proofStatus&quot;, proofStatus)</span>
+<span class="fc" id="L600">                .property(&quot;ablationStatus&quot;, ablationStatus)</span>
+<span class="fc" id="L601">                .property(&quot;interestingnessStatus&quot;, interestingnessStatus)</span>
+<span class="fc" id="L602">                .stringArray(&quot;blockers&quot;, blockers)</span>
+<span class="fc" id="L603">                .array(&quot;familyResults&quot;, array -&gt; familyResults.forEach(result -&gt;</span>
+<span class="fc" id="L604">                    array.objectValue(object -&gt; writeFamilyResult(object, result))))</span>
+<span class="fc" id="L605">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L606">                .endObject()</span>
+<span class="fc" id="L607">                .toString();</span>
+        }
+
+        public void write(Path output) {
+            try {
+<span class="fc" id="L612">                Path parent = output.getParent();</span>
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L614">                    Files.createDirectories(parent);</span>
+                }
+<span class="fc" id="L616">                Files.writeString(output, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L617">            } catch (IOException exception) {</span>
+<span class="nc" id="L618">                throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L619">            }</span>
+<span class="fc" id="L620">        }</span>
+
+        private static void writeFamilyResult(JsonWriter json, FamilyResult result) {
+<span class="fc" id="L623">            json.property(&quot;familyId&quot;, result.familyId())</span>
+<span class="fc" id="L624">                .property(&quot;role&quot;, result.role().name())</span>
+<span class="fc" id="L625">                .property(&quot;status&quot;, result.status().name())</span>
+<span class="fc" id="L626">                .property(&quot;configuredPositiveHoldouts&quot;, result.configuredPositiveHoldouts())</span>
+<span class="fc" id="L627">                .property(&quot;executedPositiveHoldouts&quot;, result.executedPositiveHoldouts())</span>
+<span class="fc" id="L628">                .property(&quot;skippedPositiveHoldouts&quot;, result.skippedPositiveHoldouts())</span>
+<span class="fc" id="L629">                .property(&quot;configuredNegativeHoldouts&quot;, result.configuredNegativeHoldouts())</span>
+<span class="fc" id="L630">                .property(&quot;executedNegativeHoldouts&quot;, result.executedNegativeHoldouts())</span>
+<span class="fc" id="L631">                .property(&quot;skippedNegativeHoldouts&quot;, result.skippedNegativeHoldouts())</span>
+<span class="fc" id="L632">                .stringArray(&quot;failedPositiveHoldouts&quot;, result.failedPositiveHoldouts())</span>
+<span class="fc" id="L633">                .stringArray(&quot;failedNegativeHoldouts&quot;, result.failedNegativeHoldouts())</span>
+<span class="fc" id="L634">                .property(&quot;dynamicRuleId&quot;, result.dynamicRuleId())</span>
+<span class="fc" id="L635">                .property(&quot;provenanceHash&quot;, result.provenanceHash())</span>
+<span class="fc" id="L636">                .property(&quot;counterexampleStatus&quot;, result.counterexampleStatus())</span>
+<span class="fc" id="L637">                .stringArray(&quot;counterexampleAttemptedSources&quot;,</span>
+<span class="fc" id="L638">                    result.counterexampleAttemptedSources())</span>
+<span class="fc" id="L639">                .stringArray(&quot;inferredAssumptions&quot;, result.inferredAssumptions())</span>
+<span class="fc" id="L640">                .stringArray(&quot;counterexampleAssignments&quot;,</span>
+<span class="fc" id="L641">                    result.counterexampleAssignments())</span>
+<span class="fc" id="L642">                .property(&quot;counterexampleLeftValue&quot;, result.counterexampleLeftValue())</span>
+<span class="fc" id="L643">                .property(&quot;counterexampleRightValue&quot;, result.counterexampleRightValue())</span>
+<span class="fc" id="L644">                .property(&quot;counterexampleExplanation&quot;, result.counterexampleExplanation())</span>
+<span class="fc" id="L645">                .stringArray(&quot;blockers&quot;, result.blockers());</span>
+<span class="fc" id="L646">        }</span>
+    }
+
+    private static List&lt;String&gt; sortedDistinct(List&lt;String&gt; values) {
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">        return values == null</span>
+<span class="nc" id="L651">            ? List.of()</span>
+<span class="fc" id="L652">            : values.stream()</span>
+<span class="pc bpc" id="L653" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L654">                .distinct()</span>
+<span class="fc" id="L655">                .sorted()</span>
+<span class="fc" id="L656">                .toList();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L660" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L661">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L663">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L666" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L667">            throw new IllegalArgumentException(name + &quot; must be a SHA-256 hash&quot;);</span>
+        }
+<span class="fc" id="L669">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L673">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L675">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

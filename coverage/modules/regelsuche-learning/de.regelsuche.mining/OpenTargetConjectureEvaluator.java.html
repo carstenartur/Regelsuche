@@ -185,8 +185,8 @@ public final class OpenTargetConjectureEvaluator {
 
     private static List&lt;String&gt; pathAssumptions(OpenTargetConjecture conjecture) {
 <span class="fc" id="L187">        return conjecture.evidence().stream()</span>
-<span class="pc" id="L188">            .flatMap(evidence -&gt; evidence.paths().stream())</span>
-<span class="pc" id="L189">            .flatMap(path -&gt; path.assumptions().stream())</span>
+<span class="fc" id="L188">            .flatMap(evidence -&gt; evidence.paths().stream())</span>
+<span class="fc" id="L189">            .flatMap(path -&gt; path.assumptions().stream())</span>
 <span class="pc bnc" id="L190" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
 <span class="fc" id="L191">            .distinct()</span>
 <span class="fc" id="L192">            .sorted()</span>
