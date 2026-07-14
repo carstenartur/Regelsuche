@@ -63,7 +63,7 @@ class OpenTargetPromotionGateTest {
         assertTrue(json.contains("\"interestingnessStatus\":\"NOT_EVALUATED\""));
         assertTrue(json.contains("\"sourceCampaign\":\"open-target-campaign-2026-07\""));
         assertTrue(json.contains("\"evaluationProvenanceHash\":\"" + hash('e') + "\""));
-        assertTrue(json.contains("\"proofObligationHash\":\"" + hash('o') + "\""));
+        assertTrue(json.contains("\"proofObligationHash\":\"" + hash('d') + "\""));
     }
 
     @Test
@@ -415,7 +415,7 @@ class OpenTargetPromotionGateTest {
             conjecture.leftPattern(),
             conjecture.rightPattern(),
             List.of(),
-            hash('o'));
+            hash('d'));
         List<String> blockers = status == ProofStatus.SYMBOLICALLY_VERIFIED
             ? List.of()
             : List.of("oracle produced no conclusive equivalence result");
