@@ -1,0 +1,49 @@
+name: Autopilot Evidence
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: autopilot-evidence-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Generate deterministic research brief, ledger and allocation plan
+        run: |
+          ./gradlew :regelsuche-experiments:test \
+            --tests de.regelsuche.experiments.autopilot.DeterministicCampaignPlannerTest
+
+      - name: Require planning evidence artifacts
+        run: |
+          test -s regelsuche-experiments/build/reports/autopilot-planner/brief.json
+          test -s regelsuche-experiments/build/reports/autopilot-planner/ledger.json
+          test -s regelsuche-experiments/build/reports/autopilot-planner/plan.json
+
+      - name: Upload planning evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: autopilot-planning-evidence
+          path: regelsuche-experiments/build/reports/autopilot-planner/**
+          if-no-files-found: warn
