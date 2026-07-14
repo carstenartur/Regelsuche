@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.cross-family-bridge-ablation/v1",
+  "title": "Regelsuche cross-family bridge ablation evidence v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "hypothesisId",
+    "formationHash",
+    "transferContentHash",
+    "trainingFamilies",
+    "heldOutFamilies",
+    "status",
+    "blockers",
+    "familyResults",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.cross-family-bridge-ablation/v1" },
+    "hypothesisId": { "$ref": "#/$defs/nonBlank" },
+    "formationHash": { "$ref": "#/$defs/sha256" },
+    "transferContentHash": { "$ref": "#/$defs/sha256" },
+    "trainingFamilies": { "$ref": "#/$defs/stringArray" },
+    "heldOutFamilies": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "status": {
+      "enum": [
+        "BENEFICIAL_HELD_OUT",
+        "NO_HELD_OUT_GAIN",
+        "REGRESSION",
+        "TRADE_OFF",
+        "INCOMPLETE_EVIDENCE",
+        "NOT_ELIGIBLE_TRANSFER"
+      ]
+    },
+    "blockers": { "$ref": "#/$defs/stringArray" },
+    "familyResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/familyResult" }
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "familyResult": {
+      "type": "object",
+      "required": [
+        "familyId",
+        "role",
+        "status",
+        "withBridge",
+        "withoutBridge",
+        "pathLengthGain",
+        "statesExploredGain",
+        "explanation"
+      ],
+      "properties": {
+        "familyId": { "$ref": "#/$defs/nonBlank" },
+        "role": { "enum": ["FORMATION", "HELD_OUT"] },
+        "status": {
+          "enum": ["MATERIAL_GAIN", "UNCHANGED", "REGRESSION", "TRADE_OFF", "INCOMPLETE"]
+        },
+        "withBridge": { "$ref": "#/$defs/run" },
+        "withoutBridge": { "$ref": "#/$defs/run" },
+        "pathLengthGain": { "type": "integer" },
+        "statesExploredGain": { "type": "integer" },
+        "explanation": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "run": {
+      "type": "object",
+      "required": ["success", "pathLength", "statesExplored"],
+      "properties": {
+        "success": { "enum": ["true", "false", "unknown"] },
+        "pathLength": { "type": "integer", "minimum": -1 },
+        "statesExplored": { "type": "integer", "minimum": -1 }
+      },
+      "additionalProperties": false
+    },
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
