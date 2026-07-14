@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.cross-family-bridge-hypothesis/v1",
+  "title": "Regelsuche cross-family bridge hypothesis v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "hypothesisId",
+    "sourceClusterId",
+    "sourceClusterSignatureHash",
+    "targetProvided",
+    "leftPattern",
+    "rightPattern",
+    "trainingFamilies",
+    "sourceConjectureIds",
+    "supportingObservationIds",
+    "assumptions",
+    "validationStatus",
+    "proofStatus",
+    "noveltyStatus",
+    "ablationStatus",
+    "interestingnessStatus",
+    "formationHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.cross-family-bridge-hypothesis/v1"
+    },
+    "hypothesisId": { "$ref": "#/$defs/nonBlankString" },
+    "sourceClusterId": { "$ref": "#/$defs/nonBlankString" },
+    "sourceClusterSignatureHash": { "$ref": "#/$defs/sha256" },
+    "targetProvided": { "const": false },
+    "leftPattern": { "$ref": "#/$defs/nonBlankString" },
+    "rightPattern": { "$ref": "#/$defs/nonBlankString" },
+    "trainingFamilies": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankString" }
+    },
+    "sourceConjectureIds": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankString" }
+    },
+    "supportingObservationIds": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlankString" }
+    },
+    "assumptions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "validationStatus": { "const": "NOT_EVALUATED" },
+    "proofStatus": { "const": "NOT_EVALUATED" },
+    "noveltyStatus": { "const": "NOT_EVALUATED" },
+    "ablationStatus": { "const": "NOT_EVALUATED" },
+    "interestingnessStatus": { "const": "NOT_EVALUATED" },
+    "formationHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlankString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
