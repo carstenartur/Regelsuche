@@ -33,13 +33,15 @@ jobs:
         run: |
           ./gradlew :regelsuche-learning:test \
             --tests de.regelsuche.mining.InterestingnessCalibrationCorpusTest \
-            --tests de.regelsuche.mining.InterestingnessProfileCalibrationTest
+            --tests de.regelsuche.mining.InterestingnessProfileCalibrationTest \
+            --tests de.regelsuche.mining.InterestingnessAcceptanceEvidenceTest
 
       - name: Require evidence artifacts
         run: |
           test -s regelsuche-learning/build/reports/interestingness-calibration/review-consensus.json
           test -s regelsuche-learning/build/reports/interestingness-calibration/corpus.json
           test -s regelsuche-learning/build/reports/interestingness-calibration/profile-report.json
+          test -s regelsuche-learning/build/reports/interestingness-calibration/acceptance.json
 
       - name: Upload evidence
         if: always()
