@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.interestingness-calibration-corpus/v1",
+  "title": "Regelsuche interestingness calibration corpus v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "minimumCasesPerSplit",
+    "predictiveCorpusHash",
+    "labeledEvaluationHash",
+    "consensusReportHash",
+    "cases"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.interestingness-calibration-corpus/v1" },
+    "status": { "const": "FROZEN" },
+    "minimumCasesPerSplit": { "const": 2 },
+    "predictiveCorpusHash": { "$ref": "#/$defs/sha256" },
+    "labeledEvaluationHash": { "$ref": "#/$defs/sha256" },
+    "consensusReportHash": { "$ref": "#/$defs/sha256" },
+    "cases": {
+      "type": "array",
+      "minItems": 4,
+      "items": { "$ref": "#/$defs/case" }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "candidateId",
+        "split",
+        "candidateFamily",
+        "structuralSignatureHash",
+        "assessmentContentHash",
+        "controlClassification",
+        "consensusRelevancePermille",
+        "countedExpertReviews",
+        "blindExpertReviews",
+        "spreadPermille",
+        "meanConfidencePermille",
+        "rationaleCodes"
+      ],
+      "properties": {
+        "caseId": { "$ref": "#/$defs/nonBlank" },
+        "candidateId": { "$ref": "#/$defs/nonBlank" },
+        "split": { "enum": ["CALIBRATION", "TEST"] },
+        "candidateFamily": { "$ref": "#/$defs/nonBlank" },
+        "structuralSignatureHash": { "$ref": "#/$defs/sha256" },
+        "assessmentContentHash": { "$ref": "#/$defs/sha256" },
+        "controlClassification": {
+          "enum": ["NONE", "ALPHA_RENAMING_ONLY", "FORMAT_ONLY", "GENERIC_NORMALIZATION"]
+        },
+        "consensusRelevancePermille": { "$ref": "#/$defs/permille" },
+        "countedExpertReviews": { "$ref": "#/$defs/nonNegativeInteger" },
+        "blindExpertReviews": { "$ref": "#/$defs/nonNegativeInteger" },
+        "spreadPermille": { "$ref": "#/$defs/permille" },
+        "meanConfidencePermille": { "$ref": "#/$defs/permille" },
+        "rationaleCodes": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
