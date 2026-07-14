@@ -11,6 +11,8 @@
 ## Discovery und wissenschaftliche Evidenz
 
 - [Discovery Evidence v1](discovery-evidence-v1.md)
+- [Aktueller Open-Target-Discovery-Stand](discovery-status.md)
+- [Open-Target-Promotion-Gate-Schema v1](schemas/regelsuche-open-target-promotion-gate-v1.schema.json)
 - [Hypothesis Mining](hypothesis-mining.md)
 - [Rule Discovery](rule-discovery.md)
 - [Macro Rules](macro-rules.md)
