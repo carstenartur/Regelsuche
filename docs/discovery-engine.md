@@ -12,18 +12,28 @@ Wiederholungsmessung. Dort ist auch dokumentiert, welchen Beitrag die aktuellen
 Search-/Learning-Schritte leisten und welche Discovery-Behauptungen daraus noch
 nicht folgen.
 
+Der [aktuelle Discovery-Stand](discovery-status.md) fasst die gemessenen
+Ergebnisse, die bereits gemergten Open-Target-Stufen und die verbleibenden
+wissenschaftlichen Grenzen zusammen.
+
 Zentrale Bausteine:
 
 - **Layer 1 – TransformationEngine:** lokale Rewrites, Hypothesenoperatoren und
   Wiederverwendung bereits gelernter Makrozüge.
 - **Layer 2 – Search:** Suchstrategien explorieren die von der Engine gelieferten
   Transformationen unter Tiefe/Budget.
-- **Layer 3 – Discovery-Orchestrierung:** Workflows klassifizieren Ergebnisse,
+- **Layer 3 – Open-Target-Mining:** untargetete Suchgraphen liefern konvergente,
+  alpha-distinkte Zeugen; daraus entstehen parametrisierte Hypothesen ohne
+  Zielausdruck oder versteckte erwartete Antwort.
+- **Layer 4 – Validierung und Lifecycle:** kompilierte Kandidaten durchlaufen
+  frische Holdouts, Gegenbeispielsuche, projektinterne Novelty, symbolische
+  Proof-Obligations und anschließend den bestehenden Hypothesen-Lebenszyklus.
+- **Layer 5 – Discovery-Orchestrierung:** Workflows klassifizieren Ergebnisse,
   validieren Äquivalenz und lernen/promoten Makros nur, wenn
   `DiscoveryLearningOptions` dies explizit erlaubt.
-- **Layer 4 – Reporting/Gallery:** Reports rendern ausschließlich
+- **Layer 6 – Reporting/Gallery:** Reports rendern ausschließlich
   `DiscoveryTrace`-/Replay-Evidence und Descriptor-Metadaten, keine hart
-  codierten Seed-Sonderfälle.
+  codierten Seed-Sonderfälle. Public Evidence bleibt ein eigener Gate-Schritt.
 - `ScientificDiscoveryWorkflow` bootet die produktive App-Wiring-Schicht und führt reproduzierbare Discovery-Läufe aus.
 - `DeterministicDiscoveryExperimentRunner` wertet Seeds deterministisch, budgetiert und optional parallel aus.
 - `DiscoveryReplayArtifactWriter` erzeugt `discovery-report.{json,html,md}`, `discovery-replay.json`, `discovery-summary.png` und `discovery-replay.gif`.
@@ -71,6 +81,7 @@ Zentrale Bausteine:
 
 Wichtige Einstiegspunkte:
 
+- [docs/discovery-status.md](discovery-status.md)
 - [docs/from-transformations-to-discovery.md](from-transformations-to-discovery.md)
 - [docs/rule-discovery.md](rule-discovery.md)
 - [docs/experiment-runner.md](experiment-runner.md)
