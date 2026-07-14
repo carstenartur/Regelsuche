@@ -72,8 +72,8 @@ final class NormalizedNode {
 <span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
 <span class="nc" id="L73">            return number(0);</span>
         }
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (normalized.size() == 1) {</span>
-<span class="nc" id="L76">            return normalized.getFirst();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (normalized.size() == 1) {</span>
+<span class="fc" id="L76">            return normalized.getFirst();</span>
         }
 <span class="fc" id="L78">        return new NormalizedNode(Kind.ADD, null, null, normalized);</span>
     }

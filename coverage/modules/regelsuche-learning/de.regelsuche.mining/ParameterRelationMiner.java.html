@@ -47,10 +47,10 @@ import java.util.Map;
 <span class="fc" id="L47">                continue;</span>
             }
 <span class="fc" id="L49">            int currentOffset = offset;</span>
-<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (matches(values, baseValues, a -&gt; a + currentOffset)) {</span>
-<span class="nc" id="L51">                return new Relation(</span>
-<span class="nc" id="L52">                    NormalizedNode.add(List.of(NormalizedNode.variable(&quot;A&quot;), NormalizedNode.number(currentOffset))),</span>
-<span class="nc bnc" id="L53" title="All 2 branches missed.">                    currentOffset &gt; 0 ? &quot;A + &quot; + currentOffset : &quot;A - &quot; + Math.abs(currentOffset)</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (matches(values, baseValues, a -&gt; a + currentOffset)) {</span>
+<span class="fc" id="L51">                return new Relation(</span>
+<span class="fc" id="L52">                    NormalizedNode.add(List.of(NormalizedNode.variable(&quot;A&quot;), NormalizedNode.number(currentOffset))),</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                    currentOffset &gt; 0 ? &quot;A + &quot; + currentOffset : &quot;A - &quot; + Math.abs(currentOffset)</span>
                 );
             }
         }
@@ -70,15 +70,15 @@ import java.util.Map;
 <span class="fc" id="L70">                    continue;</span>
                 }
 <span class="fc" id="L72">                int currentOffset = offset;</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                if (matches(values, baseValues, a -&gt; currentFactor * a + currentOffset)) {</span>
-<span class="nc" id="L74">                    return new Relation(</span>
-<span class="nc" id="L75">                        NormalizedNode.add(List.of(</span>
-<span class="nc" id="L76">                            NormalizedNode.multiply(List.of(NormalizedNode.number(currentFactor), NormalizedNode.variable(&quot;A&quot;))),</span>
-<span class="nc" id="L77">                            NormalizedNode.number(currentOffset)</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                if (matches(values, baseValues, a -&gt; currentFactor * a + currentOffset)) {</span>
+<span class="fc" id="L74">                    return new Relation(</span>
+<span class="fc" id="L75">                        NormalizedNode.add(List.of(</span>
+<span class="fc" id="L76">                            NormalizedNode.multiply(List.of(NormalizedNode.number(currentFactor), NormalizedNode.variable(&quot;A&quot;))),</span>
+<span class="fc" id="L77">                            NormalizedNode.number(currentOffset)</span>
                         )),
-<span class="nc bnc" id="L79" title="All 2 branches missed.">                        currentOffset &gt; 0</span>
-<span class="nc" id="L80">                            ? currentFactor + &quot;*A + &quot; + currentOffset</span>
-<span class="nc" id="L81">                            : currentFactor + &quot;*A - &quot; + Math.abs(currentOffset)</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                        currentOffset &gt; 0</span>
+<span class="fc" id="L80">                            ? currentFactor + &quot;*A + &quot; + currentOffset</span>
+<span class="pc" id="L81">                            : currentFactor + &quot;*A - &quot; + Math.abs(currentOffset)</span>
                     );
                 }
             }

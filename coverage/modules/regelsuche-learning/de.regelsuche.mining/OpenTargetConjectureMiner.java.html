@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenTargetConjectureMiner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">OpenTargetConjectureMiner.java</span></div><h1>OpenTargetConjectureMiner.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.learning.ExpressionFingerprint;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.search.strategy.SearchState;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+/**
+ * Mines first-stage conjectures from real untargeted search convergence.
+ *
+ * &lt;p&gt;The miner receives no target expression. It uses only explored search states,
+ * requires genuinely different convergent paths, and refuses to count pure
+ * alpha-renaming as independent support.&lt;/p&gt;
+ */
+public final class OpenTargetConjectureMiner {
+    public static final String SCHEMA = &quot;regelsuche.open-target-conjecture-mining/v1&quot;;
+<span class="fc" id="L34">    private static final Pattern SINGLE_PLACEHOLDER = Pattern.compile(&quot;[A-Z]&quot;);</span>
+
+    private final PatternGeneralizer generalizer;
+    private final ExpressionCanonicalizer canonicalizer;
+    private final ExpressionScorer scorer;
+
+    public OpenTargetConjectureMiner() {
+<span class="fc" id="L41">        this(new PatternGeneralizer(), new ExpressionCanonicalizer(), new ExpressionScorer());</span>
+<span class="fc" id="L42">    }</span>
+
+    OpenTargetConjectureMiner(
+        PatternGeneralizer generalizer,
+        ExpressionCanonicalizer canonicalizer,
+        ExpressionScorer scorer
+<span class="fc" id="L48">    ) {</span>
+<span class="fc" id="L49">        this.generalizer = Objects.requireNonNull(generalizer, &quot;generalizer&quot;);</span>
+<span class="fc" id="L50">        this.canonicalizer = Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
+<span class="fc" id="L51">        this.scorer = Objects.requireNonNull(scorer, &quot;scorer&quot;);</span>
+<span class="fc" id="L52">    }</span>
+
+    public MiningReport mine(List&lt;OpenTargetObservation&gt; observations) {
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        List&lt;OpenTargetObservation&gt; ordered = observations == null</span>
+<span class="nc" id="L56">            ? List.of()</span>
+<span class="fc" id="L57">            : observations.stream()</span>
+<span class="fc" id="L58">                .sorted(Comparator.comparing(OpenTargetObservation::observationId))</span>
+<span class="fc" id="L59">                .toList();</span>
+<span class="fc" id="L60">        List&lt;ConvergenceEvidence&gt; evidence = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L61">        List&lt;RejectedCluster&gt; rejected = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (OpenTargetObservation observation : ordered) {</span>
+<span class="fc" id="L63">            Optional&lt;ConvergenceEvidence&gt; convergence = bestConvergence(observation);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (convergence.isPresent()) {</span>
+<span class="fc" id="L65">                evidence.add(convergence.orElseThrow());</span>
+            } else {
+<span class="fc" id="L67">                rejected.add(new RejectedCluster(</span>
+<span class="fc" id="L68">                    &quot;observation:&quot; + observation.observationId(),</span>
+<span class="fc" id="L69">                    List.of(observation.observationId()),</span>
+                    0,
+                    0,
+                    &quot;no-independent-equivalence-preserving-convergence&quot;));
+            }
+<span class="fc" id="L74">        }</span>
+
+<span class="fc" id="L76">        Map&lt;String, List&lt;ConvergenceEvidence&gt;&gt; clusters = evidence.stream()</span>
+<span class="fc" id="L77">            .collect(Collectors.groupingBy(</span>
+                ConvergenceEvidence::pathCompetitionSignature,
+                LinkedHashMap::new,
+<span class="fc" id="L80">                Collectors.toList()));</span>
+<span class="fc" id="L81">        List&lt;OpenTargetConjecture&gt; conjectures = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L82">        clusters.entrySet().stream()</span>
+<span class="fc" id="L83">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L84">            .forEach(entry -&gt; mineCluster(entry.getKey(), entry.getValue(), conjectures, rejected));</span>
+<span class="fc" id="L85">        return new MiningReport(</span>
+            SCHEMA,
+            false,
+<span class="fc" id="L88">            conjectures.stream()</span>
+<span class="fc" id="L89">                .sorted(Comparator.comparing(OpenTargetConjecture::conjectureId))</span>
+<span class="fc" id="L90">                .toList(),</span>
+<span class="fc" id="L91">            rejected.stream()</span>
+<span class="fc" id="L92">                .sorted(Comparator.comparing(RejectedCluster::clusterSignature))</span>
+<span class="fc" id="L93">                .toList());</span>
+    }
+
+    private void mineCluster(
+        String signature,
+        List&lt;ConvergenceEvidence&gt; cluster,
+        List&lt;OpenTargetConjecture&gt; conjectures,
+        List&lt;RejectedCluster&gt; rejected
+    ) {
+<span class="fc" id="L102">        List&lt;ConvergenceEvidence&gt; ordered = cluster.stream()</span>
+<span class="fc" id="L103">            .sorted(Comparator.comparing(ConvergenceEvidence::observationId))</span>
+<span class="fc" id="L104">            .toList();</span>
+<span class="fc" id="L105">        List&lt;String&gt; observationIds = ordered.stream()</span>
+<span class="fc" id="L106">            .map(ConvergenceEvidence::observationId)</span>
+<span class="fc" id="L107">            .toList();</span>
+<span class="fc" id="L108">        int distinctAlphaSupport = (int) ordered.stream()</span>
+<span class="fc" id="L109">            .map(ConvergenceEvidence::alphaPairFingerprint)</span>
+<span class="fc" id="L110">            .distinct()</span>
+<span class="fc" id="L111">            .count();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (ordered.size() &lt; 2) {</span>
+<span class="nc" id="L113">            rejected.add(new RejectedCluster(</span>
+<span class="nc" id="L114">                signature, observationIds, ordered.size(), distinctAlphaSupport, &quot;support-count&lt;2&quot;));</span>
+<span class="nc" id="L115">            return;</span>
+        }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (distinctAlphaSupport &lt; 2) {</span>
+<span class="fc" id="L118">            rejected.add(new RejectedCluster(</span>
+                signature,
+                observationIds,
+<span class="fc" id="L121">                ordered.size(),</span>
+                distinctAlphaSupport,
+                &quot;alpha-distinct-support&lt;2&quot;));
+<span class="fc" id="L124">            return;</span>
+        }
+
+<span class="fc" id="L127">        List&lt;SuccessfulTransformationPath&gt; paths = ordered.stream()</span>
+<span class="fc" id="L128">            .map(this::toLearningPath)</span>
+<span class="fc" id="L129">            .toList();</span>
+<span class="fc" id="L130">        Optional&lt;GeneralizedPattern&gt; generalized = generalizer.generalize(paths);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (generalized.isEmpty()) {</span>
+<span class="nc" id="L132">            rejected.add(new RejectedCluster(</span>
+                signature,
+                observationIds,
+<span class="nc" id="L135">                ordered.size(),</span>
+                distinctAlphaSupport,
+                &quot;generalizer-returned-no-compatible-pattern&quot;));
+<span class="nc" id="L138">            return;</span>
+        }
+<span class="fc" id="L140">        GeneralizedPattern pattern = generalized.orElseThrow();</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (!specificEnough(pattern)) {</span>
+<span class="nc" id="L142">            rejected.add(new RejectedCluster(</span>
+                signature,
+                observationIds,
+<span class="nc" id="L145">                ordered.size(),</span>
+                distinctAlphaSupport,
+                &quot;over-broad-or-structure-free-pattern&quot;));
+<span class="nc" id="L148">            return;</span>
+        }
+
+<span class="fc" id="L151">        Set&lt;String&gt; families = ordered.stream()</span>
+<span class="fc" id="L152">            .map(ConvergenceEvidence::family)</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isBlank())</span>
+<span class="fc" id="L154">            .collect(Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L155">        conjectures.add(new OpenTargetConjecture(</span>
+<span class="fc" id="L156">            conjectureId(signature, pattern),</span>
+<span class="fc" id="L157">            pattern.leftPattern(),</span>
+<span class="fc" id="L158">            pattern.rightPattern(),</span>
+<span class="fc" id="L159">            ordered.size(),</span>
+            distinctAlphaSupport,
+<span class="fc" id="L161">            List.copyOf(families),</span>
+            observationIds,
+            ordered,
+<span class="fc" id="L164">            pattern.parameterRelations(),</span>
+<span class="fc" id="L165">            pattern.expressionPlaceholderValues(),</span>
+            &quot;OBSERVED_CONJECTURE&quot;,
+            &quot;EQUIVALENCE_PRESERVING_CONVERGENT_PATHS&quot;));
+<span class="fc" id="L168">    }</span>
+
+    private Optional&lt;ConvergenceEvidence&gt; bestConvergence(OpenTargetObservation observation) {
+<span class="fc" id="L171">        Map&lt;String, List&lt;SearchState&gt;&gt; byCanonicalHash = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L172">        observation.exploredStates().stream()</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            .filter(state -&gt; state.depth() &gt; 0)</span>
+<span class="fc" id="L174">            .filter(this::eligiblePath)</span>
+<span class="fc" id="L175">            .sorted(Comparator</span>
+<span class="fc" id="L176">                .comparing(SearchState::canonicalHash)</span>
+<span class="fc" id="L177">                .thenComparing(SearchState::expression)</span>
+<span class="fc" id="L178">                .thenComparingInt(SearchState::depth)</span>
+<span class="fc" id="L179">                .thenComparing(this::rulePathSignature))</span>
+<span class="fc" id="L180">            .forEach(state -&gt; byCanonicalHash</span>
+<span class="fc" id="L181">                .computeIfAbsent(state.canonicalHash(), ignored -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L182">                .add(state));</span>
+
+<span class="fc" id="L184">        List&lt;ConvergenceCandidate&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (Map.Entry&lt;String, List&lt;SearchState&gt;&gt; canonicalEntry : byCanonicalHash.entrySet()) {</span>
+<span class="fc" id="L186">            Map&lt;String, List&lt;SearchState&gt;&gt; byExactOutput = canonicalEntry.getValue().stream()</span>
+<span class="fc" id="L187">                .collect(Collectors.groupingBy(</span>
+<span class="fc" id="L188">                    state -&gt; normalize(state.expression()),</span>
+                    LinkedHashMap::new,
+<span class="fc" id="L190">                    Collectors.toList()));</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            for (List&lt;SearchState&gt; outputStates : byExactOutput.values()) {</span>
+<span class="fc" id="L192">                addCandidate(observation, canonicalEntry.getKey(), outputStates, candidates);</span>
+<span class="fc" id="L193">            }</span>
+<span class="fc" id="L194">        }</span>
+<span class="fc" id="L195">        return candidates.stream()</span>
+<span class="fc" id="L196">            .sorted(Comparator</span>
+<span class="pc" id="L197">                .comparingInt((ConvergenceCandidate candidate) -&gt; -candidate.evidence().scoreImprovement())</span>
+<span class="fc" id="L198">                .thenComparingInt(ConvergenceCandidate::outputScore)</span>
+<span class="pc" id="L199">                .thenComparing(candidate -&gt; candidate.evidence().canonicalOutputHash())</span>
+<span class="pc" id="L200">                .thenComparing(candidate -&gt; candidate.evidence().outputExpression()))</span>
+<span class="fc" id="L201">            .map(ConvergenceCandidate::evidence)</span>
+<span class="fc" id="L202">            .findFirst();</span>
+    }
+
+    private void addCandidate(
+        OpenTargetObservation observation,
+        String canonicalOutputHash,
+        List&lt;SearchState&gt; outputStates,
+        List&lt;ConvergenceCandidate&gt; candidates
+    ) {
+<span class="fc" id="L211">        Map&lt;String, SearchState&gt; distinctPaths = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L212">        outputStates.stream()</span>
+<span class="fc" id="L213">            .sorted(Comparator.comparingInt(SearchState::depth).thenComparing(this::rulePathSignature))</span>
+<span class="fc" id="L214">            .forEach(state -&gt; distinctPaths.putIfAbsent(rulePathSignature(state), state));</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (distinctPaths.size() &lt; 2) {</span>
+<span class="fc" id="L216">            return;</span>
+        }
+<span class="fc" id="L218">        SearchState representative = distinctPaths.values().stream()</span>
+<span class="fc" id="L219">            .min(Comparator</span>
+<span class="fc" id="L220">                .comparingInt(SearchState::depth)</span>
+<span class="pc" id="L221">                .thenComparingInt(state -&gt; state.score().weightedTotal())</span>
+<span class="fc" id="L222">                .thenComparing(this::rulePathSignature))</span>
+<span class="fc" id="L223">            .orElseThrow();</span>
+<span class="fc" id="L224">        int improvement = scorer.score(observation.rootExpression()).weightedTotal()</span>
+<span class="fc" id="L225">            - representative.score().weightedTotal();</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (improvement &lt;= 0) {</span>
+<span class="nc" id="L227">            return;</span>
+        }
+<span class="fc" id="L229">        List&lt;PathEvidence&gt; paths = distinctPaths.values().stream()</span>
+<span class="fc" id="L230">            .map(this::pathEvidence)</span>
+<span class="fc" id="L231">            .sorted(Comparator.comparing(PathEvidence::pathId))</span>
+<span class="fc" id="L232">            .toList();</span>
+<span class="fc" id="L233">        String competition = paths.stream()</span>
+<span class="fc" id="L234">            .map(path -&gt; String.join(&quot;&gt;&quot;, path.ruleIds()))</span>
+<span class="fc" id="L235">            .sorted()</span>
+<span class="fc" id="L236">            .collect(Collectors.joining(&quot;||&quot;));</span>
+<span class="fc" id="L237">        ExpressionFingerprint input = ExpressionFingerprint.of(</span>
+<span class="fc" id="L238">            observation.rootExpression(), canonicalizer);</span>
+<span class="fc" id="L239">        ExpressionFingerprint output = ExpressionFingerprint.of(</span>
+<span class="fc" id="L240">            representative.expression(), canonicalizer);</span>
+<span class="fc" id="L241">        candidates.add(new ConvergenceCandidate(</span>
+            new ConvergenceEvidence(
+<span class="fc" id="L243">                observation.observationId(),</span>
+<span class="fc" id="L244">                observation.family(),</span>
+<span class="fc" id="L245">                observation.searchStatus(),</span>
+<span class="fc" id="L246">                observation.rootExpression(),</span>
+<span class="fc" id="L247">                representative.expression(),</span>
+                canonicalOutputHash,
+                improvement,
+<span class="fc" id="L250">                input.alphaShapeHash() + &quot;-&gt;&quot; + output.alphaShapeHash(),</span>
+<span class="fc" id="L251">                input.valueHash() + &quot;-&gt;&quot; + output.valueHash(),</span>
+                competition,
+                paths),
+<span class="fc" id="L254">            representative.score().weightedTotal()));</span>
+<span class="fc" id="L255">    }</span>
+
+    private boolean eligiblePath(SearchState state) {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        return !state.appliedRuleIds().isEmpty()</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">            &amp;&amp; !state.path().isEmpty()</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            &amp;&amp; new LinkedHashSet&lt;&gt;(state.path()).size() == state.path().size()</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            &amp;&amp; !state.equivalencePreservingFlags().isEmpty()</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            &amp;&amp; state.equivalencePreservingFlags().stream().allMatch(Boolean::booleanValue);</span>
+    }
+
+    private String rulePathSignature(SearchState state) {
+<span class="fc" id="L266">        return String.join(&quot;&gt;&quot;, state.appliedRuleIds());</span>
+    }
+
+    private PathEvidence pathEvidence(SearchState state) {
+<span class="fc" id="L270">        String material = String.join(&quot;\u0001&quot;, state.path())</span>
+<span class="fc" id="L271">            + &quot;\u0002&quot; + String.join(&quot;\u0001&quot;, state.appliedRuleIds());</span>
+<span class="fc" id="L272">        return new PathEvidence(</span>
+<span class="fc" id="L273">            &quot;path-&quot; + sha256(material).substring(0, 16),</span>
+<span class="fc" id="L274">            state.path(),</span>
+<span class="fc" id="L275">            state.appliedRuleIds(),</span>
+<span class="fc" id="L276">            state.assumptions(),</span>
+<span class="fc" id="L277">            state.depth(),</span>
+<span class="fc" id="L278">            state.score().weightedTotal());</span>
+    }
+
+    private SuccessfulTransformationPath toLearningPath(ConvergenceEvidence evidence) {
+<span class="fc" id="L282">        PathEvidence representative = evidence.paths().stream()</span>
+<span class="fc" id="L283">            .min(Comparator</span>
+<span class="fc" id="L284">                .comparingInt(PathEvidence::depth)</span>
+<span class="fc" id="L285">                .thenComparing(PathEvidence::pathId))</span>
+<span class="fc" id="L286">            .orElseThrow();</span>
+<span class="fc" id="L287">        if (!normalize(representative.expressions().getLast())</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">                .equals(normalize(evidence.outputExpression()))) {</span>
+<span class="nc" id="L289">            throw new IllegalStateException(&quot;convergence path does not end at its reported output&quot;);</span>
+        }
+<span class="fc" id="L291">        return new SuccessfulTransformationPath(</span>
+<span class="fc" id="L292">            &quot;open-target-&quot; + evidence.observationId(),</span>
+<span class="fc" id="L293">            evidence.inputExpression(),</span>
+<span class="fc" id="L294">            evidence.outputExpression(),</span>
+<span class="fc" id="L295">            representative.expressions(),</span>
+<span class="fc" id="L296">            representative.ruleIds(),</span>
+<span class="fc" id="L297">            scorer.score(evidence.inputExpression()),</span>
+<span class="fc" id="L298">            scorer.score(evidence.outputExpression()),</span>
+            true,
+            &quot;EQUIVALENCE_PRESERVING_PATH_CONVERGENCE&quot;,
+<span class="fc" id="L301">            Map.of(&quot;source&quot;, &quot;UNTARGETED_SEARCH&quot;),</span>
+<span class="fc" id="L302">            representative.assumptions());</span>
+    }
+
+    private boolean specificEnough(GeneralizedPattern pattern) {
+<span class="fc" id="L306">        String left = pattern.leftPattern().trim();</span>
+<span class="fc" id="L307">        String right = pattern.rightPattern().trim();</span>
+<span class="pc bpc" id="L308" title="3 of 6 branches missed.">        if (left.isBlank() || right.isBlank() || left.equals(right)) {</span>
+<span class="nc" id="L309">            return false;</span>
+        }
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (SINGLE_PLACEHOLDER.matcher(left).matches()</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                &amp;&amp; SINGLE_PLACEHOLDER.matcher(right).matches()) {</span>
+<span class="nc" id="L313">            return false;</span>
+        }
+<span class="pc bpc" id="L315" title="3 of 4 branches missed.">        return containsStructure(left) || containsStructure(right);</span>
+    }
+
+    private boolean containsStructure(String pattern) {
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        return pattern.indexOf('+') &gt;= 0</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">            || pattern.indexOf('-') &gt;= 0</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            || pattern.indexOf('*') &gt;= 0</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            || pattern.indexOf('/') &gt;= 0</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            || pattern.indexOf('^') &gt;= 0</span>
+<span class="pc bnc" id="L324" title="All 2 branches missed.">            || pattern.indexOf('(') &gt;= 0;</span>
+    }
+
+    private String conjectureId(String signature, GeneralizedPattern pattern) {
+<span class="fc" id="L328">        String material = signature + &quot;\n&quot; + pattern.leftPattern() + &quot;-&gt;&quot; + pattern.rightPattern();</span>
+<span class="fc" id="L329">        return &quot;open-target-conjecture-&quot; + sha256(material).substring(0, 20);</span>
+    }
+
+    private static String normalize(String expression) {
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        return expression == null ? &quot;&quot; : expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L338">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L339">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L340">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L341">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L342">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    public record OpenTargetObservation(
+        String observationId,
+        String family,
+        String rootExpression,
+        GoalStatus searchStatus,
+        List&lt;SearchState&gt; exploredStates
+    ) {
+<span class="fc" id="L353">        public OpenTargetObservation {</span>
+<span class="pc bpc" id="L354" title="2 of 4 branches missed.">            if (observationId == null || observationId.isBlank()) {</span>
+<span class="nc" id="L355">                throw new IllegalArgumentException(&quot;observationId must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L357" title="2 of 4 branches missed.">            if (rootExpression == null || rootExpression.isBlank()) {</span>
+<span class="nc" id="L358">                throw new IllegalArgumentException(&quot;rootExpression must not be blank&quot;);</span>
+            }
+<span class="fc bfc" id="L360" title="All 2 branches covered.">            if (searchStatus != GoalStatus.UNTARGETED) {</span>
+<span class="fc" id="L361">                throw new IllegalArgumentException(</span>
+                    &quot;open-target observations require GoalStatus.UNTARGETED&quot;);
+            }
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            exploredStates = exploredStates == null ? List.of() : List.copyOf(exploredStates);</span>
+<span class="fc" id="L366">        }</span>
+
+        public static OpenTargetObservation from(
+            String observationId,
+            String postHocFamily,
+            String rootExpression,
+            GoalSearchResult result
+        ) {
+<span class="fc" id="L374">            Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L375">            return new OpenTargetObservation(</span>
+                observationId,
+                postHocFamily,
+                rootExpression,
+<span class="fc" id="L379">                result.status(),</span>
+<span class="fc" id="L380">                result.states());</span>
+        }
+    }
+
+    public record MiningReport(
+        String schema,
+        boolean targetProvided,
+        List&lt;OpenTargetConjecture&gt; conjectures,
+        List&lt;RejectedCluster&gt; rejectedClusters
+    ) {
+<span class="fc" id="L390">        public MiningReport {</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">            conjectures = conjectures == null ? List.of() : List.copyOf(conjectures);</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">            rejectedClusters = rejectedClusters == null ? List.of() : List.copyOf(rejectedClusters);</span>
+<span class="fc" id="L393">        }</span>
+    }
+
+    public record OpenTargetConjecture(
+        String conjectureId,
+        String leftPattern,
+        String rightPattern,
+        int supportCount,
+        int distinctAlphaSupport,
+        List&lt;String&gt; postHocFamilies,
+        List&lt;String&gt; supportingObservationIds,
+        List&lt;ConvergenceEvidence&gt; evidence,
+        List&lt;String&gt; parameterRelations,
+        Map&lt;String, List&lt;String&gt;&gt; expressionPlaceholderValues,
+        String candidateStatus,
+        String evidenceStatus
+    ) {
+<span class="fc" id="L410">        public OpenTargetConjecture {</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">            postHocFamilies = postHocFamilies == null ? List.of() : List.copyOf(postHocFamilies);</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            supportingObservationIds = supportingObservationIds == null</span>
+<span class="nc" id="L413">                ? List.of()</span>
+<span class="fc" id="L414">                : List.copyOf(supportingObservationIds);</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">            evidence = evidence == null ? List.of() : List.copyOf(evidence);</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">            parameterRelations = parameterRelations == null ? List.of() : List.copyOf(parameterRelations);</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">            expressionPlaceholderValues = expressionPlaceholderValues == null</span>
+<span class="nc" id="L418">                ? Map.of()</span>
+<span class="fc" id="L419">                : Map.copyOf(expressionPlaceholderValues);</span>
+<span class="fc" id="L420">        }</span>
+    }
+
+    public record ConvergenceEvidence(
+        String observationId,
+        String family,
+        GoalStatus searchStatus,
+        String inputExpression,
+        String outputExpression,
+        String canonicalOutputHash,
+        int scoreImprovement,
+        String alphaPairFingerprint,
+        String valuePairFingerprint,
+        String pathCompetitionSignature,
+        List&lt;PathEvidence&gt; paths
+    ) {
+<span class="fc" id="L436">        public ConvergenceEvidence {</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">            family = family == null ? &quot;&quot; : family;</span>
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">            if (searchStatus != GoalStatus.UNTARGETED) {</span>
+<span class="nc" id="L439">                throw new IllegalArgumentException(&quot;convergence evidence must come from untargeted search&quot;);</span>
+            }
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">            paths = paths == null ? List.of() : List.copyOf(paths);</span>
+<span class="fc" id="L442">        }</span>
+    }
+
+    public record PathEvidence(
+        String pathId,
+        List&lt;String&gt; expressions,
+        List&lt;String&gt; ruleIds,
+        List&lt;String&gt; assumptions,
+        int depth,
+        int finalScore
+    ) {
+<span class="fc" id="L453">        public PathEvidence {</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            expressions = expressions == null ? List.of() : List.copyOf(expressions);</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">            ruleIds = ruleIds == null ? List.of() : List.copyOf(ruleIds);</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L457">        }</span>
+    }
+
+    public record RejectedCluster(
+        String clusterSignature,
+        List&lt;String&gt; observationIds,
+        int supportCount,
+        int distinctAlphaSupport,
+        String reason
+    ) {
+<span class="fc" id="L467">        public RejectedCluster {</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">            observationIds = observationIds == null ? List.of() : List.copyOf(observationIds);</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">            reason = reason == null ? &quot;&quot; : reason;</span>
+<span class="fc" id="L470">        }</span>
+    }
+
+<span class="fc" id="L473">    private record ConvergenceCandidate(ConvergenceEvidence evidence, int outputScore) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
