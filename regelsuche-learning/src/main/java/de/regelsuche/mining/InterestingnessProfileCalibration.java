@@ -16,7 +16,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +29,9 @@ import java.util.TreeSet;
  */
 public final class InterestingnessProfileCalibration {
     public static final String SCHEMA = "regelsuche.interestingness-profile-calibration/v1";
+    private static final List<InterestingnessProfile> V1_PROFILES = List.of(
+        InterestingnessProfile.THEORY_DISCOVERY,
+        InterestingnessProfile.SEARCH_REUSE);
     private static final List<String> PARETO_AXES = List.of(
         "structuralSurprise",
         "crossFamilyTransfer",
@@ -175,7 +177,7 @@ public final class InterestingnessProfileCalibration {
         List<ScoredCase> test
     ) {
         List<ProfileMetric> metrics = new ArrayList<>();
-        for (InterestingnessProfile profile : InterestingnessProfile.values()) {
+        for (InterestingnessProfile profile : V1_PROFILES) {
             metrics.add(new ProfileMetric(
                 profile,
                 pairwiseLabelAgreement(calibration, profile),
@@ -185,7 +187,7 @@ public final class InterestingnessProfileCalibration {
     }
 
     private static InterestingnessProfile select(List<ProfileMetric> metrics) {
-        InterestingnessProfile selected = InterestingnessProfile.values()[0];
+        InterestingnessProfile selected = V1_PROFILES.get(0);
         int best = -1;
         for (ProfileMetric metric : metrics) {
             if (metric.calibrationAgreementPermille() > best) {
@@ -212,9 +214,8 @@ public final class InterestingnessProfileCalibration {
                 if (desired == 0) {
                     continue;
                 }
-                int actual = Integer.compare(
-                    first.assessment(profile).totalPermille(),
-                    second.assessment(profile).totalPermille());
+                int actual = rankingDirection(
+                    first.assessment(profile), second.assessment(profile));
                 points += actual == desired ? 1000 : actual == 0 ? 500 : 0;
                 pairs++;
             }
@@ -317,9 +318,20 @@ public final class InterestingnessProfileCalibration {
         ScoredCase right,
         InterestingnessProfile profile
     ) {
-        return Integer.compare(
-            left.assessment(profile).totalPermille(),
-            right.assessment(profile).totalPermille());
+        return rankingDirection(left.assessment(profile), right.assessment(profile));
+    }
+
+    static int rankingDirection(
+        InterestingnessAssessment left,
+        InterestingnessAssessment right
+    ) {
+        Objects.requireNonNull(left, "left");
+        Objects.requireNonNull(right, "right");
+        return -Integer.signum(left.compareTo(right));
+    }
+
+    static List<InterestingnessProfile> supportedProfilesV1() {
+        return V1_PROFILES;
     }
 
     private static int leaveOneOutStability(
@@ -515,9 +527,19 @@ public final class InterestingnessProfileCalibration {
                 : profileMetrics.stream()
                     .sorted(Comparator.comparing(metric -> metric.profile().name()))
                     .toList();
+            if (profileMetrics.size() != V1_PROFILES.size()
+                    || !new TreeSet<>(profileMetrics.stream()
+                        .map(metric -> metric.profile().name()).toList())
+                        .equals(new TreeSet<>(V1_PROFILES.stream()
+                            .map(Enum::name).toList()))) {
+                throw new IllegalArgumentException(
+                    "v1 calibration report requires exactly the two v1 profiles");
+            }
             testRanking = testRanking == null
                 ? List.of()
-                : testRanking.stream().sorted(Comparator.comparingInt(RankedCase::rank)).toList();
+                : testRanking.stream()
+                    .sorted(Comparator.comparingInt(RankedCase::rank))
+                    .toList();
             paretoCandidateIds = paretoCandidateIds == null
                 ? List.of()
                 : paretoCandidateIds.stream().distinct().sorted().toList();
