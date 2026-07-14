@@ -13,6 +13,7 @@ import java.util.Objects;
 
 /** Rule-ID-independent, explainable ranking for already-applicable transformations. */
 public final class DescriptorSearchPolicy implements SearchPolicy {
+    private static final String PAIRWISE_TARGET_REACHED = "pairwise.targetReached";
     private static final int TARGET_DISTANCE_WEIGHT = 20;
     private static final int UNKNOWN_DESCRIPTOR_PENALTY = 2_000;
 
@@ -82,6 +83,7 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         Map<String, Integer> descriptorFeatures = descriptorFeatures(descriptor);
         Map<String, Integer> contributions = base(context);
         boolean localTransitionSupported = localTransitionSupported(descriptorFeatures);
+        boolean targetCompetitionSupported = targetCompetitionSupported(descriptorFeatures);
         int informative = 0;
         int pairwiseContextEvidence = 0;
         int outOfRange = 0;
@@ -94,6 +96,9 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
                 continue;
             }
             String featureName = entry.getKey();
+            if (targetCompetitionSupported && !pairwiseContextFeature(featureName)) {
+                continue;
+            }
             int value = descriptorFeatures.getOrDefault(featureName, 0);
             if (pairwiseContextFeature(featureName)) {
                 if (value == 0) {
@@ -137,6 +142,7 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
             Math.min(1000, minimumEvidence * 100 + informative * 50),
             "transparent linear descriptor evidence from " + informative
                 + " shared features; pairwiseContextEvidence=" + pairwiseContextEvidence
+                + "; targetCompetitionSupported=" + targetCompetitionSupported
                 + "; ignoredOutOfRange=" + outOfRange
                 + "; ignoredUnsupportedLocal=" + ignoredUnsupportedLocal);
     }
@@ -154,6 +160,14 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         return false;
     }
 
+    private boolean targetCompetitionSupported(Map<String, Integer> descriptorFeatures) {
+        FeatureStatistics statistics = model.features().get(PAIRWISE_TARGET_REACHED);
+        return descriptorFeatures.getOrDefault(PAIRWISE_TARGET_REACHED, 0) == 1
+            && statistics != null
+            && statistics.observations() >= model.minimumObservations()
+            && statistics.maximumValue() > 0;
+    }
+
     static Map<String, Integer> descriptorFeatures(TransformationDescriptor descriptor) {
         Map<String, Integer> features = new LinkedHashMap<>(descriptor.featureVector());
         TransformationDescriptor.LocalChange local = descriptor.localChange();
@@ -161,11 +175,15 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
             features.put("local.contextRole." + local.contextRoot().kind().name()
                 + "_" + local.role().name(), 1);
         }
+        if (descriptor.targeted()) {
+            features.put(PAIRWISE_TARGET_REACHED, descriptor.targetDistanceAfter() == 0 ? 1 : 0);
+        }
         return features;
     }
 
     static boolean pairwiseContextFeature(String featureName) {
-        return featureName.startsWith("local.context.")
+        return PAIRWISE_TARGET_REACHED.equals(featureName)
+            || featureName.startsWith("local.context.")
             || featureName.startsWith("local.contextRole.");
     }
 
