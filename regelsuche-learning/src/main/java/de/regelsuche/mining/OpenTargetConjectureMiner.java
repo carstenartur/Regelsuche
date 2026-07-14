@@ -3,6 +3,8 @@ package de.regelsuche.mining;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.learning.ExpressionFingerprint;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
 import de.regelsuche.search.strategy.SearchState;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -169,69 +171,87 @@ public final class OpenTargetConjectureMiner {
         Map<String, List<SearchState>> byCanonicalHash = new LinkedHashMap<>();
         observation.exploredStates().stream()
             .filter(state -> state.depth() > 0)
+            .filter(this::eligiblePath)
             .sorted(Comparator
                 .comparing(SearchState::canonicalHash)
+                .thenComparing(SearchState::expression)
                 .thenComparingInt(SearchState::depth)
-                .thenComparing(SearchState::expression))
+                .thenComparing(this::rulePathSignature))
             .forEach(state -> byCanonicalHash
                 .computeIfAbsent(state.canonicalHash(), ignored -> new ArrayList<>())
                 .add(state));
 
         List<ConvergenceCandidate> candidates = new ArrayList<>();
-        for (Map.Entry<String, List<SearchState>> entry : byCanonicalHash.entrySet()) {
-            Map<String, SearchState> distinctPaths = new LinkedHashMap<>();
-            entry.getValue().stream()
-                .filter(this::eligiblePath)
-                .sorted(Comparator.comparingInt(SearchState::depth).thenComparing(SearchState::expression))
-                .forEach(state -> distinctPaths.putIfAbsent(rulePathSignature(state), state));
-            if (distinctPaths.size() < 2) {
-                continue;
+        for (Map.Entry<String, List<SearchState>> canonicalEntry : byCanonicalHash.entrySet()) {
+            Map<String, List<SearchState>> byExactOutput = canonicalEntry.getValue().stream()
+                .collect(Collectors.groupingBy(
+                    state -> normalize(state.expression()),
+                    LinkedHashMap::new,
+                    Collectors.toList()));
+            for (List<SearchState> outputStates : byExactOutput.values()) {
+                addCandidate(observation, canonicalEntry.getKey(), outputStates, candidates);
             }
-            SearchState representative = distinctPaths.values().stream()
-                .min(Comparator
-                    .comparingInt((SearchState state) -> state.score().weightedTotal())
-                    .thenComparingInt(SearchState::depth)
-                    .thenComparing(SearchState::expression)
-                    .thenComparing(this::rulePathSignature))
-                .orElseThrow();
-            int improvement = scorer.score(observation.rootExpression()).weightedTotal()
-                - representative.score().weightedTotal();
-            if (improvement <= 0) {
-                continue;
-            }
-            List<PathEvidence> paths = distinctPaths.values().stream()
-                .map(this::pathEvidence)
-                .sorted(Comparator.comparing(PathEvidence::pathId))
-                .toList();
-            String competition = paths.stream()
-                .map(path -> String.join(">", path.ruleIds()))
-                .sorted()
-                .collect(Collectors.joining("||"));
-            ExpressionFingerprint input = ExpressionFingerprint.of(
-                observation.rootExpression(), canonicalizer);
-            ExpressionFingerprint output = ExpressionFingerprint.of(
-                representative.expression(), canonicalizer);
-            candidates.add(new ConvergenceCandidate(
-                new ConvergenceEvidence(
-                    observation.observationId(),
-                    observation.family(),
-                    observation.rootExpression(),
-                    representative.expression(),
-                    entry.getKey(),
-                    improvement,
-                    input.alphaShapeHash() + "->" + output.alphaShapeHash(),
-                    input.valueHash() + "->" + output.valueHash(),
-                    competition,
-                    paths),
-                representative.score().weightedTotal()));
         }
         return candidates.stream()
             .sorted(Comparator
                 .comparingInt((ConvergenceCandidate candidate) -> -candidate.evidence().scoreImprovement())
                 .thenComparingInt(ConvergenceCandidate::outputScore)
-                .thenComparing(candidate -> candidate.evidence().canonicalOutputHash()))
+                .thenComparing(candidate -> candidate.evidence().canonicalOutputHash())
+                .thenComparing(candidate -> candidate.evidence().outputExpression()))
             .map(ConvergenceCandidate::evidence)
             .findFirst();
+    }
+
+    private void addCandidate(
+        OpenTargetObservation observation,
+        String canonicalOutputHash,
+        List<SearchState> outputStates,
+        List<ConvergenceCandidate> candidates
+    ) {
+        Map<String, SearchState> distinctPaths = new LinkedHashMap<>();
+        outputStates.stream()
+            .sorted(Comparator.comparingInt(SearchState::depth).thenComparing(this::rulePathSignature))
+            .forEach(state -> distinctPaths.putIfAbsent(rulePathSignature(state), state));
+        if (distinctPaths.size() < 2) {
+            return;
+        }
+        SearchState representative = distinctPaths.values().stream()
+            .min(Comparator
+                .comparingInt(SearchState::depth)
+                .thenComparingInt(state -> state.score().weightedTotal())
+                .thenComparing(this::rulePathSignature))
+            .orElseThrow();
+        int improvement = scorer.score(observation.rootExpression()).weightedTotal()
+            - representative.score().weightedTotal();
+        if (improvement <= 0) {
+            return;
+        }
+        List<PathEvidence> paths = distinctPaths.values().stream()
+            .map(this::pathEvidence)
+            .sorted(Comparator.comparing(PathEvidence::pathId))
+            .toList();
+        String competition = paths.stream()
+            .map(path -> String.join(">", path.ruleIds()))
+            .sorted()
+            .collect(Collectors.joining("||"));
+        ExpressionFingerprint input = ExpressionFingerprint.of(
+            observation.rootExpression(), canonicalizer);
+        ExpressionFingerprint output = ExpressionFingerprint.of(
+            representative.expression(), canonicalizer);
+        candidates.add(new ConvergenceCandidate(
+            new ConvergenceEvidence(
+                observation.observationId(),
+                observation.family(),
+                observation.searchStatus(),
+                observation.rootExpression(),
+                representative.expression(),
+                canonicalOutputHash,
+                improvement,
+                input.alphaShapeHash() + "->" + output.alphaShapeHash(),
+                input.valueHash() + "->" + output.valueHash(),
+                competition,
+                paths),
+            representative.score().weightedTotal()));
     }
 
     private boolean eligiblePath(SearchState state) {
@@ -264,6 +284,10 @@ public final class OpenTargetConjectureMiner {
                 .comparingInt(PathEvidence::depth)
                 .thenComparing(PathEvidence::pathId))
             .orElseThrow();
+        if (!normalize(representative.expressions().getLast())
+                .equals(normalize(evidence.outputExpression()))) {
+            throw new IllegalStateException("convergence path does not end at its reported output");
+        }
         return new SuccessfulTransformationPath(
             "open-target-" + evidence.observationId(),
             evidence.inputExpression(),
@@ -305,6 +329,10 @@ public final class OpenTargetConjectureMiner {
         return "open-target-conjecture-" + sha256(material).substring(0, 20);
     }
 
+    private static String normalize(String expression) {
+        return expression == null ? "" : expression.trim().replaceAll("\\s+", " ");
+    }
+
     private static String sha256(String value) {
         try {
             return java.util.HexFormat.of().formatHex(
@@ -319,6 +347,7 @@ public final class OpenTargetConjectureMiner {
         String observationId,
         String family,
         String rootExpression,
+        GoalStatus searchStatus,
         List<SearchState> exploredStates
     ) {
         public OpenTargetObservation {
@@ -328,8 +357,27 @@ public final class OpenTargetConjectureMiner {
             if (rootExpression == null || rootExpression.isBlank()) {
                 throw new IllegalArgumentException("rootExpression must not be blank");
             }
+            if (searchStatus != GoalStatus.UNTARGETED) {
+                throw new IllegalArgumentException(
+                    "open-target observations require GoalStatus.UNTARGETED");
+            }
             family = family == null ? "" : family;
             exploredStates = exploredStates == null ? List.of() : List.copyOf(exploredStates);
+        }
+
+        public static OpenTargetObservation from(
+            String observationId,
+            String postHocFamily,
+            String rootExpression,
+            GoalSearchResult result
+        ) {
+            Objects.requireNonNull(result, "result");
+            return new OpenTargetObservation(
+                observationId,
+                postHocFamily,
+                rootExpression,
+                result.status(),
+                result.states());
         }
     }
 
@@ -375,6 +423,7 @@ public final class OpenTargetConjectureMiner {
     public record ConvergenceEvidence(
         String observationId,
         String family,
+        GoalStatus searchStatus,
         String inputExpression,
         String outputExpression,
         String canonicalOutputHash,
@@ -386,6 +435,9 @@ public final class OpenTargetConjectureMiner {
     ) {
         public ConvergenceEvidence {
             family = family == null ? "" : family;
+            if (searchStatus != GoalStatus.UNTARGETED) {
+                throw new IllegalArgumentException("convergence evidence must come from untargeted search");
+            }
             paths = paths == null ? List.of() : List.copyOf(paths);
         }
     }
