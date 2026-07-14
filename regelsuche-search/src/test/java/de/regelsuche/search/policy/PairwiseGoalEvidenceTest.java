@@ -66,20 +66,22 @@ class PairwiseGoalEvidenceTest {
     }
 
     @Test
-    void trainerLearnsTargetReachedOnlyFromRealCandidateCompetition() {
+    void trainerLearnsTerminalTargetAgainstAnEarlierRunAlternative() {
         SearchTrajectoryCollector collector = new SearchTrajectoryCollector();
-        TransformationEngine engine = expression -> expression.equals("x ^ 2 * x ^ 2")
-            ? List.of(
-                step("train-target", "x ^ 4"),
-                step("train-alternative", "(x ^ 2) ^ 2"))
-            : List.of();
+        TransformationEngine engine = expression -> switch (expression) {
+            case "r" -> List.of(
+                step("train-progress", "p"),
+                step("train-alternative", "dead"));
+            case "p" -> List.of(step("train-target", "q"));
+            default -> List.of();
+        };
         SearchProblem problem = new SearchProblem(
-            "x ^ 2 * x ^ 2",
+            "r",
             engine,
             scorer,
             canonicalizer,
-            new SearchHeuristic(2, 20, 1, 2, 10, 10))
-            .withTarget(SearchTarget.syntaxExact("x ^ 4"))
+            new SearchHeuristic(3, 20, 1, 2, 10, 10))
+            .withTarget(SearchTarget.syntaxExact("q"))
             .withObserver(collector);
         var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
         assertTrue(result.reached(), result.toString());
@@ -90,7 +92,7 @@ class PairwiseGoalEvidenceTest {
                 "train-pairwise-goal",
                 "goal-family",
                 "pairwise-goal-test/v1",
-                List.of("train-target", "train-alternative"),
+                List.of("train-progress", "train-alternative", "train-target"),
                 DatasetSplit.TRAIN));
 
         DescriptorPolicyModel model = new DescriptorPolicyTrainer().train(
