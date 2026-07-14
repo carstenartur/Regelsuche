@@ -1,0 +1,589 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeterministicCampaignPlanner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">DeterministicCampaignPlanner.java</span></div><h1>DeterministicCampaignPlanner.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.experiments.autopilot.AutonomousResearchBrief.AllocationPolicy;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBrief.EvidenceStage;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBrief.ResourceKind;
+import de.regelsuche.experiments.autopilot.CampaignBudgetLedger.BudgetLine;
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+
+/**
+ * Produces a deterministic, non-executing allocation plan for existing
+ * discovery/evidence stages.
+ */
+<span class="fc" id="L24">public final class DeterministicCampaignPlanner {</span>
+    public static final String SCHEMA = &quot;regelsuche.autonomous-campaign-plan/v1&quot;;
+
+    public AllocationPlan plan(
+        AutonomousResearchBrief brief,
+        CampaignBudgetLedger ledger,
+        List&lt;BranchSnapshot&gt; suppliedBranches
+    ) {
+<span class="fc" id="L32">        Objects.requireNonNull(brief, &quot;brief&quot;);</span>
+<span class="fc" id="L33">        Objects.requireNonNull(ledger, &quot;ledger&quot;);</span>
+<span class="fc" id="L34">        ledger.validateAgainst(brief);</span>
+<span class="fc" id="L35">        List&lt;BranchSnapshot&gt; branches = orderedBranches(brief, suppliedBranches);</span>
+<span class="fc" id="L36">        ensureUniqueBranchIds(branches);</span>
+
+<span class="fc" id="L38">        Map&lt;LineKey, Long&gt; remaining = remainingByLine(ledger);</span>
+<span class="fc" id="L39">        Map&lt;LineKey, Long&gt; planned = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L40">        List&lt;AllocationDecision&gt; decisions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (BranchSnapshot branch : branches) {</span>
+<span class="fc" id="L42">            decisions.add(decide(brief, branch, remaining, planned));</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">        List&lt;PlannedBudget&gt; plannedBudget = planned.entrySet().stream()</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            .filter(entry -&gt; entry.getValue() &gt; 0L)</span>
+<span class="fc" id="L46">            .map(entry -&gt; new PlannedBudget(</span>
+<span class="fc" id="L47">                entry.getKey().stage(), entry.getKey().resource(), entry.getValue()))</span>
+<span class="fc" id="L48">            .toList();</span>
+<span class="fc" id="L49">        validatePlanWithinLedger(plannedBudget, ledger);</span>
+<span class="fc" id="L50">        String contentHash = AutonomousResearchBrief.hash(canonicalMaterial(</span>
+            brief, ledger, decisions, plannedBudget));
+<span class="fc" id="L52">        return new AllocationPlan(</span>
+            SCHEMA,
+<span class="fc" id="L54">            brief.contentHash(),</span>
+<span class="fc" id="L55">            ledger.contentHash(),</span>
+<span class="fc" id="L56">            brief.allocationPolicy(),</span>
+            decisions,
+            plannedBudget,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    private static AllocationDecision decide(
+        AutonomousResearchBrief brief,
+        BranchSnapshot branch,
+        Map&lt;LineKey, Long&gt; remaining,
+        Map&lt;LineKey, Long&gt; planned
+    ) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (branch.status().hardStopped()) {</span>
+<span class="fc" id="L72">            return AllocationDecision.stop(</span>
+                branch,
+<span class="fc" id="L74">                &quot;hard-stop=&quot; + branch.status().name(),</span>
+<span class="fc" id="L75">                List.of(&quot;no additional generation or evidence budget&quot;));</span>
+        }
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (branch.mandatoryEvidenceComplete()) {</span>
+<span class="nc" id="L78">            return AllocationDecision.noAction(</span>
+                branch,
+                &quot;mandatory evidence already complete&quot;);
+        }
+<span class="fc" id="L82">        Optional&lt;EvidenceStage&gt; nextStage = branch.nextMissingStage(brief.enabledStages());</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (nextStage.isEmpty()) {</span>
+<span class="nc" id="L84">            return AllocationDecision.stop(</span>
+                branch,
+                &quot;mandatory-stage-not-enabled&quot;,
+<span class="nc" id="L87">                List.of(&quot;brief and branch mandatory stages are inconsistent&quot;));</span>
+        }
+<span class="fc" id="L89">        EvidenceStage stage = nextStage.orElseThrow();</span>
+<span class="fc" id="L90">        List&lt;BudgetDelta&gt; requested = requestedBudget(stage);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!canAllocate(requested, remaining, planned)) {</span>
+<span class="nc" id="L92">            return AllocationDecision.stop(</span>
+                branch,
+<span class="nc" id="L94">                &quot;budget-exhausted=&quot; + stage.name(),</span>
+<span class="nc" id="L95">                requested.stream()</span>
+<span class="nc" id="L96">                    .map(delta -&gt; delta.resource().name() + '=' + delta.amount())</span>
+<span class="nc" id="L97">                    .toList());</span>
+        }
+<span class="fc" id="L99">        requested.forEach(delta -&gt; planned.merge(</span>
+<span class="fc" id="L100">            new LineKey(stage, delta.resource()), delta.amount(), Math::addExact));</span>
+<span class="fc" id="L101">        return AllocationDecision.allocate(</span>
+            branch,
+            stage,
+            requested,
+<span class="fc" id="L105">            allocationReason(brief, branch, stage));</span>
+    }
+
+    private static String allocationReason(
+        AutonomousResearchBrief brief,
+        BranchSnapshot branch,
+        EvidenceStage stage
+    ) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        String interestingness = branch.interestingnessPermille() &lt; 0</span>
+<span class="fc" id="L114">            ? &quot;NOT_EVALUATED&quot;</span>
+<span class="fc" id="L115">            : Integer.toString(branch.interestingnessPermille());</span>
+<span class="fc" id="L116">        return &quot;policy=&quot; + brief.allocationPolicy().name()</span>
+<span class="fc" id="L117">            + &quot;;missingStage=&quot; + stage.name()</span>
+<span class="fc" id="L118">            + &quot;;supportDiversity=&quot; + branch.supportDiversity()</span>
+<span class="fc" id="L119">            + &quot;;counterexampleRisk=&quot; + branch.counterexampleRiskPermille()</span>
+            + &quot;;interestingness=&quot; + interestingness;
+    }
+
+    private static List&lt;BudgetDelta&gt; requestedBudget(EvidenceStage stage) {
+<span class="pc bpc" id="L124" title="3 of 5 branches missed.">        return switch (stage) {</span>
+<span class="nc" id="L125">            case GENERATION -&gt; List.of(</span>
+                new BudgetDelta(ResourceKind.WALL_CLOCK_MILLIS, 1000L),
+                new BudgetDelta(ResourceKind.GENERATED_STATES, 100L),
+                new BudgetDelta(ResourceKind.EXPLORED_STATES, 50L));
+<span class="nc" id="L129">            case CANDIDATE_FORMATION -&gt; List.of(</span>
+                new BudgetDelta(ResourceKind.WALL_CLOCK_MILLIS, 250L),
+                new BudgetDelta(ResourceKind.CANDIDATES, 1L));
+<span class="fc" id="L132">            case VALIDATION -&gt; List.of(</span>
+                new BudgetDelta(ResourceKind.WALL_CLOCK_MILLIS, 250L),
+                new BudgetDelta(ResourceKind.VALIDATION_CHECKS, 1L));
+<span class="nc" id="L135">            case COUNTEREXAMPLE_SEARCH -&gt; List.of(</span>
+                new BudgetDelta(ResourceKind.WALL_CLOCK_MILLIS, 250L),
+                new BudgetDelta(ResourceKind.COUNTEREXAMPLE_ATTEMPTS, 1L));
+<span class="fc" id="L138">            case PROOF -&gt; List.of(</span>
+                new BudgetDelta(ResourceKind.WALL_CLOCK_MILLIS, 1000L),
+                new BudgetDelta(ResourceKind.PROOF_ATTEMPTS, 1L));
+        };
+    }
+
+    private static boolean canAllocate(
+        List&lt;BudgetDelta&gt; requested,
+        Map&lt;LineKey, Long&gt; remaining,
+        Map&lt;LineKey, Long&gt; planned
+    ) {
+<span class="fc" id="L149">        EvidenceStage stage = requestedStage(requested, remaining);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (BudgetDelta delta : requested) {</span>
+<span class="fc" id="L151">            LineKey key = new LineKey(stage, delta.resource());</span>
+<span class="fc" id="L152">            long available = remaining.getOrDefault(key, 0L)</span>
+<span class="fc" id="L153">                - planned.getOrDefault(key, 0L);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (available &lt; delta.amount()) {</span>
+<span class="nc" id="L155">                return false;</span>
+            }
+<span class="fc" id="L157">        }</span>
+<span class="fc" id="L158">        return true;</span>
+    }
+
+    private static EvidenceStage requestedStage(
+        List&lt;BudgetDelta&gt; requested,
+        Map&lt;LineKey, Long&gt; remaining
+    ) {
+<span class="fc" id="L165">        return remaining.keySet().stream()</span>
+<span class="fc" id="L166">            .map(LineKey::stage)</span>
+<span class="fc" id="L167">            .filter(stage -&gt; requested.stream().allMatch(delta -&gt;</span>
+<span class="fc" id="L168">                remaining.containsKey(new LineKey(stage, delta.resource()))))</span>
+<span class="fc" id="L169">            .findFirst()</span>
+<span class="pc" id="L170">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;requested budget resources do not belong to one configured stage&quot;));
+    }
+
+    private static Map&lt;LineKey, Long&gt; remainingByLine(CampaignBudgetLedger ledger) {
+<span class="fc" id="L175">        Map&lt;LineKey, Long&gt; remaining = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L176">        ledger.lines().forEach(line -&gt; remaining.put(</span>
+<span class="fc" id="L177">            new LineKey(line.stage(), line.resource()), line.remaining()));</span>
+<span class="fc" id="L178">        return remaining;</span>
+    }
+
+    private static void validatePlanWithinLedger(
+        List&lt;PlannedBudget&gt; planned,
+        CampaignBudgetLedger ledger
+    ) {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (PlannedBudget item : planned) {</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            if (item.amount() &gt; ledger.remaining(item.stage(), item.resource())) {</span>
+<span class="nc" id="L187">                throw new IllegalStateException(</span>
+                    &quot;planned allocation exceeds factual ledger remaining budget&quot;);
+            }
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">    }</span>
+
+    private static List&lt;BranchSnapshot&gt; orderedBranches(
+        AutonomousResearchBrief brief,
+        List&lt;BranchSnapshot&gt; supplied
+    ) {
+<span class="fc" id="L197">        Objects.requireNonNull(supplied, &quot;branches&quot;);</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (supplied.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L199">            throw new IllegalArgumentException(&quot;branches must not contain null&quot;);</span>
+        }
+<span class="pc bpc" id="L201" title="3 of 4 branches missed.">        Comparator&lt;BranchSnapshot&gt; comparator = switch (brief.allocationPolicy()) {</span>
+<span class="nc" id="L202">            case ROUND_ROBIN -&gt; Comparator</span>
+<span class="nc" id="L203">                .comparing((BranchSnapshot branch) -&gt; seededKey(</span>
+<span class="nc" id="L204">                    brief.deterministicSeed(), branch.branchId()))</span>
+<span class="nc" id="L205">                .thenComparing(BranchSnapshot::branchId);</span>
+<span class="fc" id="L206">            case EVIDENCE_COMPLETION_FIRST -&gt; Comparator</span>
+<span class="fc" id="L207">                .comparingInt(BranchSnapshot::missingMandatoryStageCount)</span>
+<span class="fc" id="L208">                .thenComparing(Comparator.comparingInt(</span>
+<span class="fc" id="L209">                    BranchSnapshot::supportDiversity).reversed())</span>
+<span class="fc" id="L210">                .thenComparing(BranchSnapshot::branchId);</span>
+<span class="nc" id="L211">            case COUNTEREXAMPLE_RISK_FIRST -&gt; Comparator</span>
+<span class="nc" id="L212">                .comparingInt(BranchSnapshot::counterexampleRiskPermille)</span>
+<span class="nc" id="L213">                .reversed()</span>
+<span class="nc" id="L214">                .thenComparingInt(BranchSnapshot::missingMandatoryStageCount)</span>
+<span class="nc" id="L215">                .thenComparing(BranchSnapshot::branchId);</span>
+<span class="nc" id="L216">            case BALANCED -&gt; Comparator</span>
+<span class="nc" id="L217">                .comparingInt(DeterministicCampaignPlanner::balancedPriority)</span>
+<span class="nc" id="L218">                .reversed()</span>
+<span class="pc" id="L219">                .thenComparing(BranchSnapshot::branchId);</span>
+        };
+<span class="fc" id="L221">        return supplied.stream().sorted(comparator).toList();</span>
+    }
+
+    private static int balancedPriority(BranchSnapshot branch) {
+<span class="nc" id="L225">        int interestingness = Math.max(0, branch.interestingnessPermille());</span>
+<span class="nc" id="L226">        return branch.supportDiversity() * 200</span>
+<span class="nc" id="L227">            + branch.counterexampleRiskPermille() / 4</span>
+            + interestingness / 4
+<span class="nc" id="L229">            - branch.missingMandatoryStageCount() * 150;</span>
+    }
+
+    private static String seededKey(long seed, String branchId) {
+<span class="nc" id="L233">        return AutonomousResearchBrief.hash(seed + &quot;|&quot; + branchId);</span>
+    }
+
+    private static void ensureUniqueBranchIds(List&lt;BranchSnapshot&gt; branches) {
+<span class="fc" id="L237">        long distinct = branches.stream().map(BranchSnapshot::branchId).distinct().count();</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (distinct != branches.size()) {</span>
+<span class="nc" id="L239">            throw new IllegalArgumentException(&quot;branch IDs must be unique&quot;);</span>
+        }
+<span class="fc" id="L241">    }</span>
+
+    private static String canonicalMaterial(
+        AutonomousResearchBrief brief,
+        CampaignBudgetLedger ledger,
+        List&lt;AllocationDecision&gt; decisions,
+        List&lt;PlannedBudget&gt; planned
+    ) {
+<span class="fc" id="L249">        StringBuilder material = new StringBuilder(SCHEMA)</span>
+<span class="fc" id="L250">            .append(&quot;\nbrief=&quot;).append(brief.contentHash())</span>
+<span class="fc" id="L251">            .append(&quot;\nledger=&quot;).append(ledger.contentHash())</span>
+<span class="fc" id="L252">            .append(&quot;\npolicy=&quot;).append(brief.allocationPolicy().name());</span>
+<span class="fc" id="L253">        decisions.forEach(decision -&gt; material.append(&quot;\ndecision=&quot;)</span>
+<span class="fc" id="L254">            .append(decision.canonicalMaterial()));</span>
+<span class="fc" id="L255">        planned.forEach(item -&gt; material.append(&quot;\nplanned=&quot;)</span>
+<span class="fc" id="L256">            .append(item.canonicalMaterial()));</span>
+<span class="fc" id="L257">        return material.toString();</span>
+    }
+
+<span class="fc" id="L260">    public enum BranchStatus {</span>
+<span class="fc" id="L261">        NEW(false),</span>
+<span class="fc" id="L262">        ELIGIBLE_INCOMPLETE(false),</span>
+<span class="fc" id="L263">        COMPLETE_EVIDENCE(false),</span>
+<span class="fc" id="L264">        DUPLICATE(true),</span>
+<span class="fc" id="L265">        DISPROVED(true),</span>
+<span class="fc" id="L266">        UNSAFE(true),</span>
+<span class="fc" id="L267">        PERSISTENTLY_WEAK(true);</span>
+
+        private final boolean hardStopped;
+
+<span class="fc" id="L271">        BranchStatus(boolean hardStopped) {</span>
+<span class="fc" id="L272">            this.hardStopped = hardStopped;</span>
+<span class="fc" id="L273">        }</span>
+
+        public boolean hardStopped() {
+<span class="fc" id="L276">            return hardStopped;</span>
+        }
+    }
+
+<span class="fc" id="L280">    public enum DecisionKind {</span>
+<span class="fc" id="L281">        ALLOCATE,</span>
+<span class="fc" id="L282">        STOP,</span>
+<span class="fc" id="L283">        NO_ACTION</span>
+    }
+
+    public record BranchSnapshot(
+        String branchId,
+        String familyId,
+        BranchStatus status,
+        Set&lt;EvidenceStage&gt; mandatoryStages,
+        Set&lt;EvidenceStage&gt; completedStages,
+        int supportDiversity,
+        int counterexampleRiskPermille,
+        int interestingnessPermille,
+        String snapshotHash
+    ) {
+<span class="fc" id="L297">        public BranchSnapshot {</span>
+<span class="fc" id="L298">            requireText(branchId, &quot;branchId&quot;);</span>
+<span class="fc" id="L299">            requireText(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L300">            status = Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L301">            mandatoryStages = immutableStages(mandatoryStages, &quot;mandatoryStages&quot;);</span>
+<span class="fc" id="L302">            completedStages = immutableStages(completedStages, &quot;completedStages&quot;);</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (!mandatoryStages.containsAll(completedStages)) {</span>
+<span class="nc" id="L304">                throw new IllegalArgumentException(</span>
+                    &quot;completed stages must be a subset of mandatory stages&quot;);
+            }
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            if (supportDiversity &lt; 0) {</span>
+<span class="nc" id="L308">                throw new IllegalArgumentException(&quot;supportDiversity must be non-negative&quot;);</span>
+            }
+<span class="fc" id="L310">            requirePermille(counterexampleRiskPermille, &quot;counterexampleRiskPermille&quot;);</span>
+<span class="pc bpc" id="L311" title="2 of 4 branches missed.">            if (interestingnessPermille &lt; -1 || interestingnessPermille &gt; 1000) {</span>
+<span class="nc" id="L312">                throw new IllegalArgumentException(</span>
+                    &quot;interestingnessPermille must be -1 or in [0,1000]&quot;);
+            }
+<span class="fc" id="L315">            requireSha256(snapshotHash, &quot;snapshotHash&quot;);</span>
+<span class="fc" id="L316">        }</span>
+
+        public static BranchSnapshot create(
+            String branchId,
+            String familyId,
+            BranchStatus status,
+            Set&lt;EvidenceStage&gt; mandatoryStages,
+            Set&lt;EvidenceStage&gt; completedStages,
+            int supportDiversity,
+            int counterexampleRiskPermille,
+            int interestingnessPermille
+        ) {
+<span class="fc" id="L328">            Set&lt;EvidenceStage&gt; mandatory = immutableStages(</span>
+                mandatoryStages, &quot;mandatoryStages&quot;);
+<span class="fc" id="L330">            Set&lt;EvidenceStage&gt; completed = immutableStages(</span>
+                completedStages, &quot;completedStages&quot;);
+<span class="fc" id="L332">            String hash = AutonomousResearchBrief.hash(</span>
+<span class="fc" id="L333">                branchId + '|' + familyId + '|' + status.name() + '|'</span>
+<span class="fc" id="L334">                    + mandatory.stream().map(Enum::name).sorted().toList() + '|'</span>
+<span class="fc" id="L335">                    + completed.stream().map(Enum::name).sorted().toList() + '|'</span>
+                    + supportDiversity + '|' + counterexampleRiskPermille + '|'
+                    + interestingnessPermille);
+<span class="fc" id="L338">            return new BranchSnapshot(</span>
+                branchId,
+                familyId,
+                status,
+                mandatory,
+                completed,
+                supportDiversity,
+                counterexampleRiskPermille,
+                interestingnessPermille,
+                hash);
+        }
+
+        boolean mandatoryEvidenceComplete() {
+<span class="fc" id="L351">            return completedStages.containsAll(mandatoryStages);</span>
+        }
+
+        int missingMandatoryStageCount() {
+<span class="fc" id="L355">            return (int) mandatoryStages.stream()</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">                .filter(stage -&gt; !completedStages.contains(stage))</span>
+<span class="fc" id="L357">                .count();</span>
+        }
+
+        Optional&lt;EvidenceStage&gt; nextMissingStage(Set&lt;EvidenceStage&gt; enabledStages) {
+<span class="fc" id="L361">            return mandatoryStages.stream()</span>
+<span class="fc" id="L362">                .filter(enabledStages::contains)</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                .filter(stage -&gt; !completedStages.contains(stage))</span>
+<span class="fc" id="L364">                .sorted()</span>
+<span class="fc" id="L365">                .findFirst();</span>
+        }
+    }
+
+    public record BudgetDelta(ResourceKind resource, long amount) {
+<span class="fc" id="L370">        public BudgetDelta {</span>
+<span class="fc" id="L371">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">            if (amount &lt;= 0L) {</span>
+<span class="nc" id="L373">                throw new IllegalArgumentException(&quot;planned budget amount must be positive&quot;);</span>
+            }
+<span class="fc" id="L375">        }</span>
+    }
+
+    public record AllocationDecision(
+        String branchId,
+        String branchSnapshotHash,
+        DecisionKind kind,
+        String stage,
+        List&lt;BudgetDelta&gt; budgetDeltas,
+        String reason,
+        List&lt;String&gt; constraints
+    ) {
+<span class="fc" id="L387">        public AllocationDecision {</span>
+<span class="fc" id="L388">            requireText(branchId, &quot;branchId&quot;);</span>
+<span class="fc" id="L389">            requireSha256(branchSnapshotHash, &quot;branchSnapshotHash&quot;);</span>
+<span class="fc" id="L390">            kind = Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L391">            requireText(stage, &quot;stage&quot;);</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">            budgetDeltas = budgetDeltas == null</span>
+<span class="nc" id="L393">                ? List.of()</span>
+<span class="fc" id="L394">                : budgetDeltas.stream()</span>
+<span class="fc" id="L395">                    .sorted(Comparator.comparing(BudgetDelta::resource))</span>
+<span class="fc" id="L396">                    .toList();</span>
+<span class="fc" id="L397">            requireText(reason, &quot;reason&quot;);</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            constraints = constraints == null</span>
+<span class="nc" id="L399">                ? List.of()</span>
+<span class="fc" id="L400">                : constraints.stream().filter(Objects::nonNull).distinct().sorted().toList();</span>
+<span class="pc bpc" id="L401" title="1 of 4 branches missed.">            if (kind == DecisionKind.ALLOCATE &amp;&amp; budgetDeltas.isEmpty()) {</span>
+<span class="nc" id="L402">                throw new IllegalArgumentException(&quot;allocation requires budget deltas&quot;);</span>
+            }
+<span class="pc bpc" id="L404" title="1 of 4 branches missed.">            if (kind != DecisionKind.ALLOCATE &amp;&amp; !budgetDeltas.isEmpty()) {</span>
+<span class="nc" id="L405">                throw new IllegalArgumentException(&quot;non-allocation decision cannot consume budget&quot;);</span>
+            }
+<span class="fc" id="L407">        }</span>
+
+        static AllocationDecision allocate(
+            BranchSnapshot branch,
+            EvidenceStage stage,
+            List&lt;BudgetDelta&gt; deltas,
+            String reason
+        ) {
+<span class="fc" id="L415">            return new AllocationDecision(</span>
+<span class="fc" id="L416">                branch.branchId(),</span>
+<span class="fc" id="L417">                branch.snapshotHash(),</span>
+                DecisionKind.ALLOCATE,
+<span class="fc" id="L419">                stage.name(),</span>
+                deltas,
+                reason,
+<span class="fc" id="L422">                List.of(&quot;hard-eligibility-preserved&quot;, &quot;no-target-input&quot;));</span>
+        }
+
+        static AllocationDecision stop(
+            BranchSnapshot branch,
+            String reason,
+            List&lt;String&gt; constraints
+        ) {
+<span class="fc" id="L430">            return new AllocationDecision(</span>
+<span class="fc" id="L431">                branch.branchId(),</span>
+<span class="fc" id="L432">                branch.snapshotHash(),</span>
+                DecisionKind.STOP,
+                &quot;NOT_APPLICABLE&quot;,
+<span class="fc" id="L435">                List.of(),</span>
+                reason,
+                constraints);
+        }
+
+        static AllocationDecision noAction(BranchSnapshot branch, String reason) {
+<span class="nc" id="L441">            return new AllocationDecision(</span>
+<span class="nc" id="L442">                branch.branchId(),</span>
+<span class="nc" id="L443">                branch.snapshotHash(),</span>
+                DecisionKind.NO_ACTION,
+                &quot;NOT_APPLICABLE&quot;,
+<span class="nc" id="L446">                List.of(),</span>
+                reason,
+<span class="nc" id="L448">                List.of(&quot;planner-does-not-accept-or-promote&quot;));</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L452">            return branchId + '|' + branchSnapshotHash + '|' + kind.name() + '|'</span>
+                + stage + '|' + budgetDeltas + '|' + reason + '|' + constraints;
+        }
+    }
+
+    public record PlannedBudget(
+        EvidenceStage stage,
+        ResourceKind resource,
+        long amount
+    ) {
+<span class="fc" id="L462">        public PlannedBudget {</span>
+<span class="fc" id="L463">            Objects.requireNonNull(stage, &quot;stage&quot;);</span>
+<span class="fc" id="L464">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">            if (amount &lt;= 0L) {</span>
+<span class="nc" id="L466">                throw new IllegalArgumentException(&quot;planned amount must be positive&quot;);</span>
+            }
+<span class="fc" id="L468">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L471">            return stage.name() + '|' + resource.name() + '|' + amount;</span>
+        }
+    }
+
+    public record AllocationPlan(
+        String schema,
+        String briefHash,
+        String ledgerHash,
+        AllocationPolicy policy,
+        List&lt;AllocationDecision&gt; decisions,
+        List&lt;PlannedBudget&gt; plannedBudget,
+        boolean plannerDecisionIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L487">        public AllocationPlan {</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L489">                throw new IllegalArgumentException(&quot;unsupported campaign plan schema&quot;);</span>
+            }
+<span class="fc" id="L491">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="fc" id="L492">            requireSha256(ledgerHash, &quot;ledgerHash&quot;);</span>
+<span class="fc" id="L493">            policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">            decisions = decisions == null ? List.of() : List.copyOf(decisions);</span>
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">            plannedBudget = plannedBudget == null</span>
+<span class="nc" id="L496">                ? List.of()</span>
+<span class="fc" id="L497">                : plannedBudget.stream()</span>
+<span class="fc" id="L498">                    .sorted(Comparator.comparing(PlannedBudget::stage)</span>
+<span class="fc" id="L499">                        .thenComparing(PlannedBudget::resource))</span>
+<span class="fc" id="L500">                    .toList();</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">            if (plannerDecisionIsMathematicalEvidence) {</span>
+<span class="nc" id="L502">                throw new IllegalArgumentException(</span>
+                    &quot;planner decisions cannot be mathematical evidence&quot;);
+            }
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">            if (!&quot;NOT_EVALUATED&quot;.equals(promotionStatus)</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(publicEvidenceStatus)) {</span>
+<span class="nc" id="L507">                throw new IllegalArgumentException(</span>
+                    &quot;planner cannot perform promotion or public evidence&quot;);
+            }
+<span class="fc" id="L510">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L511">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L514">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L515">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L516">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L517">                .property(&quot;ledgerHash&quot;, ledgerHash)</span>
+<span class="fc" id="L518">                .property(&quot;policy&quot;, policy.name())</span>
+<span class="fc" id="L519">                .property(&quot;plannerDecisionIsMathematicalEvidence&quot;,</span>
+                    plannerDecisionIsMathematicalEvidence)
+<span class="fc" id="L521">                .array(&quot;decisions&quot;, array -&gt; decisions.forEach(decision -&gt;</span>
+<span class="fc" id="L522">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L523">                        .property(&quot;branchId&quot;, decision.branchId())</span>
+<span class="fc" id="L524">                        .property(&quot;branchSnapshotHash&quot;, decision.branchSnapshotHash())</span>
+<span class="fc" id="L525">                        .property(&quot;kind&quot;, decision.kind().name())</span>
+<span class="fc" id="L526">                        .property(&quot;stage&quot;, decision.stage())</span>
+<span class="fc" id="L527">                        .array(&quot;budgetDeltas&quot;, deltas -&gt; decision.budgetDeltas()</span>
+<span class="fc" id="L528">                            .forEach(delta -&gt; deltas.objectValue(item -&gt; item</span>
+<span class="fc" id="L529">                                .property(&quot;resource&quot;, delta.resource().name())</span>
+<span class="fc" id="L530">                                .property(&quot;amount&quot;, delta.amount()))))</span>
+<span class="fc" id="L531">                        .property(&quot;reason&quot;, decision.reason())</span>
+<span class="fc" id="L532">                        .stringArray(&quot;constraints&quot;, decision.constraints()))))</span>
+<span class="fc" id="L533">                .array(&quot;plannedBudget&quot;, array -&gt; plannedBudget.forEach(item -&gt;</span>
+<span class="fc" id="L534">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L535">                        .property(&quot;stage&quot;, item.stage().name())</span>
+<span class="fc" id="L536">                        .property(&quot;resource&quot;, item.resource().name())</span>
+<span class="fc" id="L537">                        .property(&quot;amount&quot;, item.amount()))))</span>
+<span class="fc" id="L538">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L539">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L540">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L541">                .endObject()</span>
+<span class="fc" id="L542">                .toString();</span>
+        }
+    }
+
+    private record LineKey(EvidenceStage stage, ResourceKind resource)
+            implements Comparable&lt;LineKey&gt; {
+<span class="fc" id="L548">        LineKey {</span>
+<span class="fc" id="L549">            Objects.requireNonNull(stage, &quot;stage&quot;);</span>
+<span class="fc" id="L550">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="fc" id="L551">        }</span>
+
+        @Override
+        public int compareTo(LineKey other) {
+<span class="fc" id="L555">            int stageOrder = stage.compareTo(other.stage);</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">            return stageOrder != 0 ? stageOrder : resource.compareTo(other.resource);</span>
+        }
+    }
+
+    private static Set&lt;EvidenceStage&gt; immutableStages(
+        Set&lt;EvidenceStage&gt; values,
+        String name
+    ) {
+<span class="fc" id="L564">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L565" title="2 of 4 branches missed.">        if (values.isEmpty() || values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L566">            throw new IllegalArgumentException(name + &quot; must not be empty or contain null&quot;);</span>
+        }
+<span class="fc" id="L568">        return Collections.unmodifiableSet(EnumSet.copyOf(values));</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L572" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L573">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L575">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L578" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L579">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L581">    }</span>
+
+    private static void requirePermille(int value, String name) {
+<span class="pc bpc" id="L584" title="2 of 4 branches missed.">        if (value &lt; 0 || value &gt; 1000) {</span>
+<span class="nc" id="L585">            throw new IllegalArgumentException(name + &quot; must be in [0,1000]&quot;);</span>
+        }
+<span class="fc" id="L587">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
