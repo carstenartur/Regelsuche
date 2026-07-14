@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1783792600991,
+  "lastUpdate": 1784022045390,
   "repoUrl": "https://github.com/carstenartur/Regelsuche",
   "entries": {
     "Regelsuche JMH Benchmarks": [
@@ -4398,6 +4398,90 @@ window.BENCHMARK_DATA = {
           {
             "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
             "value": 1031.7466342689622,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f1ff04223d1f5e3fa4c7c4916bcabe2c1c2c5fbb",
+          "message": "Scale the leak-free hidden-rule rediscovery benchmark to 20 cases\n\n* Scale the runtime-hidden corpus to twenty rediscovery cases\n\n* Add evaluation-only hidden references for the twenty-case corpus\n\n* Report scaled rediscovery and false-positive benchmark metrics\n\n* Validate the twenty-case hidden-rule benchmark report\n\n* Add the scaled hidden-rule benchmark evidence schema\n\n* Run the scaled hidden-rule evidence corpus once per JVM\n\n* Align two benchmark holdouts with learned associative pattern shape\n\n* Align hidden references with the corrected benchmark shapes\n\n* Separate deterministic benchmark evidence from runtime telemetry\n\n* Write deterministic cost evidence and non-canonical runtime telemetry\n\n* Add deterministic validation-cost fields to benchmark schema\n\n* Define the non-canonical hidden-rule runtime telemetry schema\n\n* Publish deterministic evidence and non-canonical runtime telemetry together\n\n* Require four mathematical families in the scaled benchmark\n\n* Distinguish configured from executable negative holdouts\n\n* Report configured and executed holdout coverage separately\n\n* Assert configured and executed holdout coverage separately\n\n* Make skipped benchmark holdouts explicit in the evidence schema",
+          "timestamp": "2026-07-14T10:38:07+02:00",
+          "tree_id": "6d8cb3ac9e3f06f0affe53933f6aa0bb26ba36e1",
+          "url": "https://github.com/carstenartur/Regelsuche/commit/f1ff04223d1f5e3fa4c7c4916bcabe2c1c2c5fbb"
+        },
+        "date": 1784022042611,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+            "value": 2.947858519052834,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+            "value": 8.12135055737177,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+            "value": 3535.338447010512,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+            "value": 5.816863882381134,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+            "value": 1709.4219448612537,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+            "value": 479.36006234418863,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+            "value": 2.029424103502557,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+            "value": 90.26760805799563,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+            "value": 195.2467131977331,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
+            "value": 1002.8765793022941,
             "unit": "us/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
