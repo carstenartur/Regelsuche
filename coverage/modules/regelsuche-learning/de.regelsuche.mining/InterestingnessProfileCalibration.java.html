@@ -1,0 +1,630 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessProfileCalibration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessProfileCalibration.java</span></div><h1>InterestingnessProfileCalibration.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.InterestingnessAssessment.ComponentContribution;
+import de.regelsuche.mining.InterestingnessAssessment.Eligibility;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusReport;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusSplit;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.FrozenCase;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+
+/**
+ * Selects an interestingness profile on CALIBRATION only and evaluates it once
+ * on structurally and family-held-out TEST cases.
+ */
+<span class="fc" id="L30">public final class InterestingnessProfileCalibration {</span>
+    public static final String SCHEMA = &quot;regelsuche.interestingness-profile-calibration/v1&quot;;
+<span class="fc" id="L32">    private static final List&lt;InterestingnessProfile&gt; V1_PROFILES = List.of(</span>
+        InterestingnessProfile.THEORY_DISCOVERY,
+        InterestingnessProfile.SEARCH_REUSE);
+<span class="fc" id="L35">    private static final List&lt;String&gt; PARETO_AXES = List.of(</span>
+        &quot;structuralSurprise&quot;,
+        &quot;crossFamilyTransfer&quot;,
+        &quot;pairedUtility&quot;,
+        &quot;reusability&quot;);
+
+    public CalibrationReport calibrate(
+        CorpusReport corpus,
+        List&lt;CaseProfiles&gt; suppliedProfiles
+    ) {
+<span class="fc" id="L45">        Objects.requireNonNull(corpus, &quot;corpus&quot;);</span>
+<span class="fc" id="L46">        List&lt;CaseProfiles&gt; profiles = orderedProfiles(suppliedProfiles);</span>
+<span class="fc" id="L47">        Map&lt;String, CaseProfiles&gt; byCaseId = validateAndIndex(corpus, profiles);</span>
+<span class="fc" id="L48">        List&lt;ScoredCase&gt; calibration = scoredCases(</span>
+<span class="fc" id="L49">            corpus.split(CorpusSplit.CALIBRATION), byCaseId);</span>
+<span class="fc" id="L50">        List&lt;ScoredCase&gt; test = scoredCases(corpus.split(CorpusSplit.TEST), byCaseId);</span>
+
+<span class="fc" id="L52">        List&lt;ProfileMetric&gt; metrics = profileMetrics(calibration, test);</span>
+<span class="fc" id="L53">        InterestingnessProfile selected = select(metrics);</span>
+<span class="fc" id="L54">        List&lt;RankedCase&gt; testRanking = ranking(test, selected);</span>
+<span class="fc" id="L55">        List&lt;String&gt; pareto = paretoFront(test, selected);</span>
+<span class="fc" id="L56">        Sensitivity sensitivity = sensitivity(calibration, test, selected);</span>
+<span class="fc" id="L57">        String selectionHash = hash(selectionMaterial(</span>
+            corpus, calibration, metrics, selected));
+<span class="fc" id="L59">        String contentHash = hash(reportMaterial(</span>
+            corpus,
+            selected,
+            metrics,
+            testRanking,
+            pareto,
+            sensitivity,
+            selectionHash));
+<span class="fc" id="L67">        return new CalibrationReport(</span>
+            SCHEMA,
+<span class="fc" id="L69">            corpus.predictiveCorpusHash(),</span>
+<span class="fc" id="L70">            corpus.labeledEvaluationHash(),</span>
+            selected,
+            metrics,
+            testRanking,
+            pareto,
+            sensitivity,
+            selectionHash,
+            contentHash);
+    }
+
+    private static List&lt;CaseProfiles&gt; orderedProfiles(
+        List&lt;CaseProfiles&gt; suppliedProfiles
+    ) {
+<span class="fc" id="L83">        Objects.requireNonNull(suppliedProfiles, &quot;suppliedProfiles&quot;);</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (suppliedProfiles.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;case profiles must not contain null&quot;);</span>
+        }
+<span class="fc" id="L87">        return suppliedProfiles.stream()</span>
+<span class="fc" id="L88">            .sorted(Comparator.comparing(CaseProfiles::caseId))</span>
+<span class="fc" id="L89">            .toList();</span>
+    }
+
+    private static Map&lt;String, CaseProfiles&gt; validateAndIndex(
+        CorpusReport corpus,
+        List&lt;CaseProfiles&gt; profiles
+    ) {
+<span class="fc" id="L96">        Map&lt;String, CaseProfiles&gt; byCaseId = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (CaseProfiles item : profiles) {</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (byCaseId.putIfAbsent(item.caseId(), item) != null) {</span>
+<span class="nc" id="L99">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L100">                    &quot;duplicate profile case: &quot; + item.caseId());</span>
+            }
+<span class="fc" id="L102">            validateProfilePair(item);</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">        Set&lt;String&gt; expected = corpus.cases().stream()</span>
+<span class="fc" id="L105">            .map(FrozenCase::caseId)</span>
+<span class="fc" id="L106">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (!expected.equals(new TreeSet&lt;&gt;(byCaseId.keySet()))) {</span>
+<span class="fc" id="L108">            throw new IllegalArgumentException(</span>
+                &quot;profile cases must match the frozen corpus exactly&quot;);
+        }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (FrozenCase item : corpus.cases()) {</span>
+<span class="fc" id="L112">            CaseProfiles caseProfiles = byCaseId.get(item.caseId());</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (!item.candidateId().equals(caseProfiles.candidateId())) {</span>
+<span class="nc" id="L114">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L115">                    &quot;candidate/profile mismatch for case: &quot; + item.caseId());</span>
+            }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (!item.assessmentContentHash().equals(</span>
+<span class="fc" id="L118">                    caseProfiles.theoryDiscovery().contentHash())) {</span>
+<span class="nc" id="L119">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L120">                    &quot;frozen baseline assessment mismatch for case: &quot; + item.caseId());</span>
+            }
+<span class="fc" id="L122">        }</span>
+<span class="fc" id="L123">        return Map.copyOf(byCaseId);</span>
+    }
+
+    private static void validateProfilePair(CaseProfiles item) {
+<span class="fc" id="L127">        InterestingnessAssessment theory = item.theoryDiscovery();</span>
+<span class="fc" id="L128">        InterestingnessAssessment reuse = item.searchReuse();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (!item.candidateId().equals(theory.candidateId())</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                || !item.candidateId().equals(reuse.candidateId())) {</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L132">                &quot;assessment candidate mismatch: &quot; + item.caseId());</span>
+        }
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (theory.profile() != InterestingnessProfile.THEORY_DISCOVERY</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                || reuse.profile() != InterestingnessProfile.SEARCH_REUSE) {</span>
+<span class="nc" id="L136">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L137">                &quot;both interestingness profiles are required: &quot; + item.caseId());</span>
+        }
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (!theory.evidence().equals(reuse.evidence())</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                || theory.eligibility() != reuse.eligibility()</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                || theory.proofStatus() != reuse.proofStatus()</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                || theory.counterexampleStatus() != reuse.counterexampleStatus()</span>
+<span class="fc" id="L143">                || theory.knownRuleSimilarityPermille()</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                    != reuse.knownRuleSimilarityPermille()</span>
+<span class="fc" id="L145">                || theory.evidenceCompletenessPermille()</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                    != reuse.evidenceCompletenessPermille()</span>
+<span class="fc" id="L147">                || theory.unresolvedRiskPenaltyPermille()</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                    != reuse.unresolvedRiskPenaltyPermille()</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                || theory.controlPenaltyPermille() != reuse.controlPenaltyPermille()</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                || !rawComponents(theory).equals(rawComponents(reuse))) {</span>
+<span class="fc" id="L151">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L152">                &quot;profile comparison must share identical raw evidence: &quot; + item.caseId());</span>
+        }
+<span class="fc" id="L154">    }</span>
+
+    private static Map&lt;String, Integer&gt; rawComponents(
+        InterestingnessAssessment assessment
+    ) {
+<span class="fc" id="L159">        Map&lt;String, Integer&gt; components = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L160">        assessment.contributions().forEach(contribution -&gt;</span>
+<span class="fc" id="L161">            components.put(contribution.name(), contribution.rawPermille()));</span>
+<span class="fc" id="L162">        return Map.copyOf(components);</span>
+    }
+
+    private static List&lt;ScoredCase&gt; scoredCases(
+        List&lt;FrozenCase&gt; cases,
+        Map&lt;String, CaseProfiles&gt; profiles
+    ) {
+<span class="fc" id="L169">        return cases.stream()</span>
+<span class="fc" id="L170">            .map(item -&gt; new ScoredCase(item, profiles.get(item.caseId())))</span>
+<span class="fc" id="L171">            .sorted(Comparator.comparing(item -&gt; item.frozenCase().caseId()))</span>
+<span class="fc" id="L172">            .toList();</span>
+    }
+
+    private static List&lt;ProfileMetric&gt; profileMetrics(
+        List&lt;ScoredCase&gt; calibration,
+        List&lt;ScoredCase&gt; test
+    ) {
+<span class="fc" id="L179">        List&lt;ProfileMetric&gt; metrics = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (InterestingnessProfile profile : V1_PROFILES) {</span>
+<span class="fc" id="L181">            metrics.add(new ProfileMetric(</span>
+                profile,
+<span class="fc" id="L183">                pairwiseLabelAgreement(calibration, profile),</span>
+<span class="fc" id="L184">                pairwiseLabelAgreement(test, profile)));</span>
+<span class="fc" id="L185">        }</span>
+<span class="fc" id="L186">        return List.copyOf(metrics);</span>
+    }
+
+    private static InterestingnessProfile select(List&lt;ProfileMetric&gt; metrics) {
+<span class="fc" id="L190">        InterestingnessProfile selected = V1_PROFILES.get(0);</span>
+<span class="fc" id="L191">        int best = -1;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (ProfileMetric metric : metrics) {</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (metric.calibrationAgreementPermille() &gt; best) {</span>
+<span class="fc" id="L194">                selected = metric.profile();</span>
+<span class="fc" id="L195">                best = metric.calibrationAgreementPermille();</span>
+            }
+<span class="fc" id="L197">        }</span>
+<span class="fc" id="L198">        return selected;</span>
+    }
+
+    private static int pairwiseLabelAgreement(
+        List&lt;ScoredCase&gt; cases,
+        InterestingnessProfile profile
+    ) {
+<span class="fc" id="L205">        int points = 0;</span>
+<span class="fc" id="L206">        int pairs = 0;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (int left = 0; left &lt; cases.size(); left++) {</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            for (int right = left + 1; right &lt; cases.size(); right++) {</span>
+<span class="fc" id="L209">                ScoredCase first = cases.get(left);</span>
+<span class="fc" id="L210">                ScoredCase second = cases.get(right);</span>
+<span class="fc" id="L211">                int desired = Integer.compare(</span>
+<span class="fc" id="L212">                    first.frozenCase().consensusRelevancePermille(),</span>
+<span class="fc" id="L213">                    second.frozenCase().consensusRelevancePermille());</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                if (desired == 0) {</span>
+<span class="nc" id="L215">                    continue;</span>
+                }
+<span class="fc" id="L217">                int actual = rankingDirection(</span>
+<span class="fc" id="L218">                    first.assessment(profile), second.assessment(profile));</span>
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">                points += actual == desired ? 1000 : actual == 0 ? 500 : 0;</span>
+<span class="fc" id="L220">                pairs++;</span>
+            }
+        }
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        return pairs == 0 ? 0 : points / pairs;</span>
+    }
+
+    private static List&lt;RankedCase&gt; ranking(
+        List&lt;ScoredCase&gt; cases,
+        InterestingnessProfile profile
+    ) {
+<span class="fc" id="L230">        List&lt;ScoredCase&gt; ordered = cases.stream()</span>
+<span class="fc" id="L231">            .sorted(Comparator</span>
+<span class="fc" id="L232">                .comparing((ScoredCase item) -&gt; item.assessment(profile))</span>
+<span class="pc" id="L233">                .thenComparing(item -&gt; item.frozenCase().caseId()))</span>
+<span class="fc" id="L234">            .toList();</span>
+<span class="fc" id="L235">        List&lt;RankedCase&gt; ranking = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (int index = 0; index &lt; ordered.size(); index++) {</span>
+<span class="fc" id="L237">            ScoredCase item = ordered.get(index);</span>
+<span class="fc" id="L238">            InterestingnessAssessment assessment = item.assessment(profile);</span>
+<span class="fc" id="L239">            ranking.add(new RankedCase(</span>
+                index + 1,
+<span class="fc" id="L241">                item.frozenCase().caseId(),</span>
+<span class="fc" id="L242">                item.frozenCase().candidateId(),</span>
+<span class="fc" id="L243">                item.frozenCase().consensusRelevancePermille(),</span>
+<span class="fc" id="L244">                assessment.eligibility(),</span>
+<span class="fc" id="L245">                assessment.totalPermille(),</span>
+<span class="fc" id="L246">                assessment.contentHash(),</span>
+<span class="fc" id="L247">                rawComponents(assessment)));</span>
+        }
+<span class="fc" id="L249">        return List.copyOf(ranking);</span>
+    }
+
+    private static List&lt;String&gt; paretoFront(
+        List&lt;ScoredCase&gt; cases,
+        InterestingnessProfile profile
+    ) {
+<span class="fc" id="L256">        List&lt;ScoredCase&gt; eligible = cases.stream()</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            .filter(item -&gt; item.assessment(profile).eligibility()</span>
+                == Eligibility.RANKABLE_COMPLETE)
+<span class="fc" id="L259">            .toList();</span>
+<span class="fc" id="L260">        return eligible.stream()</span>
+<span class="fc" id="L261">            .filter(candidate -&gt; eligible.stream().noneMatch(other -&gt;</span>
+<span class="fc bfc" id="L262" title="All 4 branches covered.">                other != candidate &amp;&amp; dominates(other, candidate, profile)))</span>
+<span class="fc" id="L263">            .map(item -&gt; item.frozenCase().candidateId())</span>
+<span class="fc" id="L264">            .distinct()</span>
+<span class="fc" id="L265">            .sorted()</span>
+<span class="fc" id="L266">            .toList();</span>
+    }
+
+    private static boolean dominates(
+        ScoredCase left,
+        ScoredCase right,
+        InterestingnessProfile profile
+    ) {
+<span class="fc" id="L274">        Map&lt;String, Integer&gt; leftComponents = rawComponents(left.assessment(profile));</span>
+<span class="fc" id="L275">        Map&lt;String, Integer&gt; rightComponents = rawComponents(right.assessment(profile));</span>
+<span class="fc" id="L276">        boolean strictlyBetter = false;</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        for (String axis : PARETO_AXES) {</span>
+<span class="fc" id="L278">            int leftValue = leftComponents.getOrDefault(axis, 0);</span>
+<span class="fc" id="L279">            int rightValue = rightComponents.getOrDefault(axis, 0);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (leftValue &lt; rightValue) {</span>
+<span class="fc" id="L281">                return false;</span>
+            }
+<span class="fc bfc" id="L283" title="All 2 branches covered.">            strictlyBetter |= leftValue &gt; rightValue;</span>
+<span class="fc" id="L284">        }</span>
+<span class="fc" id="L285">        return strictlyBetter;</span>
+    }
+
+    private static Sensitivity sensitivity(
+        List&lt;ScoredCase&gt; calibration,
+        List&lt;ScoredCase&gt; test,
+        InterestingnessProfile selected
+    ) {
+<span class="fc" id="L293">        int profileOrderAgreement = pairwiseProfileAgreement(test);</span>
+<span class="fc" id="L294">        int leaveOneOut = leaveOneOutStability(calibration, selected);</span>
+<span class="fc" id="L295">        boolean topStable = topCandidate(test, InterestingnessProfile.THEORY_DISCOVERY)</span>
+<span class="fc" id="L296">            .equals(topCandidate(test, InterestingnessProfile.SEARCH_REUSE));</span>
+<span class="fc" id="L297">        return new Sensitivity(profileOrderAgreement, leaveOneOut, topStable);</span>
+    }
+
+    private static int pairwiseProfileAgreement(List&lt;ScoredCase&gt; cases) {
+<span class="fc" id="L301">        int points = 0;</span>
+<span class="fc" id="L302">        int pairs = 0;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        for (int left = 0; left &lt; cases.size(); left++) {</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            for (int right = left + 1; right &lt; cases.size(); right++) {</span>
+<span class="fc" id="L305">                int theory = compare(cases.get(left), cases.get(right),</span>
+                    InterestingnessProfile.THEORY_DISCOVERY);
+<span class="fc" id="L307">                int reuse = compare(cases.get(left), cases.get(right),</span>
+                    InterestingnessProfile.SEARCH_REUSE);
+<span class="pc bpc" id="L309" title="5 of 6 branches missed.">                points += theory == reuse ? 1000 : theory == 0 || reuse == 0 ? 500 : 0;</span>
+<span class="fc" id="L310">                pairs++;</span>
+            }
+        }
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        return pairs == 0 ? 0 : points / pairs;</span>
+    }
+
+    private static int compare(
+        ScoredCase left,
+        ScoredCase right,
+        InterestingnessProfile profile
+    ) {
+<span class="fc" id="L321">        return rankingDirection(left.assessment(profile), right.assessment(profile));</span>
+    }
+
+    static int rankingDirection(
+        InterestingnessAssessment left,
+        InterestingnessAssessment right
+    ) {
+<span class="fc" id="L328">        Objects.requireNonNull(left, &quot;left&quot;);</span>
+<span class="fc" id="L329">        Objects.requireNonNull(right, &quot;right&quot;);</span>
+<span class="fc" id="L330">        return -Integer.signum(left.compareTo(right));</span>
+    }
+
+    static List&lt;InterestingnessProfile&gt; supportedProfilesV1() {
+<span class="fc" id="L334">        return V1_PROFILES;</span>
+    }
+
+    private static int leaveOneOutStability(
+        List&lt;ScoredCase&gt; calibration,
+        InterestingnessProfile selected
+    ) {
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (calibration.size() &lt; 3) {</span>
+<span class="nc" id="L342">            return 0;</span>
+        }
+<span class="fc" id="L344">        int stable = 0;</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        for (int omitted = 0; omitted &lt; calibration.size(); omitted++) {</span>
+<span class="fc" id="L346">            List&lt;ScoredCase&gt; subset = new ArrayList&lt;&gt;(calibration);</span>
+<span class="fc" id="L347">            subset.remove(omitted);</span>
+<span class="fc" id="L348">            InterestingnessProfile subsetSelection = select(profileMetrics(subset, List.of()));</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            if (subsetSelection == selected) {</span>
+<span class="fc" id="L350">                stable++;</span>
+            }
+        }
+<span class="fc" id="L353">        return stable * 1000 / calibration.size();</span>
+    }
+
+    private static String topCandidate(
+        List&lt;ScoredCase&gt; cases,
+        InterestingnessProfile profile
+    ) {
+<span class="fc" id="L360">        return cases.stream()</span>
+<span class="fc" id="L361">            .min(Comparator</span>
+<span class="fc" id="L362">                .comparing((ScoredCase item) -&gt; item.assessment(profile))</span>
+<span class="pc" id="L363">                .thenComparing(item -&gt; item.frozenCase().candidateId()))</span>
+<span class="fc" id="L364">            .map(item -&gt; item.frozenCase().candidateId())</span>
+<span class="fc" id="L365">            .orElse(&quot;&quot;);</span>
+    }
+
+    private static String selectionMaterial(
+        CorpusReport corpus,
+        List&lt;ScoredCase&gt; calibration,
+        List&lt;ProfileMetric&gt; metrics,
+        InterestingnessProfile selected
+    ) {
+<span class="fc" id="L374">        StringBuilder material = new StringBuilder(SCHEMA)</span>
+<span class="fc" id="L375">            .append(&quot;\npredictiveCorpus=&quot;).append(corpus.predictiveCorpusHash())</span>
+<span class="fc" id="L376">            .append(&quot;\nselected=&quot;).append(selected.name());</span>
+<span class="fc" id="L377">        calibration.forEach(item -&gt; material.append(&quot;\ncalibration=&quot;)</span>
+<span class="fc" id="L378">            .append(item.frozenCase().caseId()).append('|')</span>
+<span class="fc" id="L379">            .append(item.frozenCase().consensusRelevancePermille()).append('|')</span>
+<span class="fc" id="L380">            .append(item.profiles().theoryDiscovery().contentHash()).append('|')</span>
+<span class="fc" id="L381">            .append(item.profiles().searchReuse().contentHash()));</span>
+<span class="fc" id="L382">        metrics.forEach(metric -&gt; material.append(&quot;\nmetric=&quot;)</span>
+<span class="fc" id="L383">            .append(metric.profile().name()).append('|')</span>
+<span class="fc" id="L384">            .append(metric.calibrationAgreementPermille()));</span>
+<span class="fc" id="L385">        return material.toString();</span>
+    }
+
+    private static String reportMaterial(
+        CorpusReport corpus,
+        InterestingnessProfile selected,
+        List&lt;ProfileMetric&gt; metrics,
+        List&lt;RankedCase&gt; testRanking,
+        List&lt;String&gt; pareto,
+        Sensitivity sensitivity,
+        String selectionHash
+    ) {
+<span class="fc" id="L397">        StringBuilder material = new StringBuilder(selectionHash)</span>
+<span class="fc" id="L398">            .append(&quot;\nlabeledCorpus=&quot;).append(corpus.labeledEvaluationHash())</span>
+<span class="fc" id="L399">            .append(&quot;\nselected=&quot;).append(selected.name())</span>
+<span class="fc" id="L400">            .append(&quot;\npareto=&quot;).append(pareto)</span>
+<span class="fc" id="L401">            .append(&quot;\nsensitivity=&quot;).append(sensitivity.canonicalMaterial());</span>
+<span class="fc" id="L402">        metrics.forEach(metric -&gt; material.append(&quot;\nprofile=&quot;)</span>
+<span class="fc" id="L403">            .append(metric.canonicalMaterial()));</span>
+<span class="fc" id="L404">        testRanking.forEach(item -&gt; material.append(&quot;\ntest=&quot;)</span>
+<span class="fc" id="L405">            .append(item.canonicalMaterial()));</span>
+<span class="fc" id="L406">        return material.toString();</span>
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L411">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L412">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L413">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L414">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L415">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    public record CaseProfiles(
+        String caseId,
+        String candidateId,
+        InterestingnessAssessment theoryDiscovery,
+        InterestingnessAssessment searchReuse
+    ) {
+<span class="fc" id="L425">        public CaseProfiles {</span>
+<span class="fc" id="L426">            requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L427">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L428">            Objects.requireNonNull(theoryDiscovery, &quot;theoryDiscovery&quot;);</span>
+<span class="fc" id="L429">            Objects.requireNonNull(searchReuse, &quot;searchReuse&quot;);</span>
+<span class="fc" id="L430">        }</span>
+    }
+
+    public record ProfileMetric(
+        InterestingnessProfile profile,
+        int calibrationAgreementPermille,
+        int testAgreementPermille
+    ) {
+<span class="fc" id="L438">        public ProfileMetric {</span>
+<span class="fc" id="L439">            Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L440">            requirePermille(calibrationAgreementPermille,</span>
+                &quot;calibrationAgreementPermille&quot;);
+<span class="fc" id="L442">            requirePermille(testAgreementPermille, &quot;testAgreementPermille&quot;);</span>
+<span class="fc" id="L443">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L446">            return profile.name() + '|'</span>
+                + calibrationAgreementPermille + '|'
+                + testAgreementPermille;
+        }
+    }
+
+    public record RankedCase(
+        int rank,
+        String caseId,
+        String candidateId,
+        int consensusRelevancePermille,
+        Eligibility eligibility,
+        int totalPermille,
+        String assessmentContentHash,
+        Map&lt;String, Integer&gt; rawComponents
+    ) {
+<span class="fc" id="L462">        public RankedCase {</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">            if (rank &lt; 1) {</span>
+<span class="nc" id="L464">                throw new IllegalArgumentException(&quot;rank must be positive&quot;);</span>
+            }
+<span class="fc" id="L466">            requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L467">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L468">            requirePermille(consensusRelevancePermille,</span>
+                &quot;consensusRelevancePermille&quot;);
+<span class="fc" id="L470">            Objects.requireNonNull(eligibility, &quot;eligibility&quot;);</span>
+<span class="pc bpc" id="L471" title="2 of 4 branches missed.">            if (totalPermille &lt; -1000 || totalPermille &gt; 1000) {</span>
+<span class="nc" id="L472">                throw new IllegalArgumentException(&quot;totalPermille must be in [-1000,1000]&quot;);</span>
+            }
+<span class="fc" id="L474">            requireSha256(assessmentContentHash, &quot;assessmentContentHash&quot;);</span>
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">            rawComponents = rawComponents == null</span>
+<span class="nc" id="L476">                ? Map.of()</span>
+<span class="fc" id="L477">                : Map.copyOf(new TreeMap&lt;&gt;(rawComponents));</span>
+<span class="fc" id="L478">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L481">            return rank + &quot;|&quot; + caseId + &quot;|&quot; + candidateId + &quot;|&quot;</span>
+<span class="fc" id="L482">                + consensusRelevancePermille + &quot;|&quot; + eligibility.name() + &quot;|&quot;</span>
+                + totalPermille + &quot;|&quot; + assessmentContentHash + &quot;|&quot; + rawComponents;
+        }
+    }
+
+    public record Sensitivity(
+        int profileOrderAgreementPermille,
+        int leaveOneOutSelectionStabilityPermille,
+        boolean topCandidateStableAcrossProfiles
+    ) {
+<span class="fc" id="L492">        public Sensitivity {</span>
+<span class="fc" id="L493">            requirePermille(profileOrderAgreementPermille,</span>
+                &quot;profileOrderAgreementPermille&quot;);
+<span class="fc" id="L495">            requirePermille(leaveOneOutSelectionStabilityPermille,</span>
+                &quot;leaveOneOutSelectionStabilityPermille&quot;);
+<span class="fc" id="L497">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L500">            return profileOrderAgreementPermille + &quot;|&quot;</span>
+                + leaveOneOutSelectionStabilityPermille + &quot;|&quot;
+                + topCandidateStableAcrossProfiles;
+        }
+    }
+
+    public record CalibrationReport(
+        String schema,
+        String predictiveCorpusHash,
+        String labeledEvaluationHash,
+        InterestingnessProfile selectedProfile,
+        List&lt;ProfileMetric&gt; profileMetrics,
+        List&lt;RankedCase&gt; testRanking,
+        List&lt;String&gt; paretoCandidateIds,
+        Sensitivity sensitivity,
+        String selectionHash,
+        String contentHash
+    ) {
+<span class="fc" id="L518">        public CalibrationReport {</span>
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L520">                throw new IllegalArgumentException(&quot;unsupported profile-calibration schema&quot;);</span>
+            }
+<span class="fc" id="L522">            requireSha256(predictiveCorpusHash, &quot;predictiveCorpusHash&quot;);</span>
+<span class="fc" id="L523">            requireSha256(labeledEvaluationHash, &quot;labeledEvaluationHash&quot;);</span>
+<span class="fc" id="L524">            Objects.requireNonNull(selectedProfile, &quot;selectedProfile&quot;);</span>
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">            profileMetrics = profileMetrics == null</span>
+<span class="nc" id="L526">                ? List.of()</span>
+<span class="fc" id="L527">                : profileMetrics.stream()</span>
+<span class="fc" id="L528">                    .sorted(Comparator.comparing(metric -&gt; metric.profile().name()))</span>
+<span class="fc" id="L529">                    .toList();</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">            if (profileMetrics.size() != V1_PROFILES.size()</span>
+<span class="fc" id="L531">                    || !new TreeSet&lt;&gt;(profileMetrics.stream()</span>
+<span class="fc" id="L532">                        .map(metric -&gt; metric.profile().name()).toList())</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">                        .equals(new TreeSet&lt;&gt;(V1_PROFILES.stream()</span>
+<span class="fc" id="L534">                            .map(Enum::name).toList()))) {</span>
+<span class="nc" id="L535">                throw new IllegalArgumentException(</span>
+                    &quot;v1 calibration report requires exactly the two v1 profiles&quot;);
+            }
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">            testRanking = testRanking == null</span>
+<span class="nc" id="L539">                ? List.of()</span>
+<span class="fc" id="L540">                : testRanking.stream()</span>
+<span class="fc" id="L541">                    .sorted(Comparator.comparingInt(RankedCase::rank))</span>
+<span class="fc" id="L542">                    .toList();</span>
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">            paretoCandidateIds = paretoCandidateIds == null</span>
+<span class="nc" id="L544">                ? List.of()</span>
+<span class="fc" id="L545">                : paretoCandidateIds.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L546">            Objects.requireNonNull(sensitivity, &quot;sensitivity&quot;);</span>
+<span class="fc" id="L547">            requireSha256(selectionHash, &quot;selectionHash&quot;);</span>
+<span class="fc" id="L548">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L549">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L552">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L553">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L554">                .property(&quot;predictiveCorpusHash&quot;, predictiveCorpusHash)</span>
+<span class="fc" id="L555">                .property(&quot;labeledEvaluationHash&quot;, labeledEvaluationHash)</span>
+<span class="fc" id="L556">                .property(&quot;selectedProfile&quot;, selectedProfile.name())</span>
+<span class="fc" id="L557">                .array(&quot;profileMetrics&quot;, array -&gt; profileMetrics.forEach(metric -&gt;</span>
+<span class="fc" id="L558">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L559">                        .property(&quot;profile&quot;, metric.profile().name())</span>
+<span class="fc" id="L560">                        .property(&quot;calibrationAgreementPermille&quot;,</span>
+<span class="fc" id="L561">                            metric.calibrationAgreementPermille())</span>
+<span class="fc" id="L562">                        .property(&quot;testAgreementPermille&quot;,</span>
+<span class="fc" id="L563">                            metric.testAgreementPermille()))))</span>
+<span class="fc" id="L564">                .array(&quot;testRanking&quot;, array -&gt; testRanking.forEach(item -&gt;</span>
+<span class="fc" id="L565">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L566">                        .property(&quot;rank&quot;, item.rank())</span>
+<span class="fc" id="L567">                        .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L568">                        .property(&quot;candidateId&quot;, item.candidateId())</span>
+<span class="fc" id="L569">                        .property(&quot;consensusRelevancePermille&quot;,</span>
+<span class="fc" id="L570">                            item.consensusRelevancePermille())</span>
+<span class="fc" id="L571">                        .property(&quot;eligibility&quot;, item.eligibility().name())</span>
+<span class="fc" id="L572">                        .property(&quot;totalPermille&quot;, item.totalPermille())</span>
+<span class="fc" id="L573">                        .property(&quot;assessmentContentHash&quot;,</span>
+<span class="fc" id="L574">                            item.assessmentContentHash())</span>
+<span class="fc" id="L575">                        .object(&quot;rawComponents&quot;, components -&gt;</span>
+<span class="fc" id="L576">                            item.rawComponents().forEach(components::property)))))</span>
+<span class="fc" id="L577">                .stringArray(&quot;paretoCandidateIds&quot;, paretoCandidateIds)</span>
+<span class="fc" id="L578">                .object(&quot;sensitivity&quot;, object -&gt; object</span>
+<span class="fc" id="L579">                    .property(&quot;profileOrderAgreementPermille&quot;,</span>
+<span class="fc" id="L580">                        sensitivity.profileOrderAgreementPermille())</span>
+<span class="fc" id="L581">                    .property(&quot;leaveOneOutSelectionStabilityPermille&quot;,</span>
+<span class="fc" id="L582">                        sensitivity.leaveOneOutSelectionStabilityPermille())</span>
+<span class="fc" id="L583">                    .property(&quot;topCandidateStableAcrossProfiles&quot;,</span>
+<span class="fc" id="L584">                        sensitivity.topCandidateStableAcrossProfiles()))</span>
+<span class="fc" id="L585">                .property(&quot;selectionHash&quot;, selectionHash)</span>
+<span class="fc" id="L586">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L587">                .endObject()</span>
+<span class="fc" id="L588">                .toString();</span>
+        }
+
+        public void write(Path output) {
+            try {
+<span class="fc" id="L593">                Path parent = output.getParent();</span>
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L595">                    Files.createDirectories(parent);</span>
+                }
+<span class="fc" id="L597">                Files.writeString(output, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L598">            } catch (IOException exception) {</span>
+<span class="nc" id="L599">                throw new UncheckedIOException(exception);</span>
+<span class="fc" id="L600">            }</span>
+<span class="fc" id="L601">        }</span>
+    }
+
+<span class="fc" id="L604">    private record ScoredCase(FrozenCase frozenCase, CaseProfiles profiles) {</span>
+        InterestingnessAssessment assessment(InterestingnessProfile profile) {
+<span class="fc bfc" id="L606" title="All 2 branches covered.">            return profile == InterestingnessProfile.THEORY_DISCOVERY</span>
+<span class="fc" id="L607">                ? profiles.theoryDiscovery()</span>
+<span class="fc" id="L608">                : profiles.searchReuse();</span>
+        }
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L613" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L614">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L616">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L619" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L620">            throw new IllegalArgumentException(name + &quot; must be a SHA-256 hash&quot;);</span>
+        }
+<span class="fc" id="L622">    }</span>
+
+    private static void requirePermille(int value, String name) {
+<span class="pc bpc" id="L625" title="2 of 4 branches missed.">        if (value &lt; 0 || value &gt; 1000) {</span>
+<span class="nc" id="L626">            throw new IllegalArgumentException(name + &quot; must be in [0,1000]&quot;);</span>
+        }
+<span class="fc" id="L628">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

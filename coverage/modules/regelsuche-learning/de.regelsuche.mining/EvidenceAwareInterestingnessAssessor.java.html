@@ -254,10 +254,10 @@ import java.util.Set;
         int similarityPermille
     ) {
 <span class="fc" id="L256">        int raw = 1000 - similarityPermille;</span>
-<span class="pc bpc" id="L257" title="3 of 4 branches missed.">        return switch (novelty) {</span>
+<span class="pc bpc" id="L257" title="2 of 4 branches missed.">        return switch (novelty) {</span>
 <span class="fc" id="L258">            case NOVEL_WITHIN_PROJECT -&gt; raw;</span>
 <span class="nc" id="L259">            case ALPHA_EQUIVALENT -&gt; Math.min(raw, 200);</span>
-<span class="nc" id="L260">            case DUPLICATE -&gt; Math.min(raw, 100);</span>
+<span class="fc" id="L260">            case DUPLICATE -&gt; Math.min(raw, 100);</span>
 <span class="nc" id="L261">            case UNKNOWN -&gt; Math.min(raw, 400);</span>
         };
     }
@@ -282,10 +282,10 @@ import java.util.Set;
     }
 
     private static int controlPenalty(ControlClassification classification) {
-<span class="pc bpc" id="L285" title="2 of 4 branches missed.">        return switch (classification) {</span>
+<span class="pc bpc" id="L285" title="1 of 4 branches missed.">        return switch (classification) {</span>
 <span class="fc" id="L286">            case NONE -&gt; 0;</span>
 <span class="nc" id="L287">            case ALPHA_RENAMING_ONLY -&gt; 800;</span>
-<span class="nc" id="L288">            case FORMAT_ONLY -&gt; 750;</span>
+<span class="fc" id="L288">            case FORMAT_ONLY -&gt; 750;</span>
 <span class="fc" id="L289">            case GENERIC_NORMALIZATION -&gt; 650;</span>
         };
     }

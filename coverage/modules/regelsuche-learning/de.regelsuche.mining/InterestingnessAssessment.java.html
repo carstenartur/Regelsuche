@@ -70,11 +70,11 @@ public record InterestingnessAssessment(
     public int compareTo(InterestingnessAssessment other) {
 <span class="fc" id="L71">        int eligibilityOrder = Integer.compare(</span>
 <span class="fc" id="L72">            eligibility.rankOrder(), other.eligibility.rankOrder());</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (eligibilityOrder != 0) {</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (eligibilityOrder != 0) {</span>
 <span class="fc" id="L74">            return eligibilityOrder;</span>
         }
-<span class="nc" id="L76">        int scoreOrder = Integer.compare(other.totalPermille, totalPermille);</span>
-<span class="nc bnc" id="L77" title="All 2 branches missed.">        return scoreOrder != 0 ? scoreOrder : candidateId.compareTo(other.candidateId);</span>
+<span class="fc" id="L76">        int scoreOrder = Integer.compare(other.totalPermille, totalPermille);</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        return scoreOrder != 0 ? scoreOrder : candidateId.compareTo(other.candidateId);</span>
     }
 
     public String toCanonicalJson() {
