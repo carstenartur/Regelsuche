@@ -99,7 +99,7 @@ final class HiddenRulePilotCatalog {
         references.put("case-018", reference(
             "hidden_nested_left_zero_macro",
             "zero-annihilation",
-            "1 * (0 * A)", "0"));
+            "(1 * 0) * A", "0"));
         references.put("case-019", reference(
             "hidden_product_square_power_macro",
             "power-normalization",
@@ -107,7 +107,7 @@ final class HiddenRulePilotCatalog {
         references.put("case-020", reference(
             "hidden_mixed_product_power_macro",
             "power-normalization",
-            "A^2 * (A * A)", "A^4"));
+            "A^2 * A * A", "A^4"));
         return Map.copyOf(references);
     }
 
