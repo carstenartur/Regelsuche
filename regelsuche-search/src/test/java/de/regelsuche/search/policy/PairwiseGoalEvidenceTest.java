@@ -58,6 +58,7 @@ class PairwiseGoalEvidenceTest {
                 alternative);
 
         assertFalse(targetDecision.fallback());
+        assertEquals(0, targetDecision.contributions().get("targetDistance"));
         assertEquals(-1_000, targetDecision.contributions().get("descriptor." + FEATURE));
         assertFalse(targetDecision.contributions().containsKey("descriptor.estimatedCostDelta"));
         assertTrue(targetDecision.explanation().contains("targetCompetitionSupported=true"));
