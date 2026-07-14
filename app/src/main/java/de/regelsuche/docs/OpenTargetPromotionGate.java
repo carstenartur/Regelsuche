@@ -61,7 +61,7 @@ final class OpenTargetPromotionGate {
             proof.backendEvidence(),
             input.ablationEvidence().ablationStatus(),
             evaluation.dynamicRuleId(),
-            evaluation.provenanceHash(),
+            "open-target:" + evaluation.provenanceHash(),
             assumptions,
             rationale(evaluation, novelty, proof),
             rulePath,
@@ -74,6 +74,45 @@ final class OpenTargetPromotionGate {
 
         PromotionRecord baseRecord = promotionDecider.decide(
             observation, input.ablationEvidence());
+        List<String> blockers = collectBlockers(coreBlockers, baseRecord, novelty, proof);
+        PromotionStage stage = finalStage(baseRecord, coreBlockers.isEmpty(), blockers);
+        PromotionRecord finalRecord = copyWithDecision(
+            baseRecord, stage, blockers.isEmpty(), blockers);
+        NoveltyStatus publicNovelty = publicNovelty(novelty);
+        PublicEvidenceGate.GateDecision publicDecision =
+            publicEvidenceGate.evaluate(finalRecord, publicNovelty);
+        OpenTargetPromotionProvenance provenance = provenance(input, finalRecord);
+
+        String evidenceHash = hash(canonicalMaterial(
+            input,
+            finalRecord,
+            publicNovelty,
+            blockers,
+            publicDecision,
+            provenance));
+        return new Decision(
+            SCHEMA,
+            conjecture.conjectureId(),
+            finalRecord,
+            publicNovelty,
+            novelty.status().name(),
+            novelty.externalNoveltyStatus(),
+            proof.proofStatus().name(),
+            proof.formalProofStatus(),
+            "NOT_EVALUATED",
+            input.proverExecutionStatus(),
+            blockers,
+            publicDecision,
+            provenance,
+            evidenceHash);
+    }
+
+    private static List<String> collectBlockers(
+        List<String> coreBlockers,
+        PromotionRecord baseRecord,
+        NoveltyReport novelty,
+        ProofReport proof
+    ) {
         List<String> blockers = new ArrayList<>(coreBlockers);
         blockers.addAll(baseRecord.promotionBlockers());
         proof.blockers().stream()
@@ -88,39 +127,11 @@ final class OpenTargetPromotionGate {
                     .NOVEL_WITHIN_PROJECT) {
             blockers.add("project-novelty=" + novelty.status().name());
         }
-        List<String> orderedBlockers = blockers.stream()
+        return blockers.stream()
             .filter(value -> value != null && !value.isBlank())
             .distinct()
             .sorted()
             .toList();
-
-        PromotionStage stage = finalStage(baseRecord, coreBlockers.isEmpty(), orderedBlockers);
-        PromotionRecord finalRecord = copyWithDecision(
-            baseRecord, stage, orderedBlockers.isEmpty(), orderedBlockers);
-        NoveltyStatus publicNovelty = publicNovelty(novelty);
-        PublicEvidenceGate.GateDecision publicDecision =
-            publicEvidenceGate.evaluate(finalRecord, publicNovelty);
-
-        String evidenceHash = hash(canonicalMaterial(
-            input,
-            finalRecord,
-            publicNovelty,
-            orderedBlockers,
-            publicDecision));
-        return new Decision(
-            SCHEMA,
-            conjecture.conjectureId(),
-            finalRecord,
-            publicNovelty,
-            novelty.status().name(),
-            novelty.externalNoveltyStatus(),
-            proof.proofStatus().name(),
-            proof.formalProofStatus(),
-            "NOT_EVALUATED",
-            input.proverExecutionStatus(),
-            orderedBlockers,
-            publicDecision,
-            evidenceHash);
     }
 
     private static PromotionStage finalStage(
@@ -280,37 +291,55 @@ final class OpenTargetPromotionGate {
             + "; externalNovelty=" + novelty.externalNoveltyStatus();
     }
 
+    private static OpenTargetPromotionProvenance provenance(
+        Input input,
+        PromotionRecord record
+    ) {
+        String proofObligationHash = input.proof().obligation() == null
+            ? ""
+            : input.proof().obligation().obligationHash();
+        return new OpenTargetPromotionProvenance(
+            input.sourceCampaign(),
+            input.discoveryDate(),
+            input.evaluation().dynamicRuleId(),
+            input.evaluation().provenanceHash(),
+            input.novelty().exactSignatureHash(),
+            input.novelty().alphaSignatureHash(),
+            input.proof().evidenceHash(),
+            proofObligationHash,
+            record.assumptions(),
+            record.rulePath(),
+            record.evidenceExists(),
+            record.curatedPathPresent(),
+            record.fallbackUsed());
+    }
+
     private static String canonicalMaterial(
         Input input,
         PromotionRecord record,
         NoveltyStatus publicNovelty,
         List<String> blockers,
-        PublicEvidenceGate.GateDecision publicDecision
+        PublicEvidenceGate.GateDecision publicDecision,
+        OpenTargetPromotionProvenance provenance
     ) {
         return SCHEMA
             + "\ncandidate=" + record.candidateId()
-            + "\ncampaign=" + record.sourceCampaign()
-            + "\ndate=" + record.discoveryDate()
             + "\nstage=" + record.stage().name()
             + "\npromotionEligible=" + record.promotionEligible()
             + "\nprojectNovelty=" + input.novelty().status().name()
             + "\npublicNovelty=" + publicNovelty.name()
             + "\nexternalNovelty=" + input.novelty().externalNoveltyStatus()
             + "\nsymbolicProof=" + input.proof().proofStatus().name()
-            + "\nproofEvidence=" + input.proof().evidenceHash()
             + "\nformalProof=" + input.proof().formalProofStatus()
             + "\nproofPolicy=" + input.proofPolicy().name()
             + "\nproverExecution=" + input.proverExecutionStatus()
-            + "\nevaluationProvenance=" + input.evaluation().provenanceHash()
-            + "\nexactSignature=" + input.novelty().exactSignatureHash()
-            + "\nalphaSignature=" + input.novelty().alphaSignatureHash()
+            + "\ninterestingness=NOT_EVALUATED"
             + "\nablation=" + input.ablationEvidence().compactSummary()
-            + "\nassumptions=" + String.join("\u0001", record.assumptions())
-            + "\nrulePath=" + String.join("\u0001", record.rulePath())
             + "\nblockers=" + String.join("\u0001", blockers)
             + "\npublicEvidence=" + publicDecision.accepted()
             + "\npublicRejections="
-            + String.join("\u0001", publicDecision.rejectionReasons());
+            + String.join("\u0001", publicDecision.rejectionReasons())
+            + "\n" + provenance.canonicalMaterial();
     }
 
     private static String hash(String material) {
@@ -369,6 +398,7 @@ final class OpenTargetPromotionGate {
         String proverExecutionStatus,
         List<String> promotionBlockers,
         PublicEvidenceGate.GateDecision publicEvidenceDecision,
+        OpenTargetPromotionProvenance provenance,
         String evidenceHash
     ) {
         Decision {
@@ -382,8 +412,9 @@ final class OpenTargetPromotionGate {
                 ? List.of()
                 : List.copyOf(promotionBlockers);
             Objects.requireNonNull(publicEvidenceDecision, "publicEvidenceDecision");
+            Objects.requireNonNull(provenance, "provenance");
             requireText(evidenceHash, "evidenceHash");
-            if (!evidenceHash.startsWith("sha256:")) {
+            if (!evidenceHash.matches("sha256:[0-9a-f]{64}")) {
                 throw new IllegalArgumentException("evidenceHash must be SHA-256");
             }
             externalNoveltyStatus = externalNoveltyStatus == null
@@ -420,6 +451,7 @@ final class OpenTargetPromotionGate {
                 .property("interestingnessStatus", interestingnessStatus)
                 .property("proofPolicy", promotionRecord.proofPolicy().name())
                 .property("proverExecutionStatus", proverExecutionStatus)
+                .object("provenance", provenance::writeJson)
                 .object("ablation", object -> object
                     .property("status", ablation.ablationStatus())
                     .property("improvementRatio", ablation.improvementRatio())
