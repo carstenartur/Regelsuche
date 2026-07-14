@@ -82,9 +82,25 @@ Der Report enthält außerdem:
 
 Pareto- und Sensitivitätswerte bleiben Diagnoseevidenz. Sie verändern weder Kandidatenbildung noch Proof-, Novelty-, Promotion- oder Public-Evidence-Entscheidungen.
 
+## Vorab deklarierte Akzeptanz
+
+`regelsuche.interestingness-acceptance/v1` bewertet den abgeschlossenen Calibration-/TEST-Report gegen Schwellen, die **vor** der Interpretation des TEST-Ergebnisses feststehen.
+
+Der Gate-Vertrag kann Mindestwerte verlangen für:
+
+- Zahl der TEST-Fälle,
+- Agreement auf CALIBRATION,
+- Agreement auf TEST,
+- profilübergreifende Rangordnungsstabilität,
+- Leave-one-out-Stabilität der Profilwahl,
+- Stabilität des höchstgerankten Kandidaten,
+- eine nicht leere Pareto-Front.
+
+Unterschreitungen werden als benannte Blocker ausgegeben. Das Gate darf weder Profilwahl noch Rangwerte verändern und führt weder Promotion noch Public Evidence aus. Dadurch kann eine schwache TEST-Auswertung nicht nachträglich durch angepasste Erfolgskriterien als bestanden definiert werden.
+
 ## Was diese Artefakte nicht behaupten
 
-Auch ein hoch gerankter, konsensuell relevanter Kandidat ist nicht automatisch:
+Auch ein hoch gerankter, konsensuell relevanter und nach vorab festgelegten Schwellen akzeptierter Kandidat ist nicht automatisch:
 
 - mathematisch wahr,
 - projektintern oder extern neu,
