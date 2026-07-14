@@ -4,6 +4,14 @@ Die produktive Discovery-Pipeline in Regelsuche folgt dem Pfad:
 
 `Seed → Discovery/Search/Validation → Replay → Persistenz → Report`
 
+Die technische Pipeline allein definiert noch keine mathematische Entdeckung.
+[Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md)
+beschreibt die geschlossene Zielkette von besserer Pfadsuche über Mining,
+Falsifikation und Beweis bis zur versionierten Promotion und gepaarten
+Wiederholungsmessung. Dort ist auch dokumentiert, welchen Beitrag die aktuellen
+Search-/Learning-Schritte leisten und welche Discovery-Behauptungen daraus noch
+nicht folgen.
+
 Zentrale Bausteine:
 
 - **Layer 1 – TransformationEngine:** lokale Rewrites, Hypothesenoperatoren und
@@ -63,6 +71,7 @@ Zentrale Bausteine:
 
 Wichtige Einstiegspunkte:
 
+- [docs/from-transformations-to-discovery.md](from-transformations-to-discovery.md)
 - [docs/rule-discovery.md](rule-discovery.md)
 - [docs/experiment-runner.md](experiment-runner.md)
 - [docs/replay-and-reports.md](replay-and-reports.md)
