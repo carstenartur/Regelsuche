@@ -8,50 +8,53 @@ import de.regelsuche.search.learning.TransformationDescriptor;
 import de.regelsuche.search.policy.DescriptorPolicyModel.DescriptorStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.FeatureStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.Mode;
+import de.regelsuche.search.telemetry.SearchEventType;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
 /** Deterministically trains rule-ID-independent descriptor statistics from TRAIN only. */
-<span class="fc" id="L21">public final class DescriptorPolicyTrainer {</span>
+<span class="fc" id="L23">public final class DescriptorPolicyTrainer {</span>
     public DescriptorPolicyModel train(
         SearchTrajectoryDataset dataset,
         Mode mode,
         int minimumObservations
     ) {
-<span class="fc" id="L27">        validate(dataset, mode, minimumObservations);</span>
-<span class="fc" id="L28">        List&lt;SearchTrajectoryRun&gt; trainingRuns = dataset.runs().stream()</span>
-<span class="fc bfc" id="L29" title="All 2 branches covered.">            .filter(run -&gt; run.context().split() == DatasetSplit.TRAIN)</span>
-<span class="fc" id="L30">            .toList();</span>
-<span class="fc" id="L31">        List&lt;Example&gt; examples = trainingRuns.stream()</span>
-<span class="fc" id="L32">            .flatMap(run -&gt; run.records().stream())</span>
-<span class="fc" id="L33">            .filter(SearchTrajectoryRecord::decision)</span>
-<span class="fc" id="L34">            .filter(record -&gt; record.transformationDescriptor().available())</span>
-<span class="fc" id="L35">            .map(Example::of)</span>
-<span class="fc" id="L36">            .toList();</span>
-<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (examples.isEmpty()) {</span>
-<span class="nc" id="L38">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L29">        validate(dataset, mode, minimumObservations);</span>
+<span class="fc" id="L30">        List&lt;SearchTrajectoryRun&gt; trainingRuns = dataset.runs().stream()</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            .filter(run -&gt; run.context().split() == DatasetSplit.TRAIN)</span>
+<span class="fc" id="L32">            .toList();</span>
+<span class="fc" id="L33">        List&lt;Example&gt; examples = trainingRuns.stream()</span>
+<span class="fc" id="L34">            .flatMap(run -&gt; run.records().stream())</span>
+<span class="fc" id="L35">            .filter(SearchTrajectoryRecord::decision)</span>
+<span class="fc" id="L36">            .filter(record -&gt; record.transformationDescriptor().available())</span>
+<span class="fc" id="L37">            .map(Example::of)</span>
+<span class="fc" id="L38">            .toList();</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (examples.isEmpty()) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(</span>
                 &quot;training split contains no available transformation descriptors&quot;);
         }
 
-<span class="fc" id="L42">        Map&lt;String, DescriptorStatistics&gt; descriptors = descriptorStatistics(examples);</span>
-<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        Map&lt;String, FeatureStatistics&gt; features = mode == Mode.LINEAR</span>
-<span class="fc" id="L44">            ? featureStatistics(examples)</span>
-<span class="pc" id="L45">            : Map.of();</span>
-<span class="fc" id="L46">        SearchTrajectoryDataset trainingDataset = new SearchTrajectoryDataset(trainingRuns);</span>
-<span class="fc" id="L47">        String sourceHash = &quot;sha256:&quot; + sha256(trainingDataset.toJsonLines());</span>
-<span class="fc" id="L48">        String predictiveHash = &quot;sha256:&quot; + sha256(predictiveMaterial(examples));</span>
-<span class="fc" id="L49">        String modelMaterial = predictiveHash + '\n' + DescriptorPolicyModel.FEATURE_SCHEMA</span>
+<span class="fc" id="L44">        Map&lt;String, FeatureStatistics&gt; pairwise = pairwiseContextStatistics(trainingRuns);</span>
+<span class="fc" id="L45">        Map&lt;String, DescriptorStatistics&gt; descriptors = descriptorStatistics(examples);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        Map&lt;String, FeatureStatistics&gt; features = mode == Mode.LINEAR</span>
+<span class="fc" id="L47">            ? featureStatistics(examples, pairwise)</span>
+<span class="pc" id="L48">            : Map.of();</span>
+<span class="fc" id="L49">        SearchTrajectoryDataset trainingDataset = new SearchTrajectoryDataset(trainingRuns);</span>
+<span class="fc" id="L50">        String sourceHash = &quot;sha256:&quot; + sha256(trainingDataset.toJsonLines());</span>
+<span class="fc" id="L51">        String predictiveHash = &quot;sha256:&quot; + sha256(predictiveMaterial(examples, pairwise));</span>
+<span class="fc" id="L52">        String modelMaterial = predictiveHash + '\n' + DescriptorPolicyModel.FEATURE_SCHEMA</span>
             + '\n' + mode + '\n' + minimumObservations
             + '\n' + descriptors + '\n' + features;
-<span class="fc" id="L52">        String modelVersion = &quot;descriptor-policy-v1:&quot;</span>
-<span class="fc" id="L53">            + sha256(modelMaterial).substring(0, 24);</span>
-<span class="fc" id="L54">        return new DescriptorPolicyModel(</span>
+<span class="fc" id="L55">        String modelVersion = &quot;descriptor-policy-v1:&quot;</span>
+<span class="fc" id="L56">            + sha256(modelMaterial).substring(0, 24);</span>
+<span class="fc" id="L57">        return new DescriptorPolicyModel(</span>
             modelVersion,
             sourceHash,
             predictiveHash,
@@ -67,81 +70,163 @@ import java.util.TreeSet;
         Mode mode,
         int minimumObservations
     ) {
-<span class="pc bpc" id="L70" title="2 of 4 branches missed.">        if (dataset == null || mode == null) {</span>
-<span class="nc" id="L71">            throw new IllegalArgumentException(&quot;dataset and mode must not be null&quot;);</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">        if (dataset == null || mode == null) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(&quot;dataset and mode must not be null&quot;);</span>
         }
-<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (!dataset.leakageFree()) {</span>
-<span class="fc" id="L74">            throw new IllegalArgumentException(&quot;cannot train on a dataset with split leakage&quot;);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (!dataset.leakageFree()) {</span>
+<span class="fc" id="L77">            throw new IllegalArgumentException(&quot;cannot train on a dataset with split leakage&quot;);</span>
         }
-<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (minimumObservations &lt; 1) {</span>
-<span class="nc" id="L77">            throw new IllegalArgumentException(&quot;minimumObservations must be positive&quot;);</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (minimumObservations &lt; 1) {</span>
+<span class="nc" id="L80">            throw new IllegalArgumentException(&quot;minimumObservations must be positive&quot;);</span>
         }
-<span class="fc" id="L79">    }</span>
+<span class="fc" id="L82">    }</span>
 
     private static Map&lt;String, DescriptorStatistics&gt; descriptorStatistics(
         List&lt;Example&gt; examples
     ) {
-<span class="fc" id="L84">        Map&lt;String, MutableDescriptorStatistics&gt; mutable = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (Example example : examples) {</span>
-<span class="fc" id="L86">            mutable.computeIfAbsent(</span>
-<span class="fc" id="L87">                example.descriptor().predictiveFingerprint(),</span>
-<span class="fc" id="L88">                ignored -&gt; new MutableDescriptorStatistics())</span>
-<span class="fc" id="L89">                .record(example.successful(), example.scoreDelta());</span>
-<span class="fc" id="L90">        }</span>
-<span class="fc" id="L91">        Map&lt;String, DescriptorStatistics&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L92">        mutable.entrySet().stream()</span>
-<span class="fc" id="L93">            .sorted(Map.Entry.comparingByKey())</span>
-<span class="fc" id="L94">            .forEach(entry -&gt; result.put(entry.getKey(), entry.getValue().freeze()));</span>
-<span class="fc" id="L95">        return result;</span>
+<span class="fc" id="L87">        Map&lt;String, MutableDescriptorStatistics&gt; mutable = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (Example example : examples) {</span>
+<span class="fc" id="L89">            mutable.computeIfAbsent(</span>
+<span class="fc" id="L90">                example.descriptor().predictiveFingerprint(),</span>
+<span class="fc" id="L91">                ignored -&gt; new MutableDescriptorStatistics())</span>
+<span class="fc" id="L92">                .record(example.successful(), example.scoreDelta());</span>
+<span class="fc" id="L93">        }</span>
+<span class="fc" id="L94">        Map&lt;String, DescriptorStatistics&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L95">        mutable.entrySet().stream()</span>
+<span class="fc" id="L96">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L97">            .forEach(entry -&gt; result.put(entry.getKey(), entry.getValue().freeze()));</span>
+<span class="fc" id="L98">        return result;</span>
     }
 
-    private static Map&lt;String, FeatureStatistics&gt; featureStatistics(List&lt;Example&gt; examples) {
-<span class="fc" id="L99">        TreeSet&lt;String&gt; featureNames = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L100">        examples.forEach(example -&gt; featureNames.addAll(example.descriptor().featureVector().keySet()));</span>
-<span class="fc" id="L101">        Map&lt;String, FeatureStatistics&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L102" title="All 2 branches covered.">        for (String featureName : featureNames) {</span>
-<span class="fc" id="L103">            MutableFeatureStatistics mutable = new MutableFeatureStatistics();</span>
-<span class="fc bfc" id="L104" title="All 2 branches covered.">            for (Example example : examples) {</span>
-<span class="fc" id="L105">                mutable.record(</span>
-<span class="fc" id="L106">                    example.descriptor().featureVector().getOrDefault(featureName, 0),</span>
-<span class="fc" id="L107">                    example.successful());</span>
-<span class="fc" id="L108">            }</span>
-<span class="fc" id="L109">            result.put(featureName, mutable.freeze());</span>
-<span class="fc" id="L110">        }</span>
-<span class="fc" id="L111">        return result;</span>
+    private static Map&lt;String, FeatureStatistics&gt; featureStatistics(
+        List&lt;Example&gt; examples,
+        Map&lt;String, FeatureStatistics&gt; pairwise
+    ) {
+<span class="fc" id="L105">        TreeSet&lt;String&gt; featureNames = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L106">        examples.forEach(example -&gt; featureNames.addAll(example.descriptor().featureVector().keySet()));</span>
+<span class="fc" id="L107">        Map&lt;String, FeatureStatistics&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (String featureName : featureNames) {</span>
+<span class="fc" id="L109">            MutableFeatureStatistics mutable = new MutableFeatureStatistics();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            for (Example example : examples) {</span>
+<span class="fc" id="L111">                mutable.record(</span>
+<span class="fc" id="L112">                    example.descriptor().featureVector().getOrDefault(featureName, 0),</span>
+<span class="fc" id="L113">                    example.successful());</span>
+<span class="fc" id="L114">            }</span>
+<span class="fc" id="L115">            result.put(featureName, mutable.freeze());</span>
+<span class="fc" id="L116">        }</span>
+<span class="fc" id="L117">        result.keySet().removeIf(DescriptorSearchPolicy::pairwiseContextFeature);</span>
+<span class="fc" id="L118">        result.putAll(pairwise);</span>
+<span class="fc" id="L119">        return result;</span>
     }
 
-    private static String predictiveMaterial(List&lt;Example&gt; examples) {
-<span class="fc" id="L115">        List&lt;String&gt; rows = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (Example example : examples) {</span>
-<span class="fc" id="L117">            rows.add(example.descriptor().predictiveMaterial()</span>
-<span class="fc" id="L118">                + &quot;\nlabel=&quot; + example.successful()</span>
-<span class="fc" id="L119">                + &quot;\nscoreDelta=&quot; + example.scoreDelta());</span>
-<span class="fc" id="L120">        }</span>
-<span class="fc" id="L121">        rows.sort(String::compareTo);</span>
-<span class="fc" id="L122">        return String.join(&quot;\n---\n&quot;, rows);</span>
+    /** Learns context features only from candidates that competed in one expansion. */
+    private static Map&lt;String, FeatureStatistics&gt; pairwiseContextStatistics(
+        List&lt;SearchTrajectoryRun&gt; trainingRuns
+    ) {
+<span class="fc" id="L126">        Map&lt;String, MutableFeatureStatistics&gt; mutable = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (SearchTrajectoryRun run : trainingRuns) {</span>
+<span class="fc" id="L128">            List&lt;SearchTrajectoryRecord&gt; group = null;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            for (SearchTrajectoryRecord record : run.records().stream()</span>
+<span class="fc" id="L130">                    .sorted(Comparator.comparingLong(SearchTrajectoryRecord::sequence))</span>
+<span class="fc" id="L131">                    .toList()) {</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                if (record.eventType() == SearchEventType.STATE_EXPANDED) {</span>
+<span class="fc" id="L133">                    recordContextCompetition(group, mutable);</span>
+<span class="fc" id="L134">                    group = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                } else if (record.eventType() == SearchEventType.SEARCH_FINISHED) {</span>
+<span class="fc" id="L136">                    recordContextCompetition(group, mutable);</span>
+<span class="fc" id="L137">                    group = null;</span>
+<span class="fc bfc" id="L138" title="All 4 branches covered.">                } else if (group != null &amp;&amp; record.decision()</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                        &amp;&amp; record.transformationDescriptor().available()) {</span>
+<span class="fc" id="L140">                    group.add(record);</span>
+                }
+<span class="fc" id="L142">            }</span>
+<span class="fc" id="L143">            recordContextCompetition(group, mutable);</span>
+<span class="fc" id="L144">        }</span>
+<span class="fc" id="L145">        Map&lt;String, FeatureStatistics&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L146">        mutable.entrySet().stream()</span>
+<span class="fc" id="L147">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L148">            .forEach(entry -&gt; result.put(entry.getKey(), entry.getValue().freeze()));</span>
+<span class="fc" id="L149">        return result;</span>
+    }
+
+    private static void recordContextCompetition(
+        List&lt;SearchTrajectoryRecord&gt; group,
+        Map&lt;String, MutableFeatureStatistics&gt; mutable
+    ) {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        if (group == null || group.size() &lt; 2) {</span>
+<span class="fc" id="L157">            return;</span>
+        }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (SearchTrajectoryRecord winner : group) {</span>
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">            if (!winner.selectedPath() || !winner.eventualSuccess()) {</span>
+<span class="nc" id="L161">                continue;</span>
+            }
+<span class="fc" id="L163">            Map&lt;String, Integer&gt; winnerFeatures = DescriptorSearchPolicy.descriptorFeatures(</span>
+<span class="fc" id="L164">                winner.transformationDescriptor());</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            for (SearchTrajectoryRecord alternative : group) {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                if (alternative.selectedPath()) {</span>
+<span class="fc" id="L167">                    continue;</span>
+                }
+<span class="fc" id="L169">                Map&lt;String, Integer&gt; alternativeFeatures = DescriptorSearchPolicy.descriptorFeatures(</span>
+<span class="fc" id="L170">                    alternative.transformationDescriptor());</span>
+<span class="fc" id="L171">                TreeSet&lt;String&gt; names = new TreeSet&lt;&gt;(winnerFeatures.keySet());</span>
+<span class="fc" id="L172">                names.addAll(alternativeFeatures.keySet());</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">                for (String name : names) {</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                    if (!DescriptorSearchPolicy.pairwiseContextFeature(name)) {</span>
+<span class="fc" id="L175">                        continue;</span>
+                    }
+<span class="fc" id="L177">                    int winnerValue = winnerFeatures.getOrDefault(name, 0);</span>
+<span class="fc" id="L178">                    int alternativeValue = alternativeFeatures.getOrDefault(name, 0);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                    if (winnerValue != alternativeValue) {</span>
+<span class="fc" id="L180">                        MutableFeatureStatistics statistics = mutable.computeIfAbsent(</span>
+<span class="fc" id="L181">                            name, ignored -&gt; new MutableFeatureStatistics());</span>
+<span class="fc" id="L182">                        statistics.record(winnerValue, true);</span>
+<span class="fc" id="L183">                        statistics.record(alternativeValue, false);</span>
+                    }
+<span class="fc" id="L185">                }</span>
+<span class="fc" id="L186">            }</span>
+<span class="fc" id="L187">        }</span>
+<span class="fc" id="L188">    }</span>
+
+    private static String predictiveMaterial(
+        List&lt;Example&gt; examples,
+        Map&lt;String, FeatureStatistics&gt; pairwise
+    ) {
+<span class="fc" id="L194">        List&lt;String&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (Example example : examples) {</span>
+<span class="fc" id="L196">            rows.add(example.descriptor().predictiveMaterial()</span>
+<span class="fc" id="L197">                + &quot;\nlabel=&quot; + example.successful()</span>
+<span class="fc" id="L198">                + &quot;\nscoreDelta=&quot; + example.scoreDelta());</span>
+<span class="fc" id="L199">        }</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (!pairwise.isEmpty()) {</span>
+<span class="fc" id="L201">            StringBuilder row = new StringBuilder(&quot;pairwise-context&quot;);</span>
+<span class="fc" id="L202">            pairwise.forEach((name, statistics) -&gt; row</span>
+<span class="fc" id="L203">                .append('\n').append(name).append('=').append(statistics));</span>
+<span class="fc" id="L204">            rows.add(row.toString());</span>
+        }
+<span class="fc" id="L206">        rows.sort(String::compareTo);</span>
+<span class="fc" id="L207">        return String.join(&quot;\n---\n&quot;, rows);</span>
     }
 
     private static String sha256(String value) {
         try {
-<span class="fc" id="L127">            return java.util.HexFormat.of().formatHex(</span>
-<span class="fc" id="L128">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L129">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
-<span class="nc" id="L130">        } catch (NoSuchAlgorithmException exception) {</span>
-<span class="nc" id="L131">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+<span class="fc" id="L212">            return java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L213">                MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L214">                    .digest(value.getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L215">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L216">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
         }
     }
 
-<span class="fc" id="L135">    private record Example(</span>
+<span class="fc" id="L220">    private record Example(</span>
         TransformationDescriptor descriptor,
         boolean successful,
         int scoreDelta
     ) {
         private static Example of(SearchTrajectoryRecord record) {
-<span class="fc" id="L141">            return new Example(</span>
-<span class="fc" id="L142">                record.transformationDescriptor(),</span>
-<span class="pc bpc" id="L143" title="1 of 4 branches missed.">                record.selectedPath() &amp;&amp; record.eventualSuccess(),</span>
-<span class="fc" id="L144">                record.score() - record.parentScore());</span>
+<span class="fc" id="L226">            return new Example(</span>
+<span class="fc" id="L227">                record.transformationDescriptor(),</span>
+<span class="pc bpc" id="L228" title="1 of 4 branches missed.">                record.selectedPath() &amp;&amp; record.eventualSuccess(),</span>
+<span class="fc" id="L229">                record.score() - record.parentScore());</span>
         }
     }
 
@@ -151,55 +236,55 @@ import java.util.TreeSet;
         private long scoreDeltaSum;
 
         private void record(boolean successfulChoice, int scoreDelta) {
-<span class="fc" id="L154">            observations++;</span>
-<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (successfulChoice) {</span>
-<span class="fc" id="L156">                successful++;</span>
+<span class="fc" id="L239">            observations++;</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (successfulChoice) {</span>
+<span class="fc" id="L241">                successful++;</span>
             }
-<span class="fc" id="L158">            scoreDeltaSum += scoreDelta;</span>
-<span class="fc" id="L159">        }</span>
+<span class="fc" id="L243">            scoreDeltaSum += scoreDelta;</span>
+<span class="fc" id="L244">        }</span>
 
         private DescriptorStatistics freeze() {
-<span class="fc" id="L162">            int failed = observations - successful;</span>
-<span class="fc" id="L163">            int successPermille = successful * 1000 / observations;</span>
-<span class="fc" id="L164">            int meanScoreDelta = roundedMean(scoreDeltaSum, observations);</span>
-<span class="fc" id="L165">            return new DescriptorStatistics(</span>
+<span class="fc" id="L247">            int failed = observations - successful;</span>
+<span class="fc" id="L248">            int successPermille = successful * 1000 / observations;</span>
+<span class="fc" id="L249">            int meanScoreDelta = roundedMean(scoreDeltaSum, observations);</span>
+<span class="fc" id="L250">            return new DescriptorStatistics(</span>
                 observations, successful, failed, successPermille, meanScoreDelta);
         }
     }
 
-<span class="fc" id="L170">    private static final class MutableFeatureStatistics {</span>
+<span class="fc" id="L255">    private static final class MutableFeatureStatistics {</span>
         private int observations;
         private int successful;
         private long successfulValueSum;
         private long failedValueSum;
-<span class="fc" id="L175">        private int minimumValue = Integer.MAX_VALUE;</span>
-<span class="fc" id="L176">        private int maximumValue = Integer.MIN_VALUE;</span>
+<span class="fc" id="L260">        private int minimumValue = Integer.MAX_VALUE;</span>
+<span class="fc" id="L261">        private int maximumValue = Integer.MIN_VALUE;</span>
 
         private void record(int value, boolean successfulChoice) {
-<span class="fc" id="L179">            observations++;</span>
-<span class="fc" id="L180">            minimumValue = Math.min(minimumValue, value);</span>
-<span class="fc" id="L181">            maximumValue = Math.max(maximumValue, value);</span>
-<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (successfulChoice) {</span>
-<span class="fc" id="L183">                successful++;</span>
-<span class="fc" id="L184">                successfulValueSum += value;</span>
+<span class="fc" id="L264">            observations++;</span>
+<span class="fc" id="L265">            minimumValue = Math.min(minimumValue, value);</span>
+<span class="fc" id="L266">            maximumValue = Math.max(maximumValue, value);</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (successfulChoice) {</span>
+<span class="fc" id="L268">                successful++;</span>
+<span class="fc" id="L269">                successfulValueSum += value;</span>
             } else {
-<span class="fc" id="L186">                failedValueSum += value;</span>
+<span class="fc" id="L271">                failedValueSum += value;</span>
             }
-<span class="fc" id="L188">        }</span>
+<span class="fc" id="L273">        }</span>
 
         private FeatureStatistics freeze() {
-<span class="fc" id="L191">            int failed = observations - successful;</span>
-<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            int meanSuccessful = successful == 0</span>
-<span class="nc" id="L193">                ? 0</span>
-<span class="fc" id="L194">                : roundedMean(successfulValueSum, successful);</span>
-<span class="pc bpc" id="L195" title="1 of 2 branches missed.">            int meanFailed = failed == 0</span>
-<span class="nc" id="L196">                ? 0</span>
-<span class="fc" id="L197">                : roundedMean(failedValueSum, failed);</span>
-<span class="pc bpc" id="L198" title="2 of 4 branches missed.">            int coefficient = successful == 0 || failed == 0</span>
-<span class="nc" id="L199">                ? 0</span>
-<span class="fc" id="L200">                : normalizedCoefficient(</span>
+<span class="fc" id="L276">            int failed = observations - successful;</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            int meanSuccessful = successful == 0</span>
+<span class="nc" id="L278">                ? 0</span>
+<span class="fc" id="L279">                : roundedMean(successfulValueSum, successful);</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            int meanFailed = failed == 0</span>
+<span class="nc" id="L281">                ? 0</span>
+<span class="fc" id="L282">                : roundedMean(failedValueSum, failed);</span>
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">            int coefficient = successful == 0 || failed == 0</span>
+<span class="nc" id="L284">                ? 0</span>
+<span class="fc" id="L285">                : normalizedCoefficient(</span>
                     meanSuccessful, meanFailed, minimumValue, maximumValue);
-<span class="fc" id="L202">            return new FeatureStatistics(</span>
+<span class="fc" id="L287">            return new FeatureStatistics(</span>
                 observations,
                 successful,
                 failed,
@@ -217,13 +302,13 @@ import java.util.TreeSet;
         int minimum,
         int maximum
     ) {
-<span class="fc" id="L220">        long span = Math.max(1L, (long) maximum - minimum);</span>
-<span class="fc" id="L221">        long value = ((long) meanFailed - meanSuccessful) * 1000L / span;</span>
-<span class="fc" id="L222">        return (int) Math.max(-1000L, Math.min(1000L, value));</span>
+<span class="fc" id="L305">        long span = Math.max(1L, (long) maximum - minimum);</span>
+<span class="fc" id="L306">        long value = ((long) meanFailed - meanSuccessful) * 1000L / span;</span>
+<span class="fc" id="L307">        return (int) Math.max(-1000L, Math.min(1000L, value));</span>
     }
 
     private static int roundedMean(long sum, int count) {
-<span class="fc" id="L226">        return (int) Math.round((double) sum / count);</span>
+<span class="fc" id="L311">        return (int) Math.round((double) sum / count);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
