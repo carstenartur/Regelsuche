@@ -152,11 +152,11 @@ public final class HiddenRulePilotRuntimeCatalog {
                     "p-034", "(sin(t) * 0) / 1", "0"),
                 negatives("n-033", "(y * 1) / 1", "n-034", "(y * 0) / 2")),
             simpleTask(
-                "case-018", "1 * (0 * x)", "0",
-                List.of("ast_multiply_one_left", "ast_multiply_zero_left"),
-                positives("p-035", "1 * (0 * (y + z))", "0",
-                    "p-036", "1 * (0 * sin(t))", "0"),
-                negatives("n-035", "2 * (0 * y)", "n-036", "1 * (1 * y)")),
+                "case-018", "(1 * 0) * x", "0",
+                List.of("ast_multiply_zero_right", "ast_multiply_zero_left"),
+                positives("p-035", "(1 * 0) * (y + z)", "0",
+                    "p-036", "(1 * 0) * sin(t)", "0"),
+                negatives("n-035", "(2 * 0) * y", "n-036", "(1 * 1) * y")),
             simpleTask(
                 "case-019", "(x * x)^2", "x^4",
                 List.of("ast_product_to_power_two", "ast_power_of_power"),
@@ -164,11 +164,11 @@ public final class HiddenRulePilotRuntimeCatalog {
                     "p-038", "(sin(t) * sin(t))^2", "sin(t)^4"),
                 negatives("n-037", "(y * z)^2", "n-038", "(y * y)^3")),
             simpleTask(
-                "case-020", "x^2 * (x * x)", "x^4",
-                List.of("ast_product_to_power_two", "ast_combine_powers"),
-                positives("p-039", "(y + z)^2 * ((y + z) * (y + z))", "(y + z)^4",
-                    "p-040", "sin(t)^2 * (sin(t) * sin(t))", "sin(t)^4"),
-                negatives("n-039", "y^2 * (z * z)", "n-040", "y^3 * (y * y)"))));
+                "case-020", "x^2 * x * x", "x^4",
+                List.of("ast_combine_powers"),
+                positives("p-039", "(y + z)^2 * (y + z) * (y + z)", "(y + z)^4",
+                    "p-040", "sin(t)^2 * sin(t) * sin(t)", "sin(t)^4"),
+                negatives("n-039", "y^2 * z * z", "n-040", "y^3 * y * y"))));
         return List.copyOf(result);
     }
 
