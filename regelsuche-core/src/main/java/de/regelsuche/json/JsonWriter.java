@@ -12,9 +12,18 @@ import java.util.function.Consumer;
  * export consistent (escaping, comma handling, ordering) without pulling in a
  * large external dependency.</p>
  */
-public final class JsonWriter {
-    private final StringBuilder builder = new StringBuilder();
-    private final Deque<Boolean> firstEntry = new ArrayDeque<>();
+public class JsonWriter {
+    private final StringBuilder builder;
+    private final Deque<Boolean> firstEntry;
+
+    public JsonWriter() {
+        this(new StringBuilder(), new ArrayDeque<>());
+    }
+
+    protected JsonWriter(StringBuilder builder, Deque<Boolean> firstEntry) {
+        this.builder = builder;
+        this.firstEntry = firstEntry;
+    }
 
     public JsonWriter beginObject() {
         builder.append('{');
@@ -54,11 +63,14 @@ public final class JsonWriter {
         return endObject();
     }
 
-    public JsonWriter array(String key, Consumer<JsonWriter> body) {
+    public JsonWriter array(
+        String key,
+        Consumer<? super JsonArrayBuilder> body
+    ) {
         comma();
         appendKey(key);
         beginArray();
-        body.accept(this);
+        body.accept(new JsonArrayBuilder(builder, firstEntry));
         return endArray();
     }
 
@@ -182,5 +194,20 @@ public final class JsonWriter {
     @Override
     public String toString() {
         return builder.toString();
+    }
+
+    /**
+     * Typed array callback sharing the parent writer's buffer and comma state.
+     *
+     * <p>It remains a {@link JsonWriter}, so existing array lambdas and helper
+     * methods accepting {@code JsonWriter} remain source-compatible.</p>
+     */
+    public static final class JsonArrayBuilder extends JsonWriter {
+        private JsonArrayBuilder(
+            StringBuilder builder,
+            Deque<Boolean> firstEntry
+        ) {
+            super(builder, firstEntry);
+        }
     }
 }
