@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.cross-family-bridge-qualification/v1",
+  "title": "Regelsuche cross-family bridge qualification evidence v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "hypothesisId",
+    "sourceClusterId",
+    "formationHash",
+    "transferContentHash",
+    "ablationContentHash",
+    "exactSignatureHash",
+    "alphaSignatureHash",
+    "proofEvidenceHash",
+    "interestingnessContentHash",
+    "status",
+    "transferStatus",
+    "projectNoveltyStatus",
+    "externalNoveltyStatus",
+    "symbolicProofStatus",
+    "formalProofStatus",
+    "assumptionStatus",
+    "ablationStatus",
+    "interestingnessEligibility",
+    "interestingnessProfile",
+    "interestingnessTotalPermille",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "blockers",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.cross-family-bridge-qualification/v1" },
+    "hypothesisId": { "$ref": "#/$defs/nonBlank" },
+    "sourceClusterId": { "$ref": "#/$defs/nonBlank" },
+    "formationHash": { "$ref": "#/$defs/sha256" },
+    "transferContentHash": { "$ref": "#/$defs/sha256" },
+    "ablationContentHash": { "$ref": "#/$defs/sha256" },
+    "exactSignatureHash": { "$ref": "#/$defs/sha256" },
+    "alphaSignatureHash": { "$ref": "#/$defs/sha256" },
+    "proofEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "interestingnessContentHash": { "$ref": "#/$defs/sha256" },
+    "status": { "enum": ["QUALIFIED_FOR_PROMOTION_REVIEW", "BLOCKED"] },
+    "transferStatus": { "$ref": "#/$defs/nonBlank" },
+    "projectNoveltyStatus": { "$ref": "#/$defs/nonBlank" },
+    "externalNoveltyStatus": { "$ref": "#/$defs/nonBlank" },
+    "symbolicProofStatus": { "$ref": "#/$defs/nonBlank" },
+    "formalProofStatus": { "$ref": "#/$defs/nonBlank" },
+    "assumptionStatus": { "enum": ["CONSISTENT", "MISMATCH"] },
+    "ablationStatus": {
+      "enum": [
+        "BENEFICIAL_HELD_OUT",
+        "NO_HELD_OUT_GAIN",
+        "REGRESSION",
+        "TRADE_OFF",
+        "INCOMPLETE_EVIDENCE",
+        "NOT_ELIGIBLE_TRANSFER"
+      ]
+    },
+    "interestingnessEligibility": {
+      "enum": ["RANKABLE_COMPLETE", "RANKABLE_INCOMPLETE", "BLOCKED"]
+    },
+    "interestingnessProfile": { "enum": ["THEORY_DISCOVERY", "SEARCH_REUSE"] },
+    "interestingnessTotalPermille": {
+      "type": "integer",
+      "minimum": -1000,
+      "maximum": 1000
+    },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "blockers": { "$ref": "#/$defs/stringArray" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
