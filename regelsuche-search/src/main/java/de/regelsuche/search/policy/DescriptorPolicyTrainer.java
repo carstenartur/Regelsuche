@@ -119,7 +119,7 @@ public final class DescriptorPolicyTrainer {
         return result;
     }
 
-    /** Learns context features only from candidates that competed in one expansion. */
+    /** Learns ranking features only from candidates that actually competed. */
     private static Map<String, FeatureStatistics> pairwiseContextStatistics(
         List<SearchTrajectoryRun> trainingRuns
     ) {
@@ -141,6 +141,7 @@ public final class DescriptorPolicyTrainer {
                 }
             }
             recordContextCompetition(group, mutable);
+            recordTerminalCompetition(run.records(), mutable);
         }
         Map<String, FeatureStatistics> result = new LinkedHashMap<>();
         mutable.entrySet().stream()
@@ -183,6 +184,33 @@ public final class DescriptorPolicyTrainer {
                         statistics.record(alternativeValue, false);
                     }
                 }
+            }
+        }
+    }
+
+    /** Compares a terminal TRAIN choice with the real alternatives seen in its run. */
+    private static void recordTerminalCompetition(
+        List<SearchTrajectoryRecord> records,
+        Map<String, MutableFeatureStatistics> mutable
+    ) {
+        List<SearchTrajectoryRecord> alternatives = records.stream()
+            .filter(SearchTrajectoryRecord::decision)
+            .filter(record -> !record.selectedPath())
+            .filter(record -> record.transformationDescriptor().available())
+            .toList();
+        for (SearchTrajectoryRecord winner : records) {
+            TransformationDescriptor descriptor = winner.transformationDescriptor();
+            if (!winner.decision() || !winner.selectedPath() || !winner.eventualSuccess()
+                    || descriptor == null || !descriptor.targeted()
+                    || descriptor.targetDistanceAfter() != 0) {
+                continue;
+            }
+            MutableFeatureStatistics statistics = mutable.computeIfAbsent(
+                DescriptorSearchPolicy.PAIRWISE_TARGET_REACHED,
+                ignored -> new MutableFeatureStatistics());
+            for (SearchTrajectoryRecord ignored : alternatives) {
+                statistics.record(1, true);
+                statistics.record(0, false);
             }
         }
     }
