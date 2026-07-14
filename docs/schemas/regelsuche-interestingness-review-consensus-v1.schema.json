@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.interestingness-review-consensus/v1",
+  "title": "Regelsuche interestingness review consensus v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "minimumExpertReviews",
+    "maximumConsensusSpreadPermille",
+    "minimumMeanConfidencePermille",
+    "candidates",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.interestingness-review-consensus/v1" },
+    "minimumExpertReviews": { "const": 2 },
+    "maximumConsensusSpreadPermille": { "const": 250 },
+    "minimumMeanConfidencePermille": { "const": 500 },
+    "candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "required": [
+        "candidateId",
+        "status",
+        "countedExpertReviews",
+        "blindExpertReviews",
+        "consensusRelevancePermille",
+        "spreadPermille",
+        "meanConfidencePermille",
+        "sources",
+        "reviewerHashes",
+        "rationaleCodes"
+      ],
+      "properties": {
+        "candidateId": { "$ref": "#/$defs/nonBlank" },
+        "status": {
+          "enum": [
+            "CONSENSUS",
+            "UNCERTAIN",
+            "INSUFFICIENT_REVIEWS",
+            "DEVELOPMENT_ONLY"
+          ]
+        },
+        "countedExpertReviews": { "$ref": "#/$defs/nonNegativeInteger" },
+        "blindExpertReviews": { "$ref": "#/$defs/nonNegativeInteger" },
+        "consensusRelevancePermille": { "$ref": "#/$defs/permille" },
+        "spreadPermille": { "$ref": "#/$defs/permille" },
+        "meanConfidencePermille": { "$ref": "#/$defs/permille" },
+        "sources": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["EXPERT_REVIEW", "CONTROL_ASSIGNMENT", "TEST_FIXTURE"]
+          }
+        },
+        "reviewerHashes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/sha256" }
+        },
+        "rationaleCodes": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 },
+    "stringArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
