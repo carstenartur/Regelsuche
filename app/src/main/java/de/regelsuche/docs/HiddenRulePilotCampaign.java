@@ -78,7 +78,14 @@ public final class HiddenRulePilotCampaign {
         if (!split.passed()) {
             blockers.add("train/holdout split collision");
         }
-        boolean accepted = evaluation.pilotAccepted() && split.passed();
+        boolean holdoutsComplete = runtime.holdouts().positives().size()
+                == pilotCase.task().positiveHoldouts().size()
+            && runtime.holdouts().negatives().size()
+                == pilotCase.task().negativeHoldouts().size();
+        if (!holdoutsComplete) {
+            blockers.add("holdout evaluation incomplete");
+        }
+        boolean accepted = evaluation.pilotAccepted() && split.passed() && holdoutsComplete;
         return new CaseReport(
             pilotCase.task().opaqueCaseId(),
             evaluation.family(),
@@ -110,6 +117,15 @@ public final class HiddenRulePilotCampaign {
     ) {
         public CaseReport {
             blockers = List.copyOf(blockers);
+        }
+
+        public boolean holdoutsComplete() {
+            return runtime.holdouts().positives().size() == split.positives().size()
+                && runtime.holdouts().negatives().size() == split.negatives().size();
+        }
+
+        public boolean holdoutsPassed() {
+            return holdoutsComplete() && runtime.holdouts().allPassed();
         }
     }
 
@@ -144,10 +160,20 @@ public final class HiddenRulePilotCampaign {
                 .count();
         }
 
+        /** Number of adversarial negative holdouts configured in the audited benchmark. */
         public int negativeHoldouts() {
+            return cases.stream().mapToInt(caseReport -> caseReport.split().negatives().size()).sum();
+        }
+
+        /** Number of negative holdouts actually executed after a candidate was compiled. */
+        public int evaluatedNegativeHoldouts() {
             return cases.stream()
                 .mapToInt(caseReport -> caseReport.runtime().holdouts().negatives().size())
                 .sum();
+        }
+
+        public int skippedNegativeHoldouts() {
+            return negativeHoldouts() - evaluatedNegativeHoldouts();
         }
 
         public int falsePositiveHoldouts() {
@@ -186,9 +212,11 @@ public final class HiddenRulePilotCampaign {
                     .property("rediscoveredCases", rediscoveredCases())
                     .property("rediscoveryRatePermille", permille(rediscoveredCases(), cases.size()))
                     .property("negativeHoldouts", negativeHoldouts())
+                    .property("evaluatedNegativeHoldouts", evaluatedNegativeHoldouts())
+                    .property("skippedNegativeHoldouts", skippedNegativeHoldouts())
                     .property("falsePositiveHoldouts", falsePositiveHoldouts())
                     .property("falsePositiveRatePermille",
-                        permille(falsePositiveHoldouts(), negativeHoldouts()))
+                        permille(falsePositiveHoldouts(), evaluatedNegativeHoldouts()))
                     .property("generatedValidationExamples", generatedValidationExamples())
                     .property("counterexampleSearches", counterexampleSearches()))
                 .object("failureTaxonomy", taxonomy ->
@@ -236,7 +264,8 @@ public final class HiddenRulePilotCampaign {
                 .property("candidateFrozen", runtime.frozen())
                 .property("validationPassed", evaluation.validationPassed())
                 .property("splitPassed", report.split().passed())
-                .property("holdoutsPassed", runtime.holdouts().allPassed())
+                .property("holdoutsComplete", report.holdoutsComplete())
+                .property("holdoutsPassed", report.holdoutsPassed())
                 .property("materialAblation", evaluation.materialAblation())
                 .property("accepted", report.accepted())
                 .property("pathLength", Math.max(0, runtime.path().size() - 1))
