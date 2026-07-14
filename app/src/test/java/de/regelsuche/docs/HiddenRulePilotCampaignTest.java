@@ -28,10 +28,20 @@ class HiddenRulePilotCampaignTest {
         campaign.write(output, report);
         campaign.writeRuntime(runtimeOutput, report);
 
+        int configuredNegativeHoldouts = HiddenRulePilotCatalog.cases().stream()
+            .mapToInt(pilotCase -> pilotCase.task().negativeHoldouts().size())
+            .sum();
+        int auditedNegativeHoldouts = report.cases().stream()
+            .mapToInt(caseReport -> caseReport.split().negatives().size())
+            .sum();
+
         assertEquals(HiddenRulePilotCampaign.SCHEMA, report.schema());
         assertEquals(20, report.cases().size());
         assertTrue(report.familyCount() >= 4);
-        assertEquals(40, report.negativeHoldouts());
+        assertEquals(40, configuredNegativeHoldouts);
+        assertEquals(configuredNegativeHoldouts, auditedNegativeHoldouts);
+        assertTrue(report.negativeHoldouts() <= configuredNegativeHoldouts,
+            "only holdouts reached after a candidate is compiled are executable");
         assertTrue(report.generatedValidationExamples() > 0);
         assertTrue(report.counterexampleSearches() > 0);
         assertTrue(report.frozenCandidates() >= 1);
