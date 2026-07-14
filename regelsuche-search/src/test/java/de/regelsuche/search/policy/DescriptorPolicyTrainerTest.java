@@ -3,6 +3,7 @@ package de.regelsuche.search.policy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,10 +16,12 @@ import de.regelsuche.search.learning.SearchTrajectoryContext.DatasetSplit;
 import de.regelsuche.search.learning.SearchTrajectoryDataset;
 import de.regelsuche.search.learning.SearchTrajectoryRun;
 import de.regelsuche.search.learning.TransformationDescriptor;
+import de.regelsuche.search.policy.DescriptorPolicyModel.FeatureStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.Mode;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import de.regelsuche.search.strategy.SearchProblem;
 import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.search.telemetry.SearchEventType;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
@@ -141,6 +144,54 @@ class DescriptorPolicyTrainerTest {
     }
 
     @Test
+    void localContextInteractionsComeOnlyFromRealCandidateCompetition() {
+        SearchTrajectoryRun training = contextCompetitionRun();
+
+        DescriptorPolicyModel model = new DescriptorPolicyTrainer().train(
+            new SearchTrajectoryDataset(List.of(training)), Mode.LINEAR, 1);
+
+        FeatureStatistics context = model.features().get("local.context.MUL");
+        FeatureStatistics contextRole =
+            model.features().get("local.contextRole.MUL_AC_CHILD");
+        assertNotNull(context);
+        assertNotNull(contextRole);
+        assertEquals(2, context.observations());
+        assertEquals(1, context.successfulChoices());
+        assertEquals(1, context.failedAlternatives());
+        assertEquals(-1000, context.coefficientPermille());
+        assertEquals(-1000, contextRole.coefficientPermille());
+    }
+
+    @Test
+    void pairwiseGroupingIsPartOfPredictiveModelIdentity() {
+        SearchTrajectoryRun competition = contextCompetitionRun();
+        SearchTrajectoryRun withoutExpansionBoundary = new SearchTrajectoryRun(
+            competition.context(),
+            competition.root(),
+            competition.target(),
+            competition.taskValueFingerprint(),
+            competition.taskAlphaFingerprint(),
+            competition.terminalStatus(),
+            competition.success(),
+            competition.records().stream()
+                .filter(record -> record.eventType() != SearchEventType.STATE_EXPANDED)
+                .toList());
+        DescriptorPolicyTrainer trainer = new DescriptorPolicyTrainer();
+
+        DescriptorPolicyModel grouped = trainer.train(
+            new SearchTrajectoryDataset(List.of(competition)), Mode.LINEAR, 1);
+        DescriptorPolicyModel ungrouped = trainer.train(
+            new SearchTrajectoryDataset(List.of(withoutExpansionBoundary)), Mode.LINEAR, 1);
+
+        assertEquals(grouped.descriptors(), ungrouped.descriptors());
+        assertNotEquals(grouped.sourceDatasetHash(), ungrouped.sourceDatasetHash());
+        assertNotEquals(grouped.predictiveDatasetHash(), ungrouped.predictiveDatasetHash());
+        assertNotEquals(grouped.modelVersion(), ungrouped.modelVersion());
+        assertTrue(grouped.features().containsKey("local.contextRole.MUL_AC_CHILD"));
+        assertFalse(ungrouped.features().containsKey("local.contextRole.MUL_AC_CHILD"));
+    }
+
+    @Test
     void exactOrAlphaSplitLeakageStillBlocksTraining() {
         SearchTrajectoryRun training = run(
             "train-neutral",
@@ -167,6 +218,36 @@ class DescriptorPolicyTrainerTest {
         SearchTrajectoryDataset dataset = new SearchTrajectoryDataset(List.of(training, validation));
         assertTrue(dataset.leakageFree(), dataset.leakageViolations().toString());
         return dataset;
+    }
+
+    private SearchTrajectoryRun contextCompetitionRun() {
+        String root = "(p + 0) * 1";
+        String target = "p * 1";
+        TransformationEngine engine = expression -> expression.equals(root)
+            ? List.of(
+                step("inner-progress", target, -1),
+                step("outer-alternative", "p + 0", -1))
+            : List.of();
+        SearchTrajectoryCollector collector = new SearchTrajectoryCollector();
+        SearchProblem problem = new SearchProblem(
+            root,
+            engine,
+            scorer,
+            canonicalizer,
+            new SearchHeuristic(2, 20, 1, 2, 10, 10))
+            .withTarget(SearchTarget.syntaxExact(target))
+            .withObserver(collector);
+        var result = new BestFirstSearchStrategy().searchWithDiagnostics(problem);
+        assertTrue(result.reached(), result.toString());
+        return collector.finish(
+            problem,
+            result,
+            new SearchTrajectoryContext(
+                "train-context-competition",
+                "context-family",
+                "descriptor-context-test/v1",
+                List.of("inner-progress", "outer-alternative"),
+                DatasetSplit.TRAIN));
     }
 
     private SearchTrajectoryRun run(

@@ -3,6 +3,7 @@ package de.regelsuche.search.policy;
 import de.regelsuche.search.learning.ExpressionFingerprint;
 import de.regelsuche.search.learning.SearchExperienceRepository;
 import de.regelsuche.search.learning.TransformationDescriptor;
+import de.regelsuche.search.learning.TransformationDescriptor.OccurrenceRole;
 import de.regelsuche.search.policy.DescriptorPolicyModel.DescriptorStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.FeatureStatistics;
 import de.regelsuche.transform.Transformation;
@@ -78,10 +79,11 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         Transformation transformation,
         TransformationDescriptor descriptor
     ) {
-        Map<String, Integer> descriptorFeatures = descriptor.featureVector();
+        Map<String, Integer> descriptorFeatures = descriptorFeatures(descriptor);
         Map<String, Integer> contributions = base(context);
-        boolean localEvidenceSupported = localEvidenceSupported(descriptorFeatures);
+        boolean localTransitionSupported = localTransitionSupported(descriptorFeatures);
         int informative = 0;
+        int pairwiseContextEvidence = 0;
         int outOfRange = 0;
         int ignoredUnsupportedLocal = 0;
         int minimumEvidence = Integer.MAX_VALUE;
@@ -92,11 +94,16 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
                 continue;
             }
             String featureName = entry.getKey();
-            if (featureName.startsWith("local.") && !localEvidenceSupported) {
+            int value = descriptorFeatures.getOrDefault(featureName, 0);
+            if (pairwiseContextFeature(featureName)) {
+                if (value == 0) {
+                    continue;
+                }
+                pairwiseContextEvidence++;
+            } else if (featureName.startsWith("local.") && !localTransitionSupported) {
                 ignoredUnsupportedLocal++;
                 continue;
             }
-            int value = descriptorFeatures.getOrDefault(featureName, 0);
             if (value < statistics.minimumValue() || value > statistics.maximumValue()) {
                 outOfRange++;
                 continue;
@@ -129,11 +136,12 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
         return decision(contributions,
             Math.min(1000, minimumEvidence * 100 + informative * 50),
             "transparent linear descriptor evidence from " + informative
-                + " shared features; ignoredOutOfRange=" + outOfRange
+                + " shared features; pairwiseContextEvidence=" + pairwiseContextEvidence
+                + "; ignoredOutOfRange=" + outOfRange
                 + "; ignoredUnsupportedLocal=" + ignoredUnsupportedLocal);
     }
 
-    private boolean localEvidenceSupported(Map<String, Integer> descriptorFeatures) {
+    private boolean localTransitionSupported(Map<String, Integer> descriptorFeatures) {
         for (Map.Entry<String, Integer> feature : descriptorFeatures.entrySet()) {
             if (!feature.getKey().startsWith("local.transition.") || feature.getValue() == 0) {
                 continue;
@@ -144,6 +152,21 @@ public final class DescriptorSearchPolicy implements SearchPolicy {
                 && statistics.maximumValue() > 0;
         }
         return false;
+    }
+
+    static Map<String, Integer> descriptorFeatures(TransformationDescriptor descriptor) {
+        Map<String, Integer> features = new LinkedHashMap<>(descriptor.featureVector());
+        TransformationDescriptor.LocalChange local = descriptor.localChange();
+        if (local.available() && local.role() != OccurrenceRole.ROOT) {
+            features.put("local.contextRole." + local.contextRoot().kind().name()
+                + "_" + local.role().name(), 1);
+        }
+        return features;
+    }
+
+    static boolean pairwiseContextFeature(String featureName) {
+        return featureName.startsWith("local.context.")
+            || featureName.startsWith("local.contextRole.");
     }
 
     private Map<String, Integer> base(PolicyContext context) {
