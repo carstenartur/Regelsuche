@@ -25,13 +25,13 @@ class OpenTargetConjectureMinerTest {
 
     @Test
     void minesParameterizedConjectureFromRealUntargetedAlphaDistinctConvergence() {
-        var variable = factoringObservation(
-            "obs-variable", "factor-common", "x", "y", "z");
-        var product = factoringObservation(
-            "obs-product", "factor-common", "a * b", "c", "d");
+        var first = factoringObservation(
+            "obs-2-3", "factor-common", "x", "2", "3");
+        var second = factoringObservation(
+            "obs-4-5", "factor-common", "a", "4", "5");
 
-        var report = miner.mine(List.of(variable, product));
-        var reversed = miner.mine(List.of(product, variable));
+        var report = miner.mine(List.of(first, second));
+        var reversed = miner.mine(List.of(second, first));
 
         assertEquals(OpenTargetConjectureMiner.SCHEMA, report.schema());
         assertFalse(report.targetProvided());
@@ -40,7 +40,7 @@ class OpenTargetConjectureMinerTest {
         var conjecture = report.conjectures().getFirst();
         assertEquals(2, conjecture.supportCount());
         assertEquals(2, conjecture.distinctAlphaSupport());
-        assertEquals(List.of("obs-product", "obs-variable"), conjecture.supportingObservationIds());
+        assertEquals(List.of("obs-2-3", "obs-4-5"), conjecture.supportingObservationIds());
         assertEquals(List.of("factor-common"), conjecture.postHocFamilies());
         assertNotEquals(conjecture.leftPattern(), conjecture.rightPattern());
         assertTrue(conjecture.leftPattern().contains("+"), conjecture.leftPattern());
@@ -58,8 +58,8 @@ class OpenTargetConjectureMinerTest {
 
     @Test
     void rejectsSupportThatDiffersOnlyByAlphaRenaming() {
-        var first = factoringObservation("obs-first", "factor-common", "x", "y", "z");
-        var renamed = factoringObservation("obs-renamed", "factor-common", "a", "b", "c");
+        var first = factoringObservation("obs-first", "factor-common", "x", "2", "3");
+        var renamed = factoringObservation("obs-renamed", "factor-common", "a", "2", "3");
 
         var report = miner.mine(List.of(first, renamed));
 
