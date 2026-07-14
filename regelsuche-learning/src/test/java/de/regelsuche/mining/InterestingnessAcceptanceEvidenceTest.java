@@ -2,24 +2,35 @@ package de.regelsuche.mining;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.mining.InterestingnessAcceptanceGate.Thresholds;
-import de.regelsuche.mining.InterestingnessAssessment.Eligibility;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusReport;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusSplit;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusStatus;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.FrozenCase;
+import de.regelsuche.mining.InterestingnessEvidence.ControlClassification;
+import de.regelsuche.mining.InterestingnessEvidence.ProjectNoveltyStatus;
 import de.regelsuche.mining.InterestingnessProfileCalibration.CalibrationReport;
-import de.regelsuche.mining.InterestingnessProfileCalibration.ProfileMetric;
-import de.regelsuche.mining.InterestingnessProfileCalibration.RankedCase;
-import de.regelsuche.mining.InterestingnessProfileCalibration.Sensitivity;
+import de.regelsuche.mining.InterestingnessProfileCalibration.CaseProfiles;
+import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.validation.CounterexampleSearchService;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** Retains one internally consistent profile/acceptance evidence pair for CI. */
 class InterestingnessAcceptanceEvidenceTest {
     @Test
-    void retainedAcceptanceReferencesTheSimultaneouslyWrittenProfileReport()
+    void retainedAcceptanceReferencesAProductionCalibratedProfileReport()
             throws Exception {
         CalibrationReport profileReport = profileReport();
         var decision = new InterestingnessAcceptanceGate().evaluate(
@@ -33,6 +44,7 @@ class InterestingnessAcceptanceEvidenceTest {
         Files.writeString(acceptanceOutput, decision.toCanonicalJson());
 
         assertEquals(profileReport.contentHash(), decision.calibrationReportHash());
+        assertNotEquals(hash("placeholder-report"), profileReport.contentHash());
         assertTrue(Files.readString(profileOutput).contains(
             "\"contentHash\":\"" + decision.calibrationReportHash() + "\""));
         assertEquals(decision.toCanonicalJson(), Files.readString(acceptanceOutput));
@@ -41,57 +53,137 @@ class InterestingnessAcceptanceEvidenceTest {
     }
 
     private static CalibrationReport profileReport() {
-        return new CalibrationReport(
-            InterestingnessProfileCalibration.SCHEMA,
-            hash('p'),
-            hash('l'),
-            InterestingnessProfile.THEORY_DISCOVERY,
-            List.of(
-                new ProfileMetric(
-                    InterestingnessProfile.SEARCH_REUSE,
-                    666,
-                    666),
-                new ProfileMetric(
-                    InterestingnessProfile.THEORY_DISCOVERY,
-                    666,
-                    666)),
-            List.of(
-                ranked(1, "test-reuse", 700, 760, 'a'),
-                ranked(2, "test-surprise", 820, 720, 'b'),
-                ranked(3, "test-control", 100, -200, 'c')),
-            List.of("test-reuse", "test-surprise"),
-            new Sensitivity(1000, 1000, true),
-            hash('s'),
-            hash('r'));
+        List<Prepared> prepared = List.of(
+            prepared("cal-reuse", CorpusSplit.CALIBRATION, "cal-algebra", 850,
+                ControlClassification.NONE, 900),
+            prepared("cal-surprise", CorpusSplit.CALIBRATION, "cal-rational", 650,
+                ControlClassification.NONE, 650),
+            prepared("cal-control", CorpusSplit.CALIBRATION, "cal-control", 100,
+                ControlClassification.GENERIC_NORMALIZATION, 0),
+            prepared("test-reuse", CorpusSplit.TEST, "test-functional", 800,
+                ControlClassification.NONE, 900),
+            prepared("test-surprise", CorpusSplit.TEST, "test-combinatorics", 700,
+                ControlClassification.NONE, 650),
+            prepared("test-control", CorpusSplit.TEST, "test-control", 100,
+                ControlClassification.FORMAT_ONLY, 0));
+        CorpusReport corpus = new CorpusReport(
+            InterestingnessCalibrationCorpus.SCHEMA,
+            CorpusStatus.FROZEN,
+            InterestingnessCalibrationCorpus.MIN_CASES_PER_SPLIT,
+            prepared.stream().map(Prepared::frozenCase).toList(),
+            hash("predictive-corpus"),
+            hash("labeled-evaluation"),
+            hash("review-consensus"));
+        return new InterestingnessProfileCalibration().calibrate(
+            corpus, prepared.stream().map(Prepared::profiles).toList());
     }
 
-    private static RankedCase ranked(
-        int rank,
+    private static Prepared prepared(
         String candidateId,
+        CorpusSplit split,
+        String family,
         int relevance,
-        int total,
-        char hashCharacter
+        ControlClassification control,
+        int pairedUtility
     ) {
-        return new RankedCase(
-            rank,
+        boolean trivial = control != ControlClassification.NONE;
+        HypothesisCandidate candidate = candidate(candidateId, trivial);
+        InterestingnessEvidence evidence = new InterestingnessEvidence(
+            hash("evidence-" + candidateId),
+            2, 2, 0, 0,
+            2, 2, 0, 0,
+            CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND,
+            2,
+            false,
+            trivial ? ProjectNoveltyStatus.DUPLICATE
+                : ProjectNoveltyStatus.NOVEL_WITHIN_PROJECT,
+            trivial ? 1 : 3,
+            !trivial,
+            trivial ? 0 : 1,
+            trivial ? 0 : 1,
+            true,
+            pairedUtility,
+            control);
+        EvidenceAwareInterestingnessAssessor assessor =
+            new EvidenceAwareInterestingnessAssessor();
+        double similarity = trivial ? 0.95 : 0.10;
+        Set<String> domains = trivial
+            ? Set.of("normalization")
+            : Set.of("algebra", family);
+        InterestingnessAssessment theory = assessor.assess(
+            candidate, similarity, domains, evidence,
+            InterestingnessProfile.THEORY_DISCOVERY);
+        InterestingnessAssessment reuse = assessor.assess(
+            candidate, similarity, domains, evidence,
+            InterestingnessProfile.SEARCH_REUSE);
+        FrozenCase frozenCase = new FrozenCase(
             candidateId + "-case",
             candidateId,
+            split,
+            family,
+            hash("shape-" + candidateId),
+            theory.contentHash(),
+            control,
             relevance,
-            Eligibility.RANKABLE_COMPLETE,
-            total,
-            hash(hashCharacter),
-            Map.of(
-                "structuralSurprise", candidateId.contains("control") ? 50 : 800,
-                "crossFamilyTransfer", candidateId.contains("control") ? 0 : 1000,
-                "pairedUtility", candidateId.contains("reuse") ? 900 : 650,
-                "reusability", candidateId.contains("reuse") ? 950 : 700));
+            2,
+            2,
+            40,
+            850,
+            List.of("mathematical-usefulness", "structural-reuse"));
+        return new Prepared(
+            frozenCase,
+            new CaseProfiles(
+                frozenCase.caseId(), candidateId, theory, reuse));
     }
 
-    private static String hash(char character) {
-        char normalized = Character.toLowerCase(character);
-        if (normalized < 'a' || normalized > 'f') {
-            normalized = 'a';
+    private static HypothesisCandidate candidate(
+        String candidateId,
+        boolean trivial
+    ) {
+        String left = trivial ? "A + 0" : "A * B + A * C";
+        String right = trivial ? "A" : "A * (B + C)";
+        List<String> paths = trivial
+            ? List.of("add-zero")
+            : candidateId.contains("reuse")
+                ? List.of("prepare>factor", "normalize>factor", "alternate>factor")
+                : List.of("prepare>factor", "alternate>factor");
+        List<HypothesisCandidate.ExpressionPair> witnesses = trivial
+            ? List.of(new HypothesisCandidate.ExpressionPair("x+0", "x"))
+            : List.of(
+                new HypothesisCandidate.ExpressionPair("m*2+m*3", "m*(2+3)"),
+                new HypothesisCandidate.ExpressionPair(
+                    "(p/q)*4+(p/q)*5", "(p/q)*(4+5)"));
+        return new HypothesisCandidate(
+            candidateId,
+            left,
+            right,
+            paths,
+            witnesses,
+            List.of(),
+            trivial ? 0.05 : 0.85,
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            Boolean.FALSE,
+            CounterexampleSearchService.Status.NO_COUNTEREXAMPLE_FOUND,
+            List.of("numeric-boundary-values", "symbolic-substitutions"),
+            "no counterexample within the configured budget",
+            List.of(),
+            Map.of("A", List.of("x", "p/q")),
+            Instant.parse("2026-07-14T12:00:00Z"));
+    }
+
+    private static String hash(String material) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(material.getBytes(StandardCharsets.UTF_8));
+            return "sha256:" + java.util.HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
         }
-        return "sha256:" + String.valueOf(normalized).repeat(64);
+    }
+
+    private record Prepared(
+        FrozenCase frozenCase,
+        CaseProfiles profiles
+    ) {
     }
 }
