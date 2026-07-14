@@ -5,6 +5,7 @@ import de.regelsuche.mining.CrossFamilyStructuralClusterer.BridgeCluster;
 import de.regelsuche.mining.CrossFamilyStructuralClusterer.ClusterStatus;
 import de.regelsuche.mining.OpenTargetConjectureMiner.ConvergenceEvidence;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.mining.OpenTargetConjectureMiner.PathEvidence;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -41,6 +42,7 @@ public final class CrossFamilyBridgeHypothesisBuilder {
 
         List<ConvergenceEvidence> evidence = ordered.stream()
             .flatMap(conjecture -> conjecture.evidence().stream())
+            .map(CrossFamilyBridgeHypothesisBuilder::orderedEvidence)
             .sorted(Comparator.comparing(ConvergenceEvidence::observationId))
             .toList();
         TreeSet<String> observationIds = evidence.stream()
@@ -222,6 +224,25 @@ public final class CrossFamilyBridgeHypothesisBuilder {
         }
     }
 
+    private static ConvergenceEvidence orderedEvidence(ConvergenceEvidence source) {
+        List<PathEvidence> paths = source.paths().stream()
+            .sorted(Comparator.comparing(PathEvidence::pathId)
+                .thenComparing(path -> String.join("\u0001", path.ruleIds())))
+            .toList();
+        return new ConvergenceEvidence(
+            source.observationId(),
+            source.family(),
+            source.searchStatus(),
+            source.inputExpression(),
+            source.outputExpression(),
+            source.canonicalOutputHash(),
+            source.scoreImprovement(),
+            source.alphaPairFingerprint(),
+            source.valuePairFingerprint(),
+            source.pathCompetitionSignature(),
+            paths);
+    }
+
     private static Map<String, List<String>> orderedPlaceholderValues(
         Map<String, List<String>> values
     ) {
@@ -241,7 +262,8 @@ public final class CrossFamilyBridgeHypothesisBuilder {
                 ordered.put(key, normalized);
             }
         });
-        return Map.copyOf(ordered);
+        return java.util.Collections.unmodifiableMap(
+            new LinkedHashMap<>(ordered));
     }
 
     private static String formationMaterial(
@@ -268,12 +290,16 @@ public final class CrossFamilyBridgeHypothesisBuilder {
             .append("\nobservations=").append(observationIds)
             .append("\nassumptions=").append(assumptions)
             .append("\nparameterRelations=").append(parameterRelations)
-            .append("\nplaceholderValues=").append(placeholderValues);
+            .append("\nplaceholderValues=")
+            .append(new TreeMap<>(placeholderValues));
         evidence.forEach(item -> material.append("\nevidence=")
             .append(item.observationId()).append('|')
             .append(item.alphaPairFingerprint()).append('|')
             .append(item.valuePairFingerprint()).append('|')
-            .append(item.pathCompetitionSignature()));
+            .append(item.pathCompetitionSignature()).append('|')
+            .append(item.paths().stream()
+                .map(path -> path.pathId() + ':' + String.join(">", path.ruleIds()))
+                .toList()));
         return material.toString();
     }
 
