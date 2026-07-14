@@ -98,6 +98,19 @@ jobs:
         path: app/build/reports/held-out-descriptor-policy/**
         if-no-files-found: warn
 
+    - name: Require open-target conjecture evidence after a successful build
+      if: success()
+      shell: bash
+      run: test -s regelsuche-learning/build/reports/open-target-conjecture-mining/report.json
+
+    - name: Upload open-target conjecture evidence
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: open-target-conjecture-evidence
+        path: regelsuche-learning/build/reports/open-target-conjecture-mining/**
+        if-no-files-found: warn
+
   dependency-submission:
     runs-on: ubuntu-latest
     permissions:

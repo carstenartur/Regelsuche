@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.open-target-conjecture-mining/v1",
+  "title": "Regelsuche open-target conjecture mining evidence v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "targetProvided",
+    "contentHash",
+    "campaign",
+    "summary",
+    "conjectures",
+    "rejectedClusters"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.open-target-conjecture-mining/v1" },
+    "targetProvided": { "const": false },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "campaign": { "$ref": "#/$defs/campaign" },
+    "summary": { "$ref": "#/$defs/summary" },
+    "conjectures": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/conjecture" }
+    },
+    "rejectedClusters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rejectedCluster" }
+    }
+  },
+  "$defs": {
+    "campaign": {
+      "type": "object",
+      "required": [
+        "campaignId",
+        "producerVersion",
+        "softwareRevision",
+        "ruleInventoryHash",
+        "budget",
+        "seeds"
+      ],
+      "properties": {
+        "campaignId": { "$ref": "#/$defs/nonBlankString" },
+        "producerVersion": { "$ref": "#/$defs/nonBlankString" },
+        "softwareRevision": { "$ref": "#/$defs/nonBlankString" },
+        "ruleInventoryHash": { "$ref": "#/$defs/nonBlankString" },
+        "budget": { "$ref": "#/$defs/budget" },
+        "seeds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/seed" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "budget": {
+      "type": "object",
+      "required": [
+        "maxDepth",
+        "maxVisitedExpressions",
+        "significantImprovementThreshold",
+        "maxExpandingSteps",
+        "maxCandidatesPerState",
+        "beamWidth"
+      ],
+      "properties": {
+        "maxDepth": { "$ref": "#/$defs/nonNegativeInteger" },
+        "maxVisitedExpressions": { "$ref": "#/$defs/positiveInteger" },
+        "significantImprovementThreshold": { "$ref": "#/$defs/positiveInteger" },
+        "maxExpandingSteps": { "$ref": "#/$defs/nonNegativeInteger" },
+        "maxCandidatesPerState": { "$ref": "#/$defs/positiveInteger" },
+        "beamWidth": { "$ref": "#/$defs/positiveInteger" }
+      },
+      "additionalProperties": false
+    },
+    "seed": {
+      "type": "object",
+      "required": [
+        "observationId",
+        "seedId",
+        "generatorId",
+        "generatorParameters"
+      ],
+      "properties": {
+        "observationId": { "$ref": "#/$defs/nonBlankString" },
+        "seedId": { "$ref": "#/$defs/nonBlankString" },
+        "generatorId": { "$ref": "#/$defs/nonBlankString" },
+        "generatorParameters": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/nonBlankString" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "observations",
+        "conjectures",
+        "rejectedClusters",
+        "supportingObservations",
+        "postHocFamilies"
+      ],
+      "properties": {
+        "observations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "conjectures": { "$ref": "#/$defs/nonNegativeInteger" },
+        "rejectedClusters": { "$ref": "#/$defs/nonNegativeInteger" },
+        "supportingObservations": { "$ref": "#/$defs/nonNegativeInteger" },
+        "postHocFamilies": { "$ref": "#/$defs/nonNegativeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "conjecture": {
+      "type": "object",
+      "required": [
+        "conjectureId",
+        "leftPattern",
+        "rightPattern",
+        "supportCount",
+        "distinctAlphaSupport",
+        "candidateStatus",
+        "evidenceStatus",
+        "validationStatus",
+        "proofStatus",
+        "noveltyStatus",
+        "postHocFamilies",
+        "supportingObservationIds",
+        "parameterRelations",
+        "expressionPlaceholderValues",
+        "evidence"
+      ],
+      "properties": {
+        "conjectureId": { "$ref": "#/$defs/nonBlankString" },
+        "leftPattern": { "$ref": "#/$defs/nonBlankString" },
+        "rightPattern": { "$ref": "#/$defs/nonBlankString" },
+        "supportCount": { "$ref": "#/$defs/positiveInteger" },
+        "distinctAlphaSupport": { "$ref": "#/$defs/positiveInteger" },
+        "candidateStatus": { "const": "OBSERVED_CONJECTURE" },
+        "evidenceStatus": { "const": "EQUIVALENCE_PRESERVING_CONVERGENT_PATHS" },
+        "validationStatus": { "const": "NOT_EVALUATED" },
+        "proofStatus": { "const": "NOT_EVALUATED" },
+        "noveltyStatus": { "const": "NOT_EVALUATED" },
+        "postHocFamilies": { "$ref": "#/$defs/stringArray" },
+        "supportingObservationIds": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/nonBlankString" }
+        },
+        "parameterRelations": { "$ref": "#/$defs/stringArray" },
+        "expressionPlaceholderValues": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/stringArray" }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/convergenceEvidence" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "convergenceEvidence": {
+      "type": "object",
+      "required": [
+        "observationId",
+        "postHocFamily",
+        "searchStatus",
+        "inputExpression",
+        "outputExpression",
+        "canonicalOutputHash",
+        "scoreImprovement",
+        "alphaPairFingerprint",
+        "valuePairFingerprint",
+        "pathCompetitionSignature",
+        "paths"
+      ],
+      "properties": {
+        "observationId": { "$ref": "#/$defs/nonBlankString" },
+        "postHocFamily": { "type": "string" },
+        "searchStatus": { "const": "UNTARGETED" },
+        "inputExpression": { "$ref": "#/$defs/nonBlankString" },
+        "outputExpression": { "$ref": "#/$defs/nonBlankString" },
+        "canonicalOutputHash": { "$ref": "#/$defs/nonBlankString" },
+        "scoreImprovement": { "$ref": "#/$defs/positiveInteger" },
+        "alphaPairFingerprint": { "$ref": "#/$defs/nonBlankString" },
+        "valuePairFingerprint": { "$ref": "#/$defs/nonBlankString" },
+        "pathCompetitionSignature": { "$ref": "#/$defs/nonBlankString" },
+        "paths": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/pathEvidence" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "pathEvidence": {
+      "type": "object",
+      "required": [
+        "pathId",
+        "depth",
+        "finalScore",
+        "expressions",
+        "ruleIds",
+        "assumptions"
+      ],
+      "properties": {
+        "pathId": { "$ref": "#/$defs/nonBlankString" },
+        "depth": { "$ref": "#/$defs/positiveInteger" },
+        "finalScore": { "type": "integer" },
+        "expressions": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/nonBlankString" }
+        },
+        "ruleIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/nonBlankString" }
+        },
+        "assumptions": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "rejectedCluster": {
+      "type": "object",
+      "required": [
+        "clusterSignature",
+        "supportCount",
+        "distinctAlphaSupport",
+        "reason",
+        "observationIds"
+      ],
+      "properties": {
+        "clusterSignature": { "$ref": "#/$defs/nonBlankString" },
+        "supportCount": { "$ref": "#/$defs/nonNegativeInteger" },
+        "distinctAlphaSupport": { "$ref": "#/$defs/nonNegativeInteger" },
+        "reason": {
+          "enum": [
+            "no-independent-equivalence-preserving-convergence",
+            "support-count<2",
+            "alpha-distinct-support<2",
+            "generalizer-returned-no-compatible-pattern",
+            "over-broad-or-structure-free-pattern"
+          ]
+        },
+        "observationIds": { "$ref": "#/$defs/stringArray" }
+      },
+      "additionalProperties": false
+    },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "nonBlankString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "additionalProperties": false
+}
