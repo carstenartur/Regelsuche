@@ -21,13 +21,19 @@ class HiddenRulePilotCampaignTest {
         HiddenRulePilotCampaign campaign = new HiddenRulePilotCampaign();
         HiddenRulePilotCampaign.PilotReport report = HiddenRulePilotTestEvidence.report();
         String json = report.toJson();
-        Path output = Path.of("build", "reports", "hidden-rule-pilot", "report.json");
+        String runtimeJson = report.runtimeJson();
+        Path directory = Path.of("build", "reports", "hidden-rule-pilot");
+        Path output = directory.resolve("report.json");
+        Path runtimeOutput = directory.resolve("runtime.json");
         campaign.write(output, report);
+        campaign.writeRuntime(runtimeOutput, report);
 
         assertEquals(HiddenRulePilotCampaign.SCHEMA, report.schema());
         assertEquals(20, report.cases().size());
         assertTrue(report.familyCount() >= 3);
         assertEquals(40, report.negativeHoldouts());
+        assertTrue(report.generatedValidationExamples() > 0);
+        assertTrue(report.counterexampleSearches() > 0);
         assertTrue(report.frozenCandidates() >= 1);
         assertTrue(report.rediscoveredCases() >= 1);
         assertTrue(report.acceptedCases() >= 1);
@@ -40,13 +46,19 @@ class HiddenRulePilotCampaignTest {
                 .toList().toString());
         assertEquals(json, report.toJson());
         assertTrue(Files.isRegularFile(output));
+        assertTrue(Files.isRegularFile(runtimeOutput));
         assertTrue(json.contains("\"schema\":\"regelsuche.hidden-rule-benchmark/v2\""));
         assertTrue(json.contains("\"rediscoveryRatePermille\""));
         assertTrue(json.contains("\"falsePositiveRatePermille\""));
+        assertTrue(json.contains("\"generatedValidationExamples\""));
+        assertTrue(json.contains("\"counterexampleSearches\""));
         assertTrue(json.contains("\"failureTaxonomy\""));
         assertTrue(json.indexOf("case-001") < json.indexOf("case-020"));
         assertFalse(json.contains("hidden_"));
         assertFalse(json.contains("elapsedNanos"));
+        assertTrue(runtimeJson.contains(
+            "\"schema\":\"regelsuche.hidden-rule-benchmark-runtime/v1\""));
+        assertTrue(runtimeJson.contains("\"elapsedNanos\""));
     }
 
     @Test
