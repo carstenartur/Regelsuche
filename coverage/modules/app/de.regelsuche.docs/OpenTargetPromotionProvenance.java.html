@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenTargetPromotionProvenance.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">OpenTargetPromotionProvenance.java</span></div><h1>OpenTargetPromotionProvenance.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.json.JsonWriter;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.List;
+
+/** Canonical provenance needed to reproduce one open-target promotion decision. */
+record OpenTargetPromotionProvenance(
+    String sourceCampaign,
+    String discoveryDate,
+    String dynamicRuleId,
+    String evaluationProvenanceHash,
+    String exactSignatureHash,
+    String alphaSignatureHash,
+    String proofEvidenceHash,
+    String proofObligationHash,
+    List&lt;String&gt; assumptions,
+    List&lt;String&gt; rulePath,
+    boolean evidenceExists,
+    boolean curatedPathPresent,
+    boolean fallbackUsed
+) {
+<span class="fc" id="L24">    OpenTargetPromotionProvenance {</span>
+<span class="fc" id="L25">        requireText(sourceCampaign, &quot;sourceCampaign&quot;);</span>
+<span class="fc" id="L26">        requireText(discoveryDate, &quot;discoveryDate&quot;);</span>
+        try {
+<span class="fc" id="L28">            LocalDate.parse(discoveryDate);</span>
+<span class="nc" id="L29">        } catch (DateTimeParseException exception) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(</span>
+                &quot;discoveryDate must use ISO-8601 YYYY-MM-DD&quot;, exception);
+<span class="fc" id="L32">        }</span>
+<span class="fc" id="L33">        dynamicRuleId = normalize(dynamicRuleId);</span>
+<span class="fc" id="L34">        evaluationProvenanceHash = optionalSha256(</span>
+            evaluationProvenanceHash, &quot;evaluationProvenanceHash&quot;);
+<span class="fc" id="L36">        exactSignatureHash = optionalSha256(exactSignatureHash, &quot;exactSignatureHash&quot;);</span>
+<span class="fc" id="L37">        alphaSignatureHash = optionalSha256(alphaSignatureHash, &quot;alphaSignatureHash&quot;);</span>
+<span class="fc" id="L38">        proofEvidenceHash = optionalSha256(proofEvidenceHash, &quot;proofEvidenceHash&quot;);</span>
+<span class="fc" id="L39">        proofObligationHash = optionalSha256(</span>
+            proofObligationHash, &quot;proofObligationHash&quot;);
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        rulePath = rulePath == null ? List.of() : List.copyOf(rulePath);</span>
+<span class="fc" id="L43">    }</span>
+
+    void writeJson(JsonWriter json) {
+<span class="fc" id="L46">        json.property(&quot;sourceCampaign&quot;, sourceCampaign)</span>
+<span class="fc" id="L47">            .property(&quot;discoveryDate&quot;, discoveryDate)</span>
+<span class="fc" id="L48">            .property(&quot;dynamicRuleId&quot;, dynamicRuleId)</span>
+<span class="fc" id="L49">            .property(&quot;evaluationProvenanceHash&quot;, evaluationProvenanceHash)</span>
+<span class="fc" id="L50">            .property(&quot;exactSignatureHash&quot;, exactSignatureHash)</span>
+<span class="fc" id="L51">            .property(&quot;alphaSignatureHash&quot;, alphaSignatureHash)</span>
+<span class="fc" id="L52">            .property(&quot;proofEvidenceHash&quot;, proofEvidenceHash)</span>
+<span class="fc" id="L53">            .property(&quot;proofObligationHash&quot;, proofObligationHash)</span>
+<span class="fc" id="L54">            .stringArray(&quot;assumptions&quot;, assumptions)</span>
+<span class="fc" id="L55">            .stringArray(&quot;rulePath&quot;, rulePath)</span>
+<span class="fc" id="L56">            .property(&quot;evidenceExists&quot;, evidenceExists)</span>
+<span class="fc" id="L57">            .property(&quot;curatedPathPresent&quot;, curatedPathPresent)</span>
+<span class="fc" id="L58">            .property(&quot;fallbackUsed&quot;, fallbackUsed);</span>
+<span class="fc" id="L59">    }</span>
+
+    String canonicalMaterial() {
+<span class="fc" id="L62">        return &quot;campaign=&quot; + sourceCampaign</span>
+            + &quot;\ndiscoveryDate=&quot; + discoveryDate
+            + &quot;\ndynamicRuleId=&quot; + dynamicRuleId
+            + &quot;\nevaluationProvenance=&quot; + evaluationProvenanceHash
+            + &quot;\nexactSignature=&quot; + exactSignatureHash
+            + &quot;\nalphaSignature=&quot; + alphaSignatureHash
+            + &quot;\nproofEvidence=&quot; + proofEvidenceHash
+            + &quot;\nproofObligation=&quot; + proofObligationHash
+<span class="fc" id="L70">            + &quot;\nassumptions=&quot; + String.join(&quot;\u0001&quot;, assumptions)</span>
+<span class="fc" id="L71">            + &quot;\nrulePath=&quot; + String.join(&quot;\u0001&quot;, rulePath)</span>
+            + &quot;\nevidenceExists=&quot; + evidenceExists
+            + &quot;\ncuratedPathPresent=&quot; + curatedPathPresent
+            + &quot;\nfallbackUsed=&quot; + fallbackUsed;
+    }
+
+    private static String optionalSha256(String value, String name) {
+<span class="fc" id="L78">        String normalized = normalize(value);</span>
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (!normalized.isEmpty() &amp;&amp; !normalized.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L80">            throw new IllegalArgumentException(name + &quot; must be empty or a SHA-256 hash&quot;);</span>
+        }
+<span class="fc" id="L82">        return normalized;</span>
+    }
+
+    private static String normalize(String value) {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L91">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L93">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

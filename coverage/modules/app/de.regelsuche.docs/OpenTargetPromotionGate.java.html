@@ -1,0 +1,493 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenTargetPromotionGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.docs</a> &gt; <span class="el_source">OpenTargetPromotionGate.java</span></div><h1>OpenTargetPromotionGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.docs;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.HypothesisCandidate;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
+import de.regelsuche.mining.OpenTargetConjectureMiner.ConvergenceEvidence;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.mining.OpenTargetConjectureMiner.PathEvidence;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyMatch;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
+import de.regelsuche.proof.ProofPolicy;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.TreeSet;
+
+/**
+ * Connects independently produced open-target evidence to the existing promotion
+ * and public-evidence gates without merging truth, novelty, proof or interestingness.
+ */
+<span class="fc" id="L30">final class OpenTargetPromotionGate {</span>
+    static final String SCHEMA = &quot;regelsuche.open-target-promotion-gate/v1&quot;;
+
+<span class="fc" id="L33">    private final PromotionDecider promotionDecider = new PromotionDecider();</span>
+<span class="fc" id="L34">    private final PublicEvidenceGate publicEvidenceGate = new PublicEvidenceGate();</span>
+
+    Decision evaluate(Input input) {
+<span class="fc" id="L37">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+<span class="fc" id="L38">        OpenTargetConjecture conjecture = input.conjecture();</span>
+<span class="fc" id="L39">        EvaluationReport evaluation = input.evaluation();</span>
+<span class="fc" id="L40">        NoveltyReport novelty = input.novelty();</span>
+<span class="fc" id="L41">        ProofReport proof = input.proof();</span>
+<span class="fc" id="L42">        HypothesisCandidate hypothesis = input.hypothesis();</span>
+
+<span class="fc" id="L44">        List&lt;String&gt; coreBlockers = OpenTargetPromotionEvidenceValidator.validate(</span>
+            conjecture, evaluation, novelty, proof, hypothesis);
+<span class="fc" id="L46">        List&lt;String&gt; assumptions = assumptions(conjecture);</span>
+<span class="fc" id="L47">        List&lt;String&gt; rulePath = representativeRulePath(conjecture);</span>
+<span class="fc" id="L48">        boolean evidenceExists = completeSearchEvidence(conjecture, hypothesis, rulePath);</span>
+<span class="fc" id="L49">        boolean curatedPathPresent = curatedPathPresent(conjecture);</span>
+<span class="fc" id="L50">        boolean fallbackUsed = fallbackUsed(conjecture);</span>
+
+<span class="fc" id="L52">        PromotionObservation observation = new PromotionObservation(</span>
+<span class="fc" id="L53">            conjecture.conjectureId(),</span>
+<span class="fc" id="L54">            input.sourceCampaign(),</span>
+<span class="fc" id="L55">            input.discoveryDate(),</span>
+<span class="fc" id="L56">            family(conjecture),</span>
+<span class="fc" id="L57">            conjecture.leftPattern(),</span>
+<span class="fc" id="L58">            conjecture.rightPattern(),</span>
+<span class="fc" id="L59">            coreBlockers.isEmpty(),</span>
+<span class="fc" id="L60">            oracleStatus(proof.proofStatus()),</span>
+<span class="fc" id="L61">            proof.backendEvidence(),</span>
+<span class="fc" id="L62">            input.ablationEvidence().ablationStatus(),</span>
+<span class="fc" id="L63">            evaluation.dynamicRuleId(),</span>
+<span class="fc" id="L64">            &quot;open-target:&quot; + evaluation.provenanceHash(),</span>
+            assumptions,
+<span class="fc" id="L66">            rationale(evaluation, novelty, proof),</span>
+            rulePath,
+            evidenceExists,
+            curatedPathPresent,
+            fallbackUsed,
+<span class="pc bpc" id="L71" title="2 of 4 branches missed.">            rulePath.size() &gt;= 2 || !conjecture.parameterRelations().isEmpty(),</span>
+<span class="fc" id="L72">            input.proofPolicy(),</span>
+<span class="fc" id="L73">            input.proverExecutionStatus());</span>
+
+<span class="fc" id="L75">        PromotionRecord baseRecord = promotionDecider.decide(</span>
+<span class="fc" id="L76">            observation, input.ablationEvidence());</span>
+<span class="fc" id="L77">        List&lt;String&gt; blockers = collectBlockers(coreBlockers, baseRecord, novelty, proof);</span>
+<span class="fc" id="L78">        PromotionStage stage = finalStage(baseRecord, coreBlockers.isEmpty(), blockers);</span>
+<span class="fc" id="L79">        PromotionRecord finalRecord = copyWithDecision(</span>
+<span class="fc" id="L80">            baseRecord, stage, blockers.isEmpty(), blockers);</span>
+<span class="fc" id="L81">        NoveltyStatus publicNovelty = publicNovelty(novelty);</span>
+<span class="fc" id="L82">        PublicEvidenceGate.GateDecision publicDecision =</span>
+<span class="fc" id="L83">            publicEvidenceGate.evaluate(finalRecord, publicNovelty);</span>
+<span class="fc" id="L84">        OpenTargetPromotionProvenance provenance = provenance(input, finalRecord);</span>
+
+<span class="fc" id="L86">        String evidenceHash = hash(canonicalMaterial(</span>
+            input,
+            finalRecord,
+            publicNovelty,
+            blockers,
+            publicDecision,
+            provenance));
+<span class="fc" id="L93">        return new Decision(</span>
+            SCHEMA,
+<span class="fc" id="L95">            conjecture.conjectureId(),</span>
+            finalRecord,
+            publicNovelty,
+<span class="fc" id="L98">            novelty.status().name(),</span>
+<span class="fc" id="L99">            novelty.externalNoveltyStatus(),</span>
+<span class="fc" id="L100">            proof.proofStatus().name(),</span>
+<span class="fc" id="L101">            proof.formalProofStatus(),</span>
+            &quot;NOT_EVALUATED&quot;,
+<span class="fc" id="L103">            input.proverExecutionStatus(),</span>
+            blockers,
+            publicDecision,
+            provenance,
+            evidenceHash);
+    }
+
+    private static List&lt;String&gt; collectBlockers(
+        List&lt;String&gt; coreBlockers,
+        PromotionRecord baseRecord,
+        NoveltyReport novelty,
+        ProofReport proof
+    ) {
+<span class="fc" id="L116">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;(coreBlockers);</span>
+<span class="fc" id="L117">        blockers.addAll(baseRecord.promotionBlockers());</span>
+<span class="fc" id="L118">        proof.blockers().stream()</span>
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L120">            .map(value -&gt; &quot;proof-report=&quot; + value)</span>
+<span class="fc" id="L121">            .forEach(blockers::add);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (proof.proofStatus() != ProofStatus.SYMBOLICALLY_VERIFIED) {</span>
+<span class="fc" id="L123">            blockers.add(&quot;symbolic-proof=&quot; + proof.proofStatus().name());</span>
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (novelty.status()</span>
+                != de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus
+                    .NOVEL_WITHIN_PROJECT) {
+<span class="fc" id="L128">            blockers.add(&quot;project-novelty=&quot; + novelty.status().name());</span>
+        }
+<span class="fc" id="L130">        return blockers.stream()</span>
+<span class="pc bpc" id="L131" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L132">            .distinct()</span>
+<span class="fc" id="L133">            .sorted()</span>
+<span class="fc" id="L134">            .toList();</span>
+    }
+
+    private static PromotionStage finalStage(
+        PromotionRecord baseRecord,
+        boolean coreAccepted,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (!coreAccepted) {</span>
+<span class="fc" id="L143">            return baseRecord.stage();</span>
+        }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (blockers.isEmpty()) {</span>
+<span class="fc" id="L146">            return PromotionStage.PROMOTED;</span>
+        }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (&quot;DISAGREE&quot;.equals(baseRecord.oracleStatus())) {</span>
+<span class="nc" id="L149">            return PromotionStage.CANDIDATE;</span>
+        }
+<span class="fc" id="L151">        return PromotionStage.VALIDATED;</span>
+    }
+
+    private static PromotionRecord copyWithDecision(
+        PromotionRecord source,
+        PromotionStage stage,
+        boolean promotionEligible,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L160">        return new PromotionRecord(</span>
+<span class="fc" id="L161">            source.candidateId(),</span>
+<span class="fc" id="L162">            source.sourceCampaign(),</span>
+<span class="fc" id="L163">            source.discoveryDate(),</span>
+<span class="fc" id="L164">            source.family(),</span>
+            stage,
+<span class="fc" id="L166">            source.originalExpression(),</span>
+<span class="fc" id="L167">            source.discoveredStructure(),</span>
+<span class="fc" id="L168">            source.oracleStatus(),</span>
+<span class="fc" id="L169">            source.oracleEvidence(),</span>
+<span class="fc" id="L170">            source.ablationStatus(),</span>
+<span class="fc" id="L171">            source.sourceOperator(),</span>
+<span class="fc" id="L172">            source.sourcePack(),</span>
+<span class="fc" id="L173">            source.assumptions(),</span>
+<span class="fc" id="L174">            source.rationale(),</span>
+<span class="fc" id="L175">            source.rulePath(),</span>
+            promotionEligible,
+            blockers,
+<span class="fc" id="L178">            source.evidenceExists(),</span>
+<span class="fc" id="L179">            source.curatedPathPresent(),</span>
+<span class="fc" id="L180">            source.fallbackUsed(),</span>
+<span class="fc" id="L181">            source.macroOpportunity(),</span>
+<span class="fc" id="L182">            source.generatedMacroId(),</span>
+<span class="fc" id="L183">            source.reusedMacroIds(),</span>
+<span class="fc" id="L184">            source.measuredImprovement(),</span>
+<span class="fc" id="L185">            source.reuseCampaign(),</span>
+<span class="fc" id="L186">            source.ablationEvidence(),</span>
+<span class="fc" id="L187">            source.proofPolicy(),</span>
+<span class="fc" id="L188">            source.proverExecutionStatus());</span>
+    }
+
+    private static NoveltyStatus publicNovelty(NoveltyReport novelty) {
+<span class="pc bpc" id="L192" title="2 of 4 branches missed.">        return switch (novelty.status()) {</span>
+<span class="fc" id="L193">            case NOVEL_WITHIN_PROJECT -&gt; NoveltyStatus.NEW;</span>
+<span class="fc" id="L194">            case EXACT_DUPLICATE -&gt; novelty.matches().stream()</span>
+<span class="fc" id="L195">                .map(NoveltyMatch::source)</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                .anyMatch(&quot;ACTIVE_INVENTORY&quot;::equals)</span>
+<span class="fc" id="L197">                    ? NoveltyStatus.KNOWN_RULE</span>
+<span class="nc" id="L198">                    : NoveltyStatus.DUPLICATE;</span>
+<span class="nc" id="L199">            case ALPHA_EQUIVALENT_DUPLICATE -&gt; NoveltyStatus.ALPHA_EQUIVALENT;</span>
+<span class="nc" id="L200">            case INCONCLUSIVE_UNPARSEABLE -&gt; NoveltyStatus.UNKNOWN;</span>
+        };
+    }
+
+    private static String oracleStatus(ProofStatus status) {
+<span class="pc bpc" id="L205" title="1 of 3 branches missed.">        return switch (status) {</span>
+<span class="fc" id="L206">            case SYMBOLICALLY_VERIFIED -&gt; &quot;AGREE&quot;;</span>
+<span class="nc" id="L207">            case REFUTED -&gt; &quot;DISAGREE&quot;;</span>
+<span class="fc" id="L208">            case INCONCLUSIVE, NOT_RUN -&gt; &quot;UNAVAILABLE&quot;;</span>
+        };
+    }
+
+    private static List&lt;String&gt; assumptions(OpenTargetConjecture conjecture) {
+<span class="fc" id="L213">        return conjecture.evidence().stream()</span>
+<span class="fc" id="L214">            .flatMap(evidence -&gt; evidence.paths().stream())</span>
+<span class="fc" id="L215">            .flatMap(path -&gt; path.assumptions().stream())</span>
+<span class="pc bnc" id="L216" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="pc" id="L217">            .map(value -&gt; value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;))</span>
+<span class="fc" id="L218">            .distinct()</span>
+<span class="fc" id="L219">            .sorted()</span>
+<span class="fc" id="L220">            .toList();</span>
+    }
+
+    private static List&lt;String&gt; representativeRulePath(OpenTargetConjecture conjecture) {
+<span class="fc" id="L224">        return conjecture.evidence().stream()</span>
+<span class="fc" id="L225">            .flatMap(evidence -&gt; evidence.paths().stream())</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            .filter(path -&gt; !path.ruleIds().isEmpty())</span>
+<span class="fc" id="L227">            .sorted(Comparator.comparing((PathEvidence path) -&gt;</span>
+<span class="fc" id="L228">                    String.join(&quot;\u0001&quot;, path.ruleIds()))</span>
+<span class="fc" id="L229">                .thenComparing(PathEvidence::pathId))</span>
+<span class="fc" id="L230">            .map(path -&gt; List.copyOf(path.ruleIds()))</span>
+<span class="fc" id="L231">            .findFirst()</span>
+<span class="fc" id="L232">            .orElse(List.of());</span>
+    }
+
+    private static boolean completeSearchEvidence(
+        OpenTargetConjecture conjecture,
+        HypothesisCandidate hypothesis,
+        List&lt;String&gt; representativeRulePath
+    ) {
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        return !representativeRulePath.isEmpty()</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            &amp;&amp; !hypothesis.supportingPaths().isEmpty()</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            &amp;&amp; conjecture.evidence().stream().allMatch(evidence -&gt;</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">                evidence.paths().size() &gt;= 2</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                    &amp;&amp; evidence.paths().stream().allMatch(path -&gt;</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                        !path.expressions().isEmpty()</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                            &amp;&amp; path.expressions().getLast().equals(evidence.outputExpression())</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                            &amp;&amp; !path.ruleIds().isEmpty()));</span>
+    }
+
+    private static boolean curatedPathPresent(OpenTargetConjecture conjecture) {
+<span class="fc" id="L251">        return conjecture.evidence().stream()</span>
+<span class="fc" id="L252">            .flatMap(evidence -&gt; evidence.paths().stream())</span>
+<span class="fc" id="L253">            .flatMap(path -&gt; java.util.stream.Stream.concat(</span>
+<span class="fc" id="L254">                java.util.stream.Stream.of(path.pathId()), path.ruleIds().stream()))</span>
+<span class="fc" id="L255">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L256">            .map(value -&gt; value.toLowerCase(Locale.ROOT))</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            .anyMatch(value -&gt; value.contains(&quot;curated&quot;)</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                || value.contains(&quot;hardcoded&quot;)</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">                || value.contains(&quot;scenario-exact-path&quot;));</span>
+    }
+
+    private static boolean fallbackUsed(OpenTargetConjecture conjecture) {
+<span class="fc" id="L263">        return conjecture.evidence().stream()</span>
+<span class="fc" id="L264">            .flatMap(evidence -&gt; evidence.paths().stream())</span>
+<span class="fc" id="L265">            .flatMap(path -&gt; path.ruleIds().stream())</span>
+<span class="fc" id="L266">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L267">            .map(value -&gt; value.toLowerCase(Locale.ROOT))</span>
+<span class="fc" id="L268">            .anyMatch(value -&gt; value.contains(&quot;fallback&quot;));</span>
+    }
+
+    private static String family(OpenTargetConjecture conjecture) {
+<span class="fc" id="L272">        TreeSet&lt;String&gt; families = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L273">        conjecture.postHocFamilies().stream()</span>
+<span class="pc bpc" id="L274" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L275">            .forEach(families::add);</span>
+<span class="fc" id="L276">        conjecture.evidence().stream()</span>
+<span class="fc" id="L277">            .map(ConvergenceEvidence::family)</span>
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L279">            .forEach(families::add);</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        return families.isEmpty() ? &quot;unclassified&quot; : String.join(&quot;,&quot;, families);</span>
+    }
+
+    private static String rationale(
+        EvaluationReport evaluation,
+        NoveltyReport novelty,
+        ProofReport proof
+    ) {
+<span class="fc" id="L288">        return &quot;target-free candidate; evaluation=&quot; + evaluation.status().name()</span>
+<span class="fc" id="L289">            + &quot;; projectNovelty=&quot; + novelty.status().name()</span>
+<span class="fc" id="L290">            + &quot;; symbolicProof=&quot; + proof.proofStatus().name()</span>
+<span class="fc" id="L291">            + &quot;; externalNovelty=&quot; + novelty.externalNoveltyStatus();</span>
+    }
+
+    private static OpenTargetPromotionProvenance provenance(
+        Input input,
+        PromotionRecord record
+    ) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        String proofObligationHash = input.proof().obligation() == null</span>
+<span class="nc" id="L299">            ? &quot;&quot;</span>
+<span class="fc" id="L300">            : input.proof().obligation().obligationHash();</span>
+<span class="fc" id="L301">        return new OpenTargetPromotionProvenance(</span>
+<span class="fc" id="L302">            input.sourceCampaign(),</span>
+<span class="fc" id="L303">            input.discoveryDate(),</span>
+<span class="fc" id="L304">            input.evaluation().dynamicRuleId(),</span>
+<span class="fc" id="L305">            input.evaluation().provenanceHash(),</span>
+<span class="fc" id="L306">            input.novelty().exactSignatureHash(),</span>
+<span class="fc" id="L307">            input.novelty().alphaSignatureHash(),</span>
+<span class="fc" id="L308">            input.proof().evidenceHash(),</span>
+            proofObligationHash,
+<span class="fc" id="L310">            record.assumptions(),</span>
+<span class="fc" id="L311">            record.rulePath(),</span>
+<span class="fc" id="L312">            record.evidenceExists(),</span>
+<span class="fc" id="L313">            record.curatedPathPresent(),</span>
+<span class="fc" id="L314">            record.fallbackUsed());</span>
+    }
+
+    private static String canonicalMaterial(
+        Input input,
+        PromotionRecord record,
+        NoveltyStatus publicNovelty,
+        List&lt;String&gt; blockers,
+        PublicEvidenceGate.GateDecision publicDecision,
+        OpenTargetPromotionProvenance provenance
+    ) {
+<span class="fc" id="L325">        return SCHEMA</span>
+<span class="fc" id="L326">            + &quot;\ncandidate=&quot; + record.candidateId()</span>
+<span class="fc" id="L327">            + &quot;\nstage=&quot; + record.stage().name()</span>
+<span class="fc" id="L328">            + &quot;\npromotionEligible=&quot; + record.promotionEligible()</span>
+<span class="fc" id="L329">            + &quot;\nprojectNovelty=&quot; + input.novelty().status().name()</span>
+<span class="fc" id="L330">            + &quot;\npublicNovelty=&quot; + publicNovelty.name()</span>
+<span class="fc" id="L331">            + &quot;\nexternalNovelty=&quot; + input.novelty().externalNoveltyStatus()</span>
+<span class="fc" id="L332">            + &quot;\nsymbolicProof=&quot; + input.proof().proofStatus().name()</span>
+<span class="fc" id="L333">            + &quot;\nformalProof=&quot; + input.proof().formalProofStatus()</span>
+<span class="fc" id="L334">            + &quot;\nproofPolicy=&quot; + input.proofPolicy().name()</span>
+<span class="fc" id="L335">            + &quot;\nproverExecution=&quot; + input.proverExecutionStatus()</span>
+            + &quot;\ninterestingness=NOT_EVALUATED&quot;
+<span class="fc" id="L337">            + &quot;\nablation=&quot; + input.ablationEvidence().compactSummary()</span>
+<span class="fc" id="L338">            + &quot;\nblockers=&quot; + String.join(&quot;\u0001&quot;, blockers)</span>
+<span class="fc" id="L339">            + &quot;\npublicEvidence=&quot; + publicDecision.accepted()</span>
+            + &quot;\npublicRejections=&quot;
+<span class="fc" id="L341">            + String.join(&quot;\u0001&quot;, publicDecision.rejectionReasons())</span>
+<span class="fc" id="L342">            + &quot;\n&quot; + provenance.canonicalMaterial();</span>
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L347">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L348">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L349">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L350">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L351">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    record Input(
+        String sourceCampaign,
+        String discoveryDate,
+        OpenTargetConjecture conjecture,
+        EvaluationReport evaluation,
+        NoveltyReport novelty,
+        ProofReport proof,
+        HypothesisCandidate hypothesis,
+        AblationEvidence ablationEvidence,
+        ProofPolicy proofPolicy,
+        String proverExecutionStatus
+    ) {
+<span class="fc" id="L367">        Input {</span>
+<span class="fc" id="L368">            requireText(sourceCampaign, &quot;sourceCampaign&quot;);</span>
+<span class="fc" id="L369">            requireText(discoveryDate, &quot;discoveryDate&quot;);</span>
+            try {
+<span class="fc" id="L371">                LocalDate.parse(discoveryDate);</span>
+<span class="nc" id="L372">            } catch (DateTimeParseException exception) {</span>
+<span class="nc" id="L373">                throw new IllegalArgumentException(</span>
+                    &quot;discoveryDate must use ISO-8601 YYYY-MM-DD&quot;, exception);
+<span class="fc" id="L375">            }</span>
+<span class="fc" id="L376">            Objects.requireNonNull(conjecture, &quot;conjecture&quot;);</span>
+<span class="fc" id="L377">            Objects.requireNonNull(evaluation, &quot;evaluation&quot;);</span>
+<span class="fc" id="L378">            Objects.requireNonNull(novelty, &quot;novelty&quot;);</span>
+<span class="fc" id="L379">            Objects.requireNonNull(proof, &quot;proof&quot;);</span>
+<span class="fc" id="L380">            Objects.requireNonNull(hypothesis, &quot;hypothesis&quot;);</span>
+<span class="fc" id="L381">            Objects.requireNonNull(ablationEvidence, &quot;ablationEvidence&quot;);</span>
+<span class="fc" id="L382">            Objects.requireNonNull(proofPolicy, &quot;proofPolicy&quot;);</span>
+<span class="fc" id="L383">            proverExecutionStatus = ProofPolicy.normaliseExecutionStatus(</span>
+                proverExecutionStatus);
+<span class="fc" id="L385">        }</span>
+    }
+
+    record Decision(
+        String schema,
+        String candidateId,
+        PromotionRecord promotionRecord,
+        NoveltyStatus publicNoveltyStatus,
+        String projectNoveltyStatus,
+        String externalNoveltyStatus,
+        String symbolicProofStatus,
+        String formalProofStatus,
+        String interestingnessStatus,
+        String proverExecutionStatus,
+        List&lt;String&gt; promotionBlockers,
+        PublicEvidenceGate.GateDecision publicEvidenceDecision,
+        OpenTargetPromotionProvenance provenance,
+        String evidenceHash
+    ) {
+<span class="fc" id="L404">        Decision {</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L406">                throw new IllegalArgumentException(&quot;unsupported promotion-gate schema&quot;);</span>
+            }
+<span class="fc" id="L408">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L409">            Objects.requireNonNull(promotionRecord, &quot;promotionRecord&quot;);</span>
+<span class="fc" id="L410">            Objects.requireNonNull(publicNoveltyStatus, &quot;publicNoveltyStatus&quot;);</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">            promotionBlockers = promotionBlockers == null</span>
+<span class="nc" id="L412">                ? List.of()</span>
+<span class="fc" id="L413">                : List.copyOf(promotionBlockers);</span>
+<span class="fc" id="L414">            Objects.requireNonNull(publicEvidenceDecision, &quot;publicEvidenceDecision&quot;);</span>
+<span class="fc" id="L415">            Objects.requireNonNull(provenance, &quot;provenance&quot;);</span>
+<span class="fc" id="L416">            requireText(evidenceHash, &quot;evidenceHash&quot;);</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">            if (!evidenceHash.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L418">                throw new IllegalArgumentException(&quot;evidenceHash must be SHA-256&quot;);</span>
+            }
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">            externalNoveltyStatus = externalNoveltyStatus == null</span>
+<span class="nc" id="L421">                ? &quot;NOT_EVALUATED&quot;</span>
+<span class="fc" id="L422">                : externalNoveltyStatus;</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">            interestingnessStatus = interestingnessStatus == null</span>
+<span class="nc" id="L424">                ? &quot;NOT_EVALUATED&quot;</span>
+<span class="fc" id="L425">                : interestingnessStatus;</span>
+<span class="fc" id="L426">            proverExecutionStatus = ProofPolicy.normaliseExecutionStatus(</span>
+                proverExecutionStatus);
+<span class="fc" id="L428">        }</span>
+
+        boolean promoted() {
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            return promotionRecord.stage().atLeast(PromotionStage.PROMOTED)</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">                &amp;&amp; promotionRecord.promotionEligible();</span>
+        }
+
+        boolean publicEvidenceAccepted() {
+<span class="fc" id="L436">            return publicEvidenceDecision.accepted();</span>
+        }
+
+        String toCanonicalJson() {
+<span class="fc" id="L440">            AblationEvidence ablation = promotionRecord.ablationEvidence();</span>
+<span class="fc" id="L441">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L442">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L443">                .property(&quot;candidateId&quot;, candidateId)</span>
+<span class="fc" id="L444">                .property(&quot;promotionStage&quot;, promotionRecord.stage().name())</span>
+<span class="fc" id="L445">                .property(&quot;promotionEligible&quot;, promotionRecord.promotionEligible())</span>
+<span class="fc" id="L446">                .property(&quot;publicNoveltyStatus&quot;, publicNoveltyStatus.name())</span>
+<span class="fc" id="L447">                .property(&quot;projectNoveltyStatus&quot;, projectNoveltyStatus)</span>
+<span class="fc" id="L448">                .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus)</span>
+<span class="fc" id="L449">                .property(&quot;symbolicProofStatus&quot;, symbolicProofStatus)</span>
+<span class="fc" id="L450">                .property(&quot;formalProofStatus&quot;, formalProofStatus)</span>
+<span class="fc" id="L451">                .property(&quot;interestingnessStatus&quot;, interestingnessStatus)</span>
+<span class="fc" id="L452">                .property(&quot;proofPolicy&quot;, promotionRecord.proofPolicy().name())</span>
+<span class="fc" id="L453">                .property(&quot;proverExecutionStatus&quot;, proverExecutionStatus)</span>
+<span class="fc" id="L454">                .object(&quot;provenance&quot;, provenance::writeJson)</span>
+<span class="fc" id="L455">                .object(&quot;ablation&quot;, object -&gt; object</span>
+<span class="fc" id="L456">                    .property(&quot;status&quot;, ablation.ablationStatus())</span>
+<span class="fc" id="L457">                    .property(&quot;improvementRatio&quot;, ablation.improvementRatio())</span>
+<span class="fc" id="L458">                    .object(&quot;withCandidate&quot;, run -&gt; writeRun(</span>
+<span class="fc" id="L459">                        run, ablation.withCandidate()))</span>
+<span class="fc" id="L460">                    .object(&quot;withoutCandidate&quot;, run -&gt; writeRun(</span>
+<span class="fc" id="L461">                        run, ablation.withoutCandidate())))</span>
+<span class="fc" id="L462">                .stringArray(&quot;promotionBlockers&quot;, promotionBlockers)</span>
+<span class="fc" id="L463">                .object(&quot;publicEvidence&quot;, object -&gt; object</span>
+<span class="fc" id="L464">                    .property(&quot;accepted&quot;, publicEvidenceDecision.accepted())</span>
+<span class="fc" id="L465">                    .stringArray(</span>
+                        &quot;rejectionReasons&quot;,
+<span class="fc" id="L467">                        publicEvidenceDecision.rejectionReasons()))</span>
+<span class="fc" id="L468">                .property(&quot;evidenceHash&quot;, evidenceHash)</span>
+<span class="fc" id="L469">                .endObject()</span>
+<span class="fc" id="L470">                .toString();</span>
+        }
+
+        private static void writeRun(
+            JsonWriter json,
+            AblationEvidence.RunEvidence evidence
+        ) {
+<span class="fc" id="L477">            json.property(</span>
+                    &quot;success&quot;,
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">                    evidence.success() == null</span>
+<span class="nc" id="L480">                        ? &quot;unknown&quot;</span>
+<span class="fc" id="L481">                        : evidence.success().toString())</span>
+<span class="fc" id="L482">                .property(&quot;pathLength&quot;, evidence.pathLength())</span>
+<span class="fc" id="L483">                .property(&quot;statesExplored&quot;, evidence.statesExplored());</span>
+<span class="fc" id="L484">        }</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L488" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L489">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L491">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
