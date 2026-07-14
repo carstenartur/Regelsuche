@@ -126,6 +126,21 @@ jobs:
         path: regelsuche-learning/build/reports/cross-family-bridge-transfer/**
         if-no-files-found: warn
 
+    - name: Require cross-family bridge qualification evidence after a successful build
+      if: success()
+      shell: bash
+      run: |
+        test -s regelsuche-learning/build/reports/cross-family-bridge-qualification/ablation.json
+        test -s regelsuche-learning/build/reports/cross-family-bridge-qualification/report.json
+
+    - name: Upload cross-family bridge qualification evidence
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: cross-family-bridge-qualification-evidence
+        path: regelsuche-learning/build/reports/cross-family-bridge-qualification/**
+        if-no-files-found: warn
+
   dependency-submission:
     runs-on: ubuntu-latest
     permissions:
