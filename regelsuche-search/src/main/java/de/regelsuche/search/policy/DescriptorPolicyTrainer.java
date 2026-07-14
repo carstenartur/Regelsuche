@@ -5,7 +5,6 @@ import de.regelsuche.search.learning.SearchTrajectoryDataset;
 import de.regelsuche.search.learning.SearchTrajectoryRecord;
 import de.regelsuche.search.learning.SearchTrajectoryRun;
 import de.regelsuche.search.learning.TransformationDescriptor;
-import de.regelsuche.search.learning.TransformationDescriptor.OccurrenceRole;
 import de.regelsuche.search.policy.DescriptorPolicyModel.DescriptorStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.FeatureStatistics;
 import de.regelsuche.search.policy.DescriptorPolicyModel.Mode;
@@ -41,16 +40,15 @@ public final class DescriptorPolicyTrainer {
             throw new IllegalArgumentException(
                 "training split contains no available transformation descriptors");
         }
-        List<ContextComparison> contextComparisons = contextComparisons(trainingRuns);
 
+        Map<String, FeatureStatistics> pairwise = pairwiseContextStatistics(trainingRuns);
         Map<String, DescriptorStatistics> descriptors = descriptorStatistics(examples);
         Map<String, FeatureStatistics> features = mode == Mode.LINEAR
-            ? featureStatistics(examples, contextComparisons)
+            ? featureStatistics(examples, pairwise)
             : Map.of();
         SearchTrajectoryDataset trainingDataset = new SearchTrajectoryDataset(trainingRuns);
         String sourceHash = "sha256:" + sha256(trainingDataset.toJsonLines());
-        String predictiveHash = "sha256:"
-            + sha256(predictiveMaterial(examples, contextComparisons));
+        String predictiveHash = "sha256:" + sha256(predictiveMaterial(examples, pairwise));
         String modelMaterial = predictiveHash + '\n' + DescriptorPolicyModel.FEATURE_SCHEMA
             + '\n' + mode + '\n' + minimumObservations
             + '\n' + descriptors + '\n' + features;
@@ -102,103 +100,48 @@ public final class DescriptorPolicyTrainer {
 
     private static Map<String, FeatureStatistics> featureStatistics(
         List<Example> examples,
-        List<ContextComparison> contextComparisons
+        Map<String, FeatureStatistics> pairwise
     ) {
         TreeSet<String> featureNames = new TreeSet<>();
-        examples.forEach(example -> featureNames.addAll(example.features().keySet()));
+        examples.forEach(example -> featureNames.addAll(example.descriptor().featureVector().keySet()));
         Map<String, FeatureStatistics> result = new LinkedHashMap<>();
         for (String featureName : featureNames) {
             MutableFeatureStatistics mutable = new MutableFeatureStatistics();
             for (Example example : examples) {
                 mutable.record(
-                    example.features().getOrDefault(featureName, 0),
+                    example.descriptor().featureVector().getOrDefault(featureName, 0),
                     example.successful());
             }
             result.put(featureName, mutable.freeze());
         }
-
-        result.keySet().removeIf(DescriptorPolicyTrainer::pairwiseContextFeature);
-        pairwiseContextStatistics(contextComparisons).forEach(result::put);
+        result.keySet().removeIf(DescriptorSearchPolicy::pairwiseContextFeature);
+        result.putAll(pairwise);
         return result;
     }
 
-    /**
-     * Context and context/role interactions are ranking evidence, so they are
-     * learned only from candidates that actually competed in the same expansion.
-     */
-    private static List<ContextComparison> contextComparisons(
+    /** Learns context features only from candidates that competed in one expansion. */
+    private static Map<String, FeatureStatistics> pairwiseContextStatistics(
         List<SearchTrajectoryRun> trainingRuns
     ) {
-        List<ContextComparison> result = new ArrayList<>();
+        Map<String, MutableFeatureStatistics> mutable = new LinkedHashMap<>();
         for (SearchTrajectoryRun run : trainingRuns) {
-            List<SearchTrajectoryRecord> group = new ArrayList<>();
-            boolean collectingExpansion = false;
+            List<SearchTrajectoryRecord> group = null;
             for (SearchTrajectoryRecord record : run.records().stream()
                     .sorted(Comparator.comparingLong(SearchTrajectoryRecord::sequence))
                     .toList()) {
                 if (record.eventType() == SearchEventType.STATE_EXPANDED) {
-                    recordContextCompetition(group, result);
-                    group.clear();
-                    collectingExpansion = true;
+                    recordContextCompetition(group, mutable);
+                    group = new ArrayList<>();
                 } else if (record.eventType() == SearchEventType.SEARCH_FINISHED) {
-                    recordContextCompetition(group, result);
-                    group.clear();
-                    collectingExpansion = false;
-                } else if (collectingExpansion && record.decision()
+                    recordContextCompetition(group, mutable);
+                    group = null;
+                } else if (group != null && record.decision()
                         && record.transformationDescriptor().available()) {
                     group.add(record);
                 }
             }
-            recordContextCompetition(group, result);
+            recordContextCompetition(group, mutable);
         }
-        return List.copyOf(result);
-    }
-
-    private static void recordContextCompetition(
-        List<SearchTrajectoryRecord> group,
-        List<ContextComparison> comparisons
-    ) {
-        List<SearchTrajectoryRecord> selected = group.stream()
-            .filter(record -> record.selectedPath() && record.eventualSuccess())
-            .toList();
-        List<SearchTrajectoryRecord> alternatives = group.stream()
-            .filter(record -> !record.selectedPath())
-            .toList();
-        if (selected.isEmpty() || alternatives.isEmpty()) {
-            return;
-        }
-
-        for (SearchTrajectoryRecord winner : selected) {
-            Map<String, Integer> winnerFeatures =
-                descriptorFeatures(winner.transformationDescriptor());
-            for (SearchTrajectoryRecord alternative : alternatives) {
-                comparisons.add(new ContextComparison(
-                    winnerFeatures,
-                    descriptorFeatures(alternative.transformationDescriptor())));
-            }
-        }
-    }
-
-    private static Map<String, FeatureStatistics> pairwiseContextStatistics(
-        List<ContextComparison> comparisons
-    ) {
-        Map<String, MutableFeatureStatistics> mutable = new LinkedHashMap<>();
-        for (ContextComparison comparison : comparisons) {
-            for (String featureName : comparison.pairwiseFeatureNames()) {
-                int winnerValue = comparison.winnerFeatures()
-                    .getOrDefault(featureName, 0);
-                int alternativeValue = comparison.alternativeFeatures()
-                    .getOrDefault(featureName, 0);
-                if (winnerValue == alternativeValue) {
-                    continue;
-                }
-                MutableFeatureStatistics statistics = mutable.computeIfAbsent(
-                    featureName, ignored -> new MutableFeatureStatistics());
-                statistics.record(winnerValue, true);
-                statistics.record(alternativeValue, false);
-            }
-        }
-
         Map<String, FeatureStatistics> result = new LinkedHashMap<>();
         mutable.entrySet().stream()
             .sorted(Map.Entry.comparingByKey())
@@ -206,45 +149,62 @@ public final class DescriptorPolicyTrainer {
         return result;
     }
 
+    private static void recordContextCompetition(
+        List<SearchTrajectoryRecord> group,
+        Map<String, MutableFeatureStatistics> mutable
+    ) {
+        if (group == null || group.size() < 2) {
+            return;
+        }
+        for (SearchTrajectoryRecord winner : group) {
+            if (!winner.selectedPath() || !winner.eventualSuccess()) {
+                continue;
+            }
+            Map<String, Integer> winnerFeatures = DescriptorSearchPolicy.descriptorFeatures(
+                winner.transformationDescriptor());
+            for (SearchTrajectoryRecord alternative : group) {
+                if (alternative.selectedPath()) {
+                    continue;
+                }
+                Map<String, Integer> alternativeFeatures = DescriptorSearchPolicy.descriptorFeatures(
+                    alternative.transformationDescriptor());
+                TreeSet<String> names = new TreeSet<>(winnerFeatures.keySet());
+                names.addAll(alternativeFeatures.keySet());
+                for (String name : names) {
+                    if (!DescriptorSearchPolicy.pairwiseContextFeature(name)) {
+                        continue;
+                    }
+                    int winnerValue = winnerFeatures.getOrDefault(name, 0);
+                    int alternativeValue = alternativeFeatures.getOrDefault(name, 0);
+                    if (winnerValue != alternativeValue) {
+                        MutableFeatureStatistics statistics = mutable.computeIfAbsent(
+                            name, ignored -> new MutableFeatureStatistics());
+                        statistics.record(winnerValue, true);
+                        statistics.record(alternativeValue, false);
+                    }
+                }
+            }
+        }
+    }
+
     private static String predictiveMaterial(
         List<Example> examples,
-        List<ContextComparison> contextComparisons
+        Map<String, FeatureStatistics> pairwise
     ) {
         List<String> rows = new ArrayList<>();
         for (Example example : examples) {
-            StringBuilder row = new StringBuilder(TransformationDescriptor.SCHEMA);
-            example.features().forEach((name, value) -> row
-                .append('\n').append(name).append('=').append(value));
-            row.append("\nlabel=").append(example.successful())
-                .append("\nscoreDelta=").append(example.scoreDelta());
+            rows.add(example.descriptor().predictiveMaterial()
+                + "\nlabel=" + example.successful()
+                + "\nscoreDelta=" + example.scoreDelta());
+        }
+        if (!pairwise.isEmpty()) {
+            StringBuilder row = new StringBuilder("pairwise-context");
+            pairwise.forEach((name, statistics) -> row
+                .append('\n').append(name).append('=').append(statistics));
             rows.add(row.toString());
         }
         rows.sort(String::compareTo);
-
-        List<String> comparisons = contextComparisons.stream()
-            .map(ContextComparison::predictiveMaterial)
-            .sorted()
-            .toList();
-        return String.join("\n---\n", rows)
-            + "\n===PAIRWISE_CONTEXT===\n"
-            + String.join("\n---\n", comparisons);
-    }
-
-    private static Map<String, Integer> descriptorFeatures(
-        TransformationDescriptor descriptor
-    ) {
-        Map<String, Integer> features = new LinkedHashMap<>(descriptor.featureVector());
-        TransformationDescriptor.LocalChange local = descriptor.localChange();
-        if (local.available() && local.role() != OccurrenceRole.ROOT) {
-            features.put("local.contextRole." + local.contextRoot().kind().name()
-                + "_" + local.role().name(), 1);
-        }
-        return features;
-    }
-
-    private static boolean pairwiseContextFeature(String featureName) {
-        return featureName.startsWith("local.context.")
-            || featureName.startsWith("local.contextRole.");
+        return String.join("\n---\n", rows);
     }
 
     private static String sha256(String value) {
@@ -259,46 +219,14 @@ public final class DescriptorPolicyTrainer {
 
     private record Example(
         TransformationDescriptor descriptor,
-        Map<String, Integer> features,
         boolean successful,
         int scoreDelta
     ) {
         private static Example of(SearchTrajectoryRecord record) {
-            TransformationDescriptor descriptor = record.transformationDescriptor();
             return new Example(
-                descriptor,
-                descriptorFeatures(descriptor),
+                record.transformationDescriptor(),
                 record.selectedPath() && record.eventualSuccess(),
                 record.score() - record.parentScore());
-        }
-    }
-
-    private record ContextComparison(
-        Map<String, Integer> winnerFeatures,
-        Map<String, Integer> alternativeFeatures
-    ) {
-        private TreeSet<String> pairwiseFeatureNames() {
-            TreeSet<String> names = new TreeSet<>();
-            winnerFeatures.keySet().stream()
-                .filter(DescriptorPolicyTrainer::pairwiseContextFeature)
-                .forEach(names::add);
-            alternativeFeatures.keySet().stream()
-                .filter(DescriptorPolicyTrainer::pairwiseContextFeature)
-                .forEach(names::add);
-            return names;
-        }
-
-        private String predictiveMaterial() {
-            StringBuilder result = new StringBuilder("pairwise-context");
-            for (String featureName : pairwiseFeatureNames()) {
-                int winner = winnerFeatures.getOrDefault(featureName, 0);
-                int alternative = alternativeFeatures.getOrDefault(featureName, 0);
-                if (winner != alternative) {
-                    result.append('\n').append(featureName)
-                        .append('=').append(winner).append('>').append(alternative);
-                }
-            }
-            return result.toString();
         }
     }
 
