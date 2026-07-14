@@ -198,6 +198,8 @@ public final class DescriptorPolicyTrainer {
             .filter(SearchTrajectoryRecord::decision)
             .filter(record -> !record.selectedPath())
             .filter(record -> record.transformationDescriptor().available())
+            .filter(record -> !record.transformationDescriptor().targeted()
+                || record.transformationDescriptor().targetDistanceAfter() != 0)
             .toList();
         if (alternatives.isEmpty()) {
             return;
@@ -205,7 +207,7 @@ public final class DescriptorPolicyTrainer {
         for (SearchTrajectoryRecord winner : records) {
             TransformationDescriptor descriptor = winner.transformationDescriptor();
             if (!winner.decision() || !winner.selectedPath() || !winner.eventualSuccess()
-                    || descriptor == null || !descriptor.targeted()
+                    || descriptor == null || !descriptor.available() || !descriptor.targeted()
                     || descriptor.targetDistanceAfter() != 0) {
                 continue;
             }
