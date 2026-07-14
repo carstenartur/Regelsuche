@@ -1,7 +1,6 @@
 package de.regelsuche.mining;
 
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -25,6 +24,9 @@ public final class OpenTargetConjectureNoveltyChecker {
     ) {
         validate(conjecture);
         Objects.requireNonNull(activeInventory, "activeInventory");
+        List<KnownRule> activeRules = activeInventory.all().stream()
+            .sorted(Comparator.comparing(KnownRule::name))
+            .toList();
         List<PriorCandidate> prior = priorCandidates == null
             ? List.of()
             : priorCandidates.stream()
@@ -41,7 +43,7 @@ public final class OpenTargetConjectureNoveltyChecker {
                 NoveltyStatus.INCONCLUSIVE_UNPARSEABLE,
                 "",
                 "",
-                activeInventory.all().size(),
+                activeRules.size(),
                 prior.size(),
                 List.of(),
                 "NOT_EVALUATED",
@@ -49,10 +51,8 @@ public final class OpenTargetConjectureNoveltyChecker {
         }
 
         List<ReferenceCandidate> references = new ArrayList<>();
-        activeInventory.all().stream()
-            .sorted(Comparator.comparing(KnownRule::id))
-            .forEach(rule -> references.add(new ReferenceCandidate(
-                "ACTIVE_INVENTORY", rule.id(), rule.leftPattern(), rule.rightPattern())));
+        activeRules.forEach(rule -> references.add(new ReferenceCandidate(
+            "ACTIVE_INVENTORY", rule.name(), rule.leftPattern(), rule.rightPattern())));
         prior.forEach(item -> references.add(new ReferenceCandidate(
             item.source(), item.candidateId(), item.leftPattern(), item.rightPattern())));
 
@@ -89,7 +89,7 @@ public final class OpenTargetConjectureNoveltyChecker {
             status,
             hash(candidate.exact()),
             hash(candidate.alpha()),
-            activeInventory.all().size(),
+            activeRules.size(),
             prior.size(),
             orderedMatches,
             "NOT_EVALUATED",
@@ -114,20 +114,26 @@ public final class OpenTargetConjectureNoveltyChecker {
         Map<String, String> alphaNames,
         boolean alphaNormalize
     ) {
-        return switch (node.kind()) {
-            case PLACEHOLDER -> "P:" + (alphaNormalize
-                ? alphaNames.computeIfAbsent(node.name(), ignored -> "p" + alphaNames.size())
-                : node.name());
-            case VARIABLE -> "V:" + node.name();
-            case NUMBER -> "N:" + BigDecimal.valueOf(node.numericValue())
-                .stripTrailingZeros().toPlainString();
-            case FUNCTION -> "F:" + node.name() + "(" + node.arguments().stream()
+        if (node instanceof PatternVariable variable) {
+            String name = alphaNormalize
+                ? alphaNames.computeIfAbsent(
+                    variable.name(), ignored -> "p" + alphaNames.size())
+                : variable.name();
+            return "P:" + name;
+        }
+        if (node instanceof PatternNumber number) {
+            return "N:" + number.value();
+        }
+        if (node instanceof PatternFunction function) {
+            return "F:" + function.name() + "(" + function.arguments().stream()
                 .map(argument -> render(argument, alphaNames, alphaNormalize))
-                .reduce((left, right) -> left + "," + right).orElse("") + ")";
-            case BINARY -> "B:" + node.operator().name() + "("
-                + render(node.left(), alphaNames, alphaNormalize) + ","
-                + render(node.right(), alphaNames, alphaNormalize) + ")";
-        };
+                .reduce((left, right) -> left + "," + right)
+                .orElse("") + ")";
+        }
+        PatternBinary binary = (PatternBinary) node;
+        return "B:" + binary.op().name() + "("
+            + render(binary.left(), alphaNames, alphaNormalize) + ","
+            + render(binary.right(), alphaNames, alphaNormalize) + ")";
     }
 
     private static void validate(OpenTargetConjecture conjecture) {
