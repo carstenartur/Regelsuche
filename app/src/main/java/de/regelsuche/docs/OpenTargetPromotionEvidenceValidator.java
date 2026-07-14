@@ -13,6 +13,7 @@ import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /** Validates the independent evidence axes consumed by {@link OpenTargetPromotionGate}. */
@@ -106,13 +107,15 @@ final class OpenTargetPromotionEvidenceValidator {
         boolean holdoutsComplete = evaluation.holdoutsComplete()
             && evaluation.allHoldoutsPassed()
             && evaluation.configuredPositiveHoldouts() >= 1
-            && evaluation.configuredNegativeHoldouts() >= 1;
+            && evaluation.configuredNegativeHoldouts() >= 1
+            && evaluation.executedPositiveHoldouts() == evaluation.positiveResults().size()
+            && evaluation.executedNegativeHoldouts() == evaluation.negativeResults().size();
         if (!accepted || !holdoutsComplete || !evaluation.blockers().isEmpty()) {
             blockers.add("candidate-evaluation-not-accepted");
         }
         boolean compiled = "COMPILED".equals(evaluation.compilationStatus())
             && !evaluation.dynamicRuleId().isBlank()
-            && !evaluation.provenanceHash().isBlank();
+            && sha256(evaluation.provenanceHash());
         if (!compiled) {
             blockers.add("compiled-operator-provenance-missing");
         }
@@ -143,7 +146,15 @@ final class OpenTargetPromotionEvidenceValidator {
             && Boolean.FALSE.equals(hypothesis.counterexampleStatus());
         boolean supportPresent = !hypothesis.supportingPaths().isEmpty()
             && hypothesis.supportingExpressions().size() == conjecture.supportCount();
-        if (!patternsMatch || !lifecycleValidated || !counterexampleCleared || !supportPresent) {
+        boolean metadataPreserved = assumptions(conjecture).equals(hypothesis.assumptions())
+            && conjecture.parameterRelations().equals(hypothesis.parameterRelations())
+            && new TreeMap<>(conjecture.expressionPlaceholderValues()).equals(
+                new TreeMap<>(hypothesis.expressionPlaceholders()));
+        if (!patternsMatch
+                || !lifecycleValidated
+                || !counterexampleCleared
+                || !supportPresent
+                || !metadataPreserved) {
             blockers.add("hypothesis-lifecycle-evidence-incomplete");
         }
     }
@@ -155,7 +166,8 @@ final class OpenTargetPromotionEvidenceValidator {
     ) {
         boolean obligationAvailable = proof.eligibility() == EligibilityStatus.ELIGIBLE
             && proof.proofObligationEmitted()
-            && proof.obligation() != null;
+            && proof.obligation() != null
+            && sha256(proof.evidenceHash());
         if (!obligationAvailable) {
             blockers.add("proof-obligation-ineligible");
             return;
@@ -170,7 +182,8 @@ final class OpenTargetPromotionEvidenceValidator {
         if (!identityMatches
                 || proof.obligation().targetProvided()
                 || !relationMatches
-                || !assumptionsMatch) {
+                || !assumptionsMatch
+                || !sha256(proof.obligation().obligationHash())) {
             blockers.add("proof-obligation-provenance-mismatch");
         }
     }
@@ -183,11 +196,15 @@ final class OpenTargetPromotionEvidenceValidator {
             == de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus
                 .NOVEL_WITHIN_PROJECT;
         boolean evidenceConsistent = novelty.matches().isEmpty()
-            && !novelty.exactSignatureHash().isBlank()
-            && !novelty.alphaSignatureHash().isBlank();
+            && sha256(novelty.exactSignatureHash())
+            && sha256(novelty.alphaSignatureHash());
         if (claimsProjectNovelty && !evidenceConsistent) {
             blockers.add("novelty-evidence-inconsistent");
         }
+    }
+
+    private static boolean sha256(String value) {
+        return value != null && value.matches("sha256:[0-9a-f]{64}");
     }
 
     private static List<String> assumptions(OpenTargetConjecture conjecture) {
