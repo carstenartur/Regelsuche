@@ -1,0 +1,897 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousProductionGenerationRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">AutonomousProductionGenerationRunner.java</span></div><h1>AutonomousProductionGenerationRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunner;
+import de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunner.DiscoveryReport;
+import de.regelsuche.benchmark.DeterministicDiscoveryExperimentRunner.SeedRunOutcome;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.example.SeedExpression;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.ObservationBranch;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalMetrics;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+/**
+ * Executes the pinned issue-348 generation slice through the real untargeted
+ * best-first search and deterministic experiment runner.
+ */
+<span class="fc" id="L42">public final class AutonomousProductionGenerationRunner {</span>
+    public static final String SEED_CATALOG_SCHEMA =
+        &quot;regelsuche.autonomous-production-seed-catalog/v1&quot;;
+    public static final String OBSERVATION_BUNDLE_SCHEMA =
+        &quot;regelsuche.autonomous-production-observations/v2&quot;;
+    public static final String GENERATION_RECEIPT_SCHEMA =
+        &quot;regelsuche.autonomous-generation-receipt/v2&quot;;
+    public static final String GENERATION_RUN_SCHEMA =
+        &quot;regelsuche.autonomous-production-generation/v2&quot;;
+
+    public GenerationRun runPinned(int parallelism) {
+<span class="fc" id="L53">        return run(</span>
+<span class="fc" id="L54">            PinnedAutonomousProductionCampaign.brief(),</span>
+<span class="fc" id="L55">            PinnedAutonomousProductionCampaign.seeds(),</span>
+            parallelism);
+    }
+
+    public GenerationRun run(
+        AutonomousResearchBriefV2 brief,
+        List&lt;SeedExpression&gt; suppliedSeeds,
+        int parallelism
+    ) {
+<span class="fc" id="L64">        Objects.requireNonNull(brief, &quot;brief&quot;);</span>
+<span class="fc" id="L65">        List&lt;SeedExpression&gt; seeds = validateAndOrderSeeds(brief, suppliedSeeds);</span>
+<span class="fc" id="L66">        SeedCatalog catalog = SeedCatalog.create(brief.contentHash(), seeds);</span>
+<span class="fc" id="L67">        ConcurrentMap&lt;String, GoalSearchResult&gt; searchResults =</span>
+            new ConcurrentHashMap&lt;&gt;();
+
+<span class="fc" id="L70">        DeterministicDiscoveryExperimentRunner runner =</span>
+            new DeterministicDiscoveryExperimentRunner(
+<span class="fc" id="L72">                seeds.size(),</span>
+<span class="fc" id="L73">                Math.max(1, parallelism),</span>
+<span class="fc" id="L74">                seed -&gt; evaluate(seed, searchResults));</span>
+<span class="fc" id="L75">        DiscoveryReport report = runner.runDetailed(seeds);</span>
+
+<span class="fc" id="L77">        List&lt;GeneratedObservation&gt; observations = report.rows().stream()</span>
+<span class="fc" id="L78">            .map(row -&gt; generatedObservation(</span>
+                brief,
+<span class="fc" id="L80">                row.seed(),</span>
+<span class="fc" id="L81">                requireSearchResult(searchResults, row.seed())))</span>
+<span class="fc" id="L82">            .sorted(Comparator.comparing(item -&gt; item.seed().stableKey()))</span>
+<span class="fc" id="L83">            .toList();</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (observations.size() != seeds.size()) {</span>
+<span class="nc" id="L85">            throw new IllegalStateException(</span>
+                &quot;every production seed must produce one immutable observation branch&quot;);
+        }
+
+<span class="fc" id="L89">        ObservationBundle bundle = ObservationBundle.create(</span>
+<span class="fc" id="L90">            brief.contentHash(), observations.stream()</span>
+<span class="fc" id="L91">                .map(GeneratedObservation::snapshot)</span>
+<span class="fc" id="L92">                .toList());</span>
+<span class="fc" id="L93">        GenerationReceipt receipt = generationReceipt(brief, observations);</span>
+<span class="fc" id="L94">        String reportHash = AutonomousResearchBrief.hash(</span>
+<span class="fc" id="L95">            report.renderDeterministicJson());</span>
+<span class="fc" id="L96">        String contentHash = AutonomousResearchBrief.hash(</span>
+            GENERATION_RUN_SCHEMA
+<span class="fc" id="L98">                + &quot;\nbrief=&quot; + brief.contentHash()</span>
+<span class="fc" id="L99">                + &quot;\nseedCatalog=&quot; + catalog.contentHash()</span>
+<span class="fc" id="L100">                + &quot;\nobservations=&quot; + bundle.contentHash()</span>
+<span class="fc" id="L101">                + &quot;\nreceipt=&quot; + receipt.contentHash()</span>
+                + &quot;\ndiscoveryReport=&quot; + reportHash);
+<span class="fc" id="L103">        return new GenerationRun(</span>
+            GENERATION_RUN_SCHEMA,
+            brief,
+            catalog,
+            observations,
+            bundle,
+            receipt,
+            report,
+            reportHash,
+            false,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    public void write(Path outputDirectory, GenerationRun run) {
+<span class="fc" id="L120">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L121">        Objects.requireNonNull(run, &quot;run&quot;);</span>
+        try {
+<span class="fc" id="L123">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L124">            write(outputDirectory.resolve(&quot;brief-v2.json&quot;),</span>
+<span class="fc" id="L125">                run.brief().toCanonicalJson());</span>
+<span class="fc" id="L126">            write(outputDirectory.resolve(&quot;seeds.json&quot;),</span>
+<span class="fc" id="L127">                run.seedCatalog().toCanonicalJson());</span>
+<span class="fc" id="L128">            write(outputDirectory.resolve(&quot;observations.json&quot;),</span>
+<span class="fc" id="L129">                run.observationBundle().toCanonicalJson());</span>
+<span class="fc" id="L130">            write(outputDirectory.resolve(&quot;generation-receipt.json&quot;),</span>
+<span class="fc" id="L131">                run.receipt().toCanonicalJson());</span>
+<span class="fc" id="L132">            write(outputDirectory.resolve(&quot;discovery-report.json&quot;),</span>
+<span class="fc" id="L133">                run.discoveryReport().renderDeterministicJson());</span>
+<span class="fc" id="L134">            write(outputDirectory.resolve(&quot;generation-run.json&quot;),</span>
+<span class="fc" id="L135">                run.toCanonicalJson());</span>
+<span class="nc" id="L136">        } catch (IOException exception) {</span>
+<span class="nc" id="L137">            throw new UncheckedIOException(</span>
+                &quot;Could not write production generation evidence&quot;, exception);
+<span class="fc" id="L139">        }</span>
+<span class="fc" id="L140">    }</span>
+
+    private static void write(Path path, String content) throws IOException {
+<span class="fc" id="L143">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L144">    }</span>
+
+    private static SeedRunOutcome evaluate(
+        SeedExpression seed,
+        ConcurrentMap&lt;String, GoalSearchResult&gt; searchResults
+    ) {
+<span class="fc" id="L150">        GoalSearchResult result = search(seed);</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (result.status() != GoalStatus.UNTARGETED) {</span>
+<span class="nc" id="L152">            throw new IllegalStateException(</span>
+                &quot;production generation unexpectedly used a search target&quot;);
+        }
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (searchResults.putIfAbsent(seed.stableKey(), result) != null) {</span>
+<span class="nc" id="L156">            throw new IllegalStateException(</span>
+<span class="nc" id="L157">                &quot;duplicate production seed execution: &quot; + seed.stableKey());</span>
+        }
+<span class="fc" id="L159">        SearchState selected = selectedState(result);</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        boolean transformed = selected.depth() &gt; 0;</span>
+<span class="fc" id="L161">        return new SeedRunOutcome(</span>
+            transformed,
+            &quot;untargeted production search explored &quot;
+<span class="fc" id="L164">                + result.metrics().exploredStates() + &quot; states&quot;,</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            transformed ? List.of(selected.expression()) : List.of(),</span>
+<span class="fc" id="L166">            List.of(),</span>
+<span class="fc" id="L167">            selected.path(),</span>
+            0L,
+            0L);
+    }
+
+    private static GoalSearchResult search(SeedExpression seed) {
+<span class="fc" id="L173">        SearchProblem problem = new SearchProblem(</span>
+<span class="fc" id="L174">            seed.expression(),</span>
+            new AstRewriteTransformationEngine(),
+            new ExpressionScorer(),
+            new ExpressionCanonicalizer(),
+<span class="fc" id="L178">            PinnedAutonomousProductionCampaign.searchHeuristic());</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (problem.target() != null) {</span>
+<span class="nc" id="L180">            throw new IllegalStateException(</span>
+                &quot;production generation problem must not have a target&quot;);
+        }
+<span class="fc" id="L183">        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+    }
+
+    private static GoalSearchResult requireSearchResult(
+        Map&lt;String, GoalSearchResult&gt; results,
+        SeedExpression seed
+    ) {
+<span class="fc" id="L190">        GoalSearchResult result = results.get(seed.stableKey());</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (result == null) {</span>
+<span class="nc" id="L192">            throw new IllegalStateException(</span>
+<span class="nc" id="L193">                &quot;missing production search result for &quot; + seed.stableKey());</span>
+        }
+<span class="fc" id="L195">        return result;</span>
+    }
+
+    private static GeneratedObservation generatedObservation(
+        AutonomousResearchBriefV2 brief,
+        SeedExpression seed,
+        GoalSearchResult result
+    ) {
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (result.status() != GoalStatus.UNTARGETED) {</span>
+<span class="nc" id="L204">            throw new IllegalArgumentException(</span>
+                &quot;only UNTARGETED search results may become observation branches&quot;);
+        }
+<span class="fc" id="L207">        List&lt;StateSnapshot&gt; states = result.states().stream()</span>
+<span class="fc" id="L208">            .map(StateSnapshot::from)</span>
+<span class="fc" id="L209">            .sorted(StateSnapshot.ORDER)</span>
+<span class="fc" id="L210">            .toList();</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (states.isEmpty()) {</span>
+<span class="nc" id="L212">            throw new IllegalStateException(</span>
+                &quot;production search must retain at least the root state&quot;);
+        }
+<span class="fc" id="L215">        SearchState selected = selectedState(result);</span>
+<span class="fc" id="L216">        SearchMetricsSnapshot metrics = SearchMetricsSnapshot.from(result.metrics());</span>
+<span class="fc" id="L217">        String observationId = &quot;observation-&quot; + seed.stableKey();</span>
+<span class="fc" id="L218">        String branchId = &quot;autopilot/observation/&quot; + seed.stableKey();</span>
+<span class="fc" id="L219">        String snapshotHash = AutonomousResearchBrief.hash(</span>
+            &quot;regelsuche.autonomous-observation-snapshot/v2&quot;
+<span class="fc" id="L221">                + &quot;\nbrief=&quot; + brief.contentHash()</span>
+<span class="fc" id="L222">                + &quot;\nseed=&quot; + seedMaterial(seed)</span>
+<span class="fc" id="L223">                + &quot;\nstatus=&quot; + result.status().name()</span>
+<span class="fc" id="L224">                + &quot;\nmetrics=&quot; + metrics.canonicalMaterial()</span>
+<span class="fc" id="L225">                + &quot;\nstates=&quot; + states.stream()</span>
+<span class="fc" id="L226">                    .map(StateSnapshot::canonicalMaterial).toList());</span>
+<span class="fc" id="L227">        String evidenceHash = AutonomousResearchBrief.hash(</span>
+            &quot;regelsuche.autonomous-observation-evidence/v2&quot;
+                + &quot;\nobservation=&quot; + observationId
+<span class="fc" id="L230">                + &quot;\nseed=&quot; + seedMaterial(seed)</span>
+                + &quot;\nsnapshot=&quot; + snapshotHash
+<span class="fc" id="L232">                + &quot;\nselected=&quot; + selected.expression()</span>
+<span class="fc" id="L233">                + &quot;\npath=&quot; + selected.path()</span>
+<span class="fc" id="L234">                + &quot;\nrules=&quot; + selected.appliedRuleIds());</span>
+<span class="fc" id="L235">        ObservationBranch branch = ObservationBranch.create(</span>
+            branchId,
+<span class="fc" id="L237">            seed.source(),</span>
+            observationId,
+            snapshotHash,
+            evidenceHash);
+<span class="fc" id="L241">        ObservationSnapshot snapshot = new ObservationSnapshot(</span>
+            observationId,
+            branchId,
+<span class="fc" id="L244">            seed.source(),</span>
+<span class="fc" id="L245">            seed.id(),</span>
+<span class="fc" id="L246">            seed.expression(),</span>
+<span class="fc" id="L247">            seed.source(),</span>
+<span class="fc" id="L248">            seed.category(),</span>
+<span class="fc" id="L249">            sorted(seed.tags()),</span>
+<span class="fc" id="L250">            sorted(seed.assumptions()),</span>
+<span class="fc" id="L251">            result.status().name(),</span>
+            metrics,
+            states,
+<span class="fc" id="L254">            selected.expression(),</span>
+<span class="fc" id="L255">            selected.path(),</span>
+<span class="fc" id="L256">            selected.appliedRuleIds(),</span>
+            snapshotHash,
+            evidenceHash,
+<span class="fc" id="L259">            branch.contentHash());</span>
+<span class="fc" id="L260">        return new GeneratedObservation(seed, branch, snapshot, result);</span>
+    }
+
+    private static SearchState selectedState(GoalSearchResult result) {
+<span class="fc" id="L264">        return result.states().stream()</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            .filter(state -&gt; state.depth() &gt; 0)</span>
+<span class="fc" id="L266">            .min(Comparator</span>
+<span class="fc" id="L267">                .comparingInt(SearchState::depth)</span>
+<span class="fc" id="L268">                .thenComparing(SearchState::expression)</span>
+<span class="pc" id="L269">                .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds())))</span>
+<span class="pc" id="L270">            .orElseGet(() -&gt; result.states().getFirst());</span>
+    }
+
+    private static GenerationReceipt generationReceipt(
+        AutonomousResearchBriefV2 brief,
+        List&lt;GeneratedObservation&gt; observations
+    ) {
+<span class="fc" id="L277">        Map&lt;ResourceKind, Long&gt; configured = brief.budget(EvidenceStage.GENERATION)</span>
+<span class="fc" id="L278">            .resources();</span>
+<span class="fc" id="L279">        long generatedStates = observations.stream()</span>
+<span class="fc" id="L280">            .map(GeneratedObservation::searchResult)</span>
+<span class="fc" id="L281">            .map(GoalSearchResult::metrics)</span>
+<span class="fc" id="L282">            .mapToLong(GoalMetrics::generatedTransformations)</span>
+<span class="fc" id="L283">            .sum();</span>
+<span class="fc" id="L284">        long exploredStates = observations.stream()</span>
+<span class="fc" id="L285">            .map(GeneratedObservation::searchResult)</span>
+<span class="fc" id="L286">            .map(GoalSearchResult::metrics)</span>
+<span class="fc" id="L287">            .mapToLong(GoalMetrics::exploredStates)</span>
+<span class="fc" id="L288">            .sum();</span>
+<span class="fc" id="L289">        Map&lt;ResourceKind, Long&gt; executed = immutableResources(Map.of(</span>
+<span class="fc" id="L290">            ResourceKind.GENERATED_STATES, generatedStates,</span>
+<span class="fc" id="L291">            ResourceKind.EXPLORED_STATES, exploredStates,</span>
+<span class="fc" id="L292">            ResourceKind.OBSERVATIONS, (long) observations.size()));</span>
+<span class="fc" id="L293">        Map&lt;ResourceKind, Long&gt; skipped = Map.of();</span>
+<span class="fc" id="L294">        Map&lt;ResourceKind, Long&gt; remaining = remaining(configured, executed, skipped);</span>
+<span class="fc" id="L295">        String contentHash = AutonomousResearchBrief.hash(</span>
+            GENERATION_RECEIPT_SCHEMA
+<span class="fc" id="L297">                + &quot;\nbrief=&quot; + brief.contentHash()</span>
+                + &quot;\nconfigured=&quot; + configured
+                + &quot;\nexecuted=&quot; + executed
+                + &quot;\nskipped=&quot; + skipped
+                + &quot;\nremaining=&quot; + remaining
+<span class="fc" id="L302">                + &quot;\nobservationBranches=&quot; + observations.stream()</span>
+<span class="fc" id="L303">                    .map(item -&gt; item.branch().contentHash()).toList());</span>
+<span class="fc" id="L304">        return new GenerationReceipt(</span>
+            GENERATION_RECEIPT_SCHEMA,
+<span class="fc" id="L306">            brief.contentHash(),</span>
+            EvidenceStage.GENERATION,
+            &quot;COMPLETED&quot;,
+            configured,
+            executed,
+            skipped,
+            remaining,
+<span class="fc" id="L313">            observations.stream().map(item -&gt; item.branch().branchId()).toList(),</span>
+            false,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    private static Map&lt;ResourceKind, Long&gt; remaining(
+        Map&lt;ResourceKind, Long&gt; configured,
+        Map&lt;ResourceKind, Long&gt; executed,
+        Map&lt;ResourceKind, Long&gt; skipped
+    ) {
+<span class="fc" id="L326">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        for (Map.Entry&lt;ResourceKind, Long&gt; entry : configured.entrySet()) {</span>
+<span class="fc" id="L328">            long consumed = Math.addExact(</span>
+<span class="fc" id="L329">                executed.getOrDefault(entry.getKey(), 0L),</span>
+<span class="fc" id="L330">                skipped.getOrDefault(entry.getKey(), 0L));</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            if (consumed &gt; entry.getValue()) {</span>
+<span class="nc" id="L332">                throw new IllegalArgumentException(</span>
+                    &quot;production generation exceeds configured resource &quot;
+<span class="nc" id="L334">                        + entry.getKey());</span>
+            }
+<span class="fc" id="L336">            long amount = entry.getValue() - consumed;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            if (amount &gt; 0L) {</span>
+<span class="fc" id="L338">                result.put(entry.getKey(), amount);</span>
+            }
+<span class="fc" id="L340">        }</span>
+<span class="fc" id="L341">        Set&lt;ResourceKind&gt; unexpected = new HashSet&lt;&gt;(executed.keySet());</span>
+<span class="fc" id="L342">        unexpected.addAll(skipped.keySet());</span>
+<span class="fc" id="L343">        unexpected.removeAll(configured.keySet());</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (!unexpected.isEmpty()) {</span>
+<span class="nc" id="L345">            throw new IllegalArgumentException(</span>
+                &quot;production generation reported unconfigured resources: &quot; + unexpected);
+        }
+<span class="fc" id="L348">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static List&lt;SeedExpression&gt; validateAndOrderSeeds(
+        AutonomousResearchBriefV2 brief,
+        List&lt;SeedExpression&gt; suppliedSeeds
+    ) {
+<span class="fc" id="L355">        Objects.requireNonNull(suppliedSeeds, &quot;seeds&quot;);</span>
+<span class="fc" id="L356">        List&lt;SeedExpression&gt; seeds = suppliedSeeds.stream()</span>
+<span class="fc" id="L357">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L358">            .sorted(Comparator.comparing(SeedExpression::stableKey))</span>
+<span class="fc" id="L359">            .toList();</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (seeds.size() &lt; PinnedAutonomousProductionCampaign.REQUIRED_OBSERVATIONS) {</span>
+<span class="fc" id="L361">            throw new IllegalArgumentException(</span>
+                &quot;production generation requires at least twelve seeds&quot;);
+        }
+<span class="fc" id="L364">        if (seeds.stream().map(SeedExpression::stableKey).distinct().count()</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">                != seeds.size()) {</span>
+<span class="nc" id="L366">            throw new IllegalArgumentException(</span>
+                &quot;production seed stable keys must be unique&quot;);
+        }
+<span class="fc" id="L369">        Set&lt;String&gt; allowedGenerators = Set.copyOf(brief.seedGenerators());</span>
+<span class="fc" id="L370">        Set&lt;String&gt; allowedDomains = Set.copyOf(brief.allowedDomains());</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        for (SeedExpression seed : seeds) {</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            if (seed.id().isBlank()</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                    || seed.expression().isBlank()</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">                    || !allowedGenerators.contains(seed.source())</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">                    || !allowedDomains.contains(seed.category())) {</span>
+<span class="fc" id="L376">                throw new IllegalArgumentException(</span>
+                    &quot;production seed requires a non-blank ID and must be inside the pinned target-free brief: &quot;
+<span class="fc" id="L378">                        + seed.stableKey());</span>
+            }
+<span class="fc" id="L380">        }</span>
+<span class="fc" id="L381">        long families = seeds.stream().map(SeedExpression::source).distinct().count();</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (families &lt; brief.minimumDistinctFamilies()) {</span>
+<span class="fc" id="L383">            throw new IllegalArgumentException(</span>
+                &quot;production seed catalog lacks independent generator families&quot;);
+        }
+<span class="fc" id="L386">        if (brief.budget(EvidenceStage.GENERATION)</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">                .configured(ResourceKind.OBSERVATIONS) &lt; seeds.size()) {</span>
+<span class="nc" id="L388">            throw new IllegalArgumentException(</span>
+                &quot;generation observation budget is smaller than the seed catalog&quot;);
+        }
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        if (!brief.inventoryHash().equals(</span>
+<span class="fc" id="L392">                PinnedAutonomousProductionCampaign.inventoryHash())) {</span>
+<span class="nc" id="L393">            throw new IllegalArgumentException(</span>
+                &quot;production brief does not bind the active AST rule inventory&quot;);
+        }
+<span class="fc" id="L396">        return List.copyOf(seeds);</span>
+    }
+
+    private static Map&lt;ResourceKind, Long&gt; immutableResources(
+        Map&lt;ResourceKind, Long&gt; supplied
+    ) {
+<span class="fc" id="L402">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L403">        supplied.forEach((resource, amount) -&gt; {</span>
+<span class="fc" id="L404">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L405" title="2 of 4 branches missed.">            if (amount == null || amount &lt; 0L) {</span>
+<span class="nc" id="L406">                throw new IllegalArgumentException(</span>
+                    &quot;resource amounts must be non-negative&quot;);
+            }
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            if (amount &gt; 0L) {</span>
+<span class="fc" id="L410">                result.put(resource, amount);</span>
+            }
+<span class="fc" id="L412">        });</span>
+<span class="fc" id="L413">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static String seedMaterial(SeedExpression seed) {
+<span class="fc" id="L417">        return seed.stableKey() + '|' + seed.expression() + '|' + seed.source()</span>
+<span class="fc" id="L418">            + '|' + seed.category() + '|' + sorted(seed.tags()) + '|'</span>
+<span class="fc" id="L419">            + sorted(seed.assumptions());</span>
+    }
+
+    private static List&lt;String&gt; sorted(List&lt;String&gt; values) {
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">        return values == null ? List.of() : values.stream().distinct().sorted().toList();</span>
+    }
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L427" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L428">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L430">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L434">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L436">    }</span>
+
+    public record GenerationRun(
+        String schema,
+        AutonomousResearchBriefV2 brief,
+        SeedCatalog seedCatalog,
+        List&lt;GeneratedObservation&gt; observations,
+        ObservationBundle observationBundle,
+        GenerationReceipt receipt,
+        DiscoveryReport discoveryReport,
+        String discoveryReportHash,
+        boolean targetProvided,
+        boolean generationIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L453">        public GenerationRun {</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            if (!GENERATION_RUN_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L455">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported production generation schema&quot;);
+            }
+<span class="fc" id="L458">            brief = Objects.requireNonNull(brief, &quot;brief&quot;);</span>
+<span class="fc" id="L459">            seedCatalog = Objects.requireNonNull(seedCatalog, &quot;seedCatalog&quot;);</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">            observations = observations == null ? List.of() : List.copyOf(observations);</span>
+<span class="fc" id="L461">            observationBundle = Objects.requireNonNull(</span>
+                observationBundle, &quot;observationBundle&quot;);
+<span class="fc" id="L463">            receipt = Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L464">            discoveryReport = Objects.requireNonNull(</span>
+                discoveryReport, &quot;discoveryReport&quot;);
+<span class="fc" id="L466">            requireSha256(discoveryReportHash, &quot;discoveryReportHash&quot;);</span>
+<span class="pc bpc" id="L467" title="2 of 4 branches missed.">            if (targetProvided || generationIsMathematicalEvidence) {</span>
+<span class="nc" id="L468">                throw new IllegalArgumentException(</span>
+                    &quot;generation metadata must remain target-free and non-mathematical&quot;);
+            }
+<span class="fc" id="L471">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L472">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L473">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L474">        }</span>
+
+        public List&lt;ObservationBranch&gt; observationBranches() {
+<span class="fc" id="L477">            return observations.stream().map(GeneratedObservation::branch).toList();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L481">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L482">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L483">                .property(&quot;briefHash&quot;, brief.contentHash())</span>
+<span class="fc" id="L484">                .property(&quot;seedCatalogHash&quot;, seedCatalog.contentHash())</span>
+<span class="fc" id="L485">                .property(&quot;observationBundleHash&quot;, observationBundle.contentHash())</span>
+<span class="fc" id="L486">                .property(&quot;generationReceiptHash&quot;, receipt.contentHash())</span>
+<span class="fc" id="L487">                .property(&quot;discoveryReportHash&quot;, discoveryReportHash)</span>
+<span class="fc" id="L488">                .property(&quot;seedCount&quot;, seedCatalog.seeds().size())</span>
+<span class="fc" id="L489">                .property(&quot;observationCount&quot;, observations.size())</span>
+<span class="fc" id="L490">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L491">                .property(&quot;generationIsMathematicalEvidence&quot;,</span>
+                    generationIsMathematicalEvidence)
+<span class="fc" id="L493">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L494">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L495">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L496">                .endObject()</span>
+<span class="fc" id="L497">                .toString();</span>
+        }
+    }
+
+    public record GeneratedObservation(
+        SeedExpression seed,
+        ObservationBranch branch,
+        ObservationSnapshot snapshot,
+        GoalSearchResult searchResult
+    ) {
+<span class="fc" id="L507">        public GeneratedObservation {</span>
+<span class="fc" id="L508">            seed = Objects.requireNonNull(seed, &quot;seed&quot;);</span>
+<span class="fc" id="L509">            branch = Objects.requireNonNull(branch, &quot;branch&quot;);</span>
+<span class="fc" id="L510">            snapshot = Objects.requireNonNull(snapshot, &quot;snapshot&quot;);</span>
+<span class="fc" id="L511">            searchResult = Objects.requireNonNull(searchResult, &quot;searchResult&quot;);</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">            if (!branch.observationId().equals(snapshot.observationId())</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">                    || !branch.snapshotHash().equals(snapshot.snapshotHash())</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">                    || !branch.evidenceHash().equals(snapshot.evidenceHash())) {</span>
+<span class="nc" id="L515">                throw new IllegalArgumentException(</span>
+                    &quot;generated observation snapshot does not match its branch&quot;);
+            }
+<span class="fc" id="L518">        }</span>
+    }
+
+    public record SeedCatalog(
+        String schema,
+        String briefHash,
+        List&lt;SeedExpression&gt; seeds,
+        boolean targetProvided,
+        String contentHash
+    ) {
+<span class="fc" id="L528">        public SeedCatalog {</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">            if (!SEED_CATALOG_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L530">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported production seed catalog schema&quot;);
+            }
+<span class="fc" id="L533">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">            seeds = seeds == null ? List.of() : seeds.stream()</span>
+<span class="fc" id="L535">                .sorted(Comparator.comparing(SeedExpression::stableKey))</span>
+<span class="fc" id="L536">                .toList();</span>
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">            if (targetProvided) {</span>
+<span class="nc" id="L538">                throw new IllegalArgumentException(</span>
+                    &quot;production seed catalog cannot provide a target&quot;);
+            }
+<span class="fc" id="L541">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L542">        }</span>
+
+        static SeedCatalog create(String briefHash, List&lt;SeedExpression&gt; seeds) {
+<span class="fc" id="L545">            List&lt;SeedExpression&gt; ordered = seeds.stream()</span>
+<span class="fc" id="L546">                .sorted(Comparator.comparing(SeedExpression::stableKey))</span>
+<span class="fc" id="L547">                .toList();</span>
+<span class="fc" id="L548">            String contentHash = AutonomousResearchBrief.hash(</span>
+                SEED_CATALOG_SCHEMA + &quot;\nbrief=&quot; + briefHash + &quot;\nseeds=&quot;
+<span class="fc" id="L550">                    + ordered.stream()</span>
+<span class="fc" id="L551">                        .map(AutonomousProductionGenerationRunner::seedMaterial)</span>
+<span class="fc" id="L552">                        .toList());</span>
+<span class="fc" id="L553">            return new SeedCatalog(</span>
+                SEED_CATALOG_SCHEMA, briefHash, ordered, false, contentHash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L558">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L559">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L560">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L561">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L562">                .array(&quot;seeds&quot;, array -&gt; seeds.forEach(seed -&gt;</span>
+<span class="fc" id="L563">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L564">                        .property(&quot;seedId&quot;, seed.stableKey())</span>
+<span class="fc" id="L565">                        .property(&quot;expression&quot;, seed.expression())</span>
+<span class="fc" id="L566">                        .property(&quot;generator&quot;, seed.source())</span>
+<span class="fc" id="L567">                        .property(&quot;domain&quot;, seed.category())</span>
+<span class="fc" id="L568">                        .stringArray(&quot;tags&quot;, sorted(seed.tags()))</span>
+<span class="fc" id="L569">                        .stringArray(&quot;assumptions&quot;, sorted(seed.assumptions())))))</span>
+<span class="fc" id="L570">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L571">                .endObject()</span>
+<span class="fc" id="L572">                .toString();</span>
+        }
+    }
+
+    public record ObservationBundle(
+        String schema,
+        String briefHash,
+        List&lt;ObservationSnapshot&gt; observations,
+        boolean targetProvided,
+        String contentHash
+    ) {
+<span class="fc" id="L583">        public ObservationBundle {</span>
+<span class="pc bpc" id="L584" title="1 of 2 branches missed.">            if (!OBSERVATION_BUNDLE_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L585">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported production observation bundle schema&quot;);
+            }
+<span class="fc" id="L588">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="pc bpc" id="L589" title="1 of 2 branches missed.">            observations = observations == null ? List.of() : observations.stream()</span>
+<span class="fc" id="L590">                .sorted(Comparator.comparing(ObservationSnapshot::observationId))</span>
+<span class="fc" id="L591">                .toList();</span>
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            if (targetProvided || observations.stream()</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">                    .anyMatch(item -&gt; !GoalStatus.UNTARGETED.name()</span>
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">                        .equals(item.searchStatus()))) {</span>
+<span class="nc" id="L595">                throw new IllegalArgumentException(</span>
+                    &quot;production observation bundle must remain target-free&quot;);
+            }
+<span class="fc" id="L598">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L599">        }</span>
+
+        static ObservationBundle create(
+            String briefHash,
+            List&lt;ObservationSnapshot&gt; observations
+        ) {
+<span class="fc" id="L605">            List&lt;ObservationSnapshot&gt; ordered = observations.stream()</span>
+<span class="fc" id="L606">                .sorted(Comparator.comparing(ObservationSnapshot::observationId))</span>
+<span class="fc" id="L607">                .toList();</span>
+<span class="fc" id="L608">            String contentHash = AutonomousResearchBrief.hash(</span>
+                OBSERVATION_BUNDLE_SCHEMA + &quot;\nbrief=&quot; + briefHash
+<span class="fc" id="L610">                    + &quot;\nobservations=&quot; + ordered.stream()</span>
+<span class="fc" id="L611">                        .map(ObservationSnapshot::canonicalMaterial).toList());</span>
+<span class="fc" id="L612">            return new ObservationBundle(</span>
+                OBSERVATION_BUNDLE_SCHEMA,
+                briefHash,
+                ordered,
+                false,
+                contentHash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L621">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L622">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L623">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L624">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L625">                .array(&quot;observations&quot;, array -&gt; observations.forEach(item -&gt;</span>
+<span class="fc" id="L626">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L627">                        .property(&quot;observationId&quot;, item.observationId())</span>
+<span class="fc" id="L628">                        .property(&quot;branchId&quot;, item.branchId())</span>
+<span class="fc" id="L629">                        .property(&quot;familyId&quot;, item.familyId())</span>
+<span class="fc" id="L630">                        .property(&quot;seedId&quot;, item.seedId())</span>
+<span class="fc" id="L631">                        .property(&quot;seedExpression&quot;, item.seedExpression())</span>
+<span class="fc" id="L632">                        .property(&quot;generator&quot;, item.generator())</span>
+<span class="fc" id="L633">                        .property(&quot;domain&quot;, item.domain())</span>
+<span class="fc" id="L634">                        .stringArray(&quot;tags&quot;, item.tags())</span>
+<span class="fc" id="L635">                        .stringArray(&quot;assumptions&quot;, item.assumptions())</span>
+<span class="fc" id="L636">                        .property(&quot;searchStatus&quot;, item.searchStatus())</span>
+<span class="fc" id="L637">                        .object(&quot;metrics&quot;, metrics -&gt; metrics</span>
+<span class="fc" id="L638">                            .property(&quot;exploredStates&quot;,</span>
+<span class="fc" id="L639">                                item.metrics().exploredStates())</span>
+<span class="fc" id="L640">                            .property(&quot;expandedStates&quot;,</span>
+<span class="fc" id="L641">                                item.metrics().expandedStates())</span>
+<span class="fc" id="L642">                            .property(&quot;generatedTransformations&quot;,</span>
+<span class="fc" id="L643">                                item.metrics().generatedTransformations())</span>
+<span class="fc" id="L644">                            .property(&quot;enqueuedStates&quot;,</span>
+<span class="fc" id="L645">                                item.metrics().enqueuedStates()))</span>
+<span class="fc" id="L646">                        .array(&quot;states&quot;, states -&gt; item.states().forEach(state -&gt;</span>
+<span class="fc" id="L647">                            states.objectValue(value -&gt; value</span>
+<span class="fc" id="L648">                                .property(&quot;expression&quot;, state.expression())</span>
+<span class="fc" id="L649">                                .property(&quot;depth&quot;, state.depth())</span>
+<span class="fc" id="L650">                                .property(&quot;canonicalHash&quot;, state.canonicalHash())</span>
+<span class="fc" id="L651">                                .property(&quot;scoreWeightedTotal&quot;,</span>
+<span class="fc" id="L652">                                    state.scoreWeightedTotal())</span>
+<span class="fc" id="L653">                                .stringArray(&quot;path&quot;, state.path())</span>
+<span class="fc" id="L654">                                .stringArray(&quot;appliedRuleIds&quot;,</span>
+<span class="fc" id="L655">                                    state.appliedRuleIds())</span>
+<span class="fc" id="L656">                                .booleanArray(&quot;equivalencePreservingFlags&quot;,</span>
+<span class="fc" id="L657">                                    state.equivalencePreservingFlags())</span>
+<span class="fc" id="L658">                                .stringArray(&quot;assumptions&quot;, state.assumptions()))))</span>
+<span class="fc" id="L659">                        .property(&quot;selectedExpression&quot;, item.selectedExpression())</span>
+<span class="fc" id="L660">                        .stringArray(&quot;selectedPath&quot;, item.selectedPath())</span>
+<span class="fc" id="L661">                        .stringArray(&quot;selectedRuleIds&quot;, item.selectedRuleIds())</span>
+<span class="fc" id="L662">                        .property(&quot;snapshotHash&quot;, item.snapshotHash())</span>
+<span class="fc" id="L663">                        .property(&quot;evidenceHash&quot;, item.evidenceHash())</span>
+<span class="fc" id="L664">                        .property(&quot;branchHash&quot;, item.branchHash()))))</span>
+<span class="fc" id="L665">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L666">                .endObject()</span>
+<span class="fc" id="L667">                .toString();</span>
+        }
+    }
+
+    public record ObservationSnapshot(
+        String observationId,
+        String branchId,
+        String familyId,
+        String seedId,
+        String seedExpression,
+        String generator,
+        String domain,
+        List&lt;String&gt; tags,
+        List&lt;String&gt; assumptions,
+        String searchStatus,
+        SearchMetricsSnapshot metrics,
+        List&lt;StateSnapshot&gt; states,
+        String selectedExpression,
+        List&lt;String&gt; selectedPath,
+        List&lt;String&gt; selectedRuleIds,
+        String snapshotHash,
+        String evidenceHash,
+        String branchHash
+    ) {
+<span class="fc" id="L691">        public ObservationSnapshot {</span>
+<span class="fc" id="L692">            tags = sorted(tags);</span>
+<span class="fc" id="L693">            assumptions = sorted(assumptions);</span>
+<span class="fc" id="L694">            metrics = Objects.requireNonNull(metrics, &quot;metrics&quot;);</span>
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">            states = states == null ? List.of() : states.stream()</span>
+<span class="fc" id="L696">                .sorted(StateSnapshot.ORDER)</span>
+<span class="fc" id="L697">                .toList();</span>
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">            selectedPath = selectedPath == null ? List.of() : List.copyOf(selectedPath);</span>
+<span class="pc bpc" id="L699" title="1 of 2 branches missed.">            selectedRuleIds = selectedRuleIds == null</span>
+<span class="nc" id="L700">                ? List.of()</span>
+<span class="fc" id="L701">                : List.copyOf(selectedRuleIds);</span>
+<span class="fc" id="L702">            requireSha256(snapshotHash, &quot;snapshotHash&quot;);</span>
+<span class="fc" id="L703">            requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
+<span class="fc" id="L704">            requireSha256(branchHash, &quot;branchHash&quot;);</span>
+<span class="fc" id="L705">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L708">            return observationId + '|' + branchId + '|' + familyId + '|'</span>
+                + seedId + '|' + seedExpression + '|' + generator + '|'
+                + domain + '|' + tags + '|' + assumptions + '|' + searchStatus
+<span class="fc" id="L711">                + '|' + metrics.canonicalMaterial() + '|'</span>
+<span class="fc" id="L712">                + states.stream().map(StateSnapshot::canonicalMaterial).toList()</span>
+                + '|' + selectedExpression + '|' + selectedPath + '|'
+                + selectedRuleIds + '|' + snapshotHash + '|' + evidenceHash
+                + '|' + branchHash;
+        }
+    }
+
+    public record StateSnapshot(
+        String expression,
+        int depth,
+        String canonicalHash,
+        int scoreWeightedTotal,
+        List&lt;String&gt; path,
+        List&lt;String&gt; appliedRuleIds,
+        List&lt;Boolean&gt; equivalencePreservingFlags,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L729">        static final Comparator&lt;StateSnapshot&gt; ORDER = Comparator</span>
+<span class="fc" id="L730">            .comparingInt(StateSnapshot::depth)</span>
+<span class="fc" id="L731">            .thenComparing(StateSnapshot::expression)</span>
+<span class="fc" id="L732">            .thenComparing(item -&gt; String.join(&quot;-&gt;&quot;, item.appliedRuleIds()))</span>
+<span class="fc" id="L733">            .thenComparing(item -&gt; String.join(&quot;-&gt;&quot;, item.path()));</span>
+
+<span class="fc" id="L735">        public StateSnapshot {</span>
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">            appliedRuleIds = appliedRuleIds == null</span>
+<span class="nc" id="L738">                ? List.of()</span>
+<span class="fc" id="L739">                : List.copyOf(appliedRuleIds);</span>
+<span class="pc bpc" id="L740" title="1 of 2 branches missed.">            equivalencePreservingFlags = equivalencePreservingFlags == null</span>
+<span class="nc" id="L741">                ? List.of()</span>
+<span class="fc" id="L742">                : List.copyOf(equivalencePreservingFlags);</span>
+<span class="fc" id="L743">            assumptions = sorted(assumptions);</span>
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">            if (equivalencePreservingFlags.size() != appliedRuleIds.size()) {</span>
+<span class="nc" id="L745">                throw new IllegalArgumentException(</span>
+                    &quot;equivalence flags must align with the applied rule path&quot;);
+            }
+<span class="fc" id="L748">        }</span>
+
+        static StateSnapshot from(SearchState state) {
+<span class="fc" id="L751">            return new StateSnapshot(</span>
+<span class="fc" id="L752">                state.expression(),</span>
+<span class="fc" id="L753">                state.depth(),</span>
+<span class="fc" id="L754">                state.canonicalHash(),</span>
+<span class="fc" id="L755">                state.score().weightedTotal(),</span>
+<span class="fc" id="L756">                state.path(),</span>
+<span class="fc" id="L757">                state.appliedRuleIds(),</span>
+<span class="fc" id="L758">                state.equivalencePreservingFlags(),</span>
+<span class="fc" id="L759">                state.assumptions());</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L763">            return expression + '|' + depth + '|' + canonicalHash + '|'</span>
+                + scoreWeightedTotal + '|' + path + '|' + appliedRuleIds + '|'
+                + equivalencePreservingFlags + '|' + assumptions;
+        }
+    }
+
+<span class="fc" id="L769">    public record SearchMetricsSnapshot(</span>
+        int exploredStates,
+        int expandedStates,
+        int generatedTransformations,
+        int enqueuedStates
+    ) {
+        static SearchMetricsSnapshot from(GoalMetrics metrics) {
+<span class="fc" id="L776">            return new SearchMetricsSnapshot(</span>
+<span class="fc" id="L777">                metrics.exploredStates(),</span>
+<span class="fc" id="L778">                metrics.expandedStates(),</span>
+<span class="fc" id="L779">                metrics.generatedTransformations(),</span>
+<span class="fc" id="L780">                metrics.enqueuedStates());</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L784">            return exploredStates + &quot;|&quot; + expandedStates + &quot;|&quot;</span>
+                + generatedTransformations + &quot;|&quot; + enqueuedStates;
+        }
+    }
+
+    public record GenerationReceipt(
+        String schema,
+        String briefHash,
+        EvidenceStage stage,
+        String disposition,
+        Map&lt;ResourceKind, Long&gt; configuredResources,
+        Map&lt;ResourceKind, Long&gt; executedResources,
+        Map&lt;ResourceKind, Long&gt; skippedResources,
+        Map&lt;ResourceKind, Long&gt; remainingResources,
+        List&lt;String&gt; observationBranchIds,
+        boolean targetProvided,
+        boolean receiptIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L805">        public GenerationReceipt {</span>
+<span class="pc bpc" id="L806" title="2 of 4 branches missed.">            if (!GENERATION_RECEIPT_SCHEMA.equals(schema)</span>
+                    || stage != EvidenceStage.GENERATION
+<span class="pc bpc" id="L808" title="1 of 2 branches missed.">                    || !&quot;COMPLETED&quot;.equals(disposition)) {</span>
+<span class="nc" id="L809">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported or incomplete production generation receipt&quot;);
+            }
+<span class="fc" id="L812">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="fc" id="L813">            configuredResources = immutableResources(configuredResources);</span>
+<span class="fc" id="L814">            executedResources = immutableResources(executedResources);</span>
+<span class="fc" id="L815">            skippedResources = immutableResources(skippedResources);</span>
+<span class="fc" id="L816">            remainingResources = immutableResources(remainingResources);</span>
+<span class="pc bpc" id="L817" title="1 of 2 branches missed.">            observationBranchIds = observationBranchIds == null</span>
+<span class="nc" id="L818">                ? List.of()</span>
+<span class="fc" id="L819">                : observationBranchIds.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L820">            validateBalance(</span>
+                configuredResources,
+                executedResources,
+                skippedResources,
+                remainingResources);
+<span class="fc" id="L825">            if (executedResources.getOrDefault(ResourceKind.OBSERVATIONS, 0L)</span>
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">                    != observationBranchIds.size()) {</span>
+<span class="nc" id="L827">                throw new IllegalArgumentException(</span>
+                    &quot;observation execution count must match retained branches&quot;);
+            }
+<span class="pc bpc" id="L830" title="2 of 4 branches missed.">            if (targetProvided || receiptIsMathematicalEvidence) {</span>
+<span class="nc" id="L831">                throw new IllegalArgumentException(</span>
+                    &quot;generation receipt must remain target-free and non-mathematical&quot;);
+            }
+<span class="fc" id="L834">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L835">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L836">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L837">        }</span>
+
+        public long executed(ResourceKind resource) {
+<span class="fc" id="L840">            return executedResources.getOrDefault(resource, 0L);</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L844">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L845">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L846">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L847">                .property(&quot;stage&quot;, stage.name())</span>
+<span class="fc" id="L848">                .property(&quot;disposition&quot;, disposition)</span>
+<span class="fc" id="L849">                .array(&quot;resources&quot;, array -&gt; configuredResources.keySet().stream()</span>
+<span class="fc" id="L850">                    .sorted()</span>
+<span class="fc" id="L851">                    .forEach(resource -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L852">                        .property(&quot;resource&quot;, resource.name())</span>
+<span class="fc" id="L853">                        .property(&quot;configured&quot;,</span>
+<span class="fc" id="L854">                            configuredResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L855">                        .property(&quot;executed&quot;,</span>
+<span class="fc" id="L856">                            executedResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L857">                        .property(&quot;skipped&quot;,</span>
+<span class="fc" id="L858">                            skippedResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L859">                        .property(&quot;remaining&quot;,</span>
+<span class="fc" id="L860">                            remainingResources.getOrDefault(resource, 0L)))))</span>
+<span class="fc" id="L861">                .stringArray(&quot;observationBranchIds&quot;, observationBranchIds)</span>
+<span class="fc" id="L862">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L863">                .property(&quot;receiptIsMathematicalEvidence&quot;,</span>
+                    receiptIsMathematicalEvidence)
+<span class="fc" id="L865">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L866">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L867">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L868">                .endObject()</span>
+<span class="fc" id="L869">                .toString();</span>
+        }
+
+        private static void validateBalance(
+            Map&lt;ResourceKind, Long&gt; configured,
+            Map&lt;ResourceKind, Long&gt; executed,
+            Map&lt;ResourceKind, Long&gt; skipped,
+            Map&lt;ResourceKind, Long&gt; remaining
+        ) {
+<span class="fc" id="L878">            Set&lt;ResourceKind&gt; resources = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L879">            resources.addAll(configured.keySet());</span>
+<span class="fc" id="L880">            resources.addAll(executed.keySet());</span>
+<span class="fc" id="L881">            resources.addAll(skipped.keySet());</span>
+<span class="fc" id="L882">            resources.addAll(remaining.keySet());</span>
+<span class="fc bfc" id="L883" title="All 2 branches covered.">            for (ResourceKind resource : resources) {</span>
+<span class="fc" id="L884">                long accounted = Math.addExact(</span>
+<span class="fc" id="L885">                    Math.addExact(</span>
+<span class="fc" id="L886">                        executed.getOrDefault(resource, 0L),</span>
+<span class="fc" id="L887">                        skipped.getOrDefault(resource, 0L)),</span>
+<span class="fc" id="L888">                    remaining.getOrDefault(resource, 0L));</span>
+<span class="pc bpc" id="L889" title="1 of 2 branches missed.">                if (configured.getOrDefault(resource, 0L) != accounted) {</span>
+<span class="nc" id="L890">                    throw new IllegalArgumentException(</span>
+                        &quot;unbalanced production generation resource &quot; + resource);
+                }
+<span class="fc" id="L893">            }</span>
+<span class="fc" id="L894">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -108,80 +108,90 @@ import java.util.function.Consumer;
 <span class="nc" id="L108">        return array(key, writer -&gt; values.forEach(writer::value));</span>
     }
 
+    public JsonWriter booleanArray(String key, List&lt;Boolean&gt; values) {
+<span class="nc" id="L112">        return array(key, writer -&gt; values.forEach(writer::value));</span>
+    }
+
     public JsonWriter value(String value) {
-<span class="nc" id="L112">        comma();</span>
-<span class="nc" id="L113">        appendString(value);</span>
-<span class="nc" id="L114">        return this;</span>
+<span class="nc" id="L116">        comma();</span>
+<span class="nc" id="L117">        appendString(value);</span>
+<span class="nc" id="L118">        return this;</span>
     }
 
     public JsonWriter value(int value) {
-<span class="nc" id="L118">        comma();</span>
-<span class="nc" id="L119">        builder.append(value);</span>
-<span class="nc" id="L120">        return this;</span>
+<span class="nc" id="L122">        comma();</span>
+<span class="nc" id="L123">        builder.append(value);</span>
+<span class="nc" id="L124">        return this;</span>
+    }
+
+    public JsonWriter value(boolean value) {
+<span class="nc" id="L128">        comma();</span>
+<span class="nc" id="L129">        builder.append(value);</span>
+<span class="nc" id="L130">        return this;</span>
     }
 
     public JsonWriter objectValue(Consumer&lt;JsonWriter&gt; body) {
-<span class="nc" id="L124">        comma();</span>
-<span class="nc" id="L125">        beginObject();</span>
-<span class="nc" id="L126">        body.accept(this);</span>
-<span class="nc" id="L127">        return endObject();</span>
+<span class="nc" id="L134">        comma();</span>
+<span class="nc" id="L135">        beginObject();</span>
+<span class="nc" id="L136">        body.accept(this);</span>
+<span class="nc" id="L137">        return endObject();</span>
     }
 
     /** Emit a nested array value inside an array context. */
     public JsonWriter arrayValue(Consumer&lt;JsonWriter&gt; body) {
-<span class="nc" id="L132">        comma();</span>
-<span class="nc" id="L133">        beginArray();</span>
-<span class="nc" id="L134">        body.accept(this);</span>
-<span class="nc" id="L135">        return endArray();</span>
+<span class="nc" id="L142">        comma();</span>
+<span class="nc" id="L143">        beginArray();</span>
+<span class="nc" id="L144">        body.accept(this);</span>
+<span class="nc" id="L145">        return endArray();</span>
     }
 
     private void comma() {
-<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
-<span class="nc" id="L140">            return;</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (firstEntry.isEmpty()) {</span>
+<span class="nc" id="L150">            return;</span>
         }
-<span class="nc" id="L142">        boolean first = firstEntry.pop();</span>
-<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (!first) {</span>
-<span class="nc" id="L144">            builder.append(',');</span>
+<span class="nc" id="L152">        boolean first = firstEntry.pop();</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (!first) {</span>
+<span class="nc" id="L154">            builder.append(',');</span>
         }
-<span class="nc" id="L146">        firstEntry.push(false);</span>
-<span class="nc" id="L147">    }</span>
+<span class="nc" id="L156">        firstEntry.push(false);</span>
+<span class="nc" id="L157">    }</span>
 
     private void appendKey(String key) {
-<span class="nc" id="L150">        appendString(key);</span>
-<span class="nc" id="L151">        builder.append(':');</span>
-<span class="nc" id="L152">    }</span>
+<span class="nc" id="L160">        appendString(key);</span>
+<span class="nc" id="L161">        builder.append(':');</span>
+<span class="nc" id="L162">    }</span>
 
     private void appendString(String value) {
-<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (value == null) {</span>
-<span class="nc" id="L156">            builder.append(&quot;null&quot;);</span>
-<span class="nc" id="L157">            return;</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L166">            builder.append(&quot;null&quot;);</span>
+<span class="nc" id="L167">            return;</span>
         }
-<span class="nc" id="L159">        builder.append('&quot;');</span>
-<span class="nc bnc" id="L160" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
-<span class="nc" id="L161">            char current = value.charAt(i);</span>
-<span class="nc bnc" id="L162" title="All 8 branches missed.">            switch (current) {</span>
-<span class="nc" id="L163">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
-<span class="nc" id="L164">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
-<span class="nc" id="L165">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
-<span class="nc" id="L166">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
-<span class="nc" id="L167">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
-<span class="nc" id="L168">                case '\b' -&gt; builder.append(&quot;\\b&quot;);</span>
-<span class="nc" id="L169">                case '\f' -&gt; builder.append(&quot;\\f&quot;);</span>
+<span class="nc" id="L169">        builder.append('&quot;');</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="nc" id="L171">            char current = value.charAt(i);</span>
+<span class="nc bnc" id="L172" title="All 8 branches missed.">            switch (current) {</span>
+<span class="nc" id="L173">                case '\\' -&gt; builder.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L174">                case '&quot;' -&gt; builder.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L175">                case '\n' -&gt; builder.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L176">                case '\r' -&gt; builder.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L177">                case '\t' -&gt; builder.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L178">                case '\b' -&gt; builder.append(&quot;\\b&quot;);</span>
+<span class="nc" id="L179">                case '\f' -&gt; builder.append(&quot;\\f&quot;);</span>
                 default -&gt; {
-<span class="nc bnc" id="L171" title="All 2 branches missed.">                    if (current &lt; 0x20) {</span>
-<span class="nc" id="L172">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) current));</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">                    if (current &lt; 0x20) {</span>
+<span class="nc" id="L182">                        builder.append(String.format(&quot;\\u%04x&quot;, (int) current));</span>
                     } else {
-<span class="nc" id="L174">                        builder.append(current);</span>
+<span class="nc" id="L184">                        builder.append(current);</span>
                     }
                 }
             }
         }
-<span class="nc" id="L179">        builder.append('&quot;');</span>
-<span class="nc" id="L180">    }</span>
+<span class="nc" id="L189">        builder.append('&quot;');</span>
+<span class="nc" id="L190">    }</span>
 
     @Override
     public String toString() {
-<span class="nc" id="L184">        return builder.toString();</span>
+<span class="nc" id="L194">        return builder.toString();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
