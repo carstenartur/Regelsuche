@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-production-generation/v2",
+  "title": "Regelsuche autonomous production generation manifest v2",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "seedCatalogHash", "observationBundleHash",
+    "generationReceiptHash", "discoveryReportHash", "seedCount",
+    "observationCount", "targetProvided", "generationIsMathematicalEvidence",
+    "promotionStatus", "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-production-generation/v2" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "seedCatalogHash": { "$ref": "#/$defs/sha256" },
+    "observationBundleHash": { "$ref": "#/$defs/sha256" },
+    "generationReceiptHash": { "$ref": "#/$defs/sha256" },
+    "discoveryReportHash": { "$ref": "#/$defs/sha256" },
+    "seedCount": { "type": "integer", "minimum": 12 },
+    "observationCount": { "type": "integer", "minimum": 12 },
+    "targetProvided": { "const": false },
+    "generationIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
