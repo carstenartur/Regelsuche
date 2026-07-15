@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-branch-lineage/v2",
+  "title": "Regelsuche immutable aggregate branch lineage v2",
+  "type": "object",
+  "required": [
+    "schema", "outputBranchId", "candidateId", "decisionHash",
+    "miningReportHash", "convergenceEvidenceHash", "sourceBranches",
+    "lineageHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-branch-lineage/v2" },
+    "outputBranchId": { "$ref": "#/$defs/nonBlank" },
+    "candidateId": { "$ref": "#/$defs/nonBlank" },
+    "decisionHash": { "$ref": "#/$defs/sha256" },
+    "miningReportHash": { "$ref": "#/$defs/sha256" },
+    "convergenceEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "sourceBranches": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["branchId", "snapshotHash", "evidenceHash"],
+        "properties": {
+          "branchId": { "$ref": "#/$defs/nonBlank" },
+          "snapshotHash": { "$ref": "#/$defs/sha256" },
+          "evidenceHash": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "lineageHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}
