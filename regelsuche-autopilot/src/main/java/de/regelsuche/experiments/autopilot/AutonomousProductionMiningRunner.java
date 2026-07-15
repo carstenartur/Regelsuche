@@ -52,7 +52,7 @@ public final class AutonomousProductionMiningRunner {
         return run(new AutonomousProductionGenerationRunner().runPinned(parallelism));
     }
 
-    public MiningRun run(GenerationRun generation) {
+    MiningRun run(GenerationRun generation) {
         Objects.requireNonNull(generation, "generation");
         var brief = generation.brief();
         long candidateCapacity = brief.budget(EvidenceStage.CANDIDATE_FORMATION)
