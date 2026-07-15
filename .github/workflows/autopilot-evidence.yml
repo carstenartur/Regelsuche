@@ -33,7 +33,8 @@ jobs:
         run: |
           ./gradlew :regelsuche-experiments:test \
             --tests de.regelsuche.experiments.autopilot.DeterministicCampaignPlannerTest \
-            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionAdapterTest
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionAdapterTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionReceiptContractTest
 
       - name: Require evidence artifacts
         run: |
