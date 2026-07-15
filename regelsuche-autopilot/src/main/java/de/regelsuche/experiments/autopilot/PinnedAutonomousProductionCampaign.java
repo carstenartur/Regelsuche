@@ -39,7 +39,7 @@ public final class PinnedAutonomousProductionCampaign {
                 "core-ast-default-rules/v1|" + inventoryHash()),
             AutonomousResearchBrief.hash(
                 "best-first-search/v1|expression-scorer/v1|"
-                    + SEARCH_HEURISTIC),
+                    + "expression-canonicalizer/v1|" + SEARCH_HEURISTIC),
             348_202_607_15L,
             2,
             2,
