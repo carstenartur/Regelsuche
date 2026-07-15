@@ -1,10 +1,13 @@
 # Makros
 
-Makros sind textbasierte Kurzformen für häufige Umformungen.
+Makros in Regeldateien sind **vom Autor deklarierte** Kurzformen für häufige
+Umformungen. Sie sind von den aus realen Suchpfaden gelernten und erst nach
+Evidenz-/Promotion-Gates aktivierten Makroregeln zu unterscheiden.
 
 ## Modell
 
-Makros werden als `de.regelsuche.plugin.RuleMacro` registriert und über `MacroRegistry` sichtbar gemacht.
+Deklarative Makros werden als `de.regelsuche.plugin.RuleMacro` registriert und
+über `MacroRegistry` sichtbar gemacht.
 
 ## Beispiel
 
@@ -16,7 +19,25 @@ macro expand_square:
     - macro
 ```
 
-Makros werden geladen, gelistet und deaktivierbar verwaltet. Aktivierte Makros werden zusätzlich als einstufige Transformationskanten (`macro.<id>`) in den Suchgraphen eingebunden, sodass sie wie reguläre Umformungen während der Suche angewendet werden. Ein über `--disable-rule <id>` oder die Konfiguration deaktiviertes Makro erzeugt keine solche Kante.
+Aktivierte Makros werden als einstufige Transformationskanten (`macro.<id>`) in
+den Suchgraphen eingebunden und können wie reguläre Umformungen angewendet
+werden. Ein über `--disable-rule <id>` oder eine Laufzeitkonfiguration
+deaktiviertes Makro erzeugt keine Kante.
 
+Makros erscheinen in `rules debug` als normale Regelversuche. Beim `rules export`
+werden sie nur berücksichtigt, wenn ihre erzeugten Transformationskanten aktiv
+sind. Profilfilter und deaktivierte Makros bleiben dadurch in Debug- und
+Paket-Workflows konsistent sichtbar.
 
-Makros erscheinen auch in `rules debug` als normale Regelversuche und werden beim `rules export` nur dann berücksichtigt, wenn ihre daraus erzeugten Transformationskanten aktiv sind. So bleiben Profilfilter und deaktivierte Makros in Debug- und Paket-Workflows konsistent sichtbar.
+## Abgrenzung zu gelernten Makros
+
+Ein deklaratives Regeldatei-Makro wird unmittelbar vom Autor vorgegeben. Ein
+gelerntes Makro entsteht dagegen aus reproduzierbaren Suchpfaden und darf erst
+nach Generalisierung, Holdouts, Gegenbeispielsuche, Novelty, Proof- und
+Promotion-Gates in das wiederverwendbare Inventar gelangen.
+
+Siehe:
+
+- [Regeldateien](rule-files.md) für Syntax und Aktivierungsprofile,
+- [Makroregeln und emergente Identitäten](macro-rules.md) für gelerntes Wissen,
+- [Erweiterungssystem](extension-system.md) für die gemeinsame Architekturkarte.
