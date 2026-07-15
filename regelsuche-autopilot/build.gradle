@@ -39,6 +39,15 @@ tasks.register('runProductionMining', JavaExec) {
         .get().asFile.absolutePath
 }
 
+tasks.register('runProductionLifecycle', JavaExec) {
+    group = 'verification'
+    description = 'Runs pinned generation, mining, validation, novelty, proof and lifecycle.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionLifecycleMain'
+    args layout.buildDirectory.dir('reports/autopilot-production-lifecycle')
+        .get().asFile.absolutePath
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
