@@ -1,0 +1,759 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousProductionMiningRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">AutonomousProductionMiningRunner.java</span></div><h1>AutonomousProductionMiningRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2.BranchLineageArtifact;
+import de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2.CampaignExecution;
+import de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2.CampaignPlan;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.AggregateDecision;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.AggregateReceipt;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.EvidenceDagSnapshot;
+import de.regelsuche.experiments.autopilot.AutonomousProductionGenerationRunner.GeneratedObservation;
+import de.regelsuche.experiments.autopilot.AutonomousProductionGenerationRunner.GenerationRun;
+import de.regelsuche.experiments.autopilot.AutonomousProductionGenerationRunner.StateSnapshot;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.OpenTargetConjectureEvidence;
+import de.regelsuche.mining.OpenTargetConjectureEvidence.CampaignContext;
+import de.regelsuche.mining.OpenTargetConjectureEvidence.SeedProvenance;
+import de.regelsuche.mining.OpenTargetConjectureMiner;
+import de.regelsuche.mining.OpenTargetConjectureMiner.MiningReport;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetObservation;
+import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.search.strategy.SearchState;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Executes production candidate formation from immutable generation snapshots. */
+<span class="fc" id="L40">public final class AutonomousProductionMiningRunner {</span>
+    public static final String FORMATION_RECEIPT_SCHEMA =
+        &quot;regelsuche.autonomous-candidate-formation-receipt/v2&quot;;
+    public static final String MINING_RUN_SCHEMA =
+        &quot;regelsuche.autonomous-production-mining/v2&quot;;
+    private static final String FULL_DECISION_ID = &quot;production-mining-full-batch&quot;;
+    private static final String REJECTION_DECISION_ID =
+        &quot;production-mining-alpha-rejection-batch&quot;;
+    private static final String PRODUCER_VERSION =
+        &quot;regelsuche-autopilot-production-mining/v2&quot;;
+
+    public MiningRun runPinned(int parallelism) {
+<span class="fc" id="L52">        return run(new AutonomousProductionGenerationRunner().runPinned(parallelism));</span>
+    }
+
+    MiningRun run(GenerationRun generation) {
+<span class="fc" id="L56">        Objects.requireNonNull(generation, &quot;generation&quot;);</span>
+<span class="fc" id="L57">        var brief = generation.brief();</span>
+<span class="fc" id="L58">        long candidateCapacity = brief.budget(EvidenceStage.CANDIDATE_FORMATION)</span>
+<span class="fc" id="L59">            .configured(ResourceKind.CANDIDATES);</span>
+<span class="fc" id="L60">        long batchCapacity = brief.budget(EvidenceStage.CANDIDATE_FORMATION)</span>
+<span class="fc" id="L61">            .configured(ResourceKind.MINING_BATCHES);</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">        if (candidateCapacity &lt; 2L || batchCapacity &lt; 2L) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
+                &quot;production mining requires two batches and candidate capacity for both&quot;);
+        }
+
+<span class="fc" id="L67">        List&lt;GeneratedObservation&gt; fullInputs = generation.observations().stream()</span>
+<span class="fc" id="L68">            .sorted(Comparator.comparing(item -&gt; item.snapshot().observationId()))</span>
+<span class="fc" id="L69">            .toList();</span>
+<span class="fc" id="L70">        List&lt;GeneratedObservation&gt; rejectionInputs = rejectionInputs(fullInputs);</span>
+<span class="fc" id="L71">        AggregateDecision fullDecision = AutonomousEvidenceDagV2.planCandidateFormation(</span>
+            brief,
+            FULL_DECISION_ID,
+<span class="fc" id="L74">            fullInputs.stream().map(GeneratedObservation::branch).toList(),</span>
+<span class="fc" id="L75">            Map.of(</span>
+<span class="fc" id="L76">                ResourceKind.MINING_BATCHES, 1L,</span>
+<span class="fc" id="L77">                ResourceKind.CANDIDATES, candidateCapacity - 1L),</span>
+            &quot;mine all pinned cross-family production observations&quot;);
+<span class="fc" id="L79">        AggregateDecision rejectionDecision = AutonomousEvidenceDagV2.planCandidateFormation(</span>
+            brief,
+            REJECTION_DECISION_ID,
+<span class="fc" id="L82">            rejectionInputs.stream().map(GeneratedObservation::branch).toList(),</span>
+<span class="fc" id="L83">            Map.of(</span>
+<span class="fc" id="L84">                ResourceKind.MINING_BATCHES, 1L,</span>
+<span class="fc" id="L85">                ResourceKind.CANDIDATES, 1L),</span>
+            &quot;execute the predeclared alpha-equivalent cross-family rejection batch&quot;);
+<span class="fc" id="L87">        CampaignPlan plan = AutonomousCampaignArtifactsV2.plan(</span>
+<span class="fc" id="L88">            brief, List.of(fullDecision, rejectionDecision));</span>
+
+<span class="fc" id="L90">        MiningBatch fullBatch = mineBatch(brief, plan, fullDecision, fullInputs);</span>
+<span class="fc" id="L91">        MiningBatch rejectionBatch = mineBatch(</span>
+            brief, plan, rejectionDecision, rejectionInputs);
+<span class="fc" id="L93">        validatePinnedOutcomes(fullBatch, rejectionBatch);</span>
+
+<span class="fc" id="L95">        CandidateFormationReceipt formationReceipt = formationReceipt(</span>
+<span class="fc" id="L96">            brief, List.of(fullBatch, rejectionBatch));</span>
+<span class="fc" id="L97">        EvidenceDagSnapshot dag = AutonomousEvidenceDagV2.snapshot(</span>
+            brief,
+<span class="fc" id="L99">            generation.observationBranches(),</span>
+<span class="fc" id="L100">            List.of(fullDecision, rejectionDecision),</span>
+<span class="fc" id="L101">            List.of(fullBatch.binding().receipt(), rejectionBatch.binding().receipt()));</span>
+<span class="fc" id="L102">        String contentHash = AutonomousResearchBriefV2.hash(</span>
+            MINING_RUN_SCHEMA
+<span class="fc" id="L104">                + &quot;\ngeneration=&quot; + generation.contentHash()</span>
+<span class="fc" id="L105">                + &quot;\nplan=&quot; + plan.contentHash()</span>
+<span class="fc" id="L106">                + &quot;\nfull=&quot; + fullBatch.canonicalMaterial()</span>
+<span class="fc" id="L107">                + &quot;\nrejection=&quot; + rejectionBatch.canonicalMaterial()</span>
+<span class="fc" id="L108">                + &quot;\nformationReceipt=&quot; + formationReceipt.contentHash()</span>
+<span class="fc" id="L109">                + &quot;\ndag=&quot; + dag.contentHash());</span>
+<span class="fc" id="L110">        return new MiningRun(</span>
+            MINING_RUN_SCHEMA,
+            generation,
+            plan,
+            fullBatch,
+            rejectionBatch,
+            formationReceipt,
+            dag,
+            false,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    public void write(Path outputDirectory, MiningRun run) {
+<span class="fc" id="L126">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L127">        Objects.requireNonNull(run, &quot;run&quot;);</span>
+        try {
+<span class="fc" id="L129">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L130">            new AutonomousProductionGenerationRunner().write(</span>
+<span class="fc" id="L131">                outputDirectory, run.generation());</span>
+<span class="fc" id="L132">            write(outputDirectory.resolve(&quot;plan-v2.json&quot;), run.plan().toCanonicalJson());</span>
+<span class="fc" id="L133">            writeBatch(outputDirectory, &quot;full&quot;, run.fullBatch());</span>
+<span class="fc" id="L134">            writeBatch(outputDirectory, &quot;rejection&quot;, run.rejectionBatch());</span>
+<span class="fc" id="L135">            write(outputDirectory.resolve(&quot;candidate-formation-receipt.json&quot;),</span>
+<span class="fc" id="L136">                run.formationReceipt().toCanonicalJson());</span>
+<span class="fc" id="L137">            write(outputDirectory.resolve(&quot;evidence-dag.json&quot;),</span>
+<span class="fc" id="L138">                run.dag().toCanonicalJson());</span>
+<span class="fc" id="L139">            write(outputDirectory.resolve(&quot;production-mining-run.json&quot;),</span>
+<span class="fc" id="L140">                run.toCanonicalJson());</span>
+<span class="nc" id="L141">        } catch (IOException exception) {</span>
+<span class="nc" id="L142">            throw new UncheckedIOException(</span>
+                &quot;Could not write production mining evidence&quot;, exception);
+<span class="fc" id="L144">        }</span>
+<span class="fc" id="L145">    }</span>
+
+    private static void writeBatch(
+        Path outputDirectory,
+        String name,
+        MiningBatch batch
+    ) throws IOException {
+<span class="fc" id="L152">        write(outputDirectory.resolve(name + &quot;-decision.json&quot;),</span>
+<span class="fc" id="L153">            batch.decision().toCanonicalJson());</span>
+<span class="fc" id="L154">        write(outputDirectory.resolve(name + &quot;-mining-evidence.json&quot;),</span>
+<span class="fc" id="L155">            batch.evidence().toJson());</span>
+<span class="fc" id="L156">        write(outputDirectory.resolve(name + &quot;-binding.json&quot;),</span>
+<span class="fc" id="L157">            batch.binding().toCanonicalJson());</span>
+<span class="fc" id="L158">        write(outputDirectory.resolve(name + &quot;-receipt.json&quot;),</span>
+<span class="fc" id="L159">            batch.binding().receipt().toCanonicalJson());</span>
+<span class="fc" id="L160">        write(outputDirectory.resolve(name + &quot;-execution-v2.json&quot;),</span>
+<span class="fc" id="L161">            batch.execution().toCanonicalJson());</span>
+<span class="fc" id="L162">        write(outputDirectory.resolve(name + &quot;-lineage-v2.json&quot;),</span>
+<span class="fc" id="L163">            batch.lineage().toCanonicalJson());</span>
+<span class="fc" id="L164">    }</span>
+
+    private static void write(Path path, String content) throws IOException {
+<span class="fc" id="L167">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L168">    }</span>
+
+    private static MiningBatch mineBatch(
+        AutonomousResearchBriefV2 brief,
+        CampaignPlan plan,
+        AggregateDecision decision,
+        List&lt;GeneratedObservation&gt; inputs
+    ) {
+<span class="fc" id="L176">        OpenTargetConjectureMiner miner = new OpenTargetConjectureMiner();</span>
+<span class="fc" id="L177">        List&lt;OpenTargetObservation&gt; replayed = inputs.stream()</span>
+<span class="fc" id="L178">            .map(AutonomousProductionMiningRunner::replayObservation)</span>
+<span class="fc" id="L179">            .toList();</span>
+<span class="fc" id="L180">        MiningReport report = miner.mine(replayed);</span>
+<span class="fc" id="L181">        MiningReport liveReport = miner.mine(inputs.stream()</span>
+<span class="fc" id="L182">            .map(item -&gt; OpenTargetObservation.from(</span>
+<span class="fc" id="L183">                item.snapshot().observationId(),</span>
+<span class="fc" id="L184">                item.branch().familyId(),</span>
+<span class="fc" id="L185">                item.seed().expression(),</span>
+<span class="fc" id="L186">                item.searchResult()))</span>
+<span class="fc" id="L187">            .toList());</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (!report.equals(liveReport)) {</span>
+<span class="nc" id="L189">            throw new IllegalStateException(</span>
+                &quot;immutable observation replay changed production mining evidence&quot;);
+        }
+<span class="fc" id="L192">        OpenTargetConjectureEvidence evidence = new OpenTargetConjectureEvidence(</span>
+<span class="fc" id="L193">            context(brief, inputs), report);</span>
+<span class="fc" id="L194">        long candidateCapacity = decision.plannedResources()</span>
+<span class="fc" id="L195">            .getOrDefault(ResourceKind.CANDIDATES, 0L);</span>
+<span class="fc" id="L196">        long produced = report.conjectures().size();</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (produced &gt; candidateCapacity) {</span>
+<span class="nc" id="L198">            throw new IllegalStateException(</span>
+                &quot;production miner exceeded the planned candidate capacity&quot;);
+        }
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        Map&lt;ResourceKind, Long&gt; executed = produced == 0L</span>
+<span class="fc" id="L202">            ? Map.of(ResourceKind.MINING_BATCHES, 1L)</span>
+<span class="fc" id="L203">            : Map.of(</span>
+<span class="fc" id="L204">                ResourceKind.MINING_BATCHES, 1L,</span>
+<span class="fc" id="L205">                ResourceKind.CANDIDATES, produced);</span>
+<span class="fc" id="L206">        long skippedCandidates = candidateCapacity - produced;</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        Map&lt;ResourceKind, Long&gt; skipped = skippedCandidates == 0L</span>
+<span class="nc" id="L208">            ? Map.of()</span>
+<span class="fc" id="L209">            : Map.of(ResourceKind.CANDIDATES, skippedCandidates);</span>
+<span class="fc" id="L210">        var binding = OpenTargetAutopilotV2Binding.completeCandidateFormation(</span>
+            brief, decision, evidence, executed, skipped);
+<span class="fc" id="L212">        CampaignExecution execution = AutonomousCampaignArtifactsV2.execution(</span>
+<span class="fc" id="L213">            plan, binding.receipt());</span>
+<span class="fc" id="L214">        BranchLineageArtifact lineage = AutonomousCampaignArtifactsV2.lineage(</span>
+<span class="fc" id="L215">            binding.receipt());</span>
+<span class="fc" id="L216">        return new MiningBatch(</span>
+            decision, evidence, binding, execution, lineage);
+    }
+
+    private static CampaignContext context(
+        AutonomousResearchBriefV2 brief,
+        List&lt;GeneratedObservation&gt; inputs
+    ) {
+<span class="fc" id="L224">        List&lt;SeedProvenance&gt; seeds = inputs.stream()</span>
+<span class="fc" id="L225">            .map(item -&gt; new SeedProvenance(</span>
+<span class="fc" id="L226">                item.snapshot().observationId(),</span>
+<span class="fc" id="L227">                item.snapshot().seedId(),</span>
+<span class="fc" id="L228">                item.snapshot().generator(),</span>
+<span class="fc" id="L229">                Map.of(</span>
+<span class="fc" id="L230">                    &quot;domain&quot;, item.snapshot().domain(),</span>
+<span class="fc" id="L231">                    &quot;seedExpressionHash&quot;, AutonomousResearchBriefV2.hash(</span>
+<span class="fc" id="L232">                        item.snapshot().seedExpression()),</span>
+<span class="fc" id="L233">                    &quot;snapshotHash&quot;, item.snapshot().snapshotHash())))</span>
+<span class="fc" id="L234">            .toList();</span>
+<span class="fc" id="L235">        return new CampaignContext(</span>
+            PinnedAutonomousProductionCampaign.CAMPAIGN_ID,
+            PRODUCER_VERSION,
+<span class="fc" id="L238">            brief.modelHash(),</span>
+<span class="fc" id="L239">            brief.inventoryHash(),</span>
+<span class="fc" id="L240">            PinnedAutonomousProductionCampaign.searchHeuristic(),</span>
+            seeds);
+    }
+
+    private static OpenTargetObservation replayObservation(
+        GeneratedObservation item
+    ) {
+<span class="fc" id="L247">        return new OpenTargetObservation(</span>
+<span class="fc" id="L248">            item.snapshot().observationId(),</span>
+<span class="fc" id="L249">            item.branch().familyId(),</span>
+<span class="fc" id="L250">            item.snapshot().seedExpression(),</span>
+<span class="fc" id="L251">            GoalStatus.valueOf(item.snapshot().searchStatus()),</span>
+<span class="fc" id="L252">            item.snapshot().states().stream()</span>
+<span class="fc" id="L253">                .map(AutonomousProductionMiningRunner::replayState)</span>
+<span class="fc" id="L254">                .toList());</span>
+    }
+
+    private static SearchState replayState(StateSnapshot state) {
+<span class="fc" id="L258">        return new SearchState(</span>
+<span class="fc" id="L259">            state.expression(),</span>
+<span class="fc" id="L260">            state.depth(),</span>
+<span class="fc" id="L261">            new ExpressionScore(state.scoreWeightedTotal(), 0, 0, 0, 0),</span>
+<span class="fc" id="L262">            state.path(),</span>
+<span class="fc" id="L263">            state.appliedRuleIds(),</span>
+<span class="fc" id="L264">            Set.of(),</span>
+            0,
+<span class="fc" id="L266">            state.canonicalHash(),</span>
+            null,
+            null,
+            null,
+            false,
+            0,
+<span class="fc" id="L272">            state.equivalencePreservingFlags().stream()</span>
+<span class="fc" id="L273">                .allMatch(Boolean::booleanValue),</span>
+            0,
+<span class="fc" id="L275">            List.of(),</span>
+<span class="fc" id="L276">            state.equivalencePreservingFlags(),</span>
+<span class="fc" id="L277">            state.assumptions());</span>
+    }
+
+    private static List&lt;GeneratedObservation&gt; rejectionInputs(
+        List&lt;GeneratedObservation&gt; observations
+    ) {
+<span class="fc" id="L283">        Set&lt;String&gt; required = Set.copyOf(</span>
+<span class="fc" id="L284">            PinnedAutonomousProductionCampaign.alphaRejectionSeedIds());</span>
+<span class="fc" id="L285">        List&lt;GeneratedObservation&gt; result = observations.stream()</span>
+<span class="fc" id="L286">            .filter(item -&gt; required.contains(item.seed().id()))</span>
+<span class="fc" id="L287">            .sorted(Comparator.comparing(item -&gt; item.seed().id()))</span>
+<span class="fc" id="L288">            .toList();</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (result.size() != required.size()</span>
+<span class="fc" id="L290">                || result.stream().map(item -&gt; item.branch().familyId())</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                    .distinct().count() != 2L) {</span>
+<span class="nc" id="L292">            throw new IllegalStateException(</span>
+                &quot;pinned alpha-rejection batch must retain one seed from each family&quot;);
+        }
+<span class="fc" id="L295">        return result;</span>
+    }
+
+    private static void validatePinnedOutcomes(
+        MiningBatch full,
+        MiningBatch rejection
+    ) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (full.evidence().report().conjectures().isEmpty()</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                || full.binding().receipt().outputs().isEmpty()) {</span>
+<span class="nc" id="L304">            throw new IllegalStateException(</span>
+                &quot;full production batch must retain at least one candidate&quot;);
+        }
+<span class="fc" id="L307">        boolean crossFamily = full.binding().receipt().outputs().stream()</span>
+<span class="fc" id="L308">            .anyMatch(output -&gt; output.sources().stream()</span>
+<span class="fc" id="L309">                .map(AutonomousEvidenceDagV2.SourceLink::familyId)</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">                .distinct().count() &gt;= 2L);</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (!crossFamily) {</span>
+<span class="nc" id="L312">            throw new IllegalStateException(</span>
+                &quot;production candidate must retain exact support from both configured families&quot;);
+        }
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (!rejection.evidence().report().conjectures().isEmpty()</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                || !rejection.binding().receipt().outputs().isEmpty()</span>
+<span class="fc" id="L317">                || rejection.evidence().report().rejectedClusters().stream()</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                    .noneMatch(cluster -&gt; &quot;alpha-distinct-support&lt;2&quot;</span>
+<span class="fc" id="L319">                        .equals(cluster.reason()))) {</span>
+<span class="nc" id="L320">            throw new IllegalStateException(</span>
+                &quot;predeclared alpha-equivalent batch must terminate as rejected evidence&quot;);
+        }
+<span class="fc" id="L323">    }</span>
+
+    private static CandidateFormationReceipt formationReceipt(
+        AutonomousResearchBriefV2 brief,
+        List&lt;MiningBatch&gt; batches
+    ) {
+<span class="fc" id="L329">        Map&lt;ResourceKind, Long&gt; configured = brief.budget(</span>
+<span class="fc" id="L330">            EvidenceStage.CANDIDATE_FORMATION).resources();</span>
+<span class="fc" id="L331">        EnumMap&lt;ResourceKind, Long&gt; executed = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L332">        EnumMap&lt;ResourceKind, Long&gt; skipped = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L333">        batches.forEach(batch -&gt; {</span>
+<span class="fc" id="L334">            add(executed, batch.binding().receipt().executedResources());</span>
+<span class="fc" id="L335">            add(skipped, batch.binding().receipt().skippedResources());</span>
+<span class="fc" id="L336">        });</span>
+<span class="fc" id="L337">        Map&lt;ResourceKind, Long&gt; remaining = remaining(configured, executed, skipped);</span>
+<span class="fc" id="L338">        List&lt;String&gt; decisionHashes = batches.stream()</span>
+<span class="fc" id="L339">            .map(batch -&gt; batch.decision().contentHash()).sorted().toList();</span>
+<span class="fc" id="L340">        List&lt;String&gt; miningHashes = batches.stream()</span>
+<span class="fc" id="L341">            .map(batch -&gt; batch.evidence().contentHash()).sorted().toList();</span>
+<span class="fc" id="L342">        List&lt;String&gt; receiptHashes = batches.stream()</span>
+<span class="fc" id="L343">            .map(batch -&gt; batch.binding().receipt().contentHash()).sorted().toList();</span>
+<span class="fc" id="L344">        List&lt;String&gt; outputBranches = batches.stream()</span>
+<span class="fc" id="L345">            .flatMap(batch -&gt; batch.binding().receipt().outputs().stream())</span>
+<span class="fc" id="L346">            .map(AutonomousEvidenceDagV2.CandidateOutput::outputBranchId)</span>
+<span class="fc" id="L347">            .sorted().toList();</span>
+<span class="fc" id="L348">        List&lt;String&gt; rejected = batches.stream()</span>
+<span class="fc" id="L349">            .flatMap(batch -&gt; batch.binding().receipt().rejectedClusters().stream())</span>
+<span class="fc" id="L350">            .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
+<span class="fc" id="L351">            .sorted().toList();</span>
+<span class="fc" id="L352">        String contentHash = AutonomousResearchBriefV2.hash(</span>
+            FORMATION_RECEIPT_SCHEMA
+<span class="fc" id="L354">                + &quot;\nbrief=&quot; + brief.contentHash()</span>
+                + &quot;\nconfigured=&quot; + configured
+                + &quot;\nexecuted=&quot; + executed
+                + &quot;\nskipped=&quot; + skipped
+                + &quot;\nremaining=&quot; + remaining
+                + &quot;\ndecisions=&quot; + decisionHashes
+                + &quot;\nmining=&quot; + miningHashes
+                + &quot;\nreceipts=&quot; + receiptHashes
+                + &quot;\noutputs=&quot; + outputBranches
+                + &quot;\nrejected=&quot; + rejected);
+<span class="fc" id="L364">        return new CandidateFormationReceipt(</span>
+            FORMATION_RECEIPT_SCHEMA,
+<span class="fc" id="L366">            brief.contentHash(),</span>
+            EvidenceStage.CANDIDATE_FORMATION,
+            &quot;COMPLETED&quot;,
+            configured,
+            executed,
+            skipped,
+            remaining,
+            decisionHashes,
+            miningHashes,
+            receiptHashes,
+            outputBranches,
+            rejected,
+            false,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    private static void add(
+        EnumMap&lt;ResourceKind, Long&gt; target,
+        Map&lt;ResourceKind, Long&gt; values
+    ) {
+<span class="fc" id="L389">        values.forEach((resource, amount) -&gt; target.merge(</span>
+            resource, amount, Math::addExact));
+<span class="fc" id="L391">    }</span>
+
+    private static Map&lt;ResourceKind, Long&gt; remaining(
+        Map&lt;ResourceKind, Long&gt; configured,
+        Map&lt;ResourceKind, Long&gt; executed,
+        Map&lt;ResourceKind, Long&gt; skipped
+    ) {
+<span class="fc" id="L398">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        for (Map.Entry&lt;ResourceKind, Long&gt; entry : configured.entrySet()) {</span>
+<span class="fc" id="L400">            long consumed = Math.addExact(</span>
+<span class="fc" id="L401">                executed.getOrDefault(entry.getKey(), 0L),</span>
+<span class="fc" id="L402">                skipped.getOrDefault(entry.getKey(), 0L));</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            if (consumed &gt; entry.getValue()) {</span>
+<span class="nc" id="L404">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L405">                    &quot;candidate formation exceeds configured resource &quot; + entry.getKey());</span>
+            }
+<span class="fc" id="L407">            long amount = entry.getValue() - consumed;</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">            if (amount &gt; 0L) {</span>
+<span class="nc" id="L409">                result.put(entry.getKey(), amount);</span>
+            }
+<span class="fc" id="L411">        }</span>
+<span class="fc" id="L412">        Set&lt;ResourceKind&gt; unexpected = new HashSet&lt;&gt;(executed.keySet());</span>
+<span class="fc" id="L413">        unexpected.addAll(skipped.keySet());</span>
+<span class="fc" id="L414">        unexpected.removeAll(configured.keySet());</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        if (!unexpected.isEmpty()) {</span>
+<span class="nc" id="L416">            throw new IllegalArgumentException(</span>
+                &quot;candidate formation reported unconfigured resources: &quot; + unexpected);
+        }
+<span class="fc" id="L419">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static Map&lt;ResourceKind, Long&gt; immutableResources(
+        Map&lt;ResourceKind, Long&gt; supplied
+    ) {
+<span class="fc" id="L425">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L426">        supplied.forEach((resource, amount) -&gt; {</span>
+<span class="fc" id="L427">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L428" title="2 of 4 branches missed.">            if (amount == null || amount &lt; 0L) {</span>
+<span class="nc" id="L429">                throw new IllegalArgumentException(</span>
+                    &quot;resource amounts must be non-negative&quot;);
+            }
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">            if (amount &gt; 0L) {</span>
+<span class="fc" id="L433">                result.put(resource, amount);</span>
+            }
+<span class="fc" id="L435">        });</span>
+<span class="fc" id="L436">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L440" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L441">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L443">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L447">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L449">    }</span>
+
+    public record MiningBatch(
+        AggregateDecision decision,
+        OpenTargetConjectureEvidence evidence,
+        OpenTargetAutopilotV2Binding.BindingResult binding,
+        CampaignExecution execution,
+        BranchLineageArtifact lineage
+    ) {
+<span class="fc" id="L458">        public MiningBatch {</span>
+<span class="fc" id="L459">            decision = Objects.requireNonNull(decision, &quot;decision&quot;);</span>
+<span class="fc" id="L460">            evidence = Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L461">            binding = Objects.requireNonNull(binding, &quot;binding&quot;);</span>
+<span class="fc" id="L462">            execution = Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="fc" id="L463">            lineage = Objects.requireNonNull(lineage, &quot;lineage&quot;);</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            if (!decision.contentHash().equals(binding.decisionHash())</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">                    || !evidence.contentHash().equals(binding.miningEvidenceHash())</span>
+<span class="fc" id="L466">                    || !binding.receipt().contentHash()</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                        .equals(execution.aggregateReceiptHash())</span>
+<span class="fc" id="L468">                    || !binding.receipt().contentHash()</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">                        .equals(lineage.aggregateReceiptHash())) {</span>
+<span class="nc" id="L470">                throw new IllegalArgumentException(</span>
+                    &quot;production mining batch artifacts are not hash-linked&quot;);
+            }
+<span class="fc" id="L473">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L476">            return decision.contentHash() + '|' + evidence.contentHash() + '|'</span>
+<span class="fc" id="L477">                + binding.contentHash() + '|' + binding.receipt().contentHash() + '|'</span>
+<span class="fc" id="L478">                + execution.contentHash() + '|' + lineage.contentHash();</span>
+        }
+    }
+
+    public record CandidateFormationReceipt(
+        String schema,
+        String briefHash,
+        EvidenceStage stage,
+        String disposition,
+        Map&lt;ResourceKind, Long&gt; configuredResources,
+        Map&lt;ResourceKind, Long&gt; executedResources,
+        Map&lt;ResourceKind, Long&gt; skippedResources,
+        Map&lt;ResourceKind, Long&gt; remainingResources,
+        List&lt;String&gt; decisionHashes,
+        List&lt;String&gt; miningEvidenceHashes,
+        List&lt;String&gt; aggregateReceiptHashes,
+        List&lt;String&gt; outputBranchIds,
+        List&lt;String&gt; rejectedClusterHashes,
+        boolean targetProvided,
+        boolean receiptIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L502">        public CandidateFormationReceipt {</span>
+<span class="pc bpc" id="L503" title="2 of 4 branches missed.">            if (!FORMATION_RECEIPT_SCHEMA.equals(schema)</span>
+                    || stage != EvidenceStage.CANDIDATE_FORMATION
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">                    || !&quot;COMPLETED&quot;.equals(disposition)) {</span>
+<span class="nc" id="L506">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported or incomplete candidate-formation receipt&quot;);
+            }
+<span class="fc" id="L509">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="fc" id="L510">            configuredResources = immutableResources(configuredResources);</span>
+<span class="fc" id="L511">            executedResources = immutableResources(executedResources);</span>
+<span class="fc" id="L512">            skippedResources = immutableResources(skippedResources);</span>
+<span class="fc" id="L513">            remainingResources = immutableResources(remainingResources);</span>
+<span class="fc" id="L514">            decisionHashes = sortedHashes(decisionHashes, &quot;decisionHashes&quot;);</span>
+<span class="fc" id="L515">            miningEvidenceHashes = sortedHashes(</span>
+                miningEvidenceHashes, &quot;miningEvidenceHashes&quot;);
+<span class="fc" id="L517">            aggregateReceiptHashes = sortedHashes(</span>
+                aggregateReceiptHashes, &quot;aggregateReceiptHashes&quot;);
+<span class="fc" id="L519">            outputBranchIds = sortedText(outputBranchIds, &quot;outputBranchIds&quot;);</span>
+<span class="fc" id="L520">            rejectedClusterHashes = sortedHashes(</span>
+                rejectedClusterHashes, &quot;rejectedClusterHashes&quot;);
+<span class="fc" id="L522">            validateBalance(</span>
+                configuredResources,
+                executedResources,
+                skippedResources,
+                remainingResources);
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">            if (decisionHashes.size() &lt; 2</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">                    || miningEvidenceHashes.size() != decisionHashes.size()</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">                    || aggregateReceiptHashes.size() != decisionHashes.size()</span>
+<span class="fc" id="L530">                    || executedResources.getOrDefault(</span>
+<span class="pc bpc" id="L531" title="1 of 2 branches missed.">                        ResourceKind.MINING_BATCHES, 0L) != decisionHashes.size()</span>
+<span class="fc" id="L532">                    || executedResources.getOrDefault(</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">                        ResourceKind.CANDIDATES, 0L) != outputBranchIds.size()</span>
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">                    || outputBranchIds.isEmpty()</span>
+<span class="pc bpc" id="L535" title="1 of 2 branches missed.">                    || rejectedClusterHashes.isEmpty()) {</span>
+<span class="nc" id="L536">                throw new IllegalArgumentException(</span>
+                    &quot;candidate formation must retain factual batches, outputs and rejection evidence&quot;);
+            }
+<span class="pc bpc" id="L539" title="2 of 4 branches missed.">            if (targetProvided || receiptIsMathematicalEvidence) {</span>
+<span class="nc" id="L540">                throw new IllegalArgumentException(</span>
+                    &quot;candidate-formation receipt must remain target-free and non-mathematical&quot;);
+            }
+<span class="fc" id="L543">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L544">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L545">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L546">        }</span>
+
+        public long executed(ResourceKind resource) {
+<span class="fc" id="L549">            return executedResources.getOrDefault(resource, 0L);</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L553">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L554">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L555">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L556">                .property(&quot;stage&quot;, stage.name())</span>
+<span class="fc" id="L557">                .property(&quot;disposition&quot;, disposition)</span>
+<span class="fc" id="L558">                .array(&quot;resources&quot;, array -&gt; configuredResources.keySet().stream()</span>
+<span class="fc" id="L559">                    .sorted()</span>
+<span class="fc" id="L560">                    .forEach(resource -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L561">                        .property(&quot;resource&quot;, resource.name())</span>
+<span class="fc" id="L562">                        .property(&quot;configured&quot;,</span>
+<span class="fc" id="L563">                            configuredResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L564">                        .property(&quot;executed&quot;,</span>
+<span class="fc" id="L565">                            executedResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L566">                        .property(&quot;skipped&quot;,</span>
+<span class="fc" id="L567">                            skippedResources.getOrDefault(resource, 0L))</span>
+<span class="fc" id="L568">                        .property(&quot;remaining&quot;,</span>
+<span class="fc" id="L569">                            remainingResources.getOrDefault(resource, 0L)))))</span>
+<span class="fc" id="L570">                .stringArray(&quot;decisionHashes&quot;, decisionHashes)</span>
+<span class="fc" id="L571">                .stringArray(&quot;miningEvidenceHashes&quot;, miningEvidenceHashes)</span>
+<span class="fc" id="L572">                .stringArray(&quot;aggregateReceiptHashes&quot;, aggregateReceiptHashes)</span>
+<span class="fc" id="L573">                .stringArray(&quot;outputBranchIds&quot;, outputBranchIds)</span>
+<span class="fc" id="L574">                .stringArray(&quot;rejectedClusterHashes&quot;, rejectedClusterHashes)</span>
+<span class="fc" id="L575">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L576">                .property(&quot;receiptIsMathematicalEvidence&quot;,</span>
+                    receiptIsMathematicalEvidence)
+<span class="fc" id="L578">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L579">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L580">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L581">                .endObject()</span>
+<span class="fc" id="L582">                .toString();</span>
+        }
+
+        private static void validateBalance(
+            Map&lt;ResourceKind, Long&gt; configured,
+            Map&lt;ResourceKind, Long&gt; executed,
+            Map&lt;ResourceKind, Long&gt; skipped,
+            Map&lt;ResourceKind, Long&gt; remaining
+        ) {
+<span class="fc" id="L591">            Set&lt;ResourceKind&gt; resources = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L592">            resources.addAll(configured.keySet());</span>
+<span class="fc" id="L593">            resources.addAll(executed.keySet());</span>
+<span class="fc" id="L594">            resources.addAll(skipped.keySet());</span>
+<span class="fc" id="L595">            resources.addAll(remaining.keySet());</span>
+<span class="fc bfc" id="L596" title="All 2 branches covered.">            for (ResourceKind resource : resources) {</span>
+<span class="fc" id="L597">                long accounted = Math.addExact(</span>
+<span class="fc" id="L598">                    Math.addExact(</span>
+<span class="fc" id="L599">                        executed.getOrDefault(resource, 0L),</span>
+<span class="fc" id="L600">                        skipped.getOrDefault(resource, 0L)),</span>
+<span class="fc" id="L601">                    remaining.getOrDefault(resource, 0L));</span>
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">                if (configured.getOrDefault(resource, 0L) != accounted) {</span>
+<span class="nc" id="L603">                    throw new IllegalArgumentException(</span>
+                        &quot;unbalanced candidate-formation resource &quot; + resource);
+                }
+<span class="fc" id="L606">            }</span>
+<span class="fc" id="L607">        }</span>
+    }
+
+    public record MiningRun(
+        String schema,
+        GenerationRun generation,
+        CampaignPlan plan,
+        MiningBatch fullBatch,
+        MiningBatch rejectionBatch,
+        CandidateFormationReceipt formationReceipt,
+        EvidenceDagSnapshot dag,
+        boolean targetProvided,
+        boolean miningRunIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L624">        public MiningRun {</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            if (!MINING_RUN_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L626">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported production mining schema&quot;);
+            }
+<span class="fc" id="L629">            generation = Objects.requireNonNull(generation, &quot;generation&quot;);</span>
+<span class="fc" id="L630">            plan = Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L631">            fullBatch = Objects.requireNonNull(fullBatch, &quot;fullBatch&quot;);</span>
+<span class="fc" id="L632">            rejectionBatch = Objects.requireNonNull(</span>
+                rejectionBatch, &quot;rejectionBatch&quot;);
+<span class="fc" id="L634">            formationReceipt = Objects.requireNonNull(</span>
+                formationReceipt, &quot;formationReceipt&quot;);
+<span class="fc" id="L636">            dag = Objects.requireNonNull(dag, &quot;dag&quot;);</span>
+<span class="fc" id="L637">            List&lt;MiningBatch&gt; batches = List.of(fullBatch, rejectionBatch);</span>
+<span class="fc" id="L638">            Set&lt;String&gt; decisionHashes = batches.stream()</span>
+<span class="fc" id="L639">                .map(batch -&gt; batch.decision().contentHash())</span>
+<span class="fc" id="L640">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L641">            Set&lt;String&gt; miningHashes = batches.stream()</span>
+<span class="fc" id="L642">                .map(batch -&gt; batch.evidence().contentHash())</span>
+<span class="fc" id="L643">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L644">            Set&lt;String&gt; receiptHashes = batches.stream()</span>
+<span class="fc" id="L645">                .map(batch -&gt; batch.binding().receipt().contentHash())</span>
+<span class="fc" id="L646">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L647">            Set&lt;String&gt; outputBranchIds = batches.stream()</span>
+<span class="fc" id="L648">                .flatMap(batch -&gt; batch.binding().receipt().outputs().stream())</span>
+<span class="fc" id="L649">                .map(AutonomousEvidenceDagV2.CandidateOutput::outputBranchId)</span>
+<span class="fc" id="L650">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L651">            Set&lt;String&gt; rejectedHashes = batches.stream()</span>
+<span class="fc" id="L652">                .flatMap(batch -&gt; batch.binding().receipt().rejectedClusters().stream())</span>
+<span class="fc" id="L653">                .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
+<span class="fc" id="L654">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L655">            Set&lt;String&gt; dagDecisionHashes = dag.decisions().stream()</span>
+<span class="fc" id="L656">                .map(AggregateDecision::contentHash)</span>
+<span class="fc" id="L657">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L658">            Set&lt;String&gt; dagReceiptHashes = dag.receipts().stream()</span>
+<span class="fc" id="L659">                .map(AggregateReceipt::contentHash)</span>
+<span class="fc" id="L660">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">            if (!generation.brief().contentHash().equals(plan.briefHash())</span>
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">                    || !generation.brief().contentHash().equals(dag.briefHash())</span>
+<span class="fc" id="L663">                    || !generation.brief().contentHash()</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">                        .equals(formationReceipt.briefHash())</span>
+<span class="pc bpc" id="L665" title="1 of 2 branches missed.">                    || !plan.contentHash().equals(fullBatch.execution().planHash())</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">                    || !plan.contentHash().equals(rejectionBatch.execution().planHash())</span>
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">                    || !decisionHashes.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L668">                        formationReceipt.decisionHashes()))</span>
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">                    || !miningHashes.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L670">                        formationReceipt.miningEvidenceHashes()))</span>
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">                    || !receiptHashes.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L672">                        formationReceipt.aggregateReceiptHashes()))</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">                    || !outputBranchIds.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L674">                        formationReceipt.outputBranchIds()))</span>
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">                    || !rejectedHashes.equals(new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L676">                        formationReceipt.rejectedClusterHashes()))</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">                    || !decisionHashes.equals(dagDecisionHashes)</span>
+<span class="pc bpc" id="L678" title="3 of 6 branches missed.">                    || !receiptHashes.equals(dagReceiptHashes)</span>
+                    || targetProvided
+                    || miningRunIsMathematicalEvidence) {
+<span class="nc" id="L681">                throw new IllegalArgumentException(</span>
+                    &quot;production mining manifest is inconsistent or not target-free&quot;);
+            }
+<span class="fc" id="L684">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L685">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L686">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L687">        }</span>
+
+        public int candidateCount() {
+<span class="fc" id="L690">            return fullBatch.binding().receipt().outputs().size()</span>
+<span class="fc" id="L691">                + rejectionBatch.binding().receipt().outputs().size();</span>
+        }
+
+        public int rejectedClusterCount() {
+<span class="fc" id="L695">            return fullBatch.binding().receipt().rejectedClusters().size()</span>
+<span class="fc" id="L696">                + rejectionBatch.binding().receipt().rejectedClusters().size();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L700">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L701">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L702">                .property(&quot;briefHash&quot;, generation.brief().contentHash())</span>
+<span class="fc" id="L703">                .property(&quot;generationRunHash&quot;, generation.contentHash())</span>
+<span class="fc" id="L704">                .property(&quot;planHash&quot;, plan.contentHash())</span>
+<span class="fc" id="L705">                .property(&quot;fullDecisionHash&quot;, fullBatch.decision().contentHash())</span>
+<span class="fc" id="L706">                .property(&quot;fullMiningEvidenceHash&quot;, fullBatch.evidence().contentHash())</span>
+<span class="fc" id="L707">                .property(&quot;fullBindingHash&quot;, fullBatch.binding().contentHash())</span>
+<span class="fc" id="L708">                .property(&quot;fullReceiptHash&quot;,</span>
+<span class="fc" id="L709">                    fullBatch.binding().receipt().contentHash())</span>
+<span class="fc" id="L710">                .property(&quot;fullExecutionHash&quot;, fullBatch.execution().contentHash())</span>
+<span class="fc" id="L711">                .property(&quot;fullLineageHash&quot;, fullBatch.lineage().contentHash())</span>
+<span class="fc" id="L712">                .property(&quot;rejectionDecisionHash&quot;,</span>
+<span class="fc" id="L713">                    rejectionBatch.decision().contentHash())</span>
+<span class="fc" id="L714">                .property(&quot;rejectionMiningEvidenceHash&quot;,</span>
+<span class="fc" id="L715">                    rejectionBatch.evidence().contentHash())</span>
+<span class="fc" id="L716">                .property(&quot;rejectionBindingHash&quot;,</span>
+<span class="fc" id="L717">                    rejectionBatch.binding().contentHash())</span>
+<span class="fc" id="L718">                .property(&quot;rejectionReceiptHash&quot;,</span>
+<span class="fc" id="L719">                    rejectionBatch.binding().receipt().contentHash())</span>
+<span class="fc" id="L720">                .property(&quot;rejectionExecutionHash&quot;,</span>
+<span class="fc" id="L721">                    rejectionBatch.execution().contentHash())</span>
+<span class="fc" id="L722">                .property(&quot;rejectionLineageHash&quot;,</span>
+<span class="fc" id="L723">                    rejectionBatch.lineage().contentHash())</span>
+<span class="fc" id="L724">                .property(&quot;candidateFormationReceiptHash&quot;,</span>
+<span class="fc" id="L725">                    formationReceipt.contentHash())</span>
+<span class="fc" id="L726">                .property(&quot;evidenceDagHash&quot;, dag.contentHash())</span>
+<span class="fc" id="L727">                .property(&quot;candidateCount&quot;, candidateCount())</span>
+<span class="fc" id="L728">                .property(&quot;rejectedClusterCount&quot;, rejectedClusterCount())</span>
+<span class="fc" id="L729">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L730">                .property(&quot;miningRunIsMathematicalEvidence&quot;,</span>
+                    miningRunIsMathematicalEvidence)
+<span class="fc" id="L732">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L733">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L734">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L735">                .endObject()</span>
+<span class="fc" id="L736">                .toString();</span>
+        }
+    }
+
+    private static List&lt;String&gt; sortedHashes(List&lt;String&gt; values, String name) {
+<span class="pc bpc" id="L741" title="1 of 2 branches missed.">        List&lt;String&gt; result = values == null ? List.of() : values.stream().sorted().toList();</span>
+<span class="fc" id="L742">        result.forEach(value -&gt; requireSha256(value, name));</span>
+<span class="pc bpc" id="L743" title="1 of 2 branches missed.">        if (new TreeSet&lt;&gt;(result).size() != result.size()) {</span>
+<span class="nc" id="L744">            throw new IllegalArgumentException(name + &quot; must be unique&quot;);</span>
+        }
+<span class="fc" id="L746">        return result;</span>
+    }
+
+    private static List&lt;String&gt; sortedText(List&lt;String&gt; values, String name) {
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L751">            return List.of();</span>
+        }
+<span class="pc bpc" id="L753" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L754">            throw new IllegalArgumentException(name + &quot; must contain non-blank values&quot;);</span>
+        }
+<span class="fc" id="L756">        return values.stream().distinct().sorted().toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

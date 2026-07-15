@@ -10,31 +10,35 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-/** Pinned, target-free input for the first production campaign in issue #348. */
+/** Pinned, target-free input for the production campaign in issue #348. */
 public final class PinnedAutonomousProductionCampaign {
     public static final String CAMPAIGN_ID = &quot;autopilot-production-campaign-348&quot;;
-    public static final String LEFT_FACTOR_GENERATOR =
-        &quot;factor-common-left-generator/v1&quot;;
-    public static final String RIGHT_FACTOR_GENERATOR =
-        &quot;factor-common-right-generator/v1&quot;;
+    public static final String GAP_TWO_FACTOR_GENERATOR =
+        &quot;factor-common-gap-two-generator/v1&quot;;
+    public static final String TWIN_PRIME_FACTOR_GENERATOR =
+        &quot;factor-common-twin-prime-generator/v1&quot;;
     public static final String DOMAIN = &quot;polynomial-factorization&quot;;
     public static final int REQUIRED_OBSERVATIONS = 12;
 
-<span class="fc" id="L23">    private static final SearchHeuristic SEARCH_HEURISTIC =</span>
+    private static final String GAP_TWO_REJECTION_SEED =
+        &quot;gap-two-factor-01&quot;;
+    private static final String TWIN_PRIME_REJECTION_SEED =
+        &quot;twin-prime-factor-01&quot;;
+<span class="fc" id="L27">    private static final SearchHeuristic SEARCH_HEURISTIC =</span>
         new SearchHeuristic(3, 80, 1, 2, 40, 16);
 
     private PinnedAutonomousProductionCampaign() {
     }
 
     public static AutonomousResearchBriefV2 brief() {
-<span class="fc" id="L30">        return AutonomousResearchBriefV2.create(</span>
+<span class="fc" id="L34">        return AutonomousResearchBriefV2.create(</span>
             CAMPAIGN_ID,
-<span class="fc" id="L32">            List.of(DOMAIN),</span>
-<span class="fc" id="L33">            List.of(LEFT_FACTOR_GENERATOR, RIGHT_FACTOR_GENERATOR),</span>
-<span class="fc" id="L34">            inventoryHash(),</span>
-<span class="fc" id="L35">            AutonomousResearchBriefV2.hash(</span>
-<span class="fc" id="L36">                &quot;core-ast-default-rules/v1|&quot; + inventoryHash()),</span>
-<span class="fc" id="L37">            AutonomousResearchBriefV2.hash(</span>
+<span class="fc" id="L36">            List.of(DOMAIN),</span>
+<span class="fc" id="L37">            List.of(GAP_TWO_FACTOR_GENERATOR, TWIN_PRIME_FACTOR_GENERATOR),</span>
+<span class="fc" id="L38">            inventoryHash(),</span>
+<span class="fc" id="L39">            AutonomousResearchBriefV2.hash(</span>
+<span class="fc" id="L40">                &quot;core-ast-default-rules/v1|&quot; + inventoryHash()),</span>
+<span class="fc" id="L41">            AutonomousResearchBriefV2.hash(</span>
                 &quot;best-first-search/v1|expression-scorer/v1|&quot;
                     + &quot;expression-canonicalizer/v1|&quot; + SEARCH_HEURISTIC),
             348_202_607_15L,
@@ -42,99 +46,130 @@ public final class PinnedAutonomousProductionCampaign {
             2,
             2,
             &quot;autopilot/production-candidate&quot;,
-<span class="fc" id="L45">            stageBudgets());</span>
+<span class="fc" id="L49">            stageBudgets());</span>
     }
 
     public static SearchHeuristic searchHeuristic() {
-<span class="fc" id="L49">        return SEARCH_HEURISTIC;</span>
+<span class="fc" id="L53">        return SEARCH_HEURISTIC;</span>
     }
 
     public static String inventoryHash() {
-<span class="fc" id="L53">        List&lt;String&gt; rules = AstRewriteTransformationEngine.defaultRules().stream()</span>
-<span class="fc" id="L54">            .map(rule -&gt; {</span>
-<span class="fc" id="L55">                var descriptor = rule.descriptor();</span>
-<span class="fc" id="L56">                return rule.id()</span>
-<span class="fc" id="L57">                    + '|' + rule.kind().name()</span>
-<span class="fc" id="L58">                    + '|' + rule.mayIncreaseComplexity()</span>
-<span class="fc" id="L59">                    + '|' + rule.estimatedCostDelta()</span>
-<span class="fc" id="L60">                    + '|' + rule.isEquivalencePreservingByConstruction()</span>
-<span class="fc" id="L61">                    + '|' + descriptor.packId()</span>
-<span class="fc" id="L62">                    + '|' + descriptor.license()</span>
-<span class="fc" id="L63">                    + '|' + descriptor.sourceVersion()</span>
-<span class="fc" id="L64">                    + '|' + descriptor.status().name();</span>
+<span class="fc" id="L57">        List&lt;String&gt; rules = AstRewriteTransformationEngine.defaultRules().stream()</span>
+<span class="fc" id="L58">            .map(rule -&gt; {</span>
+<span class="fc" id="L59">                var descriptor = rule.descriptor();</span>
+<span class="fc" id="L60">                return rule.id()</span>
+<span class="fc" id="L61">                    + '|' + rule.kind().name()</span>
+<span class="fc" id="L62">                    + '|' + rule.mayIncreaseComplexity()</span>
+<span class="fc" id="L63">                    + '|' + rule.estimatedCostDelta()</span>
+<span class="fc" id="L64">                    + '|' + rule.isEquivalencePreservingByConstruction()</span>
+<span class="fc" id="L65">                    + '|' + descriptor.packId()</span>
+<span class="fc" id="L66">                    + '|' + descriptor.license()</span>
+<span class="fc" id="L67">                    + '|' + descriptor.sourceVersion()</span>
+<span class="fc" id="L68">                    + '|' + descriptor.status().name();</span>
             })
-<span class="fc" id="L66">            .sorted()</span>
-<span class="fc" id="L67">            .toList();</span>
-<span class="fc" id="L68">        return AutonomousResearchBriefV2.hash(</span>
+<span class="fc" id="L70">            .sorted()</span>
+<span class="fc" id="L71">            .toList();</span>
+<span class="fc" id="L72">        return AutonomousResearchBriefV2.hash(</span>
             &quot;regelsuche.ast-default-rule-inventory/v2|&quot; + rules);
     }
 
     public static List&lt;SeedExpression&gt; seeds() {
-<span class="fc" id="L73">        return List.of(</span>
-<span class="fc" id="L74">            leftSeed(&quot;left-factor-01&quot;, &quot;x&quot;, 2, 3),</span>
-<span class="fc" id="L75">            leftSeed(&quot;left-factor-02&quot;, &quot;a&quot;, 4, 5),</span>
-<span class="fc" id="L76">            leftSeed(&quot;left-factor-03&quot;, &quot;b&quot;, 6, 7),</span>
-<span class="fc" id="L77">            leftSeed(&quot;left-factor-04&quot;, &quot;c&quot;, 8, 9),</span>
-<span class="fc" id="L78">            leftSeed(&quot;left-factor-05&quot;, &quot;d&quot;, 10, 11),</span>
-<span class="fc" id="L79">            leftSeed(&quot;left-factor-06&quot;, &quot;e&quot;, 12, 13),</span>
-<span class="fc" id="L80">            rightSeed(&quot;right-factor-01&quot;, &quot;y&quot;, 2, 3),</span>
-<span class="fc" id="L81">            rightSeed(&quot;right-factor-02&quot;, &quot;f&quot;, 4, 5),</span>
-<span class="fc" id="L82">            rightSeed(&quot;right-factor-03&quot;, &quot;g&quot;, 6, 7),</span>
-<span class="fc" id="L83">            rightSeed(&quot;right-factor-04&quot;, &quot;h&quot;, 8, 9),</span>
-<span class="fc" id="L84">            rightSeed(&quot;right-factor-05&quot;, &quot;i&quot;, 10, 11),</span>
-<span class="fc" id="L85">            rightSeed(&quot;right-factor-06&quot;, &quot;j&quot;, 12, 13));</span>
+<span class="fc" id="L77">        return List.of(</span>
+<span class="fc" id="L78">            factorSeed(</span>
+                GAP_TWO_REJECTION_SEED,
+                GAP_TWO_FACTOR_GENERATOR,
+                &quot;x&quot;, 3, 5, &quot;gap-two-parameters&quot;),
+<span class="fc" id="L82">            factorSeed(</span>
+                &quot;gap-two-factor-02&quot;,
+                GAP_TWO_FACTOR_GENERATOR,
+                &quot;a&quot;, 4, 6, &quot;gap-two-parameters&quot;),
+<span class="fc" id="L86">            factorSeed(</span>
+                &quot;gap-two-factor-03&quot;,
+                GAP_TWO_FACTOR_GENERATOR,
+                &quot;b&quot;, 6, 8, &quot;gap-two-parameters&quot;),
+<span class="fc" id="L90">            factorSeed(</span>
+                &quot;gap-two-factor-04&quot;,
+                GAP_TWO_FACTOR_GENERATOR,
+                &quot;c&quot;, 8, 10, &quot;gap-two-parameters&quot;),
+<span class="fc" id="L94">            factorSeed(</span>
+                &quot;gap-two-factor-05&quot;,
+                GAP_TWO_FACTOR_GENERATOR,
+                &quot;d&quot;, 10, 12, &quot;gap-two-parameters&quot;),
+<span class="fc" id="L98">            factorSeed(</span>
+                &quot;gap-two-factor-06&quot;,
+                GAP_TWO_FACTOR_GENERATOR,
+                &quot;e&quot;, 12, 14, &quot;gap-two-parameters&quot;),
+<span class="fc" id="L102">            factorSeed(</span>
+                TWIN_PRIME_REJECTION_SEED,
+                TWIN_PRIME_FACTOR_GENERATOR,
+                &quot;y&quot;, 3, 5, &quot;twin-prime-parameters&quot;),
+<span class="fc" id="L106">            factorSeed(</span>
+                &quot;twin-prime-factor-02&quot;,
+                TWIN_PRIME_FACTOR_GENERATOR,
+                &quot;f&quot;, 5, 7, &quot;twin-prime-parameters&quot;),
+<span class="fc" id="L110">            factorSeed(</span>
+                &quot;twin-prime-factor-03&quot;,
+                TWIN_PRIME_FACTOR_GENERATOR,
+                &quot;g&quot;, 11, 13, &quot;twin-prime-parameters&quot;),
+<span class="fc" id="L114">            factorSeed(</span>
+                &quot;twin-prime-factor-04&quot;,
+                TWIN_PRIME_FACTOR_GENERATOR,
+                &quot;h&quot;, 17, 19, &quot;twin-prime-parameters&quot;),
+<span class="fc" id="L118">            factorSeed(</span>
+                &quot;twin-prime-factor-05&quot;,
+                TWIN_PRIME_FACTOR_GENERATOR,
+                &quot;i&quot;, 29, 31, &quot;twin-prime-parameters&quot;),
+<span class="fc" id="L122">            factorSeed(</span>
+                &quot;twin-prime-factor-06&quot;,
+                TWIN_PRIME_FACTOR_GENERATOR,
+                &quot;j&quot;, 41, 43, &quot;twin-prime-parameters&quot;));
     }
 
-    private static SeedExpression leftSeed(
+    /**
+     * Predeclared cross-family pair with the same constants and only an alpha
+     * renaming. It is used to retain an honest zero-output rejection batch.
+     */
+    public static List&lt;String&gt; alphaRejectionSeedIds() {
+<span class="fc" id="L133">        return List.of(GAP_TWO_REJECTION_SEED, TWIN_PRIME_REJECTION_SEED);</span>
+    }
+
+    private static SeedExpression factorSeed(
         String id,
+        String generator,
         String common,
         int left,
-        int right
+        int right,
+        String familyTag
     ) {
-<span class="fc" id="L94">        return new SeedExpression(</span>
+<span class="fc" id="L144">        return new SeedExpression(</span>
             id,
             common + &quot; * &quot; + left + &quot; + &quot; + common + &quot; * &quot; + right,
-            LEFT_FACTOR_GENERATOR,
+            generator,
             DOMAIN,
-<span class="fc" id="L99">            List.of(&quot;autopilot&quot;, &quot;production&quot;, &quot;factor-common-left&quot;),</span>
-<span class="fc" id="L100">            List.of());</span>
-    }
-
-    private static SeedExpression rightSeed(
-        String id,
-        String common,
-        int left,
-        int right
-    ) {
-<span class="fc" id="L109">        return new SeedExpression(</span>
-            id,
-            left + &quot; * &quot; + common + &quot; + &quot; + right + &quot; * &quot; + common,
-            RIGHT_FACTOR_GENERATOR,
-            DOMAIN,
-<span class="fc" id="L114">            List.of(&quot;autopilot&quot;, &quot;production&quot;, &quot;factor-common-right&quot;),</span>
-<span class="fc" id="L115">            List.of());</span>
+<span class="fc" id="L149">            List.of(&quot;autopilot&quot;, &quot;production&quot;, &quot;factor-common&quot;, familyTag),</span>
+<span class="fc" id="L150">            List.of());</span>
     }
 
     private static Map&lt;EvidenceStage, StageBudget&gt; stageBudgets() {
-<span class="fc" id="L119">        EnumMap&lt;EvidenceStage, StageBudget&gt; budgets = new EnumMap&lt;&gt;(EvidenceStage.class);</span>
-<span class="fc" id="L120">        budgets.put(EvidenceStage.GENERATION, new StageBudget(Map.of(</span>
-<span class="fc" id="L121">            ResourceKind.GENERATED_STATES, 100_000L,</span>
-<span class="fc" id="L122">            ResourceKind.EXPLORED_STATES, 10_000L,</span>
-<span class="fc" id="L123">            ResourceKind.OBSERVATIONS, (long) REQUIRED_OBSERVATIONS)));</span>
-<span class="fc" id="L124">        budgets.put(EvidenceStage.CANDIDATE_FORMATION, new StageBudget(Map.of(</span>
-<span class="fc" id="L125">            ResourceKind.MINING_BATCHES, 2L,</span>
-<span class="fc" id="L126">            ResourceKind.CANDIDATES, 12L)));</span>
-<span class="fc" id="L127">        budgets.put(EvidenceStage.VALIDATION, new StageBudget(Map.of(</span>
-<span class="fc" id="L128">            ResourceKind.VALIDATION_CHECKS, 120L)));</span>
-<span class="fc" id="L129">        budgets.put(EvidenceStage.COUNTEREXAMPLE_SEARCH, new StageBudget(Map.of(</span>
-<span class="fc" id="L130">            ResourceKind.COUNTEREXAMPLE_ATTEMPTS, 1_200L)));</span>
-<span class="fc" id="L131">        budgets.put(EvidenceStage.PROJECT_NOVELTY, new StageBudget(Map.of(</span>
-<span class="fc" id="L132">            ResourceKind.NOVELTY_COMPARISONS, 1_200L)));</span>
-<span class="fc" id="L133">        budgets.put(EvidenceStage.PROOF, new StageBudget(Map.of(</span>
-<span class="fc" id="L134">            ResourceKind.PROOF_ATTEMPTS, 12L)));</span>
-<span class="fc" id="L135">        budgets.put(EvidenceStage.LIFECYCLE_HANDOFF, new StageBudget(Map.of(</span>
-<span class="fc" id="L136">            ResourceKind.LIFECYCLE_HANDOFFS, 12L)));</span>
-<span class="fc" id="L137">        return Map.copyOf(budgets);</span>
+<span class="fc" id="L154">        EnumMap&lt;EvidenceStage, StageBudget&gt; budgets = new EnumMap&lt;&gt;(EvidenceStage.class);</span>
+<span class="fc" id="L155">        budgets.put(EvidenceStage.GENERATION, new StageBudget(Map.of(</span>
+<span class="fc" id="L156">            ResourceKind.GENERATED_STATES, 100_000L,</span>
+<span class="fc" id="L157">            ResourceKind.EXPLORED_STATES, 10_000L,</span>
+<span class="fc" id="L158">            ResourceKind.OBSERVATIONS, (long) REQUIRED_OBSERVATIONS)));</span>
+<span class="fc" id="L159">        budgets.put(EvidenceStage.CANDIDATE_FORMATION, new StageBudget(Map.of(</span>
+<span class="fc" id="L160">            ResourceKind.MINING_BATCHES, 2L,</span>
+<span class="fc" id="L161">            ResourceKind.CANDIDATES, 12L)));</span>
+<span class="fc" id="L162">        budgets.put(EvidenceStage.VALIDATION, new StageBudget(Map.of(</span>
+<span class="fc" id="L163">            ResourceKind.VALIDATION_CHECKS, 120L)));</span>
+<span class="fc" id="L164">        budgets.put(EvidenceStage.COUNTEREXAMPLE_SEARCH, new StageBudget(Map.of(</span>
+<span class="fc" id="L165">            ResourceKind.COUNTEREXAMPLE_ATTEMPTS, 1_200L)));</span>
+<span class="fc" id="L166">        budgets.put(EvidenceStage.PROJECT_NOVELTY, new StageBudget(Map.of(</span>
+<span class="fc" id="L167">            ResourceKind.NOVELTY_COMPARISONS, 1_200L)));</span>
+<span class="fc" id="L168">        budgets.put(EvidenceStage.PROOF, new StageBudget(Map.of(</span>
+<span class="fc" id="L169">            ResourceKind.PROOF_ATTEMPTS, 12L)));</span>
+<span class="fc" id="L170">        budgets.put(EvidenceStage.LIFECYCLE_HANDOFF, new StageBudget(Map.of(</span>
+<span class="fc" id="L171">            ResourceKind.LIFECYCLE_HANDOFFS, 12L)));</span>
+<span class="fc" id="L172">        return Map.copyOf(budgets);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

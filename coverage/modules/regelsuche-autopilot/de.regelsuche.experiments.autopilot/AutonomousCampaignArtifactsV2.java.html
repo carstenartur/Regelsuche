@@ -309,9 +309,9 @@ public final class AutonomousCampaignArtifactsV2 {
 <span class="fc" id="L309">                        .property(&quot;amount&quot;, entry.getValue()))))</span>
 <span class="fc" id="L310">                .array(&quot;skippedResources&quot;, array -&gt; skippedResources.entrySet().stream()</span>
 <span class="fc" id="L311">                    .sorted(Map.Entry.comparingByKey())</span>
-<span class="pc" id="L312">                    .forEach(entry -&gt; array.objectValue(object -&gt; object</span>
-<span class="nc" id="L313">                        .property(&quot;resource&quot;, entry.getKey().name())</span>
-<span class="nc" id="L314">                        .property(&quot;amount&quot;, entry.getValue()))))</span>
+<span class="fc" id="L312">                    .forEach(entry -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L313">                        .property(&quot;resource&quot;, entry.getKey().name())</span>
+<span class="fc" id="L314">                        .property(&quot;amount&quot;, entry.getValue()))))</span>
 <span class="fc" id="L315">                .property(&quot;executionIsMathematicalEvidence&quot;,</span>
                     executionIsMathematicalEvidence)
 <span class="fc" id="L317">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
