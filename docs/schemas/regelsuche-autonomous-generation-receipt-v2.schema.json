@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-generation-receipt/v2",
+  "title": "Regelsuche autonomous production generation receipt v2",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "stage", "disposition", "resources",
+    "observationBranchIds", "targetProvided",
+    "receiptIsMathematicalEvidence", "promotionStatus",
+    "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-generation-receipt/v2" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "stage": { "const": "GENERATION" },
+    "disposition": { "const": "COMPLETED" },
+    "resources": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["resource", "configured", "executed", "skipped", "remaining"],
+        "properties": {
+          "resource": {
+            "enum": ["GENERATED_STATES", "EXPLORED_STATES", "OBSERVATIONS"]
+          },
+          "configured": { "type": "integer", "minimum": 1 },
+          "executed": { "type": "integer", "minimum": 0 },
+          "skipped": { "type": "integer", "minimum": 0 },
+          "remaining": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "observationBranchIds": {
+      "type": "array",
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "targetProvided": { "const": false },
+    "receiptIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
