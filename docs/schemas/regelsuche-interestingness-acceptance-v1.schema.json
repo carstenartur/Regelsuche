@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.interestingness-acceptance/v1",
+  "title": "Regelsuche interestingness acceptance decision v1",
+  "type": "object",
+  "required": [
+    "schema", "predictiveCorpusHash", "labeledEvaluationHash",
+    "selectionHash", "calibrationReportHash", "selectedProfile",
+    "thresholds", "calibrationAgreementPermille", "testAgreementPermille",
+    "profileOrderAgreementPermille", "leaveOneOutSelectionStabilityPermille",
+    "topCandidateStableAcrossProfiles", "testCaseCount",
+    "paretoCandidateCount", "status", "blockers",
+    "promotionStatus", "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.interestingness-acceptance/v1" },
+    "predictiveCorpusHash": { "$ref": "#/$defs/sha256" },
+    "labeledEvaluationHash": { "$ref": "#/$defs/sha256" },
+    "selectionHash": { "$ref": "#/$defs/sha256" },
+    "calibrationReportHash": { "$ref": "#/$defs/sha256" },
+    "selectedProfile": { "enum": ["THEORY_DISCOVERY", "SEARCH_REUSE"] },
+    "thresholds": {
+      "type": "object",
+      "required": [
+        "minimumTestCases", "minimumCalibrationAgreementPermille",
+        "minimumTestAgreementPermille", "minimumProfileOrderAgreementPermille",
+        "minimumLeaveOneOutStabilityPermille", "requireStableTopCandidate",
+        "requireNonEmptyParetoFront"
+      ],
+      "properties": {
+        "minimumTestCases": { "type": "integer", "minimum": 2 },
+        "minimumCalibrationAgreementPermille": { "$ref": "#/$defs/permille" },
+        "minimumTestAgreementPermille": { "$ref": "#/$defs/permille" },
+        "minimumProfileOrderAgreementPermille": { "$ref": "#/$defs/permille" },
+        "minimumLeaveOneOutStabilityPermille": { "$ref": "#/$defs/permille" },
+        "requireStableTopCandidate": { "type": "boolean" },
+        "requireNonEmptyParetoFront": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "calibrationAgreementPermille": { "$ref": "#/$defs/permille" },
+    "testAgreementPermille": { "$ref": "#/$defs/permille" },
+    "profileOrderAgreementPermille": { "$ref": "#/$defs/permille" },
+    "leaveOneOutSelectionStabilityPermille": { "$ref": "#/$defs/permille" },
+    "topCandidateStableAcrossProfiles": { "type": "boolean" },
+    "testCaseCount": { "type": "integer", "minimum": 0 },
+    "paretoCandidateCount": { "type": "integer", "minimum": 0 },
+    "status": { "enum": ["ACCEPTED", "REJECTED"] },
+    "blockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}
