@@ -21,6 +21,15 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+tasks.register('runProductionGeneration', JavaExec) {
+    group = 'verification'
+    description = 'Runs the pinned target-free issue-348 production generation slice.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionGenerationMain'
+    args layout.buildDirectory.dir('reports/autopilot-production-generation')
+        .get().asFile.absolutePath
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
