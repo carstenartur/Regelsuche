@@ -36,10 +36,10 @@ public final class AutonomousCandidateLifecycleV2 {
         NoveltyStatus noveltyStatus = Objects.requireNonNull(
             novelty.status(), "novelty.status");
 
-        LifecycleOutcome outcome;
-        StageDisposition proofDisposition;
-        StageDisposition handoffDisposition;
-        List<String> blockers;
+        LifecycleOutcome outcome = LifecycleOutcome.INCOMPLETE;
+        StageDisposition proofDisposition = StageDisposition.NOT_RUN_BLOCKED;
+        StageDisposition handoffDisposition = StageDisposition.NOT_RUN_BLOCKED;
+        List<String> blockers = List.of("unresolved lifecycle outcome");
         String proofEvidenceHash = "";
         String lifecycleCandidateId = "";
 
@@ -107,6 +107,8 @@ public final class AutonomousCandidateLifecycleV2 {
                                 blockers = List.of();
                             }
                         }
+                        default -> throw new IllegalStateException(
+                            "unhandled proof status: " + proof.proofStatus());
                     }
                 }
             }
