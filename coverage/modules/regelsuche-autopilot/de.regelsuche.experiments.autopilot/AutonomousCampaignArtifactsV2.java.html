@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousCampaignArtifactsV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">AutonomousCampaignArtifactsV2.java</span></div><h1>AutonomousCampaignArtifactsV2.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2.LifecycleDecision;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.AggregateDecision;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.AggregateReceipt;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.CandidateOutput;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.SourceLink;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.json.JsonWriter;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Versioned outer artifacts for the Autopilot v2 aggregate evidence DAG. */
+public final class AutonomousCampaignArtifactsV2 {
+    public static final String PLAN_SCHEMA =
+        &quot;regelsuche.autonomous-campaign-plan/v2&quot;;
+    public static final String EXECUTION_SCHEMA =
+        &quot;regelsuche.autonomous-campaign-execution/v2&quot;;
+    public static final String LINEAGE_SCHEMA =
+        &quot;regelsuche.autonomous-branch-lineage/v2&quot;;
+    public static final String ROUND_SCHEMA =
+        &quot;regelsuche.autonomous-campaign-round/v2&quot;;
+
+    private AutonomousCampaignArtifactsV2() {
+    }
+
+    public static CampaignPlan plan(
+        AutonomousResearchBriefV2 brief,
+        List&lt;AggregateDecision&gt; suppliedDecisions
+    ) {
+<span class="fc" id="L37">        Objects.requireNonNull(brief, &quot;brief&quot;);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        List&lt;AggregateDecision&gt; decisions = suppliedDecisions == null</span>
+<span class="nc" id="L39">            ? List.of()</span>
+<span class="fc" id="L40">            : suppliedDecisions.stream()</span>
+<span class="fc" id="L41">                .sorted(Comparator.comparing(AggregateDecision::decisionId))</span>
+<span class="fc" id="L42">                .toList();</span>
+<span class="fc" id="L43">        requireUnique(</span>
+<span class="fc" id="L44">            decisions.stream().map(AggregateDecision::decisionId).toList(),</span>
+            &quot;decision IDs&quot;);
+<span class="fc" id="L46">        requireUnique(</span>
+<span class="fc" id="L47">            decisions.stream().map(AggregateDecision::contentHash).toList(),</span>
+            &quot;decision hashes&quot;);
+<span class="fc" id="L49">        decisions.forEach(decision -&gt; {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (!brief.contentHash().equals(decision.briefHash())) {</span>
+<span class="nc" id="L51">                throw new IllegalArgumentException(</span>
+                    &quot;v2 plan decision belongs to another research brief&quot;);
+            }
+<span class="fc" id="L54">        });</span>
+<span class="fc" id="L55">        String contentHash = AutonomousResearchBrief.hash(</span>
+            PLAN_SCHEMA
+<span class="fc" id="L57">                + &quot;\nbrief=&quot; + brief.contentHash()</span>
+<span class="fc" id="L58">                + &quot;\ndecisions=&quot; + decisions.stream()</span>
+<span class="fc" id="L59">                    .map(AggregateDecision::contentHash).toList());</span>
+<span class="fc" id="L60">        return new CampaignPlan(</span>
+            PLAN_SCHEMA,
+<span class="fc" id="L62">            brief.contentHash(),</span>
+            decisions,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    public static CampaignExecution execution(
+        CampaignPlan plan,
+        AggregateReceipt receipt
+    ) {
+<span class="fc" id="L74">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L75">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (plan.decisions().stream().noneMatch(decision -&gt;</span>
+<span class="fc" id="L77">                decision.contentHash().equals(receipt.decisionHash()))) {</span>
+<span class="fc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;aggregate receipt has no matching decision in the v2 plan&quot;);
+        }
+<span class="fc" id="L81">        String contentHash = AutonomousResearchBrief.hash(</span>
+            EXECUTION_SCHEMA
+<span class="fc" id="L83">                + &quot;\nplan=&quot; + plan.contentHash()</span>
+<span class="fc" id="L84">                + &quot;\ndecision=&quot; + receipt.decisionHash()</span>
+<span class="fc" id="L85">                + &quot;\nreceipt=&quot; + receipt.contentHash()</span>
+<span class="fc" id="L86">                + &quot;\nmining=&quot; + receipt.miningEvidenceHash()</span>
+<span class="fc" id="L87">                + &quot;\ndisposition=&quot; + receipt.disposition().name()</span>
+<span class="fc" id="L88">                + &quot;\noutputs=&quot; + receipt.outputs().stream()</span>
+<span class="fc" id="L89">                    .map(CandidateOutput::outputBranchId).toList()</span>
+<span class="fc" id="L90">                + &quot;\nrejected=&quot; + receipt.rejectedClusters().stream()</span>
+<span class="fc" id="L91">                    .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash).toList()</span>
+<span class="fc" id="L92">                + &quot;\nexecuted=&quot; + receipt.executedResources()</span>
+<span class="fc" id="L93">                + &quot;\nskipped=&quot; + receipt.skippedResources());</span>
+<span class="fc" id="L94">        return new CampaignExecution(</span>
+            EXECUTION_SCHEMA,
+<span class="fc" id="L96">            plan.contentHash(),</span>
+<span class="fc" id="L97">            receipt.decisionHash(),</span>
+<span class="fc" id="L98">            receipt.contentHash(),</span>
+<span class="fc" id="L99">            receipt.miningEvidenceHash(),</span>
+<span class="fc" id="L100">            receipt.disposition().name(),</span>
+<span class="fc" id="L101">            receipt.outputs().stream().map(CandidateOutput::outputBranchId).toList(),</span>
+<span class="fc" id="L102">            receipt.rejectedClusters().stream()</span>
+<span class="fc" id="L103">                .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash).toList(),</span>
+<span class="fc" id="L104">            receipt.executedResources(),</span>
+<span class="fc" id="L105">            receipt.skippedResources(),</span>
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    public static BranchLineageArtifact lineage(AggregateReceipt receipt) {
+<span class="fc" id="L113">        Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L114">        List&lt;CandidateLineage&gt; candidates = receipt.outputs().stream()</span>
+<span class="fc" id="L115">            .map(AutonomousCampaignArtifactsV2::candidateLineage)</span>
+<span class="fc" id="L116">            .sorted(Comparator.comparing(CandidateLineage::outputBranchId))</span>
+<span class="fc" id="L117">            .toList();</span>
+<span class="fc" id="L118">        String contentHash = AutonomousResearchBrief.hash(</span>
+            LINEAGE_SCHEMA
+<span class="fc" id="L120">                + &quot;\nreceipt=&quot; + receipt.contentHash()</span>
+<span class="fc" id="L121">                + &quot;\ndecision=&quot; + receipt.decisionHash()</span>
+<span class="fc" id="L122">                + &quot;\nmining=&quot; + receipt.miningEvidenceHash()</span>
+<span class="fc" id="L123">                + &quot;\ncandidates=&quot; + candidates.stream()</span>
+<span class="fc" id="L124">                    .map(CandidateLineage::lineageHash).toList());</span>
+<span class="fc" id="L125">        return new BranchLineageArtifact(</span>
+            LINEAGE_SCHEMA,
+<span class="fc" id="L127">            receipt.contentHash(),</span>
+<span class="fc" id="L128">            receipt.decisionHash(),</span>
+<span class="fc" id="L129">            receipt.miningEvidenceHash(),</span>
+            candidates,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    public static CampaignRound round(
+        CampaignPlan currentPlan,
+        CampaignExecution execution,
+        BranchLineageArtifact lineage,
+        List&lt;LifecycleDecision&gt; suppliedLifecycleDecisions,
+        CampaignPlan nextPlan
+    ) {
+<span class="fc" id="L144">        Objects.requireNonNull(currentPlan, &quot;currentPlan&quot;);</span>
+<span class="fc" id="L145">        Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="fc" id="L146">        Objects.requireNonNull(lineage, &quot;lineage&quot;);</span>
+<span class="fc" id="L147">        Objects.requireNonNull(nextPlan, &quot;nextPlan&quot;);</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (!currentPlan.contentHash().equals(execution.planHash())) {</span>
+<span class="nc" id="L149">            throw new IllegalArgumentException(</span>
+                &quot;v2 execution belongs to another current plan&quot;);
+        }
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (!execution.aggregateReceiptHash().equals(lineage.aggregateReceiptHash())) {</span>
+<span class="nc" id="L153">            throw new IllegalArgumentException(</span>
+                &quot;v2 lineage belongs to another aggregate receipt&quot;);
+        }
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (!currentPlan.briefHash().equals(nextPlan.briefHash())) {</span>
+<span class="nc" id="L157">            throw new IllegalArgumentException(</span>
+                &quot;next v2 plan belongs to another research brief&quot;);
+        }
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        List&lt;LifecycleDecision&gt; lifecycleDecisions = suppliedLifecycleDecisions == null</span>
+<span class="nc" id="L161">            ? List.of()</span>
+<span class="fc" id="L162">            : suppliedLifecycleDecisions.stream()</span>
+<span class="fc" id="L163">                .sorted(Comparator.comparing(LifecycleDecision::candidateBranchId))</span>
+<span class="fc" id="L164">                .toList();</span>
+<span class="fc" id="L165">        requireUnique(</span>
+<span class="fc" id="L166">            lifecycleDecisions.stream()</span>
+<span class="fc" id="L167">                .map(LifecycleDecision::candidateBranchId).toList(),</span>
+            &quot;lifecycle candidate branch IDs&quot;);
+<span class="fc" id="L169">        Set&lt;String&gt; outputBranches = new TreeSet&lt;&gt;(execution.outputBranchIds());</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (!outputBranches.containsAll(lifecycleDecisions.stream()</span>
+<span class="fc" id="L171">                .map(LifecycleDecision::candidateBranchId).toList())) {</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(</span>
+                &quot;lifecycle decisions must reference outputs of this v2 execution&quot;);
+        }
+<span class="fc" id="L175">        String contentHash = AutonomousResearchBrief.hash(</span>
+            ROUND_SCHEMA
+<span class="fc" id="L177">                + &quot;\nplan=&quot; + currentPlan.contentHash()</span>
+<span class="fc" id="L178">                + &quot;\nexecution=&quot; + execution.contentHash()</span>
+<span class="fc" id="L179">                + &quot;\nlineage=&quot; + lineage.contentHash()</span>
+<span class="fc" id="L180">                + &quot;\nlifecycle=&quot; + lifecycleDecisions.stream()</span>
+<span class="fc" id="L181">                    .map(LifecycleDecision::contentHash).toList()</span>
+<span class="fc" id="L182">                + &quot;\nnextPlan=&quot; + nextPlan.contentHash());</span>
+<span class="fc" id="L183">        return new CampaignRound(</span>
+            ROUND_SCHEMA,
+<span class="fc" id="L185">            currentPlan.contentHash(),</span>
+<span class="fc" id="L186">            execution.contentHash(),</span>
+<span class="fc" id="L187">            lineage.contentHash(),</span>
+<span class="fc" id="L188">            lifecycleDecisions.stream().map(LifecycleDecision::contentHash).toList(),</span>
+<span class="fc" id="L189">            nextPlan.contentHash(),</span>
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    private static CandidateLineage candidateLineage(CandidateOutput output) {
+<span class="fc" id="L197">        return new CandidateLineage(</span>
+<span class="fc" id="L198">            output.outputBranchId(),</span>
+<span class="fc" id="L199">            output.conjectureId(),</span>
+<span class="fc" id="L200">            output.candidateEvidenceHash(),</span>
+<span class="fc" id="L201">            output.sources(),</span>
+<span class="fc" id="L202">            output.lineageHash());</span>
+    }
+
+    public record CampaignPlan(
+        String schema,
+        String briefHash,
+        List&lt;AggregateDecision&gt; decisions,
+        boolean plannerDecisionIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L214">        public CampaignPlan {</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (!PLAN_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L216">                throw new IllegalArgumentException(&quot;unsupported v2 campaign plan schema&quot;);</span>
+            }
+<span class="fc" id="L218">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            decisions = decisions == null</span>
+<span class="nc" id="L220">                ? List.of()</span>
+<span class="fc" id="L221">                : decisions.stream()</span>
+<span class="fc" id="L222">                    .sorted(Comparator.comparing(AggregateDecision::decisionId))</span>
+<span class="fc" id="L223">                    .toList();</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            if (plannerDecisionIsMathematicalEvidence) {</span>
+<span class="nc" id="L225">                throw new IllegalArgumentException(</span>
+                    &quot;v2 campaign plan cannot be mathematical evidence&quot;);
+            }
+<span class="fc" id="L228">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L229">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L230">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L231">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L234">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L235">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L236">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L237">                .array(&quot;decisions&quot;, array -&gt; decisions.forEach(decision -&gt;</span>
+<span class="fc" id="L238">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L239">                        .property(&quot;decisionId&quot;, decision.decisionId())</span>
+<span class="fc" id="L240">                        .property(&quot;decisionHash&quot;, decision.contentHash())</span>
+<span class="fc" id="L241">                        .property(&quot;stage&quot;, decision.stage().name())</span>
+<span class="fc" id="L242">                        .property(&quot;scope&quot;, decision.scope().name())</span>
+<span class="fc" id="L243">                        .stringArray(&quot;inputBranchIds&quot;, decision.inputs().stream()</span>
+<span class="fc" id="L244">                            .map(AutonomousEvidenceDagV2.ObservationBranch::branchId)</span>
+<span class="fc" id="L245">                            .toList()))))</span>
+<span class="fc" id="L246">                .property(&quot;plannerDecisionIsMathematicalEvidence&quot;,</span>
+                    plannerDecisionIsMathematicalEvidence)
+<span class="fc" id="L248">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L249">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L250">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L251">                .endObject()</span>
+<span class="fc" id="L252">                .toString();</span>
+        }
+    }
+
+    public record CampaignExecution(
+        String schema,
+        String planHash,
+        String decisionHash,
+        String aggregateReceiptHash,
+        String miningEvidenceHash,
+        String disposition,
+        List&lt;String&gt; outputBranchIds,
+        List&lt;String&gt; rejectedClusterHashes,
+        Map&lt;ResourceKind, Long&gt; executedResources,
+        Map&lt;ResourceKind, Long&gt; skippedResources,
+        boolean executionIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L272">        public CampaignExecution {</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">            if (!EXECUTION_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L274">                throw new IllegalArgumentException(&quot;unsupported v2 execution schema&quot;);</span>
+            }
+<span class="fc" id="L276">            requireSha256(planHash, &quot;planHash&quot;);</span>
+<span class="fc" id="L277">            requireSha256(decisionHash, &quot;decisionHash&quot;);</span>
+<span class="fc" id="L278">            requireSha256(aggregateReceiptHash, &quot;aggregateReceiptHash&quot;);</span>
+<span class="fc" id="L279">            requireSha256(miningEvidenceHash, &quot;miningEvidenceHash&quot;);</span>
+<span class="fc" id="L280">            requireText(disposition, &quot;disposition&quot;);</span>
+<span class="fc" id="L281">            outputBranchIds = sortedText(outputBranchIds, &quot;outputBranchIds&quot;);</span>
+<span class="fc" id="L282">            rejectedClusterHashes = sortedHashes(</span>
+                rejectedClusterHashes, &quot;rejectedClusterHashes&quot;);
+<span class="fc" id="L284">            executedResources = immutableResources(executedResources);</span>
+<span class="fc" id="L285">            skippedResources = immutableResources(skippedResources);</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">            if (executionIsMathematicalEvidence) {</span>
+<span class="nc" id="L287">                throw new IllegalArgumentException(</span>
+                    &quot;v2 execution cannot be mathematical evidence&quot;);
+            }
+<span class="fc" id="L290">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L291">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L292">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L293">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L296">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L297">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L298">                .property(&quot;planHash&quot;, planHash)</span>
+<span class="fc" id="L299">                .property(&quot;decisionHash&quot;, decisionHash)</span>
+<span class="fc" id="L300">                .property(&quot;aggregateReceiptHash&quot;, aggregateReceiptHash)</span>
+<span class="fc" id="L301">                .property(&quot;miningEvidenceHash&quot;, miningEvidenceHash)</span>
+<span class="fc" id="L302">                .property(&quot;disposition&quot;, disposition)</span>
+<span class="fc" id="L303">                .stringArray(&quot;outputBranchIds&quot;, outputBranchIds)</span>
+<span class="fc" id="L304">                .stringArray(&quot;rejectedClusterHashes&quot;, rejectedClusterHashes)</span>
+<span class="fc" id="L305">                .array(&quot;executedResources&quot;, array -&gt; executedResources.entrySet().stream()</span>
+<span class="fc" id="L306">                    .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L307">                    .forEach(entry -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L308">                        .property(&quot;resource&quot;, entry.getKey().name())</span>
+<span class="fc" id="L309">                        .property(&quot;amount&quot;, entry.getValue()))))</span>
+<span class="fc" id="L310">                .array(&quot;skippedResources&quot;, array -&gt; skippedResources.entrySet().stream()</span>
+<span class="fc" id="L311">                    .sorted(Map.Entry.comparingByKey())</span>
+<span class="pc" id="L312">                    .forEach(entry -&gt; array.objectValue(object -&gt; object</span>
+<span class="nc" id="L313">                        .property(&quot;resource&quot;, entry.getKey().name())</span>
+<span class="nc" id="L314">                        .property(&quot;amount&quot;, entry.getValue()))))</span>
+<span class="fc" id="L315">                .property(&quot;executionIsMathematicalEvidence&quot;,</span>
+                    executionIsMathematicalEvidence)
+<span class="fc" id="L317">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L318">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L319">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L320">                .endObject()</span>
+<span class="fc" id="L321">                .toString();</span>
+        }
+    }
+
+    public record CandidateLineage(
+        String outputBranchId,
+        String candidateId,
+        String candidateEvidenceHash,
+        List&lt;SourceLink&gt; sources,
+        String lineageHash
+    ) {
+<span class="fc" id="L332">        public CandidateLineage {</span>
+<span class="fc" id="L333">            requireText(outputBranchId, &quot;outputBranchId&quot;);</span>
+<span class="fc" id="L334">            requireText(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L335">            requireSha256(candidateEvidenceHash, &quot;candidateEvidenceHash&quot;);</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            sources = sources == null</span>
+<span class="nc" id="L337">                ? List.of()</span>
+<span class="fc" id="L338">                : sources.stream()</span>
+<span class="fc" id="L339">                    .sorted(Comparator.comparing(SourceLink::observationId))</span>
+<span class="fc" id="L340">                    .toList();</span>
+<span class="fc" id="L341">            requireUnique(</span>
+<span class="fc" id="L342">                sources.stream().map(SourceLink::observationId).toList(),</span>
+                &quot;lineage observation IDs&quot;);
+<span class="fc" id="L344">            requireUnique(</span>
+<span class="fc" id="L345">                sources.stream().map(SourceLink::sourceBranchId).toList(),</span>
+                &quot;lineage source branch IDs&quot;);
+<span class="fc" id="L347">            requireSha256(lineageHash, &quot;lineageHash&quot;);</span>
+<span class="fc" id="L348">        }</span>
+    }
+
+    public record BranchLineageArtifact(
+        String schema,
+        String aggregateReceiptHash,
+        String decisionHash,
+        String miningEvidenceHash,
+        List&lt;CandidateLineage&gt; candidates,
+        boolean lineageIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L362">        public BranchLineageArtifact {</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">            if (!LINEAGE_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L364">                throw new IllegalArgumentException(&quot;unsupported v2 lineage schema&quot;);</span>
+            }
+<span class="fc" id="L366">            requireSha256(aggregateReceiptHash, &quot;aggregateReceiptHash&quot;);</span>
+<span class="fc" id="L367">            requireSha256(decisionHash, &quot;decisionHash&quot;);</span>
+<span class="fc" id="L368">            requireSha256(miningEvidenceHash, &quot;miningEvidenceHash&quot;);</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            candidates = candidates == null</span>
+<span class="nc" id="L370">                ? List.of()</span>
+<span class="fc" id="L371">                : candidates.stream()</span>
+<span class="fc" id="L372">                    .sorted(Comparator.comparing(CandidateLineage::outputBranchId))</span>
+<span class="fc" id="L373">                    .toList();</span>
+<span class="fc" id="L374">            requireUnique(</span>
+<span class="fc" id="L375">                candidates.stream().map(CandidateLineage::outputBranchId).toList(),</span>
+                &quot;lineage output branch IDs&quot;);
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">            if (lineageIsMathematicalEvidence) {</span>
+<span class="nc" id="L378">                throw new IllegalArgumentException(</span>
+                    &quot;v2 lineage metadata cannot be mathematical evidence&quot;);
+            }
+<span class="fc" id="L381">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L382">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L383">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L384">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L387">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L388">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L389">                .property(&quot;aggregateReceiptHash&quot;, aggregateReceiptHash)</span>
+<span class="fc" id="L390">                .property(&quot;decisionHash&quot;, decisionHash)</span>
+<span class="fc" id="L391">                .property(&quot;miningEvidenceHash&quot;, miningEvidenceHash)</span>
+<span class="fc" id="L392">                .array(&quot;candidates&quot;, array -&gt; candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L393">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L394">                        .property(&quot;outputBranchId&quot;, candidate.outputBranchId())</span>
+<span class="fc" id="L395">                        .property(&quot;candidateId&quot;, candidate.candidateId())</span>
+<span class="fc" id="L396">                        .property(&quot;candidateEvidenceHash&quot;,</span>
+<span class="fc" id="L397">                            candidate.candidateEvidenceHash())</span>
+<span class="fc" id="L398">                        .array(&quot;sources&quot;, sources -&gt; candidate.sources().forEach(source -&gt;</span>
+<span class="fc" id="L399">                            sources.objectValue(item -&gt; item</span>
+<span class="fc" id="L400">                                .property(&quot;observationId&quot;, source.observationId())</span>
+<span class="fc" id="L401">                                .property(&quot;sourceBranchId&quot;, source.sourceBranchId())</span>
+<span class="fc" id="L402">                                .property(&quot;familyId&quot;, source.familyId())</span>
+<span class="fc" id="L403">                                .property(&quot;snapshotHash&quot;, source.snapshotHash())</span>
+<span class="fc" id="L404">                                .property(&quot;evidenceHash&quot;, source.evidenceHash())</span>
+<span class="fc" id="L405">                                .property(&quot;observationBranchHash&quot;,</span>
+<span class="fc" id="L406">                                    source.observationBranchHash()))))</span>
+<span class="fc" id="L407">                        .property(&quot;lineageHash&quot;, candidate.lineageHash()))))</span>
+<span class="fc" id="L408">                .property(&quot;lineageIsMathematicalEvidence&quot;,</span>
+                    lineageIsMathematicalEvidence)
+<span class="fc" id="L410">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L411">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L412">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L413">                .endObject()</span>
+<span class="fc" id="L414">                .toString();</span>
+        }
+    }
+
+    public record CampaignRound(
+        String schema,
+        String planHash,
+        String executionHash,
+        String lineageHash,
+        List&lt;String&gt; lifecycleDecisionHashes,
+        String nextPlanHash,
+        boolean roundDecisionIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L430">        public CampaignRound {</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">            if (!ROUND_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L432">                throw new IllegalArgumentException(&quot;unsupported v2 campaign round schema&quot;);</span>
+            }
+<span class="fc" id="L434">            requireSha256(planHash, &quot;planHash&quot;);</span>
+<span class="fc" id="L435">            requireSha256(executionHash, &quot;executionHash&quot;);</span>
+<span class="fc" id="L436">            requireSha256(lineageHash, &quot;lineageHash&quot;);</span>
+<span class="fc" id="L437">            lifecycleDecisionHashes = sortedHashes(</span>
+                lifecycleDecisionHashes, &quot;lifecycleDecisionHashes&quot;);
+<span class="fc" id="L439">            requireSha256(nextPlanHash, &quot;nextPlanHash&quot;);</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">            if (roundDecisionIsMathematicalEvidence) {</span>
+<span class="nc" id="L441">                throw new IllegalArgumentException(</span>
+                    &quot;v2 campaign round cannot be mathematical evidence&quot;);
+            }
+<span class="fc" id="L444">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L445">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L446">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L447">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L450">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L451">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L452">                .property(&quot;planHash&quot;, planHash)</span>
+<span class="fc" id="L453">                .property(&quot;executionHash&quot;, executionHash)</span>
+<span class="fc" id="L454">                .property(&quot;lineageHash&quot;, lineageHash)</span>
+<span class="fc" id="L455">                .stringArray(&quot;lifecycleDecisionHashes&quot;, lifecycleDecisionHashes)</span>
+<span class="fc" id="L456">                .property(&quot;nextPlanHash&quot;, nextPlanHash)</span>
+<span class="fc" id="L457">                .property(&quot;roundDecisionIsMathematicalEvidence&quot;,</span>
+                    roundDecisionIsMathematicalEvidence)
+<span class="fc" id="L459">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L460">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L461">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L462">                .endObject()</span>
+<span class="fc" id="L463">                .toString();</span>
+        }
+    }
+
+    private static Map&lt;ResourceKind, Long&gt; immutableResources(
+        Map&lt;ResourceKind, Long&gt; supplied
+    ) {
+<span class="pc bpc" id="L470" title="1 of 4 branches missed.">        if (supplied == null || supplied.isEmpty()) {</span>
+<span class="fc" id="L471">            return Map.of();</span>
+        }
+<span class="fc" id="L473">        EnumMap&lt;ResourceKind, Long&gt; result = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L474">        supplied.forEach((resource, amount) -&gt; {</span>
+<span class="fc" id="L475">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L476" title="2 of 4 branches missed.">            if (amount == null || amount &lt; 0L) {</span>
+<span class="nc" id="L477">                throw new IllegalArgumentException(</span>
+                    &quot;resource amounts must be non-negative&quot;);
+            }
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (amount &gt; 0L) {</span>
+<span class="fc" id="L481">                result.put(resource, amount);</span>
+            }
+<span class="fc" id="L483">        });</span>
+<span class="fc" id="L484">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static List&lt;String&gt; sortedText(List&lt;String&gt; values, String name) {
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L489">            return List.of();</span>
+        }
+<span class="pc bpc" id="L491" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L492">            throw new IllegalArgumentException(name + &quot; must contain non-blank values&quot;);</span>
+        }
+<span class="fc" id="L494">        return values.stream().distinct().sorted().toList();</span>
+    }
+
+    private static List&lt;String&gt; sortedHashes(List&lt;String&gt; values, String name) {
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">        List&lt;String&gt; result = values == null ? List.of() : values.stream().sorted().toList();</span>
+<span class="fc" id="L499">        result.forEach(value -&gt; requireSha256(value, name));</span>
+<span class="fc" id="L500">        requireUnique(result, name);</span>
+<span class="fc" id="L501">        return result;</span>
+    }
+
+    private static void requireUnique(List&lt;String&gt; values, String name) {
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">        if (new TreeSet&lt;&gt;(values).size() != values.size()) {</span>
+<span class="nc" id="L506">            throw new IllegalArgumentException(name + &quot; must be unique&quot;);</span>
+        }
+<span class="fc" id="L508">    }</span>
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L511" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L512">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L514">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L517" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L518">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L520">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L524">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L526">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

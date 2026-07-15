@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousResearchBriefV2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-experiments</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">AutonomousResearchBriefV2.java</span></div><h1>AutonomousResearchBriefV2.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Target-free v2 brief with explicit novelty and lifecycle stages. */
+public record AutonomousResearchBriefV2(
+    String schema,
+    String briefId,
+    String predecessorV1BriefHash,
+    List&lt;String&gt; allowedDomains,
+    List&lt;String&gt; seedGenerators,
+    String inventoryHash,
+    String packHash,
+    String modelHash,
+    long deterministicSeed,
+    int minimumAggregateInputs,
+    int minimumDistinctFamilies,
+    int minimumDistinctEvidence,
+    String outputNamespace,
+    Map&lt;EvidenceStage, StageBudget&gt; stageBudgets,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.autonomous-research-brief/v2&quot;;
+
+<span class="fc" id="L33">    public AutonomousResearchBriefV2 {</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(&quot;unsupported autonomous research brief v2 schema&quot;);</span>
+        }
+<span class="fc" id="L37">        requireText(briefId, &quot;briefId&quot;);</span>
+<span class="fc" id="L38">        requireSha256(predecessorV1BriefHash, &quot;predecessorV1BriefHash&quot;);</span>
+<span class="fc" id="L39">        allowedDomains = sortedText(allowedDomains, &quot;allowedDomains&quot;);</span>
+<span class="fc" id="L40">        seedGenerators = sortedText(seedGenerators, &quot;seedGenerators&quot;);</span>
+<span class="pc bpc" id="L41" title="2 of 4 branches missed.">        if (allowedDomains.isEmpty() || seedGenerators.isEmpty()) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;domains and seed generators must not be empty&quot;);</span>
+        }
+<span class="fc" id="L44">        requireSha256(inventoryHash, &quot;inventoryHash&quot;);</span>
+<span class="fc" id="L45">        requireSha256(packHash, &quot;packHash&quot;);</span>
+<span class="fc" id="L46">        requireSha256(modelHash, &quot;modelHash&quot;);</span>
+<span class="pc bpc" id="L47" title="3 of 6 branches missed.">        if (minimumAggregateInputs &lt; 2</span>
+                || minimumDistinctFamilies &lt; 2
+                || minimumDistinctEvidence &lt; 2) {
+<span class="nc" id="L50">            throw new IllegalArgumentException(</span>
+                &quot;aggregate input, family and evidence minima must be at least two&quot;);
+        }
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (minimumDistinctFamilies &gt; minimumAggregateInputs</span>
+                || minimumDistinctEvidence &gt; minimumAggregateInputs) {
+<span class="nc" id="L55">            throw new IllegalArgumentException(</span>
+                &quot;diversity minima cannot exceed the aggregate input minimum&quot;);
+        }
+<span class="fc" id="L58">        requireText(outputNamespace, &quot;outputNamespace&quot;);</span>
+<span class="fc" id="L59">        stageBudgets = immutableBudgets(stageBudgets);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (!stageBudgets.keySet().equals(EnumSet.allOf(EvidenceStage.class))) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(</span>
+                &quot;v2 brief requires budgets for every explicit evidence stage&quot;);
+        }
+<span class="fc" id="L64">        stageBudgets.forEach(AutonomousResearchBriefV2::validateStageBudget);</span>
+<span class="fc" id="L65">        requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L66">    }</span>
+
+    public static AutonomousResearchBriefV2 create(
+        String briefId,
+        String predecessorV1BriefHash,
+        List&lt;String&gt; allowedDomains,
+        List&lt;String&gt; seedGenerators,
+        String inventoryHash,
+        String packHash,
+        String modelHash,
+        long deterministicSeed,
+        int minimumAggregateInputs,
+        int minimumDistinctFamilies,
+        int minimumDistinctEvidence,
+        String outputNamespace,
+        Map&lt;EvidenceStage, StageBudget&gt; stageBudgets
+    ) {
+<span class="fc" id="L83">        List&lt;String&gt; domains = sortedText(allowedDomains, &quot;allowedDomains&quot;);</span>
+<span class="fc" id="L84">        List&lt;String&gt; generators = sortedText(seedGenerators, &quot;seedGenerators&quot;);</span>
+<span class="fc" id="L85">        Map&lt;EvidenceStage, StageBudget&gt; budgets = immutableBudgets(stageBudgets);</span>
+<span class="fc" id="L86">        String material = canonicalMaterial(</span>
+            briefId,
+            predecessorV1BriefHash,
+            domains,
+            generators,
+            inventoryHash,
+            packHash,
+            modelHash,
+            deterministicSeed,
+            minimumAggregateInputs,
+            minimumDistinctFamilies,
+            minimumDistinctEvidence,
+            outputNamespace,
+            budgets);
+<span class="fc" id="L100">        return new AutonomousResearchBriefV2(</span>
+            SCHEMA,
+            briefId,
+            predecessorV1BriefHash,
+            domains,
+            generators,
+            inventoryHash,
+            packHash,
+            modelHash,
+            deterministicSeed,
+            minimumAggregateInputs,
+            minimumDistinctFamilies,
+            minimumDistinctEvidence,
+            outputNamespace,
+            budgets,
+<span class="fc" id="L115">            AutonomousResearchBrief.hash(material));</span>
+    }
+
+    public StageBudget budget(EvidenceStage stage) {
+<span class="fc" id="L119">        return stageBudgets.get(stage);</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L123">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L124">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L125">            .property(&quot;briefId&quot;, briefId)</span>
+<span class="fc" id="L126">            .property(&quot;predecessorV1BriefHash&quot;, predecessorV1BriefHash)</span>
+<span class="fc" id="L127">            .stringArray(&quot;allowedDomains&quot;, allowedDomains)</span>
+<span class="fc" id="L128">            .stringArray(&quot;seedGenerators&quot;, seedGenerators)</span>
+<span class="fc" id="L129">            .property(&quot;inventoryHash&quot;, inventoryHash)</span>
+<span class="fc" id="L130">            .property(&quot;packHash&quot;, packHash)</span>
+<span class="fc" id="L131">            .property(&quot;modelHash&quot;, modelHash)</span>
+<span class="fc" id="L132">            .property(&quot;deterministicSeed&quot;, deterministicSeed)</span>
+<span class="fc" id="L133">            .property(&quot;minimumAggregateInputs&quot;, minimumAggregateInputs)</span>
+<span class="fc" id="L134">            .property(&quot;minimumDistinctFamilies&quot;, minimumDistinctFamilies)</span>
+<span class="fc" id="L135">            .property(&quot;minimumDistinctEvidence&quot;, minimumDistinctEvidence)</span>
+<span class="fc" id="L136">            .property(&quot;outputNamespace&quot;, outputNamespace)</span>
+<span class="fc" id="L137">            .array(&quot;stageBudgets&quot;, array -&gt; stageBudgets.entrySet().stream()</span>
+<span class="fc" id="L138">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L139">                .forEach(entry -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L140">                    .property(&quot;stage&quot;, entry.getKey().name())</span>
+<span class="fc" id="L141">                    .array(&quot;resources&quot;, resources -&gt; entry.getValue().resources()</span>
+<span class="fc" id="L142">                        .entrySet().stream()</span>
+<span class="fc" id="L143">                        .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L144">                        .forEach(resource -&gt; resources.objectValue(item -&gt; item</span>
+<span class="fc" id="L145">                            .property(&quot;resource&quot;, resource.getKey().name())</span>
+<span class="fc" id="L146">                            .property(&quot;configured&quot;, resource.getValue())))))))</span>
+<span class="fc" id="L147">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L148">            .endObject()</span>
+<span class="fc" id="L149">            .toString();</span>
+    }
+
+    private static String canonicalMaterial(
+        String briefId,
+        String predecessorV1BriefHash,
+        List&lt;String&gt; domains,
+        List&lt;String&gt; generators,
+        String inventoryHash,
+        String packHash,
+        String modelHash,
+        long deterministicSeed,
+        int minimumAggregateInputs,
+        int minimumDistinctFamilies,
+        int minimumDistinctEvidence,
+        String outputNamespace,
+        Map&lt;EvidenceStage, StageBudget&gt; budgets
+    ) {
+<span class="fc" id="L167">        StringBuilder material = new StringBuilder(SCHEMA)</span>
+<span class="fc" id="L168">            .append(&quot;\nbriefId=&quot;).append(briefId)</span>
+<span class="fc" id="L169">            .append(&quot;\npredecessor=&quot;).append(predecessorV1BriefHash)</span>
+<span class="fc" id="L170">            .append(&quot;\ndomains=&quot;).append(domains)</span>
+<span class="fc" id="L171">            .append(&quot;\ngenerators=&quot;).append(generators)</span>
+<span class="fc" id="L172">            .append(&quot;\ninventory=&quot;).append(inventoryHash)</span>
+<span class="fc" id="L173">            .append(&quot;\npack=&quot;).append(packHash)</span>
+<span class="fc" id="L174">            .append(&quot;\nmodel=&quot;).append(modelHash)</span>
+<span class="fc" id="L175">            .append(&quot;\nseed=&quot;).append(deterministicSeed)</span>
+<span class="fc" id="L176">            .append(&quot;\nminimumAggregateInputs=&quot;).append(minimumAggregateInputs)</span>
+<span class="fc" id="L177">            .append(&quot;\nminimumDistinctFamilies=&quot;).append(minimumDistinctFamilies)</span>
+<span class="fc" id="L178">            .append(&quot;\nminimumDistinctEvidence=&quot;).append(minimumDistinctEvidence)</span>
+<span class="fc" id="L179">            .append(&quot;\noutputNamespace=&quot;).append(outputNamespace);</span>
+<span class="fc" id="L180">        budgets.entrySet().stream()</span>
+<span class="fc" id="L181">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L182">            .forEach(entry -&gt; material.append(&quot;\nbudget=&quot;)</span>
+<span class="fc" id="L183">                .append(entry.getKey().name())</span>
+<span class="fc" id="L184">                .append('|')</span>
+<span class="fc" id="L185">                .append(entry.getValue().canonicalMaterial()));</span>
+<span class="fc" id="L186">        return material.toString();</span>
+    }
+
+    private static Map&lt;EvidenceStage, StageBudget&gt; immutableBudgets(
+        Map&lt;EvidenceStage, StageBudget&gt; values
+    ) {
+<span class="fc" id="L192">        Objects.requireNonNull(values, &quot;stageBudgets&quot;);</span>
+<span class="fc" id="L193">        EnumMap&lt;EvidenceStage, StageBudget&gt; ordered =</span>
+            new EnumMap&lt;&gt;(EvidenceStage.class);
+<span class="fc" id="L195">        values.forEach((stage, budget) -&gt; ordered.put(</span>
+<span class="fc" id="L196">            Objects.requireNonNull(stage, &quot;stage&quot;),</span>
+<span class="fc" id="L197">            Objects.requireNonNull(budget, &quot;stageBudget&quot;)));</span>
+<span class="fc" id="L198">        return Collections.unmodifiableMap(ordered);</span>
+    }
+
+    private static void validateStageBudget(
+        EvidenceStage stage,
+        StageBudget budget
+    ) {
+<span class="fc bfc" id="L205" title="All 7 branches covered.">        Set&lt;ResourceKind&gt; allowed = switch (stage) {</span>
+<span class="fc" id="L206">            case GENERATION -&gt; EnumSet.of(</span>
+                ResourceKind.WALL_CLOCK_MILLIS,
+                ResourceKind.GENERATED_STATES,
+                ResourceKind.EXPLORED_STATES,
+                ResourceKind.OBSERVATIONS);
+<span class="fc" id="L211">            case CANDIDATE_FORMATION -&gt; EnumSet.of(</span>
+                ResourceKind.WALL_CLOCK_MILLIS,
+                ResourceKind.MINING_BATCHES,
+                ResourceKind.CANDIDATES);
+<span class="fc" id="L215">            case VALIDATION -&gt; EnumSet.of(</span>
+                ResourceKind.WALL_CLOCK_MILLIS,
+                ResourceKind.VALIDATION_CHECKS);
+<span class="fc" id="L218">            case COUNTEREXAMPLE_SEARCH -&gt; EnumSet.of(</span>
+                ResourceKind.WALL_CLOCK_MILLIS,
+                ResourceKind.COUNTEREXAMPLE_ATTEMPTS);
+<span class="fc" id="L221">            case PROJECT_NOVELTY -&gt; EnumSet.of(</span>
+                ResourceKind.WALL_CLOCK_MILLIS,
+                ResourceKind.NOVELTY_COMPARISONS);
+<span class="fc" id="L224">            case PROOF -&gt; EnumSet.of(</span>
+                ResourceKind.WALL_CLOCK_MILLIS,
+                ResourceKind.PROOF_ATTEMPTS);
+<span class="fc" id="L227">            case LIFECYCLE_HANDOFF -&gt; EnumSet.of(</span>
+                ResourceKind.WALL_CLOCK_MILLIS,
+                ResourceKind.LIFECYCLE_HANDOFFS);
+        };
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (!allowed.containsAll(budget.resources().keySet())) {</span>
+<span class="fc" id="L232">            EnumSet&lt;ResourceKind&gt; invalid = EnumSet.copyOf(budget.resources().keySet());</span>
+<span class="fc" id="L233">            invalid.removeAll(allowed);</span>
+<span class="fc" id="L234">            throw new IllegalArgumentException(</span>
+                &quot;resources assigned to the wrong v2 stage &quot; + stage + &quot;: &quot; + invalid);
+        }
+<span class="fc" id="L237">        boolean hasDomainWork = budget.resources().entrySet().stream()</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            .anyMatch(entry -&gt; entry.getKey() != ResourceKind.WALL_CLOCK_MILLIS</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">                &amp;&amp; entry.getValue() &gt; 0L);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (!hasDomainWork) {</span>
+<span class="fc" id="L241">            throw new IllegalArgumentException(</span>
+                &quot;every v2 stage requires configured non-time domain work: &quot; + stage);
+        }
+<span class="fc" id="L244">    }</span>
+
+    private static List&lt;String&gt; sortedText(List&lt;String&gt; values, String name) {
+<span class="fc" id="L247">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L248" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L249">            throw new IllegalArgumentException(name + &quot; must contain non-blank values&quot;);</span>
+        }
+<span class="fc" id="L251">        return values.stream().distinct().sorted().toList();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L255" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L256">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L258">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L261" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L262">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L264">    }</span>
+
+<span class="fc" id="L266">    public enum EvidenceStage {</span>
+<span class="fc" id="L267">        GENERATION,</span>
+<span class="fc" id="L268">        CANDIDATE_FORMATION,</span>
+<span class="fc" id="L269">        VALIDATION,</span>
+<span class="fc" id="L270">        COUNTEREXAMPLE_SEARCH,</span>
+<span class="fc" id="L271">        PROJECT_NOVELTY,</span>
+<span class="fc" id="L272">        PROOF,</span>
+<span class="fc" id="L273">        LIFECYCLE_HANDOFF</span>
+    }
+
+<span class="fc" id="L276">    public enum ResourceKind {</span>
+<span class="fc" id="L277">        WALL_CLOCK_MILLIS,</span>
+<span class="fc" id="L278">        GENERATED_STATES,</span>
+<span class="fc" id="L279">        EXPLORED_STATES,</span>
+<span class="fc" id="L280">        OBSERVATIONS,</span>
+<span class="fc" id="L281">        MINING_BATCHES,</span>
+<span class="fc" id="L282">        CANDIDATES,</span>
+<span class="fc" id="L283">        VALIDATION_CHECKS,</span>
+<span class="fc" id="L284">        COUNTEREXAMPLE_ATTEMPTS,</span>
+<span class="fc" id="L285">        NOVELTY_COMPARISONS,</span>
+<span class="fc" id="L286">        PROOF_ATTEMPTS,</span>
+<span class="fc" id="L287">        LIFECYCLE_HANDOFFS</span>
+    }
+
+    public record StageBudget(Map&lt;ResourceKind, Long&gt; resources) {
+<span class="fc" id="L291">        public StageBudget {</span>
+<span class="fc" id="L292">            Objects.requireNonNull(resources, &quot;resources&quot;);</span>
+<span class="fc" id="L293">            EnumMap&lt;ResourceKind, Long&gt; ordered = new EnumMap&lt;&gt;(ResourceKind.class);</span>
+<span class="fc" id="L294">            resources.forEach((resource, amount) -&gt; {</span>
+<span class="fc" id="L295">                Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L296" title="2 of 4 branches missed.">                if (amount == null || amount &lt; 0L) {</span>
+<span class="nc" id="L297">                    throw new IllegalArgumentException(</span>
+                        &quot;configured v2 resource amounts must be non-negative&quot;);
+                }
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                if (amount &gt; 0L) {</span>
+<span class="fc" id="L301">                    ordered.put(resource, amount);</span>
+                }
+<span class="fc" id="L303">            });</span>
+<span class="fc" id="L304">            resources = Collections.unmodifiableMap(ordered);</span>
+<span class="fc" id="L305">        }</span>
+
+        public long configured(ResourceKind resource) {
+<span class="fc" id="L308">            return resources.getOrDefault(resource, 0L);</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L312">            return resources.entrySet().stream()</span>
+<span class="fc" id="L313">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L314">                .map(entry -&gt; entry.getKey().name() + '=' + entry.getValue())</span>
+<span class="fc" id="L315">                .toList()</span>
+<span class="fc" id="L316">                .toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

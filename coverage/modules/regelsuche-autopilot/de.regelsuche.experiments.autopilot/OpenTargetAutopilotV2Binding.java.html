@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenTargetAutopilotV2Binding.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">OpenTargetAutopilotV2Binding.java</span></div><h1>OpenTargetAutopilotV2Binding.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.AggregateDecision;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.AggregateReceipt;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.CandidateDraft;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.RejectedCluster;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.OpenTargetConjectureEvidence;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Production binding between canonical open-target mining evidence and the
+ * Autopilot v2 aggregate receipt/DAG contracts.
+ */
+public final class OpenTargetAutopilotV2Binding {
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-open-target-mining-binding/v2&quot;;
+
+    private OpenTargetAutopilotV2Binding() {
+    }
+
+    public static BindingResult completeCandidateFormation(
+        AutonomousResearchBriefV2 brief,
+        AggregateDecision decision,
+        OpenTargetConjectureEvidence evidence,
+        Map&lt;ResourceKind, Long&gt; executedResources,
+        Map&lt;ResourceKind, Long&gt; skippedResources
+    ) {
+<span class="fc" id="L35">        Objects.requireNonNull(brief, &quot;brief&quot;);</span>
+<span class="fc" id="L36">        Objects.requireNonNull(decision, &quot;decision&quot;);</span>
+<span class="fc" id="L37">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L38">        validateBindingInputs(brief, decision, evidence);</span>
+
+<span class="fc" id="L40">        String miningEvidenceHash = evidence.contentHash();</span>
+<span class="fc" id="L41">        List&lt;CandidateDraft&gt; candidates = evidence.report().conjectures().stream()</span>
+<span class="fc" id="L42">            .map(conjecture -&gt; new CandidateDraft(</span>
+<span class="fc" id="L43">                conjecture.conjectureId(),</span>
+<span class="fc" id="L44">                candidateEvidenceHash(miningEvidenceHash, conjecture),</span>
+<span class="fc" id="L45">                conjecture.supportingObservationIds()))</span>
+<span class="fc" id="L46">            .toList();</span>
+<span class="fc" id="L47">        List&lt;RejectedCluster&gt; rejectedClusters = evidence.report().rejectedClusters().stream()</span>
+<span class="fc" id="L48">            .map(cluster -&gt; RejectedCluster.create(</span>
+<span class="fc" id="L49">                AutonomousResearchBrief.hash(</span>
+                    miningEvidenceHash
+<span class="fc" id="L51">                        + &quot;|rejected=&quot; + cluster.clusterSignature()</span>
+<span class="fc" id="L52">                        + &quot;|support=&quot; + cluster.observationIds()</span>
+<span class="fc" id="L53">                        + &quot;|count=&quot; + cluster.supportCount()</span>
+<span class="fc" id="L54">                        + &quot;|alpha=&quot; + cluster.distinctAlphaSupport()</span>
+<span class="fc" id="L55">                        + &quot;|reason=&quot; + cluster.reason()),</span>
+<span class="fc" id="L56">                cluster.reason(),</span>
+<span class="fc" id="L57">                cluster.observationIds()))</span>
+<span class="fc" id="L58">            .toList();</span>
+
+<span class="fc" id="L60">        AggregateReceipt receipt = AutonomousEvidenceDagV2.completeCandidateFormation(</span>
+            decision,
+            miningEvidenceHash,
+            candidates,
+            rejectedClusters,
+            executedResources,
+            skippedResources);
+<span class="fc" id="L67">        String contentHash = AutonomousResearchBrief.hash(</span>
+            SCHEMA
+<span class="fc" id="L69">                + &quot;\ncampaign=&quot; + evidence.context().campaignId()</span>
+<span class="fc" id="L70">                + &quot;\ninventory=&quot; + evidence.context().ruleInventoryHash()</span>
+                + &quot;\nminingEvidence=&quot; + miningEvidenceHash
+<span class="fc" id="L72">                + &quot;\ndecision=&quot; + decision.contentHash()</span>
+<span class="fc" id="L73">                + &quot;\nreceipt=&quot; + receipt.contentHash()</span>
+<span class="fc" id="L74">                + &quot;\nconjectures=&quot; + candidates.stream()</span>
+<span class="fc" id="L75">                    .map(CandidateDraft::conjectureId).toList()</span>
+<span class="fc" id="L76">                + &quot;\nrejected=&quot; + rejectedClusters.stream()</span>
+<span class="fc" id="L77">                    .map(RejectedCluster::contentHash).toList());</span>
+<span class="fc" id="L78">        return new BindingResult(</span>
+            SCHEMA,
+<span class="fc" id="L80">            evidence.context().campaignId(),</span>
+<span class="fc" id="L81">            evidence.context().ruleInventoryHash(),</span>
+            miningEvidenceHash,
+<span class="fc" id="L83">            decision.contentHash(),</span>
+            receipt,
+<span class="fc" id="L85">            evidence.report().conjectures().size(),</span>
+<span class="fc" id="L86">            evidence.report().rejectedClusters().size(),</span>
+            false,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    private static void validateBindingInputs(
+        AutonomousResearchBriefV2 brief,
+        AggregateDecision decision,
+        OpenTargetConjectureEvidence evidence
+    ) {
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (!brief.contentHash().equals(decision.briefHash())) {</span>
+<span class="nc" id="L100">            throw new IllegalArgumentException(</span>
+                &quot;aggregate decision belongs to another v2 research brief&quot;);
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!brief.inventoryHash().equals(evidence.context().ruleInventoryHash())) {</span>
+<span class="fc" id="L104">            throw new IllegalArgumentException(</span>
+                &quot;open-target mining inventory does not match the v2 brief&quot;);
+        }
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (evidence.report().targetProvided()) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(</span>
+                &quot;Autopilot v2 candidate formation accepts only target-free mining evidence&quot;);
+        }
+<span class="fc" id="L111">        Set&lt;String&gt; plannedObservations = decision.inputs().stream()</span>
+<span class="fc" id="L112">            .map(AutonomousEvidenceDagV2.ObservationBranch::observationId)</span>
+<span class="fc" id="L113">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L114">        Set&lt;String&gt; minedObservations = evidence.context().seeds().stream()</span>
+<span class="fc" id="L115">            .map(OpenTargetConjectureEvidence.SeedProvenance::observationId)</span>
+<span class="fc" id="L116">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (!plannedObservations.equals(minedObservations)) {</span>
+<span class="fc" id="L118">            throw new IllegalArgumentException(</span>
+                &quot;aggregate decision observations do not match canonical mining evidence: &quot;
+                    + plannedObservations + &quot; != &quot; + minedObservations);
+        }
+<span class="fc" id="L122">    }</span>
+
+    private static String candidateEvidenceHash(
+        String miningEvidenceHash,
+        OpenTargetConjecture conjecture
+    ) {
+<span class="fc" id="L128">        return AutonomousResearchBrief.hash(</span>
+            miningEvidenceHash
+<span class="fc" id="L130">                + &quot;|conjecture=&quot; + conjecture.conjectureId()</span>
+<span class="fc" id="L131">                + &quot;|patterns=&quot; + conjecture.leftPattern() + &quot;-&gt;&quot; + conjecture.rightPattern()</span>
+<span class="fc" id="L132">                + &quot;|support=&quot; + conjecture.supportingObservationIds()</span>
+<span class="fc" id="L133">                + &quot;|alpha=&quot; + conjecture.distinctAlphaSupport()</span>
+<span class="fc" id="L134">                + &quot;|families=&quot; + conjecture.postHocFamilies());</span>
+    }
+
+    public record BindingResult(
+        String schema,
+        String campaignId,
+        String ruleInventoryHash,
+        String miningEvidenceHash,
+        String decisionHash,
+        AggregateReceipt receipt,
+        int conjectureCount,
+        int rejectedClusterCount,
+        boolean targetProvided,
+        boolean bindingIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L152">        public BindingResult {</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L154">                throw new IllegalArgumentException(&quot;unsupported production binding schema&quot;);</span>
+            }
+<span class="fc" id="L156">            requireText(campaignId, &quot;campaignId&quot;);</span>
+<span class="fc" id="L157">            requireSha256(ruleInventoryHash, &quot;ruleInventoryHash&quot;);</span>
+<span class="fc" id="L158">            requireSha256(miningEvidenceHash, &quot;miningEvidenceHash&quot;);</span>
+<span class="fc" id="L159">            requireSha256(decisionHash, &quot;decisionHash&quot;);</span>
+<span class="fc" id="L160">            receipt = Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (!decisionHash.equals(receipt.decisionHash())) {</span>
+<span class="nc" id="L162">                throw new IllegalArgumentException(</span>
+                    &quot;production binding receipt belongs to another aggregate decision&quot;);
+            }
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            if (!miningEvidenceHash.equals(receipt.miningEvidenceHash())) {</span>
+<span class="nc" id="L166">                throw new IllegalArgumentException(</span>
+                    &quot;production binding receipt does not retain the mining evidence hash&quot;);
+            }
+<span class="pc bpc" id="L169" title="2 of 4 branches missed.">            if (conjectureCount &lt; 0 || rejectedClusterCount &lt; 0) {</span>
+<span class="nc" id="L170">                throw new IllegalArgumentException(&quot;binding counts must be non-negative&quot;);</span>
+            }
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (targetProvided) {</span>
+<span class="nc" id="L173">                throw new IllegalArgumentException(</span>
+                    &quot;production Autopilot binding must remain target-free&quot;);
+            }
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (bindingIsMathematicalEvidence) {</span>
+<span class="nc" id="L177">                throw new IllegalArgumentException(</span>
+                    &quot;the production binding is lineage metadata, not mathematical evidence&quot;);
+            }
+<span class="fc" id="L180">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L181">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L182">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L183">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L186">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L187">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L188">                .property(&quot;campaignId&quot;, campaignId)</span>
+<span class="fc" id="L189">                .property(&quot;ruleInventoryHash&quot;, ruleInventoryHash)</span>
+<span class="fc" id="L190">                .property(&quot;miningEvidenceHash&quot;, miningEvidenceHash)</span>
+<span class="fc" id="L191">                .property(&quot;decisionHash&quot;, decisionHash)</span>
+<span class="fc" id="L192">                .property(&quot;receiptHash&quot;, receipt.contentHash())</span>
+<span class="fc" id="L193">                .property(&quot;conjectureCount&quot;, conjectureCount)</span>
+<span class="fc" id="L194">                .property(&quot;rejectedClusterCount&quot;, rejectedClusterCount)</span>
+<span class="fc" id="L195">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L196">                .property(&quot;bindingIsMathematicalEvidence&quot;, bindingIsMathematicalEvidence)</span>
+<span class="fc" id="L197">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L198">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L199">                .stringArray(&quot;outputBranchIds&quot;, receipt.outputs().stream()</span>
+<span class="fc" id="L200">                    .map(AutonomousEvidenceDagV2.CandidateOutput::outputBranchId)</span>
+<span class="fc" id="L201">                    .toList())</span>
+<span class="fc" id="L202">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L203">                .endObject()</span>
+<span class="fc" id="L204">                .toString();</span>
+        }
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L209" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L210">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L212">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L216">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L218">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L222">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L224">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
