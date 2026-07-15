@@ -29,12 +29,25 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Generate deterministic planning and execution evidence
+      - name: Generate deterministic planning, execution and v2 DAG evidence
+        shell: bash
         run: |
+          set -o pipefail
           ./gradlew :regelsuche-experiments:test \
             --tests de.regelsuche.experiments.autopilot.DeterministicCampaignPlannerTest \
             --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionAdapterTest \
-            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionReceiptContractTest
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionReceiptContractTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignV1CompatibilityTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2Test \
+            --tests de.regelsuche.experiments.autopilot.AutonomousAggregateDecisionV2Test \
+            --tests de.regelsuche.experiments.autopilot.AutonomousAggregateReceiptV2Test \
+            --tests de.regelsuche.experiments.autopilot.AutonomousEvidenceDagSnapshotV2Test \
+            2>&1 | tee autopilot-build.log
+          ./gradlew :regelsuche-autopilot:test \
+            --tests de.regelsuche.experiments.autopilot.OpenTargetAutopilotV2BindingTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2Test \
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2Test \
+            2>&1 | tee -a autopilot-build.log
 
       - name: Require evidence artifacts
         run: |
@@ -45,13 +58,32 @@ jobs:
           test -s regelsuche-experiments/build/reports/autopilot-execution/updated-ledger.json
           test -s regelsuche-experiments/build/reports/autopilot-execution/next-plan.json
           test -s regelsuche-experiments/build/reports/autopilot-execution/round.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/v1-compatibility.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/brief-v2.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/aggregate-decision.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/aggregate-receipt.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/dag.json
+          test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/production-binding.json
+          test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/lifecycle-decision.json
+          test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/plan-v2.json
+          test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/execution-v2.json
+          test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/lineage-v2.json
+          test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/round-v2.json
+          test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/next-plan-v2.json
 
-      - name: Upload planning and execution evidence
+      - name: Upload Autopilot evidence and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: autopilot-evidence
           path: |
+            autopilot-build.log
+            regelsuche-experiments/build/test-results/**
+            regelsuche-experiments/build/reports/tests/**
             regelsuche-experiments/build/reports/autopilot-planner/**
             regelsuche-experiments/build/reports/autopilot-execution/**
+            regelsuche-experiments/build/reports/autopilot-v2-dag/**
+            regelsuche-autopilot/build/test-results/**
+            regelsuche-autopilot/build/reports/tests/**
+            regelsuche-autopilot/build/reports/autopilot-v2-dag/**
           if-no-files-found: warn

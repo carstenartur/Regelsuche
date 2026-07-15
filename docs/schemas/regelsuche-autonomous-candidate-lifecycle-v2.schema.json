@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-candidate-lifecycle/v2",
+  "title": "Regelsuche autonomous candidate lifecycle v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "candidateBranchId",
+    "candidateId",
+    "noveltyStatus",
+    "proofDisposition",
+    "proofEvidenceHash",
+    "lifecycleHandoffDisposition",
+    "lifecycleCandidateId",
+    "outcome",
+    "terminal",
+    "promotionAttempted",
+    "publicationAttempted",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "blockers",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-candidate-lifecycle/v2" },
+    "candidateBranchId": { "$ref": "#/$defs/nonBlank" },
+    "candidateId": { "$ref": "#/$defs/nonBlank" },
+    "noveltyStatus": {
+      "enum": [
+        "NOVEL_WITHIN_PROJECT",
+        "EXACT_DUPLICATE",
+        "ALPHA_EQUIVALENT_DUPLICATE",
+        "INCONCLUSIVE_UNPARSEABLE"
+      ]
+    },
+    "proofDisposition": { "$ref": "#/$defs/stageDisposition" },
+    "proofEvidenceHash": {
+      "oneOf": [
+        { "const": "" },
+        { "$ref": "#/$defs/sha256" }
+      ]
+    },
+    "lifecycleHandoffDisposition": { "$ref": "#/$defs/stageDisposition" },
+    "lifecycleCandidateId": { "type": "string" },
+    "outcome": {
+      "enum": ["COMPLETED", "DUPLICATE", "DISPROVED", "INCOMPLETE"]
+    },
+    "terminal": { "type": "boolean" },
+    "promotionAttempted": { "const": false },
+    "publicationAttempted": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "blockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "stageDisposition": {
+      "enum": [
+        "COMPLETED",
+        "COMPLETED_TERMINAL",
+        "COMPLETED_INCONCLUSIVE",
+        "NOT_RUN",
+        "NOT_RUN_BLOCKED",
+        "NOT_RUN_TERMINAL"
+      ]
+    }
+  }
+}

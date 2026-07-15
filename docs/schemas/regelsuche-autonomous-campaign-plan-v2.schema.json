@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-campaign-plan/v2",
+  "title": "Regelsuche autonomous campaign plan v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "briefHash",
+    "decisions",
+    "plannerDecisionIsMathematicalEvidence",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-campaign-plan/v2" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["decisionId", "decisionHash", "stage", "scope", "inputBranchIds"],
+        "properties": {
+          "decisionId": { "$ref": "#/$defs/nonBlank" },
+          "decisionHash": { "$ref": "#/$defs/sha256" },
+          "stage": { "const": "CANDIDATE_FORMATION" },
+          "scope": { "const": "AGGREGATE" },
+          "inputBranchIds": {
+            "type": "array",
+            "minItems": 2,
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/nonBlank" }
+          }
+        }
+      }
+    },
+    "plannerDecisionIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

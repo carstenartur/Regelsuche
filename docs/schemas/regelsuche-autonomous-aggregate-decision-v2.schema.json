@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-aggregate-decision/v2",
+  "title": "Regelsuche autonomous aggregate candidate-formation decision v2",
+  "type": "object",
+  "required": [
+    "schema", "decisionId", "briefHash", "stage", "scope",
+    "minimumInputs", "minimumDistinctFamilies", "minimumDistinctEvidence",
+    "outputNamespace", "inputs", "plannedResources", "reason",
+    "decisionIsMathematicalEvidence", "promotionStatus",
+    "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-aggregate-decision/v2" },
+    "decisionId": { "$ref": "#/$defs/nonBlank" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "stage": { "const": "CANDIDATE_FORMATION" },
+    "scope": { "const": "AGGREGATE" },
+    "minimumInputs": { "type": "integer", "minimum": 2 },
+    "minimumDistinctFamilies": { "type": "integer", "minimum": 2 },
+    "minimumDistinctEvidence": { "type": "integer", "minimum": 2 },
+    "outputNamespace": { "$ref": "#/$defs/nonBlank" },
+    "inputs": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "plannedResources": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/plannedResource" },
+      "contains": {
+        "properties": { "resource": { "const": "MINING_BATCHES" } },
+        "required": ["resource"]
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": { "resource": { "const": "CANDIDATES" } },
+            "required": ["resource"]
+          }
+        }
+      ]
+    },
+    "reason": { "$ref": "#/$defs/nonBlank" },
+    "decisionIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "observation": {
+      "type": "object",
+      "required": [
+        "branchId", "familyId", "observationId", "snapshotHash",
+        "evidenceHash", "goalStatus", "contentHash"
+      ],
+      "properties": {
+        "branchId": { "$ref": "#/$defs/nonBlank" },
+        "familyId": { "$ref": "#/$defs/nonBlank" },
+        "observationId": { "$ref": "#/$defs/nonBlank" },
+        "snapshotHash": { "$ref": "#/$defs/sha256" },
+        "evidenceHash": { "$ref": "#/$defs/sha256" },
+        "goalStatus": { "const": "UNTARGETED" },
+        "contentHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "plannedResource": {
+      "type": "object",
+      "required": ["resource", "amount"],
+      "properties": {
+        "resource": {
+          "enum": ["WALL_CLOCK_MILLIS", "MINING_BATCHES", "CANDIDATES"]
+        },
+        "amount": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
