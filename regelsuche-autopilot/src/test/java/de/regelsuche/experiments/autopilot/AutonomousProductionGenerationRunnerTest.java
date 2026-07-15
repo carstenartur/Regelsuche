@@ -126,7 +126,7 @@ class AutonomousProductionGenerationRunnerTest {
             .map(seed -> new SeedExpression(
                 seed.id(),
                 seed.expression(),
-                PinnedAutonomousProductionCampaign.LEFT_FACTOR_GENERATOR,
+                PinnedAutonomousProductionCampaign.GAP_TWO_FACTOR_GENERATOR,
                 seed.category(),
                 seed.tags(),
                 seed.assumptions()))

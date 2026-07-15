@@ -30,6 +30,15 @@ tasks.register('runProductionGeneration', JavaExec) {
         .get().asFile.absolutePath
 }
 
+tasks.register('runProductionMining', JavaExec) {
+    group = 'verification'
+    description = 'Runs pinned target-free generation and aggregate production mining.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionMiningMain'
+    args layout.buildDirectory.dir('reports/autopilot-production-mining')
+        .get().asFile.absolutePath
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')

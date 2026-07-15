@@ -67,7 +67,9 @@ final class NormalizedNode {
         }
         List<NormalizedNode> normalized = flattened.stream()
             .filter(term -> term.kind != Kind.NUMBER || term.number != 0)
-            .sorted(Comparator.comparing(NormalizedNode::sortKey))
+            .sorted(Comparator.comparing(
+                NormalizedNode::sortKey,
+                NormalizedNode::compareNaturalText))
             .toList();
         if (normalized.isEmpty()) {
             return number(0);
@@ -98,7 +100,9 @@ final class NormalizedNode {
         }
         List<NormalizedNode> normalized = flattened.stream()
             .filter(factor -> factor.kind != Kind.NUMBER || factor.number != 1 || flattened.size() == 1)
-            .sorted(Comparator.comparing(NormalizedNode::factorSortKey))
+            .sorted(Comparator.comparing(
+                NormalizedNode::factorSortKey,
+                NormalizedNode::compareNaturalText))
             .toList();
         if (normalized.size() == 1) {
             return normalized.getFirst();
@@ -239,6 +243,76 @@ final class NormalizedNode {
 
     private String factorSortKey() {
         return kind == Kind.NUMBER ? "0:" + Math.abs(number) : "1:" + canonicalString();
+    }
+
+    /**
+     * Compares embedded decimal runs by numeric magnitude while retaining the
+     * existing textual order for all non-numeric characters. This prevents
+     * canonical commutative ordering from placing 10*x before 8*x merely
+     * because '1' sorts before '8'.
+     */
+    private static int compareNaturalText(String left, String right) {
+        int leftIndex = 0;
+        int rightIndex = 0;
+        while (leftIndex < left.length() && rightIndex < right.length()) {
+            char leftChar = left.charAt(leftIndex);
+            char rightChar = right.charAt(rightIndex);
+            if (Character.isDigit(leftChar) && Character.isDigit(rightChar)) {
+                int leftEnd = digitEnd(left, leftIndex);
+                int rightEnd = digitEnd(right, rightIndex);
+                int leftSignificant = significantDigitStart(left, leftIndex, leftEnd);
+                int rightSignificant = significantDigitStart(right, rightIndex, rightEnd);
+                int leftDigits = leftEnd - leftSignificant;
+                int rightDigits = rightEnd - rightSignificant;
+                int lengthComparison = Integer.compare(leftDigits, rightDigits);
+                if (lengthComparison != 0) {
+                    return lengthComparison;
+                }
+                int digitsComparison = left.regionMatches(
+                    leftSignificant,
+                    right,
+                    rightSignificant,
+                    leftDigits)
+                    ? 0
+                    : left.substring(leftSignificant, leftEnd)
+                        .compareTo(right.substring(rightSignificant, rightEnd));
+                if (digitsComparison != 0) {
+                    return digitsComparison;
+                }
+                int rawLengthComparison = Integer.compare(
+                    leftEnd - leftIndex,
+                    rightEnd - rightIndex);
+                if (rawLengthComparison != 0) {
+                    return rawLengthComparison;
+                }
+                leftIndex = leftEnd;
+                rightIndex = rightEnd;
+                continue;
+            }
+            int characterComparison = Character.compare(leftChar, rightChar);
+            if (characterComparison != 0) {
+                return characterComparison;
+            }
+            leftIndex++;
+            rightIndex++;
+        }
+        return Integer.compare(left.length() - leftIndex, right.length() - rightIndex);
+    }
+
+    private static int digitEnd(String value, int start) {
+        int index = start;
+        while (index < value.length() && Character.isDigit(value.charAt(index))) {
+            index++;
+        }
+        return index;
+    }
+
+    private static int significantDigitStart(String value, int start, int end) {
+        int index = start;
+        while (index + 1 < end && value.charAt(index) == '0') {
+            index++;
+        }
+        return index;
     }
 
     @Override

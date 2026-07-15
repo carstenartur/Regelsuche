@@ -116,11 +116,11 @@ Ein Receipt ohne retained Decision oder eine Decision ohne retained Observation 
 
 `PinnedAutonomousProductionCampaign` definiert den ersten tatsächlich ausgeführten Teil der produktiven Mehr-Runden-Campaign. Der Brief enthält kein Target und keine erwartete Antwort. Er bindet das aktive Regel-Inventar der `AstRewriteTransformationEngine`, die Best-First-Suche, `ExpressionScorer`, `ExpressionCanonicalizer` und die Suchheuristik.
 
-Zwei unabhängig bezeichnete Generatorfamilien liefern zwölf deterministische Polynomial-Seeds:
+Zwei unabhängig parametrisierte Generatorfamilien liefern zwölf deterministische Polynomial-Seeds. Beide verwenden die für den Generalizer sichtbare Relation `B = A + 2`, beziehen ihre Parameter aber aus unterschiedlichen Quellen: einer allgemeinen Abstand-zwei-Folge und einer Folge von Zwillingsprimzahlen. Dadurch kann der vorhandene Miner eine gemeinsame Regel abstrahieren, ohne die Familienbezeichnung zur Clusterbildung zu verwenden:
 
 ```text
-factor-common-left-generator/v1
-factor-common-right-generator/v1
+factor-common-gap-two-generator/v1
+factor-common-twin-prime-generator/v1
 ```
 
 `AutonomousProductionGenerationRunner` führt jeden Seed über die vorhandenen Produktionskomponenten aus:
@@ -136,16 +136,39 @@ DeterministicDiscoveryExperimentRunner
 
 Jede Observation hält Seed, Generator, alle erkundeten Zustände, gewichtete Scores, Regelpfade, Äquivalenzflags, Annahmen, Suchmetriken sowie getrennte Snapshot-, Evidence- und Branch-Hashes fest. Diese Daten reichen für die reproduzierbare Candidate Formation aus, ohne auf nur im ursprünglichen JVM-Lauf vorhandene `SearchState`-Objekte angewiesen zu sein.
 
-Der reproduzierbare Lauf lautet:
+Der reine Generationslauf lautet:
 
 ```bash
 ./gradlew :regelsuche-autopilot:runProductionGeneration
 ```
 
-Die Artefakte liegen anschließend unter:
+## Produktive Aggregate Candidate Formation
+
+`AutonomousProductionMiningRunner` setzt die unveränderlichen Generationsergebnisse direkt in den vorhandenen `OpenTargetConjectureMiner` ein. Es gibt keinen zweiten Miner und keinen Fixture-Pfad. Vor der Auswertung werden die vom Miner benötigten `SearchState`-Felder aus den persistierten `StateSnapshot`s rekonstruiert; derselbe Batch wird zusätzlich aus den live erzeugten Suchresultaten ausgewertet. Abweichende Reports brechen den Lauf ab. Damit ist maschinell geprüft, dass Candidate Formation aus der veröffentlichten Observation-Evidence reproduzierbar ist.
+
+Die Familienbezeichnungen sind Provenienz. Der Miner verwendet sie nicht zur Clusterbildung; er clustert ausschließlich nach den beobachteten unabhängigen Regelpfaden und Expression-Fingerprints.
+
+Ein Lauf führt zwei vorab definierte Aggregate Decisions aus:
+
+1. Der vollständige Batch enthält zwölf `UNTARGETED` Observations aus beiden Familien und muss mindestens einen parameterisierten Kandidaten mit exakter Zwei-Familien-Lineage erzeugen.
+2. Der Rejection-Batch enthält ein familienübergreifendes Seed-Paar mit identischen Konstanten und nur einer Alpha-Umbenennung. Er muss null Kandidaten und den Reject-Grund `alpha-distinct-support<2` festhalten.
+
+Für beide Batches entstehen kanonische Mining-Evidence, Binding, Aggregate Receipt, Execution und Lineage. Der übergeordnete Candidate-Formation-Receipt bilanziert für `MINING_BATCHES` und `CANDIDATES`:
 
 ```text
-regelsuche-autopilot/build/reports/autopilot-production-generation/
+configured = executed + skipped + remaining
+```
+
+Der reproduzierbare Generation-plus-Mining-Lauf lautet:
+
+```bash
+./gradlew :regelsuche-autopilot:runProductionMining
+```
+
+Die Generation-, Mining-, Reject-, Lineage-, DAG- und Receipt-Artefakte liegen anschließend unter:
+
+```text
+regelsuche-autopilot/build/reports/autopilot-production-mining/
 ```
 
 ## Modulgrenze
@@ -159,7 +182,7 @@ Die generischen Verträge für Brief, unveränderliche Observation Branches, Agg
 Der Workflow `Autopilot Evidence` erzeugt und archiviert ausschließlich aktuelle Artefakte:
 
 - aus `:regelsuche-experiments`: `brief-v2.json`, `aggregate-decision.json`, `aggregate-receipt.json` und `dag.json`,
-- aus `:regelsuche-autopilot`: `production-binding.json`, `lifecycle-decision.json`, `plan-v2.json`, `execution-v2.json`, `lineage-v2.json`, `round-v2.json` und `next-plan-v2.json`,
-- aus der produktiven Generation: Brief, Seed-Katalog, Observations, Generation Receipt, Discovery Report und Run Manifest.
+- aus `:regelsuche-autopilot`: die bestehenden Binding-, Lifecycle-, Plan-, Execution-, Lineage- und Round-Charakterisierungen,
+- aus dem produktiven Lauf: Research Brief, Seed-Katalog, unveränderliche Observations, Generation Receipt und Manifest, beide Aggregate Decisions, beide Mining-Evidence-Sätze, Bindings, Receipts, Executions und Lineages sowie Candidate-Formation-Receipt, Evidence DAG und Production-Mining-Manifest.
 
 Promotion und Public Evidence bleiben in diesen Planungs- und Ausführungsartefakten `NOT_EVALUATED`.

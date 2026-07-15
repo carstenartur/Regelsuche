@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-production-mining/v2",
+  "title": "Regelsuche autonomous production mining manifest v2",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "generationRunHash", "planHash",
+    "fullDecisionHash", "fullMiningEvidenceHash", "fullBindingHash",
+    "fullReceiptHash", "fullExecutionHash", "fullLineageHash",
+    "rejectionDecisionHash", "rejectionMiningEvidenceHash",
+    "rejectionBindingHash", "rejectionReceiptHash",
+    "rejectionExecutionHash", "rejectionLineageHash",
+    "candidateFormationReceiptHash", "evidenceDagHash",
+    "candidateCount", "rejectedClusterCount", "targetProvided",
+    "miningRunIsMathematicalEvidence", "promotionStatus",
+    "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-production-mining/v2" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "generationRunHash": { "$ref": "#/$defs/sha256" },
+    "planHash": { "$ref": "#/$defs/sha256" },
+    "fullDecisionHash": { "$ref": "#/$defs/sha256" },
+    "fullMiningEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "fullBindingHash": { "$ref": "#/$defs/sha256" },
+    "fullReceiptHash": { "$ref": "#/$defs/sha256" },
+    "fullExecutionHash": { "$ref": "#/$defs/sha256" },
+    "fullLineageHash": { "$ref": "#/$defs/sha256" },
+    "rejectionDecisionHash": { "$ref": "#/$defs/sha256" },
+    "rejectionMiningEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "rejectionBindingHash": { "$ref": "#/$defs/sha256" },
+    "rejectionReceiptHash": { "$ref": "#/$defs/sha256" },
+    "rejectionExecutionHash": { "$ref": "#/$defs/sha256" },
+    "rejectionLineageHash": { "$ref": "#/$defs/sha256" },
+    "candidateFormationReceiptHash": { "$ref": "#/$defs/sha256" },
+    "evidenceDagHash": { "$ref": "#/$defs/sha256" },
+    "candidateCount": { "type": "integer", "minimum": 1 },
+    "rejectedClusterCount": { "type": "integer", "minimum": 1 },
+    "targetProvided": { "const": false },
+    "miningRunIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
