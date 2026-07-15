@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-stage-resource-ledger/v2",
+  "title": "Regelsuche autonomous downstream stage resource ledger v2",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "receipts", "ledgerIsMathematicalEvidence",
+    "externalNoveltyEvaluated", "promotionStatus", "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-stage-resource-ledger/v2" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "receipts": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": { "$ref": "#/$defs/receipt" },
+      "allOf": [
+        { "contains": { "properties": { "stage": { "const": "VALIDATION" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "COUNTEREXAMPLE_SEARCH" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "PROJECT_NOVELTY" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "PROOF" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "LIFECYCLE_HANDOFF" } }, "required": ["stage"] } }
+      ]
+    },
+    "ledgerIsMathematicalEvidence": { "const": false },
+    "externalNoveltyEvaluated": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "receipt": {
+      "type": "object",
+      "required": [
+        "stage", "resource", "configured", "executed", "skipped",
+        "remaining", "disposition", "evidenceHash", "contentHash"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "VALIDATION", "COUNTEREXAMPLE_SEARCH", "PROJECT_NOVELTY",
+            "PROOF", "LIFECYCLE_HANDOFF"
+          ]
+        },
+        "resource": {
+          "enum": [
+            "VALIDATION_CHECKS", "COUNTEREXAMPLE_ATTEMPTS",
+            "NOVELTY_COMPARISONS", "PROOF_ATTEMPTS", "LIFECYCLE_HANDOFFS"
+          ]
+        },
+        "configured": { "type": "integer", "minimum": 1 },
+        "executed": { "type": "integer", "minimum": 1 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "remaining": { "type": "integer", "minimum": 0 },
+        "disposition": { "const": "COMPLETED" },
+        "evidenceHash": { "$ref": "#/$defs/sha256" },
+        "contentHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
