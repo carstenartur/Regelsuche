@@ -56,15 +56,21 @@
           "items": {
             "type": "object",
             "required": [
-              "expression", "depth", "canonicalHash", "path",
-              "appliedRuleIds", "assumptions"
+              "expression", "depth", "canonicalHash", "scoreWeightedTotal",
+              "path", "appliedRuleIds", "equivalencePreservingFlags",
+              "assumptions"
             ],
             "properties": {
               "expression": { "$ref": "#/$defs/nonBlank" },
               "depth": { "type": "integer", "minimum": 0 },
               "canonicalHash": { "$ref": "#/$defs/nonBlank" },
+              "scoreWeightedTotal": { "type": "integer" },
               "path": { "$ref": "#/$defs/strings" },
               "appliedRuleIds": { "$ref": "#/$defs/strings" },
+              "equivalencePreservingFlags": {
+                "type": "array",
+                "items": { "type": "boolean" }
+              },
               "assumptions": { "$ref": "#/$defs/strings" }
             },
             "additionalProperties": false
