@@ -46,7 +46,7 @@ public final class OpenTargetAutopilotV2Binding {
 <span class="fc" id="L46">            .toList();</span>
 <span class="fc" id="L47">        List&lt;RejectedCluster&gt; rejectedClusters = evidence.report().rejectedClusters().stream()</span>
 <span class="fc" id="L48">            .map(cluster -&gt; RejectedCluster.create(</span>
-<span class="fc" id="L49">                AutonomousResearchBrief.hash(</span>
+<span class="fc" id="L49">                AutonomousResearchBriefV2.hash(</span>
                     miningEvidenceHash
 <span class="fc" id="L51">                        + &quot;|rejected=&quot; + cluster.clusterSignature()</span>
 <span class="fc" id="L52">                        + &quot;|support=&quot; + cluster.observationIds()</span>
@@ -64,7 +64,7 @@ public final class OpenTargetAutopilotV2Binding {
             rejectedClusters,
             executedResources,
             skippedResources);
-<span class="fc" id="L67">        String contentHash = AutonomousResearchBrief.hash(</span>
+<span class="fc" id="L67">        String contentHash = AutonomousResearchBriefV2.hash(</span>
             SCHEMA
 <span class="fc" id="L69">                + &quot;\ncampaign=&quot; + evidence.context().campaignId()</span>
 <span class="fc" id="L70">                + &quot;\ninventory=&quot; + evidence.context().ruleInventoryHash()</span>
@@ -125,7 +125,7 @@ public final class OpenTargetAutopilotV2Binding {
         String miningEvidenceHash,
         OpenTargetConjecture conjecture
     ) {
-<span class="fc" id="L128">        return AutonomousResearchBrief.hash(</span>
+<span class="fc" id="L128">        return AutonomousResearchBriefV2.hash(</span>
             miningEvidenceHash
 <span class="fc" id="L130">                + &quot;|conjecture=&quot; + conjecture.conjectureId()</span>
 <span class="fc" id="L131">                + &quot;|patterns=&quot; + conjecture.leftPattern() + &quot;-&gt;&quot; + conjecture.rightPattern()</span>
