@@ -40,6 +40,14 @@ class AutonomousProductionGenerationRunnerTest {
             item.branch().snapshotHash().equals(item.snapshot().snapshotHash())
                 && item.branch().evidenceHash().equals(item.snapshot().evidenceHash())
                 && item.branch().contentHash().equals(item.snapshot().branchHash())));
+        assertTrue(run.observations().stream()
+            .flatMap(item -> item.snapshot().states().stream())
+            .allMatch(state -> state.equivalencePreservingFlags().size()
+                == state.appliedRuleIds().size()));
+        assertTrue(run.observations().stream().allMatch(item ->
+            item.snapshot().states().stream()
+                .filter(state -> state.depth() > 0)
+                .anyMatch(state -> !state.equivalencePreservingFlags().isEmpty())));
 
         assertEquals(12L, run.receipt().executed(ResourceKind.OBSERVATIONS));
         assertTrue(run.receipt().executed(ResourceKind.EXPLORED_STATES) >= 12L);
@@ -55,6 +63,8 @@ class AutonomousProductionGenerationRunnerTest {
             + run.receipt().toCanonicalJson()
             + run.toCanonicalJson();
         assertTrue(combined.contains("\"targetProvided\":false"));
+        assertTrue(combined.contains("\"scoreWeightedTotal\":"));
+        assertTrue(combined.contains("\"equivalencePreservingFlags\":["));
         assertFalse(combined.contains("targetExpression"));
         assertFalse(combined.contains("expectedAnswer"));
 
