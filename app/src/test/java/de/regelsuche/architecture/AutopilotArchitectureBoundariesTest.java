@@ -34,6 +34,20 @@ class AutopilotArchitectureBoundariesTest {
         assertTrue(build.contains("project(':regelsuche-discovery')"));
     }
 
+    @Test
+    void allDockerBuildsIncludeTheAutopilotCompositionModule() throws IOException {
+        for (String dockerfileName : List.of("Dockerfile", "Dockerfile.proof")) {
+            String dockerfile = Files.readString(REPO_ROOT.resolve(dockerfileName));
+            assertTrue(
+                dockerfile.contains(
+                    "COPY regelsuche-autopilot/build.gradle ./regelsuche-autopilot/build.gradle"),
+                () -> dockerfileName + " must copy the Autopilot Gradle build file");
+            assertTrue(
+                dockerfile.contains("COPY regelsuche-autopilot ./regelsuche-autopilot"),
+                () -> dockerfileName + " must copy the Autopilot sources");
+        }
+    }
+
     private static List<String> projectDependencyTokens(String buildFileContent) {
         return buildFileContent.lines()
             .filter(line -> line.contains("project(':"))
