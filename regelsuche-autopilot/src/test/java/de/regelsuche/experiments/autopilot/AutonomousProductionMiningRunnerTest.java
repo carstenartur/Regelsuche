@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.mining.OpenTargetConjectureMiner;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetObservation;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -20,7 +22,19 @@ class AutonomousProductionMiningRunnerTest {
 
     @Test
     void minesCrossFamilyCandidateAndRetainsPredeclaredRejection() throws Exception {
-        var run = runner.runPinned(4);
+        var generation = new AutonomousProductionGenerationRunner().runPinned(4);
+        var directReport = new OpenTargetConjectureMiner().mine(
+            generation.observations().stream()
+                .map(item -> OpenTargetObservation.from(
+                    item.snapshot().observationId(),
+                    item.branch().familyId(),
+                    item.seed().expression(),
+                    item.searchResult()))
+                .toList());
+        assertFalse(
+            directReport.conjectures().isEmpty(),
+            directReport::toString);
+        var run = runner.run(generation);
 
         assertEquals(12, run.generation().observations().size());
         assertEquals(2, run.generation().observationBranches().stream()
