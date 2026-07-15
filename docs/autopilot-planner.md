@@ -229,7 +229,7 @@ Der Workflow `Autopilot Evidence` verlangt und archiviert unter anderem:
 
 ## Produktive Generation für Issue #348
 
-`PinnedAutonomousProductionCampaign` ist der erste tatsächlich ausgeführte Teil der produktiven Mehr-Runden-Campaign. Der gepinnte v2-Brief enthält kein Target und keine erwartete Antwort. Er bindet das aktive Inventar der vorhandenen `AstRewriteTransformationEngine` und konfiguriert zwei unabhängig bezeichnete Generatorfamilien mit insgesamt zwölf deterministischen Polynomial-Seeds.
+`PinnedAutonomousProductionCampaign` ist der erste tatsächlich ausgeführte Teil der produktiven Mehr-Runden-Campaign. Der gepinnte v2-Brief enthält kein Target und keine erwartete Antwort. Er bindet das aktive Inventar der vorhandenen `AstRewriteTransformationEngine` einschließlich Regelart, Kosten-, Komplexitäts-, Äquivalenz-, Pack- und Versionsmetadaten. Der Modellhash bindet Best-First-Suche, `ExpressionScorer` und Suchheuristik. Der Brief konfiguriert zwei unabhängig bezeichnete Generatorfamilien mit insgesamt zwölf deterministischen Polynomial-Seeds.
 
 `AutonomousProductionGenerationRunner` führt diese Seeds nicht als statische Fixtures aus, sondern über die vorhandenen Produktionskomponenten:
 
@@ -242,7 +242,7 @@ DeterministicDiscoveryExperimentRunner
 → unveränderlicher Observation Branch
 ```
 
-Jede Beobachtung hält den Seed, den Generator, alle erkundeten Zustände, Regelpfade, Annahmen, Suchmetriken sowie getrennte Snapshot-, Evidence- und Branch-Hashes fest. Die Reihenfolge der Eingaben und die Parallelität verändern die kanonischen Hashes nicht.
+Jede Beobachtung hält den Seed, den Generator, alle erkundeten Zustände, gewichtete Zustands-Scores, Regelpfade, die vollständigen `equivalencePreservingFlags`, Annahmen, Suchmetriken sowie getrennte Snapshot-, Evidence- und Branch-Hashes fest. Diese miner-relevanten Felder gehen in den kanonischen Snapshot-Hash ein. Candidate Formation kann dadurch aus dem unveränderlichen Artefakt reproduziert werden und hängt nicht von nur im ursprünglichen JVM-Lauf vorhandenen `SearchState`-Objekten ab. Die Reihenfolge der Eingaben und die Parallelität verändern die kanonischen Hashes nicht.
 
 Der erste Slice veröffentlicht und archiviert:
 
