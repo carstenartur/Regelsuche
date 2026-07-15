@@ -17,6 +17,7 @@ COPY regelsuche-persistence/build.gradle ./regelsuche-persistence/build.gradle
 COPY regelsuche-persistence-hibernate/build.gradle ./regelsuche-persistence-hibernate/build.gradle
 COPY regelsuche-learning/build.gradle ./regelsuche-learning/build.gradle
 COPY regelsuche-experiments/build.gradle ./regelsuche-experiments/build.gradle
+COPY regelsuche-autopilot/build.gradle ./regelsuche-autopilot/build.gradle
 COPY regelsuche-cli/build.gradle ./regelsuche-cli/build.gradle
 COPY regelsuche-discovery/build.gradle ./regelsuche-discovery/build.gradle
 COPY regelsuche-benchmarks/build.gradle ./regelsuche-benchmarks/build.gradle
@@ -39,6 +40,7 @@ COPY regelsuche-persistence ./regelsuche-persistence
 COPY regelsuche-persistence-hibernate ./regelsuche-persistence-hibernate
 COPY regelsuche-learning ./regelsuche-learning
 COPY regelsuche-experiments ./regelsuche-experiments
+COPY regelsuche-autopilot ./regelsuche-autopilot
 COPY regelsuche-cli ./regelsuche-cli
 COPY regelsuche-discovery ./regelsuche-discovery
 COPY regelsuche-benchmarks ./regelsuche-benchmarks
