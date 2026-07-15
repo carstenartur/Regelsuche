@@ -38,7 +38,8 @@ public final class PinnedAutonomousProductionCampaign {
             AutonomousResearchBrief.hash(
                 "core-ast-default-rules/v1|" + inventoryHash()),
             AutonomousResearchBrief.hash(
-                "best-first-search/v1|" + SEARCH_HEURISTIC),
+                "best-first-search/v1|expression-scorer/v1|"
+                    + SEARCH_HEURISTIC),
             348_202_607_15L,
             2,
             2,
@@ -52,12 +53,23 @@ public final class PinnedAutonomousProductionCampaign {
     }
 
     public static String inventoryHash() {
-        List<String> ruleIds = AstRewriteTransformationEngine.defaultRules().stream()
-            .map(rule -> rule.id())
+        List<String> rules = AstRewriteTransformationEngine.defaultRules().stream()
+            .map(rule -> {
+                var descriptor = rule.descriptor();
+                return rule.id()
+                    + '|' + rule.kind().name()
+                    + '|' + rule.mayIncreaseComplexity()
+                    + '|' + rule.estimatedCostDelta()
+                    + '|' + rule.isEquivalencePreservingByConstruction()
+                    + '|' + descriptor.packId()
+                    + '|' + descriptor.license()
+                    + '|' + descriptor.sourceVersion()
+                    + '|' + descriptor.status().name();
+            })
             .sorted()
             .toList();
         return AutonomousResearchBrief.hash(
-            "regelsuche.ast-default-rule-inventory/v1|" + ruleIds);
+            "regelsuche.ast-default-rule-inventory/v2|" + rules);
     }
 
     public static List<SeedExpression> seeds() {
