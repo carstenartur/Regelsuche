@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-aggregate-receipt/v2",
+  "title": "Regelsuche autonomous aggregate candidate-formation receipt v2",
+  "type": "object",
+  "required": [
+    "schema", "decisionHash", "miningEvidenceHash", "disposition",
+    "outputs", "rejectedClusters", "executedResources", "skippedResources",
+    "receiptIsMathematicalEvidence", "promotionStatus",
+    "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-aggregate-receipt/v2" },
+    "decisionHash": { "$ref": "#/$defs/sha256" },
+    "miningEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "disposition": {
+      "enum": ["COMPLETED", "INCONCLUSIVE", "BACKEND_UNAVAILABLE"]
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidateOutput" }
+    },
+    "rejectedClusters": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rejectedCluster" }
+    },
+    "executedResources": { "$ref": "#/$defs/resources" },
+    "skippedResources": { "$ref": "#/$defs/resources" },
+    "receiptIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "disposition": { "const": "COMPLETED" } },
+        "required": ["disposition"]
+      },
+      "then": {
+        "properties": {
+          "executedResources": {
+            "contains": {
+              "properties": {
+                "resource": { "const": "MINING_BATCHES" },
+                "amount": { "type": "integer", "minimum": 1 }
+              },
+              "required": ["resource", "amount"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "enum": ["INCONCLUSIVE", "BACKEND_UNAVAILABLE"]
+          }
+        },
+        "required": ["disposition"]
+      },
+      "then": {
+        "properties": { "outputs": { "maxItems": 0 } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "disposition": { "const": "BACKEND_UNAVAILABLE" } },
+        "required": ["disposition"]
+      },
+      "then": {
+        "properties": { "executedResources": { "maxItems": 0 } }
+      }
+    }
+  ],
+  "$defs": {
+    "candidateOutput": {
+      "type": "object",
+      "required": [
+        "outputBranchId", "branchType", "conjectureId",
+        "candidateEvidenceHash", "sources", "lineageHash"
+      ],
+      "properties": {
+        "outputBranchId": { "$ref": "#/$defs/nonBlank" },
+        "branchType": { "const": "CONJECTURE_CANDIDATE" },
+        "conjectureId": { "$ref": "#/$defs/nonBlank" },
+        "candidateEvidenceHash": { "$ref": "#/$defs/sha256" },
+        "sources": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/sourceLink" }
+        },
+        "lineageHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "sourceLink": {
+      "type": "object",
+      "required": [
+        "observationId", "sourceBranchId", "familyId", "snapshotHash",
+        "evidenceHash", "observationBranchHash"
+      ],
+      "properties": {
+        "observationId": { "$ref": "#/$defs/nonBlank" },
+        "sourceBranchId": { "$ref": "#/$defs/nonBlank" },
+        "familyId": { "$ref": "#/$defs/nonBlank" },
+        "snapshotHash": { "$ref": "#/$defs/sha256" },
+        "evidenceHash": { "$ref": "#/$defs/sha256" },
+        "observationBranchHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "rejectedCluster": {
+      "type": "object",
+      "required": [
+        "clusterHash", "reasonCode", "supportingObservationIds", "contentHash"
+      ],
+      "properties": {
+        "clusterHash": { "$ref": "#/$defs/sha256" },
+        "reasonCode": { "$ref": "#/$defs/nonBlank" },
+        "supportingObservationIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/nonBlank" }
+        },
+        "contentHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["resource", "amount"],
+        "properties": {
+          "resource": {
+            "enum": ["WALL_CLOCK_MILLIS", "MINING_BATCHES", "CANDIDATES"]
+          },
+          "amount": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
