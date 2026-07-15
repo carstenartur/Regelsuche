@@ -108,6 +108,10 @@ public final class JsonWriter {
         return array(key, writer -> values.forEach(writer::value));
     }
 
+    public JsonWriter booleanArray(String key, List<Boolean> values) {
+        return array(key, writer -> values.forEach(writer::value));
+    }
+
     public JsonWriter value(String value) {
         comma();
         appendString(value);
@@ -115,6 +119,12 @@ public final class JsonWriter {
     }
 
     public JsonWriter value(int value) {
+        comma();
+        builder.append(value);
+        return this;
+    }
+
+    public JsonWriter value(boolean value) {
         comma();
         builder.append(value);
         return this;

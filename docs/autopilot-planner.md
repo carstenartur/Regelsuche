@@ -227,6 +227,44 @@ Der Workflow `Autopilot Evidence` verlangt und archiviert unter anderem:
 - aus `:regelsuche-autopilot`: `production-binding.json`, `lifecycle-decision.json`, `plan-v2.json`, `execution-v2.json`, `lineage-v2.json`, `round-v2.json` und `next-plan-v2.json`,
 - weiterhin die unveränderten v1-Kompatibilitäts- und Ausführungsartefakte.
 
+## Produktive Generation für Issue #348
+
+`PinnedAutonomousProductionCampaign` ist der erste tatsächlich ausgeführte Teil der produktiven Mehr-Runden-Campaign. Der gepinnte v2-Brief enthält kein Target und keine erwartete Antwort. Er bindet das aktive Inventar der vorhandenen `AstRewriteTransformationEngine` einschließlich Regelart, Kosten-, Komplexitäts-, Äquivalenz-, Pack- und Versionsmetadaten. Der Modellhash bindet Best-First-Suche, `ExpressionScorer` und Suchheuristik. Der Brief konfiguriert zwei unabhängig bezeichnete Generatorfamilien mit insgesamt zwölf deterministischen Polynomial-Seeds.
+
+`AutonomousProductionGenerationRunner` führt diese Seeds nicht als statische Fixtures aus, sondern über die vorhandenen Produktionskomponenten:
+
+```text
+DeterministicDiscoveryExperimentRunner
+→ targetfreies SearchProblem
+→ AstRewriteTransformationEngine
+→ BestFirstSearchStrategy
+→ GoalStatus.UNTARGETED
+→ unveränderlicher Observation Branch
+```
+
+Jede Beobachtung hält den Seed, den Generator, alle erkundeten Zustände, gewichtete Zustands-Scores, Regelpfade, die vollständigen `equivalencePreservingFlags`, Annahmen, Suchmetriken sowie getrennte Snapshot-, Evidence- und Branch-Hashes fest. Diese miner-relevanten Felder gehen in den kanonischen Snapshot-Hash ein. Candidate Formation kann dadurch aus dem unveränderlichen Artefakt reproduziert werden und hängt nicht von nur im ursprünglichen JVM-Lauf vorhandenen `SearchState`-Objekten ab. Die Reihenfolge der Eingaben und die Parallelität verändern die kanonischen Hashes nicht.
+
+Der erste Slice veröffentlicht und archiviert:
+
+- `regelsuche.autonomous-production-seed-catalog/v1`,
+- `regelsuche.autonomous-production-observations/v2`,
+- `regelsuche.autonomous-generation-receipt/v2`,
+- `regelsuche.autonomous-production-generation/v2`.
+
+Der Generation-Receipt bilanziert für `GENERATED_STATES`, `EXPLORED_STATES` und `OBSERVATIONS` weiterhin exakt:
+
+```text
+configured = executed + skipped + remaining
+```
+
+Der reproduzierbare Lauf lautet:
+
+```bash
+./gradlew :regelsuche-autopilot:runProductionGeneration
+```
+
+Die sechs kanonischen Artefakte liegen anschließend unter `regelsuche-autopilot/build/reports/autopilot-production-generation/` und werden durch den Workflow `Autopilot Evidence` verlangt und hochgeladen. Dieser Slice führt noch kein Aggregate Mining, keine Validierung, keine Novelty-Prüfung, keinen Proof und keinen Lifecycle-Handoff aus; diese folgen nach dem Merge nacheinander auf demselben Issue. Promotion und Public Evidence bleiben `NOT_EVALUATED`.
+
 ## Wissenschaftliche Grenze
 
 Planner, Executor, Binding, Lifecycle-Mapper und Evidence DAG dürfen nur entscheiden, **welche Arbeit ausgeführt wird**, **welche Ressourcen verbraucht wurden**, **aus welchen unveränderlichen Eingängen ein Output hervorging** und **welcher interne Workflow-Ausgang erreicht wurde**. Daher bleiben:
