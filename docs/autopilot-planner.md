@@ -162,9 +162,15 @@ Eine Kandidatenlinie darf keine Beobachtung außerhalb der Aggregate-Entscheidun
 
 `INCONCLUSIVE` und `BACKEND_UNAVAILABLE` erzeugen keine Kandidatenoutputs. Ein nicht verfügbarer Backend-Versuch weist keine ausgeführte Arbeit aus; die geplanten Ressourcen bleiben als übersprungen sichtbar.
 
+## Modulgrenze
+
+Die generischen v1/v2-Verträge für Brief, Budget, Planung, unveränderliche Beobachtungsbranches, Aggregate-Entscheidungen, Receipts und Evidence DAG liegen in `:regelsuche-experiments`. Dieses Modul bleibt unabhängig von den konkreten Mining-, Novelty-, Proof- und Lifecycle-Typen.
+
+Die schmale Composition-Schicht `:regelsuche-autopilot` verbindet diese Verträge mit `:regelsuche-learning`. Dort liegen die produktive Open-Target-Bindung, der Lifecycle-Mapper und die äußeren Campaign-Artefakte. Eine Architekturprüfung verhindert die Rückabhängigkeit `:regelsuche-experiments → :regelsuche-learning`.
+
 ## Produktive Open-Target-Bindung
 
-`OpenTargetAutopilotV2Binding` verbindet den Aggregate-Vertrag direkt mit dem vorhandenen produktiven `OpenTargetConjectureEvidence`:
+`OpenTargetAutopilotV2Binding` verbindet im Modul `:regelsuche-autopilot` den Aggregate-Vertrag direkt mit dem vorhandenen produktiven `OpenTargetConjectureEvidence`:
 
 - `OpenTargetConjectureEvidence.contentHash()` wird unverändert als Mining-Evidence-Hash gebunden,
 - Campaign-ID und Rule-Inventory-Hash werden übernommen und gegen den v2-Brief geprüft,
@@ -217,9 +223,8 @@ Ein Receipt ohne retained Decision oder eine Decision ohne retained Observation 
 
 Der Workflow `Autopilot Evidence` verlangt und archiviert unter anderem:
 
-- `brief-v2.json`, `aggregate-decision.json`, `aggregate-receipt.json` und `dag.json`,
-- `production-binding.json` und `lifecycle-decision.json`,
-- `plan-v2.json`, `execution-v2.json`, `lineage-v2.json`, `round-v2.json` und `next-plan-v2.json`,
+- aus `:regelsuche-experiments`: `brief-v2.json`, `aggregate-decision.json`, `aggregate-receipt.json` und `dag.json`,
+- aus `:regelsuche-autopilot`: `production-binding.json`, `lifecycle-decision.json`, `plan-v2.json`, `execution-v2.json`, `lineage-v2.json`, `round-v2.json` und `next-plan-v2.json`,
 - weiterhin die unveränderten v1-Kompatibilitäts- und Ausführungsartefakte.
 
 ## Wissenschaftliche Grenze
