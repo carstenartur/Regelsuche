@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessAcceptanceGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessAcceptanceGate.java</span></div><h1>InterestingnessAcceptanceGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.InterestingnessProfileCalibration.CalibrationReport;
+import de.regelsuche.mining.InterestingnessProfileCalibration.ProfileMetric;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Applies predeclared quality thresholds to a held-out interestingness report.
+ *
+ * &lt;p&gt;The gate consumes an already completed calibration/TEST report. It cannot
+ * change profile selection, candidate scores, relevance labels or the TEST
+ * ranking. A rejected result remains useful diagnostic evidence but cannot be
+ * presented as an accepted empirical ranking-quality result.&lt;/p&gt;
+ */
+<span class="fc" id="L21">public final class InterestingnessAcceptanceGate {</span>
+    public static final String SCHEMA = &quot;regelsuche.interestingness-acceptance/v1&quot;;
+
+    public Decision evaluate(CalibrationReport report, Thresholds thresholds) {
+<span class="fc" id="L25">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc" id="L26">        Objects.requireNonNull(thresholds, &quot;thresholds&quot;);</span>
+
+<span class="fc" id="L28">        ProfileMetric selectedMetric = report.profileMetrics().stream()</span>
+<span class="fc bfc" id="L29" title="All 2 branches covered.">            .filter(metric -&gt; metric.profile() == report.selectedProfile())</span>
+<span class="fc" id="L30">            .findFirst()</span>
+<span class="pc" id="L31">            .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                &quot;selected profile metric is missing&quot;));
+
+<span class="fc" id="L34">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L35">        requireAtLeast(</span>
+<span class="fc" id="L36">            report.testRanking().size(), thresholds.minimumTestCases(),</span>
+            &quot;test-case-count&quot;, blockers);
+<span class="fc" id="L38">        requireAtLeast(</span>
+<span class="fc" id="L39">            selectedMetric.calibrationAgreementPermille(),</span>
+<span class="fc" id="L40">            thresholds.minimumCalibrationAgreementPermille(),</span>
+            &quot;calibration-agreement&quot;, blockers);
+<span class="fc" id="L42">        requireAtLeast(</span>
+<span class="fc" id="L43">            selectedMetric.testAgreementPermille(),</span>
+<span class="fc" id="L44">            thresholds.minimumTestAgreementPermille(),</span>
+            &quot;test-agreement&quot;, blockers);
+<span class="fc" id="L46">        requireAtLeast(</span>
+<span class="fc" id="L47">            report.sensitivity().profileOrderAgreementPermille(),</span>
+<span class="fc" id="L48">            thresholds.minimumProfileOrderAgreementPermille(),</span>
+            &quot;profile-order-agreement&quot;, blockers);
+<span class="fc" id="L50">        requireAtLeast(</span>
+<span class="fc" id="L51">            report.sensitivity().leaveOneOutSelectionStabilityPermille(),</span>
+<span class="fc" id="L52">            thresholds.minimumLeaveOneOutStabilityPermille(),</span>
+            &quot;leave-one-out-selection-stability&quot;, blockers);
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (thresholds.requireStableTopCandidate()</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                &amp;&amp; !report.sensitivity().topCandidateStableAcrossProfiles()) {</span>
+<span class="fc" id="L56">            blockers.add(&quot;top-candidate-is-not-stable-across-profiles&quot;);</span>
+        }
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (thresholds.requireNonEmptyParetoFront()</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">                &amp;&amp; report.paretoCandidateIds().isEmpty()) {</span>
+<span class="nc" id="L60">            blockers.add(&quot;pareto-front-is-empty&quot;);</span>
+        }
+
+<span class="fc" id="L63">        List&lt;String&gt; orderedBlockers = blockers.stream().distinct().sorted().toList();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        AcceptanceStatus status = orderedBlockers.isEmpty()</span>
+<span class="fc" id="L65">            ? AcceptanceStatus.ACCEPTED</span>
+<span class="fc" id="L66">            : AcceptanceStatus.REJECTED;</span>
+<span class="fc" id="L67">        String contentHash = hash(canonicalMaterial(</span>
+            report, thresholds, selectedMetric, status, orderedBlockers));
+<span class="fc" id="L69">        return new Decision(</span>
+            SCHEMA,
+<span class="fc" id="L71">            report.predictiveCorpusHash(),</span>
+<span class="fc" id="L72">            report.labeledEvaluationHash(),</span>
+<span class="fc" id="L73">            report.selectionHash(),</span>
+<span class="fc" id="L74">            report.contentHash(),</span>
+<span class="fc" id="L75">            report.selectedProfile(),</span>
+            thresholds,
+<span class="fc" id="L77">            selectedMetric.calibrationAgreementPermille(),</span>
+<span class="fc" id="L78">            selectedMetric.testAgreementPermille(),</span>
+<span class="fc" id="L79">            report.sensitivity().profileOrderAgreementPermille(),</span>
+<span class="fc" id="L80">            report.sensitivity().leaveOneOutSelectionStabilityPermille(),</span>
+<span class="fc" id="L81">            report.sensitivity().topCandidateStableAcrossProfiles(),</span>
+<span class="fc" id="L82">            report.testRanking().size(),</span>
+<span class="fc" id="L83">            report.paretoCandidateIds().size(),</span>
+            status,
+            orderedBlockers,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    private static void requireAtLeast(
+        int actual,
+        int minimum,
+        String metric,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (actual &lt; minimum) {</span>
+<span class="fc" id="L98">            blockers.add(metric + &quot;=&quot; + actual + &quot;&lt;&quot; + minimum);</span>
+        }
+<span class="fc" id="L100">    }</span>
+
+    private static String canonicalMaterial(
+        CalibrationReport report,
+        Thresholds thresholds,
+        ProfileMetric selectedMetric,
+        AcceptanceStatus status,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L109">        return SCHEMA</span>
+<span class="fc" id="L110">            + &quot;\npredictiveCorpus=&quot; + report.predictiveCorpusHash()</span>
+<span class="fc" id="L111">            + &quot;\nlabeledEvaluation=&quot; + report.labeledEvaluationHash()</span>
+<span class="fc" id="L112">            + &quot;\nselection=&quot; + report.selectionHash()</span>
+<span class="fc" id="L113">            + &quot;\nreport=&quot; + report.contentHash()</span>
+<span class="fc" id="L114">            + &quot;\nprofile=&quot; + report.selectedProfile().name()</span>
+<span class="fc" id="L115">            + &quot;\nthresholds=&quot; + thresholds.canonicalMaterial()</span>
+            + &quot;\ncalibrationAgreement=&quot;
+<span class="fc" id="L117">            + selectedMetric.calibrationAgreementPermille()</span>
+<span class="fc" id="L118">            + &quot;\ntestAgreement=&quot; + selectedMetric.testAgreementPermille()</span>
+            + &quot;\nprofileOrderAgreement=&quot;
+<span class="fc" id="L120">            + report.sensitivity().profileOrderAgreementPermille()</span>
+            + &quot;\nleaveOneOut=&quot;
+<span class="fc" id="L122">            + report.sensitivity().leaveOneOutSelectionStabilityPermille()</span>
+            + &quot;\ntopStable=&quot;
+<span class="fc" id="L124">            + report.sensitivity().topCandidateStableAcrossProfiles()</span>
+<span class="fc" id="L125">            + &quot;\ntestCases=&quot; + report.testRanking().size()</span>
+<span class="fc" id="L126">            + &quot;\nparetoSize=&quot; + report.paretoCandidateIds().size()</span>
+<span class="fc" id="L127">            + &quot;\nstatus=&quot; + status.name()</span>
+            + &quot;\nblockers=&quot; + blockers;
+    }
+
+    private static String hash(String material) {
+        try {
+<span class="fc" id="L133">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L134">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L135">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L136">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L137">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L141">    public enum AcceptanceStatus {</span>
+<span class="fc" id="L142">        ACCEPTED,</span>
+<span class="fc" id="L143">        REJECTED</span>
+    }
+
+    /** Immutable thresholds fixed before TEST evaluation is interpreted. */
+    public record Thresholds(
+        int minimumTestCases,
+        int minimumCalibrationAgreementPermille,
+        int minimumTestAgreementPermille,
+        int minimumProfileOrderAgreementPermille,
+        int minimumLeaveOneOutStabilityPermille,
+        boolean requireStableTopCandidate,
+        boolean requireNonEmptyParetoFront
+    ) {
+<span class="fc" id="L156">        public Thresholds {</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">            if (minimumTestCases &lt; 2) {</span>
+<span class="nc" id="L158">                throw new IllegalArgumentException(&quot;minimumTestCases must be at least 2&quot;);</span>
+            }
+<span class="fc" id="L160">            requirePermille(minimumCalibrationAgreementPermille,</span>
+                &quot;minimumCalibrationAgreementPermille&quot;);
+<span class="fc" id="L162">            requirePermille(minimumTestAgreementPermille,</span>
+                &quot;minimumTestAgreementPermille&quot;);
+<span class="fc" id="L164">            requirePermille(minimumProfileOrderAgreementPermille,</span>
+                &quot;minimumProfileOrderAgreementPermille&quot;);
+<span class="fc" id="L166">            requirePermille(minimumLeaveOneOutStabilityPermille,</span>
+                &quot;minimumLeaveOneOutStabilityPermille&quot;);
+<span class="fc" id="L168">        }</span>
+
+        public static Thresholds conservativeDefault() {
+<span class="fc" id="L171">            return new Thresholds(4, 650, 600, 700, 600, false, true);</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L175">            return minimumTestCases + &quot;|&quot;</span>
+                + minimumCalibrationAgreementPermille + &quot;|&quot;
+                + minimumTestAgreementPermille + &quot;|&quot;
+                + minimumProfileOrderAgreementPermille + &quot;|&quot;
+                + minimumLeaveOneOutStabilityPermille + &quot;|&quot;
+                + requireStableTopCandidate + &quot;|&quot;
+                + requireNonEmptyParetoFront;
+        }
+    }
+
+    public record Decision(
+        String schema,
+        String predictiveCorpusHash,
+        String labeledEvaluationHash,
+        String selectionHash,
+        String calibrationReportHash,
+        InterestingnessProfile selectedProfile,
+        Thresholds thresholds,
+        int calibrationAgreementPermille,
+        int testAgreementPermille,
+        int profileOrderAgreementPermille,
+        int leaveOneOutSelectionStabilityPermille,
+        boolean topCandidateStableAcrossProfiles,
+        int testCaseCount,
+        int paretoCandidateCount,
+        AcceptanceStatus status,
+        List&lt;String&gt; blockers,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L206">        public Decision {</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L208">                throw new IllegalArgumentException(&quot;unsupported acceptance schema&quot;);</span>
+            }
+<span class="fc" id="L210">            requireSha256(predictiveCorpusHash, &quot;predictiveCorpusHash&quot;);</span>
+<span class="fc" id="L211">            requireSha256(labeledEvaluationHash, &quot;labeledEvaluationHash&quot;);</span>
+<span class="fc" id="L212">            requireSha256(selectionHash, &quot;selectionHash&quot;);</span>
+<span class="fc" id="L213">            requireSha256(calibrationReportHash, &quot;calibrationReportHash&quot;);</span>
+<span class="fc" id="L214">            Objects.requireNonNull(selectedProfile, &quot;selectedProfile&quot;);</span>
+<span class="fc" id="L215">            Objects.requireNonNull(thresholds, &quot;thresholds&quot;);</span>
+<span class="fc" id="L216">            requirePermille(calibrationAgreementPermille,</span>
+                &quot;calibrationAgreementPermille&quot;);
+<span class="fc" id="L218">            requirePermille(testAgreementPermille, &quot;testAgreementPermille&quot;);</span>
+<span class="fc" id="L219">            requirePermille(profileOrderAgreementPermille,</span>
+                &quot;profileOrderAgreementPermille&quot;);
+<span class="fc" id="L221">            requirePermille(leaveOneOutSelectionStabilityPermille,</span>
+                &quot;leaveOneOutSelectionStabilityPermille&quot;);
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">            if (testCaseCount &lt; 0 || paretoCandidateCount &lt; 0) {</span>
+<span class="nc" id="L224">                throw new IllegalArgumentException(&quot;counts must be non-negative&quot;);</span>
+            }
+<span class="fc" id="L226">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            blockers = blockers == null</span>
+<span class="nc" id="L228">                ? List.of()</span>
+<span class="fc" id="L229">                : blockers.stream().distinct().sorted().toList();</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (!&quot;NOT_EVALUATED&quot;.equals(promotionStatus)</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(publicEvidenceStatus)) {</span>
+<span class="nc" id="L232">                throw new IllegalArgumentException(</span>
+                    &quot;acceptance cannot perform promotion or public evidence&quot;);
+            }
+<span class="fc" id="L235">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L236">        }</span>
+
+        public boolean accepted() {
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            return status == AcceptanceStatus.ACCEPTED;</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L243">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L244">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L245">                .property(&quot;predictiveCorpusHash&quot;, predictiveCorpusHash)</span>
+<span class="fc" id="L246">                .property(&quot;labeledEvaluationHash&quot;, labeledEvaluationHash)</span>
+<span class="fc" id="L247">                .property(&quot;selectionHash&quot;, selectionHash)</span>
+<span class="fc" id="L248">                .property(&quot;calibrationReportHash&quot;, calibrationReportHash)</span>
+<span class="fc" id="L249">                .property(&quot;selectedProfile&quot;, selectedProfile.name())</span>
+<span class="fc" id="L250">                .object(&quot;thresholds&quot;, object -&gt; object</span>
+<span class="fc" id="L251">                    .property(&quot;minimumTestCases&quot;, thresholds.minimumTestCases())</span>
+<span class="fc" id="L252">                    .property(&quot;minimumCalibrationAgreementPermille&quot;,</span>
+<span class="fc" id="L253">                        thresholds.minimumCalibrationAgreementPermille())</span>
+<span class="fc" id="L254">                    .property(&quot;minimumTestAgreementPermille&quot;,</span>
+<span class="fc" id="L255">                        thresholds.minimumTestAgreementPermille())</span>
+<span class="fc" id="L256">                    .property(&quot;minimumProfileOrderAgreementPermille&quot;,</span>
+<span class="fc" id="L257">                        thresholds.minimumProfileOrderAgreementPermille())</span>
+<span class="fc" id="L258">                    .property(&quot;minimumLeaveOneOutStabilityPermille&quot;,</span>
+<span class="fc" id="L259">                        thresholds.minimumLeaveOneOutStabilityPermille())</span>
+<span class="fc" id="L260">                    .property(&quot;requireStableTopCandidate&quot;,</span>
+<span class="fc" id="L261">                        thresholds.requireStableTopCandidate())</span>
+<span class="fc" id="L262">                    .property(&quot;requireNonEmptyParetoFront&quot;,</span>
+<span class="fc" id="L263">                        thresholds.requireNonEmptyParetoFront()))</span>
+<span class="fc" id="L264">                .property(&quot;calibrationAgreementPermille&quot;,</span>
+                    calibrationAgreementPermille)
+<span class="fc" id="L266">                .property(&quot;testAgreementPermille&quot;, testAgreementPermille)</span>
+<span class="fc" id="L267">                .property(&quot;profileOrderAgreementPermille&quot;,</span>
+                    profileOrderAgreementPermille)
+<span class="fc" id="L269">                .property(&quot;leaveOneOutSelectionStabilityPermille&quot;,</span>
+                    leaveOneOutSelectionStabilityPermille)
+<span class="fc" id="L271">                .property(&quot;topCandidateStableAcrossProfiles&quot;,</span>
+                    topCandidateStableAcrossProfiles)
+<span class="fc" id="L273">                .property(&quot;testCaseCount&quot;, testCaseCount)</span>
+<span class="fc" id="L274">                .property(&quot;paretoCandidateCount&quot;, paretoCandidateCount)</span>
+<span class="fc" id="L275">                .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L276">                .stringArray(&quot;blockers&quot;, blockers)</span>
+<span class="fc" id="L277">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L278">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L279">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L280">                .endObject()</span>
+<span class="fc" id="L281">                .toString();</span>
+        }
+    }
+
+    private static void requirePermille(int value, String name) {
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">        if (value &lt; 0 || value &gt; 1000) {</span>
+<span class="nc" id="L287">            throw new IllegalArgumentException(name + &quot; must be in [0,1000]&quot;);</span>
+        }
+<span class="fc" id="L289">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L292" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L293">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L295">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

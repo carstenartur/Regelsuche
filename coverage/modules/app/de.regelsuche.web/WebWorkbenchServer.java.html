@@ -2453,8 +2453,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2454">            return;</span>
         }
-<span class="nc" id="L2456">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="nc" id="L2457">    }</span>
+<span class="fc" id="L2456">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="fc" id="L2457">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2460">        var jobs = proofWorkbenchService.listJobs();</span>
