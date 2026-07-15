@@ -15,10 +15,25 @@ Import-Zyklen über die eingeführten Ports aufgelöst sind.
 | `:regelsuche-persistence` | `de.regelsuche.persistence.PersistenceConfig`, `GraphPersistenceMode`; `de.regelsuche.checkpoint` | Persistenz-Ports/-Konfiguration und checkpointfähige Suchjob-Snapshots ohne Datenbanktreiber | `:regelsuche-core` |
 | `:regelsuche-persistence-hibernate` | `de.regelsuche.persistence.relational` | PostgreSQL-/Hibernate-ORM-Entities, MigrationRunner, Repositories und Hibernate-Search-Facettenindex | `:regelsuche-persistence`, `:regelsuche-learning`, `:regelsuche-validation`, `:regelsuche-core`, Hibernate/PostgreSQL/Lucene |
 | `:regelsuche-learning` | portable Teile von `de.regelsuche.mining` (`RuleCandidate`, Pattern-/Anti-Unification-Bausteine, `HypothesisRepository`, `RuleCandidateMiner`, `SuccessfulTransformationPath`) | Hypothesis-/Rule-Candidate-Mining und Anti-Unification-Primitiven ohne App-Orchestrierung | `:regelsuche-core`, `:regelsuche-search`, `:regelsuche-validation` |
-| `:regelsuche-experiments` | `de.regelsuche.benchmark` (Benchmark-Kern, Result-DTOs, Report-Renderer, `DiscoveryExperimentRunner`, `DeterministicDiscoveryExperimentRunner`), `de.regelsuche.example` (`AlgebraicExampleGenerator`, `SeedExpression`, `ScientificSeedCorpora`) | Experiment-/Benchmark-Primitiven, wissenschaftliches Seed-Corpus (inkl. YAML/JSON-Kataloge), reproduzierbarer Runner und deterministische Report-Artefakte ohne App-Orchestrierung | `:regelsuche-search`, `:regelsuche-validation`, `:regelsuche-discovery` |
+| `:regelsuche-experiments` | `de.regelsuche.benchmark` (Benchmark-Kern, Result-DTOs, Report-Renderer, `DiscoveryExperimentRunner`, `DeterministicDiscoveryExperimentRunner`), `de.regelsuche.example` (`AlgebraicExampleGenerator`, `SeedExpression`, `ScientificSeedCorpora`), Autopilot-Kernverträge in `de.regelsuche.experiments.autopilot` | Experiment-/Benchmark-Primitiven, wissenschaftliches Seed-Corpus, reproduzierbarer Runner sowie unabhängige v1/v2 Plan-, Budget- und Evidence-DAG-Verträge ohne Learning-Rückabhängigkeit | `:regelsuche-search`, `:regelsuche-validation`, `:regelsuche-discovery` |
+| `:regelsuche-autopilot` | Composition-Anteile von `de.regelsuche.experiments.autopilot` | Explizite Verbindung der unabhängigen Autopilot-Verträge mit produktivem Open-Target-Mining, Project-Novelty, Proof, konservativem Lifecycle-Handoff und äußeren Campaign-Artefakten | `:regelsuche-experiments`, `:regelsuche-learning` |
 | `:regelsuche-cli` | `de.regelsuche.cli.core` | CLI-neutrale Command-Registry und Optionsparser-Primitiven ohne App-/Web-Wiring | keine Projektabhängigkeiten |
 | `:regelsuche-discovery` | `de.regelsuche.discovery` | Portable Discovery-Pfad-DTOs (`DiscoveredTransformation`, `TransformationStep`), Discovery-Optionen/Profile und Hypothesenoperator-Metadaten ohne Graph-/Export-/App-Orchestrierung | `:regelsuche-core`, `:regelsuche-search`, `:regelsuche-validation` |
 | `:app` | `de.regelsuche.App`, app-spezifisches `cli.CliRouter`, `web`, `api`, orchestration-nahe `search`, app-spezifisches `mining` (`RuleDiscoveryService`, `MacroRuleMiner`), `inventory`, `graph`, app-spezifische `persistence.PersistenceContext`, `app.persistence.neo4j.Neo4jTranspositionTable`, `app.transform.SymPyTransformationEngine`, `export`, restliches `didactic`, `proof`, `demo`, `equation`, `inequality`, `paths`, `jobs`, app-spezifische `benchmark.BenchmarkSuite` | Runtime-Wiring, Web/CLI, Bootstrap und noch zyklische obere Schichten; Hibernate-Details liegen nicht mehr direkt in `app` | `:regelsuche-core`, `:regelsuche-egraph`, `:regelsuche-search`, `:regelsuche-validation`, `:regelsuche-math-algorithms`, `:regelsuche-persistence`, `:regelsuche-persistence-hibernate`, `:regelsuche-learning`, `:regelsuche-experiments`, `:regelsuche-cli`, `:regelsuche-discovery`, Neo4j/GraalVM/WebAssets |
+
+## Autopilot-Grenze
+
+Die Autopilot-Kernverträge bleiben in `:regelsuche-experiments`, weil sie nur
+Research Briefs, Budgets, unveränderliche Beobachtungsbranches, Aggregate-
+Entscheidungen, Receipts und Evidence-DAG-Provenienz beschreiben. Sie dürfen
+nicht von konkreten Mining-, Novelty-, Proof- oder Lifecycle-Implementierungen
+abhängen.
+
+`:regelsuche-autopilot` ist die schmale Composition-Schicht darüber. Nur dort
+werden `OpenTargetConjectureEvidence`, die vorhandenen Novelty-/Proof-Reports
+und der konservative Hypothesis-Handoff an die generischen v2-Verträge
+gebunden. `AutopilotArchitectureBoundariesTest` verhindert eine erneute
+Rückabhängigkeit `:regelsuche-experiments → :regelsuche-learning`.
 
 ## Noch nicht physisch getrennte Zielmodule
 
@@ -58,6 +73,12 @@ regelsuche-core
 
 regelsuche-learning / regelsuche-discovery
   → portable Ports und DTOs
+
+regelsuche-experiments
+  → unabhängige Experiment-, Planner- und Evidence-DAG-Verträge
+
+regelsuche-autopilot
+  → regelsuche-experiments + regelsuche-learning Composition
 
 regelsuche-persistence-hibernate
   → regelsuche-persistence Ports + Hibernate/PostgreSQL Adapter
