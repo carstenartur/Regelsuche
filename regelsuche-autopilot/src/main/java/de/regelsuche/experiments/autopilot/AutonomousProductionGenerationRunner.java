@@ -648,9 +648,13 @@ public final class AutonomousProductionGenerationRunner {
                                 .property("expression", state.expression())
                                 .property("depth", state.depth())
                                 .property("canonicalHash", state.canonicalHash())
+                                .property("scoreWeightedTotal",
+                                    state.scoreWeightedTotal())
                                 .stringArray("path", state.path())
                                 .stringArray("appliedRuleIds",
                                     state.appliedRuleIds())
+                                .booleanArray("equivalencePreservingFlags",
+                                    state.equivalencePreservingFlags())
                                 .stringArray("assumptions", state.assumptions()))))
                         .property("selectedExpression", item.selectedExpression())
                         .stringArray("selectedPath", item.selectedPath())
@@ -716,8 +720,10 @@ public final class AutonomousProductionGenerationRunner {
         String expression,
         int depth,
         String canonicalHash,
+        int scoreWeightedTotal,
         List<String> path,
         List<String> appliedRuleIds,
+        List<Boolean> equivalencePreservingFlags,
         List<String> assumptions
     ) {
         static final Comparator<StateSnapshot> ORDER = Comparator
@@ -731,7 +737,14 @@ public final class AutonomousProductionGenerationRunner {
             appliedRuleIds = appliedRuleIds == null
                 ? List.of()
                 : List.copyOf(appliedRuleIds);
+            equivalencePreservingFlags = equivalencePreservingFlags == null
+                ? List.of()
+                : List.copyOf(equivalencePreservingFlags);
             assumptions = sorted(assumptions);
+            if (equivalencePreservingFlags.size() != appliedRuleIds.size()) {
+                throw new IllegalArgumentException(
+                    "equivalence flags must align with the applied rule path");
+            }
         }
 
         static StateSnapshot from(SearchState state) {
@@ -739,14 +752,17 @@ public final class AutonomousProductionGenerationRunner {
                 state.expression(),
                 state.depth(),
                 state.canonicalHash(),
+                state.score().weightedTotal(),
                 state.path(),
                 state.appliedRuleIds(),
+                state.equivalencePreservingFlags(),
                 state.assumptions());
         }
 
         String canonicalMaterial() {
             return expression + '|' + depth + '|' + canonicalHash + '|'
-                + path + '|' + appliedRuleIds + '|' + assumptions;
+                + scoreWeightedTotal + '|' + path + '|' + appliedRuleIds + '|'
+                + equivalencePreservingFlags + '|' + assumptions;
         }
     }
 
