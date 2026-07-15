@@ -31,6 +31,14 @@ class AutonomousProductionMiningRunnerTest {
                     item.seed().expression(),
                     item.searchResult()))
                 .toList());
+        if (directReport.conjectures().isEmpty()) {
+            Path diagnostics = Path.of(
+                "build", "reports", "autopilot-production-mining");
+            new AutonomousProductionGenerationRunner().write(diagnostics, generation);
+            Files.writeString(
+                diagnostics.resolve("failed-direct-mining-report.txt"),
+                directReport.toString());
+        }
         assertFalse(
             directReport.conjectures().isEmpty(),
             directReport::toString);
