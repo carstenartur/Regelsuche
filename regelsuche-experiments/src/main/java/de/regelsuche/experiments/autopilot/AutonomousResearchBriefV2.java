@@ -1,8 +1,10 @@
 package de.regelsuche.experiments.autopilot;
 
 import de.regelsuche.json.JsonWriter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -10,11 +12,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/** Target-free v2 brief with explicit novelty and lifecycle stages. */
+/** Target-free research brief with explicit novelty and lifecycle stages. */
 public record AutonomousResearchBriefV2(
     String schema,
     String briefId,
-    String predecessorV1BriefHash,
     List<String> allowedDomains,
     List<String> seedGenerators,
     String inventoryHash,
@@ -32,10 +33,9 @@ public record AutonomousResearchBriefV2(
 
     public AutonomousResearchBriefV2 {
         if (!SCHEMA.equals(schema)) {
-            throw new IllegalArgumentException("unsupported autonomous research brief v2 schema");
+            throw new IllegalArgumentException("unsupported autonomous research brief schema");
         }
         requireText(briefId, "briefId");
-        requireSha256(predecessorV1BriefHash, "predecessorV1BriefHash");
         allowedDomains = sortedText(allowedDomains, "allowedDomains");
         seedGenerators = sortedText(seedGenerators, "seedGenerators");
         if (allowedDomains.isEmpty() || seedGenerators.isEmpty()) {
@@ -59,7 +59,7 @@ public record AutonomousResearchBriefV2(
         stageBudgets = immutableBudgets(stageBudgets);
         if (!stageBudgets.keySet().equals(EnumSet.allOf(EvidenceStage.class))) {
             throw new IllegalArgumentException(
-                "v2 brief requires budgets for every explicit evidence stage");
+                "research brief requires budgets for every explicit evidence stage");
         }
         stageBudgets.forEach(AutonomousResearchBriefV2::validateStageBudget);
         requireSha256(contentHash, "contentHash");
@@ -67,7 +67,6 @@ public record AutonomousResearchBriefV2(
 
     public static AutonomousResearchBriefV2 create(
         String briefId,
-        String predecessorV1BriefHash,
         List<String> allowedDomains,
         List<String> seedGenerators,
         String inventoryHash,
@@ -85,7 +84,6 @@ public record AutonomousResearchBriefV2(
         Map<EvidenceStage, StageBudget> budgets = immutableBudgets(stageBudgets);
         String material = canonicalMaterial(
             briefId,
-            predecessorV1BriefHash,
             domains,
             generators,
             inventoryHash,
@@ -100,7 +98,6 @@ public record AutonomousResearchBriefV2(
         return new AutonomousResearchBriefV2(
             SCHEMA,
             briefId,
-            predecessorV1BriefHash,
             domains,
             generators,
             inventoryHash,
@@ -112,7 +109,7 @@ public record AutonomousResearchBriefV2(
             minimumDistinctEvidence,
             outputNamespace,
             budgets,
-            AutonomousResearchBrief.hash(material));
+            hash(material));
     }
 
     public StageBudget budget(EvidenceStage stage) {
@@ -123,7 +120,6 @@ public record AutonomousResearchBriefV2(
         return new JsonWriter().beginObject()
             .property("schema", schema)
             .property("briefId", briefId)
-            .property("predecessorV1BriefHash", predecessorV1BriefHash)
             .stringArray("allowedDomains", allowedDomains)
             .stringArray("seedGenerators", seedGenerators)
             .property("inventoryHash", inventoryHash)
@@ -149,9 +145,19 @@ public record AutonomousResearchBriefV2(
             .toString();
     }
 
+    public static String hash(String material) {
+        Objects.requireNonNull(material, "material");
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(material.getBytes(StandardCharsets.UTF_8));
+            return "sha256:" + java.util.HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
     private static String canonicalMaterial(
         String briefId,
-        String predecessorV1BriefHash,
         List<String> domains,
         List<String> generators,
         String inventoryHash,
@@ -166,7 +172,6 @@ public record AutonomousResearchBriefV2(
     ) {
         StringBuilder material = new StringBuilder(SCHEMA)
             .append("\nbriefId=").append(briefId)
-            .append("\npredecessor=").append(predecessorV1BriefHash)
             .append("\ndomains=").append(domains)
             .append("\ngenerators=").append(generators)
             .append("\ninventory=").append(inventoryHash)
@@ -190,18 +195,14 @@ public record AutonomousResearchBriefV2(
         Map<EvidenceStage, StageBudget> values
     ) {
         Objects.requireNonNull(values, "stageBudgets");
-        EnumMap<EvidenceStage, StageBudget> ordered =
-            new EnumMap<>(EvidenceStage.class);
+        EnumMap<EvidenceStage, StageBudget> ordered = new EnumMap<>(EvidenceStage.class);
         values.forEach((stage, budget) -> ordered.put(
             Objects.requireNonNull(stage, "stage"),
             Objects.requireNonNull(budget, "stageBudget")));
         return Collections.unmodifiableMap(ordered);
     }
 
-    private static void validateStageBudget(
-        EvidenceStage stage,
-        StageBudget budget
-    ) {
+    private static void validateStageBudget(EvidenceStage stage, StageBudget budget) {
         Set<ResourceKind> allowed = switch (stage) {
             case GENERATION -> EnumSet.of(
                 ResourceKind.WALL_CLOCK_MILLIS,
@@ -232,14 +233,14 @@ public record AutonomousResearchBriefV2(
             EnumSet<ResourceKind> invalid = EnumSet.copyOf(budget.resources().keySet());
             invalid.removeAll(allowed);
             throw new IllegalArgumentException(
-                "resources assigned to the wrong v2 stage " + stage + ": " + invalid);
+                "resources assigned to the wrong stage " + stage + ": " + invalid);
         }
         boolean hasDomainWork = budget.resources().entrySet().stream()
             .anyMatch(entry -> entry.getKey() != ResourceKind.WALL_CLOCK_MILLIS
                 && entry.getValue() > 0L);
         if (!hasDomainWork) {
             throw new IllegalArgumentException(
-                "every v2 stage requires configured non-time domain work: " + stage);
+                "every stage requires configured non-time domain work: " + stage);
         }
     }
 
@@ -295,7 +296,7 @@ public record AutonomousResearchBriefV2(
                 Objects.requireNonNull(resource, "resource");
                 if (amount == null || amount < 0L) {
                     throw new IllegalArgumentException(
-                        "configured v2 resource amounts must be non-negative");
+                        "configured resource amounts must be non-negative");
                 }
                 if (amount > 0L) {
                     ordered.put(resource, amount);

@@ -46,7 +46,7 @@ public final class OpenTargetAutopilotV2Binding {
             .toList();
         List<RejectedCluster> rejectedClusters = evidence.report().rejectedClusters().stream()
             .map(cluster -> RejectedCluster.create(
-                AutonomousResearchBrief.hash(
+                AutonomousResearchBriefV2.hash(
                     miningEvidenceHash
                         + "|rejected=" + cluster.clusterSignature()
                         + "|support=" + cluster.observationIds()
@@ -64,7 +64,7 @@ public final class OpenTargetAutopilotV2Binding {
             rejectedClusters,
             executedResources,
             skippedResources);
-        String contentHash = AutonomousResearchBrief.hash(
+        String contentHash = AutonomousResearchBriefV2.hash(
             SCHEMA
                 + "\ncampaign=" + evidence.context().campaignId()
                 + "\ninventory=" + evidence.context().ruleInventoryHash()
@@ -125,7 +125,7 @@ public final class OpenTargetAutopilotV2Binding {
         String miningEvidenceHash,
         OpenTargetConjecture conjecture
     ) {
-        return AutonomousResearchBrief.hash(
+        return AutonomousResearchBriefV2.hash(
             miningEvidenceHash
                 + "|conjecture=" + conjecture.conjectureId()
                 + "|patterns=" + conjecture.leftPattern() + "->" + conjecture.rightPattern()

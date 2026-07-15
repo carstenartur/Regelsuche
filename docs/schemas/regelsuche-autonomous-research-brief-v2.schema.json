@@ -4,16 +4,15 @@
   "title": "Regelsuche autonomous target-free research brief v2",
   "type": "object",
   "required": [
-    "schema", "briefId", "predecessorV1BriefHash", "allowedDomains",
-    "seedGenerators", "inventoryHash", "packHash", "modelHash",
-    "deterministicSeed", "minimumAggregateInputs",
-    "minimumDistinctFamilies", "minimumDistinctEvidence",
-    "outputNamespace", "stageBudgets", "contentHash"
+    "schema", "briefId", "allowedDomains", "seedGenerators",
+    "inventoryHash", "packHash", "modelHash", "deterministicSeed",
+    "minimumAggregateInputs", "minimumDistinctFamilies",
+    "minimumDistinctEvidence", "outputNamespace", "stageBudgets",
+    "contentHash"
   ],
   "properties": {
     "schema": { "const": "regelsuche.autonomous-research-brief/v2" },
     "briefId": { "$ref": "#/$defs/nonBlank" },
-    "predecessorV1BriefHash": { "$ref": "#/$defs/sha256" },
     "allowedDomains": { "$ref": "#/$defs/nonEmptyStrings" },
     "seedGenerators": { "$ref": "#/$defs/nonEmptyStrings" },
     "inventoryHash": { "$ref": "#/$defs/sha256" },
