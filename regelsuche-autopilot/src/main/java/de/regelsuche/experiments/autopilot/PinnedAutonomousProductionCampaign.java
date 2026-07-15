@@ -20,8 +20,6 @@ public final class PinnedAutonomousProductionCampaign {
     public static final String DOMAIN = "polynomial-factorization";
     public static final int REQUIRED_OBSERVATIONS = 12;
 
-    private static final String PREDECESSOR_V1_BRIEF_HASH =
-        "sha256:b1aa8dce6924467390e2a89687678abcd54ba70925e650370faa1b151ae84359";
     private static final SearchHeuristic SEARCH_HEURISTIC =
         new SearchHeuristic(3, 80, 1, 2, 40, 16);
 
@@ -31,13 +29,12 @@ public final class PinnedAutonomousProductionCampaign {
     public static AutonomousResearchBriefV2 brief() {
         return AutonomousResearchBriefV2.create(
             CAMPAIGN_ID,
-            PREDECESSOR_V1_BRIEF_HASH,
             List.of(DOMAIN),
             List.of(LEFT_FACTOR_GENERATOR, RIGHT_FACTOR_GENERATOR),
             inventoryHash(),
-            AutonomousResearchBrief.hash(
+            AutonomousResearchBriefV2.hash(
                 "core-ast-default-rules/v1|" + inventoryHash()),
-            AutonomousResearchBrief.hash(
+            AutonomousResearchBriefV2.hash(
                 "best-first-search/v1|expression-scorer/v1|"
                     + "expression-canonicalizer/v1|" + SEARCH_HEURISTIC),
             348_202_607_15L,
@@ -68,7 +65,7 @@ public final class PinnedAutonomousProductionCampaign {
             })
             .sorted()
             .toList();
-        return AutonomousResearchBrief.hash(
+        return AutonomousResearchBriefV2.hash(
             "regelsuche.ast-default-rule-inventory/v2|" + rules);
     }
 
@@ -119,8 +116,7 @@ public final class PinnedAutonomousProductionCampaign {
     }
 
     private static Map<EvidenceStage, StageBudget> stageBudgets() {
-        EnumMap<EvidenceStage, StageBudget> budgets =
-            new EnumMap<>(EvidenceStage.class);
+        EnumMap<EvidenceStage, StageBudget> budgets = new EnumMap<>(EvidenceStage.class);
         budgets.put(EvidenceStage.GENERATION, new StageBudget(Map.of(
             ResourceKind.GENERATED_STATES, 100_000L,
             ResourceKind.EXPLORED_STATES, 10_000L,
