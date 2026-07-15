@@ -91,12 +91,12 @@ Brief + Ledger + Plan
 
 Ein `DISPROVED`-, `DUPLICATE`- oder `UNSAFE`-Receipt erzeugt einen terminalen Branch, der in der Folgerunde kein weiteres teures Budget erhält. Ein erfolgreich abgeschlossener Zwischenschritt ergänzt nur die betreffende Evidenzstufe; er ist weder Proof noch Promotion.
 
-Die logische Evidenz trennt sich von Laufzeittelemetrie:
+Die logische Receipt-Identität trennt sich von Laufzeittelemetrie:
 
-- `logicalContentHash` bindet Entscheidungen, nichtzeitliche Receipts und nächste Snapshots;
+- `logicalContentHash` bindet Entscheidungen, nichtzeitliche Receipt-Inhalte und nächste Snapshots;
 - `runtimeTelemetryHash` bindet tatsächliche Laufzeiten und den faktischen Ledgerstand.
 
-Dadurch kann die semantische Reallokationsentscheidung reproduzierbar bleiben, obwohl reale Laufzeiten schwanken.
+Der Folgeplan wird trotzdem aus dem **aktualisierten** Ledger berechnet. Tatsächlich verbrauchte Zeit darf daher den Restetat und die nächste Allokation verändern. Reproduzierbar ist die Reallokation für identische Brief-, Snapshot- und Receipt-Daten; sie ist nicht künstlich unabhängig von realem Ressourcenverbrauch.
 
 ## Wissenschaftliche Grenze
 
