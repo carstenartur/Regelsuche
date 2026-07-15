@@ -8,6 +8,16 @@
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
 - [Demo Gallery](demo-gallery.md) — reproduzierbare UI- und Replay-Beispiele.
 
+## Erweiterungen und Regelwissen
+
+- [Plugins](plugins.md) — Laufzeitmodell, Registries, Hot Reload, Debugging, Konflikte und Trust-Grenzen.
+- [Plugin-API](plugin-api.md) — Java-API, `ServiceLoader`, Paketierung und Starter-Template.
+- [Regeldateien](rule-files.md) — mathematische DSL für Regeln, Makros und Aktivierungsprofile.
+- [Knowledge Packs](knowledge-packs.md) — deklarative kuratierte Regel- und Metadatenpakete.
+- [Macro Rules](macro-rules.md) — aus Suchpfaden gelernte, validierte und wiederverwendbare Makrozüge.
+
+Die [Übersicht der Erweiterungsflächen](plugins.md#erweiterungsflächen-im-heutigen-system) trennt bewusst Java-Plugins, Regel-DSL, Knowledge Packs, gelernte Regeln, Discovery-Operatoren und mathematische Backend-Capabilities. Nicht jede interne Registry ist automatisch ein extern ladbarer Plugin-Endpunkt.
+
 ## Discovery und wissenschaftliche Evidenz
 
 - [Discovery Evidence v1](discovery-evidence-v1.md)
@@ -25,7 +35,6 @@
 - [Autonomous-Campaign-Round-Schema v1](schemas/regelsuche-autonomous-campaign-round-v1.schema.json)
 - [Hypothesis Mining](hypothesis-mining.md)
 - [Rule Discovery](rule-discovery.md)
-- [Macro Rules](macro-rules.md)
 - [Scientific Reproducibility](scientific-reproducibility.md)
 - [Experiment Runner](experiment-runner.md)
 - [Replay und Reports](replay-and-reports.md)
@@ -47,6 +56,5 @@
 - [Storage Architecture](storage-architecture.md)
 - [Proof Bridge](proof-bridge.md)
 - [Mathematical Algorithms](mathematical-algorithms.md)
-- [Knowledge Packs](knowledge-packs.md)
 
 Der Top-Level-[README](../README.md) bleibt der kurze Produkt- und Quickstart-Einstieg. Diese Seite ist der zentrale Dokumentationsindex; der datierte Forschungsstand wird in `discovery-status.md` gepflegt, damit README und Architekturtexte nicht mit häufig wechselnden Zwischenständen überladen werden.
