@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-production-seed-catalog/v1",
+  "title": "Regelsuche autonomous production seed catalog v1",
+  "type": "object",
+  "required": ["schema", "briefHash", "targetProvided", "seeds", "contentHash"],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-production-seed-catalog/v1" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "targetProvided": { "const": false },
+    "seeds": {
+      "type": "array",
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["seedId", "expression", "generator", "domain", "tags", "assumptions"],
+        "properties": {
+          "seedId": { "$ref": "#/$defs/nonBlank" },
+          "expression": { "$ref": "#/$defs/nonBlank" },
+          "generator": { "$ref": "#/$defs/nonBlank" },
+          "domain": { "$ref": "#/$defs/nonBlank" },
+          "tags": { "$ref": "#/$defs/strings" },
+          "assumptions": { "$ref": "#/$defs/strings" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "strings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
