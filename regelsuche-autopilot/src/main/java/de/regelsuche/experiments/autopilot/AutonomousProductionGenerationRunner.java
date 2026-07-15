@@ -369,11 +369,12 @@ public final class AutonomousProductionGenerationRunner {
         Set<String> allowedGenerators = Set.copyOf(brief.seedGenerators());
         Set<String> allowedDomains = Set.copyOf(brief.allowedDomains());
         for (SeedExpression seed : seeds) {
-            if (seed.expression().isBlank()
+            if (seed.id().isBlank()
+                    || seed.expression().isBlank()
                     || !allowedGenerators.contains(seed.source())
                     || !allowedDomains.contains(seed.category())) {
                 throw new IllegalArgumentException(
-                    "production seed is outside the pinned target-free brief: "
+                    "production seed requires a non-blank ID and must be inside the pinned target-free brief: "
                         + seed.stableKey());
             }
         }
