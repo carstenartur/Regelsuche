@@ -121,12 +121,12 @@ import java.util.TreeMap;
     }
 
     private static List&lt;BudgetDelta&gt; requestedBudget(EvidenceStage stage) {
-<span class="pc bpc" id="L124" title="3 of 5 branches missed.">        return switch (stage) {</span>
+<span class="pc bpc" id="L124" title="2 of 5 branches missed.">        return switch (stage) {</span>
 <span class="nc" id="L125">            case GENERATION -&gt; List.of(</span>
                 new BudgetDelta(ResourceKind.WALL_CLOCK_MILLIS, 1000L),
                 new BudgetDelta(ResourceKind.GENERATED_STATES, 100L),
                 new BudgetDelta(ResourceKind.EXPLORED_STATES, 50L));
-<span class="nc" id="L129">            case CANDIDATE_FORMATION -&gt; List.of(</span>
+<span class="fc" id="L129">            case CANDIDATE_FORMATION -&gt; List.of(</span>
                 new BudgetDelta(ResourceKind.WALL_CLOCK_MILLIS, 250L),
                 new BudgetDelta(ResourceKind.CANDIDATES, 1L));
 <span class="fc" id="L132">            case VALIDATION -&gt; List.of(</span>

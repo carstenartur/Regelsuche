@@ -1638,8 +1638,8 @@ public class WebWorkbenchServer {
 
     private void handleDidacticHint(HttpExchange exchange, String pathId) throws IOException {
 <span class="fc bfc" id="L1640" title="All 2 branches covered.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="fc" id="L1641">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="fc" id="L1642">            return;</span>
+<span class="nc" id="L1641">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L1642">            return;</span>
         }
 <span class="pc bpc" id="L1644" title="1 of 2 branches missed.">        if (pathId.isBlank()) {</span>
 <span class="nc" id="L1645">            sendStatus(exchange, 400, &quot;expected /api/didactic/hint/{pathId}&quot;);</span>
@@ -1649,8 +1649,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1649">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1650">            .findFirst();</span>
 <span class="fc bfc" id="L1651" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1652">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1653">            return;</span>
+<span class="nc" id="L1652">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1653">            return;</span>
         }
 <span class="fc" id="L1655">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1656">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>

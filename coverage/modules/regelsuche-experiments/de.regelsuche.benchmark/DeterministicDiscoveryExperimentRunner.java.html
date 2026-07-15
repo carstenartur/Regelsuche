@@ -224,7 +224,7 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
 <span class="fc" id="L224">        }</span>
 
         public static SeedRunOutcome fail(String summary) {
-<span class="nc" id="L227">            return new SeedRunOutcome(false, summary, List.of(), List.of(), List.of(), 0L, 0L);</span>
+<span class="fc" id="L227">            return new SeedRunOutcome(false, summary, List.of(), List.of(), List.of(), 0L, 0L);</span>
         }
 
         private static CounterexampleSearchService.Status deriveStatus(
@@ -234,9 +234,9 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
 <span class="fc bfc" id="L234" title="All 2 branches covered.">            if (explicitStatus != null) {</span>
 <span class="fc" id="L235">                return explicitStatus;</span>
             }
-<span class="pc bpc" id="L237" title="2 of 4 branches missed.">            return counterexamples == null || counterexamples.isEmpty()</span>
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">            return counterexamples == null || counterexamples.isEmpty()</span>
 <span class="fc" id="L238">                ? CounterexampleSearchService.Status.INCONCLUSIVE</span>
-<span class="nc" id="L239">                : CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;</span>
+<span class="fc" id="L239">                : CounterexampleSearchService.Status.COUNTEREXAMPLE_FOUND;</span>
         }
 
         private static DiscoveryResultKind defaultResultKind(boolean success, List&lt;String&gt; hypotheses, List&lt;String&gt; replayPath) {
@@ -246,9 +246,9 @@ public final class DeterministicDiscoveryExperimentRunner implements DiscoveryEx
 <span class="pc bpc" id="L246" title="2 of 6 branches missed.">            if (success &amp;&amp; replayPath != null &amp;&amp; replayPath.size() &gt; 1) {</span>
 <span class="fc" id="L247">                return DiscoveryResultKind.TRANSFORMED;</span>
             }
-<span class="pc bpc" id="L249" title="2 of 4 branches missed.">            return hypotheses == null || hypotheses.isEmpty()</span>
+<span class="pc bpc" id="L249" title="1 of 4 branches missed.">            return hypotheses == null || hypotheses.isEmpty()</span>
 <span class="fc" id="L250">                ? DiscoveryResultKind.NO_CANDIDATE</span>
-<span class="nc" id="L251">                : DiscoveryResultKind.HYPOTHESIS_ONLY;</span>
+<span class="fc" id="L251">                : DiscoveryResultKind.HYPOTHESIS_ONLY;</span>
         }
 
         static Set&lt;DiscoveryEvidenceKind&gt; inferEvidence(
