@@ -75,7 +75,7 @@ Jeder Evaluator liefert ein Receipt mit:
 - Runner-Ergebnis und Gegenbeispielstatus,
 - nächstem Snapshot-Hash.
 
-Nicht berichtete Werte werden nicht erfunden. Ein fehlender oder unzulässiger Seed verbraucht keine ausgeführte Arbeit; die geplante Zuteilung wird sichtbar als übersprungen bilanziert. Ein Receipt darf die geplanten Deltas nicht überschreiten.
+Nicht berichtete Werte werden nicht erfunden. Ein fehlender oder unzulässiger Seed verbraucht keine ausgeführte Arbeit; die geplante Zuteilung wird sichtbar als übersprungen bilanziert. Ein Receipt darf die geplanten Deltas nicht überschreiten. `COMPLETED` verlangt zusätzlich mindestens eine ausgeführte, stufenspezifische Nicht-Zeit-Ressource; reine Laufzeit oder Nullarbeit darf keinen Branch fortschreiben.
 
 ## Feedback- und Reallokationsrunde
 
@@ -97,6 +97,20 @@ Die logische Receipt-Identität trennt sich von Laufzeittelemetrie:
 - `runtimeTelemetryHash` bindet tatsächliche Laufzeiten und den faktischen Ledgerstand.
 
 Der Folgeplan wird trotzdem aus dem **aktualisierten** Ledger berechnet. Tatsächlich verbrauchte Zeit darf daher den Restetat und die nächste Allokation verändern. Reproduzierbar ist die Reallokation für identische Brief-, Snapshot- und Receipt-Daten; sie ist nicht künstlich unabhängig von realem Ressourcenverbrauch.
+
+## Grenze von v1 und geplanter v2-DAG
+
+Die v1-Ausführung ist absichtlich **branch-lokal**: Eine Allokation aktualisiert genau den referenzierten Branch. Das ist für die Ausführungs-, Receipt- und Feedback-Grundlage ausreichend, bildet aber die produktive Open-Target-Kandidatenbildung noch nicht vollständig ab.
+
+`OpenTargetConjectureMiner.mine(...)` verarbeitet mehrere unabhängige `UNTARGETED`-Beobachtungen gemeinsam und kann aus einem Batch null, einen oder mehrere Kandidaten erzeugen. Diese Fan-in/Fan-out-Semantik wird nicht nachträglich unter den v1-Schema-IDs versteckt. Issue #336 führt dafür versionierte v2-Verträge ein mit:
+
+- unveränderlichen Beobachtungsbranches als Eingängen,
+- aggregierten Entscheidungen,
+- zero-to-many Kandidatenbranches,
+- kandidatenspezifischen Herkunftslinien,
+- getrennten Stufen für Projekt-Novelty und Lifecycle-Handoff.
+
+Damit bleiben v1-Artefakte und ihre Hashsemantik stabil, während die produktive #221-Kette korrekt modelliert wird.
 
 ## Wissenschaftliche Grenze
 
