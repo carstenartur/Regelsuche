@@ -61,6 +61,40 @@
         "explanation": { "type": "string" },
         "nextSnapshotHash": { "$ref": "#/$defs/sha256" }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "disposition": { "const": "COMPLETED" } },
+            "required": ["disposition"]
+          },
+          "then": {
+            "properties": {
+              "executedResources": {
+                "contains": {
+                  "type": "object",
+                  "required": ["resource"],
+                  "properties": {
+                    "resource": {
+                      "enum": ["GENERATED_STATES", "EXPLORED_STATES", "CANDIDATES", "VALIDATION_CHECKS", "COUNTEREXAMPLE_ATTEMPTS", "PROOF_ATTEMPTS"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "disposition": { "const": "BACKEND_UNAVAILABLE" } },
+            "required": ["disposition"]
+          },
+          "then": {
+            "properties": {
+              "executedResources": { "maxItems": 0 }
+            }
+          }
+        }
+      ],
       "additionalProperties": false
     },
     "snapshot": {
