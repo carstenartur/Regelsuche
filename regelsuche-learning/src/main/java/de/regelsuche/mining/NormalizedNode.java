@@ -179,7 +179,7 @@ final class NormalizedNode {
             }
             return true;
         }
-        if (kind == Kind.NUMBER || kind == Kind.PLHOLDER) {
+        if (kind == Kind.NUMBER || kind == Kind.PLACEHOLDER) {
             return true;
         }
         for (int i = 0; i < children.size(); i++) {
