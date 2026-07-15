@@ -162,7 +162,44 @@ Eine Kandidatenlinie darf keine Beobachtung außerhalb der Aggregate-Entscheidun
 
 `INCONCLUSIVE` und `BACKEND_UNAVAILABLE` erzeugen keine Kandidatenoutputs. Ein nicht verfügbarer Backend-Versuch weist keine ausgeführte Arbeit aus; die geplanten Ressourcen bleiben als übersprungen sichtbar.
 
-## Evidence DAG v2
+## Produktive Open-Target-Bindung
+
+`OpenTargetAutopilotV2Binding` verbindet den Aggregate-Vertrag direkt mit dem vorhandenen produktiven `OpenTargetConjectureEvidence`:
+
+- `OpenTargetConjectureEvidence.contentHash()` wird unverändert als Mining-Evidence-Hash gebunden,
+- Campaign-ID und Rule-Inventory-Hash werden übernommen und gegen den v2-Brief geprüft,
+- die im Plan enthaltenen Observation-IDs müssen exakt den kanonischen Seed-Provenienzen entsprechen,
+- ausschließlich Conjecture-IDs aus dem kanonischen Mining-Report können Output-Branches erzeugen,
+- abgewiesene produktive Cluster bleiben explizite Evidence,
+- Kandidatenlinien enthalten nur die tatsächlich unterstützenden Beobachtungsbranches.
+
+Damit ist die Fan-in/Fan-out-Schicht keine zweite Mining-Implementierung. Sie bindet die vorhandene produktive Mining-Evidence an Plan, Receipt und Lineage.
+
+## Novelty-, Proof- und Lifecycle-Ausgänge
+
+`regelsuche.autonomous-candidate-lifecycle/v2` bildet die bestehenden fachlichen Reports ohne Zusammenlegung ihrer Bedeutung ab:
+
+- `EXACT_DUPLICATE` und `ALPHA_EQUIVALENT_DUPLICATE` enden terminal als `DUPLICATE`; Proof und Lifecycle werden nicht ausgeführt,
+- `INCONCLUSIVE_UNPARSEABLE` bleibt `INCOMPLETE`,
+- Proof `REFUTED` endet terminal als `DISPROVED`,
+- Proof `INCONCLUSIVE` oder `NOT_RUN` bleibt `INCOMPLETE`,
+- `SYMBOLICALLY_VERIFIED` ohne Lifecycle-Handoff bleibt `INCOMPLETE`,
+- erst der konservative `OpenTargetHypothesisCandidateAdapter`-Handoff schließt die Autopilot-Stufenkette als `COMPLETED` ab.
+
+Der Handoff akzeptiert nur den bestehenden konservativen Status `VALIDATED_BY_EXAMPLES`. Er versucht weder Promotion noch Veröffentlichung.
+
+## Versionierte Campaign-Artefakte v2
+
+Die Aggregate-Objekte werden durch vier äußere, versionierte Verträge referenziert, nicht kopiert:
+
+- `regelsuche.autonomous-campaign-plan/v2`,
+- `regelsuche.autonomous-campaign-execution/v2`,
+- `regelsuche.autonomous-branch-lineage/v2`,
+- `regelsuche.autonomous-campaign-round/v2`.
+
+Der Plan referenziert die kanonischen Aggregate-Decisions. Die Execution bindet Plan, Aggregate-Receipt, produktiven Mining-Evidence-Hash und Ressourcenbilanz. Die Lineage bindet für jeden Output exakt Candidate-, Evidence-, Observation-, Branch- und Snapshot-Provenienz. Die Round bindet Plan, Execution, Lineage, optionale Lifecycle-Entscheidungen und den deterministischen Folgeplan.
+
+## Evidence DAG und CI-Artefakte v2
 
 `regelsuche.autonomous-evidence-dag/v2` bindet:
 
@@ -172,15 +209,22 @@ Research Brief v2
 → Aggregate Decisions
 → Aggregate Receipts
 → zero-to-many Candidate Branches mit Lineage
+→ getrennte Novelty-, Proof- und Lifecycle-Ausgänge
+→ nächster versionierter Campaign-Plan
 ```
 
 Ein Receipt ohne retained Decision oder eine Decision ohne retained Observation Inputs wird abgelehnt. Abgewiesene Cluster bleiben Evidence, ohne einen erfolgreichen Kandidatenbranch zu erzeugen.
 
-Dieser Vertrags-Slice bindet den produktiven `OpenTargetConjectureMiner` noch nicht. Die nächste Stufe übersetzt dessen kanonischen Report und `OpenTargetConjectureEvidence.contentHash()` in genau diese Aggregate-Receipts und Lineages.
+Der Workflow `Autopilot Evidence` verlangt und archiviert unter anderem:
+
+- `brief-v2.json`, `aggregate-decision.json`, `aggregate-receipt.json` und `dag.json`,
+- `production-binding.json` und `lifecycle-decision.json`,
+- `plan-v2.json`, `execution-v2.json`, `lineage-v2.json`, `round-v2.json` und `next-plan-v2.json`,
+- weiterhin die unveränderten v1-Kompatibilitäts- und Ausführungsartefakte.
 
 ## Wissenschaftliche Grenze
 
-Planner, Executor und Evidence DAG dürfen nur entscheiden, **welche Arbeit ausgeführt wird**, **welche Ressourcen verbraucht wurden** und **aus welchen unveränderlichen Eingängen ein Output hervorging**. Daher bleiben:
+Planner, Executor, Binding, Lifecycle-Mapper und Evidence DAG dürfen nur entscheiden, **welche Arbeit ausgeführt wird**, **welche Ressourcen verbraucht wurden**, **aus welchen unveränderlichen Eingängen ein Output hervorging** und **welcher interne Workflow-Ausgang erreicht wurde**. Daher bleiben:
 
 ```text
 plannerDecisionIsMathematicalEvidence = false
@@ -189,6 +233,9 @@ roundDecisionIsMathematicalEvidence = false
 decisionIsMathematicalEvidence = false
 receiptIsMathematicalEvidence = false
 dagIsMathematicalEvidence = false
+bindingIsMathematicalEvidence = false
+promotionAttempted = false
+publicationAttempted = false
 promotionStatus = NOT_EVALUATED
 publicEvidenceStatus = NOT_EVALUATED
 ```
