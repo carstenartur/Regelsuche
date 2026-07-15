@@ -6,6 +6,22 @@ Regelsuche unterstützt ein leichtgewichtiges Java-Plugin-Modell auf Basis von `
 
 - `plugins/` für externe Plugin-JARs
 - `rules/` für textbasierte Regelpakete
+- `rules/packs/` für deklarative Knowledge Packs
+
+## Erweiterungsflächen im heutigen System
+
+Nicht jede Form von zusätzlichem Regelwissen folgt demselben Lebenszyklus. Die folgende Trennung verhindert, dass interne Registries, deklarative Daten und extern ladbare Java-Plugins fälschlich gleichgesetzt werden.
+
+| Erweiterungsfläche | Typischer Inhalt | Laden/Aktivieren | Wissenschaftliche Grenze |
+|---|---|---|---|
+| Java-Plugin | Regeln, Transformationen, AST-Visitor, Makros, Suchstrategien, Heuristiken, Kosten, Renderer, Erklärungen, Parser-Hooks, Beispiele | JAR über `ServiceLoader`, `PluginRuntime`, `plugins/`, Reload/Watcher | Plugin-Metadaten oder Signaturen beweisen weder Korrektheit noch Vertrauenswürdigkeit |
+| Regeldatei | deklarative Regeln, Makros und Aktivierungsprofile | `.regelsuche`/`.rules` aus `rules/`, Import/Export und Hot Reload | unbekannte Bedingungen werden dokumentiert, aber nicht automatisch zu neuen mathematischen Matchern |
+| Knowledge Pack | kuratierte Domänenregeln, Metadaten und Provenance | YAML-Pack-Loader und Pack-Registry unter `rules/packs/` | Pack-Registrierung ist kein Proof und keine externe Neuheitsprüfung |
+| Gelernte Makroregel oder dynamischer Operator | aus realen Suchpfaden generalisierte und kompilierte Kandidaten | Discovery-, Validierungs-, Novelty-, Proof- und Promotion-Lifecycle | entsteht nicht allein durch Plugin-Laden; Promotion/Public Evidence bleiben eigene Gates |
+| Discovery-Operator | Hypothesenoperatoren und Discovery-spezifische Kandidatenerzeugung | `DiscoveryOperatorProvider`/`DiscoveryOperatorRegistry` beziehungsweise explizite App-Konfiguration | Operatoraktivierung ist keine Bestätigung eines erzeugten Kandidaten |
+| Mathematische Capability | CAS-, Äquivalenz-, Counterexample- oder Proof-Fähigkeit | Algorithmus-/Capability-Registry und explizite Konfiguration; Autopilot-Briefs nennen erlaubte Capabilities | nicht jedes Backend ist automatisch ein extern ladbares Plugin; Portfolio-Orchestrierung wird separat entwickelt |
+
+Java-Plugins und Regeldateien sind die dynamisch über `PluginRuntime` verwalteten Oberflächen aus Issue #74. Knowledge Packs, gelernte Regeln und die neueren Discovery-/Capability-Registries ergänzen dieses Modell, ersetzen aber nicht dessen Kompatibilitäts-, Trust- oder Reload-Vertrag.
 
 ## Plugin-Vertrag
 
@@ -53,6 +69,16 @@ Beispielimplementierungen liegen unter `app/src/main/java/de/regelsuche/plugin/e
 - [x] Dokumentation für Plugins, Plugin-API, Regeldateien und Makros
 - [x] Tests für Discovery, Registry-Erweiterung, Regeldateien, Visitor, Suchgraph-Integration, deaktivierte Regeln, Konflikte und Beispielpakete
 
+### Neubewertung vom 15. Juli 2026
+
+Issue #74 bleibt geschlossen. Die später hinzugekommenen Knowledge Packs, Discovery-Operator-Registries, evidenzkontrollierten dynamischen Regeln und Autopilot-Capabilities erweitern die Architektur, widerlegen aber keinen der damaligen Verträge.
+
+Noch offene Aufgaben gehören in getrennte Issues:
+
+- Plugin-Katalog, veröffentlichbare Community-Artefakte, echte Signaturprüfung und ein externer Index: #104.
+- Solver-neutrale Obligations-/Proof-IR und capability-aware Backend-Orchestrierung: #233/#234.
+- Discovery- und Autopilot-Evidenz, Promotion und Public Evidence: eigene Discovery-Issues statt Plugin-Lifecycle.
+
 ## Sichtbarkeit und Debugging
 
 - `plugins list` zeigt geladene Plugins
@@ -77,6 +103,8 @@ Beispielimplementierungen liegen unter `app/src/main/java/de/regelsuche/plugin/e
 - Externe Plugins werden als JAR-Artefakte über `META-INF/services/de.regelsuche.plugin.RegelsuchePlugin` veröffentlicht.
 - Regelpakete werden als `.regelsuche`/`.rules`-Artefakte veröffentlicht und können mit `rules import`/`rules export` ausgetauscht werden.
 - Versionierung erfolgt pro Plugin über `version()`, `apiVersion()` und `minimumCoreVersion()`.
+
+Ein lokaler Installations- und Metadatenkatalog existiert. Ein kuratierter, organisationsübergreifender Plugin-Index mit veröffentlichten Artefakten, automatisierter Vertrauensprüfung und mehreren eigenständigen Beispielprojekten bleibt Bestandteil von #104.
 
 ## Vertrauensmodell
 
