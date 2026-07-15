@@ -23,7 +23,6 @@ final class AutonomousEvidenceDagV2Fixtures {
     ) {
         return AutonomousResearchBriefV2.create(
             "autopilot-v2-dag-characterization",
-            "sha256:b1aa8dce6924467390e2a89687678abcd54ba70925e650370faa1b151ae84359",
             List.of("algebra", "rational", "functional"),
             List.of("untargeted-search-generator"),
             hash("inventory-v2"),
