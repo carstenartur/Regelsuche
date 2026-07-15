@@ -44,8 +44,9 @@ jobs:
             --tests de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2Test \
             --tests de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2Test \
             --tests de.regelsuche.experiments.autopilot.AutonomousProductionGenerationRunnerTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousProductionMiningRunnerTest \
             2>&1 | tee -a autopilot-build.log
-          ./gradlew :regelsuche-autopilot:runProductionGeneration \
+          ./gradlew :regelsuche-autopilot:runProductionMining \
             2>&1 | tee -a autopilot-build.log
 
       - name: Require evidence artifacts
@@ -61,12 +62,29 @@ jobs:
           test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/lineage-v2.json
           test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/round-v2.json
           test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/next-plan-v2.json
-          test -s regelsuche-autopilot/build/reports/autopilot-production-generation/brief-v2.json
-          test -s regelsuche-autopilot/build/reports/autopilot-production-generation/seeds.json
-          test -s regelsuche-autopilot/build/reports/autopilot-production-generation/observations.json
-          test -s regelsuche-autopilot/build/reports/autopilot-production-generation/generation-receipt.json
-          test -s regelsuche-autopilot/build/reports/autopilot-production-generation/discovery-report.json
-          test -s regelsuche-autopilot/build/reports/autopilot-production-generation/generation-run.json
+          DIR=regelsuche-autopilot/build/reports/autopilot-production-mining
+          test -s "$DIR/brief-v2.json"
+          test -s "$DIR/seeds.json"
+          test -s "$DIR/observations.json"
+          test -s "$DIR/generation-receipt.json"
+          test -s "$DIR/discovery-report.json"
+          test -s "$DIR/generation-run.json"
+          test -s "$DIR/plan-v2.json"
+          test -s "$DIR/full-decision.json"
+          test -s "$DIR/full-mining-evidence.json"
+          test -s "$DIR/full-binding.json"
+          test -s "$DIR/full-receipt.json"
+          test -s "$DIR/full-execution-v2.json"
+          test -s "$DIR/full-lineage-v2.json"
+          test -s "$DIR/rejection-decision.json"
+          test -s "$DIR/rejection-mining-evidence.json"
+          test -s "$DIR/rejection-binding.json"
+          test -s "$DIR/rejection-receipt.json"
+          test -s "$DIR/rejection-execution-v2.json"
+          test -s "$DIR/rejection-lineage-v2.json"
+          test -s "$DIR/candidate-formation-receipt.json"
+          test -s "$DIR/evidence-dag.json"
+          test -s "$DIR/production-mining-run.json"
 
       - name: Upload Autopilot evidence and diagnostics
         if: always()
@@ -81,5 +99,5 @@ jobs:
             regelsuche-autopilot/build/test-results/**
             regelsuche-autopilot/build/reports/tests/**
             regelsuche-autopilot/build/reports/autopilot-v2-dag/**
-            regelsuche-autopilot/build/reports/autopilot-production-generation/**
+            regelsuche-autopilot/build/reports/autopilot-production-mining/**
           if-no-files-found: warn
