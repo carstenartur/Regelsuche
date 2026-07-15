@@ -105,7 +105,7 @@ class AutonomousProductionGenerationRunnerTest {
     }
 
     @Test
-    void rejectsAnUndersizedOrSingleFamilyCatalog() {
+    void rejectsAnUndersizedSingleFamilyOrBlankIdCatalog() {
         var brief = PinnedAutonomousProductionCampaign.brief();
         List<SeedExpression> seeds = PinnedAutonomousProductionCampaign.seeds();
 
@@ -124,5 +124,18 @@ class AutonomousProductionGenerationRunnerTest {
         assertThrows(
             IllegalArgumentException.class,
             () -> runner.run(brief, oneFamily, 1));
+
+        List<SeedExpression> blankId = new ArrayList<>(seeds);
+        SeedExpression first = blankId.getFirst();
+        blankId.set(0, new SeedExpression(
+            "",
+            first.expression(),
+            first.source(),
+            first.category(),
+            first.tags(),
+            first.assumptions()));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> runner.run(brief, blankId, 1));
     }
 }
