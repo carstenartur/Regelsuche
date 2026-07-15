@@ -116,11 +116,11 @@ Ein Receipt ohne retained Decision oder eine Decision ohne retained Observation 
 
 `PinnedAutonomousProductionCampaign` definiert den ersten tatsächlich ausgeführten Teil der produktiven Mehr-Runden-Campaign. Der Brief enthält kein Target und keine erwartete Antwort. Er bindet das aktive Regel-Inventar der `AstRewriteTransformationEngine`, die Best-First-Suche, `ExpressionScorer`, `ExpressionCanonicalizer` und die Suchheuristik.
 
-Zwei unabhängig parametrisierte Generatorfamilien liefern zwölf deterministische Polynomial-Seeds. Eine Familie verwendet aufeinanderfolgende ganze Zahlen, die andere aufeinanderfolgende Primzahlen; beide erzeugen dieselbe strukturelle Faktorisierungsaufgabe:
+Zwei unabhängig parametrisierte Generatorfamilien liefern zwölf deterministische Polynomial-Seeds. Beide verwenden die für den Generalizer sichtbare Relation `B = A + 2`, beziehen ihre Parameter aber aus unterschiedlichen Quellen: einer allgemeinen Abstand-zwei-Folge und einer Folge von Zwillingsprimzahlen. Dadurch kann der vorhandene Miner eine gemeinsame Regel abstrahieren, ohne die Familienbezeichnung zur Clusterbildung zu verwenden:
 
 ```text
-factor-common-consecutive-generator/v1
-factor-common-prime-generator/v1
+factor-common-gap-two-generator/v1
+factor-common-twin-prime-generator/v1
 ```
 
 `AutonomousProductionGenerationRunner` führt jeden Seed über die vorhandenen Produktionskomponenten aus:
