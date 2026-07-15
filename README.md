@@ -17,6 +17,8 @@
 **Navigation:** [Demo Gallery](docs/demo-gallery.md) ·
 [Discovery Engine](docs/discovery-engine.md) ·
 [Discovery Evidence v1](docs/discovery-evidence-v1.md) ·
+[Plugins & Rule DSL](docs/plugins.md) ·
+[Knowledge Packs](docs/knowledge-packs.md) ·
 [Macro Rules](docs/macro-rules.md)
 
 > **Regelsuche macht mathematische Umformungsräume sichtbar.**
@@ -159,6 +161,10 @@ Artefakte: `discovery-report.json`, `discovery-report.html`,
 
 * **Atomare Rewrite-Regeln** statt vorgefertigter Formeln — Schulbuchidentitäten
   emergieren als Pfade durch den Suchraum.
+* **Erweiterungsmodell** für Java-Plugins über `ServiceLoader`, textbasierte
+  Regel-/Makro-DSL mit Aktivierungsprofilen und Hot Reload sowie kuratierte
+  Knowledge Packs. Gelernte Makroregeln bleiben davon getrennt und durchlaufen
+  Validierungs-, Novelty-, Proof- und Promotion-Gates.
 * **Vier Math-Domänen** mit eigenen Replay-Karten: Gleichungen,
   Ungleichungen (inkl. Vergleichszeichen-Flip), Analysis
   (Potenz-/Summen-/Produktregel), Lineare Algebra (`bmatrix`-Preview).
@@ -194,6 +200,9 @@ Artefakte: `discovery-report.json`, `discovery-report.html`,
 * [Architektur](docs/architecture.md) — Leitplanken und Überblick.
 * [Modulstruktur](docs/module-structure.md) — Gradle-Module inkl. Search/Persistence/Learning/Experiments (inkl. Seed-Corpus)/CLI/Discovery, verbleibende logische Module und Paketmapping.
 * [Dependency-Regeln](docs/dependency-rules.md) — erlaubte Abhängigkeitsrichtungen.
+* [Plugins](docs/plugins.md), [Plugin-API](docs/plugin-api.md),
+  [Regeldateien](docs/rule-files.md) und [Knowledge Packs](docs/knowledge-packs.md)
+  — externe Java-Erweiterungen, DSL-Regeln, Profile und kuratiertes Regelwissen.
 * [Nutzer-Workflows](docs/user-workflows.md) — Lehrer/Schüler,
   Forscher, CAS-Vergleich, Proof-Workflow.
 * [Such-Intelligenz](docs/search-intelligence.md) und
