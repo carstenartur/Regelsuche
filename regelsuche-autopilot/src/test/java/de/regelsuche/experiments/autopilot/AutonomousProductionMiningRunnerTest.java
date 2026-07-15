@@ -5,8 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
-import de.regelsuche.mining.OpenTargetConjectureMiner;
-import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetObservation;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -14,35 +12,26 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AutonomousProductionMiningRunnerTest {
     private final AutonomousProductionMiningRunner runner =
         new AutonomousProductionMiningRunner();
+    private AutonomousProductionMiningRunner.MiningRun sequential;
+    private AutonomousProductionMiningRunner.MiningRun parallel;
+
+    @BeforeAll
+    void runPinnedCampaigns() {
+        sequential = runner.runPinned(1);
+        parallel = runner.runPinned(4);
+    }
 
     @Test
     void minesCrossFamilyCandidateAndRetainsPredeclaredRejection() throws Exception {
-        var generation = new AutonomousProductionGenerationRunner().runPinned(4);
-        var directReport = new OpenTargetConjectureMiner().mine(
-            generation.observations().stream()
-                .map(item -> OpenTargetObservation.from(
-                    item.snapshot().observationId(),
-                    item.branch().familyId(),
-                    item.seed().expression(),
-                    item.searchResult()))
-                .toList());
-        if (directReport.conjectures().isEmpty()) {
-            Path diagnostics = Path.of(
-                "build", "reports", "autopilot-production-mining");
-            new AutonomousProductionGenerationRunner().write(diagnostics, generation);
-            Files.writeString(
-                diagnostics.resolve("failed-direct-mining-report.txt"),
-                directReport.toString());
-        }
-        assertFalse(
-            directReport.conjectures().isEmpty(),
-            directReport::toString);
-        var run = runner.run(generation);
+        var run = parallel;
 
         assertEquals(12, run.generation().observations().size());
         assertEquals(2, run.generation().observationBranches().stream()
@@ -142,9 +131,6 @@ class AutonomousProductionMiningRunnerTest {
 
     @Test
     void miningEvidenceIsStableAcrossGenerationParallelism() {
-        var sequential = runner.runPinned(1);
-        var parallel = runner.runPinned(4);
-
         assertEquals(
             sequential.generation().observationBundle().contentHash(),
             parallel.generation().observationBundle().contentHash());
