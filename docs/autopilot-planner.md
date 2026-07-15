@@ -98,19 +98,25 @@ Die logische Receipt-Identität trennt sich von Laufzeittelemetrie:
 
 Der Folgeplan wird trotzdem aus dem **aktualisierten** Ledger berechnet. Tatsächlich verbrauchte Zeit darf daher den Restetat und die nächste Allokation verändern. Reproduzierbar ist die Reallokation für identische Brief-, Snapshot- und Receipt-Daten; sie ist nicht künstlich unabhängig von realem Ressourcenverbrauch.
 
-## Grenze von v1 und geplanter v2-DAG
+## Grenze von v1 und v2-DAG
 
 Die v1-Ausführung ist absichtlich **branch-lokal**: Eine Allokation aktualisiert genau den referenzierten Branch. Das ist für die Ausführungs-, Receipt- und Feedback-Grundlage ausreichend, bildet aber die produktive Open-Target-Kandidatenbildung noch nicht vollständig ab.
 
-`OpenTargetConjectureMiner.mine(...)` verarbeitet mehrere unabhängige `UNTARGETED`-Beobachtungen gemeinsam und kann aus einem Batch null, einen oder mehrere Kandidaten erzeugen. Diese Fan-in/Fan-out-Semantik wird nicht nachträglich unter den v1-Schema-IDs versteckt. Issue #336 führt dafür versionierte v2-Verträge ein mit:
+`OpenTargetConjectureMiner.mine(...)` verarbeitet mehrere unabhängige `UNTARGETED`-Beobachtungen gemeinsam und kann aus einem Batch null, einen oder mehrere Kandidaten erzeugen. Diese Fan-in/Fan-out-Semantik wird nicht nachträglich unter den v1-Schema-IDs versteckt.
 
-- unveränderlichen Beobachtungsbranches als Eingängen,
-- aggregierten Entscheidungen,
-- zero-to-many Kandidatenbranches,
-- kandidatenspezifischen Herkunftslinien,
-- getrennten Stufen für Projekt-Novelty und Lifecycle-Handoff.
+Der erste v2-Vertragsslice ergänzt deshalb neue Schema-IDs mit:
 
-Damit bleiben v1-Artefakte und ihre Hashsemantik stabil, während die produktive #221-Kette korrekt modelliert wird.
+- eingefrorenen v1-Golden-Hashes als Kompatibilitätsgate,
+- expliziten Stufen `PROJECT_NOVELTY` und `LIFECYCLE_HANDOFF`,
+- unveränderlichen Observation-Branches,
+- aggregierten Candidate-Formation-Entscheidungen,
+- zero-to-many Kandidatenbranches erst nach dem Mining-Report,
+- kandidatenspezifischer Lineage,
+- expliziter Nullausgabe und sichtbaren Rejections.
+
+Details: [Autopilot v2: Aggregate Evidence DAG](autopilot-v2-evidence-dag.md).
+
+Die direkte Bindung an `OpenTargetConjectureMiner` und `OpenTargetConjectureEvidence` folgt im nächsten Slice von #336. Damit bleiben v1-Artefakte und ihre Hashsemantik stabil, während die produktive #221-Kette schrittweise korrekt modelliert wird.
 
 ## Wissenschaftliche Grenze
 
