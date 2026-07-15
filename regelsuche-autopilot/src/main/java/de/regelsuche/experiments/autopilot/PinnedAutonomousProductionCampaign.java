@@ -13,17 +13,17 @@ import java.util.Map;
 /** Pinned, target-free input for the production campaign in issue #348. */
 public final class PinnedAutonomousProductionCampaign {
     public static final String CAMPAIGN_ID = "autopilot-production-campaign-348";
-    public static final String CONSECUTIVE_FACTOR_GENERATOR =
-        "factor-common-consecutive-generator/v1";
-    public static final String PRIME_FACTOR_GENERATOR =
-        "factor-common-prime-generator/v1";
+    public static final String GAP_TWO_FACTOR_GENERATOR =
+        "factor-common-gap-two-generator/v1";
+    public static final String TWIN_PRIME_FACTOR_GENERATOR =
+        "factor-common-twin-prime-generator/v1";
     public static final String DOMAIN = "polynomial-factorization";
     public static final int REQUIRED_OBSERVATIONS = 12;
 
-    private static final String CONSECUTIVE_REJECTION_SEED =
-        "consecutive-factor-01";
-    private static final String PRIME_REJECTION_SEED =
-        "prime-factor-01";
+    private static final String GAP_TWO_REJECTION_SEED =
+        "gap-two-factor-01";
+    private static final String TWIN_PRIME_REJECTION_SEED =
+        "twin-prime-factor-01";
     private static final SearchHeuristic SEARCH_HEURISTIC =
         new SearchHeuristic(3, 80, 1, 2, 40, 16);
 
@@ -34,7 +34,7 @@ public final class PinnedAutonomousProductionCampaign {
         return AutonomousResearchBriefV2.create(
             CAMPAIGN_ID,
             List.of(DOMAIN),
-            List.of(CONSECUTIVE_FACTOR_GENERATOR, PRIME_FACTOR_GENERATOR),
+            List.of(GAP_TWO_FACTOR_GENERATOR, TWIN_PRIME_FACTOR_GENERATOR),
             inventoryHash(),
             AutonomousResearchBriefV2.hash(
                 "core-ast-default-rules/v1|" + inventoryHash()),
@@ -76,53 +76,53 @@ public final class PinnedAutonomousProductionCampaign {
     public static List<SeedExpression> seeds() {
         return List.of(
             factorSeed(
-                CONSECUTIVE_REJECTION_SEED,
-                CONSECUTIVE_FACTOR_GENERATOR,
-                "x", 2, 3, "consecutive-parameters"),
+                GAP_TWO_REJECTION_SEED,
+                GAP_TWO_FACTOR_GENERATOR,
+                "x", 3, 5, "gap-two-parameters"),
             factorSeed(
-                "consecutive-factor-02",
-                CONSECUTIVE_FACTOR_GENERATOR,
-                "a", 4, 5, "consecutive-parameters"),
+                "gap-two-factor-02",
+                GAP_TWO_FACTOR_GENERATOR,
+                "a", 4, 6, "gap-two-parameters"),
             factorSeed(
-                "consecutive-factor-03",
-                CONSECUTIVE_FACTOR_GENERATOR,
-                "b", 6, 7, "consecutive-parameters"),
+                "gap-two-factor-03",
+                GAP_TWO_FACTOR_GENERATOR,
+                "b", 6, 8, "gap-two-parameters"),
             factorSeed(
-                "consecutive-factor-04",
-                CONSECUTIVE_FACTOR_GENERATOR,
-                "c", 8, 9, "consecutive-parameters"),
+                "gap-two-factor-04",
+                GAP_TWO_FACTOR_GENERATOR,
+                "c", 8, 10, "gap-two-parameters"),
             factorSeed(
-                "consecutive-factor-05",
-                CONSECUTIVE_FACTOR_GENERATOR,
-                "d", 10, 11, "consecutive-parameters"),
+                "gap-two-factor-05",
+                GAP_TWO_FACTOR_GENERATOR,
+                "d", 10, 12, "gap-two-parameters"),
             factorSeed(
-                "consecutive-factor-06",
-                CONSECUTIVE_FACTOR_GENERATOR,
-                "e", 12, 13, "consecutive-parameters"),
+                "gap-two-factor-06",
+                GAP_TWO_FACTOR_GENERATOR,
+                "e", 12, 14, "gap-two-parameters"),
             factorSeed(
-                PRIME_REJECTION_SEED,
-                PRIME_FACTOR_GENERATOR,
-                "y", 2, 3, "prime-parameters"),
+                TWIN_PRIME_REJECTION_SEED,
+                TWIN_PRIME_FACTOR_GENERATOR,
+                "y", 3, 5, "twin-prime-parameters"),
             factorSeed(
-                "prime-factor-02",
-                PRIME_FACTOR_GENERATOR,
-                "f", 3, 5, "prime-parameters"),
+                "twin-prime-factor-02",
+                TWIN_PRIME_FACTOR_GENERATOR,
+                "f", 5, 7, "twin-prime-parameters"),
             factorSeed(
-                "prime-factor-03",
-                PRIME_FACTOR_GENERATOR,
-                "g", 5, 7, "prime-parameters"),
+                "twin-prime-factor-03",
+                TWIN_PRIME_FACTOR_GENERATOR,
+                "g", 11, 13, "twin-prime-parameters"),
             factorSeed(
-                "prime-factor-04",
-                PRIME_FACTOR_GENERATOR,
-                "h", 7, 11, "prime-parameters"),
+                "twin-prime-factor-04",
+                TWIN_PRIME_FACTOR_GENERATOR,
+                "h", 17, 19, "twin-prime-parameters"),
             factorSeed(
-                "prime-factor-05",
-                PRIME_FACTOR_GENERATOR,
-                "i", 11, 13, "prime-parameters"),
+                "twin-prime-factor-05",
+                TWIN_PRIME_FACTOR_GENERATOR,
+                "i", 29, 31, "twin-prime-parameters"),
             factorSeed(
-                "prime-factor-06",
-                PRIME_FACTOR_GENERATOR,
-                "j", 17, 19, "prime-parameters"));
+                "twin-prime-factor-06",
+                TWIN_PRIME_FACTOR_GENERATOR,
+                "j", 41, 43, "twin-prime-parameters"));
     }
 
     /**
@@ -130,7 +130,7 @@ public final class PinnedAutonomousProductionCampaign {
      * renaming. It is used to retain an honest zero-output rejection batch.
      */
     public static List<String> alphaRejectionSeedIds() {
-        return List.of(CONSECUTIVE_REJECTION_SEED, PRIME_REJECTION_SEED);
+        return List.of(GAP_TWO_REJECTION_SEED, TWIN_PRIME_REJECTION_SEED);
     }
 
     private static SeedExpression factorSeed(
