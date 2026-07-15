@@ -9,7 +9,6 @@ import de.regelsuche.experiments.autopilot.DeterministicCampaignPlanner.Allocati
 import de.regelsuche.experiments.autopilot.DeterministicCampaignPlanner.AllocationPlan;
 import de.regelsuche.experiments.autopilot.DeterministicCampaignPlanner.BranchSnapshot;
 import de.regelsuche.experiments.autopilot.DeterministicCampaignPlanner.BranchStatus;
-import de.regelsuche.experiments.autopilot.DeterministicCampaignPlanner.BudgetDelta;
 import de.regelsuche.experiments.autopilot.DeterministicCampaignPlanner.DecisionKind;
 import de.regelsuche.json.JsonWriter;
 import java.io.IOException;
@@ -52,8 +51,9 @@ public final class AutonomousCampaignExecutionAdapter {
             brief, ledger, plan, snapshots, seedCatalog, parallelism, evaluator);
         AllocationPlan nextPlan = Objects.requireNonNull(planner, "planner").plan(
             brief, execution.updatedLedger(), execution.nextSnapshots());
-        String hash = AutonomousResearchBrief.hash(
-            ROUND_SCHEMA + "\nbrief=" + brief.contentHash()
+        String contentHash = AutonomousResearchBrief.hash(
+            ROUND_SCHEMA
+                + "\nbrief=" + brief.contentHash()
                 + "\nexecution=" + execution.logicalContentHash()
                 + "\nnextPlan=" + nextPlan.contentHash());
         return new CampaignRound(
@@ -64,7 +64,7 @@ public final class AutonomousCampaignExecutionAdapter {
             false,
             "NOT_EVALUATED",
             "NOT_EVALUATED",
-            hash);
+            contentHash);
     }
 
     public CampaignExecutionReport execute(
@@ -83,18 +83,7 @@ public final class AutonomousCampaignExecutionAdapter {
         validateAllocations(allocations, snapshots);
 
         Map<String, StageExecution> results = new ConcurrentHashMap<>();
-        List<SeedExpression> runnable = new ArrayList<>();
-        allocations.values().forEach(decision -> {
-            SeedExpression seed = seeds.get(decision.branchId());
-            if (seed == null) {
-                results.put(decision.branchId(), unavailable(
-                    decision, "eligible seed missing from supplied catalog"));
-            } else {
-                runnable.add(seed);
-            }
-        });
-        runnable.sort(Comparator.comparing(SeedExpression::stableKey));
-
+        List<SeedExpression> runnable = runnableSeeds(allocations, seeds, results);
         StageSeedEvaluator safeEvaluator = Objects.requireNonNull(evaluator, "evaluator");
         DeterministicDiscoveryExperimentRunner runner =
             new DeterministicDiscoveryExperimentRunner(
@@ -141,6 +130,25 @@ public final class AutonomousCampaignExecutionAdapter {
             runtimeHash);
     }
 
+    private static List<SeedExpression> runnableSeeds(
+        Map<String, AllocationDecision> allocations,
+        Map<String, SeedExpression> seeds,
+        Map<String, StageExecution> results
+    ) {
+        List<SeedExpression> runnable = new ArrayList<>();
+        allocations.values().forEach(decision -> {
+            SeedExpression seed = seeds.get(decision.branchId());
+            if (seed == null) {
+                results.put(decision.branchId(), unavailable(
+                    decision, "eligible seed missing from supplied catalog"));
+            } else {
+                runnable.add(seed);
+            }
+        });
+        runnable.sort(Comparator.comparing(SeedExpression::stableKey));
+        return List.copyOf(runnable);
+    }
+
     private static SeedRunOutcome evaluateSafely(
         SeedExpression seed,
         AllocationDecision decision,
@@ -183,6 +191,25 @@ public final class AutonomousCampaignExecutionAdapter {
                     "execution exceeds planned resource " + resource);
             }
         }
+        if (execution.disposition() == ExecutionDisposition.COMPLETED
+                && !hasExecutedDomainResource(execution, stage)) {
+            throw new IllegalArgumentException(
+                "completed stage requires an executed non-time resource: " + stage);
+        }
+        if (execution.disposition() == ExecutionDisposition.BACKEND_UNAVAILABLE
+                && !execution.executedResources().isEmpty()) {
+            throw new IllegalArgumentException(
+                "unavailable backend cannot report executed work");
+        }
+    }
+
+    private static boolean hasExecutedDomainResource(
+        StageExecution execution,
+        EvidenceStage stage
+    ) {
+        return allowedResources(stage).stream()
+            .filter(resource -> resource != ResourceKind.WALL_CLOCK_MILLIS)
+            .anyMatch(resource -> execution.executed(resource) > 0L);
     }
 
     private static StageExecution unavailable(
@@ -306,7 +333,7 @@ public final class AutonomousCampaignExecutionAdapter {
                         "duplicate allocation for branch " + decision.branchId());
                 }
             });
-        return result;
+        return Map.copyOf(result);
     }
 
     private static Map<String, BranchSnapshot> indexSnapshots(
@@ -538,14 +565,13 @@ public final class AutonomousCampaignExecutionAdapter {
         }
 
         String logicalMaterial() {
-            Map<ResourceKind, Long> executed = logicalResources(executedResources);
-            Map<ResourceKind, Long> skipped = logicalResources(skippedResources);
             return branchId + '|' + branchSnapshotHash + '|' + seedStableKey + '|'
                 + stage.name() + '|' + disposition.name() + '|' + runnerSuccess + '|'
                 + summary + '|' + hypothesisCount + '|' + counterexampleCount + '|'
                 + counterexampleStatus + '|' + discoveryResultKind + '|'
-                + executed + '|' + skipped + '|' + explanation + '|'
-                + nextSnapshotHash;
+                + logicalResources(executedResources) + '|'
+                + logicalResources(skippedResources) + '|'
+                + explanation + '|' + nextSnapshotHash;
         }
 
         private static Map<ResourceKind, Long> logicalResources(
@@ -634,17 +660,24 @@ public final class AutonomousCampaignExecutionAdapter {
         public void write(Path directory) {
             try {
                 Files.createDirectories(directory);
-                Files.writeString(directory.resolve("execution.json"),
-                    toCanonicalJson(), StandardCharsets.UTF_8);
-                Files.writeString(directory.resolve("updated-ledger.json"),
-                    updatedLedger.toCanonicalJson(), StandardCharsets.UTF_8);
+                Files.writeString(
+                    directory.resolve("execution.json"),
+                    toCanonicalJson(),
+                    StandardCharsets.UTF_8);
+                Files.writeString(
+                    directory.resolve("updated-ledger.json"),
+                    updatedLedger.toCanonicalJson(),
+                    StandardCharsets.UTF_8);
             } catch (IOException exception) {
                 throw new UncheckedIOException(exception);
             }
         }
 
-        private static void writeReceipt(JsonWriter json, ExecutionReceipt receipt) {
-            json.property("branchId", receipt.branchId())
+        private static void writeReceipt(
+            JsonWriter object,
+            ExecutionReceipt receipt
+        ) {
+            object.property("branchId", receipt.branchId())
                 .property("branchSnapshotHash", receipt.branchSnapshotHash())
                 .property("seedStableKey", receipt.seedStableKey())
                 .property("stage", receipt.stage().name())
@@ -655,20 +688,21 @@ public final class AutonomousCampaignExecutionAdapter {
                 .property("counterexampleCount", receipt.counterexampleCount())
                 .property("counterexampleStatus", receipt.counterexampleStatus())
                 .property("discoveryResultKind", receipt.discoveryResultKind())
-                .array("executedResources", array -> writeResources(
-                    array, receipt.executedResources()))
-                .array("skippedResources", array -> writeResources(
-                    array, receipt.skippedResources()))
+                .array("executedResources", array ->
+                    writeResources(array, receipt.executedResources()))
+                .array("skippedResources", array ->
+                    writeResources(array, receipt.skippedResources()))
                 .property("elapsedMillis", receipt.elapsedMillis())
                 .property("explanation", receipt.explanation())
                 .property("nextSnapshotHash", receipt.nextSnapshotHash());
         }
 
         private static void writeResources(
-            JsonWriter.JsonArrayBuilder array,
+            JsonWriter array,
             Map<ResourceKind, Long> resources
         ) {
-            resources.entrySet().stream().sorted(Map.Entry.comparingByKey())
+            resources.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
                 .forEach(entry -> array.objectValue(item -> item
                     .property("resource", entry.getKey().name())
                     .property("amount", entry.getValue())));
@@ -704,10 +738,14 @@ public final class AutonomousCampaignExecutionAdapter {
         public void write(Path directory) {
             execution.write(directory);
             try {
-                Files.writeString(directory.resolve("next-plan.json"),
-                    nextPlan.toCanonicalJson(), StandardCharsets.UTF_8);
-                Files.writeString(directory.resolve("round.json"),
-                    toCanonicalJson(), StandardCharsets.UTF_8);
+                Files.writeString(
+                    directory.resolve("next-plan.json"),
+                    nextPlan.toCanonicalJson(),
+                    StandardCharsets.UTF_8);
+                Files.writeString(
+                    directory.resolve("round.json"),
+                    toCanonicalJson(),
+                    StandardCharsets.UTF_8);
             } catch (IOException exception) {
                 throw new UncheckedIOException(exception);
             }
