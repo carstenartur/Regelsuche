@@ -21,6 +21,8 @@
 - [Autonomous-Research-Brief-Schema v1](schemas/regelsuche-autonomous-research-brief-v1.schema.json)
 - [Campaign-Budget-Ledger-Schema v1](schemas/regelsuche-campaign-budget-ledger-v1.schema.json)
 - [Autonomous-Campaign-Plan-Schema v1](schemas/regelsuche-autonomous-campaign-plan-v1.schema.json)
+- [Autonomous-Campaign-Execution-Schema v1](schemas/regelsuche-autonomous-campaign-execution-v1.schema.json)
+- [Autonomous-Campaign-Round-Schema v1](schemas/regelsuche-autonomous-campaign-round-v1.schema.json)
 - [Hypothesis Mining](hypothesis-mining.md)
 - [Rule Discovery](rule-discovery.md)
 - [Macro Rules](macro-rules.md)

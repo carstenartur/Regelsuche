@@ -29,21 +29,29 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Generate deterministic research brief, ledger and allocation plan
+      - name: Generate deterministic planning and execution evidence
         run: |
           ./gradlew :regelsuche-experiments:test \
-            --tests de.regelsuche.experiments.autopilot.DeterministicCampaignPlannerTest
+            --tests de.regelsuche.experiments.autopilot.DeterministicCampaignPlannerTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionAdapterTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionReceiptContractTest
 
-      - name: Require planning evidence artifacts
+      - name: Require evidence artifacts
         run: |
           test -s regelsuche-experiments/build/reports/autopilot-planner/brief.json
           test -s regelsuche-experiments/build/reports/autopilot-planner/ledger.json
           test -s regelsuche-experiments/build/reports/autopilot-planner/plan.json
+          test -s regelsuche-experiments/build/reports/autopilot-execution/execution.json
+          test -s regelsuche-experiments/build/reports/autopilot-execution/updated-ledger.json
+          test -s regelsuche-experiments/build/reports/autopilot-execution/next-plan.json
+          test -s regelsuche-experiments/build/reports/autopilot-execution/round.json
 
-      - name: Upload planning evidence
+      - name: Upload planning and execution evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: autopilot-planning-evidence
-          path: regelsuche-experiments/build/reports/autopilot-planner/**
+          name: autopilot-evidence
+          path: |
+            regelsuche-experiments/build/reports/autopilot-planner/**
+            regelsuche-experiments/build/reports/autopilot-execution/**
           if-no-files-found: warn
