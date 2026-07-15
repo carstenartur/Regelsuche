@@ -41,7 +41,8 @@ jobs:
             --tests de.regelsuche.experiments.autopilot.AutonomousAggregateReceiptV2Test \
             --tests de.regelsuche.experiments.autopilot.AutonomousEvidenceDagSnapshotV2Test \
             --tests de.regelsuche.experiments.autopilot.OpenTargetAutopilotV2BindingTest \
-            --tests de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2Test
+            --tests de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2Test \
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2Test
 
       - name: Require evidence artifacts
         run: |
@@ -59,6 +60,11 @@ jobs:
           test -s regelsuche-experiments/build/reports/autopilot-v2-dag/dag.json
           test -s regelsuche-experiments/build/reports/autopilot-v2-dag/production-binding.json
           test -s regelsuche-experiments/build/reports/autopilot-v2-dag/lifecycle-decision.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/plan-v2.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/execution-v2.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/lineage-v2.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/round-v2.json
+          test -s regelsuche-experiments/build/reports/autopilot-v2-dag/next-plan-v2.json
 
       - name: Upload Autopilot evidence
         if: always()
