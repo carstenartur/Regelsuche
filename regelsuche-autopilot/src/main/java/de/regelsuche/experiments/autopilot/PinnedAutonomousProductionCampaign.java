@@ -10,16 +10,20 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
-/** Pinned, target-free input for the first production campaign in issue #348. */
+/** Pinned, target-free input for the production campaign in issue #348. */
 public final class PinnedAutonomousProductionCampaign {
     public static final String CAMPAIGN_ID = "autopilot-production-campaign-348";
-    public static final String LEFT_FACTOR_GENERATOR =
-        "factor-common-left-generator/v1";
-    public static final String RIGHT_FACTOR_GENERATOR =
-        "factor-common-right-generator/v1";
+    public static final String CONSECUTIVE_FACTOR_GENERATOR =
+        "factor-common-consecutive-generator/v1";
+    public static final String PRIME_FACTOR_GENERATOR =
+        "factor-common-prime-generator/v1";
     public static final String DOMAIN = "polynomial-factorization";
     public static final int REQUIRED_OBSERVATIONS = 12;
 
+    private static final String CONSECUTIVE_REJECTION_SEED =
+        "consecutive-factor-01";
+    private static final String PRIME_REJECTION_SEED =
+        "prime-factor-01";
     private static final SearchHeuristic SEARCH_HEURISTIC =
         new SearchHeuristic(3, 80, 1, 2, 40, 16);
 
@@ -30,7 +34,7 @@ public final class PinnedAutonomousProductionCampaign {
         return AutonomousResearchBriefV2.create(
             CAMPAIGN_ID,
             List.of(DOMAIN),
-            List.of(LEFT_FACTOR_GENERATOR, RIGHT_FACTOR_GENERATOR),
+            List.of(CONSECUTIVE_FACTOR_GENERATOR, PRIME_FACTOR_GENERATOR),
             inventoryHash(),
             AutonomousResearchBriefV2.hash(
                 "core-ast-default-rules/v1|" + inventoryHash()),
@@ -71,47 +75,78 @@ public final class PinnedAutonomousProductionCampaign {
 
     public static List<SeedExpression> seeds() {
         return List.of(
-            leftSeed("left-factor-01", "x", 2, 3),
-            leftSeed("left-factor-02", "a", 4, 5),
-            leftSeed("left-factor-03", "b", 6, 7),
-            leftSeed("left-factor-04", "c", 8, 9),
-            leftSeed("left-factor-05", "d", 10, 11),
-            leftSeed("left-factor-06", "e", 12, 13),
-            rightSeed("right-factor-01", "y", 2, 3),
-            rightSeed("right-factor-02", "f", 4, 5),
-            rightSeed("right-factor-03", "g", 6, 7),
-            rightSeed("right-factor-04", "h", 8, 9),
-            rightSeed("right-factor-05", "i", 10, 11),
-            rightSeed("right-factor-06", "j", 12, 13));
+            factorSeed(
+                CONSECUTIVE_REJECTION_SEED,
+                CONSECUTIVE_FACTOR_GENERATOR,
+                "x", 2, 3, "consecutive-parameters"),
+            factorSeed(
+                "consecutive-factor-02",
+                CONSECUTIVE_FACTOR_GENERATOR,
+                "a", 4, 5, "consecutive-parameters"),
+            factorSeed(
+                "consecutive-factor-03",
+                CONSECUTIVE_FACTOR_GENERATOR,
+                "b", 6, 7, "consecutive-parameters"),
+            factorSeed(
+                "consecutive-factor-04",
+                CONSECUTIVE_FACTOR_GENERATOR,
+                "c", 8, 9, "consecutive-parameters"),
+            factorSeed(
+                "consecutive-factor-05",
+                CONSECUTIVE_FACTOR_GENERATOR,
+                "d", 10, 11, "consecutive-parameters"),
+            factorSeed(
+                "consecutive-factor-06",
+                CONSECUTIVE_FACTOR_GENERATOR,
+                "e", 12, 13, "consecutive-parameters"),
+            factorSeed(
+                PRIME_REJECTION_SEED,
+                PRIME_FACTOR_GENERATOR,
+                "y", 2, 3, "prime-parameters"),
+            factorSeed(
+                "prime-factor-02",
+                PRIME_FACTOR_GENERATOR,
+                "f", 3, 5, "prime-parameters"),
+            factorSeed(
+                "prime-factor-03",
+                PRIME_FACTOR_GENERATOR,
+                "g", 5, 7, "prime-parameters"),
+            factorSeed(
+                "prime-factor-04",
+                PRIME_FACTOR_GENERATOR,
+                "h", 7, 11, "prime-parameters"),
+            factorSeed(
+                "prime-factor-05",
+                PRIME_FACTOR_GENERATOR,
+                "i", 11, 13, "prime-parameters"),
+            factorSeed(
+                "prime-factor-06",
+                PRIME_FACTOR_GENERATOR,
+                "j", 17, 19, "prime-parameters"));
     }
 
-    private static SeedExpression leftSeed(
+    /**
+     * Predeclared cross-family pair with the same constants and only an alpha
+     * renaming. It is used to retain an honest zero-output rejection batch.
+     */
+    public static List<String> alphaRejectionSeedIds() {
+        return List.of(CONSECUTIVE_REJECTION_SEED, PRIME_REJECTION_SEED);
+    }
+
+    private static SeedExpression factorSeed(
         String id,
+        String generator,
         String common,
         int left,
-        int right
+        int right,
+        String familyTag
     ) {
         return new SeedExpression(
             id,
             common + " * " + left + " + " + common + " * " + right,
-            LEFT_FACTOR_GENERATOR,
+            generator,
             DOMAIN,
-            List.of("autopilot", "production", "factor-common-left"),
-            List.of());
-    }
-
-    private static SeedExpression rightSeed(
-        String id,
-        String common,
-        int left,
-        int right
-    ) {
-        return new SeedExpression(
-            id,
-            left + " * " + common + " + " + right + " * " + common,
-            RIGHT_FACTOR_GENERATOR,
-            DOMAIN,
-            List.of("autopilot", "production", "factor-common-right"),
+            List.of("autopilot", "production", "factor-common", familyTag),
             List.of());
     }
 
