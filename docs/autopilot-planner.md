@@ -165,11 +165,57 @@ Der reproduzierbare Generation-plus-Mining-Lauf lautet:
 ./gradlew :regelsuche-autopilot:runProductionMining
 ```
 
-Die Generation-, Mining-, Reject-, Lineage-, DAG- und Receipt-Artefakte liegen anschließend unter:
+## Produktive Validation bis Lifecycle-Handoff
+
+`AutonomousProductionLifecycleRunner` übernimmt ausschließlich den bereits gebildeten Kandidatenbranch. Keine Holdout- oder Proof-Information fließt zurück in Generation oder Mining.
+
+Die Downstream-Kette verwendet direkt die vorhandenen Produktionskomponenten:
 
 ```text
-regelsuche-autopilot/build/reports/autopilot-production-mining/
+OpenTargetConjectureEvaluator
+→ DeterministicCounterexampleSearchService
+→ OpenTargetConjectureNoveltyChecker
+→ OpenTargetConjectureProofGate
+→ OpenTargetHypothesisCandidateAdapter
+→ AutonomousCandidateLifecycleV2
 ```
+
+Die fest gepinnte Validation-Suite enthält drei positive und drei negative Holdouts mit Koeffizienten, die in den zwölf Mining-Seeds nicht vorkommen. Die positiven Fälle prüfen sowohl atomare als auch zusammengesetzte gemeinsame Faktoren. Die negativen Fälle verletzen gezielt den Abstand zwei, den zweiten Koeffizienten oder die Gleichheit des gemeinsamen Faktors.
+
+Counterexample Search bleibt eine eigene Evidenzstufe. Der Lauf aktiviert deterministisch:
+
+- fünf Randwertzuweisungen,
+- vier rationale Zuweisungen,
+- 64 pseudozufällige numerische Zuweisungen,
+- vier komplexe Zuweisungen.
+
+Matrixzuweisungen sind in diesem pinned Lauf deaktiviert, weil das generalisierte Muster neben `A` die kleingeschriebene Ausdrucksvariable `x` verwendet und der vorhandene Matrix-Backend bewusst nur reine Großbuchstaben-Muster ausführt.
+
+Project Novelty wird danach separat gegen die sieben aktiven Regeln des `KnownRuleRepository` geprüft. `NOVEL_WITHIN_PROJECT` ist keine Aussage über externe mathematische Neuheit; `externalNoveltyStatus` bleibt `NOT_EVALUATED`.
+
+Erst ein vollständig akzeptierter Evaluation-Report darf die Proof-Obligation auslösen. `SYMBOLICALLY_VERIFIED` bezeichnet die vorhandene deterministische Äquivalenzprüfung; der separate Formal-Proof-Status bleibt `NOT_EVALUATED`. Der anschließende Adapter erzeugt konservativ nur einen `VALIDATED_BY_EXAMPLES`-Kandidaten und führt weder Promotion noch Veröffentlichung aus.
+
+`regelsuche.autonomous-stage-resource-ledger/v2` hält für Validation, Counterexample Search, Project Novelty, Proof und Lifecycle-Handoff jeweils fest:
+
+```text
+configured = executed + skipped + remaining
+```
+
+`regelsuche.autonomous-production-lifecycle/v2` bindet alle Evidence-Hashes, die Proof-Obligation, den konservativen Lifecycle-Kandidaten, die Lifecycle-Entscheidung und den Ressourcenledger in einem Manifest.
+
+Der vollständige Lauf von der Generation bis zum Lifecycle-Handoff lautet:
+
+```bash
+./gradlew :regelsuche-autopilot:runProductionLifecycle
+```
+
+Alle produktiven Artefakte liegen anschließend unter:
+
+```text
+regelsuche-autopilot/build/reports/autopilot-production-lifecycle/
+```
+
+Promotion, Public Evidence, externe Novelty und formaler Proof bleiben dabei ausdrücklich `NOT_EVALUATED`.
 
 ## Modulgrenze
 
@@ -183,6 +229,6 @@ Der Workflow `Autopilot Evidence` erzeugt und archiviert ausschließlich aktuell
 
 - aus `:regelsuche-experiments`: `brief-v2.json`, `aggregate-decision.json`, `aggregate-receipt.json` und `dag.json`,
 - aus `:regelsuche-autopilot`: die bestehenden Binding-, Lifecycle-, Plan-, Execution-, Lineage- und Round-Charakterisierungen,
-- aus dem produktiven Lauf: Research Brief, Seed-Katalog, unveränderliche Observations, Generation Receipt und Manifest, beide Aggregate Decisions, beide Mining-Evidence-Sätze, Bindings, Receipts, Executions und Lineages sowie Candidate-Formation-Receipt, Evidence DAG und Production-Mining-Manifest.
+- aus dem produktiven Lauf: Research Brief, Seed-Katalog, unveränderliche Observations, Generation Receipt und Manifest, beide Aggregate Decisions, Mining-Evidence, Bindings, Receipts, Executions und Lineages, Candidate-Formation-Receipt und Evidence DAG sowie Validation-, Counterexample-, Project-Novelty-, Proof-, Proof-Obligation-, Lifecycle-Candidate-, Lifecycle-Decision-, Ressourcenledger- und Lifecycle-Manifest-Artefakte.
 
-Promotion und Public Evidence bleiben in diesen Planungs- und Ausführungsartefakten `NOT_EVALUATED`.
+Promotion und Public Evidence bleiben in allen Planungs-, Ausführungs- und Lifecycle-Artefakten `NOT_EVALUATED`.
