@@ -36,7 +36,10 @@ jobs:
             --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionAdapterTest \
             --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionReceiptContractTest \
             --tests de.regelsuche.experiments.autopilot.AutonomousCampaignV1CompatibilityTest \
-            --tests de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2Test
+            --tests de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2Test \
+            --tests de.regelsuche.experiments.autopilot.AutonomousAggregateDecisionV2Test \
+            --tests de.regelsuche.experiments.autopilot.AutonomousAggregateReceiptV2Test \
+            --tests de.regelsuche.experiments.autopilot.AutonomousEvidenceDagSnapshotV2Test
 
       - name: Require evidence artifacts
         run: |
