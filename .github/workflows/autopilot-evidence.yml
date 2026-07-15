@@ -30,7 +30,9 @@ jobs:
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
       - name: Generate deterministic planning, execution and v2 DAG evidence
+        shell: bash
         run: |
+          set -o pipefail
           ./gradlew :regelsuche-experiments:test \
             --tests de.regelsuche.experiments.autopilot.DeterministicCampaignPlannerTest \
             --tests de.regelsuche.experiments.autopilot.AutonomousCampaignExecutionAdapterTest \
@@ -42,7 +44,8 @@ jobs:
             --tests de.regelsuche.experiments.autopilot.AutonomousEvidenceDagSnapshotV2Test \
             --tests de.regelsuche.experiments.autopilot.OpenTargetAutopilotV2BindingTest \
             --tests de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2Test \
-            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2Test
+            --tests de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2Test \
+            2>&1 | tee autopilot-build.log
 
       - name: Require evidence artifacts
         run: |
@@ -66,12 +69,15 @@ jobs:
           test -s regelsuche-experiments/build/reports/autopilot-v2-dag/round-v2.json
           test -s regelsuche-experiments/build/reports/autopilot-v2-dag/next-plan-v2.json
 
-      - name: Upload Autopilot evidence
+      - name: Upload Autopilot evidence and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: autopilot-evidence
           path: |
+            autopilot-build.log
+            regelsuche-experiments/build/test-results/**
+            regelsuche-experiments/build/reports/tests/**
             regelsuche-experiments/build/reports/autopilot-planner/**
             regelsuche-experiments/build/reports/autopilot-execution/**
             regelsuche-experiments/build/reports/autopilot-v2-dag/**
