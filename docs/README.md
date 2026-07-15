@@ -8,6 +8,18 @@
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
 - [Demo Gallery](demo-gallery.md) — reproduzierbare UI- und Replay-Beispiele.
 
+## Erweiterungen
+
+- [Erweiterungssystem](extension-system.md) — zentrale Architekturkarte und Auswahlhilfe für Java-Plugins, Regeldateien, Knowledge Packs, deklarative und gelernte Makros, Discovery-Operatoren und mathematische Capabilities.
+- [Plugins](plugins.md) — `ServiceLoader`, externe JARs, `PluginRuntime`, Reload, Katalog, Diagnosen und aktuelle Vertrauensgrenzen.
+- [Plugin-API](plugin-api.md) — Java-Vertrag, Registries, Paketierung und Starter-Template.
+- [Regeldateien](rule-files.md) — `.regelsuche`-/`.rules`-DSL, Profile, Import/Export und Debugging.
+- [Makros](macros.md) — vom Autor deklarierte Makros als Suchkanten.
+- [Knowledge Packs](knowledge-packs.md) — kuratierte Core-Pakete mit Provenance, Lizenz, Reviewstatus, Risiko und Validierungsbeispielen.
+- [Makroregeln und emergente Identitäten](macro-rules.md) — aus Suchpfaden gelernte und erst nach Evidenz-/Promotion-Gates aktivierte Regeln.
+
+Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. Solver-/Proof-Backends, Discovery-Promotion und Public Evidence behalten ihre eigenen Verträge und Gates.
+
 ## Discovery und wissenschaftliche Evidenz
 
 - [Discovery Evidence v1](discovery-evidence-v1.md)
@@ -25,7 +37,6 @@
 - [Autonomous-Campaign-Round-Schema v1](schemas/regelsuche-autonomous-campaign-round-v1.schema.json)
 - [Hypothesis Mining](hypothesis-mining.md)
 - [Rule Discovery](rule-discovery.md)
-- [Macro Rules](macro-rules.md)
 - [Scientific Reproducibility](scientific-reproducibility.md)
 - [Experiment Runner](experiment-runner.md)
 - [Replay und Reports](replay-and-reports.md)
@@ -47,6 +58,5 @@
 - [Storage Architecture](storage-architecture.md)
 - [Proof Bridge](proof-bridge.md)
 - [Mathematical Algorithms](mathematical-algorithms.md)
-- [Knowledge Packs](knowledge-packs.md)
 
 Der Top-Level-[README](../README.md) bleibt der kurze Produkt- und Quickstart-Einstieg. Diese Seite ist der zentrale Dokumentationsindex; der datierte Forschungsstand wird in `discovery-status.md` gepflegt, damit README und Architekturtexte nicht mit häufig wechselnden Zwischenständen überladen werden.

@@ -17,7 +17,8 @@
 **Navigation:** [Demo Gallery](docs/demo-gallery.md) ·
 [Discovery Engine](docs/discovery-engine.md) ·
 [Discovery Evidence v1](docs/discovery-evidence-v1.md) ·
-[Macro Rules](docs/macro-rules.md)
+[Macro Rules](docs/macro-rules.md) ·
+[Erweiterungssystem](docs/extension-system.md)
 
 > **Regelsuche macht mathematische Umformungsräume sichtbar.**
 > Knoten sind Ausdrücke, Kanten sind Umformungen, Pfade sind Rechenwege —
@@ -185,6 +186,26 @@ Artefakte: `discovery-report.json`, `discovery-report.html`,
 * **Export-Bundle** mit Markdown, LaTeX, JSON, Mermaid, GraphML und dem
   Rule-Inventory in einer einzigen ZIP.
 
+## Erweiterungen
+
+Regelsuche kann auf mehreren Ebenen erweitert werden:
+
+- **Java-Plugins** über `ServiceLoader` und `PluginRuntime`,
+- **Regeldateien** in der `.regelsuche`-/`.rules`-DSL,
+- kuratierte **Knowledge Packs**,
+- deklarative sowie gelernte/promovierte **Makros**,
+- explizite **Discovery-Operatoren** und mathematische **Capabilities**.
+
+Diese Wege haben unterschiedliche Vertrauens- und Qualitätsgrenzen. Insbesondere
+ist nicht jede interne Discovery- oder Solver-Registry automatisch ein externer
+Plugin-JAR-Endpunkt, und vorhandene Signaturmetadaten werden derzeit noch nicht
+kryptografisch verifiziert.
+
+👉 **[Erweiterungssystem und Auswahlhilfe](docs/extension-system.md)** ·
+[Plugins](docs/plugins.md) ·
+[Regeldateien](docs/rule-files.md) ·
+[Knowledge Packs](docs/knowledge-packs.md)
+
 ## Quickstart-Varianten
 
 * [Getting Started](docs/getting-started.md) — Docker, lokaler Gradle-Lauf,
@@ -208,6 +229,12 @@ Artefakte: `discovery-report.json`, `discovery-report.html`,
   Seed-Auswertung, Budgets, Parallelität.
 * [Replay & Reports](docs/replay-and-reports.md) — Replay-UX, Discovery-Report-
   Artefakte, Browser-Screenshots/GIFs.
+* [Erweiterungssystem](docs/extension-system.md) — Java-Plugins, Regel-DSL,
+  Knowledge Packs, Makros, Discovery-Operatoren und Capabilities im Vergleich.
+* [Plugins](docs/plugins.md) und [Plugin-API](docs/plugin-api.md) — externe
+  Java-JARs, Registries, Reload und Vertrauensmetadaten.
+* [Regeldateien](docs/rule-files.md) — deklarative Regeln, Makros und
+  Aktivierungsprofile ohne Java.
 * [Storage Architecture](docs/storage-architecture.md) — In-Memory, JSON,
   PostgreSQL/Hibernate und Artefakt-Ablage.
 * [Persistenz](docs/persistence.md) — Betriebsmodi und Adapterdetails.
