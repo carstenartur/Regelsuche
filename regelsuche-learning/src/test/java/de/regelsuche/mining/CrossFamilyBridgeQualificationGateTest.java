@@ -31,6 +31,7 @@ import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.solver.ir.SolverExecution;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
 import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
@@ -40,6 +41,7 @@ import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
 import de.regelsuche.solver.ir.SolverIr.Theory;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.SolverTranslation;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.nio.charset.StandardCharsets;
@@ -96,7 +98,17 @@ class CrossFamilyBridgeQualificationGateTest {
         assertEquals("NOT_EVALUATED", report.publicEvidenceStatus());
         assertEquals(ResultStatus.CONFIRMED, fixture.proof().result().status());
         assertEquals(TranslationStatus.LOSSLESS,
-            fixture.proof().result().translationStatus());
+            fixture.proof().translation().status());
+        assertEquals(ASSUMPTIONS, fixture.proof().obligation().assumptions().stream()
+            .map(predicate -> predicate.left().canonicalMaterial()
+                + predicate.relation().name()
+                + predicate.right().canonicalMaterial())
+            .map(value -> value.isBlank() ? value : "qNOT_EQUALS0")
+            .toList());
+        assertEquals(LEFT,
+            fixture.proof().translation().termMapping().get("goal.left"));
+        assertEquals(RIGHT,
+            fixture.proof().translation().termMapping().get("goal.right"));
         assertEquals(ablation.toCanonicalJson(), Files.readString(ablationOutput));
         assertEquals(report.toCanonicalJson(), Files.readString(reportOutput));
     }
@@ -465,6 +477,16 @@ class CrossFamilyBridgeQualificationGateTest {
             List.of(SolverIr.Relation.EQUALS),
             List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
             true);
+        SolverTranslation translation = SolverTranslation.create(
+            obligation,
+            descriptor,
+            TranslationStatus.LOSSLESS,
+            List.of(),
+            Map.of(
+                "goal.left", LEFT,
+                "goal.right", RIGHT,
+                "assumption.assumption-001.left", "q",
+                "assumption.assumption-001.right", "0"));
         SolverResult result = SolverResult.create(
             obligation,
             descriptor,
@@ -475,13 +497,15 @@ class CrossFamilyBridgeQualificationGateTest {
             "symbolic equivalence confirmed under structured assumptions",
             Map.of(),
             sha("certificate"));
+        SolverExecution execution = SolverExecution.create(
+            obligation, translation, result);
         return new ProofReport(
             OpenTargetConjectureProofGate.REPORT_SCHEMA,
             ID,
             EligibilityStatus.ELIGIBLE,
             ProofStatus.SYMBOLICALLY_VERIFIED,
             obligation,
-            result,
+            execution,
             "NOT_EVALUATED",
             List.of(),
             sha("proof"));
