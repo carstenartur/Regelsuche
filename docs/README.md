@@ -30,6 +30,8 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md)
 - [Solver-Obligation-Schema v1](schemas/regelsuche-solver-obligation-v1.schema.json)
 - [Solver-Result-Schema v1](schemas/regelsuche-solver-result-v1.schema.json)
+- [Open-Target-Proof-Report-Schema v2](schemas/regelsuche-open-target-conjecture-proof-v2.schema.json)
+- [Autonomous-Production-Lifecycle-Schema v3](schemas/regelsuche-autonomous-production-lifecycle-v3.schema.json)
 - [Release-Readiness-Run-Schema v1](schemas/regelsuche-release-readiness-run-v1.schema.json)
 - [Candidate-Qualification-Evidence-Schema v1](schemas/regelsuche-autonomous-candidate-qualification-v1.schema.json)
 - [Candidate-Qualification-Run-Schema v1](schemas/regelsuche-autonomous-candidate-qualification-run-v1.schema.json)
