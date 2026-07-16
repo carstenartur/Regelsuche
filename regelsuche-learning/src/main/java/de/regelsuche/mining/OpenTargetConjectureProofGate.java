@@ -6,12 +6,14 @@ import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
 import de.regelsuche.solver.ir.PolynomialNormalFormSolverBackend;
 import de.regelsuche.solver.ir.SolverBackend;
+import de.regelsuche.solver.ir.SolverExecution;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
 import de.regelsuche.solver.ir.SolverIr.ResultStatus;
 import de.regelsuche.solver.ir.SolverIr.SolverResult;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.SolverTranslation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -69,15 +71,15 @@ public final class OpenTargetConjectureProofGate {
                 "open-target-conjecture",
                 conjecture.conjectureId(),
                 conjectureRevisionHash(conjecture, assumptions)));
-        SolverResult result = backend.solve(obligation);
-        ProofStatus status = proofStatus(result);
+        SolverExecution execution = backend.execute(obligation);
+        ProofStatus status = proofStatus(execution);
         return report(
             conjecture.conjectureId(),
             EligibilityStatus.ELIGIBLE,
             status,
             obligation,
-            result,
-            resultBlockers(result),
+            execution,
+            resultBlockers(execution),
             "NOT_EVALUATED");
     }
 
@@ -86,7 +88,7 @@ public final class OpenTargetConjectureProofGate {
         EligibilityStatus eligibility,
         ProofStatus status,
         Obligation obligation,
-        SolverResult result,
+        SolverExecution execution,
         List<String> blockers,
         String formalProofStatus
     ) {
@@ -102,7 +104,8 @@ public final class OpenTargetConjectureProofGate {
                 + "\nproof=" + status.name()
                 + "\nobligation="
                     + (obligation == null ? "" : obligation.contentHash())
-                + "\nresult=" + (result == null ? "" : result.contentHash())
+                + "\nexecution="
+                    + (execution == null ? "" : execution.contentHash())
                 + "\nformal=" + formalProofStatus
                 + "\nblockers=" + orderedBlockers);
         return new ProofReport(
@@ -111,7 +114,7 @@ public final class OpenTargetConjectureProofGate {
             eligibility,
             status,
             obligation,
-            result,
+            execution,
             formalProofStatus,
             orderedBlockers,
             evidenceHash);
@@ -174,25 +177,27 @@ public final class OpenTargetConjectureProofGate {
                 + "\nsupport=" + conjecture.supportingObservationIds());
     }
 
-    private static ProofStatus proofStatus(SolverResult result) {
-        if (result.translationStatus() != TranslationStatus.LOSSLESS) {
+    private static ProofStatus proofStatus(SolverExecution execution) {
+        if (execution.translation().status() != TranslationStatus.LOSSLESS) {
             return ProofStatus.INCONCLUSIVE;
         }
-        return switch (result.status()) {
+        return switch (execution.result().status()) {
             case CONFIRMED -> ProofStatus.SYMBOLICALLY_VERIFIED;
             case REFUTED -> ProofStatus.REFUTED;
             case UNKNOWN, TIMEOUT, UNSUPPORTED, ERROR -> ProofStatus.INCONCLUSIVE;
         };
     }
 
-    private static List<String> resultBlockers(SolverResult result) {
-        if (result.translationStatus() != TranslationStatus.LOSSLESS) {
+    private static List<String> resultBlockers(SolverExecution execution) {
+        SolverTranslation translation = execution.translation();
+        SolverResult result = execution.result();
+        if (translation.status() != TranslationStatus.LOSSLESS) {
             return List.of(
                 "solver translation is not lossless: "
-                    + result.translationStatus().name()
-                    + (result.translationIssues().isEmpty()
+                    + translation.status().name()
+                    + (translation.issues().isEmpty()
                         ? ""
-                        : " (" + String.join(",", result.translationIssues()) + ')'));
+                        : " (" + String.join(",", translation.issues()) + ')'));
         }
         return switch (result.status()) {
             case CONFIRMED -> List.of();
@@ -201,7 +206,7 @@ public final class OpenTargetConjectureProofGate {
             case TIMEOUT -> List.of("solver backend timed out");
             case UNSUPPORTED -> List.of(
                 "solver backend does not support obligation: "
-                    + String.join(",", result.translationIssues()));
+                    + String.join(",", translation.issues()));
             case ERROR -> List.of("solver backend failed: " + result.message());
         };
     }
@@ -234,7 +239,7 @@ public final class OpenTargetConjectureProofGate {
         EligibilityStatus eligibility,
         ProofStatus proofStatus,
         Obligation obligation,
-        SolverResult result,
+        SolverExecution execution,
         String formalProofStatus,
         List<String> blockers,
         String evidenceHash
@@ -253,15 +258,15 @@ public final class OpenTargetConjectureProofGate {
                 .distinct().sorted().toList();
             formalProofStatus = formalProofStatus == null
                 ? "NOT_EVALUATED" : formalProofStatus;
-            boolean emitted = obligation != null && result != null;
-            if ((obligation == null) != (result == null)) {
+            boolean emitted = obligation != null && execution != null;
+            if ((obligation == null) != (execution == null)) {
                 throw new IllegalArgumentException(
-                    "proof obligation and solver result must be present together");
+                    "proof obligation and solver execution must be present together");
             }
-            if (result != null
-                    && !result.obligationHash().equals(obligation.contentHash())) {
+            if (execution != null
+                    && !execution.obligationHash().equals(obligation.contentHash())) {
                 throw new IllegalArgumentException(
-                    "solver result belongs to another obligation");
+                    "solver execution belongs to another obligation");
             }
             if (eligibility == EligibilityStatus.NOT_ELIGIBLE
                     && (emitted || proofStatus != ProofStatus.NOT_RUN)) {
@@ -273,16 +278,16 @@ public final class OpenTargetConjectureProofGate {
                     "eligible proof must emit and execute one obligation");
             }
             if (proofStatus == ProofStatus.SYMBOLICALLY_VERIFIED
-                    && (result.status() != ResultStatus.CONFIRMED
-                        || result.translationStatus() != TranslationStatus.LOSSLESS)) {
+                    && (result().status() != ResultStatus.CONFIRMED
+                        || translation().status() != TranslationStatus.LOSSLESS)) {
                 throw new IllegalArgumentException(
-                    "symbolic verification requires a lossless confirmed result");
+                    "symbolic verification requires a lossless confirmed execution");
             }
             if (proofStatus == ProofStatus.REFUTED
-                    && (result.status() != ResultStatus.REFUTED
-                        || result.translationStatus() != TranslationStatus.LOSSLESS)) {
+                    && (result().status() != ResultStatus.REFUTED
+                        || translation().status() != TranslationStatus.LOSSLESS)) {
                 throw new IllegalArgumentException(
-                    "refutation requires a lossless refuted result");
+                    "refutation requires a lossless refuted execution");
             }
             if (evidenceHash == null
                     || !evidenceHash.matches("sha256:[0-9a-f]{64}")) {
@@ -294,12 +299,20 @@ public final class OpenTargetConjectureProofGate {
             return obligation != null;
         }
 
+        public SolverTranslation translation() {
+            return execution == null ? null : execution.translation();
+        }
+
+        public SolverResult result() {
+            return execution == null ? null : execution.result();
+        }
+
         public String backendId() {
-            return result == null ? "" : result.backendId();
+            return result() == null ? "" : result().backendId();
         }
 
         public String backendEvidence() {
-            return result == null ? "" : result.message();
+            return result() == null ? "" : result().message();
         }
 
         public String toCanonicalJson() {
@@ -311,16 +324,20 @@ public final class OpenTargetConjectureProofGate {
                 .property("proofObligationEmitted", proofObligationEmitted())
                 .property("solverObligationHash",
                     obligation == null ? "" : obligation.contentHash())
+                .property("solverTranslationHash",
+                    translation() == null ? "" : translation().contentHash())
                 .property("solverResultHash",
-                    result == null ? "" : result.contentHash())
+                    result() == null ? "" : result().contentHash())
+                .property("solverExecutionHash",
+                    execution == null ? "" : execution.contentHash())
                 .property("backendId", backendId())
                 .property("backendVersion",
-                    result == null ? "" : result.backendVersion())
+                    result() == null ? "" : result().backendVersion())
                 .property("backendStatus",
-                    result == null ? "NOT_RUN" : result.status().name())
+                    result() == null ? "NOT_RUN" : result().status().name())
                 .property("translationStatus",
-                    result == null ? "NOT_EMITTED"
-                        : result.translationStatus().name())
+                    translation() == null ? "NOT_EMITTED"
+                        : translation().status().name())
                 .property("backendEvidence", backendEvidence())
                 .property("formalProofStatus", formalProofStatus)
                 .stringArray("blockers", blockers)
