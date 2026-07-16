@@ -94,17 +94,21 @@ public final class Z3SmtSolverBackend implements SolverBackend {
     public SolverExecution execute(Obligation obligation) {
         Objects.requireNonNull(obligation, "obligation");
         SmtLibRenderer.Material material = renderer.render(obligation);
-        List<String> issues = new ArrayList<>(material.issues());
-        obligation.theories().stream()
-            .filter(theory -> !descriptor.supportedTheories().contains(theory))
-            .forEach(theory -> issues.add("UNSUPPORTED_THEORY:" + theory.name()));
+        List<String> mutableIssues = new ArrayList<>(material.issues());
+        for (Theory theory : obligation.theories()) {
+            if (!descriptor.supportedTheories().contains(theory)) {
+                mutableIssues.add("UNSUPPORTED_THEORY:" + theory.name());
+            }
+        }
         if (!descriptor.supportedRelations().contains(obligation.goal().relation())) {
-            issues.add("UNSUPPORTED_GOAL_RELATION:" + obligation.goal().relation().name());
+            mutableIssues.add(
+                "UNSUPPORTED_GOAL_RELATION:" + obligation.goal().relation().name());
         }
         if (!descriptor.supportedEvidence().contains(obligation.requestedEvidence())) {
-            issues.add("UNSUPPORTED_EVIDENCE:" + obligation.requestedEvidence().name());
+            mutableIssues.add(
+                "UNSUPPORTED_EVIDENCE:" + obligation.requestedEvidence().name());
         }
-        issues = issues.stream().distinct().sorted().toList();
+        List<String> issues = mutableIssues.stream().distinct().sorted().toList();
         if (!issues.isEmpty()) {
             return rejected(obligation, material.termMapping(), issues);
         }
@@ -125,14 +129,14 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             result = result(obligation, ResultStatus.TIMEOUT,
                 "Z3 check-sat timed out", Map.of(), "");
         } else {
-            String status = status(check.stdout());
-            result = switch (status) {
+            result = switch (status(check.stdout())) {
                 case "unsat" -> proofResult(obligation, material);
                 case "sat" -> modelResult(obligation, material);
                 case "unknown" -> result(obligation, ResultStatus.UNKNOWN,
                     "Z3 returned unknown", Map.of(), "");
                 default -> result(obligation, ResultStatus.ERROR,
-                    "unrecognized Z3 output: " + normalize(check.stdout() + check.stderr()),
+                    "unrecognized Z3 output: "
+                        + normalize(check.stdout() + check.stderr()),
                     Map.of(), "");
             };
         }
@@ -223,7 +227,8 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             List.of("z3", "-version"), "", 2_000L);
         if (!output.available()) {
             return new Detection(
-                new Z3SmtSolverBackend("unavailable", List.of("z3", "-in", "-smt2"),
+                new Z3SmtSolverBackend(
+                    "unavailable", List.of("z3", "-in", "-smt2"),
                     Duration.ofSeconds(20), runner),
                 BackendAvailability.UNAVAILABLE,
                 normalize(output.stderr()));
@@ -233,7 +238,8 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             version = "system";
         }
         return new Detection(
-            new Z3SmtSolverBackend(version, List.of("z3", "-in", "-smt2"),
+            new Z3SmtSolverBackend(
+                version, List.of("z3", "-in", "-smt2"),
                 Duration.ofSeconds(20), runner),
             BackendAvailability.AVAILABLE,
             version);
@@ -252,8 +258,10 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         if (output == null) {
             return "";
         }
-        List<String> lines = output.lines().map(String::trim)
-            .filter(line -> !line.isBlank()).toList();
+        List<String> lines = output.lines()
+            .map(String::trim)
+            .filter(line -> !line.isBlank())
+            .toList();
         int index = lines.indexOf(expectedStatus);
         if (index < 0 || index + 1 >= lines.size()) {
             return "";
