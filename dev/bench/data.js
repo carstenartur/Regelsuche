@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784051922120,
+  "lastUpdate": 1784236115608,
   "repoUrl": "https://github.com/carstenartur/Regelsuche",
   "entries": {
     "Regelsuche JMH Benchmarks": [
@@ -4566,6 +4566,90 @@ window.BENCHMARK_DATA = {
           {
             "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
             "value": 1054.8794433202668,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "316e4862a637084777cd2ef906c6ec193890847e",
+          "message": "Add solver-neutral obligation and proof IR (#363)\n\nReplace the internal proof-obligation formats with one versioned solver-neutral obligation, translation, result and execution contract. Add fail-closed capability checks, structured assumptions, internal search and exact polynomial-normal-form backends, proof/lifecycle integration, schemas, documentation and reproducible CI evidence.\n\nCloses #233.",
+          "timestamp": "2026-07-16T23:06:26+02:00",
+          "tree_id": "226ec6688d3a713715ce4ee736bafc1078dc0795",
+          "url": "https://github.com/carstenartur/Regelsuche/commit/316e4862a637084777cd2ef906c6ec193890847e"
+        },
+        "date": 1784236112567,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+            "value": 2.9638566134738014,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+            "value": 8.392330572083821,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+            "value": 3509.718792934765,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+            "value": 6.000748901849214,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+            "value": 1704.787924665948,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+            "value": 480.59580525809105,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+            "value": 1.9926077220370821,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+            "value": 92.09600394647144,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+            "value": 202.77251247914873,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
+            "value": 1004.2645972457182,
             "unit": "us/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
