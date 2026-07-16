@@ -18,48 +18,65 @@ class SolverBackendIntegrationTest {
     @Test
     void identicalObligationIsSubmittedToSearchAndExactPolynomialBackends() {
         Obligation obligation = equality("x + 0", "x", List.of());
-        SolverIr.SolverResult search = new RegelsucheSearchBackend().solve(obligation);
-        SolverIr.SolverResult polynomial = new PolynomialNormalFormSolverBackend()
-            .solve(obligation);
+        SolverExecution search = new RegelsucheSearchBackend().execute(obligation);
+        SolverExecution polynomial = new PolynomialNormalFormSolverBackend()
+            .execute(obligation);
 
-        assertEquals(ResultStatus.CONFIRMED, search.status(), search::toCanonicalJson);
         assertEquals(ResultStatus.CONFIRMED,
-            polynomial.status(), polynomial::toCanonicalJson);
+            search.result().status(), search.result()::toCanonicalJson);
+        assertEquals(ResultStatus.CONFIRMED,
+            polynomial.result().status(), polynomial.result()::toCanonicalJson);
         assertEquals(obligation.contentHash(), search.obligationHash());
         assertEquals(obligation.contentHash(), polynomial.obligationHash());
-        assertEquals(obligation.goalHash(), search.goalHash());
-        assertEquals(obligation.assumptionsHash(), polynomial.assumptionsHash());
-        assertEquals(TranslationStatus.LOSSLESS, search.translationStatus());
-        assertEquals(TranslationStatus.LOSSLESS, polynomial.translationStatus());
-        assertFalse(search.certificateHash().isBlank());
-        assertFalse(polynomial.certificateHash().isBlank());
-        assertTrue(polynomial.usedCapabilities().contains(
+        assertEquals(obligation.goalHash(), search.result().goalHash());
+        assertEquals(obligation.assumptionsHash(),
+            polynomial.result().assumptionsHash());
+        assertEquals(TranslationStatus.LOSSLESS,
+            search.translation().status());
+        assertEquals(TranslationStatus.LOSSLESS,
+            polynomial.translation().status());
+        assertEquals("x + 0", search.translation().termMapping().get("goal.left"));
+        assertEquals("x", search.translation().termMapping().get("goal.right"));
+        assertEquals(search.translation().termMapping(),
+            polynomial.translation().termMapping());
+        assertFalse(search.result().certificateHash().isBlank());
+        assertFalse(polynomial.result().certificateHash().isBlank());
+        assertTrue(polynomial.result().usedCapabilities().contains(
             "DETERMINISTIC_POLYNOMIAL_NORMAL_FORM"));
         assertEquals("matching deterministic polynomial normal form",
-            polynomial.message());
+            polynomial.result().message());
+        assertEquals(search.result().translationStatus(),
+            search.translation().status());
+        assertEquals(polynomial.result().translationIssues(),
+            polynomial.translation().issues());
 
         SolverIrJsonCodec codec = new SolverIrJsonCodec();
-        assertEquals(search.toCanonicalJson(),
-            codec.readResult(search.toCanonicalJson()).toCanonicalJson());
-        assertEquals(polynomial.toCanonicalJson(),
-            codec.readResult(polynomial.toCanonicalJson()).toCanonicalJson());
+        assertEquals(search.result().toCanonicalJson(),
+            codec.readResult(search.result().toCanonicalJson()).toCanonicalJson());
+        assertEquals(polynomial.result().toCanonicalJson(),
+            codec.readResult(polynomial.result().toCanonicalJson()).toCanonicalJson());
     }
 
     @Test
     void assumptionsAreRejectedBeforeEitherBackendCanDropThem() {
         Obligation obligation = equality("x / x", "1", List.of("x != 0"));
-        SolverIr.SolverResult search = new RegelsucheSearchBackend().solve(obligation);
-        SolverIr.SolverResult polynomial = new PolynomialNormalFormSolverBackend()
-            .solve(obligation);
+        SolverExecution search = new RegelsucheSearchBackend().execute(obligation);
+        SolverExecution polynomial = new PolynomialNormalFormSolverBackend()
+            .execute(obligation);
 
-        for (SolverIr.SolverResult result : List.of(search, polynomial)) {
-            assertEquals(ResultStatus.UNSUPPORTED, result.status());
-            assertEquals(TranslationStatus.REJECTED, result.translationStatus());
-            assertTrue(result.translationIssues().contains(
+        for (SolverExecution execution : List.of(search, polynomial)) {
+            assertEquals(ResultStatus.UNSUPPORTED, execution.result().status());
+            assertEquals(TranslationStatus.REJECTED,
+                execution.translation().status());
+            assertTrue(execution.translation().issues().contains(
                 "ASSUMPTIONS_NOT_SUPPORTED"));
-            assertTrue(result.message().contains("before execution"));
+            assertEquals(execution.translation().issues(),
+                execution.result().translationIssues());
+            assertTrue(execution.result().message().contains("before execution"));
+            assertEquals("x / x",
+                execution.translation().termMapping().get("goal.left"));
         }
-        assertTrue(polynomial.translationIssues().contains(
+        assertTrue(polynomial.translation().issues().contains(
             "UNSUPPORTED_EXPRESSION_FRAGMENT:POLYNOMIAL_ONLY"));
     }
 
@@ -69,29 +86,35 @@ class SolverBackendIntegrationTest {
         PolynomialNormalFormSolverBackend backend =
             new PolynomialNormalFormSolverBackend();
 
-        SolverIr.SolverResult first = backend.solve(obligation);
-        SolverIr.SolverResult second = backend.solve(obligation);
+        SolverExecution first = backend.execute(obligation);
+        SolverExecution second = backend.execute(obligation);
 
-        assertEquals(ResultStatus.REFUTED, first.status(), first::toCanonicalJson);
-        assertEquals("normal forms differ", first.message());
+        assertEquals(ResultStatus.REFUTED,
+            first.result().status(), first.result()::toCanonicalJson);
+        assertEquals("normal forms differ", first.result().message());
+        assertEquals(first.translation().contentHash(),
+            second.translation().contentHash());
+        assertEquals(first.result().contentHash(), second.result().contentHash());
         assertEquals(first.contentHash(), second.contentHash());
-        assertEquals(first.invocationHash(), second.invocationHash());
-        assertFalse(first.certificateHash().isBlank());
+        assertFalse(first.result().certificateHash().isBlank());
     }
 
     @Test
     void nonPolynomialExpressionsAreRejectedBeforeNormalFormExecution() {
         Obligation obligation = equality("sin(x)^2 + cos(x)^2", "1", List.of());
 
-        SolverIr.SolverResult result = new PolynomialNormalFormSolverBackend()
-            .solve(obligation);
+        SolverExecution execution = new PolynomialNormalFormSolverBackend()
+            .execute(obligation);
 
-        assertEquals(ResultStatus.UNSUPPORTED, result.status());
-        assertEquals(TranslationStatus.REJECTED, result.translationStatus());
-        assertTrue(result.translationIssues().contains(
+        assertEquals(ResultStatus.UNSUPPORTED, execution.result().status());
+        assertEquals(TranslationStatus.REJECTED,
+            execution.translation().status());
+        assertTrue(execution.translation().issues().contains(
             "UNSUPPORTED_THEORY:TRANSCENDENTAL_FUNCTIONS"));
-        assertTrue(result.translationIssues().contains(
+        assertTrue(execution.translation().issues().contains(
             "UNSUPPORTED_EXPRESSION_FRAGMENT:POLYNOMIAL_ONLY"));
+        assertEquals("sin(x) ^ 2 + cos(x) ^ 2",
+            execution.translation().termMapping().get("goal.left"));
     }
 
     private Obligation equality(
