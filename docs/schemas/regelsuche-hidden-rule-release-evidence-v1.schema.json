@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.hidden-rule-release-evidence/v1",
+  "title": "Regelsuche hidden-rule release evidence v1",
+  "type": "object",
+  "required": [
+    "schema", "sourceSchema", "sourceReportHash", "cases", "families",
+    "frozenCandidates", "materialAblations", "acceptedCases",
+    "rediscoveredCases", "configuredNegativeHoldouts",
+    "executedNegativeHoldouts", "skippedNegativeHoldouts",
+    "falsePositiveHoldouts", "generatedValidationExamples",
+    "counterexampleSearches", "splitCollisionCount",
+    "leakageViolationCount", "acceptedIncompleteHoldoutCount",
+    "executableRediscoveryCount", "hiddenReferenceIsolated",
+    "benchmarkComplete", "executableRediscoveryRetained", "evidenceHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.hidden-rule-release-evidence/v1" },
+    "sourceSchema": { "const": "regelsuche.hidden-rule-benchmark/v2" },
+    "sourceReportHash": { "$ref": "#/$defs/sha256" },
+    "cases": { "$ref": "#/$defs/count" },
+    "families": { "$ref": "#/$defs/count" },
+    "frozenCandidates": { "$ref": "#/$defs/count" },
+    "materialAblations": { "$ref": "#/$defs/count" },
+    "acceptedCases": { "$ref": "#/$defs/count" },
+    "rediscoveredCases": { "$ref": "#/$defs/count" },
+    "configuredNegativeHoldouts": { "$ref": "#/$defs/count" },
+    "executedNegativeHoldouts": { "$ref": "#/$defs/count" },
+    "skippedNegativeHoldouts": { "$ref": "#/$defs/count" },
+    "falsePositiveHoldouts": { "$ref": "#/$defs/count" },
+    "generatedValidationExamples": { "$ref": "#/$defs/count" },
+    "counterexampleSearches": { "$ref": "#/$defs/count" },
+    "splitCollisionCount": { "$ref": "#/$defs/count" },
+    "leakageViolationCount": { "$ref": "#/$defs/count" },
+    "acceptedIncompleteHoldoutCount": { "$ref": "#/$defs/count" },
+    "executableRediscoveryCount": { "$ref": "#/$defs/count" },
+    "hiddenReferenceIsolated": { "type": "boolean" },
+    "benchmarkComplete": { "type": "boolean" },
+    "executableRediscoveryRetained": { "type": "boolean" },
+    "evidenceHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "count": { "type": "integer", "minimum": 0 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}
