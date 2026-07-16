@@ -137,6 +137,10 @@ public record AutonomousCampaignReleaseEvidence(
                 .mapToLong(receipt -> receipt.skipped()).sum()));
         int counterexamples = "COUNTEREXAMPLE_FOUND".equals(
             evaluation.counterexample().status()) ? 1 : 0;
+        List<String> counterexampleSources = evaluation.counterexample()
+            .attemptedSources().stream().distinct().sorted().toList();
+        List<String> inferredAssumptions = evaluation.counterexample()
+            .inferredAssumptions().stream().distinct().sorted().toList();
         String evidenceMaterial = SCHEMA
             + "\ncampaign=" + run.contentHash()
             + "\nruns=" + runHashes
@@ -151,17 +155,14 @@ public record AutonomousCampaignReleaseEvidence(
             + "\npositiveHoldouts=" + executedPositive + '/' + configuredPositive
             + "\nnegativeHoldouts=" + executedNegative + '/' + configuredNegative
             + "\nrefutingHoldouts=" + refutingHoldouts
-            + "\ncounterexampleStrategies="
-                + evaluation.counterexample().attemptedSources().stream()
-                    .distinct().sorted().toList()
+            + "\ncounterexampleStrategies=" + counterexampleSources
             + "\ncounterexamples=" + counterexamples
             + "\nprojectNovelty=" + run.lifecycle().novelty().status().name()
             + "\nexternalNovelty="
                 + run.lifecycle().novelty().externalNoveltyStatus()
             + "\nsymbolicProof=" + run.lifecycle().proof().proofStatus().name()
             + "\nformalProof=" + run.lifecycle().proof().formalProofStatus()
-            + "\nunresolvedAssumptions="
-                + evaluation.counterexample().inferredAssumptions()
+            + "\nunresolvedAssumptions=" + inferredAssumptions
             + "\nlifecycle=" + run.lifecycle().lifecycleDecision().outcome().name();
         return new AutonomousCampaignReleaseEvidence(
             SCHEMA,
@@ -185,14 +186,13 @@ public record AutonomousCampaignReleaseEvidence(
             configuredNegative,
             executedNegative,
             refutingHoldouts,
-            (int) evaluation.counterexample().attemptedSources().stream()
-                .distinct().count(),
+            counterexampleSources.size(),
             counterexamples,
             run.lifecycle().novelty().status().name(),
             run.lifecycle().novelty().externalNoveltyStatus(),
             run.lifecycle().proof().proofStatus().name(),
             run.lifecycle().proof().formalProofStatus(),
-            evaluation.counterexample().inferredAssumptions().size(),
+            inferredAssumptions.size(),
             run.lifecycle().lifecycleDecision().outcome()
                 == LifecycleOutcome.COMPLETED,
             false,
