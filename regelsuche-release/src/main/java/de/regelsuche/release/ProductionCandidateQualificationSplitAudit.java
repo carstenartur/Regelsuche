@@ -21,21 +21,21 @@ public final class ProductionCandidateQualificationSplitAudit {
         List<Fingerprint> upstream = new ArrayList<>();
         campaign.lifecycle().mining().generation().observations().forEach(item ->
             upstream.add(fingerprint("formation:" + item.seed().id(),
-                item.seed().expression())));
+                item.seed().id(), item.seed().expression())));
         int formationCount = upstream.size();
         ProductionCandidateQualificationCatalog.developmentExpressions().forEach(value ->
-            upstream.add(fingerprint("development", value)));
+            upstream.add(fingerprint("development", "development:" + value, value)));
 
         List<Fingerprint> qualification = new ArrayList<>();
         ProductionCandidateQualificationCatalog.positives().forEach(item -> {
             qualification.add(fingerprint("positive-input:" + item.id(),
-                item.inputExpression()));
+                item.id(), item.inputExpression()));
             qualification.add(fingerprint("positive-target:" + item.id(),
-                item.targetExpression()));
+                item.id(), item.targetExpression()));
         });
         ProductionCandidateQualificationCatalog.negatives().forEach(item ->
             qualification.add(fingerprint("negative-input:" + item.id(),
-                item.inputExpression())));
+                item.id(), item.inputExpression())));
 
         List<String> upstreamCollisions = crossCollisions(upstream, qualification);
         List<String> internalCollisions = internalCollisions(qualification);
@@ -68,13 +68,18 @@ public final class ProductionCandidateQualificationSplitAudit {
             hash);
     }
 
-    private static Fingerprint fingerprint(String source, String expression) {
+    private static Fingerprint fingerprint(
+        String source,
+        String caseId,
+        String expression
+    ) {
         ExpressionFingerprint value = ExpressionFingerprint.of(
             expression, new ExpressionCanonicalizer());
         if (!value.parseable()) {
             throw new IllegalArgumentException("unparseable split expression: " + source);
         }
-        return new Fingerprint(source, value.valueHash(), value.alphaShapeHash());
+        return new Fingerprint(
+            source, caseId, value.valueHash(), value.alphaShapeHash());
     }
 
     private static List<String> crossCollisions(
@@ -100,12 +105,14 @@ public final class ProductionCandidateQualificationSplitAudit {
         Map<String, Fingerprint> alpha = new HashMap<>();
         for (Fingerprint value : values) {
             Fingerprint oldExact = exact.putIfAbsent(value.value(), value);
-            if (oldExact != null) {
+            if (oldExact != null && !oldExact.caseId().equals(value.caseId())) {
                 collisions.add("EXACT|" + value.source() + '|' + oldExact.source()
                     + '|' + value.value());
             }
             Fingerprint oldAlpha = alpha.putIfAbsent(value.alpha(), value);
-            if (oldAlpha != null && !oldAlpha.value().equals(value.value())) {
+            if (oldAlpha != null
+                    && !oldAlpha.caseId().equals(value.caseId())
+                    && !oldAlpha.value().equals(value.value())) {
                 collisions.add("ALPHA|" + value.source() + '|' + oldAlpha.source()
                     + '|' + value.alpha());
             }
@@ -166,7 +173,12 @@ public final class ProductionCandidateQualificationSplitAudit {
         }
     }
 
-    private record Fingerprint(String source, String value, String alpha) {
+    private record Fingerprint(
+        String source,
+        String caseId,
+        String value,
+        String alpha
+    ) {
     }
 
     private static void requireSha(String value) {
