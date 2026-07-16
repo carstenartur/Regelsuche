@@ -278,14 +278,16 @@ public final class OpenTargetConjectureProofGate {
                     "eligible proof must emit and execute one obligation");
             }
             if (proofStatus == ProofStatus.SYMBOLICALLY_VERIFIED
-                    && (result().status() != ResultStatus.CONFIRMED
-                        || translation().status() != TranslationStatus.LOSSLESS)) {
+                    && (execution.result().status() != ResultStatus.CONFIRMED
+                        || execution.translation().status()
+                            != TranslationStatus.LOSSLESS)) {
                 throw new IllegalArgumentException(
                     "symbolic verification requires a lossless confirmed execution");
             }
             if (proofStatus == ProofStatus.REFUTED
-                    && (result().status() != ResultStatus.REFUTED
-                        || translation().status() != TranslationStatus.LOSSLESS)) {
+                    && (execution.result().status() != ResultStatus.REFUTED
+                        || execution.translation().status()
+                            != TranslationStatus.LOSSLESS)) {
                 throw new IllegalArgumentException(
                     "refutation requires a lossless refuted execution");
             }
