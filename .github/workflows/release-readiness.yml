@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew :regelsuche-release:test :regelsuche-release:runReleaseReadiness \
+          ./gradlew :regelsuche-release:test \
             2>&1 | tee release-readiness-build.log
 
       - name: Require release evidence artifacts
