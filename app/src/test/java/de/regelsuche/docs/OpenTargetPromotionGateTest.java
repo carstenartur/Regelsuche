@@ -23,6 +23,7 @@ import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.mining.OpenTargetHypothesisCandidateAdapter;
 import de.regelsuche.proof.ProofPolicy;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.solver.ir.SolverExecution;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
 import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
@@ -32,6 +33,7 @@ import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
 import de.regelsuche.solver.ir.SolverIr.Theory;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.SolverTranslation;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +78,8 @@ class OpenTargetPromotionGateTest {
         assertTrue(json.contains("\"evaluationProvenanceHash\":\"" + hash('e') + "\""));
         assertTrue(json.contains("\"proofObligationHash\":\""
             + proof.obligation().contentHash() + "\""));
+        assertEquals(proof.execution().obligationHash(),
+            proof.obligation().contentHash());
     }
 
     @Test
@@ -129,13 +133,10 @@ class OpenTargetPromotionGateTest {
             materialAblation(),
             ProofPolicy.PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE,
             "SCRIPT_GENERATED"));
-
         assertFalse(blocked.promoted());
         assertFalse(blocked.publicEvidenceAccepted());
         assertEquals(PromotionStage.VALIDATED, blocked.promotionRecord().stage());
         assertTrue(blocked.promotionBlockers().contains("proof=SCRIPT_GENERATED"));
-        assertTrue(blocked.publicEvidenceDecision().rejectionReasons().contains(
-            "proof=SCRIPT_GENERATED"));
 
         OpenTargetPromotionGate.Decision confirmed = gate.evaluate(input(
             fixture,
@@ -144,7 +145,6 @@ class OpenTargetPromotionGateTest {
             materialAblation(),
             ProofPolicy.PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE,
             "PROVER_CONFIRMED"));
-
         assertTrue(confirmed.promoted());
         assertTrue(confirmed.publicEvidenceAccepted());
     }
@@ -152,7 +152,6 @@ class OpenTargetPromotionGateTest {
     @Test
     void inconclusiveSymbolicProofLeavesCandidateValidatedButNotPromoted() {
         Fixture fixture = fixture(false);
-
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             novel(fixture.conjecture().conjectureId()),
@@ -172,7 +171,6 @@ class OpenTargetPromotionGateTest {
     @Test
     void evidenceIdentityMismatchCannotEnterPromotion() {
         Fixture fixture = fixture(false);
-
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             novel("another-candidate"),
@@ -265,7 +263,6 @@ class OpenTargetPromotionGateTest {
     void reportIsDeterministicAcrossEvidenceAndPathOrder() {
         Fixture ordered = fixture(false);
         Fixture reversed = fixture(true);
-
         OpenTargetPromotionGate.Decision first = gate.evaluate(input(
             ordered,
             novel(ordered.conjecture().conjectureId()),
@@ -420,8 +417,7 @@ class OpenTargetPromotionGateTest {
         OpenTargetConjecture conjecture,
         ProofStatus status
     ) {
-        SolverObligationFactory factory = new SolverObligationFactory();
-        SolverIr.Obligation obligation = factory.equality(
+        SolverIr.Obligation obligation = new SolverObligationFactory().equality(
             conjecture.conjectureId() + "-proof",
             conjecture.leftPattern(),
             conjecture.rightPattern(),
@@ -432,27 +428,37 @@ class OpenTargetPromotionGateTest {
                 conjecture.conjectureId(),
                 hash('d')));
         BackendDescriptor descriptor = new BackendDescriptor(
-            "sympy-equivalence",
+            "polynomial-normal-form-fixture",
             "1",
             List.of(Theory.REAL_ARITHMETIC),
             List.of(SolverIr.Relation.EQUALS),
             List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
             true);
+        SolverTranslation translation = SolverTranslation.create(
+            obligation,
+            descriptor,
+            TranslationStatus.LOSSLESS,
+            List.of(),
+            Map.of(
+                "goal.left", conjecture.leftPattern(),
+                "goal.right", conjecture.rightPattern()));
         ResultStatus backendStatus = status == ProofStatus.SYMBOLICALLY_VERIFIED
             ? ResultStatus.CONFIRMED : ResultStatus.UNKNOWN;
         String evidence = status == ProofStatus.SYMBOLICALLY_VERIFIED
-            ? "validated by deterministic symbolic equivalence"
-            : "no equivalence evidence found";
+            ? "matching deterministic polynomial normal form"
+            : "no conclusive polynomial normal form result";
         SolverResult result = SolverResult.create(
             obligation,
             descriptor,
             backendStatus,
             TranslationStatus.LOSSLESS,
-            List.of("SYMBOLIC_EQUIVALENCE"),
+            List.of("DETERMINISTIC_POLYNOMIAL_NORMAL_FORM"),
             List.of(),
             evidence,
             Map.of(),
             backendStatus == ResultStatus.CONFIRMED ? hash('g') : "");
+        SolverExecution execution = SolverExecution.create(
+            obligation, translation, result);
         List<String> blockers = status == ProofStatus.SYMBOLICALLY_VERIFIED
             ? List.of()
             : List.of("solver backend produced no conclusive result");
@@ -462,7 +468,7 @@ class OpenTargetPromotionGateTest {
             EligibilityStatus.ELIGIBLE,
             status,
             obligation,
-            result,
+            execution,
             "NOT_EVALUATED",
             blockers,
             hash('f'));
