@@ -1,0 +1,102 @@
+name: Verify Solver IR 233 Migration
+
+on:
+  push:
+    branches: [ "feature/233-solver-neutral-ir" ]
+
+permissions:
+  contents: write
+
+jobs:
+  verify-and-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/233-solver-neutral-ir
+          fetch-depth: 0
+
+      - name: Harden execution provenance
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old in text:
+                  p.write_text(text.replace(old, new))
+              elif new not in text:
+                  raise RuntimeError(f'expected content missing from {path}')
+
+          replace(
+              'regelsuche-solver-ir/src/main/java/de/regelsuche/solver/ir/SolverTranslation.java',
+              '''        termMapping = Map.copyOf(ordered);
+          ''',
+              '''        termMapping = java.util.Collections.unmodifiableMap(ordered);
+          ''')
+
+          replace(
+              'app/src/main/java/de/regelsuche/docs/OpenTargetPromotionEvidenceValidator.java',
+              '''            || !SOLVER_OBLIGATIONS.resultBelongsTo(
+                  proof.obligation(), proof.result())) {
+          ''',
+              '''            || !SOLVER_OBLIGATIONS.executionBelongsTo(
+                  proof.obligation(), proof.execution())) {
+          ''')
+          PY
+
+      - name: Reject remaining obsolete proof contracts
+        shell: bash
+        run: |
+          if grep -R --line-number --fixed-strings 'proof-obligation.json' \
+              regelsuche-* app docs .github --exclude='*.class'; then
+            exit 1
+          fi
+          if grep -R --line-number --fixed-strings \
+              'regelsuche.open-target-conjecture-proof/v1' \
+              regelsuche-* app docs .github --exclude='*.class'; then
+            exit 1
+          fi
+          if grep -R --line-number --fixed-strings \
+              'regelsuche.autonomous-production-lifecycle/v2' \
+              regelsuche-* app docs .github --exclude='*.class'; then
+            exit 1
+          fi
+          if grep -R --line-number --extended-regexp '\.solve\(' \
+              regelsuche-solver-ir regelsuche-learning \
+              --include='*.java'; then
+            exit 1
+          fi
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Compile and test migrated modules
+        shell: bash
+        run: |
+          ./gradlew --no-daemon \
+            :regelsuche-solver-ir:test \
+            :regelsuche-learning:test \
+            :regelsuche-autopilot:test
+
+      - name: Commit verified migration
+        shell: bash
+        run: |
+          rm .github/workflows/verify-solver-ir-233.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Verify atomic solver execution migration"
+          git push origin HEAD:feature/233-solver-neutral-ir
