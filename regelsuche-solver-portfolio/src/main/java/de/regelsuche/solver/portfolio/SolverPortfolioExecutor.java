@@ -270,9 +270,11 @@ public final class SolverPortfolioExecutor {
             .filter(item -> item.execution().translation().status()
                 == TranslationStatus.LOSSLESS)
             .toList();
-        List<ObservedExecution> mathematicalConfirmations = lossless.stream()
+        List<ObservedExecution> allConfirmations = lossless.stream()
             .filter(item -> item.execution().result().status()
                 == ResultStatus.CONFIRMED)
+            .toList();
+        List<ObservedExecution> mathematicalConfirmations = allConfirmations.stream()
             .filter(item -> item.profile().roles().stream()
                 .anyMatch(role -> role != BackendRole.SEARCH_GUIDANCE))
             .toList();
@@ -296,7 +298,7 @@ public final class SolverPortfolioExecutor {
             return new Aggregate(
                 PortfolioOutcome.REFUTED, selected, List.of(), false);
         }
-        List<ObservedExecution> qualifying = mathematicalConfirmations.stream()
+        List<ObservedExecution> qualifying = allConfirmations.stream()
             .filter(item -> item.profile().canConfirm(request.objective()))
             .sorted(observedComparator())
             .toList();
