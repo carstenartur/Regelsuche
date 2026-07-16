@@ -36,11 +36,14 @@ jobs:
           z3 -version
 
       - name: Test portfolio and write real reference trace
+        shell: bash
         run: |
+          set -o pipefail
           ./gradlew \
             :regelsuche-solver-portfolio:test \
             :regelsuche-solver-portfolio:z3IntegrationTest \
-            :regelsuche-solver-portfolio:writeSolverPortfolioExample
+            :regelsuche-solver-portfolio:writeSolverPortfolioExample \
+            2>&1 | tee solver-portfolio-gradle.log
 
       - name: Validate canonical portfolio report
         run: |
@@ -79,12 +82,13 @@ jobs:
           print('solver-portfolio-contract=valid')
           PY
 
-      - name: Upload portfolio trace
+      - name: Upload portfolio trace and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: solver-portfolio-trace
           path: |
+            solver-portfolio-gradle.log
             regelsuche-solver-portfolio/build/reports/solver-portfolio/**
             regelsuche-solver-portfolio/build/reports/tests/**
             regelsuche-solver-portfolio/build/test-results/**
