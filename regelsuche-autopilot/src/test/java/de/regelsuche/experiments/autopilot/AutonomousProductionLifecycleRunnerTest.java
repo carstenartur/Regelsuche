@@ -9,6 +9,8 @@ import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceSta
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -61,7 +63,11 @@ class AutonomousProductionLifecycleRunnerTest {
         assertEquals(ProofStatus.SYMBOLICALLY_VERIFIED,
             run.proof().proofStatus());
         assertTrue(run.proof().proofObligationEmitted());
-        assertFalse(run.proof().obligation().targetProvided());
+        assertEquals(ResultStatus.CONFIRMED, run.proof().result().status());
+        assertEquals(TranslationStatus.LOSSLESS,
+            run.proof().result().translationStatus());
+        assertEquals(run.proof().obligation().contentHash(),
+            run.proof().result().obligationHash());
         assertTrue(run.proof().blockers().isEmpty());
         assertEquals("NOT_EVALUATED", run.proof().formalProofStatus());
 
@@ -96,6 +102,8 @@ class AutonomousProductionLifecycleRunnerTest {
             + run.counterexampleJson()
             + run.noveltyJson()
             + run.proof().toCanonicalJson()
+            + run.proof().obligation().toCanonicalJson()
+            + run.proof().result().toCanonicalJson()
             + run.lifecycleCandidateJson()
             + run.lifecycleDecision().toCanonicalJson()
             + run.stageLedger().toCanonicalJson()
@@ -103,6 +111,7 @@ class AutonomousProductionLifecycleRunnerTest {
         assertTrue(combined.contains("\"targetProvided\":false"));
         assertFalse(combined.contains("targetExpression"));
         assertFalse(combined.contains("expectedAnswer"));
+        assertFalse(combined.contains("proof-obligation.json"));
 
         Path output = Path.of(
             "build", "reports", "autopilot-production-lifecycle");
@@ -113,7 +122,8 @@ class AutonomousProductionLifecycleRunnerTest {
                 "counterexample-report.json",
                 "project-novelty-report.json",
                 "proof-report.json",
-                "proof-obligation.json",
+                "solver-obligation.json",
+                "solver-result.json",
                 "lifecycle-candidate.json",
                 "lifecycle-decision.json",
                 "stage-resource-ledger.json",
@@ -122,6 +132,7 @@ class AutonomousProductionLifecycleRunnerTest {
             assertTrue(Files.isRegularFile(artifact), file);
             assertTrue(Files.size(artifact) > 0L, file);
         }
+        assertFalse(Files.exists(output.resolve("proof-obligation.json")));
     }
 
     @Test
@@ -132,8 +143,11 @@ class AutonomousProductionLifecycleRunnerTest {
         assertEquals(sequential.noveltyHash(), parallel.noveltyHash());
         assertEquals(sequential.proof().evidenceHash(), parallel.proof().evidenceHash());
         assertEquals(
-            sequential.proof().obligation().obligationHash(),
-            parallel.proof().obligation().obligationHash());
+            sequential.proof().obligation().contentHash(),
+            parallel.proof().obligation().contentHash());
+        assertEquals(
+            sequential.proof().result().contentHash(),
+            parallel.proof().result().contentHash());
         assertEquals(
             sequential.lifecycleCandidateHash(),
             parallel.lifecycleCandidateHash());
