@@ -31,17 +31,7 @@ class Z3SmtSolverBackendTest {
     @Test
     void unsatIsConfirmedOnlyAfterProofObjectRetrieval() {
         AtomicInteger calls = new AtomicInteger();
-        Z3SmtSolverBackend backend = new Z3SmtSolverBackend(
-            "test", List.of("z3"), Duration.ofSeconds(1),
-            (command, stdin, timeout) -> {
-                calls.incrementAndGet();
-                if (stdin.contains("(get-proof)")) {
-                    return new Z3SmtSolverBackend.ProcessOutput(
-                        true, false, 0, "unsat\n(proof (asserted false))\n", "");
-                }
-                return new Z3SmtSolverBackend.ProcessOutput(
-                    true, false, 0, "unsat\n", "");
-            });
+        Z3SmtSolverBackend backend = backendReturningProof(calls);
 
         SolverExecution execution = backend.execute(referenceObligation());
 
@@ -51,6 +41,24 @@ class Z3SmtSolverBackendTest {
         assertTrue(execution.result().certificateHash().startsWith("sha256:"));
         assertTrue(execution.result().usedCapabilities().contains(
             "SMT_UNSAT_PROOF_OBJECT"));
+    }
+
+    @Test
+    void solverErrorPayloadCannotAuthorizeProof() {
+        Z3SmtSolverBackend backend = new Z3SmtSolverBackend(
+            "test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> stdin.contains("(get-proof)")
+                ? new Z3SmtSolverBackend.ProcessOutput(
+                    true, false, 1,
+                    "unsat\n(error \"proof is not available\")\n", "")
+                : new Z3SmtSolverBackend.ProcessOutput(
+                    true, false, 0, "unsat\n", ""));
+
+        SolverExecution execution = backend.execute(referenceObligation());
+
+        assertEquals(ResultStatus.ERROR, execution.result().status());
+        assertTrue(execution.result().certificateHash().isEmpty());
+        assertTrue(execution.result().message().contains("no valid proof object"));
     }
 
     @Test
@@ -84,13 +92,53 @@ class Z3SmtSolverBackendTest {
     }
 
     @Test
+    void divisionWithoutNonZeroAssumptionIsRejectedBeforeInvocation() {
+        AtomicInteger calls = new AtomicInteger();
+        Z3SmtSolverBackend backend = new Z3SmtSolverBackend(
+            "test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> {
+                calls.incrementAndGet();
+                return new Z3SmtSolverBackend.ProcessOutput(
+                    true, false, 0, "unsat", "");
+            });
+        Obligation obligation = new SolverObligationFactory().equality(
+            "unbounded-division", "p / q", "p / q", List.of(),
+            RequestedEvidence.FORMAL_PROOF,
+            provenance("unbounded-division"));
+
+        SolverExecution execution = backend.execute(obligation);
+
+        assertEquals(0, calls.get());
+        assertEquals(ResultStatus.UNSUPPORTED, execution.result().status());
+        assertTrue(execution.translation().issues().stream().anyMatch(issue ->
+            issue.startsWith("DIVISION_DOMAIN_NOT_ENCODED:")));
+    }
+
+    @Test
+    void explicitNonZeroAssumptionMakesDivisionTranslationLossless() {
+        AtomicInteger calls = new AtomicInteger();
+        Z3SmtSolverBackend backend = backendReturningProof(calls);
+        Obligation obligation = new SolverObligationFactory().equality(
+            "bounded-division", "p / q", "p / q", List.of("q != 0"),
+            RequestedEvidence.FORMAL_PROOF,
+            provenance("bounded-division"));
+
+        SolverExecution execution = backend.execute(obligation);
+
+        assertEquals(2, calls.get());
+        assertEquals(TranslationStatus.LOSSLESS, execution.translation().status());
+        assertEquals(ResultStatus.CONFIRMED, execution.result().status());
+    }
+
+    @Test
     void satProducesRefutationAndModelWhenAvailable() {
         Z3SmtSolverBackend backend = new Z3SmtSolverBackend(
             "test", List.of("z3"), Duration.ofSeconds(1),
             (command, stdin, timeout) -> {
                 if (stdin.contains("(get-model)")) {
                     return new Z3SmtSolverBackend.ProcessOutput(
-                        true, false, 0, "sat\n(model (define-fun x () Real 1.0))\n", "");
+                        true, false, 0,
+                        "sat\n(model (define-fun x () Real 1.0))\n", "");
                 }
                 return new Z3SmtSolverBackend.ProcessOutput(
                     true, false, 0, "sat\n", "");
@@ -98,9 +146,7 @@ class Z3SmtSolverBackendTest {
         Obligation falseIdentity = new SolverObligationFactory().equality(
             "false-identity", "x + 1", "x", List.of(),
             RequestedEvidence.FORMAL_PROOF,
-            new SourceProvenance(
-                "z3-test", "false-identity",
-                SolverIr.sha256("false-identity/v1")));
+            provenance("false-identity"));
 
         SolverExecution execution = backend.execute(falseIdentity);
 
@@ -126,12 +172,31 @@ class Z3SmtSolverBackendTest {
             .matches("sha256:[0-9a-f]{64}"));
     }
 
+    private static Z3SmtSolverBackend backendReturningProof(AtomicInteger calls) {
+        return new Z3SmtSolverBackend(
+            "test", List.of("z3"), Duration.ofSeconds(1),
+            (command, stdin, timeout) -> {
+                calls.incrementAndGet();
+                if (stdin.contains("(get-proof)")) {
+                    return new Z3SmtSolverBackend.ProcessOutput(
+                        true, false, 0,
+                        "unsat\n(proof (asserted false))\n", "");
+                }
+                return new Z3SmtSolverBackend.ProcessOutput(
+                    true, false, 0, "unsat\n", "");
+            });
+    }
+
     private static Obligation referenceObligation() {
         return new SolverObligationFactory().equality(
             "z3-x-plus-zero", "x + 0", "x", List.of(),
             RequestedEvidence.FORMAL_PROOF,
-            new SourceProvenance(
-                "z3-test", "x-plus-zero",
-                SolverIr.sha256("z3-x-plus-zero/v1")));
+            provenance("x-plus-zero"));
+    }
+
+    private static SourceProvenance provenance(String sourceId) {
+        return new SourceProvenance(
+            "z3-test", sourceId,
+            SolverIr.sha256("z3-" + sourceId + "/v1"));
     }
 }

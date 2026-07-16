@@ -128,6 +128,10 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         } else if (check.timedOut()) {
             result = result(obligation, ResultStatus.TIMEOUT,
                 "Z3 check-sat timed out", Map.of(), "");
+        } else if (check.exitCode() != 0) {
+            result = result(obligation, ResultStatus.ERROR,
+                "Z3 check-sat failed: " + normalize(check.stdout() + ' ' + check.stderr()),
+                Map.of(), "");
         } else {
             result = switch (status(check.stdout())) {
                 case "unsat" -> proofResult(obligation, material);
@@ -161,9 +165,13 @@ public final class Z3SmtSolverBackend implements SolverBackend {
                 "Z3 proof retrieval timed out", Map.of(), "");
         }
         String payload = payloadAfterStatus(proof.stdout(), "unsat");
-        if (!"unsat".equals(status(proof.stdout())) || payload.isBlank()) {
+        if (proof.exitCode() != 0
+                || !"unsat".equals(status(proof.stdout()))
+                || !validProofPayload(payload)) {
             return result(obligation, ResultStatus.ERROR,
-                "Z3 confirmed unsat but returned no proof object", Map.of(), "");
+                "Z3 confirmed unsat but returned no valid proof object: "
+                    + normalize(payload + ' ' + proof.stderr()),
+                Map.of(), "");
         }
         return result(obligation, ResultStatus.CONFIRMED,
             "Z3 returned unsat with a proof object",
@@ -179,9 +187,10 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             material.scriptPrefix() + "(check-sat)\n(get-model)\n",
             timeoutMillis);
         String payload = model.available() && !model.timedOut()
+                && model.exitCode() == 0
             ? payloadAfterStatus(model.stdout(), "sat") : "";
-        Map<String, String> counterexample = payload.isBlank()
-            ? Map.of() : Map.of("smtModel", payload);
+        Map<String, String> counterexample = validModelPayload(payload)
+            ? Map.of("smtModel", payload) : Map.of();
         return result(obligation, ResultStatus.REFUTED,
             "Z3 found a satisfying countermodel for the negated goal",
             counterexample, "");
@@ -225,13 +234,13 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         ProcessRunner runner = new DefaultProcessRunner();
         ProcessOutput output = runner.run(
             List.of("z3", "-version"), "", 2_000L);
-        if (!output.available()) {
+        if (!output.available() || output.timedOut() || output.exitCode() != 0) {
             return new Detection(
                 new Z3SmtSolverBackend(
                     "unavailable", List.of("z3", "-in", "-smt2"),
                     Duration.ofSeconds(20), runner),
                 BackendAvailability.UNAVAILABLE,
-                normalize(output.stderr()));
+                normalize(output.stdout() + ' ' + output.stderr()));
         }
         String version = normalize(output.stdout());
         if (version.isBlank()) {
@@ -243,6 +252,19 @@ public final class Z3SmtSolverBackend implements SolverBackend {
                 Duration.ofSeconds(20), runner),
             BackendAvailability.AVAILABLE,
             version);
+    }
+
+    private static boolean validProofPayload(String payload) {
+        String normalized = payload == null ? "" : payload.trim();
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        return normalized.startsWith("(")
+            && !lower.startsWith("(error")
+            && !lower.contains("\n(error");
+    }
+
+    private static boolean validModelPayload(String payload) {
+        String normalized = payload == null ? "" : payload.trim();
+        return normalized.startsWith("(model");
     }
 
     private static String status(String output) {
