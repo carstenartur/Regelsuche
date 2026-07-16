@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousCampaignResourceLedger.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">AutonomousCampaignResourceLedger.java</span></div><h1>AutonomousCampaignResourceLedger.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.experiments.autopilot.AutonomousProductionGenerationRunner.GenerationReceipt;
+import de.regelsuche.experiments.autopilot.AutonomousProductionLifecycleRunner.LifecycleRun;
+import de.regelsuche.experiments.autopilot.AutonomousProductionMiningRunner.CandidateFormationReceipt;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.experiments.autopilot.AutonomousStageResourceLedger.StageResourceReceipt;
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Complete factual resource ledger across every production campaign stage. */
+public final class AutonomousCampaignResourceLedger {
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-campaign-resource-ledger/v2&quot;;
+
+    private AutonomousCampaignResourceLedger() {
+    }
+
+    public static CampaignResourceLedger create(LifecycleRun lifecycle) {
+<span class="fc" id="L26">        Objects.requireNonNull(lifecycle, &quot;lifecycle&quot;);</span>
+<span class="fc" id="L27">        AutonomousResearchBriefV2 brief = lifecycle.mining().generation().brief();</span>
+<span class="fc" id="L28">        List&lt;CampaignResourceEntry&gt; entries = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L29">        addReceiptEntries(entries, lifecycle.mining().generation().receipt());</span>
+<span class="fc" id="L30">        addReceiptEntries(entries, lifecycle.mining().formationReceipt());</span>
+<span class="fc" id="L31">        lifecycle.stageLedger().receipts().forEach(receipt -&gt; entries.add(</span>
+            new CampaignResourceEntry(
+<span class="fc" id="L33">                receipt.stage(),</span>
+<span class="fc" id="L34">                receipt.resource(),</span>
+<span class="fc" id="L35">                receipt.configured(),</span>
+<span class="fc" id="L36">                receipt.executed(),</span>
+<span class="fc" id="L37">                receipt.skipped(),</span>
+<span class="fc" id="L38">                receipt.remaining(),</span>
+<span class="fc" id="L39">                receipt.contentHash())));</span>
+<span class="fc" id="L40">        List&lt;CampaignResourceEntry&gt; ordered = entries.stream()</span>
+<span class="fc" id="L41">            .sorted(Comparator</span>
+<span class="fc" id="L42">                .comparing(CampaignResourceEntry::stage)</span>
+<span class="fc" id="L43">                .thenComparing(CampaignResourceEntry::resource))</span>
+<span class="fc" id="L44">            .toList();</span>
+<span class="fc" id="L45">        String contentHash = hash(brief.contentHash(), ordered);</span>
+<span class="fc" id="L46">        return new CampaignResourceLedger(</span>
+            SCHEMA,
+<span class="fc" id="L48">            brief.contentHash(),</span>
+            ordered,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    private static void addReceiptEntries(
+        List&lt;CampaignResourceEntry&gt; entries,
+        GenerationReceipt receipt
+    ) {
+<span class="fc" id="L60">        receipt.configuredResources().forEach((resource, configured) -&gt; entries.add(</span>
+            new CampaignResourceEntry(
+<span class="fc" id="L62">                receipt.stage(),</span>
+                resource,
+<span class="fc" id="L64">                configured,</span>
+<span class="fc" id="L65">                receipt.executedResources().getOrDefault(resource, 0L),</span>
+<span class="fc" id="L66">                receipt.skippedResources().getOrDefault(resource, 0L),</span>
+<span class="fc" id="L67">                receipt.remainingResources().getOrDefault(resource, 0L),</span>
+<span class="fc" id="L68">                receipt.contentHash())));</span>
+<span class="fc" id="L69">    }</span>
+
+    private static void addReceiptEntries(
+        List&lt;CampaignResourceEntry&gt; entries,
+        CandidateFormationReceipt receipt
+    ) {
+<span class="fc" id="L75">        receipt.configuredResources().forEach((resource, configured) -&gt; entries.add(</span>
+            new CampaignResourceEntry(
+<span class="fc" id="L77">                receipt.stage(),</span>
+                resource,
+<span class="fc" id="L79">                configured,</span>
+<span class="fc" id="L80">                receipt.executedResources().getOrDefault(resource, 0L),</span>
+<span class="fc" id="L81">                receipt.skippedResources().getOrDefault(resource, 0L),</span>
+<span class="fc" id="L82">                receipt.remainingResources().getOrDefault(resource, 0L),</span>
+<span class="fc" id="L83">                receipt.contentHash())));</span>
+<span class="fc" id="L84">    }</span>
+
+    private static String hash(
+        String briefHash,
+        List&lt;CampaignResourceEntry&gt; entries
+    ) {
+<span class="fc" id="L90">        return AutonomousResearchBriefV2.hash(</span>
+            SCHEMA
+                + &quot;\nbrief=&quot; + briefHash
+<span class="fc" id="L93">                + &quot;\nentries=&quot; + entries.stream()</span>
+<span class="fc" id="L94">                    .map(CampaignResourceEntry::canonicalMaterial).toList());</span>
+    }
+
+    public record CampaignResourceEntry(
+        EvidenceStage stage,
+        ResourceKind resource,
+        long configured,
+        long executed,
+        long skipped,
+        long remaining,
+        String sourceReceiptHash
+    ) {
+<span class="fc" id="L106">        public CampaignResourceEntry {</span>
+<span class="fc" id="L107">            Objects.requireNonNull(stage, &quot;stage&quot;);</span>
+<span class="fc" id="L108">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L109" title="4 of 8 branches missed.">            if (configured &lt; 1L || executed &lt; 0L || skipped &lt; 0L || remaining &lt; 0L</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                    || configured != Math.addExact(</span>
+<span class="fc" id="L111">                        Math.addExact(executed, skipped), remaining)) {</span>
+<span class="nc" id="L112">                throw new IllegalArgumentException(</span>
+                    &quot;campaign resource entry must be non-negative and balanced&quot;);
+            }
+<span class="fc" id="L115">            requireSha256(sourceReceiptHash, &quot;sourceReceiptHash&quot;);</span>
+<span class="fc" id="L116">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L119">            return stage.name() + '|' + resource.name() + '|' + configured + '|'</span>
+                + executed + '|' + skipped + '|' + remaining + '|'
+                + sourceReceiptHash;
+        }
+    }
+
+    public record CampaignResourceLedger(
+        String schema,
+        String briefHash,
+        List&lt;CampaignResourceEntry&gt; entries,
+        boolean ledgerIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L134">        public CampaignResourceLedger {</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L136">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported campaign resource ledger schema&quot;);
+            }
+<span class="fc" id="L139">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            entries = entries == null</span>
+<span class="nc" id="L141">                ? List.of()</span>
+<span class="fc" id="L142">                : entries.stream()</span>
+<span class="fc" id="L143">                    .sorted(Comparator</span>
+<span class="fc" id="L144">                        .comparing(CampaignResourceEntry::stage)</span>
+<span class="fc" id="L145">                        .thenComparing(CampaignResourceEntry::resource))</span>
+<span class="fc" id="L146">                    .toList();</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (entries.isEmpty()) {</span>
+<span class="nc" id="L148">                throw new IllegalArgumentException(</span>
+                    &quot;campaign resource ledger must retain stage receipts&quot;);
+            }
+<span class="fc" id="L151">            Set&lt;String&gt; keys = entries.stream()</span>
+<span class="fc" id="L152">                .map(entry -&gt; entry.stage().name() + '/' + entry.resource().name())</span>
+<span class="fc" id="L153">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (keys.size() != entries.size()) {</span>
+<span class="nc" id="L155">                throw new IllegalArgumentException(</span>
+                    &quot;campaign resource ledger stage/resource pairs must be unique&quot;);
+            }
+<span class="fc" id="L158">            Set&lt;EvidenceStage&gt; stages = entries.stream()</span>
+<span class="fc" id="L159">                .map(CampaignResourceEntry::stage)</span>
+<span class="fc" id="L160">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (!stages.equals(Set.of(EvidenceStage.values()))) {</span>
+<span class="nc" id="L162">                throw new IllegalArgumentException(</span>
+                    &quot;campaign resource ledger must retain all evidence stages&quot;);
+            }
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            if (ledgerIsMathematicalEvidence) {</span>
+<span class="nc" id="L166">                throw new IllegalArgumentException(</span>
+                    &quot;campaign resource ledger cannot be mathematical evidence&quot;);
+            }
+<span class="fc" id="L169">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L170">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L171">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (!hash(briefHash, entries).equals(contentHash)) {</span>
+<span class="nc" id="L173">                throw new IllegalArgumentException(</span>
+                    &quot;campaign resource ledger content hash is inconsistent&quot;);
+            }
+<span class="fc" id="L176">        }</span>
+
+        public CampaignResourceEntry entry(
+            EvidenceStage stage,
+            ResourceKind resource
+        ) {
+<span class="fc" id="L182">            return entries.stream()</span>
+<span class="fc bfc" id="L183" title="All 4 branches covered.">                .filter(item -&gt; item.stage() == stage &amp;&amp; item.resource() == resource)</span>
+<span class="fc" id="L184">                .findFirst()</span>
+<span class="fc" id="L185">                .orElseThrow();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L189">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L190">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L191">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L192">                .array(&quot;entries&quot;, array -&gt; entries.forEach(entry -&gt;</span>
+<span class="fc" id="L193">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L194">                        .property(&quot;stage&quot;, entry.stage().name())</span>
+<span class="fc" id="L195">                        .property(&quot;resource&quot;, entry.resource().name())</span>
+<span class="fc" id="L196">                        .property(&quot;configured&quot;, entry.configured())</span>
+<span class="fc" id="L197">                        .property(&quot;executed&quot;, entry.executed())</span>
+<span class="fc" id="L198">                        .property(&quot;skipped&quot;, entry.skipped())</span>
+<span class="fc" id="L199">                        .property(&quot;remaining&quot;, entry.remaining())</span>
+<span class="fc" id="L200">                        .property(&quot;sourceReceiptHash&quot;, entry.sourceReceiptHash()))))</span>
+<span class="fc" id="L201">                .property(&quot;ledgerIsMathematicalEvidence&quot;,</span>
+                    ledgerIsMathematicalEvidence)
+<span class="fc" id="L203">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L204">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L205">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L206">                .endObject()</span>
+<span class="fc" id="L207">                .toString();</span>
+        }
+    }
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L212" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L213">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L215">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L219">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L221">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

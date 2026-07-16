@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousCampaignFeedback.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">AutonomousCampaignFeedback.java</span></div><h1>AutonomousCampaignFeedback.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.experiments.autopilot.AutonomousCampaignArtifactsV2.CampaignPlan;
+import de.regelsuche.experiments.autopilot.AutonomousProductionLifecycleRunner.LifecycleRun;
+import de.regelsuche.json.JsonWriter;
+import java.util.List;
+import java.util.Objects;
+
+/** Deterministic post-receipt feedback and reallocation decision. */
+public final class AutonomousCampaignFeedback {
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-feedback-reallocation/v2&quot;;
+
+    private AutonomousCampaignFeedback() {
+    }
+
+    public static FeedbackDecision complete(
+        LifecycleRun lifecycle,
+        CampaignPlan nextPlan
+    ) {
+<span class="fc" id="L21">        Objects.requireNonNull(lifecycle, &quot;lifecycle&quot;);</span>
+<span class="fc" id="L22">        Objects.requireNonNull(nextPlan, &quot;nextPlan&quot;);</span>
+<span class="fc" id="L23">        var mining = lifecycle.mining();</span>
+<span class="fc" id="L24">        var fullReceipt = mining.fullBatch().binding().receipt();</span>
+<span class="fc" id="L25">        var rejectionReceipt = mining.rejectionBatch().binding().receipt();</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (!nextPlan.decisions().isEmpty()) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(</span>
+                &quot;completed pinned campaign cannot allocate another Autopilot decision&quot;);
+        }
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (fullReceipt.outputs().size() != 1</span>
+<span class="fc" id="L31">                || !fullReceipt.outputs().getFirst().outputBranchId()</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">                    .equals(lifecycle.candidateBranchId())</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">                || !rejectionReceipt.outputs().isEmpty()</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">                || rejectionReceipt.rejectedClusters().isEmpty()) {</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(</span>
+                &quot;feedback requires one completed candidate and explicit rejection evidence&quot;);
+        }
+<span class="fc" id="L38">        List&lt;String&gt; completedBranches = List.of(lifecycle.candidateBranchId());</span>
+<span class="fc" id="L39">        List&lt;String&gt; rejectedClusters = rejectionReceipt.rejectedClusters().stream()</span>
+<span class="fc" id="L40">            .map(AutonomousEvidenceDagV2.RejectedCluster::contentHash)</span>
+<span class="fc" id="L41">            .sorted()</span>
+<span class="fc" id="L42">            .toList();</span>
+<span class="fc" id="L43">        List&lt;String&gt; reasons = List.of(</span>
+            &quot;ALPHA_EQUIVALENT_CLUSTER_REJECTED&quot;,
+            &quot;CANDIDATE_LIFECYCLE_COMPLETED&quot;,
+            &quot;NO_ELIGIBLE_AUTOPILOT_BRANCHES&quot;,
+            &quot;UNUSED_BUDGET_RETAINED&quot;);
+<span class="fc" id="L48">        String contentHash = AutonomousResearchBriefV2.hash(</span>
+            SCHEMA
+<span class="fc" id="L50">                + &quot;\nbrief=&quot; + mining.generation().brief().contentHash()</span>
+<span class="fc" id="L51">                + &quot;\ncurrentPlan=&quot; + mining.plan().contentHash()</span>
+<span class="fc" id="L52">                + &quot;\nsuccessfulExecution=&quot; + mining.fullBatch().execution().contentHash()</span>
+<span class="fc" id="L53">                + &quot;\nrejectedExecution=&quot; + mining.rejectionBatch().execution().contentHash()</span>
+<span class="fc" id="L54">                + &quot;\nlifecycle=&quot; + lifecycle.lifecycleDecision().contentHash()</span>
+<span class="fc" id="L55">                + &quot;\nformationReceipt=&quot; + mining.formationReceipt().contentHash()</span>
+<span class="fc" id="L56">                + &quot;\nstageLedger=&quot; + lifecycle.stageLedger().contentHash()</span>
+                + &quot;\ncompletedBranches=&quot; + completedBranches
+                + &quot;\nrejectedClusters=&quot; + rejectedClusters
+<span class="fc" id="L59">                + &quot;\nnextPlan=&quot; + nextPlan.contentHash()</span>
+                + &quot;\nreasons=&quot; + reasons
+                + &quot;\ndisposition=CAMPAIGN_COMPLETE&quot;);
+<span class="fc" id="L62">        return new FeedbackDecision(</span>
+            SCHEMA,
+<span class="fc" id="L64">            mining.generation().brief().contentHash(),</span>
+<span class="fc" id="L65">            mining.plan().contentHash(),</span>
+<span class="fc" id="L66">            mining.fullBatch().execution().contentHash(),</span>
+<span class="fc" id="L67">            mining.rejectionBatch().execution().contentHash(),</span>
+<span class="fc" id="L68">            lifecycle.lifecycleDecision().contentHash(),</span>
+<span class="fc" id="L69">            mining.formationReceipt().contentHash(),</span>
+<span class="fc" id="L70">            lifecycle.stageLedger().contentHash(),</span>
+            completedBranches,
+            rejectedClusters,
+<span class="fc" id="L73">            List.of(),</span>
+<span class="fc" id="L74">            nextPlan.contentHash(),</span>
+            0,
+            &quot;CAMPAIGN_COMPLETE&quot;,
+            reasons,
+            true,
+            false,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    public record FeedbackDecision(
+        String schema,
+        String briefHash,
+        String currentPlanHash,
+        String successfulExecutionHash,
+        String rejectedExecutionHash,
+        String lifecycleDecisionHash,
+        String candidateFormationReceiptHash,
+        String downstreamStageLedgerHash,
+        List&lt;String&gt; completedCandidateBranchIds,
+        List&lt;String&gt; rejectedClusterHashes,
+        List&lt;String&gt; eligibleBranchIds,
+        String nextPlanHash,
+        int nextDecisionCount,
+        String disposition,
+        List&lt;String&gt; reasonCodes,
+        boolean usesOnlyRetainedEvidence,
+        boolean feedbackIsMathematicalEvidence,
+        boolean externalNoveltyEvaluated,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L109">        public FeedbackDecision {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L111">                throw new IllegalArgumentException(&quot;unsupported feedback schema&quot;);</span>
+            }
+<span class="fc" id="L113">            requireSha256(briefHash, &quot;briefHash&quot;);</span>
+<span class="fc" id="L114">            requireSha256(currentPlanHash, &quot;currentPlanHash&quot;);</span>
+<span class="fc" id="L115">            requireSha256(successfulExecutionHash, &quot;successfulExecutionHash&quot;);</span>
+<span class="fc" id="L116">            requireSha256(rejectedExecutionHash, &quot;rejectedExecutionHash&quot;);</span>
+<span class="fc" id="L117">            requireSha256(lifecycleDecisionHash, &quot;lifecycleDecisionHash&quot;);</span>
+<span class="fc" id="L118">            requireSha256(candidateFormationReceiptHash,</span>
+                &quot;candidateFormationReceiptHash&quot;);
+<span class="fc" id="L120">            requireSha256(downstreamStageLedgerHash, &quot;downstreamStageLedgerHash&quot;);</span>
+<span class="fc" id="L121">            completedCandidateBranchIds = sortedText(</span>
+                completedCandidateBranchIds, &quot;completedCandidateBranchIds&quot;);
+<span class="fc" id="L123">            rejectedClusterHashes = sortedHashes(</span>
+                rejectedClusterHashes, &quot;rejectedClusterHashes&quot;);
+<span class="fc" id="L125">            eligibleBranchIds = sortedText(eligibleBranchIds, &quot;eligibleBranchIds&quot;);</span>
+<span class="fc" id="L126">            requireSha256(nextPlanHash, &quot;nextPlanHash&quot;);</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (completedCandidateBranchIds.size() != 1</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                    || rejectedClusterHashes.isEmpty()</span>
+<span class="pc bpc" id="L129" title="2 of 4 branches missed.">                    || !eligibleBranchIds.isEmpty()</span>
+                    || nextDecisionCount != 0
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                    || !&quot;CAMPAIGN_COMPLETE&quot;.equals(disposition)) {</span>
+<span class="nc" id="L132">                throw new IllegalArgumentException(</span>
+                    &quot;completed feedback must retain completion, rejection and an empty next plan&quot;);
+            }
+<span class="fc" id="L135">            reasonCodes = sortedText(reasonCodes, &quot;reasonCodes&quot;);</span>
+<span class="pc bpc" id="L136" title="3 of 6 branches missed.">            if (!usesOnlyRetainedEvidence</span>
+                    || feedbackIsMathematicalEvidence
+                    || externalNoveltyEvaluated) {
+<span class="nc" id="L139">                throw new IllegalArgumentException(</span>
+                    &quot;feedback must use retained evidence without creating truth or novelty claims&quot;);
+            }
+<span class="fc" id="L142">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L143">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L144">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L145">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L148">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L149">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L150">                .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L151">                .property(&quot;currentPlanHash&quot;, currentPlanHash)</span>
+<span class="fc" id="L152">                .property(&quot;successfulExecutionHash&quot;, successfulExecutionHash)</span>
+<span class="fc" id="L153">                .property(&quot;rejectedExecutionHash&quot;, rejectedExecutionHash)</span>
+<span class="fc" id="L154">                .property(&quot;lifecycleDecisionHash&quot;, lifecycleDecisionHash)</span>
+<span class="fc" id="L155">                .property(&quot;candidateFormationReceiptHash&quot;,</span>
+                    candidateFormationReceiptHash)
+<span class="fc" id="L157">                .property(&quot;downstreamStageLedgerHash&quot;, downstreamStageLedgerHash)</span>
+<span class="fc" id="L158">                .stringArray(&quot;completedCandidateBranchIds&quot;,</span>
+                    completedCandidateBranchIds)
+<span class="fc" id="L160">                .stringArray(&quot;rejectedClusterHashes&quot;, rejectedClusterHashes)</span>
+<span class="fc" id="L161">                .stringArray(&quot;eligibleBranchIds&quot;, eligibleBranchIds)</span>
+<span class="fc" id="L162">                .property(&quot;nextPlanHash&quot;, nextPlanHash)</span>
+<span class="fc" id="L163">                .property(&quot;nextDecisionCount&quot;, nextDecisionCount)</span>
+<span class="fc" id="L164">                .property(&quot;disposition&quot;, disposition)</span>
+<span class="fc" id="L165">                .stringArray(&quot;reasonCodes&quot;, reasonCodes)</span>
+<span class="fc" id="L166">                .property(&quot;usesOnlyRetainedEvidence&quot;, usesOnlyRetainedEvidence)</span>
+<span class="fc" id="L167">                .property(&quot;feedbackIsMathematicalEvidence&quot;,</span>
+                    feedbackIsMathematicalEvidence)
+<span class="fc" id="L169">                .property(&quot;externalNoveltyEvaluated&quot;, externalNoveltyEvaluated)</span>
+<span class="fc" id="L170">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L171">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L172">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L173">                .endObject()</span>
+<span class="fc" id="L174">                .toString();</span>
+        }
+    }
+
+    private static List&lt;String&gt; sortedText(List&lt;String&gt; values, String name) {
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L180">            return List.of();</span>
+        }
+<span class="pc bpc" id="L182" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L183">            throw new IllegalArgumentException(name + &quot; contains blank values&quot;);</span>
+        }
+<span class="fc" id="L185">        return values.stream().distinct().sorted().toList();</span>
+    }
+
+    private static List&lt;String&gt; sortedHashes(List&lt;String&gt; values, String name) {
+<span class="fc" id="L189">        List&lt;String&gt; result = sortedText(values, name);</span>
+<span class="fc" id="L190">        result.forEach(value -&gt; requireSha256(value, name));</span>
+<span class="fc" id="L191">        return result;</span>
+    }
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L196">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L198">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L202">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L204">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
