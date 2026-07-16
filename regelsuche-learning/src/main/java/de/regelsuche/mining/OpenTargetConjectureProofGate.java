@@ -4,6 +4,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.solver.ir.PolynomialNormalFormSolverBackend;
 import de.regelsuche.solver.ir.SolverBackend;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
@@ -11,7 +12,6 @@ import de.regelsuche.solver.ir.SolverIr.ResultStatus;
 import de.regelsuche.solver.ir.SolverIr.SolverResult;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationFactory;
-import de.regelsuche.solver.ir.SymPySolverBackend;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -32,7 +32,7 @@ public final class OpenTargetConjectureProofGate {
         new SolverObligationFactory();
 
     public OpenTargetConjectureProofGate() {
-        this(new SymPySolverBackend());
+        this(new PolynomialNormalFormSolverBackend());
     }
 
     /** Creates a gate for one explicit backend; used by solver portfolios. */
