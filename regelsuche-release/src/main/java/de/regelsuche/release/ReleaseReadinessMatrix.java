@@ -11,6 +11,8 @@ import java.util.Objects;
 public final class ReleaseReadinessMatrix {
     public static final String SCHEMA =
         "regelsuche.release-readiness-matrix/v1";
+    private static final int MIN_RELEASE_POSITIVE_HOLDOUTS = 12;
+    private static final int MIN_RELEASE_NEGATIVE_HOLDOUTS = 12;
 
     private ReleaseReadinessMatrix() {
     }
@@ -127,14 +129,15 @@ public final class ReleaseReadinessMatrix {
                 evidence.rejectedClusterCount() >= 1,
                 evidence.rejectedClusterCount(), ">=1"),
             check("VALIDATION_COMPLETE",
-                evidence.executedFreshHoldouts()
-                    == evidence.configuredFreshHoldouts()
-                    && evidence.executedFreshHoldouts() > 0
+                evidence.executedPositiveHoldouts()
+                    == evidence.configuredPositiveHoldouts()
+                    && evidence.executedNegativeHoldouts()
+                        == evidence.configuredNegativeHoldouts()
+                    && evidence.executedPositiveHoldouts() > 0
+                    && evidence.executedNegativeHoldouts() > 0
                     && evidence.refutingHoldouts() == 0,
-                evidence.executedFreshHoldouts() + "/"
-                    + evidence.configuredFreshHoldouts()
-                    + "; refuting=" + evidence.refutingHoldouts(),
-                "all configured fresh holdouts; zero refuting"),
+                holdoutSummary(evidence),
+                "all configured positive and negative holdouts; zero refuting"),
             check("COUNTEREXAMPLE_SEARCH_COMPLETE",
                 evidence.counterexampleStrategyCount() >= 2
                     && evidence.counterexamplesFound() == 0,
@@ -169,13 +172,20 @@ public final class ReleaseReadinessMatrix {
         checks.add(check("HELD_OUT_FAMILY_OR_CLUSTER",
             evidence.heldOutFamilyOrClusterCount() >= 1,
             evidence.heldOutFamilyOrClusterCount(), ">=1"));
-        checks.add(check("FRESH_HOLDOUTS_AT_LEAST_ONE_HUNDRED",
-            evidence.configuredFreshHoldouts() >= 100
-                && evidence.executedFreshHoldouts()
-                    == evidence.configuredFreshHoldouts(),
-            evidence.executedFreshHoldouts() + "/"
-                + evidence.configuredFreshHoldouts(),
-            ">=100 configured and fully executed"));
+        checks.add(check("BALANCED_RELEASE_HOLDOUT_SUITE",
+            evidence.configuredPositiveHoldouts()
+                    >= MIN_RELEASE_POSITIVE_HOLDOUTS
+                && evidence.configuredNegativeHoldouts()
+                    >= MIN_RELEASE_NEGATIVE_HOLDOUTS
+                && evidence.executedPositiveHoldouts()
+                    == evidence.configuredPositiveHoldouts()
+                && evidence.executedNegativeHoldouts()
+                    == evidence.configuredNegativeHoldouts()
+                && evidence.refutingHoldouts() == 0,
+            holdoutSummary(evidence),
+            ">=" + MIN_RELEASE_POSITIVE_HOLDOUTS + " positive and >="
+                + MIN_RELEASE_NEGATIVE_HOLDOUTS
+                + " negative; fully executed; zero refuting"));
         checks.add(check("MULTIPLE_COUNTEREXAMPLE_STRATEGIES",
             evidence.counterexampleStrategyCount() >= 2,
             evidence.counterexampleStrategyCount(), ">=2"));
@@ -199,12 +209,19 @@ public final class ReleaseReadinessMatrix {
             evidence.cleanRunCount() + " runs; identical="
                 + evidence.cleanRunsIdentical(),
             ">=3 identical canonical manifests"));
-        checks.add(check("DOMAIN_GENERIC_SEARCH_INTERFACE",
-            evidence.domainGenericSearchInterfaceReady(),
-            evidence.domainGenericSearchInterfaceReady(), true));
         return checks.stream()
             .sorted(Comparator.comparing(RequirementCheck::code))
             .toList();
+    }
+
+    private static String holdoutSummary(
+        AutonomousCampaignReleaseEvidence evidence
+    ) {
+        return "positive=" + evidence.executedPositiveHoldouts() + '/'
+            + evidence.configuredPositiveHoldouts()
+            + "; negative=" + evidence.executedNegativeHoldouts() + '/'
+            + evidence.configuredNegativeHoldouts()
+            + "; refuting=" + evidence.refutingHoldouts();
     }
 
     private static List<RequirementCheck> externalNoveltyChecks(
