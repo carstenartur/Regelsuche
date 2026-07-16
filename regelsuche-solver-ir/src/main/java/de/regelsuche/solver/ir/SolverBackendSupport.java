@@ -7,6 +7,7 @@ import de.regelsuche.solver.ir.SolverIr.SolverResult;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /** Shared fail-closed compatibility checks for backend adapters. */
 final class SolverBackendSupport {
@@ -34,20 +35,28 @@ final class SolverBackendSupport {
         return issues.stream().distinct().sorted().toList();
     }
 
-    static SolverResult unsupported(
+    static SolverExecution rejectedExecution(
         Obligation obligation,
         BackendDescriptor descriptor,
-        List<String> issues
+        List<String> issues,
+        Map<String, String> partialTermMapping
     ) {
-        return SolverResult.create(
+        SolverTranslation translation = SolverTranslation.create(
+            obligation,
+            descriptor,
+            TranslationStatus.REJECTED,
+            issues,
+            partialTermMapping);
+        SolverResult result = SolverResult.create(
             obligation,
             descriptor,
             ResultStatus.UNSUPPORTED,
             TranslationStatus.REJECTED,
             List.of(),
-            issues,
+            translation.issues(),
             "backend rejected the obligation before execution",
-            java.util.Map.of(),
+            Map.of(),
             "");
+        return SolverExecution.create(obligation, translation, result);
     }
 }
