@@ -16,6 +16,7 @@ import de.regelsuche.mining.OpenTargetConjectureProofGate;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
+import de.regelsuche.solver.ir.SolverExecution;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
 import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
@@ -25,6 +26,7 @@ import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
 import de.regelsuche.solver.ir.SolverIr.Theory;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.SolverTranslation;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -216,6 +218,14 @@ class AutonomousCandidateLifecycleV2Test {
             List.of(SolverIr.Relation.EQUALS),
             List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
             true);
+        SolverTranslation translation = SolverTranslation.create(
+            obligation,
+            descriptor,
+            TranslationStatus.LOSSLESS,
+            List.of(),
+            Map.of(
+                "goal.left", "A + B",
+                "goal.right", "B + A"));
         ResultStatus resultStatus = switch (status) {
             case SYMBOLICALLY_VERIFIED -> ResultStatus.CONFIRMED;
             case REFUTED -> ResultStatus.REFUTED;
@@ -232,16 +242,19 @@ class AutonomousCandidateLifecycleV2Test {
             status.name(),
             Map.of(),
             resultStatus == ResultStatus.CONFIRMED
+                    || resultStatus == ResultStatus.REFUTED
                 ? AutonomousEvidenceDagV2Fixtures.hash(
-                    "certificate-" + candidateId)
+                    "certificate-" + candidateId + '-' + status)
                 : "");
+        SolverExecution execution = SolverExecution.create(
+            obligation, translation, result);
         return new ProofReport(
             OpenTargetConjectureProofGate.REPORT_SCHEMA,
             candidateId,
             EligibilityStatus.ELIGIBLE,
             status,
             obligation,
-            result,
+            execution,
             "NOT_EVALUATED",
             status == ProofStatus.SYMBOLICALLY_VERIFIED
                 ? List.of()
