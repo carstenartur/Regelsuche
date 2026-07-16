@@ -67,14 +67,20 @@ public final class SolverPortfolioExampleMain {
                 "reference search portfolio did not confirm");
         }
 
-        write(output.resolve("formal-request.json"), formalRequest.toCanonicalJson());
-        write(output.resolve("formal-report.json"), formalRun.report().toCanonicalJson());
-        write(output.resolve("formal-selected-execution.json"),
-            formalRun.selectedExecution().toCanonicalJson());
-        write(output.resolve("guidance-request.json"), guidanceRequest.toCanonicalJson());
-        write(output.resolve("guidance-report.json"), guidanceRun.report().toCanonicalJson());
+        Path formalOutput = output.resolve("formal");
+        Files.createDirectories(formalOutput);
+        write(formalOutput.resolve("request.json"), formalRequest.toCanonicalJson());
+        formalRun.write(formalOutput);
+
+        Path guidanceOutput = output.resolve("guidance");
+        Files.createDirectories(guidanceOutput);
+        write(guidanceOutput.resolve("request.json"), guidanceRequest.toCanonicalJson());
+        guidanceRun.write(guidanceOutput);
+
+        Path profilesOutput = output.resolve("profiles");
+        Files.createDirectories(profilesOutput);
         for (PortfolioBackend backend : backends) {
-            write(output.resolve("profile-" + backend.profile().backendId() + ".json"),
+            write(profilesOutput.resolve(backend.profile().backendId() + ".json"),
                 backend.profile().toCanonicalJson());
         }
         String manifest = new JsonWriter().beginObject()
@@ -84,6 +90,10 @@ public final class SolverPortfolioExampleMain {
             .property("formalMultiStage", formalRun.report().attempts().stream()
                 .filter(attempt -> attempt.disposition() == AttemptDisposition.EXECUTED)
                 .map(PortfolioAttempt::backendId).distinct().count() >= 2)
+            .property("allFormalExecutionsRetained",
+                formalRun.executions().size() == formalRun.report().attempts().stream()
+                    .filter(attempt -> !attempt.executionHash().isEmpty())
+                    .map(PortfolioAttempt::executionHash).distinct().count())
             .property("formalProofAuthorized", formalRun.report().proofAuthorized())
             .property("searchGuidanceExecuted",
                 "regelsuche-search".equals(guidanceRun.report().selectedBackendId()))
