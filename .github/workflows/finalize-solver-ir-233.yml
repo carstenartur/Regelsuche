@@ -1,0 +1,460 @@
+name: Finalize Solver IR 233
+
+on:
+  push:
+    branches: [ "feature/233-solver-neutral-ir" ]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/233-solver-neutral-ir
+          fetch-depth: 0
+
+      - name: Apply atomic execution integration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          repo = Path('.')
+
+          def replace(path, old, new):
+              target = repo / path
+              text = target.read_text()
+              if old in text:
+                  target.write_text(text.replace(old, new))
+              elif new not in text:
+                  raise RuntimeError(f'neither old nor new content found in {path}')
+
+          # Lifecycle v3 schema binds translation and execution.
+          path = repo / 'docs/schemas/regelsuche-autonomous-production-lifecycle-v3.schema.json'
+          data = json.loads(path.read_text())
+          required = data['required']
+          for key, after in [
+              ('solverTranslationHash', 'solverObligationHash'),
+              ('solverExecutionHash', 'solverResultHash'),
+          ]:
+              if key not in required:
+                  required.insert(required.index(after) + 1, key)
+          properties = data['properties']
+          ordered = {}
+          for key, value in properties.items():
+              ordered[key] = value
+              if key == 'solverObligationHash':
+                  ordered['solverTranslationHash'] = {'$ref': '#/$defs/sha256'}
+              if key == 'solverResultHash':
+                  ordered['solverExecutionHash'] = {'$ref': '#/$defs/sha256'}
+          data['properties'] = ordered
+          path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n')
+
+          # Lifecycle production test.
+          test = 'regelsuche-autopilot/src/test/java/de/regelsuche/experiments/autopilot/AutonomousProductionLifecycleRunnerTest.java'
+          replace(test,
+              '''        assertEquals(ResultStatus.CONFIRMED, run.proof().result().status());
+          assertEquals(TranslationStatus.LOSSLESS,
+              run.proof().result().translationStatus());
+          assertEquals(run.proof().obligation().contentHash(),
+              run.proof().result().obligationHash());
+          ''',
+              '''        assertEquals(ResultStatus.CONFIRMED, run.proof().result().status());
+          assertEquals(TranslationStatus.LOSSLESS,
+              run.proof().translation().status());
+          assertEquals(run.proof().obligation().contentHash(),
+              run.proof().execution().obligationHash());
+          assertEquals(run.proof().translation().contentHash(),
+              run.proof().execution().translation().contentHash());
+          assertEquals(run.proof().result().contentHash(),
+              run.proof().execution().result().contentHash());
+          assertEquals("(A + 2) * x + A * x",
+              run.proof().translation().termMapping().get("goal.left"));
+          assertEquals("(2 * A + 2) * x",
+              run.proof().translation().termMapping().get("goal.right"));
+          ''')
+          replace(test,
+              '''            + run.proof().toCanonicalJson()
+              + run.proof().obligation().toCanonicalJson()
+              + run.proof().result().toCanonicalJson()
+          ''',
+              '''            + run.proof().toCanonicalJson()
+              + run.proof().obligation().toCanonicalJson()
+              + run.proof().translation().toCanonicalJson()
+              + run.proof().result().toCanonicalJson()
+              + run.proof().execution().toCanonicalJson()
+          ''')
+          replace(test,
+              '''                "proof-report.json",
+                  "solver-obligation.json",
+                  "solver-result.json",
+          ''',
+              '''                "proof-report.json",
+                  "solver-obligation.json",
+                  "solver-translation.json",
+                  "solver-result.json",
+                  "solver-execution.json",
+          ''')
+          replace(test,
+              '''        assertEquals(
+              sequential.proof().result().contentHash(),
+              parallel.proof().result().contentHash());
+          ''',
+              '''        assertEquals(
+              sequential.proof().translation().contentHash(),
+              parallel.proof().translation().contentHash());
+          assertEquals(
+              sequential.proof().result().contentHash(),
+              parallel.proof().result().contentHash());
+          assertEquals(
+              sequential.proof().execution().contentHash(),
+              parallel.proof().execution().contentHash());
+          ''')
+
+          # Remove the accidentally nonsensical bridge assertion if still present.
+          bridge = 'regelsuche-learning/src/test/java/de/regelsuche/mining/CrossFamilyBridgeQualificationGateTest.java'
+          replace(bridge,
+              '''        assertEquals(ASSUMPTIONS, fixture.proof().obligation().assumptions().stream()
+              .map(predicate -> predicate.left().canonicalMaterial()
+                  + predicate.relation().name()
+                  + predicate.right().canonicalMaterial())
+              .map(value -> value.isBlank() ? value : "qNOT_EQUALS0")
+              .toList());
+          ''',
+              '''        assertEquals(1, fixture.proof().obligation().assumptions().size());
+          assertEquals(SolverIr.Relation.NOT_EQUALS,
+              fixture.proof().obligation().assumptions().getFirst().relation());
+          assertEquals("q",
+              fixture.proof().translation().termMapping().get(
+                  "assumption.assumption-001.left"));
+          assertEquals("0",
+              fixture.proof().translation().termMapping().get(
+                  "assumption.assumption-001.right"));
+          ''')
+
+          # Documentation index.
+          replace('docs/README.md',
+              '''- [Solver-Obligation-Schema v1](schemas/regelsuche-solver-obligation-v1.schema.json)
+          - [Solver-Result-Schema v1](schemas/regelsuche-solver-result-v1.schema.json)
+          ''',
+              '''- [Solver-Obligation-Schema v1](schemas/regelsuche-solver-obligation-v1.schema.json)
+          - [Solver-Translation-Schema v1](schemas/regelsuche-solver-translation-v1.schema.json)
+          - [Solver-Result-Schema v1](schemas/regelsuche-solver-result-v1.schema.json)
+          - [Solver-Execution-Schema v1](schemas/regelsuche-solver-execution-v1.schema.json)
+          ''')
+
+          # Main IR documentation.
+          replace('docs/solver-neutral-ir.md',
+              '''Jedes Resultat enthält den Obligation-, Goal- und Assumptions-Hash, Backend-ID und -Version, Invocation-Hash, verwendete Capabilities, sichtbare Übersetzungsprobleme sowie optionale Counterexample- und Certificate-Hashes.
+          ''',
+              '''Jedes Resultat enthält den Obligation-, Goal- und Assumptions-Hash, Backend-ID und -Version, Invocation-Hash, verwendete Capabilities, sichtbare Übersetzungsprobleme sowie optionale Counterexample- und Certificate-Hashes.
+
+          ## Translation v1 und Execution v1
+
+          [`regelsuche.solver-translation/v1`](schemas/regelsuche-solver-translation-v1.schema.json) hält die tatsächliche Source-to-Backend-Zuordnung fest. Mindestens `goal.left` und `goal.right` müssen bei einer verlustfreien Übersetzung auf die erzeugten Backend-Terme abgebildet sein. Strukturierte Annahmen erhalten eigene Mapping-Pfade. Eine abgelehnte Übersetzung darf Teilabbildungen behalten, muss aber sichtbare Issues enthalten.
+
+          [`regelsuche.solver-execution/v1`](schemas/regelsuche-solver-execution-v1.schema.json) verbindet genau eine Obligation, eine Übersetzung und ein Resultat. Backend-ID, Backend-Version, Translation-Status und Translation-Issues müssen übereinstimmen. Dadurch kann kein Resultat nachträglich mit einer anderen oder stillschweigend veränderten Übersetzung kombiniert werden.
+          ''')
+          replace('docs/solver-neutral-ir.md',
+              '''proof-report.json
+          solver-obligation.json
+          solver-result.json
+          production-lifecycle-run.json
+          ''',
+              '''proof-report.json
+          solver-obligation.json
+          solver-translation.json
+          solver-result.json
+          solver-execution.json
+          production-lifecycle-run.json
+          ''')
+          replace('docs/solver-neutral-ir.md',
+              '''2. schreibt zwei Obligationen und drei Backendresultate;
+          3. validiert sie gegen die Draft-2020-12-Schemas;
+          ''',
+              '''2. schreibt zwei Obligationen sowie Translation, Resultat und Execution für jeden Backendlauf;
+          3. validiert alle vier Vertragsebenen gegen die Draft-2020-12-Schemas;
+          ''')
+
+          # Autopilot docs.
+          replace('docs/autopilot-planner.md',
+              '''→ SolverIr.Obligation
+          → SolverBackend
+          → SolverIr.SolverResult
+          ''',
+              '''→ SolverIr.Obligation
+          → SolverBackend
+          → SolverTranslation
+          → SolverIr.SolverResult
+          → SolverExecution
+          ''')
+          replace('docs/autopilot-planner.md',
+              '''`regelsuche.autonomous-production-lifecycle/v3` bindet Validation, Counterexample Search, Novelty, `solver-obligation.json`, `solver-result.json`, Proof Report v2, den konservativen Lifecycle-Kandidaten, die Lifecycle-Entscheidung und den Ressourcenledger in einem Manifest.''',
+              '''`regelsuche.autonomous-production-lifecycle/v3` bindet Validation, Counterexample Search, Novelty, `solver-obligation.json`, `solver-translation.json`, `solver-result.json`, `solver-execution.json`, Proof Report v2, den konservativen Lifecycle-Kandidaten, die Lifecycle-Entscheidung und den Ressourcenledger in einem Manifest.''')
+          replace('docs/autopilot-planner.md',
+              '''`proof-report.json`, `solver-obligation.json`, `solver-result.json`, Lifecycle-Candidate-, Lifecycle-Decision-, Ressourcenledger- und Lifecycle-v3-Artefakte.''',
+              '''`proof-report.json`, `solver-obligation.json`, `solver-translation.json`, `solver-result.json`, `solver-execution.json`, Lifecycle-Candidate-, Lifecycle-Decision-, Ressourcenledger- und Lifecycle-v3-Artefakte.''')
+
+          # Dedicated Solver IR workflow.
+          workflow = '.github/workflows/solver-ir.yml'
+          replace(workflow,
+              '''          results = [
+                  root / "regelsuche-search-result.json",
+                  root / "polynomial-normal-form-result.json",
+                  root / "unsupported-result.json",
+              ]
+          ''',
+              '''          translations = [
+                  root / "regelsuche-search-translation.json",
+                  root / "polynomial-normal-form-translation.json",
+                  root / "unsupported-translation.json",
+              ]
+              results = [
+                  root / "regelsuche-search-result.json",
+                  root / "polynomial-normal-form-result.json",
+                  root / "unsupported-result.json",
+              ]
+              executions = [
+                  root / "regelsuche-search-execution.json",
+                  root / "polynomial-normal-form-execution.json",
+                  root / "unsupported-execution.json",
+              ]
+          ''')
+          replace(workflow,
+              '''          for path in results:
+                  Draft202012Validator(result_schema).validate(
+                      json.loads(path.read_text())
+                  )
+                  print("validated=" + str(path))
+
+              obligation = json.loads((root / "obligation.json").read_text())
+          ''',
+              '''          translation_schema = json.loads(
+                  (schemas / "regelsuche-solver-translation-v1.schema.json").read_text()
+              )
+              execution_schema = json.loads(
+                  (schemas / "regelsuche-solver-execution-v1.schema.json").read_text()
+              )
+              Draft202012Validator.check_schema(translation_schema)
+              Draft202012Validator.check_schema(execution_schema)
+              for path in translations:
+                  Draft202012Validator(translation_schema).validate(
+                      json.loads(path.read_text())
+                  )
+                  print("validated=" + str(path))
+              for path in results:
+                  Draft202012Validator(result_schema).validate(
+                      json.loads(path.read_text())
+                  )
+                  print("validated=" + str(path))
+              for path in executions:
+                  Draft202012Validator(execution_schema).validate(
+                      json.loads(path.read_text())
+                  )
+                  print("validated=" + str(path))
+
+              obligation = json.loads((root / "obligation.json").read_text())
+          ''')
+          replace(workflow,
+              '''          search = json.loads((root / "regelsuche-search-result.json").read_text())
+              polynomial = json.loads(
+                  (root / "polynomial-normal-form-result.json").read_text()
+              )
+              unsupported = json.loads((root / "unsupported-result.json").read_text())
+          ''',
+              '''          search_translation = json.loads(
+                  (root / "regelsuche-search-translation.json").read_text()
+              )
+              search = json.loads((root / "regelsuche-search-result.json").read_text())
+              search_execution = json.loads(
+                  (root / "regelsuche-search-execution.json").read_text()
+              )
+              polynomial_translation = json.loads(
+                  (root / "polynomial-normal-form-translation.json").read_text()
+              )
+              polynomial = json.loads(
+                  (root / "polynomial-normal-form-result.json").read_text()
+              )
+              polynomial_execution = json.loads(
+                  (root / "polynomial-normal-form-execution.json").read_text()
+              )
+              unsupported_translation = json.loads(
+                  (root / "unsupported-translation.json").read_text()
+              )
+              unsupported = json.loads((root / "unsupported-result.json").read_text())
+              unsupported_execution = json.loads(
+                  (root / "unsupported-execution.json").read_text()
+              )
+          ''')
+          replace(workflow,
+              '''          assert search["obligationHash"] == obligation["contentHash"]
+              assert polynomial["obligationHash"] == obligation["contentHash"]
+          ''',
+              '''          assert search["obligationHash"] == obligation["contentHash"]
+              assert polynomial["obligationHash"] == obligation["contentHash"]
+              assert search_translation["obligationHash"] == obligation["contentHash"]
+              assert polynomial_translation["obligationHash"] == obligation["contentHash"]
+              assert search_translation["termMapping"]["goal.left"] == "x + 0"
+              assert search_translation["termMapping"]["goal.right"] == "x"
+              assert polynomial_translation["termMapping"] == search_translation["termMapping"]
+              assert search_execution["translationHash"] == search_translation["contentHash"]
+              assert search_execution["resultHash"] == search["contentHash"]
+              assert polynomial_execution["translationHash"] == polynomial_translation["contentHash"]
+              assert polynomial_execution["resultHash"] == polynomial["contentHash"]
+          ''')
+          replace(workflow,
+              '''          assert unsupported["status"] == "UNSUPPORTED"
+              assert unsupported["translationStatus"] == "REJECTED"
+              assert "ASSUMPTIONS_NOT_SUPPORTED" in unsupported["translationIssues"]
+          ''',
+              '''          assert unsupported["status"] == "UNSUPPORTED"
+              assert unsupported["translationStatus"] == "REJECTED"
+              assert unsupported_translation["status"] == "REJECTED"
+              assert unsupported_execution["translationHash"] == unsupported_translation["contentHash"]
+              assert unsupported_execution["resultHash"] == unsupported["contentHash"]
+              assert "ASSUMPTIONS_NOT_SUPPORTED" in unsupported["translationIssues"]
+              assert unsupported["translationIssues"] == unsupported_translation["issues"]
+          ''')
+
+          # Autopilot workflow.
+          workflow = '.github/workflows/autopilot-evidence.yml'
+          replace(workflow,
+              '''          test -s "$DIR/solver-obligation.json"
+              test -s "$DIR/solver-result.json"
+          ''',
+              '''          test -s "$DIR/solver-obligation.json"
+              test -s "$DIR/solver-translation.json"
+              test -s "$DIR/solver-result.json"
+              test -s "$DIR/solver-execution.json"
+          ''')
+          replace(workflow,
+              '''              (schemas / "regelsuche-solver-obligation-v1.schema.json", root / "solver-obligation.json"),
+                  (schemas / "regelsuche-solver-result-v1.schema.json", root / "solver-result.json"),
+          ''',
+              '''              (schemas / "regelsuche-solver-obligation-v1.schema.json", root / "solver-obligation.json"),
+                  (schemas / "regelsuche-solver-translation-v1.schema.json", root / "solver-translation.json"),
+                  (schemas / "regelsuche-solver-result-v1.schema.json", root / "solver-result.json"),
+                  (schemas / "regelsuche-solver-execution-v1.schema.json", root / "solver-execution.json"),
+          ''')
+          replace(workflow,
+              '''          result = json.loads((root / "solver-result.json").read_text())
+              proof = json.loads((root / "proof-report.json").read_text())
+          ''',
+              '''          translation = json.loads((root / "solver-translation.json").read_text())
+              result = json.loads((root / "solver-result.json").read_text())
+              execution = json.loads((root / "solver-execution.json").read_text())
+              proof = json.loads((root / "proof-report.json").read_text())
+          ''')
+          replace(workflow,
+              '''          assert result["obligationHash"] == obligation["contentHash"]
+              assert proof["solverObligationHash"] == obligation["contentHash"]
+              assert proof["solverResultHash"] == result["contentHash"]
+              assert lifecycle["solverObligationHash"] == obligation["contentHash"]
+              assert lifecycle["solverResultHash"] == result["contentHash"]
+          ''',
+              '''          assert translation["obligationHash"] == obligation["contentHash"]
+              assert result["obligationHash"] == obligation["contentHash"]
+              assert execution["obligationHash"] == obligation["contentHash"]
+              assert execution["translationHash"] == translation["contentHash"]
+              assert execution["resultHash"] == result["contentHash"]
+              assert proof["solverObligationHash"] == obligation["contentHash"]
+              assert proof["solverTranslationHash"] == translation["contentHash"]
+              assert proof["solverResultHash"] == result["contentHash"]
+              assert proof["solverExecutionHash"] == execution["contentHash"]
+              assert lifecycle["solverObligationHash"] == obligation["contentHash"]
+              assert lifecycle["solverTranslationHash"] == translation["contentHash"]
+              assert lifecycle["solverResultHash"] == result["contentHash"]
+              assert lifecycle["solverExecutionHash"] == execution["contentHash"]
+          ''')
+
+          # Release Readiness workflow.
+          workflow = '.github/workflows/release-readiness.yml'
+          replace(workflow,
+              '''            proof-report.json solver-obligation.json solver-result.json \\
+                production-lifecycle-run.json; do test -s "$DIR/campaign/$file"; done
+          ''',
+              '''            proof-report.json solver-obligation.json solver-translation.json \\
+                solver-result.json solver-execution.json \\
+                production-lifecycle-run.json; do test -s "$DIR/campaign/$file"; done
+          ''')
+          replace(workflow,
+              '''                  schemas / "regelsuche-solver-obligation-v1.schema.json",
+                      root / "campaign/solver-obligation.json",
+                  ),
+                  (
+                      schemas / "regelsuche-solver-result-v1.schema.json",
+          ''',
+              '''                  schemas / "regelsuche-solver-obligation-v1.schema.json",
+                      root / "campaign/solver-obligation.json",
+                  ),
+                  (
+                      schemas / "regelsuche-solver-translation-v1.schema.json",
+                      root / "campaign/solver-translation.json",
+                  ),
+                  (
+                      schemas / "regelsuche-solver-result-v1.schema.json",
+          ''')
+          replace(workflow,
+              '''                  schemas / "regelsuche-open-target-conjecture-proof-v2.schema.json",
+                      root / "campaign/proof-report.json",
+                  ),
+          ''',
+              '''                  schemas / "regelsuche-solver-execution-v1.schema.json",
+                      root / "campaign/solver-execution.json",
+                  ),
+                  (
+                      schemas / "regelsuche-open-target-conjecture-proof-v2.schema.json",
+                      root / "campaign/proof-report.json",
+                  ),
+          ''')
+          replace(workflow,
+              '''          result = json.loads((root / "campaign/solver-result.json").read_text())
+              proof = json.loads((root / "campaign/proof-report.json").read_text())
+          ''',
+              '''          translation = json.loads((root / "campaign/solver-translation.json").read_text())
+              result = json.loads((root / "campaign/solver-result.json").read_text())
+              execution = json.loads((root / "campaign/solver-execution.json").read_text())
+              proof = json.loads((root / "campaign/proof-report.json").read_text())
+          ''')
+          replace(workflow,
+              '''          assert result["obligationHash"] == obligation["contentHash"]
+              assert proof["solverObligationHash"] == obligation["contentHash"]
+              assert proof["solverResultHash"] == result["contentHash"]
+              assert lifecycle["solverObligationHash"] == obligation["contentHash"]
+              assert lifecycle["solverResultHash"] == result["contentHash"]
+          ''',
+              '''          assert translation["obligationHash"] == obligation["contentHash"]
+              assert result["obligationHash"] == obligation["contentHash"]
+              assert execution["obligationHash"] == obligation["contentHash"]
+              assert execution["translationHash"] == translation["contentHash"]
+              assert execution["resultHash"] == result["contentHash"]
+              assert proof["solverObligationHash"] == obligation["contentHash"]
+              assert proof["solverTranslationHash"] == translation["contentHash"]
+              assert proof["solverResultHash"] == result["contentHash"]
+              assert proof["solverExecutionHash"] == execution["contentHash"]
+              assert lifecycle["solverObligationHash"] == obligation["contentHash"]
+              assert lifecycle["solverTranslationHash"] == translation["contentHash"]
+              assert lifecycle["solverResultHash"] == result["contentHash"]
+              assert lifecycle["solverExecutionHash"] == execution["contentHash"]
+          ''')
+
+          # This workflow deletes itself in the same atomic commit.
+          (repo / '.github/workflows/finalize-solver-ir-233.yml').unlink()
+          PY
+
+      - name: Commit finalized integration
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Bind solver translations to atomic executions"
+          git push origin HEAD:feature/233-solver-neutral-ir
