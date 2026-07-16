@@ -23,7 +23,7 @@
     "dynamicRuleId": { "type": "string" },
     "provenanceHash": {
       "anyOf": [
-        { "$ref": "#/$defs/sha256" },
+        { "$ref": "#/$defs/provenanceFingerprint" },
         { "const": "" }
       ]
     },
@@ -64,9 +64,9 @@
     "noveltyStatus": { "type": "string", "minLength": 1 }
   },
   "$defs": {
-    "sha256": {
+    "provenanceFingerprint": {
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
+      "pattern": "^sha256:[0-9a-f]{16}$"
     },
     "result": {
       "type": "object",
