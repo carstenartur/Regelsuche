@@ -28,10 +28,18 @@ import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyMatch;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
-import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofObligation;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverObligationFactory;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.nio.charset.StandardCharsets;
@@ -86,6 +94,9 @@ class CrossFamilyBridgeQualificationGateTest {
         assertEquals("NOT_EVALUATED", report.externalNoveltyStatus());
         assertEquals("NOT_EVALUATED", report.promotionStatus());
         assertEquals("NOT_EVALUATED", report.publicEvidenceStatus());
+        assertEquals(ResultStatus.CONFIRMED, fixture.proof().result().status());
+        assertEquals(TranslationStatus.LOSSLESS,
+            fixture.proof().result().translationStatus());
         assertEquals(ablation.toCanonicalJson(), Files.readString(ablationOutput));
         assertEquals(report.toCanonicalJson(), Files.readString(reportOutput));
     }
@@ -437,22 +448,40 @@ class CrossFamilyBridgeQualificationGateTest {
     }
 
     private static ProofReport proof() {
-        ProofObligation obligation = new ProofObligation(
-            OpenTargetConjectureProofGate.OBLIGATION_SCHEMA,
-            ID,
-            false,
+        SolverIr.Obligation obligation = new SolverObligationFactory().equality(
+            ID + "-proof",
             LEFT,
             RIGHT,
             ASSUMPTIONS,
-            sha("obligation"));
+            RequestedEvidence.SYMBOLIC_CERTIFICATE,
+            new SourceProvenance(
+                "cross-family-bridge",
+                ID,
+                sha("bridge-proof-revision")));
+        BackendDescriptor descriptor = new BackendDescriptor(
+            "assumptions-aware-symbolic-backend",
+            "1",
+            List.of(Theory.REAL_ARITHMETIC),
+            List.of(SolverIr.Relation.EQUALS),
+            List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
+            true);
+        SolverResult result = SolverResult.create(
+            obligation,
+            descriptor,
+            ResultStatus.CONFIRMED,
+            TranslationStatus.LOSSLESS,
+            List.of("STRUCTURED_ASSUMPTIONS", "SYMBOLIC_EQUIVALENCE"),
+            List.of(),
+            "symbolic equivalence confirmed under structured assumptions",
+            Map.of(),
+            sha("certificate"));
         return new ProofReport(
             OpenTargetConjectureProofGate.REPORT_SCHEMA,
             ID,
             EligibilityStatus.ELIGIBLE,
             ProofStatus.SYMBOLICALLY_VERIFIED,
             obligation,
-            "sympy-equivalence-v1",
-            "symbolic equivalence confirmed",
+            result,
             "NOT_EVALUATED",
             List.of(),
             sha("proof"));
