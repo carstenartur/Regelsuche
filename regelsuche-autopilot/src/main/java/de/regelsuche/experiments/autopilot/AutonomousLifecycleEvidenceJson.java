@@ -4,10 +4,8 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.HypothesisCandidate;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
-import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofObligation;
 import java.util.Comparator;
 import java.util.Map;
-import java.util.Objects;
 
 /** Canonical rendering for production evidence whose domain records have no JSON writer. */
 final class AutonomousLifecycleEvidenceJson {
@@ -82,20 +80,6 @@ final class AutonomousLifecycleEvidenceJson {
                     .property("relation", match.relation().name()))))
             .property("externalNoveltyStatus", report.externalNoveltyStatus())
             .property("explanation", report.explanation())
-            .endObject()
-            .toString();
-    }
-
-    static String proofObligation(ProofObligation obligation) {
-        Objects.requireNonNull(obligation, "obligation");
-        return new JsonWriter().beginObject()
-            .property("schema", obligation.schema())
-            .property("conjectureId", obligation.conjectureId())
-            .property("targetProvided", obligation.targetProvided())
-            .property("leftExpression", obligation.leftExpression())
-            .property("rightExpression", obligation.rightExpression())
-            .stringArray("assumptions", obligation.assumptions())
-            .property("obligationHash", obligation.obligationHash())
             .endObject()
             .toString();
     }
