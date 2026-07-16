@@ -297,7 +297,7 @@ final class OpenTargetPromotionGate {
     ) {
         String proofObligationHash = input.proof().obligation() == null
             ? ""
-            : input.proof().obligation().obligationHash();
+            : input.proof().obligation().contentHash();
         return new OpenTargetPromotionProvenance(
             input.sourceCampaign(),
             input.discoveryDate(),
