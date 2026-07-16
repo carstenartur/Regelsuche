@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-campaign-resource-ledger/v2",
+  "title": "Regelsuche complete autonomous campaign resource ledger v2",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "entries", "ledgerIsMathematicalEvidence",
+    "promotionStatus", "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-campaign-resource-ledger/v2" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "entries": {
+      "type": "array", "minItems": 10, "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "stage", "resource", "configured", "executed", "skipped",
+          "remaining", "sourceReceiptHash"
+        ],
+        "properties": {
+          "stage": {
+            "enum": [
+              "GENERATION", "CANDIDATE_FORMATION", "VALIDATION",
+              "COUNTEREXAMPLE_SEARCH", "PROJECT_NOVELTY", "PROOF",
+              "LIFECYCLE_HANDOFF"
+            ]
+          },
+          "resource": {
+            "enum": [
+              "GENERATED_STATES", "EXPLORED_STATES", "OBSERVATIONS",
+              "MINING_BATCHES", "CANDIDATES", "VALIDATION_CHECKS",
+              "COUNTEREXAMPLE_ATTEMPTS", "NOVELTY_COMPARISONS",
+              "PROOF_ATTEMPTS", "LIFECYCLE_HANDOFFS"
+            ]
+          },
+          "configured": { "type": "integer", "minimum": 1 },
+          "executed": { "type": "integer", "minimum": 0 },
+          "skipped": { "type": "integer", "minimum": 0 },
+          "remaining": { "type": "integer", "minimum": 0 },
+          "sourceReceiptHash": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ledgerIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}
