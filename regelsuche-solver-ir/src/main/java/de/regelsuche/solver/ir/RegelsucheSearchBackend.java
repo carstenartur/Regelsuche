@@ -47,16 +47,27 @@ public final class RegelsucheSearchBackend implements SolverBackend {
     }
 
     @Override
-    public SolverResult solve(Obligation obligation) {
+    public SolverExecution execute(Obligation obligation) {
         Objects.requireNonNull(obligation, "obligation");
+        String left = expressions.render(obligation.goal().left());
+        String right = expressions.render(obligation.goal().right());
+        Map<String, String> terms = Map.of(
+            "goal.left", left,
+            "goal.right", right);
         List<String> issues = SolverBackendSupport.issues(
             obligation, DESCRIPTOR, false);
         if (!issues.isEmpty()) {
-            return SolverBackendSupport.unsupported(obligation, DESCRIPTOR, issues);
+            return SolverBackendSupport.rejectedExecution(
+                obligation, DESCRIPTOR, issues, terms);
         }
+        SolverTranslation translation = SolverTranslation.create(
+            obligation,
+            DESCRIPTOR,
+            TranslationStatus.LOSSLESS,
+            List.of(),
+            terms);
+        SolverResult result;
         try {
-            String left = expressions.render(obligation.goal().left());
-            String right = expressions.render(obligation.goal().right());
             SearchProblem problem = new SearchProblem(
                 left,
                 new AstRewriteTransformationEngine(),
@@ -81,7 +92,7 @@ public final class RegelsucheSearchBackend implements SolverBackend {
                 + "; reachedDepth="
                     + (outcome.reachedState() == null
                         ? -1 : outcome.reachedState().depth());
-            return SolverResult.create(
+            result = SolverResult.create(
                 obligation,
                 DESCRIPTOR,
                 status,
@@ -92,7 +103,7 @@ public final class RegelsucheSearchBackend implements SolverBackend {
                 Map.of(),
                 certificate);
         } catch (RuntimeException exception) {
-            return SolverResult.create(
+            result = SolverResult.create(
                 obligation,
                 DESCRIPTOR,
                 ResultStatus.ERROR,
@@ -103,5 +114,6 @@ public final class RegelsucheSearchBackend implements SolverBackend {
                 Map.of(),
                 "");
         }
+        return SolverExecution.create(obligation, translation, result);
     }
 }
