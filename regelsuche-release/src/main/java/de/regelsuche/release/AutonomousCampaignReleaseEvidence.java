@@ -28,8 +28,10 @@ public record AutonomousCampaignReleaseEvidence(
     boolean exactSupportingLineage,
     int mandatorySkippedWorkCount,
     int heldOutFamilyOrClusterCount,
-    int configuredFreshHoldouts,
-    int executedFreshHoldouts,
+    int configuredPositiveHoldouts,
+    int executedPositiveHoldouts,
+    int configuredNegativeHoldouts,
+    int executedNegativeHoldouts,
     int refutingHoldouts,
     int counterexampleStrategyCount,
     int counterexamplesFound,
@@ -44,7 +46,6 @@ public record AutonomousCampaignReleaseEvidence(
     boolean hiddenReferenceIsolated,
     boolean hiddenRuleBenchmarkComplete,
     boolean executableRediscoveryRetained,
-    boolean domainGenericSearchInterfaceReady,
     boolean publicEvidenceReviewed,
     String evidenceHash
 ) {
@@ -73,8 +74,10 @@ public record AutonomousCampaignReleaseEvidence(
                 alphaDistinctSupport,
                 mandatorySkippedWorkCount,
                 heldOutFamilyOrClusterCount,
-                configuredFreshHoldouts,
-                executedFreshHoldouts,
+                configuredPositiveHoldouts,
+                executedPositiveHoldouts,
+                configuredNegativeHoldouts,
+                executedNegativeHoldouts,
                 refutingHoldouts,
                 counterexampleStrategyCount,
                 counterexamplesFound,
@@ -84,6 +87,11 @@ public record AutonomousCampaignReleaseEvidence(
                 throw new IllegalArgumentException(
                     "release evidence counts must be non-negative");
             }
+        }
+        if (executedPositiveHoldouts > configuredPositiveHoldouts
+                || executedNegativeHoldouts > configuredNegativeHoldouts) {
+            throw new IllegalArgumentException(
+                "executed holdouts cannot exceed configured holdouts");
         }
         requireText(projectNoveltyStatus, "projectNoveltyStatus");
         requireText(externalNoveltyStatus, "externalNoveltyStatus");
@@ -109,12 +117,10 @@ public record AutonomousCampaignReleaseEvidence(
             .toList();
         boolean identicalRuns = runHashes.stream().distinct().count() == 1L;
         var evaluation = run.lifecycle().evaluation();
-        int configuredHoldouts = Math.addExact(
-            evaluation.configuredPositiveHoldouts(),
-            evaluation.configuredNegativeHoldouts());
-        int executedHoldouts = Math.addExact(
-            evaluation.executedPositiveHoldouts(),
-            evaluation.executedNegativeHoldouts());
+        int configuredPositive = evaluation.configuredPositiveHoldouts();
+        int executedPositive = evaluation.executedPositiveHoldouts();
+        int configuredNegative = evaluation.configuredNegativeHoldouts();
+        int executedNegative = evaluation.executedNegativeHoldouts();
         int refutingHoldouts = Math.addExact(
             (int) evaluation.positiveResults().stream()
                 .filter(result -> !result.passed()).count(),
@@ -142,7 +148,8 @@ public record AutonomousCampaignReleaseEvidence(
             + "\nalphaSupport=" + conjecture.distinctAlphaSupport()
             + "\nlineage=" + exactLineage(output, conjecture)
             + "\nmandatorySkipped=" + skippedMandatory
-            + "\nholdouts=" + configuredHoldouts + '/' + executedHoldouts
+            + "\npositiveHoldouts=" + executedPositive + '/' + configuredPositive
+            + "\nnegativeHoldouts=" + executedNegative + '/' + configuredNegative
             + "\nrefutingHoldouts=" + refutingHoldouts
             + "\ncounterexampleStrategies="
                 + evaluation.counterexample().attemptedSources().stream()
@@ -173,8 +180,10 @@ public record AutonomousCampaignReleaseEvidence(
             exactLineage(output, conjecture),
             skippedMandatory,
             0,
-            configuredHoldouts,
-            executedHoldouts,
+            configuredPositive,
+            executedPositive,
+            configuredNegative,
+            executedNegative,
             refutingHoldouts,
             (int) evaluation.counterexample().attemptedSources().stream()
                 .distinct().count(),
@@ -192,9 +201,16 @@ public record AutonomousCampaignReleaseEvidence(
             false,
             false,
             false,
-            false,
             de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.hash(
                 evidenceMaterial));
+    }
+
+    public int configuredFreshHoldouts() {
+        return Math.addExact(configuredPositiveHoldouts, configuredNegativeHoldouts);
+    }
+
+    public int executedFreshHoldouts() {
+        return Math.addExact(executedPositiveHoldouts, executedNegativeHoldouts);
     }
 
     private static OpenTargetConjecture retainedConjecture(CampaignRun run) {
@@ -256,8 +272,10 @@ public record AutonomousCampaignReleaseEvidence(
             .property("exactSupportingLineage", exactSupportingLineage)
             .property("mandatorySkippedWorkCount", mandatorySkippedWorkCount)
             .property("heldOutFamilyOrClusterCount", heldOutFamilyOrClusterCount)
-            .property("configuredFreshHoldouts", configuredFreshHoldouts)
-            .property("executedFreshHoldouts", executedFreshHoldouts)
+            .property("configuredPositiveHoldouts", configuredPositiveHoldouts)
+            .property("executedPositiveHoldouts", executedPositiveHoldouts)
+            .property("configuredNegativeHoldouts", configuredNegativeHoldouts)
+            .property("executedNegativeHoldouts", executedNegativeHoldouts)
             .property("refutingHoldouts", refutingHoldouts)
             .property("counterexampleStrategyCount", counterexampleStrategyCount)
             .property("counterexamplesFound", counterexamplesFound)
@@ -273,8 +291,6 @@ public record AutonomousCampaignReleaseEvidence(
             .property("hiddenReferenceIsolated", hiddenReferenceIsolated)
             .property("hiddenRuleBenchmarkComplete", hiddenRuleBenchmarkComplete)
             .property("executableRediscoveryRetained", executableRediscoveryRetained)
-            .property("domainGenericSearchInterfaceReady",
-                domainGenericSearchInterfaceReady)
             .property("publicEvidenceReviewed", publicEvidenceReviewed)
             .property("evidenceHash", evidenceHash)
             .endObject()
