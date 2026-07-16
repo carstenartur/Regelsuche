@@ -2,7 +2,6 @@ package de.regelsuche.solver.portfolio;
 
 import de.regelsuche.solver.ir.SolverBackend;
 import de.regelsuche.solver.ir.SolverExecution;
-import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
 import de.regelsuche.solver.ir.SolverIr.Relation;
@@ -20,7 +19,6 @@ import java.util.Optional;
 
 /** SolverBackend-compatible facade so existing proof gates consume only a selected execution. */
 public final class PortfolioSolverBackend implements SolverBackend {
-    private final List<PortfolioBackend> backends;
     private final PortfolioPolicy policy;
     private final PortfolioBudget budget;
     private final String configurationId;
@@ -45,7 +43,8 @@ public final class PortfolioSolverBackend implements SolverBackend {
         String configurationId,
         PortfolioExecutionCache cache
     ) {
-        this.backends = backends == null ? List.of() : List.copyOf(backends);
+        List<PortfolioBackend> copiedBackends = backends == null
+            ? List.of() : List.copyOf(backends);
         this.policy = Objects.requireNonNull(policy, "policy");
         this.budget = Objects.requireNonNull(budget, "budget");
         if (configurationId == null || configurationId.isBlank()) {
@@ -53,7 +52,7 @@ public final class PortfolioSolverBackend implements SolverBackend {
         }
         this.configurationId = configurationId;
         this.executor = new SolverPortfolioExecutor(
-            this.backends, new SolverPortfolioPlanner(), Objects.requireNonNull(cache));
+            copiedBackends, new SolverPortfolioPlanner(), Objects.requireNonNull(cache));
         this.descriptor = new BackendDescriptor(
             "solver-portfolio",
             "1",
@@ -61,7 +60,7 @@ public final class PortfolioSolverBackend implements SolverBackend {
             Arrays.stream(Relation.values())
                 .filter(relation -> relation != Relation.IS_INTEGER).toList(),
             Arrays.asList(RequestedEvidence.values()),
-            this.backends.stream().allMatch(item -> item.profile().deterministic()));
+            copiedBackends.stream().allMatch(item -> item.profile().deterministic()));
     }
 
     @Override
@@ -99,9 +98,14 @@ public final class PortfolioSolverBackend implements SolverBackend {
         if (rejected && issues.isEmpty()) {
             issues = List.of("NO_CAPABLE_PORTFOLIO_BACKEND");
         }
+        Map<String, String> terms = rejected
+            ? Map.of("portfolio.report", report.contentHash())
+            : Map.of(
+                "goal.left", obligation.goal().left().canonicalMaterial(),
+                "goal.right", obligation.goal().right().canonicalMaterial(),
+                "portfolio.report", report.contentHash());
         SolverTranslation translation = SolverTranslation.create(
-            obligation, descriptor, translationStatus, issues,
-            Map.of("portfolio.report", report.contentHash()));
+            obligation, descriptor, translationStatus, issues, terms);
         ResultStatus status = switch (report.outcome()) {
             case UNSUPPORTED -> ResultStatus.UNSUPPORTED;
             case TIMEOUT -> ResultStatus.TIMEOUT;

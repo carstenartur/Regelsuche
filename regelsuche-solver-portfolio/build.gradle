@@ -16,7 +16,6 @@ java {
 dependencies {
     api project(':regelsuche-solver-ir')
 
-    testImplementation project(':regelsuche-learning')
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
