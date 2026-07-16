@@ -33,11 +33,11 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew :app:test \
+          ./gradlew \
+            :app:test \
+            :regelsuche-release:runReleaseReadinessWithHiddenRuleEvidence \
             --tests de.regelsuche.docs.HiddenRulePilotCampaignTest \
             2>&1 | tee release-readiness-build.log
-          ./gradlew :regelsuche-release:runReleaseReadinessWithHiddenRuleEvidence \
-            2>&1 | tee -a release-readiness-build.log
 
       - name: Require evidence artifacts
         shell: bash
@@ -48,7 +48,9 @@ jobs:
           for file in profiles.json evidence-summary.json \
             hidden-rule-release-evidence.json release-readiness-report.json \
             release-readiness-run.json; do test -s "$DIR/$file"; done
-          test -s "$DIR/campaign/production-campaign-manifest.json"
+          for file in production-campaign-manifest.json \
+            campaign-resource-ledger.json feedback-reallocation.json \
+            proof-obligation.json; do test -s "$DIR/campaign/$file"; done
 
       - name: Verify independently bound profiles
         shell: bash
