@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReleaseEvidenceProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ReleaseEvidenceProfile.java</span></div><h1>ReleaseEvidenceProfile.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Arrays;
+import java.util.List;
+
+/** Named evidence profiles for Regelsuche 0.2 release claims. */
+<span class="fc" id="L8">public enum ReleaseEvidenceProfile {</span>
+<span class="fc" id="L9">    SEARCH_REPRODUCIBILITY(</span>
+        &quot;reproducible target-free search under pinned inputs&quot;,
+        false,
+<span class="fc" id="L12">        List.of(</span>
+            &quot;PINNED_INPUTS&quot;,
+            &quot;TARGET_FREE&quot;,
+            &quot;CANONICAL_MANIFEST&quot;,
+            &quot;THREE_CLEAN_RUNS&quot;)),
+<span class="fc" id="L17">    HIDDEN_RULE_REDISCOVERY(</span>
+        &quot;rediscovery of withheld known rules without target leakage&quot;,
+        false,
+<span class="fc" id="L20">        List.of(</span>
+            &quot;HIDDEN_REFERENCE_ISOLATED&quot;,
+            &quot;HIDDEN_RULE_BENCHMARK_COMPLETE&quot;,
+            &quot;EXECUTABLE_REDISCOVERY&quot;)),
+<span class="fc" id="L24">    OPEN_TARGET_DISCOVERY(</span>
+        &quot;formation and validation of an open-target conjecture&quot;,
+        false,
+<span class="fc" id="L27">        List.of(</span>
+            &quot;TARGET_FREE&quot;,
+            &quot;MULTI_FAMILY_OBSERVATIONS&quot;,
+            &quot;AGGREGATE_MINING&quot;,
+            &quot;EXACT_LINEAGE&quot;,
+            &quot;REJECTION_EVIDENCE&quot;,
+            &quot;VALIDATION_COMPLETE&quot;,
+            &quot;COUNTEREXAMPLE_SEARCH_COMPLETE&quot;,
+            &quot;PROJECT_NOVELTY_COMPLETE&quot;,
+            &quot;SYMBOLIC_PROOF_COMPLETE&quot;,
+            &quot;LIFECYCLE_HANDOFF_COMPLETE&quot;)),
+<span class="fc" id="L38">    AUTONOMOUS_CAMPAIGN(</span>
+        &quot;autonomous generation, validation and retention of mathematical conjectures&quot;,
+        true,
+<span class="fc" id="L41">        List.of(</span>
+            &quot;TARGET_FREE&quot;,
+            &quot;MULTI_FAMILY_OBSERVATIONS&quot;,
+            &quot;AGGREGATE_MINING&quot;,
+            &quot;EXACT_LINEAGE&quot;,
+            &quot;NO_MANDATORY_SKIPPED_WORK&quot;,
+            &quot;ALPHA_DISTINCT_SUPPORT_AT_LEAST_THREE&quot;,
+            &quot;HELD_OUT_FAMILY_OR_CLUSTER&quot;,
+            &quot;BALANCED_RELEASE_HOLDOUT_SUITE&quot;,
+            &quot;MULTIPLE_COUNTEREXAMPLE_STRATEGIES&quot;,
+            &quot;NO_REFUTATION&quot;,
+            &quot;PROJECT_NOVELTY_COMPLETE&quot;,
+            &quot;SYMBOLIC_PROOF_COMPLETE&quot;,
+            &quot;NO_UNRESOLVED_ASSUMPTIONS&quot;,
+            &quot;LIFECYCLE_HANDOFF_COMPLETE&quot;,
+            &quot;PAIRED_HELD_OUT_UTILITY&quot;,
+            &quot;THREE_CLEAN_RUNS&quot;)),
+<span class="fc" id="L58">    EXTERNAL_NOVELTY_REVIEW(</span>
+        &quot;externally reviewed mathematical novelty&quot;,
+        false,
+<span class="fc" id="L61">        List.of(</span>
+            &quot;PROJECT_NOVELTY_COMPLETE&quot;,
+            &quot;EXTERNAL_NOVELTY_REVIEWED&quot;,
+            &quot;PUBLIC_EVIDENCE_REVIEWED&quot;));
+
+    public static final String CATALOG_SCHEMA =
+        &quot;regelsuche.release-evidence-profile-catalog/v1&quot;;
+
+    private final String claim;
+    private final boolean authorizesAutonomyClaim;
+    private final List&lt;String&gt; requirements;
+
+    ReleaseEvidenceProfile(
+        String claim,
+        boolean authorizesAutonomyClaim,
+        List&lt;String&gt; requirements
+<span class="fc" id="L77">    ) {</span>
+<span class="fc" id="L78">        this.claim = claim;</span>
+<span class="fc" id="L79">        this.authorizesAutonomyClaim = authorizesAutonomyClaim;</span>
+<span class="fc" id="L80">        this.requirements = List.copyOf(requirements);</span>
+<span class="fc" id="L81">    }</span>
+
+    public String claim() {
+<span class="fc" id="L84">        return claim;</span>
+    }
+
+    public boolean authorizesAutonomyClaim() {
+<span class="fc" id="L88">        return authorizesAutonomyClaim;</span>
+    }
+
+    public List&lt;String&gt; requirements() {
+<span class="fc" id="L92">        return requirements;</span>
+    }
+
+    public static String catalogJson() {
+<span class="fc" id="L96">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L97">            .property(&quot;schema&quot;, CATALOG_SCHEMA)</span>
+<span class="fc" id="L98">            .array(&quot;profiles&quot;, array -&gt; Arrays.stream(values()).forEach(profile -&gt;</span>
+<span class="fc" id="L99">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L100">                    .property(&quot;profile&quot;, profile.name())</span>
+<span class="fc" id="L101">                    .property(&quot;claim&quot;, profile.claim())</span>
+<span class="fc" id="L102">                    .property(&quot;authorizesAutonomyClaim&quot;,</span>
+<span class="fc" id="L103">                        profile.authorizesAutonomyClaim())</span>
+<span class="fc" id="L104">                    .stringArray(&quot;requirements&quot;, profile.requirements()))))</span>
+<span class="fc" id="L105">            .property(&quot;autonomyClaimProfile&quot;, AUTONOMOUS_CAMPAIGN.name())</span>
+<span class="fc" id="L106">            .property(&quot;externalNoveltyProfile&quot;, EXTERNAL_NOVELTY_REVIEW.name())</span>
+<span class="fc" id="L107">            .endObject()</span>
+<span class="fc" id="L108">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

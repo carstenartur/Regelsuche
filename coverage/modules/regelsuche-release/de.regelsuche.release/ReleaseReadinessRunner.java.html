@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReleaseReadinessRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ReleaseReadinessRunner.java</span></div><h1>ReleaseReadinessRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner;
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner.CampaignRun;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+
+/** Executes real campaign evidence and evaluates every release profile. */
+<span class="fc" id="L15">public final class ReleaseReadinessRunner {</span>
+    public static final String SCHEMA = &quot;regelsuche.release-readiness-run/v1&quot;;
+
+    public ReleaseRun run() {
+<span class="fc" id="L19">        AutonomousProductionCampaignRunner campaignRunner =</span>
+            new AutonomousProductionCampaignRunner();
+<span class="fc" id="L21">        List&lt;CampaignRun&gt; campaigns = List.of(</span>
+<span class="fc" id="L22">            campaignRunner.runPinned(1),</span>
+<span class="fc" id="L23">            campaignRunner.runPinned(2),</span>
+<span class="fc" id="L24">            campaignRunner.runPinned(4));</span>
+<span class="fc" id="L25">        AutonomousCampaignReleaseEvidence evidence =</span>
+<span class="fc" id="L26">            AutonomousCampaignReleaseEvidence.from(campaigns);</span>
+<span class="fc" id="L27">        ReleaseReadinessMatrix.MatrixReport matrix =</span>
+<span class="fc" id="L28">            ReleaseReadinessMatrix.evaluate(evidence);</span>
+<span class="fc" id="L29">        String profileCatalog = ReleaseEvidenceProfile.catalogJson();</span>
+<span class="fc" id="L30">        String profileCatalogHash = de.regelsuche.experiments.autopilot</span>
+<span class="fc" id="L31">            .AutonomousResearchBriefV2.hash(profileCatalog);</span>
+<span class="fc" id="L32">        String contentHash = de.regelsuche.experiments.autopilot</span>
+<span class="fc" id="L33">            .AutonomousResearchBriefV2.hash(</span>
+                SCHEMA
+                    + &quot;\nprofileCatalog=&quot; + profileCatalogHash
+<span class="fc" id="L36">                    + &quot;\nevidence=&quot; + evidence.evidenceHash()</span>
+<span class="fc" id="L37">                    + &quot;\nmatrix=&quot; + matrix.contentHash()</span>
+<span class="fc" id="L38">                    + &quot;\ncampaign=&quot; + campaigns.getFirst().contentHash());</span>
+<span class="fc" id="L39">        return new ReleaseRun(</span>
+            SCHEMA,
+<span class="fc" id="L41">            campaigns.getFirst(),</span>
+            evidence,
+            matrix,
+            profileCatalog,
+            profileCatalogHash,
+            contentHash);
+    }
+
+    public void write(Path outputDirectory, ReleaseRun run) {
+<span class="fc" id="L50">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L51">        Objects.requireNonNull(run, &quot;run&quot;);</span>
+        try {
+<span class="fc" id="L53">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L54">            new AutonomousProductionCampaignRunner().write(</span>
+<span class="fc" id="L55">                outputDirectory.resolve(&quot;campaign&quot;),</span>
+<span class="fc" id="L56">                run.retainedCampaign());</span>
+<span class="fc" id="L57">            write(outputDirectory.resolve(&quot;profiles.json&quot;), run.profileCatalogJson());</span>
+<span class="fc" id="L58">            write(outputDirectory.resolve(&quot;evidence-summary.json&quot;),</span>
+<span class="fc" id="L59">                run.evidence().toCanonicalJson());</span>
+<span class="fc" id="L60">            write(outputDirectory.resolve(&quot;release-readiness-report.json&quot;),</span>
+<span class="fc" id="L61">                run.matrix().toCanonicalJson());</span>
+<span class="fc" id="L62">            write(outputDirectory.resolve(&quot;release-readiness-run.json&quot;),</span>
+<span class="fc" id="L63">                run.toCanonicalJson());</span>
+<span class="nc" id="L64">        } catch (IOException exception) {</span>
+<span class="nc" id="L65">            throw new UncheckedIOException(</span>
+                &quot;Could not write release-readiness evidence&quot;, exception);
+<span class="fc" id="L67">        }</span>
+<span class="fc" id="L68">    }</span>
+
+    private static void write(Path path, String content) throws IOException {
+<span class="fc" id="L71">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L72">    }</span>
+
+    public record ReleaseRun(
+        String schema,
+        CampaignRun retainedCampaign,
+        AutonomousCampaignReleaseEvidence evidence,
+        ReleaseReadinessMatrix.MatrixReport matrix,
+        String profileCatalogJson,
+        String profileCatalogHash,
+        String contentHash
+    ) {
+<span class="fc" id="L83">        public ReleaseRun {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L85">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported release-readiness run schema&quot;);
+            }
+<span class="fc" id="L88">            retainedCampaign = Objects.requireNonNull(</span>
+                retainedCampaign, &quot;retainedCampaign&quot;);
+<span class="fc" id="L90">            evidence = Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L91">            matrix = Objects.requireNonNull(matrix, &quot;matrix&quot;);</span>
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">            if (profileCatalogJson == null || profileCatalogJson.isBlank()) {</span>
+<span class="nc" id="L93">                throw new IllegalArgumentException(</span>
+                    &quot;profileCatalogJson must not be blank&quot;);
+            }
+<span class="fc" id="L96">            requireSha256(profileCatalogHash, &quot;profileCatalogHash&quot;);</span>
+<span class="fc" id="L97">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L98">            if (!retainedCampaign.contentHash()</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                    .equals(evidence.campaignManifestHash())</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                    || !evidence.evidenceHash().equals(matrix.evidenceHash())) {</span>
+<span class="nc" id="L101">                throw new IllegalArgumentException(</span>
+                    &quot;release-readiness run artifacts are not hash-linked&quot;);
+            }
+<span class="fc" id="L104">        }</span>
+
+        public boolean autonomousCampaignReady() {
+<span class="fc" id="L107">            return matrix.autonomyClaimAuthorized();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L111">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L112">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L113">                .property(&quot;campaignManifestHash&quot;,</span>
+<span class="fc" id="L114">                    retainedCampaign.contentHash())</span>
+<span class="fc" id="L115">                .property(&quot;profileCatalogHash&quot;, profileCatalogHash)</span>
+<span class="fc" id="L116">                .property(&quot;evidenceHash&quot;, evidence.evidenceHash())</span>
+<span class="fc" id="L117">                .property(&quot;matrixHash&quot;, matrix.contentHash())</span>
+<span class="fc" id="L118">                .property(&quot;autonomousCampaignStatus&quot;,</span>
+<span class="fc" id="L119">                    matrix.autonomousCampaignStatus().name())</span>
+<span class="fc" id="L120">                .property(&quot;autonomyClaimAuthorized&quot;,</span>
+<span class="fc" id="L121">                    matrix.autonomyClaimAuthorized())</span>
+<span class="fc" id="L122">                .property(&quot;promotionStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L123">                .property(&quot;publicEvidenceStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L124">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L125">                .endObject()</span>
+<span class="fc" id="L126">                .toString();</span>
+        }
+    }
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L131" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L132">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L134">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

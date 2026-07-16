@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousCampaignReleaseEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">AutonomousCampaignReleaseEvidence.java</span></div><h1>AutonomousCampaignReleaseEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2.LifecycleOutcome;
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.CandidateOutput;
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner.CampaignRun;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Factual release-gate inputs derived from complete campaign artifacts. */
+public record AutonomousCampaignReleaseEvidence(
+    String schema,
+    String campaignManifestHash,
+    List&lt;String&gt; cleanRunManifestHashes,
+    int cleanRunCount,
+    boolean cleanRunsIdentical,
+    boolean targetFree,
+    int seedFamilyCount,
+    int observationCount,
+    int candidateCount,
+    int rejectedClusterCount,
+    int alphaDistinctSupport,
+    boolean aggregateMiningComplete,
+    boolean exactSupportingLineage,
+    int mandatorySkippedWorkCount,
+    int heldOutFamilyOrClusterCount,
+    int configuredPositiveHoldouts,
+    int executedPositiveHoldouts,
+    int configuredNegativeHoldouts,
+    int executedNegativeHoldouts,
+    int refutingHoldouts,
+    int counterexampleStrategyCount,
+    int counterexamplesFound,
+    String projectNoveltyStatus,
+    String externalNoveltyStatus,
+    String symbolicProofStatus,
+    String formalProofStatus,
+    int unresolvedAssumptionCount,
+    boolean lifecycleHandoffComplete,
+    boolean pairedHeldOutUtilityEvaluated,
+    int pairedUtilityPermille,
+    boolean hiddenReferenceIsolated,
+    boolean hiddenRuleBenchmarkComplete,
+    boolean executableRediscoveryRetained,
+    boolean publicEvidenceReviewed,
+    String evidenceHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-campaign-release-evidence/v1&quot;;
+
+<span class="fc" id="L55">    public AutonomousCampaignReleaseEvidence {</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;unsupported release evidence schema&quot;);</span>
+        }
+<span class="fc" id="L59">        requireSha256(campaignManifestHash, &quot;campaignManifestHash&quot;);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        cleanRunManifestHashes = cleanRunManifestHashes == null</span>
+<span class="nc" id="L61">            ? List.of()</span>
+<span class="fc" id="L62">            : cleanRunManifestHashes.stream().sorted().toList();</span>
+<span class="fc" id="L63">        cleanRunManifestHashes.forEach(hash -&gt; requireSha256(</span>
+            hash, &quot;cleanRunManifestHashes&quot;));
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (cleanRunManifestHashes.isEmpty()</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                || cleanRunCount != cleanRunManifestHashes.size()</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                || !cleanRunManifestHashes.contains(campaignManifestHash)) {</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(</span>
+                &quot;clean runs must retain the campaign manifest and match their count&quot;);
+        }
+<span class="fc" id="L71">        boolean calculatedIdentical = cleanRunManifestHashes.stream()</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            .distinct().count() == 1L;</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (cleanRunsIdentical != calculatedIdentical) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(</span>
+                &quot;cleanRunsIdentical must match the retained manifest hashes&quot;);
+        }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (int value : List.of(</span>
+<span class="fc" id="L78">                seedFamilyCount,</span>
+<span class="fc" id="L79">                observationCount,</span>
+<span class="fc" id="L80">                candidateCount,</span>
+<span class="fc" id="L81">                rejectedClusterCount,</span>
+<span class="fc" id="L82">                alphaDistinctSupport,</span>
+<span class="fc" id="L83">                mandatorySkippedWorkCount,</span>
+<span class="fc" id="L84">                heldOutFamilyOrClusterCount,</span>
+<span class="fc" id="L85">                configuredPositiveHoldouts,</span>
+<span class="fc" id="L86">                executedPositiveHoldouts,</span>
+<span class="fc" id="L87">                configuredNegativeHoldouts,</span>
+<span class="fc" id="L88">                executedNegativeHoldouts,</span>
+<span class="fc" id="L89">                refutingHoldouts,</span>
+<span class="fc" id="L90">                counterexampleStrategyCount,</span>
+<span class="fc" id="L91">                counterexamplesFound,</span>
+<span class="fc" id="L92">                unresolvedAssumptionCount,</span>
+<span class="fc" id="L93">                pairedUtilityPermille)) {</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (value &lt; 0) {</span>
+<span class="nc" id="L95">                throw new IllegalArgumentException(</span>
+                    &quot;release evidence counts must be non-negative&quot;);
+            }
+<span class="fc" id="L98">        }</span>
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">        if (executedPositiveHoldouts &gt; configuredPositiveHoldouts</span>
+                || executedNegativeHoldouts &gt; configuredNegativeHoldouts) {
+<span class="nc" id="L101">            throw new IllegalArgumentException(</span>
+                &quot;executed holdouts cannot exceed configured holdouts&quot;);
+        }
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">        if (!pairedHeldOutUtilityEvaluated &amp;&amp; pairedUtilityPermille != 0) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(</span>
+                &quot;unevaluated paired utility cannot report a gain&quot;);
+        }
+<span class="fc" id="L108">        requireText(projectNoveltyStatus, &quot;projectNoveltyStatus&quot;);</span>
+<span class="fc" id="L109">        requireText(externalNoveltyStatus, &quot;externalNoveltyStatus&quot;);</span>
+<span class="fc" id="L110">        requireText(symbolicProofStatus, &quot;symbolicProofStatus&quot;);</span>
+<span class="fc" id="L111">        requireText(formalProofStatus, &quot;formalProofStatus&quot;);</span>
+<span class="fc" id="L112">        requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
+<span class="fc" id="L113">        String expectedHash = canonicalHash(</span>
+            schema,
+            campaignManifestHash,
+            cleanRunManifestHashes,
+            cleanRunCount,
+            cleanRunsIdentical,
+            targetFree,
+            seedFamilyCount,
+            observationCount,
+            candidateCount,
+            rejectedClusterCount,
+            alphaDistinctSupport,
+            aggregateMiningComplete,
+            exactSupportingLineage,
+            mandatorySkippedWorkCount,
+            heldOutFamilyOrClusterCount,
+            configuredPositiveHoldouts,
+            executedPositiveHoldouts,
+            configuredNegativeHoldouts,
+            executedNegativeHoldouts,
+            refutingHoldouts,
+            counterexampleStrategyCount,
+            counterexamplesFound,
+            projectNoveltyStatus,
+            externalNoveltyStatus,
+            symbolicProofStatus,
+            formalProofStatus,
+            unresolvedAssumptionCount,
+            lifecycleHandoffComplete,
+            pairedHeldOutUtilityEvaluated,
+            pairedUtilityPermille,
+            hiddenReferenceIsolated,
+            hiddenRuleBenchmarkComplete,
+            executableRediscoveryRetained,
+            publicEvidenceReviewed);
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (!expectedHash.equals(evidenceHash)) {</span>
+<span class="nc" id="L149">            throw new IllegalArgumentException(</span>
+                &quot;release evidence hash does not match canonical fields&quot;);
+        }
+<span class="fc" id="L152">    }</span>
+
+    public static AutonomousCampaignReleaseEvidence from(
+        List&lt;CampaignRun&gt; suppliedRuns
+    ) {
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        if (suppliedRuns == null || suppliedRuns.isEmpty()) {</span>
+<span class="fc" id="L158">            throw new IllegalArgumentException(</span>
+                &quot;release evidence requires at least one complete campaign run&quot;);
+        }
+<span class="fc" id="L161">        List&lt;CampaignRun&gt; runs = List.copyOf(suppliedRuns);</span>
+<span class="fc" id="L162">        CampaignRun run = runs.getFirst();</span>
+<span class="fc" id="L163">        OpenTargetConjecture conjecture = retainedConjecture(run);</span>
+<span class="fc" id="L164">        CandidateOutput output = retainedOutput(run, conjecture);</span>
+<span class="fc" id="L165">        List&lt;String&gt; runHashes = runs.stream()</span>
+<span class="fc" id="L166">            .map(CampaignRun::contentHash)</span>
+<span class="fc" id="L167">            .sorted()</span>
+<span class="fc" id="L168">            .toList();</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        boolean identicalRuns = runHashes.stream().distinct().count() == 1L;</span>
+<span class="fc" id="L170">        var evaluation = run.lifecycle().evaluation();</span>
+<span class="fc" id="L171">        int configuredPositive = evaluation.configuredPositiveHoldouts();</span>
+<span class="fc" id="L172">        int executedPositive = evaluation.executedPositiveHoldouts();</span>
+<span class="fc" id="L173">        int configuredNegative = evaluation.configuredNegativeHoldouts();</span>
+<span class="fc" id="L174">        int executedNegative = evaluation.executedNegativeHoldouts();</span>
+<span class="fc" id="L175">        int refutingHoldouts = Math.addExact(</span>
+<span class="fc" id="L176">            (int) evaluation.positiveResults().stream()</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                .filter(result -&gt; !result.passed()).count(),</span>
+<span class="fc" id="L178">            (int) evaluation.negativeResults().stream()</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">                .filter(result -&gt; !result.passed()).count());</span>
+<span class="fc" id="L180">        int skippedMandatory = Math.addExact(</span>
+<span class="fc" id="L181">            Math.toIntExact(run.lifecycle().mining().generation().receipt()</span>
+<span class="fc" id="L182">                .skippedResources().getOrDefault(ResourceKind.OBSERVATIONS, 0L)),</span>
+<span class="fc" id="L183">            Math.toIntExact(run.lifecycle().mining().formationReceipt()</span>
+<span class="fc" id="L184">                .skippedResources().getOrDefault(ResourceKind.MINING_BATCHES, 0L)));</span>
+<span class="fc" id="L185">        skippedMandatory = Math.addExact(</span>
+            skippedMandatory,
+<span class="fc" id="L187">            Math.toIntExact(run.lifecycle().stageLedger().receipts().stream()</span>
+<span class="fc" id="L188">                .mapToLong(receipt -&gt; receipt.skipped()).sum()));</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        int counterexamples = &quot;COUNTEREXAMPLE_FOUND&quot;.equals(</span>
+<span class="pc" id="L190">            evaluation.counterexample().status()) ? 1 : 0;</span>
+<span class="fc" id="L191">        List&lt;String&gt; counterexampleSources = evaluation.counterexample()</span>
+<span class="fc" id="L192">            .attemptedSources().stream().distinct().sorted().toList();</span>
+<span class="fc" id="L193">        List&lt;String&gt; inferredAssumptions = evaluation.counterexample()</span>
+<span class="fc" id="L194">            .inferredAssumptions().stream().distinct().sorted().toList();</span>
+
+<span class="fc" id="L196">        String campaignHash = run.contentHash();</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        boolean targetFree = !run.targetProvided();</span>
+<span class="fc" id="L198">        int seedFamilies = run.seedFamilyCount();</span>
+<span class="fc" id="L199">        int observations = run.observationCount();</span>
+<span class="fc" id="L200">        int candidates = run.candidateCount();</span>
+<span class="fc" id="L201">        int rejectedClusters = run.rejectedClusterCount();</span>
+<span class="fc" id="L202">        int alphaSupport = conjecture.distinctAlphaSupport();</span>
+<span class="fc" id="L203">        boolean aggregateComplete = run.lifecycle().mining().fullBatch()</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            .binding().receipt().outputs().size() == 1;</span>
+<span class="fc" id="L205">        boolean lineageExact = exactLineage(output, conjecture);</span>
+<span class="fc" id="L206">        int heldOutFamilies = 0;</span>
+<span class="fc" id="L207">        String projectNovelty = run.lifecycle().novelty().status().name();</span>
+<span class="fc" id="L208">        String externalNovelty = run.lifecycle().novelty().externalNoveltyStatus();</span>
+<span class="fc" id="L209">        String symbolicProof = run.lifecycle().proof().proofStatus().name();</span>
+<span class="fc" id="L210">        String formalProof = run.lifecycle().proof().formalProofStatus();</span>
+<span class="fc" id="L211">        int unresolvedAssumptions = inferredAssumptions.size();</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        boolean lifecycleComplete = run.lifecycle().lifecycleDecision().outcome()</span>
+            == LifecycleOutcome.COMPLETED;
+<span class="fc" id="L214">        boolean pairedUtilityEvaluated = false;</span>
+<span class="fc" id="L215">        int pairedUtility = 0;</span>
+<span class="fc" id="L216">        boolean hiddenReferenceIsolated = false;</span>
+<span class="fc" id="L217">        boolean hiddenBenchmarkComplete = false;</span>
+<span class="fc" id="L218">        boolean executableRediscovery = false;</span>
+<span class="fc" id="L219">        boolean publicEvidenceReviewed = false;</span>
+
+<span class="fc" id="L221">        String evidenceHash = canonicalHash(</span>
+            SCHEMA,
+            campaignHash,
+            runHashes,
+<span class="fc" id="L225">            runs.size(),</span>
+            identicalRuns,
+            targetFree,
+            seedFamilies,
+            observations,
+            candidates,
+            rejectedClusters,
+            alphaSupport,
+            aggregateComplete,
+            lineageExact,
+            skippedMandatory,
+            heldOutFamilies,
+            configuredPositive,
+            executedPositive,
+            configuredNegative,
+            executedNegative,
+            refutingHoldouts,
+<span class="fc" id="L242">            counterexampleSources.size(),</span>
+            counterexamples,
+            projectNovelty,
+            externalNovelty,
+            symbolicProof,
+            formalProof,
+            unresolvedAssumptions,
+            lifecycleComplete,
+            pairedUtilityEvaluated,
+            pairedUtility,
+            hiddenReferenceIsolated,
+            hiddenBenchmarkComplete,
+            executableRediscovery,
+            publicEvidenceReviewed);
+
+<span class="fc" id="L257">        return new AutonomousCampaignReleaseEvidence(</span>
+            SCHEMA,
+            campaignHash,
+            runHashes,
+<span class="fc" id="L261">            runs.size(),</span>
+            identicalRuns,
+            targetFree,
+            seedFamilies,
+            observations,
+            candidates,
+            rejectedClusters,
+            alphaSupport,
+            aggregateComplete,
+            lineageExact,
+            skippedMandatory,
+            heldOutFamilies,
+            configuredPositive,
+            executedPositive,
+            configuredNegative,
+            executedNegative,
+            refutingHoldouts,
+<span class="fc" id="L278">            counterexampleSources.size(),</span>
+            counterexamples,
+            projectNovelty,
+            externalNovelty,
+            symbolicProof,
+            formalProof,
+            unresolvedAssumptions,
+            lifecycleComplete,
+            pairedUtilityEvaluated,
+            pairedUtility,
+            hiddenReferenceIsolated,
+            hiddenBenchmarkComplete,
+            executableRediscovery,
+            publicEvidenceReviewed,
+            evidenceHash);
+    }
+
+    public int configuredFreshHoldouts() {
+<span class="fc" id="L296">        return Math.addExact(configuredPositiveHoldouts, configuredNegativeHoldouts);</span>
+    }
+
+    public int executedFreshHoldouts() {
+<span class="fc" id="L300">        return Math.addExact(executedPositiveHoldouts, executedNegativeHoldouts);</span>
+    }
+
+    private static String canonicalHash(
+        String schema,
+        String campaignManifestHash,
+        List&lt;String&gt; cleanRunManifestHashes,
+        int cleanRunCount,
+        boolean cleanRunsIdentical,
+        boolean targetFree,
+        int seedFamilyCount,
+        int observationCount,
+        int candidateCount,
+        int rejectedClusterCount,
+        int alphaDistinctSupport,
+        boolean aggregateMiningComplete,
+        boolean exactSupportingLineage,
+        int mandatorySkippedWorkCount,
+        int heldOutFamilyOrClusterCount,
+        int configuredPositiveHoldouts,
+        int executedPositiveHoldouts,
+        int configuredNegativeHoldouts,
+        int executedNegativeHoldouts,
+        int refutingHoldouts,
+        int counterexampleStrategyCount,
+        int counterexamplesFound,
+        String projectNoveltyStatus,
+        String externalNoveltyStatus,
+        String symbolicProofStatus,
+        String formalProofStatus,
+        int unresolvedAssumptionCount,
+        boolean lifecycleHandoffComplete,
+        boolean pairedHeldOutUtilityEvaluated,
+        int pairedUtilityPermille,
+        boolean hiddenReferenceIsolated,
+        boolean hiddenRuleBenchmarkComplete,
+        boolean executableRediscoveryRetained,
+        boolean publicEvidenceReviewed
+    ) {
+<span class="fc" id="L339">        String material = schema</span>
+            + &quot;\ncampaignManifestHash=&quot; + campaignManifestHash
+            + &quot;\ncleanRunManifestHashes=&quot; + cleanRunManifestHashes
+            + &quot;\ncleanRunCount=&quot; + cleanRunCount
+            + &quot;\ncleanRunsIdentical=&quot; + cleanRunsIdentical
+            + &quot;\ntargetFree=&quot; + targetFree
+            + &quot;\nseedFamilyCount=&quot; + seedFamilyCount
+            + &quot;\nobservationCount=&quot; + observationCount
+            + &quot;\ncandidateCount=&quot; + candidateCount
+            + &quot;\nrejectedClusterCount=&quot; + rejectedClusterCount
+            + &quot;\nalphaDistinctSupport=&quot; + alphaDistinctSupport
+            + &quot;\naggregateMiningComplete=&quot; + aggregateMiningComplete
+            + &quot;\nexactSupportingLineage=&quot; + exactSupportingLineage
+            + &quot;\nmandatorySkippedWorkCount=&quot; + mandatorySkippedWorkCount
+            + &quot;\nheldOutFamilyOrClusterCount=&quot; + heldOutFamilyOrClusterCount
+            + &quot;\nconfiguredPositiveHoldouts=&quot; + configuredPositiveHoldouts
+            + &quot;\nexecutedPositiveHoldouts=&quot; + executedPositiveHoldouts
+            + &quot;\nconfiguredNegativeHoldouts=&quot; + configuredNegativeHoldouts
+            + &quot;\nexecutedNegativeHoldouts=&quot; + executedNegativeHoldouts
+            + &quot;\nrefutingHoldouts=&quot; + refutingHoldouts
+            + &quot;\ncounterexampleStrategyCount=&quot; + counterexampleStrategyCount
+            + &quot;\ncounterexamplesFound=&quot; + counterexamplesFound
+            + &quot;\nprojectNoveltyStatus=&quot; + projectNoveltyStatus
+            + &quot;\nexternalNoveltyStatus=&quot; + externalNoveltyStatus
+            + &quot;\nsymbolicProofStatus=&quot; + symbolicProofStatus
+            + &quot;\nformalProofStatus=&quot; + formalProofStatus
+            + &quot;\nunresolvedAssumptionCount=&quot; + unresolvedAssumptionCount
+            + &quot;\nlifecycleHandoffComplete=&quot; + lifecycleHandoffComplete
+            + &quot;\npairedHeldOutUtilityEvaluated=&quot; + pairedHeldOutUtilityEvaluated
+            + &quot;\npairedUtilityPermille=&quot; + pairedUtilityPermille
+            + &quot;\nhiddenReferenceIsolated=&quot; + hiddenReferenceIsolated
+            + &quot;\nhiddenRuleBenchmarkComplete=&quot; + hiddenRuleBenchmarkComplete
+            + &quot;\nexecutableRediscoveryRetained=&quot; + executableRediscoveryRetained
+            + &quot;\npublicEvidenceReviewed=&quot; + publicEvidenceReviewed;
+<span class="fc" id="L373">        return AutonomousResearchBriefV2.hash(material);</span>
+    }
+
+    private static OpenTargetConjecture retainedConjecture(CampaignRun run) {
+<span class="fc" id="L377">        List&lt;OpenTargetConjecture&gt; conjectures = run.lifecycle().mining()</span>
+<span class="fc" id="L378">            .fullBatch().evidence().report().conjectures();</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (conjectures.size() != 1) {</span>
+<span class="nc" id="L380">            throw new IllegalArgumentException(</span>
+                &quot;release evidence requires exactly one retained conjecture&quot;);
+        }
+<span class="fc" id="L383">        return conjectures.getFirst();</span>
+    }
+
+    private static CandidateOutput retainedOutput(
+        CampaignRun run,
+        OpenTargetConjecture conjecture
+    ) {
+<span class="fc" id="L390">        List&lt;CandidateOutput&gt; outputs = run.lifecycle().mining().fullBatch()</span>
+<span class="fc" id="L391">            .binding().receipt().outputs();</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        if (outputs.size() != 1</span>
+<span class="fc" id="L393">                || !outputs.getFirst().conjectureId()</span>
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">                    .equals(conjecture.conjectureId())) {</span>
+<span class="nc" id="L395">            throw new IllegalArgumentException(</span>
+                &quot;release evidence candidate output is not linked to its conjecture&quot;);
+        }
+<span class="fc" id="L398">        return outputs.getFirst();</span>
+    }
+
+    private static boolean exactLineage(
+        CandidateOutput output,
+        OpenTargetConjecture conjecture
+    ) {
+<span class="fc" id="L405">        Set&lt;String&gt; declared = new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L406">            conjecture.supportingObservationIds());</span>
+<span class="fc" id="L407">        Set&lt;String&gt; linked = output.sources().stream()</span>
+<span class="fc" id="L408">            .map(source -&gt; source.observationId())</span>
+<span class="fc" id="L409">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        return declared.equals(linked)</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">            &amp;&amp; linked.size() == conjecture.supportCount()</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            &amp;&amp; output.sources().stream().allMatch(source -&gt;</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">                isSha256(source.snapshotHash())</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                    &amp;&amp; isSha256(source.evidenceHash())</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">                    &amp;&amp; isSha256(source.observationBranchHash()));</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L419">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L420">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L421">            .property(&quot;campaignManifestHash&quot;, campaignManifestHash)</span>
+<span class="fc" id="L422">            .stringArray(&quot;cleanRunManifestHashes&quot;, cleanRunManifestHashes)</span>
+<span class="fc" id="L423">            .property(&quot;cleanRunCount&quot;, cleanRunCount)</span>
+<span class="fc" id="L424">            .property(&quot;cleanRunsIdentical&quot;, cleanRunsIdentical)</span>
+<span class="fc" id="L425">            .property(&quot;targetFree&quot;, targetFree)</span>
+<span class="fc" id="L426">            .property(&quot;seedFamilyCount&quot;, seedFamilyCount)</span>
+<span class="fc" id="L427">            .property(&quot;observationCount&quot;, observationCount)</span>
+<span class="fc" id="L428">            .property(&quot;candidateCount&quot;, candidateCount)</span>
+<span class="fc" id="L429">            .property(&quot;rejectedClusterCount&quot;, rejectedClusterCount)</span>
+<span class="fc" id="L430">            .property(&quot;alphaDistinctSupport&quot;, alphaDistinctSupport)</span>
+<span class="fc" id="L431">            .property(&quot;aggregateMiningComplete&quot;, aggregateMiningComplete)</span>
+<span class="fc" id="L432">            .property(&quot;exactSupportingLineage&quot;, exactSupportingLineage)</span>
+<span class="fc" id="L433">            .property(&quot;mandatorySkippedWorkCount&quot;, mandatorySkippedWorkCount)</span>
+<span class="fc" id="L434">            .property(&quot;heldOutFamilyOrClusterCount&quot;, heldOutFamilyOrClusterCount)</span>
+<span class="fc" id="L435">            .property(&quot;configuredPositiveHoldouts&quot;, configuredPositiveHoldouts)</span>
+<span class="fc" id="L436">            .property(&quot;executedPositiveHoldouts&quot;, executedPositiveHoldouts)</span>
+<span class="fc" id="L437">            .property(&quot;configuredNegativeHoldouts&quot;, configuredNegativeHoldouts)</span>
+<span class="fc" id="L438">            .property(&quot;executedNegativeHoldouts&quot;, executedNegativeHoldouts)</span>
+<span class="fc" id="L439">            .property(&quot;refutingHoldouts&quot;, refutingHoldouts)</span>
+<span class="fc" id="L440">            .property(&quot;counterexampleStrategyCount&quot;, counterexampleStrategyCount)</span>
+<span class="fc" id="L441">            .property(&quot;counterexamplesFound&quot;, counterexamplesFound)</span>
+<span class="fc" id="L442">            .property(&quot;projectNoveltyStatus&quot;, projectNoveltyStatus)</span>
+<span class="fc" id="L443">            .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus)</span>
+<span class="fc" id="L444">            .property(&quot;symbolicProofStatus&quot;, symbolicProofStatus)</span>
+<span class="fc" id="L445">            .property(&quot;formalProofStatus&quot;, formalProofStatus)</span>
+<span class="fc" id="L446">            .property(&quot;unresolvedAssumptionCount&quot;, unresolvedAssumptionCount)</span>
+<span class="fc" id="L447">            .property(&quot;lifecycleHandoffComplete&quot;, lifecycleHandoffComplete)</span>
+<span class="fc" id="L448">            .property(&quot;pairedHeldOutUtilityEvaluated&quot;,</span>
+                pairedHeldOutUtilityEvaluated)
+<span class="fc" id="L450">            .property(&quot;pairedUtilityPermille&quot;, pairedUtilityPermille)</span>
+<span class="fc" id="L451">            .property(&quot;hiddenReferenceIsolated&quot;, hiddenReferenceIsolated)</span>
+<span class="fc" id="L452">            .property(&quot;hiddenRuleBenchmarkComplete&quot;, hiddenRuleBenchmarkComplete)</span>
+<span class="fc" id="L453">            .property(&quot;executableRediscoveryRetained&quot;, executableRediscoveryRetained)</span>
+<span class="fc" id="L454">            .property(&quot;publicEvidenceReviewed&quot;, publicEvidenceReviewed)</span>
+<span class="fc" id="L455">            .property(&quot;evidenceHash&quot;, evidenceHash)</span>
+<span class="fc" id="L456">            .endObject()</span>
+<span class="fc" id="L457">            .toString();</span>
+    }
+
+    private static boolean isSha256(String value) {
+<span class="pc bpc" id="L461" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+    }
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">        if (!isSha256(value)) {</span>
+<span class="nc" id="L466">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L468">    }</span>
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L471" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L472">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L474">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
