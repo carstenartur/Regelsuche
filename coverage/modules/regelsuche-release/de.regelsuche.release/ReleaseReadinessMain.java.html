@@ -13,32 +13,35 @@ public final class ReleaseReadinessMain {
 <span class="nc" id="L13">            ? Path.of(args[0])</span>
 <span class="nc" id="L14">            : Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;release-readiness&quot;);</span>
 <span class="nc" id="L15">        boolean requireReady = Arrays.asList(args).contains(&quot;--require-ready&quot;);</span>
-<span class="nc" id="L16">        Path hiddenRuleReport = optionPath(args, &quot;--hidden-rule-report&quot;);</span>
-<span class="nc" id="L17">        ReleaseReadinessRunner runner = new ReleaseReadinessRunner();</span>
-<span class="nc" id="L18">        var run = runner.run(hiddenRuleReport);</span>
-<span class="nc" id="L19">        runner.write(output, run);</span>
-<span class="nc" id="L20">        System.out.println(run.contentHash());</span>
-<span class="nc bnc" id="L21" title="All 4 branches missed.">        if (requireReady &amp;&amp; !run.autonomousCampaignReady()) {</span>
-<span class="nc" id="L22">            throw new IllegalStateException(</span>
+<span class="nc" id="L16">        boolean qualifyCandidate = Arrays.asList(args).contains(&quot;--qualify-candidate&quot;);</span>
+<span class="nc" id="L17">        Path hiddenRuleReport = optionPath(args, &quot;--hidden-rule-report&quot;);</span>
+<span class="nc" id="L18">        ReleaseReadinessRunner runner = new ReleaseReadinessRunner();</span>
+<span class="nc bnc" id="L19" title="All 2 branches missed.">        var run = qualifyCandidate</span>
+<span class="nc" id="L20">            ? runner.runQualified(hiddenRuleReport)</span>
+<span class="nc" id="L21">            : runner.run(hiddenRuleReport);</span>
+<span class="nc" id="L22">        runner.write(output, run);</span>
+<span class="nc" id="L23">        System.out.println(run.contentHash());</span>
+<span class="nc bnc" id="L24" title="All 4 branches missed.">        if (requireReady &amp;&amp; !run.autonomousCampaignReady()) {</span>
+<span class="nc" id="L25">            throw new IllegalStateException(</span>
                 &quot;AUTONOMOUS_CAMPAIGN release profile is BLOCKED: &quot;
-<span class="nc" id="L24">                    + run.matrix()</span>
-<span class="nc" id="L25">                        .result(ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN)</span>
-<span class="nc" id="L26">                        .blockers());</span>
+<span class="nc" id="L27">                    + run.matrix()</span>
+<span class="nc" id="L28">                        .result(ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN)</span>
+<span class="nc" id="L29">                        .blockers());</span>
         }
-<span class="nc" id="L28">    }</span>
+<span class="nc" id="L31">    }</span>
 
     private static Path optionPath(String[] args, String option) {
-<span class="nc bnc" id="L31" title="All 2 branches missed.">        for (int index = 0; index &lt; args.length; index++) {</span>
-<span class="nc bnc" id="L32" title="All 2 branches missed.">            if (option.equals(args[index])) {</span>
-<span class="nc bnc" id="L33" title="All 2 branches missed.">                if (index + 1 &gt;= args.length</span>
-<span class="nc bnc" id="L34" title="All 2 branches missed.">                        || args[index + 1].startsWith(&quot;--&quot;)) {</span>
-<span class="nc" id="L35">                    throw new IllegalArgumentException(</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        for (int index = 0; index &lt; args.length; index++) {</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">            if (option.equals(args[index])) {</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">                if (index + 1 &gt;= args.length</span>
+<span class="nc bnc" id="L37" title="All 2 branches missed.">                        || args[index + 1].startsWith(&quot;--&quot;)) {</span>
+<span class="nc" id="L38">                    throw new IllegalArgumentException(</span>
                         option + &quot; requires a file path&quot;);
                 }
-<span class="nc" id="L38">                return Path.of(args[index + 1]);</span>
+<span class="nc" id="L41">                return Path.of(args[index + 1]);</span>
             }
         }
-<span class="nc" id="L41">        return null;</span>
+<span class="nc" id="L44">        return null;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

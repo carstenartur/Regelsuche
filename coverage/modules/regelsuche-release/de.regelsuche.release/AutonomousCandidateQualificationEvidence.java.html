@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousCandidateQualificationEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">AutonomousCandidateQualificationEvidence.java</span></div><h1>AutonomousCandidateQualificationEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.json.JsonWriter;
+import java.util.Comparator;
+import java.util.List;
+
+/** Release qualification evidence for the exact retained production candidate. */
+public record AutonomousCandidateQualificationEvidence(
+    String schema,
+    String campaignManifestHash,
+    String briefHash,
+    String inventoryHash,
+    String modelHash,
+    String conjectureId,
+    String candidateBranchId,
+    String miningEvidenceHash,
+    String lineageHash,
+    List&lt;String&gt; supportingObservationIds,
+    List&lt;String&gt; sourceObservationBranchHashes,
+    String leftPattern,
+    String rightPattern,
+    List&lt;String&gt; parameterRelations,
+    List&lt;String&gt; assumptions,
+    String suiteRevision,
+    String suiteHash,
+    String splitAuditHash,
+    String evaluationHash,
+    String utilityHash,
+    int heldOutFamilyOrClusterCount,
+    int configuredPositiveHoldouts,
+    int executedPositiveHoldouts,
+    int configuredNegativeHoldouts,
+    int executedNegativeHoldouts,
+    int mandatorySkippedWorkCount,
+    int refutingHoldouts,
+    int counterexamplesFound,
+    boolean pairedHeldOutUtilityEvaluated,
+    int pairedUtilityPermille,
+    int correctnessRegressionCount,
+    boolean qualified,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-candidate-qualification/v1&quot;;
+
+<span class="fc" id="L47">    public AutonomousCandidateQualificationEvidence {</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;unsupported candidate qualification schema&quot;);</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        for (String hash : List.of(</span>
+                campaignManifestHash, briefHash, inventoryHash, modelHash,
+                miningEvidenceHash, lineageHash, suiteHash, splitAuditHash,
+                evaluationHash, utilityHash, contentHash)) {
+<span class="fc" id="L55">            requireSha(hash);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        supportingObservationIds = sorted(supportingObservationIds);</span>
+<span class="fc" id="L58">        sourceObservationBranchHashes = sorted(sourceObservationBranchHashes);</span>
+<span class="fc" id="L59">        sourceObservationBranchHashes.forEach(</span>
+            AutonomousCandidateQualificationEvidence::requireSha);
+<span class="fc" id="L61">        parameterRelations = sorted(parameterRelations);</span>
+<span class="fc" id="L62">        assumptions = sorted(assumptions);</span>
+<span class="fc" id="L63">        requireText(conjectureId, &quot;conjectureId&quot;);</span>
+<span class="fc" id="L64">        requireText(candidateBranchId, &quot;candidateBranchId&quot;);</span>
+<span class="fc" id="L65">        requireText(leftPattern, &quot;leftPattern&quot;);</span>
+<span class="fc" id="L66">        requireText(rightPattern, &quot;rightPattern&quot;);</span>
+<span class="fc" id="L67">        requireText(suiteRevision, &quot;suiteRevision&quot;);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (int value : new int[] {</span>
+                heldOutFamilyOrClusterCount,
+                configuredPositiveHoldouts,
+                executedPositiveHoldouts,
+                configuredNegativeHoldouts,
+                executedNegativeHoldouts,
+                mandatorySkippedWorkCount,
+                refutingHoldouts,
+                counterexamplesFound,
+                pairedUtilityPermille,
+                correctnessRegressionCount}) {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (value &lt; 0) {</span>
+<span class="nc" id="L80">                throw new IllegalArgumentException(</span>
+                    &quot;qualification evidence counts must be non-negative&quot;);
+            }
+        }
+<span class="pc bpc" id="L84" title="3 of 6 branches missed.">        if (executedPositiveHoldouts &gt; configuredPositiveHoldouts</span>
+                || executedNegativeHoldouts &gt; configuredNegativeHoldouts
+                || pairedUtilityPermille &gt; 1000
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                || supportingObservationIds.isEmpty()</span>
+<span class="fc" id="L88">                || supportingObservationIds.size()</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                    != sourceObservationBranchHashes.size()) {</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(</span>
+                &quot;qualification evidence accounting or lineage is inconsistent&quot;);
+        }
+<span class="pc bpc" id="L93" title="11 of 22 branches missed.">        boolean expectedQualified = heldOutFamilyOrClusterCount &gt;= 1</span>
+            &amp;&amp; configuredPositiveHoldouts &gt;= 12
+            &amp;&amp; executedPositiveHoldouts == configuredPositiveHoldouts
+            &amp;&amp; configuredNegativeHoldouts &gt;= 12
+            &amp;&amp; executedNegativeHoldouts == configuredNegativeHoldouts
+            &amp;&amp; mandatorySkippedWorkCount == 0
+            &amp;&amp; refutingHoldouts == 0
+            &amp;&amp; counterexamplesFound == 0
+            &amp;&amp; pairedHeldOutUtilityEvaluated
+            &amp;&amp; pairedUtilityPermille &gt; 0
+            &amp;&amp; correctnessRegressionCount == 0;
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (qualified != expectedQualified) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(</span>
+                &quot;qualified status does not match retained qualification evidence&quot;);
+        }
+<span class="fc" id="L108">        String expectedHash = hash(</span>
+            schema, campaignManifestHash, briefHash, inventoryHash, modelHash,
+            conjectureId, candidateBranchId, miningEvidenceHash, lineageHash,
+            supportingObservationIds, sourceObservationBranchHashes,
+            leftPattern, rightPattern, parameterRelations, assumptions,
+            suiteRevision, suiteHash, splitAuditHash, evaluationHash, utilityHash,
+            heldOutFamilyOrClusterCount,
+            configuredPositiveHoldouts, executedPositiveHoldouts,
+            configuredNegativeHoldouts, executedNegativeHoldouts,
+            mandatorySkippedWorkCount, refutingHoldouts, counterexamplesFound,
+            pairedHeldOutUtilityEvaluated, pairedUtilityPermille,
+            correctnessRegressionCount, qualified);
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (!expectedHash.equals(contentHash)) {</span>
+<span class="nc" id="L121">            throw new IllegalArgumentException(</span>
+                &quot;candidate qualification hash does not match canonical fields&quot;);
+        }
+<span class="fc" id="L124">    }</span>
+
+    public static AutonomousCandidateQualificationEvidence create(
+        String campaignManifestHash,
+        String briefHash,
+        String inventoryHash,
+        String modelHash,
+        String conjectureId,
+        String candidateBranchId,
+        String miningEvidenceHash,
+        String lineageHash,
+        List&lt;String&gt; supportingObservationIds,
+        List&lt;String&gt; sourceObservationBranchHashes,
+        String leftPattern,
+        String rightPattern,
+        List&lt;String&gt; parameterRelations,
+        List&lt;String&gt; assumptions,
+        String suiteRevision,
+        String suiteHash,
+        String splitAuditHash,
+        String evaluationHash,
+        String utilityHash,
+        int heldOutFamilyOrClusterCount,
+        int configuredPositiveHoldouts,
+        int executedPositiveHoldouts,
+        int configuredNegativeHoldouts,
+        int executedNegativeHoldouts,
+        int mandatorySkippedWorkCount,
+        int refutingHoldouts,
+        int counterexamplesFound,
+        boolean pairedHeldOutUtilityEvaluated,
+        int pairedUtilityPermille,
+        int correctnessRegressionCount
+    ) {
+<span class="fc" id="L158">        List&lt;String&gt; observationIds = sorted(supportingObservationIds);</span>
+<span class="fc" id="L159">        List&lt;String&gt; branchHashes = sorted(sourceObservationBranchHashes);</span>
+<span class="fc" id="L160">        List&lt;String&gt; relations = sorted(parameterRelations);</span>
+<span class="fc" id="L161">        List&lt;String&gt; normalizedAssumptions = sorted(assumptions);</span>
+<span class="pc bpc" id="L162" title="11 of 22 branches missed.">        boolean qualified = heldOutFamilyOrClusterCount &gt;= 1</span>
+            &amp;&amp; configuredPositiveHoldouts &gt;= 12
+            &amp;&amp; executedPositiveHoldouts == configuredPositiveHoldouts
+            &amp;&amp; configuredNegativeHoldouts &gt;= 12
+            &amp;&amp; executedNegativeHoldouts == configuredNegativeHoldouts
+            &amp;&amp; mandatorySkippedWorkCount == 0
+            &amp;&amp; refutingHoldouts == 0
+            &amp;&amp; counterexamplesFound == 0
+            &amp;&amp; pairedHeldOutUtilityEvaluated
+            &amp;&amp; pairedUtilityPermille &gt; 0
+            &amp;&amp; correctnessRegressionCount == 0;
+<span class="fc" id="L173">        String contentHash = hash(</span>
+            SCHEMA, campaignManifestHash, briefHash, inventoryHash, modelHash,
+            conjectureId, candidateBranchId, miningEvidenceHash, lineageHash,
+            observationIds, branchHashes, leftPattern, rightPattern, relations,
+            normalizedAssumptions, suiteRevision, suiteHash, splitAuditHash,
+            evaluationHash, utilityHash, heldOutFamilyOrClusterCount,
+            configuredPositiveHoldouts, executedPositiveHoldouts,
+            configuredNegativeHoldouts, executedNegativeHoldouts,
+            mandatorySkippedWorkCount, refutingHoldouts, counterexamplesFound,
+            pairedHeldOutUtilityEvaluated, pairedUtilityPermille,
+            correctnessRegressionCount, qualified);
+<span class="fc" id="L184">        return new AutonomousCandidateQualificationEvidence(</span>
+            SCHEMA, campaignManifestHash, briefHash, inventoryHash, modelHash,
+            conjectureId, candidateBranchId, miningEvidenceHash, lineageHash,
+            observationIds, branchHashes, leftPattern, rightPattern, relations,
+            normalizedAssumptions, suiteRevision, suiteHash, splitAuditHash,
+            evaluationHash, utilityHash, heldOutFamilyOrClusterCount,
+            configuredPositiveHoldouts, executedPositiveHoldouts,
+            configuredNegativeHoldouts, executedNegativeHoldouts,
+            mandatorySkippedWorkCount, refutingHoldouts, counterexamplesFound,
+            pairedHeldOutUtilityEvaluated, pairedUtilityPermille,
+            correctnessRegressionCount, qualified, contentHash);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L198">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L199">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L200">            .property(&quot;campaignManifestHash&quot;, campaignManifestHash)</span>
+<span class="fc" id="L201">            .property(&quot;briefHash&quot;, briefHash)</span>
+<span class="fc" id="L202">            .property(&quot;inventoryHash&quot;, inventoryHash)</span>
+<span class="fc" id="L203">            .property(&quot;modelHash&quot;, modelHash)</span>
+<span class="fc" id="L204">            .property(&quot;conjectureId&quot;, conjectureId)</span>
+<span class="fc" id="L205">            .property(&quot;candidateBranchId&quot;, candidateBranchId)</span>
+<span class="fc" id="L206">            .property(&quot;miningEvidenceHash&quot;, miningEvidenceHash)</span>
+<span class="fc" id="L207">            .property(&quot;lineageHash&quot;, lineageHash)</span>
+<span class="fc" id="L208">            .stringArray(&quot;supportingObservationIds&quot;, supportingObservationIds)</span>
+<span class="fc" id="L209">            .stringArray(&quot;sourceObservationBranchHashes&quot;,</span>
+                sourceObservationBranchHashes)
+<span class="fc" id="L211">            .property(&quot;leftPattern&quot;, leftPattern)</span>
+<span class="fc" id="L212">            .property(&quot;rightPattern&quot;, rightPattern)</span>
+<span class="fc" id="L213">            .stringArray(&quot;parameterRelations&quot;, parameterRelations)</span>
+<span class="fc" id="L214">            .stringArray(&quot;assumptions&quot;, assumptions)</span>
+<span class="fc" id="L215">            .property(&quot;suiteRevision&quot;, suiteRevision)</span>
+<span class="fc" id="L216">            .property(&quot;suiteHash&quot;, suiteHash)</span>
+<span class="fc" id="L217">            .property(&quot;splitAuditHash&quot;, splitAuditHash)</span>
+<span class="fc" id="L218">            .property(&quot;evaluationHash&quot;, evaluationHash)</span>
+<span class="fc" id="L219">            .property(&quot;utilityHash&quot;, utilityHash)</span>
+<span class="fc" id="L220">            .property(&quot;heldOutFamilyOrClusterCount&quot;,</span>
+                heldOutFamilyOrClusterCount)
+<span class="fc" id="L222">            .property(&quot;configuredPositiveHoldouts&quot;, configuredPositiveHoldouts)</span>
+<span class="fc" id="L223">            .property(&quot;executedPositiveHoldouts&quot;, executedPositiveHoldouts)</span>
+<span class="fc" id="L224">            .property(&quot;configuredNegativeHoldouts&quot;, configuredNegativeHoldouts)</span>
+<span class="fc" id="L225">            .property(&quot;executedNegativeHoldouts&quot;, executedNegativeHoldouts)</span>
+<span class="fc" id="L226">            .property(&quot;mandatorySkippedWorkCount&quot;, mandatorySkippedWorkCount)</span>
+<span class="fc" id="L227">            .property(&quot;refutingHoldouts&quot;, refutingHoldouts)</span>
+<span class="fc" id="L228">            .property(&quot;counterexamplesFound&quot;, counterexamplesFound)</span>
+<span class="fc" id="L229">            .property(&quot;pairedHeldOutUtilityEvaluated&quot;,</span>
+                pairedHeldOutUtilityEvaluated)
+<span class="fc" id="L231">            .property(&quot;pairedUtilityPermille&quot;, pairedUtilityPermille)</span>
+<span class="fc" id="L232">            .property(&quot;correctnessRegressionCount&quot;, correctnessRegressionCount)</span>
+<span class="fc" id="L233">            .property(&quot;qualified&quot;, qualified)</span>
+<span class="fc" id="L234">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L235">            .endObject().toString();</span>
+    }
+
+    private static String hash(
+        String schema, String campaign, String brief, String inventory,
+        String model, String conjecture, String branch, String mining,
+        String lineage, List&lt;String&gt; observations, List&lt;String&gt; branchHashes,
+        String left, String right, List&lt;String&gt; relations,
+        List&lt;String&gt; assumptions, String revision, String suite,
+        String split, String evaluation, String utility, int heldOut,
+        int configuredPositive, int executedPositive, int configuredNegative,
+        int executedNegative, int skipped, int refuting, int counterexamples,
+        boolean utilityEvaluated, int utilityPermille, int regressions,
+        boolean qualified
+    ) {
+<span class="fc" id="L250">        return AutonomousResearchBriefV2.hash(</span>
+            schema + &quot;\ncampaign=&quot; + campaign + &quot;\nbrief=&quot; + brief
+                + &quot;\ninventory=&quot; + inventory + &quot;\nmodel=&quot; + model
+                + &quot;\nconjecture=&quot; + conjecture + &quot;\nbranch=&quot; + branch
+                + &quot;\nmining=&quot; + mining + &quot;\nlineage=&quot; + lineage
+                + &quot;\nobservations=&quot; + observations
+                + &quot;\nbranchHashes=&quot; + branchHashes
+                + &quot;\nrelation=&quot; + left + &quot;-&gt;&quot; + right
+                + &quot;\nparameterRelations=&quot; + relations
+                + &quot;\nassumptions=&quot; + assumptions + &quot;\nrevision=&quot; + revision
+                + &quot;\nsuite=&quot; + suite + &quot;\nsplit=&quot; + split
+                + &quot;\nevaluation=&quot; + evaluation + &quot;\nutility=&quot; + utility
+                + &quot;\nheldOut=&quot; + heldOut
+                + &quot;\npositive=&quot; + executedPositive + '/' + configuredPositive
+                + &quot;\nnegative=&quot; + executedNegative + '/' + configuredNegative
+                + &quot;\nskipped=&quot; + skipped + &quot;\nrefuting=&quot; + refuting
+                + &quot;\ncounterexamples=&quot; + counterexamples
+                + &quot;\nutilityEvaluated=&quot; + utilityEvaluated
+                + &quot;\nutilityPermille=&quot; + utilityPermille
+                + &quot;\nregressions=&quot; + regressions
+                + &quot;\nqualified=&quot; + qualified);
+    }
+
+    private static List&lt;String&gt; sorted(List&lt;String&gt; values) {
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        return values == null ? List.of() : values.stream()</span>
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L276">            .distinct().sorted().toList();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L280" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L281">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L283">    }</span>
+
+    private static void requireSha(String value) {
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L287">            throw new IllegalArgumentException(&quot;value must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L289">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

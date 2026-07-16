@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousCandidateQualificationRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">AutonomousCandidateQualificationRunner.java</span></div><h1>AutonomousCandidateQualificationRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.CandidateOutput;
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner.CampaignRun;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationPlan;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.release.ProductionCandidateQualificationSplitAudit.SplitAudit;
+import de.regelsuche.release.ProductionCandidateUtilityEvaluator.UtilityReport;
+import de.regelsuche.validation.CounterexampleSearchService.CounterexampleBudget;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.TreeSet;
+
+/** Executes the independent release qualification of the retained candidate. */
+<span class="fc" id="L26">public final class AutonomousCandidateQualificationRunner {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-candidate-qualification-run/v1&quot;;
+    private static final int COUNTEREXAMPLE_SAMPLES = 256;
+
+    public QualificationRun run(CampaignRun campaign) {
+<span class="fc" id="L32">        Objects.requireNonNull(campaign, &quot;campaign&quot;);</span>
+<span class="fc" id="L33">        var lifecycle = campaign.lifecycle();</span>
+<span class="fc" id="L34">        var mining = lifecycle.mining();</span>
+<span class="fc" id="L35">        var brief = mining.generation().brief();</span>
+<span class="fc" id="L36">        OpenTargetConjecture conjecture = lifecycle.conjecture();</span>
+<span class="fc" id="L37">        CandidateOutput output = retainedOutput(campaign, conjecture);</span>
+<span class="fc" id="L38">        validateLineage(conjecture, output);</span>
+
+<span class="fc" id="L40">        String suiteJson = suiteJson();</span>
+<span class="fc" id="L41">        String suiteHash = AutonomousResearchBriefV2.hash(suiteJson);</span>
+<span class="fc" id="L42">        SplitAudit split = new ProductionCandidateQualificationSplitAudit()</span>
+<span class="fc" id="L43">            .audit(campaign);</span>
+<span class="fc" id="L44">        EvaluationPlan plan = new EvaluationPlan(</span>
+            ProductionCandidateQualificationCatalog.REVISION,
+<span class="fc" id="L46">            ProductionCandidateQualificationCatalog.positives().stream()</span>
+<span class="fc" id="L47">                .map(ProductionCandidateQualificationCatalog.PositiveCase::asHoldout)</span>
+<span class="fc" id="L48">                .toList(),</span>
+<span class="fc" id="L49">            ProductionCandidateQualificationCatalog.negatives(),</span>
+            new CounterexampleBudget(
+                COUNTEREXAMPLE_SAMPLES,
+                true,
+                false,
+<span class="fc" id="L54">                brief.deterministicSeed() ^ 359L,</span>
+                true,
+                true,
+                0,
+                0L));
+<span class="fc" id="L59">        EvaluationReport evaluation = new OpenTargetConjectureEvaluator()</span>
+<span class="fc" id="L60">            .evaluate(conjecture, plan);</span>
+<span class="fc" id="L61">        String evaluationJson = evaluationJson(evaluation);</span>
+<span class="fc" id="L62">        String evaluationHash = AutonomousResearchBriefV2.hash(evaluationJson);</span>
+<span class="fc" id="L63">        UtilityReport utility = new ProductionCandidateUtilityEvaluator()</span>
+<span class="fc" id="L64">            .evaluate(conjecture);</span>
+
+<span class="fc" id="L66">        int refuting = Math.addExact(</span>
+<span class="fc" id="L67">            (int) evaluation.positiveResults().stream()</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                .filter(result -&gt; !result.passed()).count(),</span>
+<span class="fc" id="L69">            (int) evaluation.negativeResults().stream()</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                .filter(result -&gt; !result.passed()).count());</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        int counterexamples = &quot;COUNTEREXAMPLE_FOUND&quot;.equals(</span>
+<span class="pc" id="L72">            evaluation.counterexample().status()) ? 1 : 0;</span>
+<span class="fc" id="L73">        int skipped = Math.addExact(</span>
+<span class="fc" id="L74">            evaluation.skippedPositiveHoldouts(),</span>
+<span class="fc" id="L75">            evaluation.skippedNegativeHoldouts());</span>
+<span class="fc" id="L76">        List&lt;String&gt; assumptions = conjecture.evidence().stream()</span>
+<span class="fc" id="L77">            .flatMap(evidence -&gt; evidence.paths().stream())</span>
+<span class="fc" id="L78">            .flatMap(path -&gt; path.assumptions().stream())</span>
+<span class="pc bnc" id="L79" title="All 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L80">            .distinct().sorted().toList();</span>
+<span class="fc" id="L81">        List&lt;String&gt; branchHashes = output.sources().stream()</span>
+<span class="fc" id="L82">            .map(source -&gt; source.observationBranchHash())</span>
+<span class="fc" id="L83">            .sorted().toList();</span>
+<span class="fc" id="L84">        AutonomousCandidateQualificationEvidence evidence =</span>
+<span class="fc" id="L85">            AutonomousCandidateQualificationEvidence.create(</span>
+<span class="fc" id="L86">                campaign.contentHash(),</span>
+<span class="fc" id="L87">                brief.contentHash(),</span>
+<span class="fc" id="L88">                brief.inventoryHash(),</span>
+<span class="fc" id="L89">                brief.modelHash(),</span>
+<span class="fc" id="L90">                conjecture.conjectureId(),</span>
+<span class="fc" id="L91">                output.outputBranchId(),</span>
+<span class="fc" id="L92">                mining.fullBatch().evidence().contentHash(),</span>
+<span class="fc" id="L93">                mining.fullBatch().lineage().contentHash(),</span>
+<span class="fc" id="L94">                conjecture.supportingObservationIds(),</span>
+                branchHashes,
+<span class="fc" id="L96">                conjecture.leftPattern(),</span>
+<span class="fc" id="L97">                conjecture.rightPattern(),</span>
+<span class="fc" id="L98">                conjecture.parameterRelations(),</span>
+                assumptions,
+                ProductionCandidateQualificationCatalog.REVISION,
+                suiteHash,
+<span class="fc" id="L102">                split.contentHash(),</span>
+                evaluationHash,
+<span class="fc" id="L104">                utility.contentHash(),</span>
+<span class="fc" id="L105">                split.heldOutFamilyOrClusterCount(),</span>
+<span class="fc" id="L106">                evaluation.configuredPositiveHoldouts(),</span>
+<span class="fc" id="L107">                evaluation.executedPositiveHoldouts(),</span>
+<span class="fc" id="L108">                evaluation.configuredNegativeHoldouts(),</span>
+<span class="fc" id="L109">                evaluation.executedNegativeHoldouts(),</span>
+                skipped,
+                refuting,
+                counterexamples,
+<span class="fc" id="L113">                utility.pairedUtilityEvaluated(),</span>
+<span class="fc" id="L114">                utility.gainPermille(),</span>
+<span class="fc" id="L115">                utility.correctnessRegressionCount());</span>
+<span class="fc" id="L116">        validateSuccessfulQualification(split, evaluation, utility, evidence);</span>
+<span class="fc" id="L117">        String contentHash = AutonomousResearchBriefV2.hash(</span>
+            SCHEMA
+<span class="fc" id="L119">                + &quot;\ncampaign=&quot; + campaign.contentHash()</span>
+                + &quot;\nsuite=&quot; + suiteHash
+<span class="fc" id="L121">                + &quot;\nsplit=&quot; + split.contentHash()</span>
+                + &quot;\nevaluation=&quot; + evaluationHash
+<span class="fc" id="L123">                + &quot;\nutility=&quot; + utility.contentHash()</span>
+<span class="fc" id="L124">                + &quot;\nevidence=&quot; + evidence.contentHash());</span>
+<span class="fc" id="L125">        return new QualificationRun(</span>
+            SCHEMA,
+            campaign,
+            suiteJson,
+            suiteHash,
+            split,
+            evaluation,
+            evaluationJson,
+            evaluationHash,
+            utility,
+            evidence,
+            contentHash);
+    }
+
+    public void write(Path outputDirectory, QualificationRun run) {
+<span class="fc" id="L140">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L141">        Objects.requireNonNull(run, &quot;run&quot;);</span>
+        try {
+<span class="fc" id="L143">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L144">            write(outputDirectory.resolve(&quot;qualification-suite.json&quot;),</span>
+<span class="fc" id="L145">                run.suiteJson());</span>
+<span class="fc" id="L146">            write(outputDirectory.resolve(&quot;qualification-split-audit.json&quot;),</span>
+<span class="fc" id="L147">                run.split().toCanonicalJson());</span>
+<span class="fc" id="L148">            write(outputDirectory.resolve(&quot;qualification-evaluation.json&quot;),</span>
+<span class="fc" id="L149">                run.evaluationJson());</span>
+<span class="fc" id="L150">            write(outputDirectory.resolve(&quot;qualification-utility.json&quot;),</span>
+<span class="fc" id="L151">                run.utility().toCanonicalJson());</span>
+<span class="fc" id="L152">            write(outputDirectory.resolve(&quot;candidate-qualification-evidence.json&quot;),</span>
+<span class="fc" id="L153">                run.evidence().toCanonicalJson());</span>
+<span class="fc" id="L154">            write(outputDirectory.resolve(&quot;candidate-qualification-run.json&quot;),</span>
+<span class="fc" id="L155">                run.toCanonicalJson());</span>
+<span class="nc" id="L156">        } catch (IOException exception) {</span>
+<span class="nc" id="L157">            throw new UncheckedIOException(</span>
+                &quot;Could not write candidate qualification evidence&quot;, exception);
+<span class="fc" id="L159">        }</span>
+<span class="fc" id="L160">    }</span>
+
+    private static CandidateOutput retainedOutput(
+        CampaignRun campaign,
+        OpenTargetConjecture conjecture
+    ) {
+<span class="fc" id="L166">        List&lt;CandidateOutput&gt; outputs = campaign.lifecycle().mining().fullBatch()</span>
+<span class="fc" id="L167">            .binding().receipt().outputs();</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (outputs.size() != 1</span>
+<span class="fc" id="L169">                || !outputs.getFirst().conjectureId()</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                    .equals(conjecture.conjectureId())) {</span>
+<span class="nc" id="L171">            throw new IllegalArgumentException(</span>
+                &quot;qualification requires the exact retained production output&quot;);
+        }
+<span class="fc" id="L174">        return outputs.getFirst();</span>
+    }
+
+    private static void validateLineage(
+        OpenTargetConjecture conjecture,
+        CandidateOutput output
+    ) {
+<span class="fc" id="L181">        TreeSet&lt;String&gt; declared = new TreeSet&lt;&gt;(</span>
+<span class="fc" id="L182">            conjecture.supportingObservationIds());</span>
+<span class="fc" id="L183">        TreeSet&lt;String&gt; linked = output.sources().stream()</span>
+<span class="fc" id="L184">            .map(source -&gt; source.observationId())</span>
+<span class="fc" id="L185">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (!declared.equals(linked)</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">                || linked.size() != conjecture.supportCount()</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                || output.sources().stream().anyMatch(source -&gt;</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                    !isSha(source.snapshotHash())</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                        || !isSha(source.evidenceHash())</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                        || !isSha(source.observationBranchHash()))) {</span>
+<span class="nc" id="L192">            throw new IllegalArgumentException(</span>
+                &quot;qualification candidate lineage differs from production evidence&quot;);
+        }
+<span class="fc" id="L195">    }</span>
+
+    private static void validateSuccessfulQualification(
+        SplitAudit split,
+        EvaluationReport evaluation,
+        UtilityReport utility,
+        AutonomousCandidateQualificationEvidence evidence
+    ) {
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (!split.passed()</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                || evaluation.status() != EvaluationStatus.ACCEPTED_FOR_PROOF</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                || !evaluation.holdoutsComplete()</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                || !evaluation.allHoldoutsPassed()</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                || !&quot;NO_COUNTEREXAMPLE_FOUND&quot;.equals(</span>
+<span class="fc" id="L208">                    evaluation.counterexample().status())</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                || !evaluation.counterexample().inferredAssumptions().isEmpty()</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                || !evaluation.counterexample().assignments().isEmpty()</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                || !utility.beneficial()</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                || !evidence.qualified()) {</span>
+<span class="nc" id="L213">            throw new IllegalStateException(</span>
+                &quot;retained production candidate did not pass release qualification&quot;);
+        }
+<span class="fc" id="L216">    }</span>
+
+    private static String suiteJson() {
+        List&lt;ProductionCandidateQualificationCatalog.PositiveCase&gt; positives =
+<span class="fc" id="L220">            ProductionCandidateQualificationCatalog.positives().stream()</span>
+<span class="fc" id="L221">                .sorted(Comparator.comparing(</span>
+                    ProductionCandidateQualificationCatalog.PositiveCase::id))
+<span class="fc" id="L223">                .toList();</span>
+<span class="fc" id="L224">        var negatives = ProductionCandidateQualificationCatalog.negatives().stream()</span>
+<span class="fc" id="L225">            .sorted(Comparator.comparing(item -&gt; item.id())).toList();</span>
+<span class="fc" id="L226">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L227">            .property(&quot;schema&quot;,</span>
+                &quot;regelsuche.autonomous-candidate-qualification-suite/v1&quot;)
+<span class="fc" id="L229">            .property(&quot;revision&quot;, ProductionCandidateQualificationCatalog.REVISION)</span>
+<span class="fc" id="L230">            .property(&quot;heldOutClusterId&quot;,</span>
+                ProductionCandidateQualificationCatalog.HELD_OUT_CLUSTER_ID)
+<span class="fc" id="L232">            .array(&quot;positives&quot;, array -&gt; positives.forEach(item -&gt;</span>
+<span class="fc" id="L233">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L234">                    .property(&quot;id&quot;, item.id())</span>
+<span class="fc" id="L235">                    .property(&quot;factorExpression&quot;, item.factorExpression())</span>
+<span class="fc" id="L236">                    .property(&quot;inputExpression&quot;, item.inputExpression())</span>
+<span class="fc" id="L237">                    .property(&quot;targetExpression&quot;, item.targetExpression()))))</span>
+<span class="fc" id="L238">            .array(&quot;negatives&quot;, array -&gt; negatives.forEach(item -&gt;</span>
+<span class="fc" id="L239">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L240">                    .property(&quot;id&quot;, item.id())</span>
+<span class="fc" id="L241">                    .property(&quot;inputExpression&quot;, item.inputExpression()))))</span>
+<span class="fc" id="L242">            .endObject().toString();</span>
+    }
+
+    private static String evaluationJson(EvaluationReport report) {
+<span class="fc" id="L246">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L247">            .property(&quot;schema&quot;, report.schema())</span>
+<span class="fc" id="L248">            .property(&quot;conjectureId&quot;, report.conjectureId())</span>
+<span class="fc" id="L249">            .property(&quot;status&quot;, report.status().name())</span>
+<span class="fc" id="L250">            .property(&quot;compilationStatus&quot;, report.compilationStatus())</span>
+<span class="fc" id="L251">            .property(&quot;dynamicRuleId&quot;, report.dynamicRuleId())</span>
+<span class="fc" id="L252">            .property(&quot;provenanceHash&quot;, report.provenanceHash())</span>
+<span class="fc" id="L253">            .property(&quot;configuredPositiveHoldouts&quot;,</span>
+<span class="fc" id="L254">                report.configuredPositiveHoldouts())</span>
+<span class="fc" id="L255">            .property(&quot;executedPositiveHoldouts&quot;,</span>
+<span class="fc" id="L256">                report.executedPositiveHoldouts())</span>
+<span class="fc" id="L257">            .property(&quot;skippedPositiveHoldouts&quot;,</span>
+<span class="fc" id="L258">                report.skippedPositiveHoldouts())</span>
+<span class="fc" id="L259">            .property(&quot;configuredNegativeHoldouts&quot;,</span>
+<span class="fc" id="L260">                report.configuredNegativeHoldouts())</span>
+<span class="fc" id="L261">            .property(&quot;executedNegativeHoldouts&quot;,</span>
+<span class="fc" id="L262">                report.executedNegativeHoldouts())</span>
+<span class="fc" id="L263">            .property(&quot;skippedNegativeHoldouts&quot;,</span>
+<span class="fc" id="L264">                report.skippedNegativeHoldouts())</span>
+<span class="fc" id="L265">            .array(&quot;positiveResults&quot;, array -&gt; report.positiveResults().forEach(item -&gt;</span>
+<span class="fc" id="L266">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L267">                    .property(&quot;id&quot;, item.id())</span>
+<span class="fc" id="L268">                    .property(&quot;candidateCount&quot;, item.candidateCount())</span>
+<span class="fc" id="L269">                    .property(&quot;passed&quot;, item.passed())</span>
+<span class="fc" id="L270">                    .stringArray(&quot;candidateExpressions&quot;,</span>
+<span class="fc" id="L271">                        item.candidateExpressions()))))</span>
+<span class="fc" id="L272">            .array(&quot;negativeResults&quot;, array -&gt; report.negativeResults().forEach(item -&gt;</span>
+<span class="fc" id="L273">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L274">                    .property(&quot;id&quot;, item.id())</span>
+<span class="fc" id="L275">                    .property(&quot;candidateCount&quot;, item.candidateCount())</span>
+<span class="fc" id="L276">                    .property(&quot;passed&quot;, item.passed())</span>
+<span class="fc" id="L277">                    .stringArray(&quot;candidateExpressions&quot;,</span>
+<span class="fc" id="L278">                        item.candidateExpressions()))))</span>
+<span class="fc" id="L279">            .property(&quot;counterexampleStatus&quot;, report.counterexample().status())</span>
+<span class="fc" id="L280">            .stringArray(&quot;counterexampleAttemptedSources&quot;,</span>
+<span class="fc" id="L281">                report.counterexample().attemptedSources())</span>
+<span class="fc" id="L282">            .stringArray(&quot;inferredAssumptions&quot;,</span>
+<span class="fc" id="L283">                report.counterexample().inferredAssumptions())</span>
+<span class="fc" id="L284">            .stringArray(&quot;counterexampleAssignments&quot;,</span>
+<span class="fc" id="L285">                report.counterexample().assignments())</span>
+<span class="fc" id="L286">            .stringArray(&quot;blockers&quot;, report.blockers())</span>
+<span class="fc" id="L287">            .property(&quot;proofStatus&quot;, report.proofStatus())</span>
+<span class="fc" id="L288">            .property(&quot;noveltyStatus&quot;, report.noveltyStatus())</span>
+<span class="fc" id="L289">            .endObject().toString();</span>
+    }
+
+    private static void write(Path path, String content) throws IOException {
+<span class="fc" id="L293">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L294">    }</span>
+
+    private static boolean isSha(String value) {
+<span class="pc bpc" id="L297" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+    }
+
+    public record QualificationRun(
+        String schema,
+        CampaignRun campaign,
+        String suiteJson,
+        String suiteHash,
+        SplitAudit split,
+        EvaluationReport evaluation,
+        String evaluationJson,
+        String evaluationHash,
+        UtilityReport utility,
+        AutonomousCandidateQualificationEvidence evidence,
+        String contentHash
+    ) {
+<span class="fc" id="L313">        public QualificationRun {</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)</span>
+<span class="fc" id="L315">                    || !campaign.contentHash()</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                        .equals(evidence.campaignManifestHash())</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                    || !suiteHash.equals(evidence.suiteHash())</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">                    || !split.contentHash().equals(evidence.splitAuditHash())</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">                    || !evaluationHash.equals(evidence.evaluationHash())</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                    || !utility.contentHash().equals(evidence.utilityHash())) {</span>
+<span class="nc" id="L321">                throw new IllegalArgumentException(</span>
+                    &quot;candidate qualification run is not hash-linked&quot;);
+            }
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            if (!isSha(contentHash)) {</span>
+<span class="nc" id="L325">                throw new IllegalArgumentException(&quot;contentHash must be SHA-256&quot;);</span>
+            }
+<span class="fc" id="L327">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L330">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L331">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L332">                .property(&quot;campaignManifestHash&quot;, campaign.contentHash())</span>
+<span class="fc" id="L333">                .property(&quot;suiteHash&quot;, suiteHash)</span>
+<span class="fc" id="L334">                .property(&quot;splitAuditHash&quot;, split.contentHash())</span>
+<span class="fc" id="L335">                .property(&quot;evaluationHash&quot;, evaluationHash)</span>
+<span class="fc" id="L336">                .property(&quot;utilityHash&quot;, utility.contentHash())</span>
+<span class="fc" id="L337">                .property(&quot;qualificationEvidenceHash&quot;, evidence.contentHash())</span>
+<span class="fc" id="L338">                .property(&quot;qualified&quot;, evidence.qualified())</span>
+<span class="fc" id="L339">                .property(&quot;promotionStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L340">                .property(&quot;publicEvidenceStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L341">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L342">                .endObject().toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

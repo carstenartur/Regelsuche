@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductionCandidateQualificationSplitAudit.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ProductionCandidateQualificationSplitAudit.java</span></div><h1>ProductionCandidateQualificationSplitAudit.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner.CampaignRun;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.search.learning.ExpressionFingerprint;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Exact and alpha-normalized split audit for the release qualification suite. */
+<span class="fc" id="L15">public final class ProductionCandidateQualificationSplitAudit {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-candidate-qualification-split/v1&quot;;
+
+    public SplitAudit audit(CampaignRun campaign) {
+<span class="fc" id="L20">        Objects.requireNonNull(campaign, &quot;campaign&quot;);</span>
+<span class="fc" id="L21">        List&lt;Fingerprint&gt; upstream = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L22">        campaign.lifecycle().mining().generation().observations().forEach(item -&gt;</span>
+<span class="fc" id="L23">            upstream.add(fingerprint(&quot;formation:&quot; + item.seed().id(),</span>
+<span class="fc" id="L24">                item.seed().id(), item.seed().expression())));</span>
+<span class="fc" id="L25">        int formationCount = upstream.size();</span>
+<span class="fc" id="L26">        ProductionCandidateQualificationCatalog.developmentExpressions().forEach(value -&gt;</span>
+<span class="fc" id="L27">            upstream.add(fingerprint(&quot;development&quot;, &quot;development:&quot; + value, value)));</span>
+
+<span class="fc" id="L29">        List&lt;Fingerprint&gt; qualification = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L30">        ProductionCandidateQualificationCatalog.positives().forEach(item -&gt; {</span>
+<span class="fc" id="L31">            qualification.add(fingerprint(&quot;positive-input:&quot; + item.id(),</span>
+<span class="fc" id="L32">                item.id(), item.inputExpression()));</span>
+<span class="fc" id="L33">            qualification.add(fingerprint(&quot;positive-target:&quot; + item.id(),</span>
+<span class="fc" id="L34">                item.id(), item.targetExpression()));</span>
+<span class="fc" id="L35">        });</span>
+<span class="fc" id="L36">        ProductionCandidateQualificationCatalog.negatives().forEach(item -&gt;</span>
+<span class="fc" id="L37">            qualification.add(fingerprint(&quot;negative-input:&quot; + item.id(),</span>
+<span class="fc" id="L38">                item.id(), item.inputExpression())));</span>
+
+<span class="fc" id="L40">        List&lt;String&gt; upstreamCollisions = crossCollisions(upstream, qualification);</span>
+<span class="fc" id="L41">        List&lt;String&gt; internalCollisions = internalCollisions(qualification);</span>
+        int compositeFactors = (int) ProductionCandidateQualificationCatalog
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            .positives().stream().filter(item -&gt; item.factorExpression().contains(&quot;*&quot;)</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                || item.factorExpression().contains(&quot;^&quot;)).count();</span>
+        int heldOut = compositeFactors == 12
+<span class="pc bpc" id="L46" title="3 of 6 branches missed.">                &amp;&amp; upstreamCollisions.isEmpty() &amp;&amp; internalCollisions.isEmpty()</span>
+<span class="pc" id="L47">            ? 1 : 0;</span>
+<span class="fc" id="L48">        String hash = AutonomousResearchBriefV2.hash(</span>
+            SCHEMA + &quot;\nformation=&quot; + formationCount
+                + &quot;\ndevelopment=&quot;
+<span class="fc" id="L51">                    + ProductionCandidateQualificationCatalog.developmentExpressions().size()</span>
+<span class="fc" id="L52">                + &quot;\nqualification=&quot; + qualification.size()</span>
+                + &quot;\ncomposite=&quot; + compositeFactors
+                + &quot;\nupstreamCollisions=&quot; + upstreamCollisions
+                + &quot;\ninternalCollisions=&quot; + internalCollisions
+                + &quot;\nheldOut=&quot; + heldOut);
+<span class="fc" id="L57">        return new SplitAudit(</span>
+            SCHEMA,
+            ProductionCandidateQualificationCatalog.REVISION,
+            ProductionCandidateQualificationCatalog.HELD_OUT_CLUSTER_ID,
+            formationCount,
+<span class="fc" id="L62">            ProductionCandidateQualificationCatalog.developmentExpressions().size(),</span>
+<span class="fc" id="L63">            qualification.size(),</span>
+            compositeFactors,
+            upstreamCollisions,
+            internalCollisions,
+            heldOut,
+            hash);
+    }
+
+    private static Fingerprint fingerprint(
+        String source,
+        String caseId,
+        String expression
+    ) {
+<span class="fc" id="L76">        ExpressionFingerprint value = ExpressionFingerprint.of(</span>
+            expression, new ExpressionCanonicalizer());
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (!value.parseable()) {</span>
+<span class="nc" id="L79">            throw new IllegalArgumentException(&quot;unparseable split expression: &quot; + source);</span>
+        }
+<span class="fc" id="L81">        return new Fingerprint(</span>
+<span class="fc" id="L82">            source, caseId, value.valueHash(), value.alphaShapeHash());</span>
+    }
+
+    private static List&lt;String&gt; crossCollisions(
+        List&lt;Fingerprint&gt; upstream,
+        List&lt;Fingerprint&gt; qualification
+    ) {
+<span class="fc" id="L89">        List&lt;String&gt; collisions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L90">        qualification.forEach(candidate -&gt; upstream.forEach(existing -&gt; {</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (candidate.value().equals(existing.value())) {</span>
+<span class="nc" id="L92">                collisions.add(&quot;EXACT|&quot; + candidate.source() + '|' + existing.source()</span>
+<span class="nc" id="L93">                    + '|' + candidate.value());</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            } else if (candidate.alpha().equals(existing.alpha())) {</span>
+<span class="nc" id="L95">                collisions.add(&quot;ALPHA|&quot; + candidate.source() + '|' + existing.source()</span>
+<span class="nc" id="L96">                    + '|' + candidate.alpha());</span>
+            }
+<span class="fc" id="L98">        }));</span>
+<span class="fc" id="L99">        return collisions.stream().distinct().sorted().toList();</span>
+    }
+
+    private static List&lt;String&gt; internalCollisions(List&lt;Fingerprint&gt; values) {
+<span class="fc" id="L103">        List&lt;String&gt; collisions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L104">        Map&lt;String, Fingerprint&gt; exact = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L105">        Map&lt;String, Fingerprint&gt; alpha = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (Fingerprint value : values) {</span>
+<span class="fc" id="L107">            Fingerprint oldExact = exact.putIfAbsent(value.value(), value);</span>
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">            if (oldExact != null &amp;&amp; !oldExact.caseId().equals(value.caseId())) {</span>
+<span class="nc" id="L109">                collisions.add(&quot;EXACT|&quot; + value.source() + '|' + oldExact.source()</span>
+<span class="nc" id="L110">                    + '|' + value.value());</span>
+            }
+<span class="fc" id="L112">            Fingerprint oldAlpha = alpha.putIfAbsent(value.alpha(), value);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (oldAlpha != null</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                    &amp;&amp; !oldAlpha.caseId().equals(value.caseId())</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                    &amp;&amp; !oldAlpha.value().equals(value.value())) {</span>
+<span class="nc" id="L116">                collisions.add(&quot;ALPHA|&quot; + value.source() + '|' + oldAlpha.source()</span>
+<span class="nc" id="L117">                    + '|' + value.alpha());</span>
+            }
+<span class="fc" id="L119">        }</span>
+<span class="fc" id="L120">        return collisions.stream().distinct().sorted().toList();</span>
+    }
+
+    public record SplitAudit(
+        String schema,
+        String suiteRevision,
+        String heldOutClusterId,
+        int formationExpressionCount,
+        int developmentExpressionCount,
+        int qualificationExpressionCount,
+        int compositeFactorCount,
+        List&lt;String&gt; upstreamCollisions,
+        List&lt;String&gt; internalCollisions,
+        int heldOutFamilyOrClusterCount,
+        String contentHash
+    ) {
+<span class="fc" id="L136">        public SplitAudit {</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            upstreamCollisions = upstreamCollisions == null</span>
+<span class="pc" id="L138">                ? List.of() : upstreamCollisions.stream().sorted().toList();</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            internalCollisions = internalCollisions == null</span>
+<span class="pc" id="L140">                ? List.of() : internalCollisions.stream().sorted().toList();</span>
+<span class="pc bpc" id="L141" title="7 of 14 branches missed.">            if (!SCHEMA.equals(schema) || formationExpressionCount &lt; 1</span>
+                    || developmentExpressionCount &lt; 1
+                    || qualificationExpressionCount != 36
+                    || compositeFactorCount != 12
+                    || heldOutFamilyOrClusterCount &lt; 0
+                    || heldOutFamilyOrClusterCount &gt; 1) {
+<span class="nc" id="L147">                throw new IllegalArgumentException(&quot;invalid qualification split audit&quot;);</span>
+            }
+<span class="fc" id="L149">            requireSha(contentHash);</span>
+<span class="fc" id="L150">        }</span>
+
+        public boolean passed() {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            return heldOutFamilyOrClusterCount == 1</span>
+<span class="pc bpc" id="L154" title="2 of 4 branches missed.">                &amp;&amp; upstreamCollisions.isEmpty() &amp;&amp; internalCollisions.isEmpty();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L158">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L159">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L160">                .property(&quot;suiteRevision&quot;, suiteRevision)</span>
+<span class="fc" id="L161">                .property(&quot;heldOutClusterId&quot;, heldOutClusterId)</span>
+<span class="fc" id="L162">                .property(&quot;formationExpressionCount&quot;, formationExpressionCount)</span>
+<span class="fc" id="L163">                .property(&quot;developmentExpressionCount&quot;, developmentExpressionCount)</span>
+<span class="fc" id="L164">                .property(&quot;qualificationExpressionCount&quot;, qualificationExpressionCount)</span>
+<span class="fc" id="L165">                .property(&quot;compositeFactorCount&quot;, compositeFactorCount)</span>
+<span class="fc" id="L166">                .stringArray(&quot;upstreamCollisions&quot;, upstreamCollisions)</span>
+<span class="fc" id="L167">                .stringArray(&quot;internalCollisions&quot;, internalCollisions)</span>
+<span class="fc" id="L168">                .property(&quot;heldOutFamilyOrClusterCount&quot;,</span>
+                    heldOutFamilyOrClusterCount)
+<span class="fc" id="L170">                .property(&quot;passed&quot;, passed())</span>
+<span class="fc" id="L171">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L172">                .endObject().toString();</span>
+        }
+    }
+
+<span class="fc" id="L176">    private record Fingerprint(</span>
+        String source,
+        String caseId,
+        String value,
+        String alpha
+    ) {
+    }
+
+    private static void requireSha(String value) {
+<span class="pc bpc" id="L185" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L186">            throw new IllegalArgumentException(&quot;contentHash must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L188">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

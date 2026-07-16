@@ -372,7 +372,7 @@ public final class ReleaseReadinessMatrix {
 <span class="pc bpc" id="L372" title="1 of 4 branches missed.">            if (checks.isEmpty()</span>
 <span class="pc bpc" id="L373" title="1 of 2 branches missed.">                    || (status == ProfileStatus.READY) != blockers.isEmpty()</span>
                     || autonomyClaimAuthorized
-<span class="pc bpc" id="L375" title="2 of 6 branches missed.">                        != (profile.authorizesAutonomyClaim()</span>
+<span class="pc bpc" id="L375" title="1 of 6 branches missed.">                        != (profile.authorizesAutonomyClaim()</span>
                             &amp;&amp; status == ProfileStatus.READY)) {
 <span class="nc" id="L377">                throw new IllegalArgumentException(</span>
                     &quot;profile result status, blockers or claim authority is inconsistent&quot;);

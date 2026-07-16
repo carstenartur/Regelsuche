@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReleaseQualificationMatrixAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ReleaseQualificationMatrixAdapter.java</span></div><h1>ReleaseQualificationMatrixAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.release.ReleaseReadinessMatrix.MatrixReport;
+import de.regelsuche.release.ReleaseReadinessMatrix.ProfileResult;
+import de.regelsuche.release.ReleaseReadinessMatrix.ProfileStatus;
+import de.regelsuche.release.ReleaseReadinessMatrix.RequirementCheck;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/** Re-evaluates only the three autonomy checks owned by issue #359. */
+<span class="fc" id="L14">public final class ReleaseQualificationMatrixAdapter {</span>
+    public MatrixReport apply(
+        MatrixReport base,
+        AutonomousCampaignReleaseEvidence campaignEvidence,
+        AutonomousCandidateQualificationEvidence qualification
+    ) {
+<span class="fc" id="L20">        Objects.requireNonNull(base, &quot;base&quot;);</span>
+<span class="fc" id="L21">        Objects.requireNonNull(campaignEvidence, &quot;campaignEvidence&quot;);</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        if (qualification == null) {</span>
+<span class="fc" id="L23">            return base;</span>
+        }
+<span class="fc" id="L25">        if (!qualification.campaignManifestHash()</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">                .equals(campaignEvidence.campaignManifestHash())) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(</span>
+                &quot;qualification belongs to another production campaign&quot;);
+        }
+<span class="fc" id="L30">        List&lt;ProfileResult&gt; profiles = base.profiles().stream()</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            .map(result -&gt; result.profile()</span>
+<span class="fc" id="L32">                == ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN</span>
+<span class="fc" id="L33">                    ? qualifiedAutonomy(result, qualification)</span>
+<span class="fc" id="L34">                    : result)</span>
+<span class="fc" id="L35">            .sorted(Comparator.comparing(result -&gt; result.profile().name()))</span>
+<span class="fc" id="L36">            .toList();</span>
+<span class="fc" id="L37">        ProfileResult autonomy = profiles.stream()</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">            .filter(result -&gt; result.profile()</span>
+                == ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN)
+<span class="fc" id="L40">            .findFirst().orElseThrow();</span>
+<span class="fc" id="L41">        String hash = matrixHash(</span>
+<span class="fc" id="L42">            base.evidenceHash(),</span>
+<span class="fc" id="L43">            base.hiddenRuleEvidenceHash(),</span>
+            profiles,
+<span class="fc" id="L45">            autonomy.status());</span>
+<span class="fc" id="L46">        return new MatrixReport(</span>
+<span class="fc" id="L47">            base.schema(),</span>
+<span class="fc" id="L48">            base.evidenceHash(),</span>
+<span class="fc" id="L49">            base.hiddenRuleEvidenceHash(),</span>
+            profiles,
+<span class="fc" id="L51">            autonomy.status(),</span>
+<span class="fc" id="L52">            autonomy.autonomyClaimAuthorized(),</span>
+<span class="fc" id="L53">            base.promotionStatus(),</span>
+<span class="fc" id="L54">            base.publicEvidenceStatus(),</span>
+            hash);
+    }
+
+    private static ProfileResult qualifiedAutonomy(
+        ProfileResult existing,
+        AutonomousCandidateQualificationEvidence evidence
+    ) {
+<span class="fc" id="L62">        List&lt;RequirementCheck&gt; checks = existing.checks().stream()</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">            .map(check -&gt; switch (check.code()) {</span>
+<span class="fc" id="L64">                case &quot;HELD_OUT_FAMILY_OR_CLUSTER&quot; -&gt; new RequirementCheck(</span>
+<span class="fc" id="L65">                    check.code(),</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                    evidence.heldOutFamilyOrClusterCount() &gt;= 1,</span>
+<span class="fc" id="L67">                    &quot;count=&quot; + evidence.heldOutFamilyOrClusterCount()</span>
+<span class="fc" id="L68">                        + &quot;; evidence=&quot; + evidence.contentHash(),</span>
+                    &quot;&gt;=1 hash-bound held-out family or structural cluster&quot;);
+<span class="fc" id="L70">                case &quot;BALANCED_RELEASE_HOLDOUT_SUITE&quot; -&gt; new RequirementCheck(</span>
+<span class="fc" id="L71">                    check.code(),</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                    evidence.configuredPositiveHoldouts() &gt;= 12</span>
+<span class="fc" id="L73">                        &amp;&amp; evidence.executedPositiveHoldouts()</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                            == evidence.configuredPositiveHoldouts()</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                        &amp;&amp; evidence.configuredNegativeHoldouts() &gt;= 12</span>
+<span class="fc" id="L76">                        &amp;&amp; evidence.executedNegativeHoldouts()</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                            == evidence.configuredNegativeHoldouts()</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                        &amp;&amp; evidence.mandatorySkippedWorkCount() == 0</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                        &amp;&amp; evidence.refutingHoldouts() == 0</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">                        &amp;&amp; evidence.counterexamplesFound() == 0,</span>
+<span class="fc" id="L81">                    &quot;positive=&quot; + evidence.executedPositiveHoldouts() + '/'</span>
+<span class="fc" id="L82">                        + evidence.configuredPositiveHoldouts()</span>
+<span class="fc" id="L83">                        + &quot;; negative=&quot; + evidence.executedNegativeHoldouts() + '/'</span>
+<span class="fc" id="L84">                        + evidence.configuredNegativeHoldouts()</span>
+<span class="fc" id="L85">                        + &quot;; skipped=&quot; + evidence.mandatorySkippedWorkCount()</span>
+<span class="fc" id="L86">                        + &quot;; refuting=&quot; + evidence.refutingHoldouts()</span>
+<span class="fc" id="L87">                        + &quot;; counterexamples=&quot; + evidence.counterexamplesFound()</span>
+<span class="fc" id="L88">                        + &quot;; evidence=&quot; + evidence.contentHash(),</span>
+                    &quot;&gt;=12 positive and &gt;=12 negative; fully executed; zero refuting&quot;);
+<span class="fc" id="L90">                case &quot;PAIRED_HELD_OUT_UTILITY&quot; -&gt; new RequirementCheck(</span>
+<span class="fc" id="L91">                    check.code(),</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                    evidence.pairedHeldOutUtilityEvaluated()</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                        &amp;&amp; evidence.pairedUtilityPermille() &gt; 0</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                        &amp;&amp; evidence.correctnessRegressionCount() == 0,</span>
+<span class="fc" id="L95">                    &quot;evaluated=&quot; + evidence.pairedHeldOutUtilityEvaluated()</span>
+<span class="fc" id="L96">                        + &quot;; gainPermille=&quot; + evidence.pairedUtilityPermille()</span>
+                        + &quot;; regressions=&quot;
+<span class="fc" id="L98">                            + evidence.correctnessRegressionCount()</span>
+<span class="fc" id="L99">                        + &quot;; evidence=&quot; + evidence.contentHash(),</span>
+                    &quot;positive held-out gain with zero correctness regressions&quot;);
+<span class="fc" id="L101">                default -&gt; check;</span>
+            })
+<span class="fc" id="L103">            .sorted(Comparator.comparing(RequirementCheck::code))</span>
+<span class="fc" id="L104">            .toList();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        ProfileStatus status = checks.stream().allMatch(RequirementCheck::passed)</span>
+<span class="pc" id="L106">            ? ProfileStatus.READY : ProfileStatus.BLOCKED;</span>
+<span class="fc" id="L107">        List&lt;String&gt; blockers = checks.stream()</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            .filter(check -&gt; !check.passed())</span>
+<span class="fc" id="L109">            .map(RequirementCheck::code)</span>
+<span class="fc" id="L110">            .sorted().toList();</span>
+<span class="fc" id="L111">        return new ProfileResult(</span>
+<span class="fc" id="L112">            existing.profile(),</span>
+            status,
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">            existing.profile().authorizesAutonomyClaim()</span>
+                &amp;&amp; status == ProfileStatus.READY,
+            checks,
+            blockers);
+    }
+
+    private static String matrixHash(
+        String evidenceHash,
+        String hiddenRuleEvidenceHash,
+        List&lt;ProfileResult&gt; profiles,
+        ProfileStatus autonomyStatus
+    ) {
+<span class="fc" id="L126">        List&lt;String&gt; canonicalProfiles = profiles.stream()</span>
+<span class="fc" id="L127">            .sorted(Comparator.comparing(result -&gt; result.profile().name()))</span>
+<span class="fc" id="L128">            .map(ProfileResult::canonicalMaterial)</span>
+<span class="fc" id="L129">            .toList();</span>
+<span class="fc" id="L130">        return AutonomousResearchBriefV2.hash(</span>
+            ReleaseReadinessMatrix.SCHEMA
+                + &quot;\nevidence=&quot; + evidenceHash
+                + &quot;\nhiddenRuleEvidence=&quot; + hiddenRuleEvidenceHash
+                + &quot;\nprofiles=&quot; + canonicalProfiles
+<span class="fc" id="L135">                + &quot;\nautonomy=&quot; + autonomyStatus.name());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

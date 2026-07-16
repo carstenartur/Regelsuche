@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductionCandidateQualificationCatalog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ProductionCandidateQualificationCatalog.java</span></div><h1>ProductionCandidateQualificationCatalog.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.NegativeHoldout;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.PositiveHoldout;
+import java.util.List;
+
+/** Predeclared qualification cases for the exact retained production candidate. */
+public final class ProductionCandidateQualificationCatalog {
+    public static final String REVISION =
+        &quot;production-candidate-composite-factor-qualification/v1&quot;;
+    public static final String HELD_OUT_CLUSTER_ID =
+        &quot;composite-common-factor-gap-two/v1&quot;;
+
+    private ProductionCandidateQualificationCatalog() {
+    }
+
+    public static List&lt;PositiveCase&gt; positives() {
+<span class="fc" id="L18">        return List.of(</span>
+<span class="fc" id="L19">            positive(&quot;qualified-product-14&quot;, 14, &quot;a * b&quot;),</span>
+<span class="fc" id="L20">            positive(&quot;qualified-power-15&quot;, 15, &quot;c^2&quot;),</span>
+<span class="fc" id="L21">            positive(&quot;qualified-three-factor-16&quot;, 16, &quot;d * e * f&quot;),</span>
+<span class="fc" id="L22">            positive(&quot;qualified-squared-sum-18&quot;, 18, &quot;(g + h)^2&quot;),</span>
+<span class="fc" id="L23">            positive(&quot;qualified-affine-factor-20&quot;, 20, &quot;i * j + k&quot;),</span>
+<span class="fc" id="L24">            positive(&quot;qualified-cube-21&quot;, 21, &quot;l^3&quot;),</span>
+<span class="fc" id="L25">            positive(&quot;qualified-nested-product-22&quot;, 22, &quot;m * (n + o)&quot;),</span>
+<span class="fc" id="L26">            positive(&quot;qualified-conjugate-product-24&quot;, 24, &quot;(p - q) * (p + q)&quot;),</span>
+<span class="fc" id="L27">            positive(&quot;qualified-sum-of-squares-25&quot;, 25, &quot;r^2 + s^2&quot;),</span>
+<span class="fc" id="L28">            positive(&quot;qualified-product-difference-26&quot;, 26, &quot;t * (u - v)&quot;),</span>
+<span class="fc" id="L29">            positive(&quot;qualified-two-products-27&quot;, 27, &quot;(w + x) * (y + z)&quot;),</span>
+<span class="fc" id="L30">            positive(&quot;qualified-power-product-28&quot;, 28, &quot;a^2 * b&quot;));</span>
+    }
+
+    public static List&lt;NegativeHoldout&gt; negatives() {
+<span class="fc" id="L34">        return List.of(</span>
+<span class="fc" id="L35">            negative(&quot;negative-gap-three-product&quot;, &quot;(14 + 3) * (a * b) + 14 * (a * b)&quot;),</span>
+<span class="fc" id="L36">            negative(&quot;negative-second-coefficient-power&quot;, &quot;(15 + 2) * (c^2) + 16 * (c^2)&quot;),</span>
+<span class="fc" id="L37">            negative(&quot;negative-distinct-three-factor&quot;, &quot;(16 + 2) * (d * e * f) + 16 * (d * e)&quot;),</span>
+<span class="fc" id="L38">            negative(&quot;negative-subtraction-squared-sum&quot;, &quot;(18 + 2) * ((g + h)^2) - 18 * ((g + h)^2)&quot;),</span>
+<span class="fc" id="L39">            negative(&quot;negative-distinct-affine-factor&quot;, &quot;(20 + 2) * (i * j + k) + 20 * (i * j - k)&quot;),</span>
+<span class="fc" id="L40">            negative(&quot;negative-gap-four-cube&quot;, &quot;(21 + 4) * (l^3) + 21 * (l^3)&quot;),</span>
+<span class="fc" id="L41">            negative(&quot;negative-shifted-coefficient-nested&quot;, &quot;(22 + 2) * (m * (n + o)) + 23 * (m * (n + o))&quot;),</span>
+<span class="fc" id="L42">            negative(&quot;negative-distinct-conjugate&quot;, &quot;(24 + 2) * ((p - q) * (p + q)) + 24 * ((p - q)^2)&quot;),</span>
+<span class="fc" id="L43">            negative(&quot;negative-distinct-square-sum&quot;, &quot;(25 + 2) * (r^2 + s^2) + 25 * (r^2 - s^2)&quot;),</span>
+<span class="fc" id="L44">            negative(&quot;negative-distinct-product-difference&quot;, &quot;(26 + 2) * (t * (u - v)) + 26 * (t * (u + v))&quot;),</span>
+<span class="fc" id="L45">            negative(&quot;negative-gap-one-two-products&quot;, &quot;(27 + 1) * ((w + x) * (y + z)) + 27 * ((w + x) * (y + z))&quot;),</span>
+<span class="fc" id="L46">            negative(&quot;negative-distinct-power-product&quot;, &quot;(28 + 2) * (a^2 * b) + 28 * (a^2 * c)&quot;));</span>
+    }
+
+    public static List&lt;String&gt; developmentExpressions() {
+<span class="fc" id="L50">        return List.of(</span>
+            &quot;(53 + 2) * q + 53 * q&quot;, &quot;(2 * 53 + 2) * q&quot;,
+            &quot;(67 + 2) * r + 67 * r&quot;, &quot;(2 * 67 + 2) * r&quot;,
+            &quot;(71 + 2) * (u + v) + 71 * (u + v)&quot;,
+            &quot;(2 * 71 + 2) * (u + v)&quot;,
+            &quot;(53 + 3) * q + 53 * q&quot;,
+            &quot;(67 + 2) * r + 68 * r&quot;,
+            &quot;(71 + 2) * (u + v) + 71 * (u - v)&quot;);
+    }
+
+    private static PositiveCase positive(String id, int parameter, String factor) {
+<span class="fc" id="L61">        String grouped = '(' + factor + ')';</span>
+<span class="fc" id="L62">        return new PositiveCase(</span>
+            id,
+            factor,
+            &quot;(&quot; + parameter + &quot; + 2) * &quot; + grouped
+                + &quot; + &quot; + parameter + &quot; * &quot; + grouped,
+            &quot;(2 * &quot; + parameter + &quot; + 2) * &quot; + grouped);
+    }
+
+    private static NegativeHoldout negative(String id, String expression) {
+<span class="fc" id="L71">        return new NegativeHoldout(id, expression);</span>
+    }
+
+    public record PositiveCase(
+        String id,
+        String factorExpression,
+        String inputExpression,
+        String targetExpression
+    ) {
+<span class="fc" id="L80">        public PositiveCase {</span>
+<span class="fc" id="L81">            require(id, &quot;id&quot;);</span>
+<span class="fc" id="L82">            require(factorExpression, &quot;factorExpression&quot;);</span>
+<span class="fc" id="L83">            require(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L84">            require(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc" id="L85">        }</span>
+
+        public PositiveHoldout asHoldout() {
+<span class="fc" id="L88">            return new PositiveHoldout(id, inputExpression, targetExpression);</span>
+        }
+    }
+
+    private static void require(String value, String name) {
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L94">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L96">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

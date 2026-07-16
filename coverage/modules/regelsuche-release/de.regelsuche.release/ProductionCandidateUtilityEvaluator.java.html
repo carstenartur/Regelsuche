@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProductionCandidateUtilityEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ProductionCandidateUtilityEvaluator.java</span></div><h1>ProductionCandidateUtilityEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.experiments.autopilot.PinnedAutonomousProductionCampaign;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.DynamicOperatorCompiler;
+import de.regelsuche.mining.DynamicPatternOperator;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+
+/** Paired search utility with and without the exact retained candidate. */
+<span class="fc" id="L25">public final class ProductionCandidateUtilityEvaluator {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-candidate-qualified-utility/v1&quot;;
+
+    public UtilityReport evaluate(OpenTargetConjecture conjecture) {
+<span class="fc" id="L30">        Objects.requireNonNull(conjecture, &quot;conjecture&quot;);</span>
+<span class="fc" id="L31">        DynamicPatternOperator operator = new DynamicOperatorCompiler().compile(</span>
+<span class="fc" id="L32">            conjecture.conjectureId(),</span>
+            ProductionCandidateQualificationCatalog.REVISION,
+<span class="fc" id="L34">            conjecture.leftPattern(),</span>
+<span class="fc" id="L35">            conjecture.rightPattern()).operator().orElseThrow(() -&gt;</span>
+<span class="nc" id="L36">                new IllegalStateException(&quot;retained candidate could not be compiled&quot;));</span>
+<span class="fc" id="L37">        List&lt;UtilityCase&gt; cases = ProductionCandidateQualificationCatalog.positives()</span>
+<span class="fc" id="L38">            .stream().map(item -&gt; evaluateCase(item, operator))</span>
+<span class="fc" id="L39">            .sorted(Comparator.comparing(UtilityCase::id)).toList();</span>
+<span class="fc" id="L40">        int regressions = (int) cases.stream().filter(UtilityCase::regression).count();</span>
+<span class="fc" id="L41">        int gains = (int) cases.stream().filter(UtilityCase::materialGain).count();</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        int gainPermille = cases.isEmpty() ? 0 : gains * 1000 / cases.size();</span>
+<span class="fc" id="L43">        String contentHash = AutonomousResearchBriefV2.hash(</span>
+            SCHEMA
+<span class="fc" id="L45">                + &quot;\nconjecture=&quot; + conjecture.conjectureId()</span>
+                + &quot;\nrevision=&quot; + ProductionCandidateQualificationCatalog.REVISION
+<span class="fc" id="L47">                + &quot;\ncases=&quot; + cases.stream().map(UtilityCase::canonicalMaterial).toList()</span>
+                + &quot;\nregressions=&quot; + regressions
+                + &quot;\ngains=&quot; + gains
+                + &quot;\ngainPermille=&quot; + gainPermille);
+<span class="fc" id="L51">        return new UtilityReport(</span>
+            SCHEMA,
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">            conjecture.conjectureId(),</span>
+            ProductionCandidateQualificationCatalog.REVISION,
+            cases,
+            regressions,
+            gains,
+            gainPermille,
+            true,
+            regressions == 0 &amp;&amp; gains &gt; 0,
+            contentHash);
+    }
+
+    private static UtilityCase evaluateCase(
+        ProductionCandidateQualificationCatalog.PositiveCase item,
+        DynamicPatternOperator operator
+    ) {
+<span class="fc" id="L68">        TransformationEngine baselineEngine = new AstRewriteTransformationEngine();</span>
+<span class="fc" id="L69">        TransformationEngine candidateEngine = new HypothesisTransformationEngine(</span>
+<span class="fc" id="L70">            new AstRewriteTransformationEngine(), List.of(operator), 4);</span>
+<span class="fc" id="L71">        String target = ExpressionFormatter.format(</span>
+<span class="fc" id="L72">            new ExpressionParser().parseTerm(item.targetExpression()));</span>
+<span class="fc" id="L73">        GoalSearchResult baseline = search(</span>
+<span class="fc" id="L74">            baselineEngine, item.inputExpression(), target);</span>
+<span class="fc" id="L75">        GoalSearchResult candidate = search(</span>
+<span class="fc" id="L76">            candidateEngine, item.inputExpression(), target);</span>
+<span class="fc" id="L77">        int baselineDepth = depth(baseline);</span>
+<span class="fc" id="L78">        int candidateDepth = depth(candidate);</span>
+<span class="fc" id="L79">        long baselineStates = baseline.metrics().exploredStates();</span>
+<span class="fc" id="L80">        long candidateStates = candidate.metrics().exploredStates();</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        boolean regression = !candidate.reached()</span>
+<span class="pc bpc" id="L82" title="5 of 6 branches missed.">            || baseline.reached() &amp;&amp; (candidateDepth &gt; baselineDepth</span>
+                || candidateStates &gt; baselineStates);
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        boolean materialGain = candidate.reached() &amp;&amp; !regression</span>
+<span class="pc bpc" id="L85" title="5 of 6 branches missed.">            &amp;&amp; (!baseline.reached()</span>
+                || candidateDepth &lt; baselineDepth
+                || candidateStates &lt; baselineStates);
+<span class="fc" id="L88">        return new UtilityCase(</span>
+<span class="fc" id="L89">            item.id(),</span>
+<span class="fc" id="L90">            baseline.status().name(),</span>
+<span class="fc" id="L91">            candidate.status().name(),</span>
+<span class="fc" id="L92">            baseline.reached(),</span>
+<span class="fc" id="L93">            candidate.reached(),</span>
+            baselineDepth,
+            candidateDepth,
+            baselineStates,
+            candidateStates,
+            materialGain,
+            regression);
+    }
+
+    private static GoalSearchResult search(
+        TransformationEngine engine,
+        String input,
+        String target
+    ) {
+<span class="fc" id="L107">        SearchProblem problem = new SearchProblem(</span>
+            input,
+            engine,
+            new ExpressionScorer(),
+            new ExpressionCanonicalizer(),
+<span class="fc" id="L112">            PinnedAutonomousProductionCampaign.searchHeuristic())</span>
+<span class="fc" id="L113">            .withTarget(SearchTarget.syntaxExact(target));</span>
+<span class="fc" id="L114">        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+    }
+
+    private static int depth(GoalSearchResult result) {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
+    }
+
+    public record UtilityCase(
+        String id,
+        String baselineStatus,
+        String candidateStatus,
+        boolean baselineReached,
+        boolean candidateReached,
+        int baselinePathLength,
+        int candidatePathLength,
+        long baselineExploredStates,
+        long candidateExploredStates,
+        boolean materialGain,
+        boolean regression
+    ) {
+<span class="fc" id="L134">        public UtilityCase {</span>
+<span class="pc bpc" id="L135" title="6 of 12 branches missed.">            if (id == null || id.isBlank()</span>
+                    || baselinePathLength &lt; -1 || candidatePathLength &lt; -1
+                    || baselineExploredStates &lt; 0 || candidateExploredStates &lt; 0) {
+<span class="nc" id="L138">                throw new IllegalArgumentException(&quot;invalid paired utility case&quot;);</span>
+            }
+<span class="fc" id="L140">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L143">            return id + '|' + baselineStatus + '|' + candidateStatus</span>
+                + '|' + baselineReached + '|' + candidateReached
+                + '|' + baselinePathLength + '|' + candidatePathLength
+                + '|' + baselineExploredStates + '|' + candidateExploredStates
+                + '|' + materialGain + '|' + regression;
+        }
+    }
+
+    public record UtilityReport(
+        String schema,
+        String conjectureId,
+        String suiteRevision,
+        List&lt;UtilityCase&gt; cases,
+        int correctnessRegressionCount,
+        int materialGainCount,
+        int gainPermille,
+        boolean pairedUtilityEvaluated,
+        boolean beneficial,
+        String contentHash
+    ) {
+<span class="fc" id="L163">        public UtilityReport {</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            cases = cases == null ? List.of() : cases.stream()</span>
+<span class="fc" id="L165">                .sorted(Comparator.comparing(UtilityCase::id)).toList();</span>
+<span class="pc bpc" id="L166" title="10 of 20 branches missed.">            if (!SCHEMA.equals(schema) || cases.size() != 12</span>
+                    || correctnessRegressionCount &lt; 0 || materialGainCount &lt; 0
+                    || gainPermille &lt; 0 || gainPermille &gt; 1000
+                    || beneficial != (pairedUtilityEvaluated
+                        &amp;&amp; correctnessRegressionCount == 0
+                        &amp;&amp; materialGainCount &gt; 0)) {
+<span class="nc" id="L172">                throw new IllegalArgumentException(&quot;invalid paired utility report&quot;);</span>
+            }
+<span class="fc" id="L174">            requireSha(contentHash);</span>
+<span class="fc" id="L175">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L178">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L179">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L180">                .property(&quot;conjectureId&quot;, conjectureId)</span>
+<span class="fc" id="L181">                .property(&quot;suiteRevision&quot;, suiteRevision)</span>
+<span class="fc" id="L182">                .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L183">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L184">                        .property(&quot;id&quot;, item.id())</span>
+<span class="fc" id="L185">                        .property(&quot;baselineStatus&quot;, item.baselineStatus())</span>
+<span class="fc" id="L186">                        .property(&quot;candidateStatus&quot;, item.candidateStatus())</span>
+<span class="fc" id="L187">                        .property(&quot;baselineReached&quot;, item.baselineReached())</span>
+<span class="fc" id="L188">                        .property(&quot;candidateReached&quot;, item.candidateReached())</span>
+<span class="fc" id="L189">                        .property(&quot;baselinePathLength&quot;, item.baselinePathLength())</span>
+<span class="fc" id="L190">                        .property(&quot;candidatePathLength&quot;, item.candidatePathLength())</span>
+<span class="fc" id="L191">                        .property(&quot;baselineExploredStates&quot;, item.baselineExploredStates())</span>
+<span class="fc" id="L192">                        .property(&quot;candidateExploredStates&quot;, item.candidateExploredStates())</span>
+<span class="fc" id="L193">                        .property(&quot;materialGain&quot;, item.materialGain())</span>
+<span class="fc" id="L194">                        .property(&quot;regression&quot;, item.regression()))))</span>
+<span class="fc" id="L195">                .property(&quot;correctnessRegressionCount&quot;, correctnessRegressionCount)</span>
+<span class="fc" id="L196">                .property(&quot;materialGainCount&quot;, materialGainCount)</span>
+<span class="fc" id="L197">                .property(&quot;gainPermille&quot;, gainPermille)</span>
+<span class="fc" id="L198">                .property(&quot;pairedUtilityEvaluated&quot;, pairedUtilityEvaluated)</span>
+<span class="fc" id="L199">                .property(&quot;beneficial&quot;, beneficial)</span>
+<span class="fc" id="L200">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L201">                .endObject().toString();</span>
+        }
+    }
+
+    private static void requireSha(String value) {
+<span class="pc bpc" id="L206" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L207">            throw new IllegalArgumentException(&quot;contentHash must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L209">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
