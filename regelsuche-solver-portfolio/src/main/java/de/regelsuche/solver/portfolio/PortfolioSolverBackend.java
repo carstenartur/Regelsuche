@@ -19,6 +19,7 @@ import java.util.Optional;
 
 /** SolverBackend-compatible facade so existing proof gates consume only a selected execution. */
 public final class PortfolioSolverBackend implements SolverBackend {
+    private final SolverObjective objectiveOverride;
     private final PortfolioPolicy policy;
     private final PortfolioBudget budget;
     private final String configurationId;
@@ -32,8 +33,25 @@ public final class PortfolioSolverBackend implements SolverBackend {
         PortfolioBudget budget,
         String configurationId
     ) {
-        this(backends, policy, budget, configurationId,
+        this(backends, null, policy, budget, configurationId,
             new InMemoryPortfolioExecutionCache());
+    }
+
+    /**
+     * Creates a facade for a caller that explicitly requires one objective,
+     * independent of the weaker evidence strength carried by an existing IR
+     * obligation. This lets a proof gate retain its canonical statement while
+     * requiring the portfolio to continue through formal confirmation.
+     */
+    public PortfolioSolverBackend(
+        List<? extends PortfolioBackend> backends,
+        SolverObjective objective,
+        PortfolioPolicy policy,
+        PortfolioBudget budget,
+        String configurationId
+    ) {
+        this(backends, Objects.requireNonNull(objective, "objective"), policy,
+            budget, configurationId, new InMemoryPortfolioExecutionCache());
     }
 
     public PortfolioSolverBackend(
@@ -43,8 +61,20 @@ public final class PortfolioSolverBackend implements SolverBackend {
         String configurationId,
         PortfolioExecutionCache cache
     ) {
+        this(backends, null, policy, budget, configurationId, cache);
+    }
+
+    public PortfolioSolverBackend(
+        List<? extends PortfolioBackend> backends,
+        SolverObjective objectiveOverride,
+        PortfolioPolicy policy,
+        PortfolioBudget budget,
+        String configurationId,
+        PortfolioExecutionCache cache
+    ) {
         List<PortfolioBackend> copiedBackends = backends == null
             ? List.of() : List.copyOf(backends);
+        this.objectiveOverride = objectiveOverride;
         this.policy = Objects.requireNonNull(policy, "policy");
         this.budget = Objects.requireNonNull(budget, "budget");
         if (configurationId == null || configurationId.isBlank()) {
@@ -70,9 +100,11 @@ public final class PortfolioSolverBackend implements SolverBackend {
 
     @Override
     public SolverExecution execute(Obligation obligation) {
+        SolverObjective objective = objectiveOverride == null
+            ? objective(obligation.requestedEvidence())
+            : objectiveOverride;
         PortfolioRequest request = PortfolioRequest.create(
-            obligation, objective(obligation.requestedEvidence()), policy, budget,
-            configurationId);
+            obligation, objective, policy, budget, configurationId);
         PortfolioRun run = executor.execute(request);
         lastRun.set(run);
         if (run.selectedExecution() != null) {
