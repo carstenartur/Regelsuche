@@ -157,9 +157,12 @@ public final class SolverPortfolioExecutor {
             budgetExhausted, timedOut, failed);
         PortfolioReport report = PortfolioReport.create(
             request, aggregate.outcome(), attempts,
-            aggregate.selected() == null ? "" : aggregate.selected().execution().contentHash(),
-            aggregate.selected() == null ? "" : aggregate.selected().profile().backendId(),
-            aggregate.selected() == null ? List.of() : aggregate.selected().profile().roles(),
+            aggregate.selected() == null
+                ? "" : aggregate.selected().execution().contentHash(),
+            aggregate.selected() == null
+                ? "" : aggregate.selected().profile().backendId(),
+            aggregate.selected() == null
+                ? List.of() : aggregate.selected().profile().roles(),
             aggregate.conflictHashes(), consumedCost, executedInvocations,
             aggregate.proofAuthorized());
         return new PortfolioRun(
@@ -204,7 +207,8 @@ public final class SolverPortfolioExecutor {
                     CANCELLATION_POLL_MILLIS,
                     TimeUnit.NANOSECONDS.toMillis(remainingNanos)));
                 try {
-                    SolverExecution execution = future.get(waitMillis, TimeUnit.MILLISECONDS);
+                    SolverExecution execution = future.get(
+                        waitMillis, TimeUnit.MILLISECONDS);
                     if (execution == null) {
                         return new Invocation(
                             AttemptDisposition.FAILED, null,
@@ -240,11 +244,16 @@ public final class SolverPortfolioExecutor {
     ) {
         Aggregate aggregate = aggregate(
             request,
-            new SolverPortfolioPlanner.Plan(List.of(), List.of(),
-                SolverIr.sha256("intermediate-plan")),
+            new SolverPortfolioPlanner.Plan(
+                List.of(), List.of(), SolverIr.sha256("intermediate-plan")),
             observed, false, false, false, false);
-        return aggregate.outcome() == PortfolioOutcome.CONFLICT
-            || aggregate.outcome() == PortfolioOutcome.REFUTED
+        if (aggregate.outcome() == PortfolioOutcome.CONFLICT) {
+            return true;
+        }
+        if (request.policy() == PortfolioPolicy.INDEPENDENT_CONFIRMATION) {
+            return aggregate.outcome() == PortfolioOutcome.CONFIRMED;
+        }
+        return aggregate.outcome() == PortfolioOutcome.REFUTED
             || aggregate.outcome() == PortfolioOutcome.CONFIRMED;
     }
 
@@ -261,18 +270,20 @@ public final class SolverPortfolioExecutor {
             .filter(item -> item.execution().translation().status()
                 == TranslationStatus.LOSSLESS)
             .toList();
-        List<ObservedExecution> confirmations = lossless.stream()
+        List<ObservedExecution> mathematicalConfirmations = lossless.stream()
             .filter(item -> item.execution().result().status()
                 == ResultStatus.CONFIRMED)
+            .filter(item -> item.profile().roles().stream()
+                .anyMatch(role -> role != BackendRole.SEARCH_GUIDANCE))
             .toList();
         List<ObservedExecution> refutations = lossless.stream()
             .filter(item -> item.execution().result().status()
                 == ResultStatus.REFUTED)
             .filter(item -> item.profile().canRefute())
             .toList();
-        if (!confirmations.isEmpty() && !refutations.isEmpty()) {
+        if (!mathematicalConfirmations.isEmpty() && !refutations.isEmpty()) {
             List<String> conflicts = java.util.stream.Stream.concat(
-                    confirmations.stream(), refutations.stream())
+                    mathematicalConfirmations.stream(), refutations.stream())
                 .map(item -> item.execution().contentHash())
                 .distinct().sorted().toList();
             return new Aggregate(
@@ -285,7 +296,7 @@ public final class SolverPortfolioExecutor {
             return new Aggregate(
                 PortfolioOutcome.REFUTED, selected, List.of(), false);
         }
-        List<ObservedExecution> qualifying = confirmations.stream()
+        List<ObservedExecution> qualifying = mathematicalConfirmations.stream()
             .filter(item -> item.profile().canConfirm(request.objective()))
             .sorted(observedComparator())
             .toList();
@@ -295,49 +306,66 @@ public final class SolverPortfolioExecutor {
             .map(item -> item.profile().backendId())
             .distinct().count();
         if (distinctConfirmations >= requiredConfirmations) {
-            ObservedExecution selected = qualifying.stream()
-                .filter(item -> item.profile().roles().contains(
-                    request.objective() == SolverObjective.FORMAL_PROOF
-                        ? BackendRole.FORMAL_PROOF
-                        : request.objective() == SolverObjective.SYMBOLIC_CONFIRMATION
-                            ? BackendRole.SYMBOLIC_CONFIRMATION
-                            : item.profile().roles().getFirst()))
-                .findFirst()
-                .orElse(qualifying.getFirst());
+            ObservedExecution selected = selectConfirmation(request, qualifying);
             boolean proofAuthorized = request.objective().proofObjective()
                 && selected.profile().canConfirm(request.objective());
             return new Aggregate(
                 PortfolioOutcome.CONFIRMED, selected, List.of(), proofAuthorized);
         }
         if (cancelled) {
-            return new Aggregate(PortfolioOutcome.CANCELLED, null, List.of(), false);
+            return new Aggregate(
+                PortfolioOutcome.CANCELLED, null, List.of(), false);
         }
         if (plan.planned().isEmpty() && observed.isEmpty()) {
-            return new Aggregate(PortfolioOutcome.UNSUPPORTED, null, List.of(), false);
+            return new Aggregate(
+                PortfolioOutcome.UNSUPPORTED, null, List.of(), false);
         }
         if (budgetExhausted) {
             return new Aggregate(
                 PortfolioOutcome.BUDGET_EXHAUSTED, null, List.of(), false);
         }
         if (timedOut && observed.isEmpty()) {
-            return new Aggregate(PortfolioOutcome.TIMEOUT, null, List.of(), false);
+            return new Aggregate(
+                PortfolioOutcome.TIMEOUT, null, List.of(), false);
         }
-        if (observed.stream().allMatch(item -> item.execution().result().status()
-                == ResultStatus.UNSUPPORTED) && !observed.isEmpty()) {
-            return new Aggregate(PortfolioOutcome.UNSUPPORTED, null, List.of(), false);
+        if (!observed.isEmpty() && observed.stream().allMatch(item ->
+                item.execution().result().status() == ResultStatus.UNSUPPORTED)) {
+            return new Aggregate(
+                PortfolioOutcome.UNSUPPORTED, null, List.of(), false);
         }
         if (failed && observed.isEmpty()) {
-            return new Aggregate(PortfolioOutcome.ERROR, null, List.of(), false);
+            return new Aggregate(
+                PortfolioOutcome.ERROR, null, List.of(), false);
         }
-        return new Aggregate(PortfolioOutcome.INCONCLUSIVE, null, List.of(), false);
+        return new Aggregate(
+            PortfolioOutcome.INCONCLUSIVE, null, List.of(), false);
+    }
+
+    private static ObservedExecution selectConfirmation(
+        PortfolioRequest request,
+        List<ObservedExecution> qualifying
+    ) {
+        BackendRole preferred = switch (request.objective()) {
+            case FORMAL_PROOF -> BackendRole.FORMAL_PROOF;
+            case SYMBOLIC_CONFIRMATION -> BackendRole.SYMBOLIC_CONFIRMATION;
+            case VALIDATION -> BackendRole.ORACLE_VALIDATION;
+            case SEARCH_GUIDANCE -> BackendRole.SEARCH_GUIDANCE;
+            case COUNTEREXAMPLE_SEARCH -> BackendRole.COUNTEREXAMPLE;
+        };
+        return qualifying.stream()
+            .filter(item -> item.profile().roles().contains(preferred))
+            .findFirst()
+            .orElse(qualifying.getFirst());
     }
 
     private static Comparator<ObservedExecution> observedComparator() {
         return Comparator
             .comparingInt((ObservedExecution item) ->
                 item.profile().roles().contains(BackendRole.FORMAL_PROOF) ? 0
-                    : item.profile().roles().contains(BackendRole.SYMBOLIC_CONFIRMATION) ? 1
-                    : item.profile().roles().contains(BackendRole.ORACLE_VALIDATION) ? 2
+                    : item.profile().roles().contains(
+                        BackendRole.SYMBOLIC_CONFIRMATION) ? 1
+                    : item.profile().roles().contains(
+                        BackendRole.ORACLE_VALIDATION) ? 2
                     : 3)
             .thenComparing(item -> item.profile().backendId());
     }
