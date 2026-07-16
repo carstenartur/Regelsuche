@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner;
+import de.regelsuche.release.ReleaseReadinessMatrix.ProfileStatus;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -65,6 +66,31 @@ class AutonomousCandidateQualificationRunnerTest {
                 "candidate-qualification-run.json")) {
             assertTrue(Files.isRegularFile(output.resolve(file)), file);
             assertTrue(Files.size(output.resolve(file)) > 0L, file);
+        }
+    }
+
+    @Test
+    void qualificationChangesOnlyTheAutonomyQualificationChecks() {
+        var campaignEvidence = AutonomousCampaignReleaseEvidence.from(List.of(
+            run.campaign(), run.campaign(), run.campaign()));
+        var base = ReleaseReadinessMatrix.evaluate(campaignEvidence);
+        var qualified = new ReleaseQualificationMatrixAdapter().apply(
+            base, campaignEvidence, run.evidence());
+
+        assertEquals(ProfileStatus.BLOCKED, base.result(
+            ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN).status());
+        assertEquals(ProfileStatus.READY, qualified.result(
+            ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN).status());
+        assertTrue(qualified.result(ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN)
+            .blockers().isEmpty());
+        assertTrue(qualified.autonomyClaimAuthorized());
+        for (ReleaseEvidenceProfile profile : ReleaseEvidenceProfile.values()) {
+            if (profile != ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN) {
+                assertEquals(
+                    base.result(profile).canonicalMaterial(),
+                    qualified.result(profile).canonicalMaterial(),
+                    profile.name());
+            }
         }
     }
 }
