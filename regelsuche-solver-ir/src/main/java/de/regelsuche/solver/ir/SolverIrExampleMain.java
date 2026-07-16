@@ -34,7 +34,8 @@ public final class SolverIrExampleMain {
             RequestedEvidence.DECISION,
             provenance);
         SolverResult search = new RegelsucheSearchBackend().solve(obligation);
-        SolverResult symbolic = new SymPySolverBackend().solve(obligation);
+        SolverResult polynomial = new PolynomialNormalFormSolverBackend()
+            .solve(obligation);
 
         Obligation assumptionBound = factory.equality(
             "division-identity",
@@ -44,14 +45,14 @@ public final class SolverIrExampleMain {
             RequestedEvidence.DECISION,
             provenance);
         SolverResult unsupported = new RegelsucheSearchBackend().solve(assumptionBound);
-        write(output, obligation, search, symbolic, assumptionBound, unsupported);
+        write(output, obligation, search, polynomial, assumptionBound, unsupported);
     }
 
     private static void write(
         Path output,
         Obligation obligation,
         SolverResult search,
-        SolverResult symbolic,
+        SolverResult polynomial,
         Obligation assumptionBound,
         SolverResult unsupported
     ) {
@@ -59,7 +60,8 @@ public final class SolverIrExampleMain {
             Files.createDirectories(output);
             write(output.resolve("obligation.json"), obligation.toCanonicalJson());
             write(output.resolve("regelsuche-search-result.json"), search.toCanonicalJson());
-            write(output.resolve("symbolic-result.json"), symbolic.toCanonicalJson());
+            write(output.resolve("polynomial-normal-form-result.json"),
+                polynomial.toCanonicalJson());
             write(output.resolve("assumption-obligation.json"),
                 assumptionBound.toCanonicalJson());
             write(output.resolve("unsupported-result.json"),
@@ -68,9 +70,9 @@ public final class SolverIrExampleMain {
                 .property("schema", "regelsuche.solver-ir-example/v1")
                 .property("obligationHash", obligation.contentHash())
                 .property("searchResultHash", search.contentHash())
-                .property("symbolicResultHash", symbolic.contentHash())
+                .property("polynomialResultHash", polynomial.contentHash())
                 .property("sameObligationSubmittedToBothBackends",
-                    search.obligationHash().equals(symbolic.obligationHash()))
+                    search.obligationHash().equals(polynomial.obligationHash()))
                 .property("assumptionObligationHash", assumptionBound.contentHash())
                 .property("unsupportedResultHash", unsupported.contentHash())
                 .property("unsupportedBeforeExecution",
