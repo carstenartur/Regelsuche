@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'application'
     id 'jacoco'
 }
 
@@ -11,6 +12,10 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+}
+
+application {
+    mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionCampaignMain'
 }
 
 dependencies {
@@ -46,6 +51,16 @@ tasks.register('runProductionLifecycle', JavaExec) {
     mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionLifecycleMain'
     args layout.buildDirectory.dir('reports/autopilot-production-lifecycle')
         .get().asFile.absolutePath
+}
+
+tasks.register('runProductionCampaign', JavaExec) {
+    group = 'verification'
+    description = 'Runs the complete pinned issue-348 autonomous production campaign.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionCampaignMain'
+    args providers.gradleProperty('autopilotOutputDir').getOrElse(
+        layout.buildDirectory.dir('reports/autopilot-production-campaign')
+            .get().asFile.absolutePath)
 }
 
 tasks.named('test') {
