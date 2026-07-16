@@ -3,6 +3,7 @@
 ## Einstieg
 
 - [Aktueller Discovery-Stand](discovery-status.md) — gemessene Ergebnisse, wissenschaftliche Grenzen und nächste Arbeitsschritte.
+- [Release Readiness für Regelsuche 0.2](release-readiness.md) — getrennte Evidence Profiles, qualifizierter Autonomie-Claim sowie Gradle-/Docker-Reproduktion.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
@@ -24,6 +25,14 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 
 - [Discovery Evidence v1](discovery-evidence-v1.md)
 - [Aktueller Open-Target-Discovery-Stand](discovery-status.md)
+- [Release Readiness und Kandidatenqualifikation](release-readiness.md)
+- [Release-Readiness-Run-Schema v1](schemas/regelsuche-release-readiness-run-v1.schema.json)
+- [Candidate-Qualification-Evidence-Schema v1](schemas/regelsuche-autonomous-candidate-qualification-v1.schema.json)
+- [Candidate-Qualification-Run-Schema v1](schemas/regelsuche-autonomous-candidate-qualification-run-v1.schema.json)
+- [Candidate-Qualification-Suite-Schema v1](schemas/regelsuche-autonomous-candidate-qualification-suite-v1.schema.json)
+- [Candidate-Qualification-Split-Schema v1](schemas/regelsuche-autonomous-candidate-qualification-split-v1.schema.json)
+- [Candidate-Paired-Utility-Schema v1](schemas/regelsuche-autonomous-candidate-qualified-utility-v1.schema.json)
+- [Open-Target-Evaluation-Schema v1](schemas/regelsuche-open-target-conjecture-evaluation-v1.schema.json)
 - [Open-Target-Promotion-Gate-Schema v1](schemas/regelsuche-open-target-promotion-gate-v1.schema.json)
 - [Interessantheit, blinde Reviews und Calibration/TEST](interestingness-ranking.md)
 - [Interestingness-Assessment-Schema v1](schemas/regelsuche-interestingness-assessment-v1.schema.json)
