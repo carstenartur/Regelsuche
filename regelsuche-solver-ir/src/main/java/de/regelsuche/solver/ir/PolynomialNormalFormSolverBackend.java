@@ -4,7 +4,6 @@ import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalence
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
 import de.regelsuche.solver.ir.SolverIr.Binary;
-import de.regelsuche.solver.ir.SolverIr.BinaryOperator;
 import de.regelsuche.solver.ir.SolverIr.Expression;
 import de.regelsuche.solver.ir.SolverIr.Literal;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
@@ -62,9 +61,16 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
             String right = expressions.render(obligation.goal().right());
             service.arePolynomiallyEquivalent(left, right);
             var evidence = service.lastResult();
+            if (evidence.status() == ExecutionStatus.DISABLED
+                    || evidence.status() == ExecutionStatus.UNAVAILABLE) {
+                return SolverBackendSupport.unsupported(
+                    obligation,
+                    DESCRIPTOR,
+                    List.of("BACKEND_" + evidence.status().name()));
+            }
             ResultStatus status = status(evidence.status(), evidence.resultType());
             String certificate = status == ResultStatus.CONFIRMED
-                || status == ResultStatus.REFUTED
+                    || status == ResultStatus.REFUTED
                 ? SolverIr.sha256(evidence.payload().toString())
                 : "";
             return SolverResult.create(
@@ -100,9 +106,9 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
         if (executionStatus != ExecutionStatus.SUCCESS) {
             return switch (executionStatus) {
                 case BUDGET_EXHAUSTED -> ResultStatus.TIMEOUT;
-                case DISABLED, UNAVAILABLE -> ResultStatus.UNSUPPORTED;
                 case UNKNOWN -> ResultStatus.UNKNOWN;
-                case SUCCESS -> throw new IllegalStateException();
+                case DISABLED, UNAVAILABLE, SUCCESS -> throw new IllegalStateException(
+                    "execution status must be handled before result classification");
             };
         }
         return switch (resultType) {
