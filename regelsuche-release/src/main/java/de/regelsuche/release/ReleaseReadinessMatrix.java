@@ -24,16 +24,10 @@ public final class ReleaseReadinessMatrix {
         List<ProfileResult> results = Arrays.stream(
                 ReleaseEvidenceProfile.values())
             .map(profile -> evaluate(profile, evidence))
+            .sorted(Comparator.comparing(result -> result.profile().name()))
             .toList();
         ProfileResult autonomy = findResult(
             results, ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN);
-        String contentHash = de.regelsuche.experiments.autopilot
-            .AutonomousResearchBriefV2.hash(
-                SCHEMA
-                    + "\nevidence=" + evidence.evidenceHash()
-                    + "\nprofiles=" + results.stream()
-                        .map(ProfileResult::canonicalMaterial).toList()
-                    + "\nautonomy=" + autonomy.status().name());
         return new MatrixReport(
             SCHEMA,
             evidence.evidenceHash(),
@@ -42,7 +36,7 @@ public final class ReleaseReadinessMatrix {
             autonomy.autonomyClaimAuthorized(),
             "NOT_EVALUATED",
             "NOT_EVALUATED",
-            contentHash);
+            matrixHash(evidence.evidenceHash(), results, autonomy.status()));
     }
 
     private static ProfileResult evaluate(
@@ -265,6 +259,22 @@ public final class ReleaseReadinessMatrix {
             String.valueOf(required));
     }
 
+    private static String matrixHash(
+        String evidenceHash,
+        List<ProfileResult> profiles,
+        ProfileStatus autonomyStatus
+    ) {
+        List<String> canonicalProfiles = profiles.stream()
+            .sorted(Comparator.comparing(result -> result.profile().name()))
+            .map(ProfileResult::canonicalMaterial)
+            .toList();
+        return de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.hash(
+            SCHEMA
+                + "\nevidence=" + evidenceHash
+                + "\nprofiles=" + canonicalProfiles
+                + "\nautonomy=" + autonomyStatus.name());
+    }
+
     public enum ProfileStatus {
         READY,
         BLOCKED
@@ -280,6 +290,12 @@ public final class ReleaseReadinessMatrix {
             requireText(code, "code");
             requireText(actual, "actual");
             requireText(required, "required");
+        }
+
+        String canonicalMaterial() {
+            return code + "|passed=" + passed
+                + "|actual=" + actual
+                + "|required=" + required;
         }
     }
 
@@ -314,8 +330,7 @@ public final class ReleaseReadinessMatrix {
         String canonicalMaterial() {
             return profile.name() + '|' + status.name() + '|'
                 + autonomyClaimAuthorized + '|'
-                + checks.stream().map(check -> check.code() + '=' + check.passed())
-                    .toList()
+                + checks.stream().map(RequirementCheck::canonicalMaterial).toList()
                 + '|' + blockers;
         }
     }
@@ -361,6 +376,12 @@ public final class ReleaseReadinessMatrix {
                     "release matrix cannot promote or publish evidence");
             }
             requireSha256(contentHash, "contentHash");
+            String expectedHash = matrixHash(
+                evidenceHash, profiles, autonomousCampaignStatus);
+            if (!expectedHash.equals(contentHash)) {
+                throw new IllegalArgumentException(
+                    "release matrix content hash does not match canonical semantics");
+            }
         }
 
         public ProfileResult result(ReleaseEvidenceProfile profile) {
