@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.CounterexampleEvidence;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
@@ -17,9 +16,17 @@ import de.regelsuche.mining.OpenTargetConjectureMiner.PathEvidence;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.solver.ir.PolynomialNormalFormSolverBackend;
+import de.regelsuche.solver.ir.SolverBackend;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
 import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.Theory;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
-import de.regelsuche.solver.ir.SymPySolverBackend;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -27,14 +34,8 @@ import org.junit.jupiter.api.Test;
 class OpenTargetConjectureProofGateTest {
 
     @Test
-    void emitsAndExecutesOneCanonicalSolverObligation() {
-        RecordingOracle oracle = new RecordingOracle(
-            true, "matching normalized coefficients");
-        OpenTargetConjectureProofGate gate = new OpenTargetConjectureProofGate(
-            new SymPySolverBackend(
-                oracle, "recording-symbolic-oracle", "1"));
-
-        var report = gate.evaluate(
+    void defaultGateExecutesExactPolynomialNormalFormProof() {
+        var report = new OpenTargetConjectureProofGate().evaluate(
             conjectureWithAssumptions(List.of()), acceptedEvaluation());
 
         assertEquals(EligibilityStatus.ELIGIBLE, report.eligibility());
@@ -47,9 +48,13 @@ class OpenTargetConjectureProofGateTest {
         assertEquals(ResultStatus.CONFIRMED, report.result().status());
         assertEquals(TranslationStatus.LOSSLESS,
             report.result().translationStatus());
+        assertEquals("polynomial-normal-form", report.result().backendId());
+        assertEquals("matching deterministic polynomial normal form",
+            report.result().message());
+        assertTrue(report.result().usedCapabilities().contains(
+            "DETERMINISTIC_POLYNOMIAL_NORMAL_FORM"));
         assertEquals(report.obligation().contentHash(),
             report.result().obligationHash());
-        assertEquals(1, oracle.calls());
         assertTrue(report.blockers().isEmpty());
         assertTrue(report.toCanonicalJson().contains(
             "\"schema\":\"regelsuche.open-target-conjecture-proof/v2\""));
@@ -58,12 +63,10 @@ class OpenTargetConjectureProofGateTest {
     }
 
     @Test
-    void unsupportedAssumptionsBlockBeforeBackendExecution() {
-        RecordingOracle oracle = new RecordingOracle(true, "must not execute");
-        OpenTargetConjectureProofGate gate = new OpenTargetConjectureProofGate(
-            new SymPySolverBackend(oracle, "recording-symbolic-oracle", "1"));
-
-        var report = gate.evaluate(conjecture(), acceptedEvaluation());
+    void unsupportedAssumptionsBlockBeforeNormalFormExecution() {
+        var report = new OpenTargetConjectureProofGate(
+            new PolynomialNormalFormSolverBackend())
+            .evaluate(conjecture(), acceptedEvaluation());
 
         assertEquals(EligibilityStatus.ELIGIBLE, report.eligibility());
         assertEquals(ProofStatus.INCONCLUSIVE, report.proofStatus());
@@ -74,41 +77,35 @@ class OpenTargetConjectureProofGateTest {
             "ASSUMPTIONS_NOT_SUPPORTED"));
         assertTrue(report.blockers().getFirst().contains(
             "ASSUMPTIONS_NOT_SUPPORTED"));
-        assertEquals(0, oracle.calls());
+        assertTrue(report.result().message().contains("before execution"));
     }
 
     @Test
     void rejectedCandidateCannotEmitAnObligationOrCallBackend() {
-        RecordingOracle oracle = new RecordingOracle(true, "must not execute");
-        OpenTargetConjectureProofGate gate = new OpenTargetConjectureProofGate(
-            new SymPySolverBackend(oracle, "recording-symbolic-oracle", "1"));
+        RecordingBackend backend = new RecordingBackend(ResultStatus.CONFIRMED);
         EvaluationReport rejected = evaluation(
             EvaluationStatus.REJECTED, List.of("counterexample found"));
 
-        var report = gate.evaluate(conjecture(), rejected);
+        var report = new OpenTargetConjectureProofGate(backend)
+            .evaluate(conjecture(), rejected);
 
         assertEquals(EligibilityStatus.NOT_ELIGIBLE, report.eligibility());
         assertEquals(ProofStatus.NOT_RUN, report.proofStatus());
         assertFalse(report.proofObligationEmitted());
         assertNull(report.obligation());
         assertNull(report.result());
-        assertEquals(0, oracle.calls());
+        assertEquals(0, backend.calls());
         assertTrue(report.blockers().contains(
             "candidate is not accepted for proof"));
     }
 
     @Test
-    void distinguishesRefutationFromUnknownResult() {
+    void distinguishesLosslessRefutationFromUnknownResult() {
         var refuted = new OpenTargetConjectureProofGate(
-            new SymPySolverBackend(
-                new RecordingOracle(
-                    false, "not equivalent under deterministic samples"),
-                "refuting-oracle", "1"))
+            new RecordingBackend(ResultStatus.REFUTED))
             .evaluate(conjectureWithAssumptions(List.of()), acceptedEvaluation());
         var unknown = new OpenTargetConjectureProofGate(
-            new SymPySolverBackend(
-                new RecordingOracle(false, "no equivalence evidence found"),
-                "unknown-oracle", "1"))
+            new RecordingBackend(ResultStatus.UNKNOWN))
             .evaluate(conjectureWithAssumptions(List.of()), acceptedEvaluation());
 
         assertEquals(ProofStatus.REFUTED, refuted.proofStatus());
@@ -118,16 +115,14 @@ class OpenTargetConjectureProofGateTest {
     }
 
     @Test
-    void assumptionOrderDoesNotChangeCanonicalObligationOrResult() {
-        RecordingOracle firstOracle = new RecordingOracle(true, "must not execute");
-        RecordingOracle secondOracle = new RecordingOracle(true, "must not execute");
+    void assumptionOrderDoesNotChangeCanonicalObligationOrRejection() {
         var first = new OpenTargetConjectureProofGate(
-            new SymPySolverBackend(firstOracle, "stable-oracle", "1"))
+            new PolynomialNormalFormSolverBackend())
             .evaluate(
                 conjectureWithAssumptions(List.of("B != 0", "A > 0")),
                 acceptedEvaluation());
         var second = new OpenTargetConjectureProofGate(
-            new SymPySolverBackend(secondOracle, "stable-oracle", "1"))
+            new PolynomialNormalFormSolverBackend())
             .evaluate(
                 conjectureWithAssumptions(List.of("A > 0", "B != 0")),
                 acceptedEvaluation());
@@ -136,8 +131,9 @@ class OpenTargetConjectureProofGateTest {
             second.obligation().contentHash());
         assertEquals(first.result().contentHash(), second.result().contentHash());
         assertEquals(first.evidenceHash(), second.evidenceHash());
-        assertEquals(0, firstOracle.calls());
-        assertEquals(0, secondOracle.calls());
+        assertEquals(ResultStatus.UNSUPPORTED, first.result().status());
+        assertEquals(TranslationStatus.REJECTED,
+            first.result().translationStatus());
     }
 
     private static OpenTargetConjecture conjecture() {
@@ -219,25 +215,41 @@ class OpenTargetConjectureProofGateTest {
             "NOT_EVALUATED");
     }
 
-    private static final class RecordingOracle implements EquivalenceService {
-        private final boolean equivalent;
-        private final String evidence;
+    private static final class RecordingBackend implements SolverBackend {
+        private final ResultStatus status;
         private int calls;
 
-        private RecordingOracle(boolean equivalent, String evidence) {
-            this.equivalent = equivalent;
-            this.evidence = evidence;
+        private RecordingBackend(ResultStatus status) {
+            this.status = status;
         }
 
         @Override
-        public boolean areEquivalent(String leftExpression, String rightExpression) {
+        public BackendDescriptor descriptor() {
+            return new BackendDescriptor(
+                "recording-backend",
+                "1",
+                List.of(Theory.REAL_ARITHMETIC),
+                List.of(Relation.EQUALS),
+                List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
+                true);
+        }
+
+        @Override
+        public SolverResult solve(Obligation obligation) {
             calls++;
-            return equivalent;
-        }
-
-        @Override
-        public String evidence(String leftExpression, String rightExpression) {
-            return evidence;
+            return SolverResult.create(
+                obligation,
+                descriptor(),
+                status,
+                TranslationStatus.LOSSLESS,
+                List.of("RECORDING_BACKEND"),
+                List.of(),
+                status.name(),
+                Map.of(),
+                status == ResultStatus.CONFIRMED
+                    || status == ResultStatus.REFUTED
+                    ? SolverIr.sha256("certificate-" + status.name())
+                    : "");
         }
 
         private int calls() {
