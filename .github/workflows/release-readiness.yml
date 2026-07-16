@@ -46,8 +46,8 @@ jobs:
           test -s "$DIR/release-readiness-run.json"
           test -s "$DIR/campaign/production-campaign-manifest.json"
           test -s "$DIR/campaign/campaign-resource-ledger.json"
-          test -s "$DIR/campaign/campaign-feedback.json"
-          test -s "$DIR/campaign/production-proof-obligation.json"
+          test -s "$DIR/campaign/feedback-reallocation.json"
+          test -s "$DIR/campaign/proof-obligation.json"
 
       - name: Verify the current fail-closed matrix
         shell: bash
