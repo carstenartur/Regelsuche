@@ -39,11 +39,15 @@ class OpenTargetConjectureProofGateTest {
         assertEquals("A * (B + C)", report.obligation().rightExpression());
         assertEquals(List.of("A > 0", "B != 0"), report.obligation().assumptions());
         assertTrue(report.obligation().obligationHash().startsWith("sha256:"));
+        assertTrue(report.solverObligationHash().matches("sha256:[0-9a-f]{64}"));
+        assertTrue(report.solverResultHash().matches("sha256:[0-9a-f]{64}"));
+        assertEquals("APPROXIMATED", report.solverTranslationStatus());
         assertEquals(1, oracle.calls());
         assertEquals("NOT_EVALUATED", report.formalProofStatus());
         assertTrue(report.blockers().isEmpty());
         assertEquals(report.toCanonicalJson(), report.toCanonicalJson());
         assertTrue(report.toCanonicalJson().contains("\"targetProvided\":false"));
+        assertTrue(report.toCanonicalJson().contains("\"solverTranslationStatus\":\"APPROXIMATED\""));
         assertFalse(report.toCanonicalJson().contains("targetExpression"));
     }
 
@@ -60,6 +64,9 @@ class OpenTargetConjectureProofGateTest {
         assertEquals(ProofStatus.NOT_RUN, report.proofStatus());
         assertFalse(report.proofObligationEmitted());
         assertNull(report.obligation());
+        assertEquals("", report.solverObligationHash());
+        assertEquals("", report.solverResultHash());
+        assertEquals("NOT_EMITTED", report.solverTranslationStatus());
         assertEquals(0, oracle.calls());
         assertTrue(report.blockers().contains("candidate is not accepted for proof"));
         assertTrue(report.blockers().contains("candidate evaluation contains blockers"));
@@ -81,6 +88,8 @@ class OpenTargetConjectureProofGateTest {
         assertEquals(
             List.of("oracle produced no conclusive equivalence result"),
             inconclusive.blockers());
+        assertTrue(refuted.solverResultHash().startsWith("sha256:"));
+        assertTrue(inconclusive.solverResultHash().startsWith("sha256:"));
     }
 
     @Test
@@ -96,6 +105,8 @@ class OpenTargetConjectureProofGateTest {
             secondOracle, "stable-oracle-v1").evaluate(reversed, acceptedEvaluation());
 
         assertEquals(first.obligation().obligationHash(), second.obligation().obligationHash());
+        assertEquals(first.solverObligationHash(), second.solverObligationHash());
+        assertEquals(first.solverResultHash(), second.solverResultHash());
         assertEquals(first.evidenceHash(), second.evidenceHash());
         assertEquals(first.toCanonicalJson(), second.toCanonicalJson());
     }
