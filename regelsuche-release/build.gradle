@@ -54,13 +54,37 @@ tasks.register('runReleaseReadinessWithHiddenRuleEvidence', JavaExec) {
         hiddenRuleReport.get().asFile.absolutePath
 }
 
+tasks.register('runQualifiedReleaseReadiness', JavaExec) {
+    group = 'verification'
+    description = 'Runs independent candidate qualification and evaluates release profiles.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    args layout.buildDirectory.dir('reports/release-readiness-qualified')
+        .get().asFile.absolutePath,
+        '--qualify-candidate'
+}
+
+tasks.register('runQualifiedReleaseReadinessWithHiddenRuleEvidence', JavaExec) {
+    group = 'verification'
+    description = 'Runs hidden-rule binding and independent candidate qualification.'
+    dependsOn ':app:test'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    args layout.buildDirectory.dir('reports/release-readiness-qualified')
+        .get().asFile.absolutePath,
+        '--hidden-rule-report',
+        hiddenRuleReport.get().asFile.absolutePath,
+        '--qualify-candidate'
+}
+
 tasks.register('verifyAutonomousCampaignRelease', JavaExec) {
     group = 'verification'
-    description = 'Fails unless the AUTONOMOUS_CAMPAIGN release profile is ready.'
+    description = 'Fails unless the qualified AUTONOMOUS_CAMPAIGN profile is ready.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = application.mainClass
     args layout.buildDirectory.dir('reports/release-readiness-verification')
         .get().asFile.absolutePath,
+        '--qualify-candidate',
         '--require-ready'
 }
 

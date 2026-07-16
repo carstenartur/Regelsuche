@@ -13,9 +13,12 @@ public final class ReleaseReadinessMain {
             ? Path.of(args[0])
             : Path.of("build", "reports", "release-readiness");
         boolean requireReady = Arrays.asList(args).contains("--require-ready");
+        boolean qualifyCandidate = Arrays.asList(args).contains("--qualify-candidate");
         Path hiddenRuleReport = optionPath(args, "--hidden-rule-report");
         ReleaseReadinessRunner runner = new ReleaseReadinessRunner();
-        var run = runner.run(hiddenRuleReport);
+        var run = qualifyCandidate
+            ? runner.runQualified(hiddenRuleReport)
+            : runner.run(hiddenRuleReport);
         runner.write(output, run);
         System.out.println(run.contentHash());
         if (requireReady && !run.autonomousCampaignReady()) {

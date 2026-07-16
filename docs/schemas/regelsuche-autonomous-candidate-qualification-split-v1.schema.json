@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-candidate-qualification-split/v1",
+  "title": "Regelsuche autonomous candidate qualification split audit v1",
+  "type": "object",
+  "required": [
+    "schema", "suiteRevision", "heldOutClusterId",
+    "formationExpressionCount", "developmentExpressionCount",
+    "qualificationExpressionCount", "compositeFactorCount",
+    "upstreamCollisions", "internalCollisions",
+    "heldOutFamilyOrClusterCount", "passed", "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.autonomous-candidate-qualification-split/v1"
+    },
+    "suiteRevision": {
+      "const": "production-candidate-composite-factor-qualification/v1"
+    },
+    "heldOutClusterId": {
+      "const": "composite-common-factor-gap-two/v1"
+    },
+    "formationExpressionCount": { "type": "integer", "minimum": 1 },
+    "developmentExpressionCount": { "type": "integer", "minimum": 1 },
+    "qualificationExpressionCount": { "const": 36 },
+    "compositeFactorCount": { "const": 12 },
+    "upstreamCollisions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "internalCollisions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "heldOutFamilyOrClusterCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "passed": { "type": "boolean" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

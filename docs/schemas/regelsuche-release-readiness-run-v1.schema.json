@@ -6,6 +6,7 @@
   "required": [
     "schema", "campaignManifestHash", "profileCatalogHash",
     "evidenceHash", "hiddenRuleEvidenceStatus", "hiddenRuleEvidenceHash",
+    "qualificationEvidenceStatus", "qualificationEvidenceHash",
     "matrixHash", "autonomousCampaignStatus", "autonomyClaimAuthorized",
     "promotionStatus", "publicEvidenceStatus", "contentHash"
   ],
@@ -16,6 +17,8 @@
     "evidenceHash": { "$ref": "#/$defs/sha256" },
     "hiddenRuleEvidenceStatus": { "enum": ["NOT_PROVIDED", "BOUND"] },
     "hiddenRuleEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "qualificationEvidenceStatus": { "enum": ["NOT_PROVIDED", "BOUND"] },
+    "qualificationEvidenceHash": { "$ref": "#/$defs/sha256" },
     "matrixHash": { "$ref": "#/$defs/sha256" },
     "autonomousCampaignStatus": { "enum": ["READY", "BLOCKED"] },
     "autonomyClaimAuthorized": { "type": "boolean" },

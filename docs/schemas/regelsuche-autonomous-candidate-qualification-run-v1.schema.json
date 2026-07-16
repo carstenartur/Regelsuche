@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-candidate-qualification-run/v1",
+  "title": "Regelsuche autonomous candidate qualification run v1",
+  "type": "object",
+  "required": [
+    "schema", "campaignManifestHash", "suiteHash", "splitAuditHash",
+    "evaluationHash", "utilityHash", "qualificationEvidenceHash",
+    "qualified", "promotionStatus", "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.autonomous-candidate-qualification-run/v1"
+    },
+    "campaignManifestHash": { "$ref": "#/$defs/sha256" },
+    "suiteHash": { "$ref": "#/$defs/sha256" },
+    "splitAuditHash": { "$ref": "#/$defs/sha256" },
+    "evaluationHash": { "$ref": "#/$defs/sha256" },
+    "utilityHash": { "$ref": "#/$defs/sha256" },
+    "qualificationEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "qualified": { "type": "boolean" },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
