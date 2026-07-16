@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-candidate-qualified-utility/v1",
+  "title": "Regelsuche autonomous candidate paired utility v1",
+  "type": "object",
+  "required": [
+    "schema", "conjectureId", "suiteRevision", "cases",
+    "correctnessRegressionCount", "materialGainCount", "gainPermille",
+    "pairedUtilityEvaluated", "beneficial", "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.autonomous-candidate-qualified-utility/v1"
+    },
+    "conjectureId": { "type": "string", "minLength": 1 },
+    "suiteRevision": {
+      "const": "production-candidate-composite-factor-qualification/v1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "baselineStatus", "candidateStatus",
+          "baselineReached", "candidateReached",
+          "baselinePathLength", "candidatePathLength",
+          "baselineExploredStates", "candidateExploredStates",
+          "materialGain", "regression"
+        ],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "baselineStatus": { "type": "string", "minLength": 1 },
+          "candidateStatus": { "type": "string", "minLength": 1 },
+          "baselineReached": { "type": "boolean" },
+          "candidateReached": { "type": "boolean" },
+          "baselinePathLength": { "type": "integer", "minimum": -1 },
+          "candidatePathLength": { "type": "integer", "minimum": -1 },
+          "baselineExploredStates": { "type": "integer", "minimum": 0 },
+          "candidateExploredStates": { "type": "integer", "minimum": 0 },
+          "materialGain": { "type": "boolean" },
+          "regression": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "correctnessRegressionCount": { "type": "integer", "minimum": 0 },
+    "materialGainCount": { "type": "integer", "minimum": 0, "maximum": 12 },
+    "gainPermille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "pairedUtilityEvaluated": { "type": "boolean" },
+    "beneficial": { "type": "boolean" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
