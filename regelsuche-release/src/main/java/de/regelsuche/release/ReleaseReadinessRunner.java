@@ -15,12 +15,23 @@ import java.util.Objects;
 /** Executes real campaign evidence and evaluates every release profile. */
 public final class ReleaseReadinessRunner {
     public static final String SCHEMA = "regelsuche.release-readiness-run/v1";
+    public static final String NO_QUALIFICATION_EVIDENCE_HASH =
+        AutonomousResearchBriefV2.hash(
+            "regelsuche.autonomous-candidate-qualification/NOT_PROVIDED");
 
     public ReleaseRun run() {
-        return run(null);
+        return run(null, false);
     }
 
     public ReleaseRun run(Path hiddenRuleReport) {
+        return run(hiddenRuleReport, false);
+    }
+
+    public ReleaseRun runQualified(Path hiddenRuleReport) {
+        return run(hiddenRuleReport, true);
+    }
+
+    private ReleaseRun run(Path hiddenRuleReport, boolean qualifyCandidate) {
         AutonomousProductionCampaignRunner campaignRunner =
             new AutonomousProductionCampaignRunner();
         List<CampaignRun> campaigns = List.of(
@@ -33,14 +44,40 @@ public final class ReleaseReadinessRunner {
             hiddenRuleReport == null
                 ? null
                 : HiddenRuleBenchmarkReleaseEvidence.read(hiddenRuleReport);
-        ReleaseReadinessMatrix.MatrixReport matrix =
+        ReleaseReadinessMatrix.MatrixReport baseMatrix =
             ReleaseReadinessMatrix.evaluate(evidence, hiddenRuleEvidence);
+
+        AutonomousCandidateQualificationRunner.QualificationRun qualificationRun = null;
+        AutonomousCandidateQualificationEvidence qualificationEvidence = null;
+        if (qualifyCandidate) {
+            AutonomousCandidateQualificationRunner qualificationRunner =
+                new AutonomousCandidateQualificationRunner();
+            List<AutonomousCandidateQualificationRunner.QualificationRun> runs =
+                campaigns.stream().map(qualificationRunner::run).toList();
+            if (runs.stream().map(run -> run.evidence().contentHash())
+                    .distinct().count() != 1L
+                    || runs.stream().map(
+                        AutonomousCandidateQualificationRunner.QualificationRun::contentHash)
+                        .distinct().count() != 1L) {
+                throw new IllegalStateException(
+                    "candidate qualification is not reproducible across clean campaign runs");
+            }
+            qualificationRun = runs.getFirst();
+            qualificationEvidence = qualificationRun.evidence();
+        }
+        ReleaseReadinessMatrix.MatrixReport matrix =
+            new ReleaseQualificationMatrixAdapter().apply(
+                baseMatrix, evidence, qualificationEvidence);
         String profileCatalog = ReleaseEvidenceProfile.catalogJson();
         String profileCatalogHash = AutonomousResearchBriefV2.hash(profileCatalog);
+        String qualificationHash = qualificationEvidence == null
+            ? NO_QUALIFICATION_EVIDENCE_HASH
+            : qualificationEvidence.contentHash();
         String contentHash = runHash(
             profileCatalogHash,
             evidence.evidenceHash(),
             matrix.hiddenRuleEvidenceHash(),
+            qualificationHash,
             matrix.contentHash(),
             campaigns.getFirst().contentHash());
         return new ReleaseRun(
@@ -48,6 +85,8 @@ public final class ReleaseReadinessRunner {
             campaigns.getFirst(),
             evidence,
             hiddenRuleEvidence,
+            qualificationRun,
+            qualificationEvidence,
             matrix,
             profileCatalog,
             profileCatalogHash,
@@ -72,6 +111,14 @@ public final class ReleaseReadinessRunner {
             } else {
                 write(hiddenOutput, run.hiddenRuleEvidence().toCanonicalJson());
             }
+            Path qualificationDirectory = outputDirectory.resolve("qualification");
+            if (run.qualificationRun() == null) {
+                deleteQualificationOutputs(qualificationDirectory);
+            } else {
+                new AutonomousCandidateQualificationRunner().write(
+                    qualificationDirectory,
+                    run.qualificationRun());
+            }
             write(outputDirectory.resolve("release-readiness-report.json"),
                 run.matrix().toCanonicalJson());
             write(outputDirectory.resolve("release-readiness-run.json"),
@@ -79,6 +126,18 @@ public final class ReleaseReadinessRunner {
         } catch (IOException exception) {
             throw new UncheckedIOException(
                 "Could not write release-readiness evidence", exception);
+        }
+    }
+
+    private static void deleteQualificationOutputs(Path directory) throws IOException {
+        for (String file : List.of(
+                "qualification-suite.json",
+                "qualification-split-audit.json",
+                "qualification-evaluation.json",
+                "qualification-utility.json",
+                "candidate-qualification-evidence.json",
+                "candidate-qualification-run.json")) {
+            Files.deleteIfExists(directory.resolve(file));
         }
     }
 
@@ -90,6 +149,7 @@ public final class ReleaseReadinessRunner {
         String profileCatalogHash,
         String evidenceHash,
         String hiddenRuleEvidenceHash,
+        String qualificationEvidenceHash,
         String matrixHash,
         String campaignHash
     ) {
@@ -98,6 +158,7 @@ public final class ReleaseReadinessRunner {
                 + "\nprofileCatalog=" + profileCatalogHash
                 + "\nevidence=" + evidenceHash
                 + "\nhiddenRuleEvidence=" + hiddenRuleEvidenceHash
+                + "\nqualificationEvidence=" + qualificationEvidenceHash
                 + "\nmatrix=" + matrixHash
                 + "\ncampaign=" + campaignHash);
     }
@@ -107,6 +168,8 @@ public final class ReleaseReadinessRunner {
         CampaignRun retainedCampaign,
         AutonomousCampaignReleaseEvidence evidence,
         HiddenRuleBenchmarkReleaseEvidence hiddenRuleEvidence,
+        AutonomousCandidateQualificationRunner.QualificationRun qualificationRun,
+        AutonomousCandidateQualificationEvidence qualificationEvidence,
         ReleaseReadinessMatrix.MatrixReport matrix,
         String profileCatalogJson,
         String profileCatalogHash,
@@ -130,8 +193,18 @@ public final class ReleaseReadinessRunner {
             String expectedHiddenHash = hiddenRuleEvidence == null
                 ? ReleaseReadinessMatrix.NO_HIDDEN_RULE_EVIDENCE_HASH
                 : hiddenRuleEvidence.evidenceHash();
-            if (!retainedCampaign.contentHash()
-                    .equals(evidence.campaignManifestHash())
+            String expectedQualificationHash = qualificationEvidence == null
+                ? NO_QUALIFICATION_EVIDENCE_HASH
+                : qualificationEvidence.contentHash();
+            if ((qualificationRun == null) != (qualificationEvidence == null)
+                    || qualificationRun != null
+                        && !qualificationRun.evidence().contentHash()
+                            .equals(qualificationEvidence.contentHash())
+                    || !retainedCampaign.contentHash()
+                        .equals(evidence.campaignManifestHash())
+                    || qualificationEvidence != null
+                        && !retainedCampaign.contentHash().equals(
+                            qualificationEvidence.campaignManifestHash())
                     || !evidence.evidenceHash().equals(matrix.evidenceHash())
                     || !expectedHiddenHash.equals(matrix.hiddenRuleEvidenceHash())
                     || !AutonomousResearchBriefV2.hash(profileCatalogJson)
@@ -143,6 +216,7 @@ public final class ReleaseReadinessRunner {
                 profileCatalogHash,
                 evidence.evidenceHash(),
                 expectedHiddenHash,
+                expectedQualificationHash,
                 matrix.contentHash(),
                 retainedCampaign.contentHash());
             if (!expectedHash.equals(contentHash)) {
@@ -156,6 +230,9 @@ public final class ReleaseReadinessRunner {
         }
 
         public String toCanonicalJson() {
+            String qualificationHash = qualificationEvidence == null
+                ? NO_QUALIFICATION_EVIDENCE_HASH
+                : qualificationEvidence.contentHash();
             return new JsonWriter().beginObject()
                 .property("schema", schema)
                 .property("campaignManifestHash",
@@ -166,6 +243,9 @@ public final class ReleaseReadinessRunner {
                     hiddenRuleEvidence == null ? "NOT_PROVIDED" : "BOUND")
                 .property("hiddenRuleEvidenceHash",
                     matrix.hiddenRuleEvidenceHash())
+                .property("qualificationEvidenceStatus",
+                    qualificationEvidence == null ? "NOT_PROVIDED" : "BOUND")
+                .property("qualificationEvidenceHash", qualificationHash)
                 .property("matrixHash", matrix.contentHash())
                 .property("autonomousCampaignStatus",
                     matrix.autonomousCampaignStatus().name())
