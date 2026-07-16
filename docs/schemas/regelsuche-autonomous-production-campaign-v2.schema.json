@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-production-campaign/v2",
+  "title": "Regelsuche complete autonomous production campaign manifest v2",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "generationRunHash", "miningRunHash",
+    "lifecycleRunHash", "initialPlanHash", "nextPlanHash",
+    "campaignRoundHash", "feedbackReallocationHash",
+    "campaignResourceLedgerHash", "status", "seedFamilyCount",
+    "observationCount", "candidateCount", "rejectedClusterCount",
+    "artifacts", "targetProvided",
+    "campaignCompletionIsMathematicalEvidence", "externalNoveltyEvaluated",
+    "promotionStatus", "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-production-campaign/v2" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "generationRunHash": { "$ref": "#/$defs/sha256" },
+    "miningRunHash": { "$ref": "#/$defs/sha256" },
+    "lifecycleRunHash": { "$ref": "#/$defs/sha256" },
+    "initialPlanHash": { "$ref": "#/$defs/sha256" },
+    "nextPlanHash": { "$ref": "#/$defs/sha256" },
+    "campaignRoundHash": { "$ref": "#/$defs/sha256" },
+    "feedbackReallocationHash": { "$ref": "#/$defs/sha256" },
+    "campaignResourceLedgerHash": { "$ref": "#/$defs/sha256" },
+    "status": { "const": "COMPLETED" },
+    "seedFamilyCount": { "type": "integer", "minimum": 2 },
+    "observationCount": { "type": "integer", "minimum": 12 },
+    "candidateCount": { "type": "integer", "minimum": 1 },
+    "rejectedClusterCount": { "type": "integer", "minimum": 1 },
+    "artifacts": {
+      "type": "array", "minItems": 30,
+      "items": {
+        "type": "object",
+        "required": ["artifactType", "contentHash"],
+        "properties": {
+          "artifactType": { "$ref": "#/$defs/nonBlank" },
+          "contentHash": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "targetProvided": { "const": false },
+    "campaignCompletionIsMathematicalEvidence": { "const": false },
+    "externalNoveltyEvaluated": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}

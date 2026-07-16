@@ -46,11 +46,12 @@ jobs:
             --tests de.regelsuche.experiments.autopilot.AutonomousProductionGenerationRunnerTest \
             --tests de.regelsuche.experiments.autopilot.AutonomousProductionMiningRunnerTest \
             --tests de.regelsuche.experiments.autopilot.AutonomousProductionLifecycleRunnerTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunnerTest \
             2>&1 | tee -a autopilot-build.log
-          ./gradlew :regelsuche-autopilot:runProductionLifecycle \
+          ./gradlew :regelsuche-autopilot:runProductionCampaign \
             2>&1 | tee -a autopilot-build.log
 
-      - name: Require evidence artifacts
+      - name: Require complete Gradle campaign artifacts
         run: |
           test -s regelsuche-experiments/build/reports/autopilot-v2-dag/brief-v2.json
           test -s regelsuche-experiments/build/reports/autopilot-v2-dag/aggregate-decision.json
@@ -63,7 +64,7 @@ jobs:
           test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/lineage-v2.json
           test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/round-v2.json
           test -s regelsuche-autopilot/build/reports/autopilot-v2-dag/next-plan-v2.json
-          DIR=regelsuche-autopilot/build/reports/autopilot-production-lifecycle
+          DIR=regelsuche-autopilot/build/reports/autopilot-production-campaign
           test -s "$DIR/brief-v2.json"
           test -s "$DIR/seeds.json"
           test -s "$DIR/observations.json"
@@ -95,6 +96,28 @@ jobs:
           test -s "$DIR/lifecycle-decision.json"
           test -s "$DIR/stage-resource-ledger.json"
           test -s "$DIR/production-lifecycle-run.json"
+          test -s "$DIR/next-plan-v2.json"
+          test -s "$DIR/campaign-round-v2.json"
+          test -s "$DIR/feedback-reallocation.json"
+          test -s "$DIR/campaign-resource-ledger.json"
+          test -s "$DIR/production-campaign-manifest.json"
+
+      - name: Reproduce complete campaign in Docker
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build -f Dockerfile.autopilot -t regelsuche-autopilot-campaign . \
+            2>&1 | tee -a autopilot-build.log
+          mkdir -p build/autopilot-docker-output
+          chmod 0777 build/autopilot-docker-output
+          docker run --rm \
+            -v "$PWD/build/autopilot-docker-output:/output" \
+            regelsuche-autopilot-campaign \
+            2>&1 | tee -a autopilot-build.log
+          test -s build/autopilot-docker-output/production-campaign-manifest.json
+          diff -ru \
+            regelsuche-autopilot/build/reports/autopilot-production-campaign \
+            build/autopilot-docker-output
 
       - name: Upload Autopilot evidence and diagnostics
         if: always()
@@ -109,5 +132,6 @@ jobs:
             regelsuche-autopilot/build/test-results/**
             regelsuche-autopilot/build/reports/tests/**
             regelsuche-autopilot/build/reports/autopilot-v2-dag/**
-            regelsuche-autopilot/build/reports/autopilot-production-lifecycle/**
+            regelsuche-autopilot/build/reports/autopilot-production-campaign/**
+            build/autopilot-docker-output/**
           if-no-files-found: warn
