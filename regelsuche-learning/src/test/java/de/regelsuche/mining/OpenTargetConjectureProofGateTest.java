@@ -18,6 +18,7 @@ import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
 import de.regelsuche.solver.ir.PolynomialNormalFormSolverBackend;
 import de.regelsuche.solver.ir.SolverBackend;
+import de.regelsuche.solver.ir.SolverExecution;
 import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
@@ -27,6 +28,7 @@ import de.regelsuche.solver.ir.SolverIr.ResultStatus;
 import de.regelsuche.solver.ir.SolverIr.SolverResult;
 import de.regelsuche.solver.ir.SolverIr.Theory;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverTranslation;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -47,17 +49,25 @@ class OpenTargetConjectureProofGateTest {
             report.obligation().provenance().sourceId());
         assertEquals(ResultStatus.CONFIRMED, report.result().status());
         assertEquals(TranslationStatus.LOSSLESS,
-            report.result().translationStatus());
+            report.translation().status());
+        assertEquals("A * B + A * C",
+            report.translation().termMapping().get("goal.left"));
+        assertEquals("A * (B + C)",
+            report.translation().termMapping().get("goal.right"));
         assertEquals("polynomial-normal-form", report.result().backendId());
         assertEquals("matching deterministic polynomial normal form",
             report.result().message());
         assertTrue(report.result().usedCapabilities().contains(
             "DETERMINISTIC_POLYNOMIAL_NORMAL_FORM"));
         assertEquals(report.obligation().contentHash(),
-            report.result().obligationHash());
+            report.execution().obligationHash());
         assertTrue(report.blockers().isEmpty());
         assertTrue(report.toCanonicalJson().contains(
             "\"schema\":\"regelsuche.open-target-conjecture-proof/v2\""));
+        assertTrue(report.toCanonicalJson().contains(
+            "\"solverTranslationHash\":\"sha256:"));
+        assertTrue(report.toCanonicalJson().contains(
+            "\"solverExecutionHash\":\"sha256:"));
         assertFalse(report.toCanonicalJson().contains("targetProvided"));
         assertFalse(report.toCanonicalJson().contains("leftExpression"));
     }
@@ -72,9 +82,11 @@ class OpenTargetConjectureProofGateTest {
         assertEquals(ProofStatus.INCONCLUSIVE, report.proofStatus());
         assertEquals(ResultStatus.UNSUPPORTED, report.result().status());
         assertEquals(TranslationStatus.REJECTED,
-            report.result().translationStatus());
-        assertTrue(report.result().translationIssues().contains(
+            report.translation().status());
+        assertTrue(report.translation().issues().contains(
             "ASSUMPTIONS_NOT_SUPPORTED"));
+        assertEquals(report.translation().issues(),
+            report.result().translationIssues());
         assertTrue(report.blockers().getFirst().contains(
             "ASSUMPTIONS_NOT_SUPPORTED"));
         assertTrue(report.result().message().contains("before execution"));
@@ -93,6 +105,8 @@ class OpenTargetConjectureProofGateTest {
         assertEquals(ProofStatus.NOT_RUN, report.proofStatus());
         assertFalse(report.proofObligationEmitted());
         assertNull(report.obligation());
+        assertNull(report.execution());
+        assertNull(report.translation());
         assertNull(report.result());
         assertEquals(0, backend.calls());
         assertTrue(report.blockers().contains(
@@ -115,7 +129,7 @@ class OpenTargetConjectureProofGateTest {
     }
 
     @Test
-    void assumptionOrderDoesNotChangeCanonicalObligationOrRejection() {
+    void assumptionOrderDoesNotChangeCanonicalExecutionRejection() {
         var first = new OpenTargetConjectureProofGate(
             new PolynomialNormalFormSolverBackend())
             .evaluate(
@@ -129,11 +143,15 @@ class OpenTargetConjectureProofGateTest {
 
         assertEquals(first.obligation().contentHash(),
             second.obligation().contentHash());
+        assertEquals(first.translation().contentHash(),
+            second.translation().contentHash());
         assertEquals(first.result().contentHash(), second.result().contentHash());
+        assertEquals(first.execution().contentHash(),
+            second.execution().contentHash());
         assertEquals(first.evidenceHash(), second.evidenceHash());
         assertEquals(ResultStatus.UNSUPPORTED, first.result().status());
         assertEquals(TranslationStatus.REJECTED,
-            first.result().translationStatus());
+            first.translation().status());
     }
 
     private static OpenTargetConjecture conjecture() {
@@ -235,9 +253,17 @@ class OpenTargetConjectureProofGateTest {
         }
 
         @Override
-        public SolverResult solve(Obligation obligation) {
+        public SolverExecution execute(Obligation obligation) {
             calls++;
-            return SolverResult.create(
+            SolverTranslation translation = SolverTranslation.create(
+                obligation,
+                descriptor(),
+                TranslationStatus.LOSSLESS,
+                List.of(),
+                Map.of(
+                    "goal.left", obligation.goal().left().canonicalMaterial(),
+                    "goal.right", obligation.goal().right().canonicalMaterial()));
+            SolverResult result = SolverResult.create(
                 obligation,
                 descriptor(),
                 status,
@@ -250,6 +276,7 @@ class OpenTargetConjectureProofGateTest {
                     || status == ResultStatus.REFUTED
                     ? SolverIr.sha256("certificate-" + status.name())
                     : "");
+            return SolverExecution.create(obligation, translation, result);
         }
 
         private int calls() {
