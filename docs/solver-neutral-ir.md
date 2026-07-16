@@ -1,6 +1,6 @@
 # Solver-neutrale Obligation- und Proof-IR
 
-Issue [#233](https://github.com/carstenartur/Regelsuche/issues/233) führt einen versionierten Vertrag zwischen Discovery, Suche, Oracles und späterer Solver-Orchestrierung ein. Die IR ersetzt weder Discovery Evidence noch ein formales Beweisformat. Sie beschreibt exakt, **welche** mathematische Aussage unter **welchen** Annahmen an ein Backend übergeben wurde und bindet jedes Ergebnis an diese Revision.
+Issue [#233](https://github.com/carstenartur/Regelsuche/issues/233) führt einen versionierten Vertrag zwischen Discovery, Suche, mathematischen Algorithmen und späterer Solver-Orchestrierung ein. Die IR ersetzt weder Discovery Evidence noch ein universelles formales Beweisformat. Sie beschreibt exakt, **welche** mathematische Aussage unter **welchen** Annahmen an ein Backend übergeben wurde und bindet jedes Ergebnis an diese Revision.
 
 ## Bewusste inkompatible Ablösung
 
@@ -25,7 +25,7 @@ Die früheren Komponenten enthielten eigene Formen von Proof Obligations, Ausdru
 - Refutation, unbekanntes Ergebnis, Timeout und Backendfehler zu unterscheiden;
 - Proof Evidence dauerhaft an eine konkrete Problemrevision zu binden.
 
-Das Modul `:regelsuche-solver-ir` ist nun die gemeinsame Grenze. Es hängt von `core`, `search` und `validation` ab; `learning`, Autopilot und Promotion referenzieren seine stabilen Hashes und Ergebnisse direkt.
+Das Modul `:regelsuche-solver-ir` ist nun die gemeinsame Grenze. Es hängt von `core`, `search`, `validation` und den vorhandenen mathematischen Algorithmen ab; `learning`, Autopilot und Promotion referenzieren seine stabilen Hashes und Ergebnisse direkt.
 
 ## Obligation v1
 
@@ -87,7 +87,7 @@ n is integer
 
 in typisierte Prädikate. Eine unbekannte Freitextannahme wird nicht gespeichert und nicht ignoriert, sondern als nicht unterstützte Übersetzung abgelehnt.
 
-Jeder Backend-Adapter muss erklären, ob er diese Prädikate tatsächlich verarbeitet. Der aktuelle interne Search-Adapter und der symbolische Equivalence-Adapter unterstützen noch keine Annahmen. Eine Obligation mit `x != 0` wird daher **vor** Backend-Ausführung als:
+Jeder Backend-Adapter muss erklären, ob er diese Prädikate tatsächlich verarbeitet. Der aktuelle interne Search-Adapter und die exakte Polynomial-Normalform unterstützen noch keine Annahmen. Eine Obligation mit `x != 0` wird daher **vor** Backend-Ausführung als:
 
 ```text
 status = UNSUPPORTED
@@ -128,11 +128,15 @@ Jedes Resultat enthält den Obligation-, Goal- und Assumptions-Hash, Backend-ID 
 
 Ein erreichbares Ziel liefert `CONFIRMED` und einen Hash über den retained Suchpfad. Ein nicht gefundenes Ziel liefert `UNKNOWN`, niemals `REFUTED`: unvollständige Suche ist kein Gegenbeweis.
 
-### Symbolische Equivalence
+### Exakte Polynomial-Normalform
 
-`SymPySolverBackend` verwendet die vorhandene `EquivalenceService`-/`SymPyEquivalenceService`-Grenze. Ein positiver symbolischer beziehungsweise deterministisch numerischer Nachweis liefert `CONFIRMED`; explizite Nichtäquivalenz liefert `REFUTED`; fehlende Evidenz bleibt `UNKNOWN`.
+`PolynomialNormalFormSolverBackend` verwendet die bereits vorhandene `PolynomialNormalFormEquivalenceService`. Für den unterstützten polynomialen Ausdrucksbereich expandiert und kanonisiert sie Ausdrücke mit exakten rationalen Koeffizienten. Ihr Algorithmusdescriptor trägt `PROOF_FOR_SUPPORTED_DOMAIN` und kann sowohl `PROOF` als auch `REFUTATION` liefern.
 
-Der CI-Referenzfall sendet **dieselbe** Obligation `x + 0 = x` an beide Backends. Beide Resultate referenzieren denselben `obligationHash` und bestehen unabhängig.
+Ein identisches Normalformergebnis liefert `CONFIRMED`; verschiedene Normalformen liefern `REFUTED`. Division, transzendente Funktionen, negative oder nicht-ganzzahlige Exponenten und noch nicht unterstützte strukturierte Annahmen werden vor der Ausführung als `UNSUPPORTED` retained.
+
+Dieser Backendpfad ersetzt den zuvor erwogenen `SymPySolverBackend`. Der vorhandene `SymPyEquivalenceService` kann eine Aussage auch durch deterministische numerische Stichproben bestätigen und ist deshalb keine zulässige Quelle für `SYMBOLICALLY_VERIFIED` oder einen Certificate-Hash.
+
+Der CI-Referenzfall sendet **dieselbe** Obligation `x + 0 = x` an Search und Polynomial-Normalform. Beide Resultate referenzieren denselben `obligationHash` und bestehen unabhängig; nur das Normalformbackend besitzt Proof-Semantik für seinen unterstützten Bereich.
 
 ## Open-Target Proof Evidence v2
 
@@ -140,14 +144,14 @@ Schema: [`regelsuche.open-target-conjecture-proof/v2`](schemas/regelsuche-open-t
 
 `OpenTargetConjectureProofGate` erzeugt unmittelbar eine `SolverIr.Obligation`, übergibt sie an genau ein `SolverBackend` und retains das zugehörige `SolverResult`. Der Report enthält deren Hashes und Backendstatus; er besitzt kein zweites eingebettetes Obligation-Modell.
 
-Eine Proof-Evidence gilt nur dann als symbolisch verifiziert, wenn:
+Der Standardpfad verwendet die exakte Polynomial-Normalform. Eine Proof-Evidence gilt nur dann als symbolisch verifiziert, wenn:
 
 - das Resultat zu exakt derselben Obligation gehört;
 - der Backendstatus `CONFIRMED` ist;
 - die Übersetzung `LOSSLESS` ist;
 - keine Proof-Blocker vorliegen.
 
-Nicht unterstützte Annahmen führen zu `INCONCLUSIVE` plus `UNSUPPORTED`-Resultat und blockieren Lifecycle, Qualification und Promotion.
+Nicht unterstützte Annahmen oder Ausdrucksfragmente führen zu `INCONCLUSIVE` plus `UNSUPPORTED`-Resultat und blockieren Lifecycle, Qualification und Promotion. Numerische Stichprobenevidenz kann diesen Status nicht autorisieren.
 
 ## Production Lifecycle v3
 
@@ -185,7 +189,7 @@ Der Workflow `Solver IR`:
 1. führt Contract-, Round-Trip- und Backendtests aus;
 2. schreibt zwei Obligationen und drei Backendresultate;
 3. validiert sie gegen die Draft-2020-12-Schemas;
-4. verlangt zwei unabhängige `CONFIRMED`-Resultate für dieselbe Obligation;
+4. verlangt unabhängige `CONFIRMED`-Resultate von Search und exakter Polynomial-Normalform für dieselbe Obligation;
 5. verlangt ein fail-closed `UNSUPPORTED` für die assumption-bound Obligation;
 6. archiviert Evidence und Testdiagnosen.
 
@@ -197,6 +201,7 @@ Die Workflows `Autopilot Evidence` und `Release Readiness` validieren zusätzlic
 - Quantoren, Mengen, Matrizen und allgemeine logische Formeln sind noch nicht enthalten.
 - Die direkten Backends verarbeiten derzeit keine strukturierten Annahmen.
 - Regelsuche Search kann ein Ziel bestätigen, aber Sucherschöpfung nicht als Refutation deuten.
-- Das symbolische Backend liefert noch kein universelles formales Proof-Objekt.
+- Die Polynomial-Normalform beweist ausschließlich direkte Identitäten ihres unterstützten polynomialen Fragments.
+- SMT-LIB, Z3, cvc5 und formale Theorem-Prover werden erst über #234 capability-aware orchestriert.
 
 Diese Grenzen bleiben in Capability- und Translation-Status sichtbar. Issue #234 kann darauf aufbauend Backends nach Fähigkeiten, Kosten und geforderter Evidence-Stärke auswählen, ohne eigene Problemformate einzuführen.
