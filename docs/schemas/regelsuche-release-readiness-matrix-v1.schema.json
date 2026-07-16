@@ -4,13 +4,14 @@
   "title": "Regelsuche 0.2 release readiness matrix v1",
   "type": "object",
   "required": [
-    "schema", "evidenceHash", "profiles", "autonomousCampaignStatus",
-    "autonomyClaimAuthorized", "promotionStatus", "publicEvidenceStatus",
-    "contentHash"
+    "schema", "evidenceHash", "hiddenRuleEvidenceHash", "profiles",
+    "autonomousCampaignStatus", "autonomyClaimAuthorized",
+    "promotionStatus", "publicEvidenceStatus", "contentHash"
   ],
   "properties": {
     "schema": { "const": "regelsuche.release-readiness-matrix/v1" },
     "evidenceHash": { "$ref": "#/$defs/sha256" },
+    "hiddenRuleEvidenceHash": { "$ref": "#/$defs/sha256" },
     "profiles": {
       "type": "array",
       "minItems": 5,

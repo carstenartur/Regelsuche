@@ -2,6 +2,7 @@ package de.regelsuche.release;
 
 import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner;
 import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner.CampaignRun;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
 import de.regelsuche.json.JsonWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -16,6 +17,10 @@ public final class ReleaseReadinessRunner {
     public static final String SCHEMA = "regelsuche.release-readiness-run/v1";
 
     public ReleaseRun run() {
+        return run(null);
+    }
+
+    public ReleaseRun run(Path hiddenRuleReport) {
         AutonomousProductionCampaignRunner campaignRunner =
             new AutonomousProductionCampaignRunner();
         List<CampaignRun> campaigns = List.of(
@@ -24,22 +29,25 @@ public final class ReleaseReadinessRunner {
             campaignRunner.runPinned(4));
         AutonomousCampaignReleaseEvidence evidence =
             AutonomousCampaignReleaseEvidence.from(campaigns);
+        HiddenRuleBenchmarkReleaseEvidence hiddenRuleEvidence =
+            hiddenRuleReport == null
+                ? null
+                : HiddenRuleBenchmarkReleaseEvidence.read(hiddenRuleReport);
         ReleaseReadinessMatrix.MatrixReport matrix =
-            ReleaseReadinessMatrix.evaluate(evidence);
+            ReleaseReadinessMatrix.evaluate(evidence, hiddenRuleEvidence);
         String profileCatalog = ReleaseEvidenceProfile.catalogJson();
-        String profileCatalogHash = de.regelsuche.experiments.autopilot
-            .AutonomousResearchBriefV2.hash(profileCatalog);
-        String contentHash = de.regelsuche.experiments.autopilot
-            .AutonomousResearchBriefV2.hash(
-                SCHEMA
-                    + "\nprofileCatalog=" + profileCatalogHash
-                    + "\nevidence=" + evidence.evidenceHash()
-                    + "\nmatrix=" + matrix.contentHash()
-                    + "\ncampaign=" + campaigns.getFirst().contentHash());
+        String profileCatalogHash = AutonomousResearchBriefV2.hash(profileCatalog);
+        String contentHash = runHash(
+            profileCatalogHash,
+            evidence.evidenceHash(),
+            matrix.hiddenRuleEvidenceHash(),
+            matrix.contentHash(),
+            campaigns.getFirst().contentHash());
         return new ReleaseRun(
             SCHEMA,
             campaigns.getFirst(),
             evidence,
+            hiddenRuleEvidence,
             matrix,
             profileCatalog,
             profileCatalogHash,
@@ -57,6 +65,13 @@ public final class ReleaseReadinessRunner {
             write(outputDirectory.resolve("profiles.json"), run.profileCatalogJson());
             write(outputDirectory.resolve("evidence-summary.json"),
                 run.evidence().toCanonicalJson());
+            Path hiddenOutput = outputDirectory.resolve(
+                "hidden-rule-release-evidence.json");
+            if (run.hiddenRuleEvidence() == null) {
+                Files.deleteIfExists(hiddenOutput);
+            } else {
+                write(hiddenOutput, run.hiddenRuleEvidence().toCanonicalJson());
+            }
             write(outputDirectory.resolve("release-readiness-report.json"),
                 run.matrix().toCanonicalJson());
             write(outputDirectory.resolve("release-readiness-run.json"),
@@ -71,10 +86,27 @@ public final class ReleaseReadinessRunner {
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
+    private static String runHash(
+        String profileCatalogHash,
+        String evidenceHash,
+        String hiddenRuleEvidenceHash,
+        String matrixHash,
+        String campaignHash
+    ) {
+        return AutonomousResearchBriefV2.hash(
+            SCHEMA
+                + "\nprofileCatalog=" + profileCatalogHash
+                + "\nevidence=" + evidenceHash
+                + "\nhiddenRuleEvidence=" + hiddenRuleEvidenceHash
+                + "\nmatrix=" + matrixHash
+                + "\ncampaign=" + campaignHash);
+    }
+
     public record ReleaseRun(
         String schema,
         CampaignRun retainedCampaign,
         AutonomousCampaignReleaseEvidence evidence,
+        HiddenRuleBenchmarkReleaseEvidence hiddenRuleEvidence,
         ReleaseReadinessMatrix.MatrixReport matrix,
         String profileCatalogJson,
         String profileCatalogHash,
@@ -95,11 +127,27 @@ public final class ReleaseReadinessRunner {
             }
             requireSha256(profileCatalogHash, "profileCatalogHash");
             requireSha256(contentHash, "contentHash");
+            String expectedHiddenHash = hiddenRuleEvidence == null
+                ? ReleaseReadinessMatrix.NO_HIDDEN_RULE_EVIDENCE_HASH
+                : hiddenRuleEvidence.evidenceHash();
             if (!retainedCampaign.contentHash()
                     .equals(evidence.campaignManifestHash())
-                    || !evidence.evidenceHash().equals(matrix.evidenceHash())) {
+                    || !evidence.evidenceHash().equals(matrix.evidenceHash())
+                    || !expectedHiddenHash.equals(matrix.hiddenRuleEvidenceHash())
+                    || !AutonomousResearchBriefV2.hash(profileCatalogJson)
+                        .equals(profileCatalogHash)) {
                 throw new IllegalArgumentException(
                     "release-readiness run artifacts are not hash-linked");
+            }
+            String expectedHash = runHash(
+                profileCatalogHash,
+                evidence.evidenceHash(),
+                expectedHiddenHash,
+                matrix.contentHash(),
+                retainedCampaign.contentHash());
+            if (!expectedHash.equals(contentHash)) {
+                throw new IllegalArgumentException(
+                    "release-readiness run hash does not match canonical fields");
             }
         }
 
@@ -114,6 +162,10 @@ public final class ReleaseReadinessRunner {
                     retainedCampaign.contentHash())
                 .property("profileCatalogHash", profileCatalogHash)
                 .property("evidenceHash", evidence.evidenceHash())
+                .property("hiddenRuleEvidenceStatus",
+                    hiddenRuleEvidence == null ? "NOT_PROVIDED" : "BOUND")
+                .property("hiddenRuleEvidenceHash",
+                    matrix.hiddenRuleEvidenceHash())
                 .property("matrixHash", matrix.contentHash())
                 .property("autonomousCampaignStatus",
                     matrix.autonomousCampaignStatus().name())

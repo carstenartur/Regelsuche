@@ -13,8 +13,9 @@ public final class ReleaseReadinessMain {
             ? Path.of(args[0])
             : Path.of("build", "reports", "release-readiness");
         boolean requireReady = Arrays.asList(args).contains("--require-ready");
+        Path hiddenRuleReport = optionPath(args, "--hidden-rule-report");
         ReleaseReadinessRunner runner = new ReleaseReadinessRunner();
-        var run = runner.run();
+        var run = runner.run(hiddenRuleReport);
         runner.write(output, run);
         System.out.println(run.contentHash());
         if (requireReady && !run.autonomousCampaignReady()) {
@@ -24,5 +25,19 @@ public final class ReleaseReadinessMain {
                         .result(ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN)
                         .blockers());
         }
+    }
+
+    private static Path optionPath(String[] args, String option) {
+        for (int index = 0; index < args.length; index++) {
+            if (option.equals(args[index])) {
+                if (index + 1 >= args.length
+                        || args[index + 1].startsWith("--")) {
+                    throw new IllegalArgumentException(
+                        option + " requires a file path");
+                }
+                return Path.of(args[index + 1]);
+            }
+        }
+        return null;
     }
 }

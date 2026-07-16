@@ -1,5 +1,6 @@
 package de.regelsuche.release;
 
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
 import de.regelsuche.json.JsonWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +12,9 @@ import java.util.Objects;
 public final class ReleaseReadinessMatrix {
     public static final String SCHEMA =
         "regelsuche.release-readiness-matrix/v1";
+    public static final String NO_HIDDEN_RULE_EVIDENCE_HASH =
+        AutonomousResearchBriefV2.hash(
+            "regelsuche.hidden-rule-release-evidence/NOT_PROVIDED");
     private static final int MIN_RELEASE_POSITIVE_HOLDOUTS = 12;
     private static final int MIN_RELEASE_NEGATIVE_HOLDOUTS = 12;
 
@@ -20,10 +24,20 @@ public final class ReleaseReadinessMatrix {
     public static MatrixReport evaluate(
         AutonomousCampaignReleaseEvidence evidence
     ) {
+        return evaluate(evidence, null);
+    }
+
+    public static MatrixReport evaluate(
+        AutonomousCampaignReleaseEvidence evidence,
+        HiddenRuleBenchmarkReleaseEvidence hiddenRuleEvidence
+    ) {
         Objects.requireNonNull(evidence, "evidence");
+        String hiddenRuleEvidenceHash = hiddenRuleEvidence == null
+            ? NO_HIDDEN_RULE_EVIDENCE_HASH
+            : hiddenRuleEvidence.evidenceHash();
         List<ProfileResult> results = Arrays.stream(
                 ReleaseEvidenceProfile.values())
-            .map(profile -> evaluate(profile, evidence))
+            .map(profile -> evaluate(profile, evidence, hiddenRuleEvidence))
             .sorted(Comparator.comparing(result -> result.profile().name()))
             .toList();
         ProfileResult autonomy = findResult(
@@ -31,21 +45,27 @@ public final class ReleaseReadinessMatrix {
         return new MatrixReport(
             SCHEMA,
             evidence.evidenceHash(),
+            hiddenRuleEvidenceHash,
             results,
             autonomy.status(),
             autonomy.autonomyClaimAuthorized(),
             "NOT_EVALUATED",
             "NOT_EVALUATED",
-            matrixHash(evidence.evidenceHash(), results, autonomy.status()));
+            matrixHash(
+                evidence.evidenceHash(),
+                hiddenRuleEvidenceHash,
+                results,
+                autonomy.status()));
     }
 
     private static ProfileResult evaluate(
         ReleaseEvidenceProfile profile,
-        AutonomousCampaignReleaseEvidence evidence
+        AutonomousCampaignReleaseEvidence evidence,
+        HiddenRuleBenchmarkReleaseEvidence hiddenRuleEvidence
     ) {
         List<RequirementCheck> checks = switch (profile) {
             case SEARCH_REPRODUCIBILITY -> searchChecks(evidence);
-            case HIDDEN_RULE_REDISCOVERY -> hiddenRuleChecks(evidence);
+            case HIDDEN_RULE_REDISCOVERY -> hiddenRuleChecks(hiddenRuleEvidence);
             case OPEN_TARGET_DISCOVERY -> openTargetChecks(evidence);
             case AUTONOMOUS_CAMPAIGN -> autonomousCampaignChecks(evidence);
             case EXTERNAL_NOVELTY_REVIEW -> externalNoveltyChecks(evidence);
@@ -83,18 +103,48 @@ public final class ReleaseReadinessMatrix {
     }
 
     private static List<RequirementCheck> hiddenRuleChecks(
-        AutonomousCampaignReleaseEvidence evidence
+        HiddenRuleBenchmarkReleaseEvidence evidence
     ) {
+        if (evidence == null) {
+            return List.of(
+                check("HIDDEN_REFERENCE_ISOLATED", false,
+                    "NOT_PROVIDED", true),
+                check("HIDDEN_RULE_BENCHMARK_COMPLETE", false,
+                    "NOT_PROVIDED", true),
+                check("EXECUTABLE_REDISCOVERY", false,
+                    "NOT_PROVIDED", ">=1 retained executable rediscovery"));
+        }
         return List.of(
             check("HIDDEN_REFERENCE_ISOLATED",
                 evidence.hiddenReferenceIsolated(),
-                evidence.hiddenReferenceIsolated(), true),
+                "isolated=" + evidence.hiddenReferenceIsolated()
+                    + "; splitCollisions=" + evidence.splitCollisionCount()
+                    + "; leakageViolations=" + evidence.leakageViolationCount(),
+                "isolated=true; splitCollisions=0; leakageViolations=0"),
             check("HIDDEN_RULE_BENCHMARK_COMPLETE",
-                evidence.hiddenRuleBenchmarkComplete(),
-                evidence.hiddenRuleBenchmarkComplete(), true),
+                evidence.benchmarkComplete(),
+                hiddenRuleSummary(evidence),
+                ">=20 cases; >=3 families; complete accepted cases; "
+                    + "zero false positives; balanced negative holdouts"),
             check("EXECUTABLE_REDISCOVERY",
                 evidence.executableRediscoveryRetained(),
-                evidence.executableRediscoveryRetained(), true));
+                evidence.executableRediscoveryCount(),
+                ">=1 retained executable rediscovery"));
+    }
+
+    private static String hiddenRuleSummary(
+        HiddenRuleBenchmarkReleaseEvidence evidence
+    ) {
+        return "cases=" + evidence.cases()
+            + "; families=" + evidence.families()
+            + "; accepted=" + evidence.acceptedCases()
+            + "; rediscovered=" + evidence.rediscoveredCases()
+            + "; negatives=" + evidence.executedNegativeHoldouts()
+                + '/' + evidence.configuredNegativeHoldouts()
+            + "; skipped=" + evidence.skippedNegativeHoldouts()
+            + "; falsePositives=" + evidence.falsePositiveHoldouts()
+            + "; acceptedIncomplete="
+                + evidence.acceptedIncompleteHoldoutCount();
     }
 
     private static List<RequirementCheck> openTargetChecks(
@@ -261,6 +311,7 @@ public final class ReleaseReadinessMatrix {
 
     private static String matrixHash(
         String evidenceHash,
+        String hiddenRuleEvidenceHash,
         List<ProfileResult> profiles,
         ProfileStatus autonomyStatus
     ) {
@@ -268,9 +319,10 @@ public final class ReleaseReadinessMatrix {
             .sorted(Comparator.comparing(result -> result.profile().name()))
             .map(ProfileResult::canonicalMaterial)
             .toList();
-        return de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.hash(
+        return AutonomousResearchBriefV2.hash(
             SCHEMA
                 + "\nevidence=" + evidenceHash
+                + "\nhiddenRuleEvidence=" + hiddenRuleEvidenceHash
                 + "\nprofiles=" + canonicalProfiles
                 + "\nautonomy=" + autonomyStatus.name());
     }
@@ -338,6 +390,7 @@ public final class ReleaseReadinessMatrix {
     public record MatrixReport(
         String schema,
         String evidenceHash,
+        String hiddenRuleEvidenceHash,
         List<ProfileResult> profiles,
         ProfileStatus autonomousCampaignStatus,
         boolean autonomyClaimAuthorized,
@@ -351,6 +404,7 @@ public final class ReleaseReadinessMatrix {
                     "unsupported release-readiness matrix schema");
             }
             requireSha256(evidenceHash, "evidenceHash");
+            requireSha256(hiddenRuleEvidenceHash, "hiddenRuleEvidenceHash");
             profiles = profiles == null
                 ? List.of()
                 : profiles.stream()
@@ -377,7 +431,10 @@ public final class ReleaseReadinessMatrix {
             }
             requireSha256(contentHash, "contentHash");
             String expectedHash = matrixHash(
-                evidenceHash, profiles, autonomousCampaignStatus);
+                evidenceHash,
+                hiddenRuleEvidenceHash,
+                profiles,
+                autonomousCampaignStatus);
             if (!expectedHash.equals(contentHash)) {
                 throw new IllegalArgumentException(
                     "release matrix content hash does not match canonical semantics");
@@ -392,6 +449,7 @@ public final class ReleaseReadinessMatrix {
             return new JsonWriter().beginObject()
                 .property("schema", schema)
                 .property("evidenceHash", evidenceHash)
+                .property("hiddenRuleEvidenceHash", hiddenRuleEvidenceHash)
                 .array("profiles", array -> profiles.forEach(result ->
                     array.objectValue(object -> object
                         .property("profile", result.profile().name())

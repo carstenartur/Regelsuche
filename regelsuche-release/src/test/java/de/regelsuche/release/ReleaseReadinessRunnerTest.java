@@ -52,6 +52,12 @@ class ReleaseReadinessRunnerTest {
             .autonomyClaimAuthorized());
         assertFalse(matrix.autonomyClaimAuthorized());
         assertFalse(run.autonomousCampaignReady());
+        assertEquals(
+            ReleaseReadinessMatrix.NO_HIDDEN_RULE_EVIDENCE_HASH,
+            matrix.hiddenRuleEvidenceHash());
+        assertEquals("NOT_PROVIDED", run.toCanonicalJson().contains(
+            "\"hiddenRuleEvidenceStatus\":\"NOT_PROVIDED\"")
+                ? "NOT_PROVIDED" : "missing");
 
         assertEquals(List.of(
             "BALANCED_RELEASE_HOLDOUT_SUITE",
@@ -99,6 +105,8 @@ class ReleaseReadinessRunnerTest {
             assertTrue(Files.isRegularFile(artifact), file);
             assertTrue(Files.size(artifact) > 0L, file);
         }
+        assertFalse(Files.exists(output.resolve(
+            "hidden-rule-release-evidence.json")));
     }
 
     @Test
@@ -132,6 +140,7 @@ class ReleaseReadinessRunnerTest {
         MatrixReport reordered = new MatrixReport(
             matrix.schema(),
             matrix.evidenceHash(),
+            matrix.hiddenRuleEvidenceHash(),
             reversed,
             matrix.autonomousCampaignStatus(),
             matrix.autonomyClaimAuthorized(),
@@ -165,6 +174,7 @@ class ReleaseReadinessRunnerTest {
         assertThrows(IllegalArgumentException.class, () -> new MatrixReport(
             matrix.schema(),
             matrix.evidenceHash(),
+            matrix.hiddenRuleEvidenceHash(),
             changedProfiles,
             matrix.autonomousCampaignStatus(),
             matrix.autonomyClaimAuthorized(),
