@@ -59,6 +59,63 @@ jobs:
             test -s "$DIR/qualification/$file"
           done
 
+      - name: Validate versioned release schemas
+        shell: bash
+        run: |
+          python -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            jsonschema==4.25.1
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from jsonschema import Draft202012Validator
+
+          root = Path("regelsuche-release/build/reports/release-readiness-qualified")
+          schemas = Path("docs/schemas")
+          pairs = [
+              (
+                  schemas / "regelsuche-autonomous-candidate-qualification-suite-v1.schema.json",
+                  root / "qualification/qualification-suite.json",
+              ),
+              (
+                  schemas / "regelsuche-autonomous-candidate-qualification-split-v1.schema.json",
+                  root / "qualification/qualification-split-audit.json",
+              ),
+              (
+                  schemas / "regelsuche-open-target-conjecture-evaluation-v1.schema.json",
+                  root / "qualification/qualification-evaluation.json",
+              ),
+              (
+                  schemas / "regelsuche-autonomous-candidate-qualified-utility-v1.schema.json",
+                  root / "qualification/qualification-utility.json",
+              ),
+              (
+                  schemas / "regelsuche-autonomous-candidate-qualification-v1.schema.json",
+                  root / "qualification/candidate-qualification-evidence.json",
+              ),
+              (
+                  schemas / "regelsuche-autonomous-candidate-qualification-run-v1.schema.json",
+                  root / "qualification/candidate-qualification-run.json",
+              ),
+              (
+                  schemas / "regelsuche-release-readiness-matrix-v1.schema.json",
+                  root / "release-readiness-report.json",
+              ),
+              (
+                  schemas / "regelsuche-release-readiness-run-v1.schema.json",
+                  root / "release-readiness-run.json",
+              ),
+          ]
+          for schema_path, artifact_path in pairs:
+              schema = json.loads(schema_path.read_text(encoding="utf-8"))
+              artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+              Draft202012Validator.check_schema(schema)
+              Draft202012Validator(schema).validate(artifact)
+              print(f"validated {artifact_path} against {schema_path}")
+          PY
+
       - name: Verify independently bound profiles and candidate qualification
         shell: bash
         run: |
