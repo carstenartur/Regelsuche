@@ -99,12 +99,15 @@ class CrossFamilyBridgeQualificationGateTest {
         assertEquals(ResultStatus.CONFIRMED, fixture.proof().result().status());
         assertEquals(TranslationStatus.LOSSLESS,
             fixture.proof().translation().status());
-        assertEquals(ASSUMPTIONS, fixture.proof().obligation().assumptions().stream()
-            .map(predicate -> predicate.left().canonicalMaterial()
-                + predicate.relation().name()
-                + predicate.right().canonicalMaterial())
-            .map(value -> value.isBlank() ? value : "qNOT_EQUALS0")
-            .toList());
+        assertEquals(1, fixture.proof().obligation().assumptions().size());
+        assertEquals(SolverIr.Relation.NOT_EQUALS,
+            fixture.proof().obligation().assumptions().getFirst().relation());
+        assertEquals("q",
+            fixture.proof().translation().termMapping().get(
+                "assumption.assumption-001.left"));
+        assertEquals("0",
+            fixture.proof().translation().termMapping().get(
+                "assumption.assumption-001.right"));
         assertEquals(LEFT,
             fixture.proof().translation().termMapping().get("goal.left"));
         assertEquals(RIGHT,
