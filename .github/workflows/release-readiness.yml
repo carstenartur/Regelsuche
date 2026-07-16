@@ -29,67 +29,68 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Test and generate release readiness evidence
+      - name: Generate hidden-rule and release evidence
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew :regelsuche-release:test \
+          ./gradlew :app:test \
+            --tests de.regelsuche.docs.HiddenRulePilotCampaignTest \
             2>&1 | tee release-readiness-build.log
+          ./gradlew :regelsuche-release:runReleaseReadinessWithHiddenRuleEvidence \
+            2>&1 | tee -a release-readiness-build.log
 
-      - name: Require release evidence artifacts
+      - name: Require evidence artifacts
         shell: bash
         run: |
+          test -s app/build/reports/hidden-rule-pilot/report.json
+          test -s app/build/reports/hidden-rule-pilot/runtime.json
           DIR=regelsuche-release/build/reports/release-readiness
-          test -s "$DIR/profiles.json"
-          test -s "$DIR/evidence-summary.json"
-          test -s "$DIR/release-readiness-report.json"
-          test -s "$DIR/release-readiness-run.json"
+          for file in profiles.json evidence-summary.json \
+            hidden-rule-release-evidence.json release-readiness-report.json \
+            release-readiness-run.json; do test -s "$DIR/$file"; done
           test -s "$DIR/campaign/production-campaign-manifest.json"
-          test -s "$DIR/campaign/campaign-resource-ledger.json"
-          test -s "$DIR/campaign/feedback-reallocation.json"
-          test -s "$DIR/campaign/proof-obligation.json"
 
-      - name: Verify the current fail-closed matrix
+      - name: Verify independently bound profiles
         shell: bash
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-
           root = Path("regelsuche-release/build/reports/release-readiness")
           matrix = json.loads((root / "release-readiness-report.json").read_text())
-          evidence = json.loads((root / "evidence-summary.json").read_text())
-          profiles = {entry["profile"]: entry for entry in matrix["profiles"]}
-
-          assert len(profiles) == 5, profiles.keys()
-          assert profiles["SEARCH_REPRODUCIBILITY"]["status"] == "READY"
+          hidden = json.loads((root / "hidden-rule-release-evidence.json").read_text())
+          run = json.loads((root / "release-readiness-run.json").read_text())
+          profiles = {item["profile"]: item for item in matrix["profiles"]}
+          assert profiles["HIDDEN_RULE_REDISCOVERY"]["status"] == "READY"
+          assert profiles["HIDDEN_RULE_REDISCOVERY"]["blockers"] == []
           assert profiles["OPEN_TARGET_DISCOVERY"]["status"] == "READY"
-          assert profiles["AUTONOMOUS_CAMPAIGN"]["status"] == "BLOCKED"
-          assert matrix["autonomyClaimAuthorized"] is False
           assert profiles["AUTONOMOUS_CAMPAIGN"]["blockers"] == [
               "BALANCED_RELEASE_HOLDOUT_SUITE",
               "HELD_OUT_FAMILY_OR_CLUSTER",
               "PAIRED_HELD_OUT_UTILITY",
           ]
-          codes = {check["code"] for check in profiles["AUTONOMOUS_CAMPAIGN"]["checks"]}
-          assert "DOMAIN_GENERIC_SEARCH_INTERFACE" not in codes
-          assert "FRESH_HOLDOUTS_AT_LEAST_ONE_HUNDRED" not in codes
-          assert evidence["configuredPositiveHoldouts"] == 3
-          assert evidence["executedPositiveHoldouts"] == 3
-          assert evidence["configuredNegativeHoldouts"] == 3
-          assert evidence["executedNegativeHoldouts"] == 3
-          assert evidence["cleanRunCount"] == 3
-          assert evidence["cleanRunsIdentical"] is True
+          assert (hidden["cases"], hidden["families"]) == (20, 4)
+          assert hidden["configuredNegativeHoldouts"] == 40
+          assert hidden["executedNegativeHoldouts"] == 38
+          assert hidden["skippedNegativeHoldouts"] == 2
+          assert hidden["falsePositiveHoldouts"] == 0
+          assert hidden["hiddenReferenceIsolated"] is True
+          assert hidden["benchmarkComplete"] is True
+          assert hidden["executableRediscoveryRetained"] is True
+          assert matrix["hiddenRuleEvidenceHash"] == hidden["evidenceHash"]
+          assert run["hiddenRuleEvidenceStatus"] == "BOUND"
+          assert run["hiddenRuleEvidenceHash"] == hidden["evidenceHash"]
+          assert matrix["autonomyClaimAuthorized"] is False
           PY
 
-      - name: Upload release readiness evidence and diagnostics
+      - name: Upload evidence and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: release-readiness
           path: |
             release-readiness-build.log
-            regelsuche-release/build/test-results/**
-            regelsuche-release/build/reports/tests/**
+            app/build/reports/hidden-rule-pilot/**
+            app/build/test-results/test/**
             regelsuche-release/build/reports/release-readiness/**
           if-no-files-found: warn
