@@ -20,6 +20,7 @@ application {
 
 dependencies {
     api project(':regelsuche-autopilot')
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.0'
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -32,6 +33,20 @@ tasks.register('runReleaseReadiness', JavaExec) {
     mainClass = application.mainClass
     args layout.buildDirectory.dir('reports/release-readiness')
         .get().asFile.absolutePath
+}
+
+tasks.register('runReleaseReadinessWithHiddenRuleEvidence', JavaExec) {
+    group = 'verification'
+    description = 'Evaluates release profiles with retained hidden-rule benchmark evidence.'
+    dependsOn ':app:test'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    args layout.buildDirectory.dir('reports/release-readiness')
+        .get().asFile.absolutePath,
+        '--hidden-rule-report',
+        project(':app').layout.buildDirectory
+            .file('reports/hidden-rule-pilot/report.json')
+            .get().asFile.absolutePath
 }
 
 tasks.register('verifyAutonomousCampaignRelease', JavaExec) {
