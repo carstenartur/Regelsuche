@@ -25,11 +25,8 @@ public final class ReleaseReadinessMatrix {
                 ReleaseEvidenceProfile.values())
             .map(profile -> evaluate(profile, evidence))
             .toList();
-        ProfileResult autonomy = results.stream()
-            .filter(result -> result.profile()
-                == ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN)
-            .findFirst()
-            .orElseThrow();
+        ProfileResult autonomy = findResult(
+            results, ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN);
         String contentHash = de.regelsuche.experiments.autopilot
             .AutonomousResearchBriefV2.hash(
                 SCHEMA
@@ -62,12 +59,10 @@ public final class ReleaseReadinessMatrix {
         ProfileStatus status = checks.stream().allMatch(RequirementCheck::passed)
             ? ProfileStatus.READY
             : ProfileStatus.BLOCKED;
-        boolean autonomyAuthorized = profile.authorizesAutonomyClaim()
-            && status == ProfileStatus.READY;
         return new ProfileResult(
             profile,
             status,
-            autonomyAuthorized,
+            profile.authorizesAutonomyClaim() && status == ProfileStatus.READY,
             checks,
             checks.stream()
                 .filter(check -> !check.passed())
@@ -89,8 +84,7 @@ public final class ReleaseReadinessMatrix {
                 evidence.campaignManifestHash(), "sha256"),
             check("THREE_CLEAN_RUNS",
                 evidence.cleanRunCount() >= 3 && evidence.cleanRunsIdentical(),
-                evidence.cleanRunCount() + " runs; identical="
-                    + evidence.cleanRunsIdentical(),
+                cleanRunSummary(evidence),
                 ">=3 identical canonical manifests"));
     }
 
@@ -129,12 +123,7 @@ public final class ReleaseReadinessMatrix {
                 evidence.rejectedClusterCount() >= 1,
                 evidence.rejectedClusterCount(), ">=1"),
             check("VALIDATION_COMPLETE",
-                evidence.executedPositiveHoldouts()
-                    == evidence.configuredPositiveHoldouts()
-                    && evidence.executedNegativeHoldouts()
-                        == evidence.configuredNegativeHoldouts()
-                    && evidence.executedPositiveHoldouts() > 0
-                    && evidence.executedNegativeHoldouts() > 0
+                developmentHoldoutsComplete(evidence)
                     && evidence.refutingHoldouts() == 0,
                 holdoutSummary(evidence),
                 "all configured positive and negative holdouts; zero refuting"),
@@ -173,14 +162,7 @@ public final class ReleaseReadinessMatrix {
             evidence.heldOutFamilyOrClusterCount() >= 1,
             evidence.heldOutFamilyOrClusterCount(), ">=1"));
         checks.add(check("BALANCED_RELEASE_HOLDOUT_SUITE",
-            evidence.configuredPositiveHoldouts()
-                    >= MIN_RELEASE_POSITIVE_HOLDOUTS
-                && evidence.configuredNegativeHoldouts()
-                    >= MIN_RELEASE_NEGATIVE_HOLDOUTS
-                && evidence.executedPositiveHoldouts()
-                    == evidence.configuredPositiveHoldouts()
-                && evidence.executedNegativeHoldouts()
-                    == evidence.configuredNegativeHoldouts()
+            releaseHoldoutsComplete(evidence)
                 && evidence.refutingHoldouts() == 0,
             holdoutSummary(evidence),
             ">=" + MIN_RELEASE_POSITIVE_HOLDOUTS + " positive and >="
@@ -206,22 +188,11 @@ public final class ReleaseReadinessMatrix {
             "evaluated with positive held-out gain"));
         checks.add(check("THREE_CLEAN_RUNS",
             evidence.cleanRunCount() >= 3 && evidence.cleanRunsIdentical(),
-            evidence.cleanRunCount() + " runs; identical="
-                + evidence.cleanRunsIdentical(),
+            cleanRunSummary(evidence),
             ">=3 identical canonical manifests"));
         return checks.stream()
             .sorted(Comparator.comparing(RequirementCheck::code))
             .toList();
-    }
-
-    private static String holdoutSummary(
-        AutonomousCampaignReleaseEvidence evidence
-    ) {
-        return "positive=" + evidence.executedPositiveHoldouts() + '/'
-            + evidence.configuredPositiveHoldouts()
-            + "; negative=" + evidence.executedNegativeHoldouts() + '/'
-            + evidence.configuredNegativeHoldouts()
-            + "; refuting=" + evidence.refutingHoldouts();
     }
 
     private static List<RequirementCheck> externalNoveltyChecks(
@@ -238,6 +209,47 @@ public final class ReleaseReadinessMatrix {
             check("PUBLIC_EVIDENCE_REVIEWED",
                 evidence.publicEvidenceReviewed(),
                 evidence.publicEvidenceReviewed(), true));
+    }
+
+    private static boolean developmentHoldoutsComplete(
+        AutonomousCampaignReleaseEvidence evidence
+    ) {
+        return evidence.configuredPositiveHoldouts() > 0
+            && evidence.configuredNegativeHoldouts() > 0
+            && evidence.executedPositiveHoldouts()
+                == evidence.configuredPositiveHoldouts()
+            && evidence.executedNegativeHoldouts()
+                == evidence.configuredNegativeHoldouts();
+    }
+
+    private static boolean releaseHoldoutsComplete(
+        AutonomousCampaignReleaseEvidence evidence
+    ) {
+        return evidence.configuredPositiveHoldouts()
+                >= MIN_RELEASE_POSITIVE_HOLDOUTS
+            && evidence.configuredNegativeHoldouts()
+                >= MIN_RELEASE_NEGATIVE_HOLDOUTS
+            && evidence.executedPositiveHoldouts()
+                == evidence.configuredPositiveHoldouts()
+            && evidence.executedNegativeHoldouts()
+                == evidence.configuredNegativeHoldouts();
+    }
+
+    private static String holdoutSummary(
+        AutonomousCampaignReleaseEvidence evidence
+    ) {
+        return "positive=" + evidence.executedPositiveHoldouts() + '/'
+            + evidence.configuredPositiveHoldouts()
+            + "; negative=" + evidence.executedNegativeHoldouts() + '/'
+            + evidence.configuredNegativeHoldouts()
+            + "; refuting=" + evidence.refutingHoldouts();
+    }
+
+    private static String cleanRunSummary(
+        AutonomousCampaignReleaseEvidence evidence
+    ) {
+        return evidence.cleanRunCount() + " runs; identical="
+            + evidence.cleanRunsIdentical();
     }
 
     private static RequirementCheck check(
@@ -335,7 +347,7 @@ public final class ReleaseReadinessMatrix {
                 throw new IllegalArgumentException(
                     "matrix must contain every release evidence profile exactly once");
             }
-            ProfileResult autonomy = result(
+            ProfileResult autonomy = findResult(
                 profiles, ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN);
             if (autonomousCampaignStatus != autonomy.status()
                     || autonomyClaimAuthorized
@@ -352,7 +364,7 @@ public final class ReleaseReadinessMatrix {
         }
 
         public ProfileResult result(ReleaseEvidenceProfile profile) {
-            return result(profiles, profile);
+            return findResult(profiles, profile);
         }
 
         public String toCanonicalJson() {
@@ -384,7 +396,7 @@ public final class ReleaseReadinessMatrix {
         }
     }
 
-    private static ProfileResult result(
+    private static ProfileResult findResult(
         List<ProfileResult> profiles,
         ReleaseEvidenceProfile profile
     ) {
