@@ -1,0 +1,95 @@
+name: Release Readiness
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: release-readiness-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Test and generate release readiness evidence
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :regelsuche-release:test \
+            2>&1 | tee release-readiness-build.log
+
+      - name: Require release evidence artifacts
+        shell: bash
+        run: |
+          DIR=regelsuche-release/build/reports/release-readiness
+          test -s "$DIR/profiles.json"
+          test -s "$DIR/evidence-summary.json"
+          test -s "$DIR/release-readiness-report.json"
+          test -s "$DIR/release-readiness-run.json"
+          test -s "$DIR/campaign/production-campaign-manifest.json"
+          test -s "$DIR/campaign/campaign-resource-ledger.json"
+          test -s "$DIR/campaign/feedback-reallocation.json"
+          test -s "$DIR/campaign/proof-obligation.json"
+
+      - name: Verify the current fail-closed matrix
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path("regelsuche-release/build/reports/release-readiness")
+          matrix = json.loads((root / "release-readiness-report.json").read_text())
+          evidence = json.loads((root / "evidence-summary.json").read_text())
+          profiles = {entry["profile"]: entry for entry in matrix["profiles"]}
+
+          assert len(profiles) == 5, profiles.keys()
+          assert profiles["SEARCH_REPRODUCIBILITY"]["status"] == "READY"
+          assert profiles["OPEN_TARGET_DISCOVERY"]["status"] == "READY"
+          assert profiles["AUTONOMOUS_CAMPAIGN"]["status"] == "BLOCKED"
+          assert matrix["autonomyClaimAuthorized"] is False
+          assert profiles["AUTONOMOUS_CAMPAIGN"]["blockers"] == [
+              "BALANCED_RELEASE_HOLDOUT_SUITE",
+              "HELD_OUT_FAMILY_OR_CLUSTER",
+              "PAIRED_HELD_OUT_UTILITY",
+          ]
+          codes = {check["code"] for check in profiles["AUTONOMOUS_CAMPAIGN"]["checks"]}
+          assert "DOMAIN_GENERIC_SEARCH_INTERFACE" not in codes
+          assert "FRESH_HOLDOUTS_AT_LEAST_ONE_HUNDRED" not in codes
+          assert evidence["configuredPositiveHoldouts"] == 3
+          assert evidence["executedPositiveHoldouts"] == 3
+          assert evidence["configuredNegativeHoldouts"] == 3
+          assert evidence["executedNegativeHoldouts"] == 3
+          assert evidence["cleanRunCount"] == 3
+          assert evidence["cleanRunsIdentical"] is True
+          PY
+
+      - name: Upload release readiness evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-readiness
+          path: |
+            release-readiness-build.log
+            regelsuche-release/build/test-results/**
+            regelsuche-release/build/reports/tests/**
+            regelsuche-release/build/reports/release-readiness/**
+          if-no-files-found: warn

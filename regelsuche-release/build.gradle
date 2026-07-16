@@ -1,0 +1,67 @@
+plugins {
+    id 'java-library'
+    id 'application'
+    id 'jacoco'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = 'de.regelsuche.release.ReleaseReadinessMain'
+}
+
+dependencies {
+    api project(':regelsuche-autopilot')
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.register('runReleaseReadiness', JavaExec) {
+    group = 'verification'
+    description = 'Evaluates all Regelsuche 0.2 evidence profiles fail-closed.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    args layout.buildDirectory.dir('reports/release-readiness')
+        .get().asFile.absolutePath
+}
+
+tasks.register('verifyAutonomousCampaignRelease', JavaExec) {
+    group = 'verification'
+    description = 'Fails unless the AUTONOMOUS_CAMPAIGN release profile is ready.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    args layout.buildDirectory.dir('reports/release-readiness-verification')
+        .get().asFile.absolutePath,
+        '--require-ready'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport')
+}
