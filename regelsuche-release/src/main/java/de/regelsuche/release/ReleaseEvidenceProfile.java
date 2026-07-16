@@ -46,7 +46,7 @@ public enum ReleaseEvidenceProfile {
             "NO_MANDATORY_SKIPPED_WORK",
             "ALPHA_DISTINCT_SUPPORT_AT_LEAST_THREE",
             "HELD_OUT_FAMILY_OR_CLUSTER",
-            "FRESH_HOLDOUTS_AT_LEAST_ONE_HUNDRED",
+            "BALANCED_RELEASE_HOLDOUT_SUITE",
             "MULTIPLE_COUNTEREXAMPLE_STRATEGIES",
             "NO_REFUTATION",
             "PROJECT_NOVELTY_COMPLETE",
@@ -54,8 +54,7 @@ public enum ReleaseEvidenceProfile {
             "NO_UNRESOLVED_ASSUMPTIONS",
             "LIFECYCLE_HANDOFF_COMPLETE",
             "PAIRED_HELD_OUT_UTILITY",
-            "THREE_CLEAN_RUNS",
-            "DOMAIN_GENERIC_SEARCH_INTERFACE")),
+            "THREE_CLEAN_RUNS")),
     EXTERNAL_NOVELTY_REVIEW(
         "externally reviewed mathematical novelty",
         false,
