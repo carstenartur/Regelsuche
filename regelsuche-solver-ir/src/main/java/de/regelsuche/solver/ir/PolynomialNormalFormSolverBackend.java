@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 
 /** Exact polynomial-identity backend over deterministic rational normal forms. */
 public final class PolynomialNormalFormSolverBackend implements SolverBackend {
@@ -71,7 +72,7 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
             ResultStatus status = status(evidence.status(), evidence.resultType());
             String certificate = status == ResultStatus.CONFIRMED
                     || status == ResultStatus.REFUTED
-                ? SolverIr.sha256(evidence.payload().toString())
+                ? SolverIr.sha256(canonicalPayload(evidence.payload()))
                 : "";
             return SolverResult.create(
                 obligation,
@@ -97,6 +98,15 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
                 Map.of(),
                 "");
         }
+    }
+
+    private static String canonicalPayload(Map<String, Object> payload) {
+        TreeMap<String, String> ordered = new TreeMap<>();
+        payload.forEach((key, value) -> ordered.put(
+            key, value == null ? "" : value.toString()));
+        return ordered.entrySet().stream()
+            .map(entry -> entry.getKey() + '=' + entry.getValue())
+            .collect(java.util.stream.Collectors.joining("\n"));
     }
 
     private static ResultStatus status(
