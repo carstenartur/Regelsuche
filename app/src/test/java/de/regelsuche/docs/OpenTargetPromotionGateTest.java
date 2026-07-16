@@ -18,12 +18,20 @@ import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyMatch;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
-import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofObligation;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.mining.OpenTargetHypothesisCandidateAdapter;
 import de.regelsuche.proof.ProofPolicy;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverObligationFactory;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -35,11 +43,13 @@ class OpenTargetPromotionGateTest {
     @Test
     void promotesAndPublishesOnlyAfterAllIndependentGatesPass() {
         Fixture fixture = fixture(false);
+        ProofReport proof = proof(
+            fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED);
 
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             novel(fixture.conjecture().conjectureId()),
-            proof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            proof,
             materialAblation(),
             ProofPolicy.PROOF_OPTIONAL,
             "SCRIPT_GENERATED"));
@@ -47,7 +57,8 @@ class OpenTargetPromotionGateTest {
         assertTrue(decision.promoted());
         assertTrue(decision.publicEvidenceAccepted());
         assertEquals(PromotionStage.PROMOTED, decision.promotionRecord().stage());
-        assertEquals(de.regelsuche.docs.NoveltyStatus.NEW, decision.publicNoveltyStatus());
+        assertEquals(de.regelsuche.docs.NoveltyStatus.NEW,
+            decision.publicNoveltyStatus());
         assertEquals("NOVEL_WITHIN_PROJECT", decision.projectNoveltyStatus());
         assertEquals("NOT_EVALUATED", decision.externalNoveltyStatus());
         assertEquals("SYMBOLICALLY_VERIFIED", decision.symbolicProofStatus());
@@ -63,7 +74,8 @@ class OpenTargetPromotionGateTest {
         assertTrue(json.contains("\"interestingnessStatus\":\"NOT_EVALUATED\""));
         assertTrue(json.contains("\"sourceCampaign\":\"open-target-campaign-2026-07\""));
         assertTrue(json.contains("\"evaluationProvenanceHash\":\"" + hash('e') + "\""));
-        assertTrue(json.contains("\"proofObligationHash\":\"" + hash('d') + "\""));
+        assertTrue(json.contains("\"proofObligationHash\":\""
+            + proof.obligation().contentHash() + "\""));
     }
 
     @Test
@@ -408,27 +420,49 @@ class OpenTargetPromotionGateTest {
         OpenTargetConjecture conjecture,
         ProofStatus status
     ) {
-        ProofObligation obligation = new ProofObligation(
-            de.regelsuche.mining.OpenTargetConjectureProofGate.OBLIGATION_SCHEMA,
-            conjecture.conjectureId(),
-            false,
+        SolverObligationFactory factory = new SolverObligationFactory();
+        SolverIr.Obligation obligation = factory.equality(
+            conjecture.conjectureId() + "-proof",
             conjecture.leftPattern(),
             conjecture.rightPattern(),
             List.of(),
-            hash('d'));
+            RequestedEvidence.SYMBOLIC_CERTIFICATE,
+            new SourceProvenance(
+                "open-target-conjecture",
+                conjecture.conjectureId(),
+                hash('d')));
+        BackendDescriptor descriptor = new BackendDescriptor(
+            "sympy-equivalence",
+            "1",
+            List.of(Theory.REAL_ARITHMETIC),
+            List.of(SolverIr.Relation.EQUALS),
+            List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
+            true);
+        ResultStatus backendStatus = status == ProofStatus.SYMBOLICALLY_VERIFIED
+            ? ResultStatus.CONFIRMED : ResultStatus.UNKNOWN;
+        String evidence = status == ProofStatus.SYMBOLICALLY_VERIFIED
+            ? "validated by deterministic symbolic equivalence"
+            : "no equivalence evidence found";
+        SolverResult result = SolverResult.create(
+            obligation,
+            descriptor,
+            backendStatus,
+            TranslationStatus.LOSSLESS,
+            List.of("SYMBOLIC_EQUIVALENCE"),
+            List.of(),
+            evidence,
+            Map.of(),
+            backendStatus == ResultStatus.CONFIRMED ? hash('g') : "");
         List<String> blockers = status == ProofStatus.SYMBOLICALLY_VERIFIED
             ? List.of()
-            : List.of("oracle produced no conclusive equivalence result");
+            : List.of("solver backend produced no conclusive result");
         return new ProofReport(
             de.regelsuche.mining.OpenTargetConjectureProofGate.REPORT_SCHEMA,
             conjecture.conjectureId(),
             EligibilityStatus.ELIGIBLE,
             status,
             obligation,
-            "sympy-equivalence-v1",
-            status == ProofStatus.SYMBOLICALLY_VERIFIED
-                ? "validated by deterministic symbolic equivalence"
-                : "no equivalence evidence found",
+            result,
             "NOT_EVALUATED",
             blockers,
             hash('f'));
