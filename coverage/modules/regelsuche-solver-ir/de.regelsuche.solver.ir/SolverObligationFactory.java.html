@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolverObligationFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">SolverObligationFactory.java</span></div><h1>SolverObligationFactory.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.solver.ir.SolverIr.Call;
+import de.regelsuche.solver.ir.SolverIr.Expression;
+import de.regelsuche.solver.ir.SolverIr.Goal;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Predicate;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.Sort;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import de.regelsuche.solver.ir.SolverIr.SymbolDeclaration;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/** Creates canonical bounded-algebra obligations from existing expression strings. */
+<span class="fc" id="L20">public final class SolverObligationFactory {</span>
+<span class="fc" id="L21">    private final CoreExpressionIrAdapter expressions = new CoreExpressionIrAdapter();</span>
+<span class="fc" id="L22">    private final StructuredAssumptionParser assumptionParser =</span>
+        new StructuredAssumptionParser();
+
+    public Obligation equality(
+        String obligationId,
+        String leftExpression,
+        String rightExpression,
+        List&lt;String&gt; assumptions,
+        RequestedEvidence requestedEvidence,
+        SourceProvenance provenance
+    ) {
+<span class="fc" id="L33">        return relation(</span>
+            obligationId,
+            Relation.EQUALS,
+            leftExpression,
+            rightExpression,
+            assumptions,
+            requestedEvidence,
+            provenance);
+    }
+
+    public Obligation relation(
+        String obligationId,
+        Relation relation,
+        String leftExpression,
+        String rightExpression,
+        List&lt;String&gt; assumptions,
+        RequestedEvidence requestedEvidence,
+        SourceProvenance provenance
+    ) {
+<span class="fc" id="L52">        Expression left = expressions.parse(leftExpression);</span>
+<span class="fc" id="L53">        Expression right = expressions.parse(rightExpression);</span>
+<span class="fc" id="L54">        List&lt;Predicate&gt; predicates = assumptionParser.parse(assumptions);</span>
+<span class="fc" id="L55">        Goal goal = new Goal(relation, left, right);</span>
+
+<span class="fc" id="L57">        LinkedHashSet&lt;String&gt; symbols = new LinkedHashSet&lt;&gt;(goal.referencedSymbols());</span>
+<span class="fc" id="L58">        predicates.forEach(predicate -&gt; symbols.addAll(predicate.referencedSymbols()));</span>
+<span class="fc" id="L59">        List&lt;SymbolDeclaration&gt; declarations = symbols.stream().sorted()</span>
+<span class="fc" id="L60">            .map(name -&gt; new SymbolDeclaration(name, Sort.REAL))</span>
+<span class="fc" id="L61">            .toList();</span>
+
+<span class="fc" id="L63">        LinkedHashSet&lt;Theory&gt; theories = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L64">        theories.add(Theory.REAL_ARITHMETIC);</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (containsCall(left) || containsCall(right)</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                || predicates.stream().anyMatch(predicate -&gt;</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                    containsCall(predicate.left())</span>
+<span class="pc bpc" id="L68" title="2 of 4 branches missed.">                        || predicate.right() != null &amp;&amp; containsCall(predicate.right()))) {</span>
+<span class="fc" id="L69">            theories.add(Theory.TRANSCENDENTAL_FUNCTIONS);</span>
+        }
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (predicates.stream().anyMatch(predicate -&gt;</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                predicate.relation() == Relation.IS_INTEGER)) {</span>
+<span class="nc" id="L73">            theories.add(Theory.INTEGER_ARITHMETIC);</span>
+        }
+
+<span class="fc" id="L76">        return Obligation.create(</span>
+            obligationId,
+            declarations,
+            new ArrayList&lt;&gt;(theories),
+            predicates,
+            goal,
+            requestedEvidence,
+            provenance);
+    }
+
+    private static boolean containsCall(Expression expression) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (expression instanceof Call) {</span>
+<span class="fc" id="L88">            return true;</span>
+        }
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (expression instanceof SolverIr.Binary binary) {</span>
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">            return containsCall(binary.left()) || containsCall(binary.right());</span>
+        }
+<span class="fc" id="L93">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

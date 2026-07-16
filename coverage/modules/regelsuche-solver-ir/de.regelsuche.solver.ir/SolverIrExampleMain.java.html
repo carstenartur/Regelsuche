@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolverIrExampleMain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">SolverIrExampleMain.java</span></div><h1>SolverIrExampleMain.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+/** Writes annotated, deterministic two-backend solver IR examples. */
+public final class SolverIrExampleMain {
+    private SolverIrExampleMain() {
+    }
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L20" title="All 2 branches missed.">        Path output = args.length == 0</span>
+<span class="nc" id="L21">            ? Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;solver-ir&quot;)</span>
+<span class="nc" id="L22">            : Path.of(args[0]);</span>
+<span class="nc" id="L23">        SolverObligationFactory factory = new SolverObligationFactory();</span>
+<span class="nc" id="L24">        SourceProvenance provenance = new SourceProvenance(</span>
+            &quot;documentation-example&quot;,
+            &quot;solver-neutral-ir&quot;,
+<span class="nc" id="L27">            SolverIr.sha256(&quot;solver-neutral-ir-example/v1&quot;));</span>
+<span class="nc" id="L28">        Obligation obligation = factory.equality(</span>
+            &quot;additive-identity&quot;,
+            &quot;x + 0&quot;,
+            &quot;x&quot;,
+<span class="nc" id="L32">            List.of(),</span>
+            RequestedEvidence.DECISION,
+            provenance);
+<span class="nc" id="L35">        SolverExecution search = new RegelsucheSearchBackend().execute(obligation);</span>
+<span class="nc" id="L36">        SolverExecution polynomial = new PolynomialNormalFormSolverBackend()</span>
+<span class="nc" id="L37">            .execute(obligation);</span>
+
+<span class="nc" id="L39">        Obligation assumptionBound = factory.equality(</span>
+            &quot;division-identity&quot;,
+            &quot;x / x&quot;,
+            &quot;1&quot;,
+<span class="nc" id="L43">            List.of(&quot;x != 0&quot;),</span>
+            RequestedEvidence.DECISION,
+            provenance);
+<span class="nc" id="L46">        SolverExecution unsupported = new RegelsucheSearchBackend()</span>
+<span class="nc" id="L47">            .execute(assumptionBound);</span>
+<span class="nc" id="L48">        write(output, obligation, search, polynomial, assumptionBound, unsupported);</span>
+<span class="nc" id="L49">    }</span>
+
+    private static void write(
+        Path output,
+        Obligation obligation,
+        SolverExecution search,
+        SolverExecution polynomial,
+        Obligation assumptionBound,
+        SolverExecution unsupported
+    ) {
+        try {
+<span class="nc" id="L60">            Files.createDirectories(output);</span>
+<span class="nc" id="L61">            write(output.resolve(&quot;obligation.json&quot;), obligation.toCanonicalJson());</span>
+<span class="nc" id="L62">            writeExecution(output, &quot;regelsuche-search&quot;, search);</span>
+<span class="nc" id="L63">            writeExecution(output, &quot;polynomial-normal-form&quot;, polynomial);</span>
+<span class="nc" id="L64">            write(output.resolve(&quot;assumption-obligation.json&quot;),</span>
+<span class="nc" id="L65">                assumptionBound.toCanonicalJson());</span>
+<span class="nc" id="L66">            writeExecution(output, &quot;unsupported&quot;, unsupported);</span>
+<span class="nc" id="L67">            String manifest = new JsonWriter().beginObject()</span>
+<span class="nc" id="L68">                .property(&quot;schema&quot;, &quot;regelsuche.solver-ir-example/v1&quot;)</span>
+<span class="nc" id="L69">                .property(&quot;obligationHash&quot;, obligation.contentHash())</span>
+<span class="nc" id="L70">                .property(&quot;searchExecutionHash&quot;, search.contentHash())</span>
+<span class="nc" id="L71">                .property(&quot;polynomialExecutionHash&quot;, polynomial.contentHash())</span>
+<span class="nc" id="L72">                .property(&quot;sameObligationSubmittedToBothBackends&quot;,</span>
+<span class="nc" id="L73">                    search.obligationHash().equals(polynomial.obligationHash()))</span>
+<span class="nc" id="L74">                .property(&quot;assumptionObligationHash&quot;, assumptionBound.contentHash())</span>
+<span class="nc" id="L75">                .property(&quot;unsupportedExecutionHash&quot;, unsupported.contentHash())</span>
+<span class="nc" id="L76">                .property(&quot;unsupportedBeforeExecution&quot;,</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                    unsupported.result().status()</span>
+                        == SolverIr.ResultStatus.UNSUPPORTED)
+<span class="nc" id="L79">                .endObject().toString();</span>
+<span class="nc" id="L80">            write(output.resolve(&quot;manifest.json&quot;), manifest);</span>
+<span class="nc" id="L81">        } catch (IOException exception) {</span>
+<span class="nc" id="L82">            throw new UncheckedIOException(&quot;could not write solver IR example&quot;, exception);</span>
+<span class="nc" id="L83">        }</span>
+<span class="nc" id="L84">    }</span>
+
+    private static void writeExecution(
+        Path output,
+        String prefix,
+        SolverExecution execution
+    ) throws IOException {
+<span class="nc" id="L91">        write(output.resolve(prefix + &quot;-translation.json&quot;),</span>
+<span class="nc" id="L92">            execution.translation().toCanonicalJson());</span>
+<span class="nc" id="L93">        write(output.resolve(prefix + &quot;-result.json&quot;),</span>
+<span class="nc" id="L94">            execution.result().toCanonicalJson());</span>
+<span class="nc" id="L95">        write(output.resolve(prefix + &quot;-execution.json&quot;),</span>
+<span class="nc" id="L96">            execution.toCanonicalJson());</span>
+<span class="nc" id="L97">    }</span>
+
+    private static void write(Path path, String value) throws IOException {
+<span class="nc" id="L100">        Files.writeString(path, value, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L101">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

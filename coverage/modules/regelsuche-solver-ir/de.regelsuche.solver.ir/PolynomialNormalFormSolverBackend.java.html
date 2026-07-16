@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialNormalFormSolverBackend.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">PolynomialNormalFormSolverBackend.java</span></div><h1>PolynomialNormalFormSolverBackend.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.Binary;
+import de.regelsuche.solver.ir.SolverIr.Expression;
+import de.regelsuche.solver.ir.SolverIr.Literal;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry.ExecutionStatus;
+import de.regelsuche.validation.MathematicalAlgorithmRegistry.ResultType;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Exact polynomial-identity backend over deterministic rational normal forms. */
+<span class="fc" id="L26">public final class PolynomialNormalFormSolverBackend implements SolverBackend {</span>
+<span class="fc" id="L27">    private static final BackendDescriptor DESCRIPTOR = new BackendDescriptor(</span>
+        &quot;polynomial-normal-form&quot;,
+        &quot;1&quot;,
+<span class="fc" id="L30">        List.of(Theory.REAL_ARITHMETIC),</span>
+<span class="fc" id="L31">        List.of(Relation.EQUALS),</span>
+<span class="fc" id="L32">        List.of(RequestedEvidence.DECISION,</span>
+            RequestedEvidence.SYMBOLIC_CERTIFICATE),
+        true);
+
+<span class="fc" id="L36">    private final CoreExpressionIrAdapter expressions = new CoreExpressionIrAdapter();</span>
+<span class="fc" id="L37">    private final PolynomialNormalFormEquivalenceService service =</span>
+        new PolynomialNormalFormEquivalenceService(
+            new DefaultMathematicalAlgorithmRegistry());
+
+    @Override
+    public BackendDescriptor descriptor() {
+<span class="nc" id="L43">        return DESCRIPTOR;</span>
+    }
+
+    @Override
+    public SolverExecution execute(Obligation obligation) {
+<span class="fc" id="L48">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L49">        String left = expressions.render(obligation.goal().left());</span>
+<span class="fc" id="L50">        String right = expressions.render(obligation.goal().right());</span>
+<span class="fc" id="L51">        Map&lt;String, String&gt; terms = Map.of(</span>
+            &quot;goal.left&quot;, left,
+            &quot;goal.right&quot;, right);
+<span class="fc" id="L54">        List&lt;String&gt; issues = new ArrayList&lt;&gt;(SolverBackendSupport.issues(</span>
+            obligation, DESCRIPTOR, false));
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!isPolynomial(obligation.goal().left())</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">                || !isPolynomial(obligation.goal().right())) {</span>
+<span class="fc" id="L58">            issues.add(&quot;UNSUPPORTED_EXPRESSION_FRAGMENT:POLYNOMIAL_ONLY&quot;);</span>
+        }
+<span class="fc" id="L60">        issues = issues.stream().distinct().sorted().toList();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        if (!issues.isEmpty()) {</span>
+<span class="fc" id="L62">            return SolverBackendSupport.rejectedExecution(</span>
+                obligation, DESCRIPTOR, issues, terms);
+        }
+
+<span class="fc" id="L66">        SolverTranslation translation = SolverTranslation.create(</span>
+            obligation,
+            DESCRIPTOR,
+            TranslationStatus.LOSSLESS,
+<span class="fc" id="L70">            List.of(),</span>
+            terms);
+        SolverResult result;
+        try {
+<span class="fc" id="L74">            service.arePolynomiallyEquivalent(left, right);</span>
+<span class="fc" id="L75">            var evidence = service.lastResult();</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (evidence.status() == ExecutionStatus.DISABLED</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                    || evidence.status() == ExecutionStatus.UNAVAILABLE) {</span>
+<span class="nc" id="L78">                result = SolverResult.create(</span>
+                    obligation,
+                    DESCRIPTOR,
+                    ResultStatus.ERROR,
+                    TranslationStatus.LOSSLESS,
+<span class="nc" id="L83">                    List.of(&quot;DETERMINISTIC_POLYNOMIAL_NORMAL_FORM&quot;),</span>
+<span class="nc" id="L84">                    List.of(),</span>
+<span class="nc" id="L85">                    &quot;backend &quot; + evidence.status().name().toLowerCase(),</span>
+<span class="nc" id="L86">                    Map.of(),</span>
+                    &quot;&quot;);
+            } else {
+<span class="fc" id="L89">                ResultStatus status = status(</span>
+<span class="fc" id="L90">                    evidence.status(), evidence.resultType());</span>
+                String certificate = status == ResultStatus.CONFIRMED
+<span class="pc bpc" id="L92" title="1 of 4 branches missed.">                        || status == ResultStatus.REFUTED</span>
+<span class="fc" id="L93">                    ? SolverIr.sha256(canonicalPayload(evidence.payload()))</span>
+<span class="pc" id="L94">                    : &quot;&quot;;</span>
+<span class="fc" id="L95">                result = SolverResult.create(</span>
+                    obligation,
+                    DESCRIPTOR,
+                    status,
+                    TranslationStatus.LOSSLESS,
+<span class="fc" id="L100">                    List.of(</span>
+                        &quot;DETERMINISTIC_POLYNOMIAL_NORMAL_FORM&quot;,
+                        &quot;EXACT_RATIONAL_COEFFICIENTS&quot;),
+<span class="fc" id="L103">                    List.of(),</span>
+<span class="fc" id="L104">                    evidence.detail(),</span>
+<span class="fc" id="L105">                    Map.of(),</span>
+                    certificate);
+            }
+<span class="nc" id="L108">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L109">            result = SolverResult.create(</span>
+                obligation,
+                DESCRIPTOR,
+                ResultStatus.ERROR,
+                TranslationStatus.LOSSLESS,
+<span class="nc" id="L114">                List.of(&quot;DETERMINISTIC_POLYNOMIAL_NORMAL_FORM&quot;),</span>
+<span class="nc" id="L115">                List.of(),</span>
+<span class="nc" id="L116">                exception.getClass().getSimpleName() + &quot;: &quot; + exception.getMessage(),</span>
+<span class="nc" id="L117">                Map.of(),</span>
+                &quot;&quot;);
+<span class="fc" id="L119">        }</span>
+<span class="fc" id="L120">        return SolverExecution.create(obligation, translation, result);</span>
+    }
+
+    private static String canonicalPayload(Map&lt;String, Object&gt; payload) {
+<span class="fc" id="L124">        TreeMap&lt;String, String&gt; ordered = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L125">        payload.forEach((key, value) -&gt; ordered.put(</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            key, value == null ? &quot;&quot; : value.toString()));</span>
+<span class="fc" id="L127">        return ordered.entrySet().stream()</span>
+<span class="fc" id="L128">            .map(entry -&gt; entry.getKey() + '=' + entry.getValue())</span>
+<span class="fc" id="L129">            .collect(java.util.stream.Collectors.joining(&quot;\n&quot;));</span>
+    }
+
+    private static ResultStatus status(
+        ExecutionStatus executionStatus,
+        ResultType resultType
+    ) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (executionStatus != ExecutionStatus.SUCCESS) {</span>
+<span class="nc bnc" id="L137" title="All 3 branches missed.">            return switch (executionStatus) {</span>
+<span class="nc" id="L138">                case BUDGET_EXHAUSTED -&gt; ResultStatus.TIMEOUT;</span>
+<span class="nc" id="L139">                case UNKNOWN -&gt; ResultStatus.UNKNOWN;</span>
+<span class="nc" id="L140">                case DISABLED, UNAVAILABLE, SUCCESS -&gt; throw new IllegalStateException(</span>
+                    &quot;execution status must be handled before result classification&quot;);
+            };
+        }
+<span class="pc bpc" id="L144" title="1 of 3 branches missed.">        return switch (resultType) {</span>
+<span class="fc" id="L145">            case PROOF -&gt; ResultStatus.CONFIRMED;</span>
+<span class="fc" id="L146">            case REFUTATION -&gt; ResultStatus.REFUTED;</span>
+<span class="nc" id="L147">            case HYPOTHESIS, DIAGNOSTIC -&gt; ResultStatus.UNKNOWN;</span>
+        };
+    }
+
+    private static boolean isPolynomial(Expression expression) {
+<span class="fc bfc" id="L152" title="All 4 branches covered.">        if (expression instanceof Literal || expression instanceof SolverIr.Symbol) {</span>
+<span class="fc" id="L153">            return true;</span>
+        }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (!(expression instanceof Binary binary)) {</span>
+<span class="fc" id="L156">            return false;</span>
+        }
+<span class="pc bpc" id="L158" title="1 of 4 branches missed.">        if (!isPolynomial(binary.left()) || !isPolynomial(binary.right())) {</span>
+<span class="fc" id="L159">            return false;</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 3 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L162">            case ADD, SUBTRACT, MULTIPLY -&gt; true;</span>
+<span class="fc" id="L163">            case DIVIDE -&gt; false;</span>
+<span class="nc" id="L164">            case POWER -&gt; nonNegativeIntegerExponent(binary.right());</span>
+        };
+    }
+
+    private static boolean nonNegativeIntegerExponent(Expression expression) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (!(expression instanceof Literal literal)) {</span>
+<span class="nc" id="L170">            return false;</span>
+        }
+        try {
+<span class="nc" id="L173">            BigDecimal value = new BigDecimal(literal.value()).stripTrailingZeros();</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            return value.scale() &lt;= 0</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">                &amp;&amp; value.signum() &gt;= 0</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                &amp;&amp; value.compareTo(BigDecimal.valueOf(20)) &lt;= 0;</span>
+<span class="nc" id="L177">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L178">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

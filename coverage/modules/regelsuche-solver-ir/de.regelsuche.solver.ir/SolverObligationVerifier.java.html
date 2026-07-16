@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolverObligationVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">SolverObligationVerifier.java</span></div><h1>SolverObligationVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import java.util.List;
+import java.util.Objects;
+
+/** Reconstructs expected obligations instead of duplicating field-level checks. */
+<span class="nc" id="L10">public final class SolverObligationVerifier {</span>
+<span class="nc" id="L11">    private final SolverObligationFactory factory = new SolverObligationFactory();</span>
+
+    public boolean matchesEquality(
+        Obligation actual,
+        String sourceId,
+        String leftExpression,
+        String rightExpression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="nc bnc" id="L20" title="All 6 branches missed.">        if (actual == null || sourceId == null || sourceId.isBlank()) {</span>
+<span class="nc" id="L21">            return false;</span>
+        }
+        try {
+<span class="nc" id="L24">            Obligation expected = factory.relation(</span>
+<span class="nc" id="L25">                actual.obligationId(),</span>
+                Relation.EQUALS,
+                leftExpression,
+                rightExpression,
+                assumptions,
+<span class="nc" id="L30">                actual.requestedEvidence(),</span>
+<span class="nc" id="L31">                actual.provenance());</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">            return sourceId.equals(actual.provenance().sourceId())</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">                &amp;&amp; expected.contentHash().equals(actual.contentHash());</span>
+<span class="nc" id="L34">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L35">            return false;</span>
+        }
+    }
+
+    public boolean resultBelongsTo(
+        Obligation obligation,
+        SolverResult result
+    ) {
+<span class="nc bnc" id="L43" title="All 4 branches missed.">        return obligation != null</span>
+            &amp;&amp; result != null
+<span class="nc bnc" id="L45" title="All 2 branches missed.">            &amp;&amp; Objects.equals(result.obligationHash(), obligation.contentHash())</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">            &amp;&amp; Objects.equals(result.goalHash(), obligation.goalHash())</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">            &amp;&amp; Objects.equals(result.assumptionsHash(), obligation.assumptionsHash());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

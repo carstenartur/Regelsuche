@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StructuredAssumptionParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">StructuredAssumptionParser.java</span></div><h1>StructuredAssumptionParser.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.solver.ir.SolverIr.Predicate;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Converts the bounded legacy assumption syntax into typed IR predicates. */
+<span class="fc" id="L13">public final class StructuredAssumptionParser {</span>
+<span class="fc" id="L14">    private static final Pattern COMPARISON = Pattern.compile(</span>
+        &quot;^(.+?)\\s*(&lt;=|&gt;=|!=|=|&lt;|&gt;)\\s*(.+)$&quot;);
+<span class="fc" id="L16">    private static final Pattern INTEGER = Pattern.compile(</span>
+        &quot;^([A-Za-z][A-Za-z0-9_]*)\\s+is\\s+integer$&quot;,
+        Pattern.CASE_INSENSITIVE);
+
+<span class="fc" id="L20">    private final CoreExpressionIrAdapter expressions = new CoreExpressionIrAdapter();</span>
+
+    public List&lt;Predicate&gt; parse(List&lt;String&gt; assumptions) {
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        if (assumptions == null) {</span>
+<span class="nc" id="L24">            return List.of();</span>
+        }
+<span class="fc" id="L26">        List&lt;String&gt; ordered = assumptions.stream()</span>
+<span class="pc bpc" id="L27" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L28">            .map(value -&gt; value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;))</span>
+<span class="fc" id="L29">            .distinct()</span>
+<span class="fc" id="L30">            .sorted()</span>
+<span class="fc" id="L31">            .toList();</span>
+<span class="fc" id="L32">        List&lt;Predicate&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">        for (int index = 0; index &lt; ordered.size(); index++) {</span>
+<span class="fc" id="L34">            result.add(parseOne(String.format(Locale.ROOT, &quot;assumption-%03d&quot;, index + 1),</span>
+<span class="fc" id="L35">                ordered.get(index)));</span>
+        }
+<span class="fc" id="L37">        result.sort(Comparator.comparing(Predicate::id));</span>
+<span class="fc" id="L38">        return List.copyOf(result);</span>
+    }
+
+    private Predicate parseOne(String id, String assumption) {
+<span class="fc" id="L42">        Matcher integer = INTEGER.matcher(assumption);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (integer.matches()) {</span>
+<span class="nc" id="L44">            return new Predicate(</span>
+                id,
+                Relation.IS_INTEGER,
+<span class="nc" id="L47">                expressions.parse(integer.group(1)),</span>
+                null);
+        }
+<span class="fc" id="L50">        Matcher comparison = COMPARISON.matcher(assumption);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!comparison.matches()) {</span>
+<span class="fc" id="L52">            throw new IllegalArgumentException(</span>
+                &quot;unsupported structured assumption: &quot; + assumption);
+        }
+<span class="fc" id="L55">        return new Predicate(</span>
+            id,
+<span class="fc" id="L57">            relation(comparison.group(2)),</span>
+<span class="fc" id="L58">            expressions.parse(comparison.group(1)),</span>
+<span class="fc" id="L59">            expressions.parse(comparison.group(3)));</span>
+    }
+
+    private static Relation relation(String operator) {
+<span class="pc bpc" id="L63" title="5 of 7 branches missed.">        return switch (operator) {</span>
+<span class="nc" id="L64">            case &quot;=&quot; -&gt; Relation.EQUALS;</span>
+<span class="fc" id="L65">            case &quot;!=&quot; -&gt; Relation.NOT_EQUALS;</span>
+<span class="nc" id="L66">            case &quot;&lt;&quot; -&gt; Relation.LESS_THAN;</span>
+<span class="nc" id="L67">            case &quot;&lt;=&quot; -&gt; Relation.LESS_OR_EQUAL;</span>
+<span class="fc" id="L68">            case &quot;&gt;&quot; -&gt; Relation.GREATER_THAN;</span>
+<span class="nc" id="L69">            case &quot;&gt;=&quot; -&gt; Relation.GREATER_OR_EQUAL;</span>
+<span class="nc" id="L70">            default -&gt; throw new IllegalArgumentException(</span>
+                &quot;unsupported assumption relation: &quot; + operator);
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

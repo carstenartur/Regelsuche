@@ -297,7 +297,7 @@ import java.util.TreeSet;
     ) {
 <span class="pc bpc" id="L298" title="1 of 2 branches missed.">        String proofObligationHash = input.proof().obligation() == null</span>
 <span class="nc" id="L299">            ? &quot;&quot;</span>
-<span class="fc" id="L300">            : input.proof().obligation().obligationHash();</span>
+<span class="fc" id="L300">            : input.proof().obligation().contentHash();</span>
 <span class="fc" id="L301">        return new OpenTargetPromotionProvenance(</span>
 <span class="fc" id="L302">            input.sourceCampaign(),</span>
 <span class="fc" id="L303">            input.discoveryDate(),</span>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolverExecution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">SolverExecution.java</span></div><h1>SolverExecution.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import java.util.Objects;
+
+/** One atomic backend execution linking obligation, translation and result. */
+public record SolverExecution(
+    String schema,
+    String obligationHash,
+    SolverTranslation translation,
+    SolverResult result,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.solver-execution/v1&quot;;
+
+<span class="fc" id="L18">    public SolverExecution {</span>
+<span class="pc bpc" id="L19" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L20">            throw new IllegalArgumentException(&quot;unsupported solver execution schema&quot;);</span>
+        }
+<span class="fc" id="L22">        requireSha(obligationHash, &quot;obligationHash&quot;);</span>
+<span class="fc" id="L23">        Objects.requireNonNull(translation, &quot;translation&quot;);</span>
+<span class="fc" id="L24">        Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        if (!obligationHash.equals(translation.obligationHash())</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">                || !obligationHash.equals(result.obligationHash())) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(</span>
+                &quot;translation and result must reference the same obligation&quot;);
+        }
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (!translation.backendId().equals(result.backendId())</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">                || !translation.backendVersion().equals(result.backendVersion())) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(</span>
+                &quot;translation and result must reference the same backend revision&quot;);
+        }
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (translation.status() != result.translationStatus()</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">                || !translation.issues().equals(result.translationIssues())) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(</span>
+                &quot;result translation summary differs from translation artifact&quot;);
+        }
+<span class="fc" id="L40">        requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L41">        String expected = hash(obligationHash, translation, result);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(</span>
+                &quot;solver execution hash does not match canonical fields&quot;);
+        }
+<span class="fc" id="L46">    }</span>
+
+    public static SolverExecution create(
+        Obligation obligation,
+        SolverTranslation translation,
+        SolverResult result
+    ) {
+<span class="fc" id="L53">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L54">        Objects.requireNonNull(translation, &quot;translation&quot;);</span>
+<span class="fc" id="L55">        Objects.requireNonNull(result, &quot;result&quot;);</span>
+<span class="fc" id="L56">        return new SolverExecution(</span>
+            SCHEMA,
+<span class="fc" id="L58">            obligation.contentHash(),</span>
+            translation,
+            result,
+<span class="fc" id="L61">            hash(obligation.contentHash(), translation, result));</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="nc" id="L65">        return new JsonWriter().beginObject()</span>
+<span class="nc" id="L66">            .property(&quot;schema&quot;, schema)</span>
+<span class="nc" id="L67">            .property(&quot;obligationHash&quot;, obligationHash)</span>
+<span class="nc" id="L68">            .property(&quot;translationHash&quot;, translation.contentHash())</span>
+<span class="nc" id="L69">            .property(&quot;resultHash&quot;, result.contentHash())</span>
+<span class="nc" id="L70">            .property(&quot;backendId&quot;, result.backendId())</span>
+<span class="nc" id="L71">            .property(&quot;backendVersion&quot;, result.backendVersion())</span>
+<span class="nc" id="L72">            .property(&quot;translationStatus&quot;, translation.status().name())</span>
+<span class="nc" id="L73">            .property(&quot;resultStatus&quot;, result.status().name())</span>
+<span class="nc" id="L74">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="nc" id="L75">            .endObject()</span>
+<span class="nc" id="L76">            .toString();</span>
+    }
+
+    private static String hash(
+        String obligationHash,
+        SolverTranslation translation,
+        SolverResult result
+    ) {
+<span class="fc" id="L84">        return SolverIr.sha256(</span>
+            SCHEMA
+                + &quot;\nobligation=&quot; + obligationHash
+<span class="fc" id="L87">                + &quot;\ntranslation=&quot; + translation.contentHash()</span>
+<span class="fc" id="L88">                + &quot;\nresult=&quot; + result.contentHash());</span>
+    }
+
+    private static void requireSha(String value, String name) {
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L95">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

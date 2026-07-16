@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolverIrJsonCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">SolverIrJsonCodec.java</span></div><h1>SolverIrJsonCodec.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.solver.ir.SolverIr.Binary;
+import de.regelsuche.solver.ir.SolverIr.BinaryOperator;
+import de.regelsuche.solver.ir.SolverIr.Call;
+import de.regelsuche.solver.ir.SolverIr.Expression;
+import de.regelsuche.solver.ir.SolverIr.Goal;
+import de.regelsuche.solver.ir.SolverIr.Literal;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Predicate;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.Sort;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import de.regelsuche.solver.ir.SolverIr.Symbol;
+import de.regelsuche.solver.ir.SolverIr.SymbolDeclaration;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Strict JSON decoder that re-runs all canonical IR invariants and hash checks. */
+<span class="fc" id="L31">public final class SolverIrJsonCodec {</span>
+<span class="fc" id="L32">    private final ObjectMapper mapper = new ObjectMapper();</span>
+
+    public Obligation readObligation(String json) {
+<span class="fc" id="L35">        JsonNode root = parse(json);</span>
+<span class="fc" id="L36">        List&lt;SymbolDeclaration&gt; declarations = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        for (JsonNode item : array(root, &quot;declarations&quot;)) {</span>
+<span class="fc" id="L38">            declarations.add(new SymbolDeclaration(</span>
+<span class="fc" id="L39">                text(item, &quot;name&quot;),</span>
+<span class="fc" id="L40">                Sort.valueOf(text(item, &quot;sort&quot;))));</span>
+<span class="fc" id="L41">        }</span>
+<span class="fc" id="L42">        List&lt;Theory&gt; theories = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (JsonNode item : array(root, &quot;theories&quot;)) {</span>
+<span class="fc" id="L44">            theories.add(Theory.valueOf(item.asText()));</span>
+<span class="fc" id="L45">        }</span>
+<span class="fc" id="L46">        List&lt;Predicate&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (JsonNode item : array(root, &quot;assumptions&quot;)) {</span>
+<span class="fc" id="L48">            JsonNode right = item.get(&quot;right&quot;);</span>
+<span class="fc" id="L49">            assumptions.add(new Predicate(</span>
+<span class="fc" id="L50">                text(item, &quot;id&quot;),</span>
+<span class="fc" id="L51">                Relation.valueOf(text(item, &quot;relation&quot;)),</span>
+<span class="fc" id="L52">                readExpression(required(item, &quot;left&quot;)),</span>
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">                right == null || right.isNull() ? null : readExpression(right)));</span>
+<span class="fc" id="L54">        }</span>
+<span class="fc" id="L55">        JsonNode goal = required(root, &quot;goal&quot;);</span>
+<span class="fc" id="L56">        JsonNode provenance = required(root, &quot;provenance&quot;);</span>
+<span class="fc" id="L57">        return new Obligation(</span>
+<span class="fc" id="L58">            text(root, &quot;schema&quot;),</span>
+<span class="fc" id="L59">            text(root, &quot;obligationId&quot;),</span>
+            declarations,
+            theories,
+            assumptions,
+            new Goal(
+<span class="fc" id="L64">                Relation.valueOf(text(goal, &quot;relation&quot;)),</span>
+<span class="fc" id="L65">                readExpression(required(goal, &quot;left&quot;)),</span>
+<span class="fc" id="L66">                readExpression(required(goal, &quot;right&quot;))),</span>
+<span class="fc" id="L67">            RequestedEvidence.valueOf(text(root, &quot;requestedEvidence&quot;)),</span>
+            new SourceProvenance(
+<span class="fc" id="L69">                text(provenance, &quot;sourceType&quot;),</span>
+<span class="fc" id="L70">                text(provenance, &quot;sourceId&quot;),</span>
+<span class="fc" id="L71">                text(provenance, &quot;revisionHash&quot;)),</span>
+<span class="fc" id="L72">            text(root, &quot;contentHash&quot;));</span>
+    }
+
+    public SolverResult readResult(String json) {
+<span class="fc" id="L76">        JsonNode root = parse(json);</span>
+<span class="fc" id="L77">        List&lt;String&gt; capabilities = strings(array(root, &quot;usedCapabilities&quot;));</span>
+<span class="fc" id="L78">        List&lt;String&gt; issues = strings(array(root, &quot;translationIssues&quot;));</span>
+<span class="fc" id="L79">        Map&lt;String, String&gt; counterexample = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L80">        JsonNode model = required(root, &quot;counterexample&quot;);</span>
+<span class="fc" id="L81">        Iterator&lt;Map.Entry&lt;String, JsonNode&gt;&gt; fields = model.fields();</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        while (fields.hasNext()) {</span>
+<span class="nc" id="L83">            Map.Entry&lt;String, JsonNode&gt; field = fields.next();</span>
+<span class="nc" id="L84">            counterexample.put(field.getKey(), field.getValue().asText());</span>
+<span class="nc" id="L85">        }</span>
+<span class="fc" id="L86">        return new SolverResult(</span>
+<span class="fc" id="L87">            text(root, &quot;schema&quot;),</span>
+<span class="fc" id="L88">            text(root, &quot;obligationHash&quot;),</span>
+<span class="fc" id="L89">            text(root, &quot;goalHash&quot;),</span>
+<span class="fc" id="L90">            text(root, &quot;assumptionsHash&quot;),</span>
+<span class="fc" id="L91">            text(root, &quot;backendId&quot;),</span>
+<span class="fc" id="L92">            text(root, &quot;backendVersion&quot;),</span>
+<span class="fc" id="L93">            ResultStatus.valueOf(text(root, &quot;status&quot;)),</span>
+<span class="fc" id="L94">            TranslationStatus.valueOf(text(root, &quot;translationStatus&quot;)),</span>
+            capabilities,
+            issues,
+<span class="fc" id="L97">            text(root, &quot;invocationHash&quot;),</span>
+<span class="fc" id="L98">            root.path(&quot;message&quot;).asText(&quot;&quot;),</span>
+            counterexample,
+<span class="fc" id="L100">            root.path(&quot;certificateHash&quot;).asText(&quot;&quot;),</span>
+<span class="fc" id="L101">            text(root, &quot;contentHash&quot;));</span>
+    }
+
+    private Expression readExpression(JsonNode node) {
+<span class="pc bpc" id="L105" title="2 of 5 branches missed.">        return switch (text(node, &quot;kind&quot;)) {</span>
+<span class="fc" id="L106">            case &quot;LITERAL&quot; -&gt; new Literal(text(node, &quot;value&quot;));</span>
+<span class="fc" id="L107">            case &quot;SYMBOL&quot; -&gt; new Symbol(text(node, &quot;name&quot;));</span>
+<span class="fc" id="L108">            case &quot;BINARY&quot; -&gt; new Binary(</span>
+<span class="fc" id="L109">                BinaryOperator.valueOf(text(node, &quot;operator&quot;)),</span>
+<span class="fc" id="L110">                readExpression(required(node, &quot;left&quot;)),</span>
+<span class="fc" id="L111">                readExpression(required(node, &quot;right&quot;)));</span>
+<span class="nc" id="L112">            case &quot;CALL&quot; -&gt; new Call(</span>
+<span class="nc" id="L113">                text(node, &quot;function&quot;),</span>
+<span class="nc" id="L114">                expressions(array(node, &quot;arguments&quot;)));</span>
+<span class="nc" id="L115">            default -&gt; throw new IllegalArgumentException(</span>
+<span class="nc" id="L116">                &quot;unsupported solver expression kind: &quot; + node.path(&quot;kind&quot;).asText());</span>
+        };
+    }
+
+    private List&lt;Expression&gt; expressions(JsonNode values) {
+<span class="nc" id="L121">        List&lt;Expression&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L122">        values.forEach(value -&gt; result.add(readExpression(value)));</span>
+<span class="nc" id="L123">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;String&gt; strings(JsonNode values) {
+<span class="fc" id="L127">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L128">        values.forEach(value -&gt; result.add(value.asText()));</span>
+<span class="fc" id="L129">        return List.copyOf(result);</span>
+    }
+
+    private JsonNode parse(String json) {
+<span class="pc bpc" id="L133" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L134">            throw new IllegalArgumentException(&quot;JSON must not be blank&quot;);</span>
+        }
+        try {
+<span class="fc" id="L137">            JsonNode root = mapper.readTree(json);</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">            if (root == null || !root.isObject()) {</span>
+<span class="nc" id="L139">                throw new IllegalArgumentException(&quot;solver IR JSON must be an object&quot;);</span>
+            }
+<span class="fc" id="L141">            return root;</span>
+<span class="nc" id="L142">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L143">            throw new IllegalArgumentException(&quot;invalid solver IR JSON&quot;, exception);</span>
+        }
+    }
+
+    private static JsonNode array(JsonNode node, String field) {
+<span class="fc" id="L148">        JsonNode value = required(node, field);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!value.isArray()) {</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(field + &quot; must be an array&quot;);</span>
+        }
+<span class="fc" id="L152">        return value;</span>
+    }
+
+    private static JsonNode required(JsonNode node, String field) {
+<span class="fc" id="L156">        JsonNode value = node.get(field);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L158">            throw new IllegalArgumentException(&quot;missing required field: &quot; + field);</span>
+        }
+<span class="fc" id="L160">        return value;</span>
+    }
+
+    private static String text(JsonNode node, String field) {
+<span class="fc" id="L164">        JsonNode value = required(node, field);</span>
+<span class="pc bpc" id="L165" title="2 of 4 branches missed.">        if (!value.isTextual() || value.asText().isBlank()) {</span>
+<span class="nc" id="L166">            throw new IllegalArgumentException(field + &quot; must be non-blank text&quot;);</span>
+        }
+<span class="fc" id="L168">        return value.asText();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

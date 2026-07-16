@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RegelsucheSearchBackend.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">RegelsucheSearchBackend.java</span></div><h1>RegelsucheSearchBackend.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Internal adapter that submits an equality obligation to Regelsuche search. */
+public final class RegelsucheSearchBackend implements SolverBackend {
+<span class="fc" id="L25">    private static final BackendDescriptor DESCRIPTOR = new BackendDescriptor(</span>
+        &quot;regelsuche-search&quot;,
+        &quot;1&quot;,
+<span class="fc" id="L28">        List.of(Theory.REAL_ARITHMETIC),</span>
+<span class="fc" id="L29">        List.of(Relation.EQUALS),</span>
+<span class="fc" id="L30">        List.of(RequestedEvidence.DECISION),</span>
+        true);
+
+<span class="fc" id="L33">    private final CoreExpressionIrAdapter expressions = new CoreExpressionIrAdapter();</span>
+    private final SearchHeuristic heuristic;
+
+    public RegelsucheSearchBackend() {
+<span class="fc" id="L37">        this(new SearchHeuristic(6, 2_000, 1, 4, 80, 12));</span>
+<span class="fc" id="L38">    }</span>
+
+<span class="fc" id="L40">    public RegelsucheSearchBackend(SearchHeuristic heuristic) {</span>
+<span class="fc" id="L41">        this.heuristic = Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L42">    }</span>
+
+    @Override
+    public BackendDescriptor descriptor() {
+<span class="nc" id="L46">        return DESCRIPTOR;</span>
+    }
+
+    @Override
+    public SolverExecution execute(Obligation obligation) {
+<span class="fc" id="L51">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L52">        String left = expressions.render(obligation.goal().left());</span>
+<span class="fc" id="L53">        String right = expressions.render(obligation.goal().right());</span>
+<span class="fc" id="L54">        Map&lt;String, String&gt; terms = Map.of(</span>
+            &quot;goal.left&quot;, left,
+            &quot;goal.right&quot;, right);
+<span class="fc" id="L57">        List&lt;String&gt; issues = SolverBackendSupport.issues(</span>
+            obligation, DESCRIPTOR, false);
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!issues.isEmpty()) {</span>
+<span class="fc" id="L60">            return SolverBackendSupport.rejectedExecution(</span>
+                obligation, DESCRIPTOR, issues, terms);
+        }
+<span class="fc" id="L63">        SolverTranslation translation = SolverTranslation.create(</span>
+            obligation,
+            DESCRIPTOR,
+            TranslationStatus.LOSSLESS,
+<span class="fc" id="L67">            List.of(),</span>
+            terms);
+        SolverResult result;
+        try {
+<span class="fc" id="L71">            SearchProblem problem = new SearchProblem(</span>
+                left,
+                new AstRewriteTransformationEngine(),
+                new ExpressionScorer(),
+                new ExpressionCanonicalizer(),
+                heuristic)
+<span class="fc" id="L77">                .withTarget(SearchTarget.syntaxExact(right));</span>
+<span class="fc" id="L78">            GoalSearchResult outcome = new BestFirstSearchStrategy()</span>
+<span class="fc" id="L79">                .searchWithDiagnostics(problem);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            ResultStatus status = outcome.reached()</span>
+<span class="pc" id="L81">                ? ResultStatus.CONFIRMED : ResultStatus.UNKNOWN;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            String certificate = outcome.reached()</span>
+<span class="fc" id="L83">                ? SolverIr.sha256(</span>
+<span class="fc" id="L84">                    &quot;path=&quot; + outcome.reachedState().path()</span>
+<span class="fc" id="L85">                        + &quot;\nrules=&quot; + outcome.reachedState().appliedRuleIds()</span>
+<span class="fc" id="L86">                        + &quot;\nassumptions=&quot; + outcome.reachedState().assumptions())</span>
+<span class="pc" id="L87">                : &quot;&quot;;</span>
+<span class="fc" id="L88">            String message = &quot;goalStatus=&quot; + outcome.status().name()</span>
+<span class="fc" id="L89">                + &quot;; exploredStates=&quot; + outcome.metrics().exploredStates()</span>
+                + &quot;; generatedTransformations=&quot;
+<span class="fc" id="L91">                    + outcome.metrics().generatedTransformations()</span>
+                + &quot;; reachedDepth=&quot;
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                    + (outcome.reachedState() == null</span>
+<span class="pc" id="L94">                        ? -1 : outcome.reachedState().depth());</span>
+<span class="fc" id="L95">            result = SolverResult.create(</span>
+                obligation,
+                DESCRIPTOR,
+                status,
+                TranslationStatus.LOSSLESS,
+<span class="fc" id="L100">                List.of(&quot;BOUNDED_REWRITE_SEARCH&quot;, &quot;EXACT_TARGET_MATCH&quot;),</span>
+<span class="fc" id="L101">                List.of(),</span>
+                message,
+<span class="fc" id="L103">                Map.of(),</span>
+                certificate);
+<span class="nc" id="L105">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L106">            result = SolverResult.create(</span>
+                obligation,
+                DESCRIPTOR,
+                ResultStatus.ERROR,
+                TranslationStatus.LOSSLESS,
+<span class="nc" id="L111">                List.of(&quot;BOUNDED_REWRITE_SEARCH&quot;),</span>
+<span class="nc" id="L112">                List.of(),</span>
+<span class="nc" id="L113">                exception.getClass().getSimpleName() + &quot;: &quot; + exception.getMessage(),</span>
+<span class="nc" id="L114">                Map.of(),</span>
+                &quot;&quot;);
+<span class="fc" id="L116">        }</span>
+<span class="fc" id="L117">        return SolverExecution.create(obligation, translation, result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

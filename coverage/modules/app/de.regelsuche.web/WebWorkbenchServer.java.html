@@ -355,8 +355,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L355">        String profileName = stringValue(body, &quot;profile&quot;, SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);</span>
 <span class="fc" id="L356">        String goalName = stringValue(body, &quot;goal&quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
 <span class="fc bfc" id="L357" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="fc" id="L358">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
-<span class="fc" id="L359">            return;</span>
+<span class="nc" id="L358">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
+<span class="nc" id="L359">            return;</span>
         }
         InputType type;
         SearchProfile profile;
@@ -1420,8 +1420,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1420">        String matchId = stringValue(body, &quot;matchId&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1421">        int matchIndex = intValue(body, &quot;matchIndex&quot;, -1);</span>
 <span class="pc bpc" id="L1422" title="4 of 8 branches missed.">        if (expression.isBlank() || pathKey.isBlank() || (matchId.isBlank() &amp;&amp; matchIndex &lt; 0)) {</span>
-<span class="fc" id="L1423">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
-<span class="fc" id="L1424">            return;</span>
+<span class="nc" id="L1423">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
+<span class="nc" id="L1424">            return;</span>
         }
 
 <span class="fc" id="L1427">        de.regelsuche.ide.RuleInspectionService service = new de.regelsuche.ide.RuleInspectionService();</span>
@@ -1638,8 +1638,8 @@ public class WebWorkbenchServer {
 
     private void handleDidacticHint(HttpExchange exchange, String pathId) throws IOException {
 <span class="fc bfc" id="L1640" title="All 2 branches covered.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="fc" id="L1641">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="fc" id="L1642">            return;</span>
+<span class="nc" id="L1641">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L1642">            return;</span>
         }
 <span class="pc bpc" id="L1644" title="1 of 2 branches missed.">        if (pathId.isBlank()) {</span>
 <span class="nc" id="L1645">            sendStatus(exchange, 400, &quot;expected /api/didactic/hint/{pathId}&quot;);</span>
@@ -1738,8 +1738,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1738">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1739">            .findFirst();</span>
 <span class="fc bfc" id="L1740" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1741">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1742">            return;</span>
+<span class="nc" id="L1741">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1742">            return;</span>
         }
 <span class="fc" id="L1744">        var derivation = match.get();</span>
 <span class="fc" id="L1745">        JsonWriter writer = new JsonWriter();</span>
@@ -2476,13 +2476,13 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2477">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
 <span class="fc bfc" id="L2478" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
-<span class="fc" id="L2479">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
-<span class="fc" id="L2480">            return;</span>
+<span class="nc" id="L2479">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
+<span class="nc" id="L2480">            return;</span>
         }
 <span class="fc" id="L2482">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2483" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
-<span class="fc" id="L2484">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
-<span class="fc" id="L2485">            return;</span>
+<span class="nc" id="L2484">            sendStatus(exchange, 400, &quot;worker selection is not supported&quot;);</span>
+<span class="nc" id="L2485">            return;</span>
         }
 <span class="fc" id="L2487">        List&lt;de.regelsuche.assumption.Assumption&gt; assumptions = new java.util.ArrayList&lt;&gt;();</span>
 <span class="fc" id="L2488">        Object raw = body.get(&quot;assumptions&quot;);</span>

@@ -142,34 +142,35 @@ import java.util.TreeSet;
 <span class="fc" id="L142">            ref(&quot;counterexample-report&quot;, lifecycle.counterexampleHash()),</span>
 <span class="fc" id="L143">            ref(&quot;project-novelty-report&quot;, lifecycle.noveltyHash()),</span>
 <span class="fc" id="L144">            ref(&quot;proof-report&quot;, lifecycle.proof().evidenceHash()),</span>
-<span class="fc" id="L145">            ref(&quot;proof-obligation&quot;,</span>
-<span class="fc" id="L146">                lifecycle.proof().obligation().obligationHash()),</span>
-<span class="fc" id="L147">            ref(&quot;lifecycle-candidate&quot;, lifecycle.lifecycleCandidateHash()),</span>
-<span class="fc" id="L148">            ref(&quot;lifecycle-decision&quot;,</span>
-<span class="fc" id="L149">                lifecycle.lifecycleDecision().contentHash()),</span>
-<span class="fc" id="L150">            ref(&quot;stage-resource-ledger&quot;, lifecycle.stageLedger().contentHash()),</span>
-<span class="fc" id="L151">            ref(&quot;lifecycle-run&quot;, lifecycle.contentHash()),</span>
-<span class="fc" id="L152">            ref(&quot;next-plan&quot;, nextPlan.contentHash()),</span>
-<span class="fc" id="L153">            ref(&quot;campaign-round&quot;, round.contentHash()),</span>
-<span class="fc" id="L154">            ref(&quot;feedback-reallocation&quot;, feedback.contentHash()),</span>
-<span class="fc" id="L155">            ref(&quot;campaign-resource-ledger&quot;, resourceLedger.contentHash()))</span>
-<span class="fc" id="L156">            .stream()</span>
-<span class="fc" id="L157">            .sorted(Comparator.comparing(ArtifactReference::artifactType))</span>
-<span class="fc" id="L158">            .toList();</span>
+<span class="fc" id="L145">            ref(&quot;solver-obligation&quot;,</span>
+<span class="fc" id="L146">                lifecycle.proof().obligation().contentHash()),</span>
+<span class="fc" id="L147">            ref(&quot;solver-result&quot;, lifecycle.proof().result().contentHash()),</span>
+<span class="fc" id="L148">            ref(&quot;lifecycle-candidate&quot;, lifecycle.lifecycleCandidateHash()),</span>
+<span class="fc" id="L149">            ref(&quot;lifecycle-decision&quot;,</span>
+<span class="fc" id="L150">                lifecycle.lifecycleDecision().contentHash()),</span>
+<span class="fc" id="L151">            ref(&quot;stage-resource-ledger&quot;, lifecycle.stageLedger().contentHash()),</span>
+<span class="fc" id="L152">            ref(&quot;lifecycle-run&quot;, lifecycle.contentHash()),</span>
+<span class="fc" id="L153">            ref(&quot;next-plan&quot;, nextPlan.contentHash()),</span>
+<span class="fc" id="L154">            ref(&quot;campaign-round&quot;, round.contentHash()),</span>
+<span class="fc" id="L155">            ref(&quot;feedback-reallocation&quot;, feedback.contentHash()),</span>
+<span class="fc" id="L156">            ref(&quot;campaign-resource-ledger&quot;, resourceLedger.contentHash()))</span>
+<span class="fc" id="L157">            .stream()</span>
+<span class="fc" id="L158">            .sorted(Comparator.comparing(ArtifactReference::artifactType))</span>
+<span class="fc" id="L159">            .toList();</span>
     }
 
     private static ArtifactReference ref(String type, String hash) {
-<span class="fc" id="L162">        return new ArtifactReference(type, hash);</span>
+<span class="fc" id="L163">        return new ArtifactReference(type, hash);</span>
     }
 
     public record ArtifactReference(String artifactType, String contentHash) {
-<span class="fc" id="L166">        public ArtifactReference {</span>
-<span class="fc" id="L167">            requireText(artifactType, &quot;artifactType&quot;);</span>
-<span class="fc" id="L168">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L169">        }</span>
+<span class="fc" id="L167">        public ArtifactReference {</span>
+<span class="fc" id="L168">            requireText(artifactType, &quot;artifactType&quot;);</span>
+<span class="fc" id="L169">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L170">        }</span>
 
         String canonicalMaterial() {
-<span class="fc" id="L172">            return artifactType + '|' + contentHash;</span>
+<span class="fc" id="L173">            return artifactType + '|' + contentHash;</span>
         }
     }
 
@@ -193,102 +194,102 @@ import java.util.TreeSet;
         String publicEvidenceStatus,
         String contentHash
     ) {
-<span class="fc" id="L196">        public CampaignRun {</span>
-<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L198">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L197">        public CampaignRun {</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L199">                throw new IllegalArgumentException(</span>
                     &quot;unsupported production campaign schema&quot;);
             }
-<span class="fc" id="L201">            lifecycle = Objects.requireNonNull(lifecycle, &quot;lifecycle&quot;);</span>
-<span class="fc" id="L202">            nextPlan = Objects.requireNonNull(nextPlan, &quot;nextPlan&quot;);</span>
-<span class="fc" id="L203">            round = Objects.requireNonNull(round, &quot;round&quot;);</span>
-<span class="fc" id="L204">            feedback = Objects.requireNonNull(feedback, &quot;feedback&quot;);</span>
-<span class="fc" id="L205">            resourceLedger = Objects.requireNonNull(</span>
+<span class="fc" id="L202">            lifecycle = Objects.requireNonNull(lifecycle, &quot;lifecycle&quot;);</span>
+<span class="fc" id="L203">            nextPlan = Objects.requireNonNull(nextPlan, &quot;nextPlan&quot;);</span>
+<span class="fc" id="L204">            round = Objects.requireNonNull(round, &quot;round&quot;);</span>
+<span class="fc" id="L205">            feedback = Objects.requireNonNull(feedback, &quot;feedback&quot;);</span>
+<span class="fc" id="L206">            resourceLedger = Objects.requireNonNull(</span>
                 resourceLedger, &quot;resourceLedger&quot;);
-<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            artifacts = artifacts == null</span>
-<span class="nc" id="L208">                ? List.of()</span>
-<span class="fc" id="L209">                : artifacts.stream()</span>
-<span class="fc" id="L210">                    .sorted(Comparator.comparing(ArtifactReference::artifactType))</span>
-<span class="fc" id="L211">                    .toList();</span>
-<span class="fc" id="L212">            Set&lt;String&gt; types = artifacts.stream()</span>
-<span class="fc" id="L213">                .map(ArtifactReference::artifactType)</span>
-<span class="fc" id="L214">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
-<span class="pc bpc" id="L215" title="2 of 4 branches missed.">            if (types.size() != artifacts.size() || artifacts.size() &lt; 30) {</span>
-<span class="nc" id="L216">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            artifacts = artifacts == null</span>
+<span class="nc" id="L209">                ? List.of()</span>
+<span class="fc" id="L210">                : artifacts.stream()</span>
+<span class="fc" id="L211">                    .sorted(Comparator.comparing(ArtifactReference::artifactType))</span>
+<span class="fc" id="L212">                    .toList();</span>
+<span class="fc" id="L213">            Set&lt;String&gt; types = artifacts.stream()</span>
+<span class="fc" id="L214">                .map(ArtifactReference::artifactType)</span>
+<span class="fc" id="L215">                .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L216" title="2 of 4 branches missed.">            if (types.size() != artifacts.size() || artifacts.size() &lt; 30) {</span>
+<span class="nc" id="L217">                throw new IllegalArgumentException(</span>
                     &quot;campaign manifest requires unique complete artifact references&quot;);
             }
-<span class="pc bpc" id="L219" title="5 of 10 branches missed.">            if (!&quot;COMPLETED&quot;.equals(status)</span>
+<span class="pc bpc" id="L220" title="5 of 10 branches missed.">            if (!&quot;COMPLETED&quot;.equals(status)</span>
                     || seedFamilyCount &lt; 2
                     || observationCount &lt; 12
                     || candidateCount &lt; 1
                     || rejectedClusterCount &lt; 1
-<span class="pc bpc" id="L224" title="1 of 2 branches missed.">                    || !nextPlan.decisions().isEmpty()</span>
-<span class="pc bpc" id="L225" title="1 of 2 branches missed.">                    || !round.nextPlanHash().equals(nextPlan.contentHash())</span>
-<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                    || !feedback.nextPlanHash().equals(nextPlan.contentHash())</span>
-<span class="fc" id="L227">                    || !lifecycle.mining().generation().brief().contentHash()</span>
-<span class="pc bpc" id="L228" title="4 of 8 branches missed.">                        .equals(resourceLedger.briefHash())</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">                    || !nextPlan.decisions().isEmpty()</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                    || !round.nextPlanHash().equals(nextPlan.contentHash())</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                    || !feedback.nextPlanHash().equals(nextPlan.contentHash())</span>
+<span class="fc" id="L228">                    || !lifecycle.mining().generation().brief().contentHash()</span>
+<span class="pc bpc" id="L229" title="4 of 8 branches missed.">                        .equals(resourceLedger.briefHash())</span>
                     || targetProvided
                     || campaignCompletionIsMathematicalEvidence
                     || externalNoveltyEvaluated) {
-<span class="nc" id="L232">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L233">                throw new IllegalArgumentException(</span>
                     &quot;production campaign is incomplete or overclaims its evidence&quot;);
             }
-<span class="fc" id="L235">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
-<span class="fc" id="L236">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
-<span class="fc" id="L237">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L238">        }</span>
+<span class="fc" id="L236">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L237">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L238">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L239">        }</span>
 
         public String toCanonicalJson() {
-<span class="fc" id="L241">            return new JsonWriter().beginObject()</span>
-<span class="fc" id="L242">                .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L243">                .property(&quot;briefHash&quot;,</span>
-<span class="fc" id="L244">                    lifecycle.mining().generation().brief().contentHash())</span>
-<span class="fc" id="L245">                .property(&quot;generationRunHash&quot;,</span>
-<span class="fc" id="L246">                    lifecycle.mining().generation().contentHash())</span>
-<span class="fc" id="L247">                .property(&quot;miningRunHash&quot;, lifecycle.mining().contentHash())</span>
-<span class="fc" id="L248">                .property(&quot;lifecycleRunHash&quot;, lifecycle.contentHash())</span>
-<span class="fc" id="L249">                .property(&quot;initialPlanHash&quot;, lifecycle.mining().plan().contentHash())</span>
-<span class="fc" id="L250">                .property(&quot;nextPlanHash&quot;, nextPlan.contentHash())</span>
-<span class="fc" id="L251">                .property(&quot;campaignRoundHash&quot;, round.contentHash())</span>
-<span class="fc" id="L252">                .property(&quot;feedbackReallocationHash&quot;, feedback.contentHash())</span>
-<span class="fc" id="L253">                .property(&quot;campaignResourceLedgerHash&quot;,</span>
-<span class="fc" id="L254">                    resourceLedger.contentHash())</span>
-<span class="fc" id="L255">                .property(&quot;status&quot;, status)</span>
-<span class="fc" id="L256">                .property(&quot;seedFamilyCount&quot;, seedFamilyCount)</span>
-<span class="fc" id="L257">                .property(&quot;observationCount&quot;, observationCount)</span>
-<span class="fc" id="L258">                .property(&quot;candidateCount&quot;, candidateCount)</span>
-<span class="fc" id="L259">                .property(&quot;rejectedClusterCount&quot;, rejectedClusterCount)</span>
-<span class="fc" id="L260">                .array(&quot;artifacts&quot;, array -&gt; artifacts.forEach(reference -&gt;</span>
-<span class="fc" id="L261">                    array.objectValue(object -&gt; object</span>
-<span class="fc" id="L262">                        .property(&quot;artifactType&quot;, reference.artifactType())</span>
-<span class="fc" id="L263">                        .property(&quot;contentHash&quot;, reference.contentHash()))))</span>
-<span class="fc" id="L264">                .property(&quot;targetProvided&quot;, targetProvided)</span>
-<span class="fc" id="L265">                .property(&quot;campaignCompletionIsMathematicalEvidence&quot;,</span>
+<span class="fc" id="L242">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L243">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L244">                .property(&quot;briefHash&quot;,</span>
+<span class="fc" id="L245">                    lifecycle.mining().generation().brief().contentHash())</span>
+<span class="fc" id="L246">                .property(&quot;generationRunHash&quot;,</span>
+<span class="fc" id="L247">                    lifecycle.mining().generation().contentHash())</span>
+<span class="fc" id="L248">                .property(&quot;miningRunHash&quot;, lifecycle.mining().contentHash())</span>
+<span class="fc" id="L249">                .property(&quot;lifecycleRunHash&quot;, lifecycle.contentHash())</span>
+<span class="fc" id="L250">                .property(&quot;initialPlanHash&quot;, lifecycle.mining().plan().contentHash())</span>
+<span class="fc" id="L251">                .property(&quot;nextPlanHash&quot;, nextPlan.contentHash())</span>
+<span class="fc" id="L252">                .property(&quot;campaignRoundHash&quot;, round.contentHash())</span>
+<span class="fc" id="L253">                .property(&quot;feedbackReallocationHash&quot;, feedback.contentHash())</span>
+<span class="fc" id="L254">                .property(&quot;campaignResourceLedgerHash&quot;,</span>
+<span class="fc" id="L255">                    resourceLedger.contentHash())</span>
+<span class="fc" id="L256">                .property(&quot;status&quot;, status)</span>
+<span class="fc" id="L257">                .property(&quot;seedFamilyCount&quot;, seedFamilyCount)</span>
+<span class="fc" id="L258">                .property(&quot;observationCount&quot;, observationCount)</span>
+<span class="fc" id="L259">                .property(&quot;candidateCount&quot;, candidateCount)</span>
+<span class="fc" id="L260">                .property(&quot;rejectedClusterCount&quot;, rejectedClusterCount)</span>
+<span class="fc" id="L261">                .array(&quot;artifacts&quot;, array -&gt; artifacts.forEach(reference -&gt;</span>
+<span class="fc" id="L262">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L263">                        .property(&quot;artifactType&quot;, reference.artifactType())</span>
+<span class="fc" id="L264">                        .property(&quot;contentHash&quot;, reference.contentHash()))))</span>
+<span class="fc" id="L265">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L266">                .property(&quot;campaignCompletionIsMathematicalEvidence&quot;,</span>
                     campaignCompletionIsMathematicalEvidence)
-<span class="fc" id="L267">                .property(&quot;externalNoveltyEvaluated&quot;, externalNoveltyEvaluated)</span>
-<span class="fc" id="L268">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
-<span class="fc" id="L269">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
-<span class="fc" id="L270">                .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="fc" id="L271">                .endObject()</span>
-<span class="fc" id="L272">                .toString();</span>
+<span class="fc" id="L268">                .property(&quot;externalNoveltyEvaluated&quot;, externalNoveltyEvaluated)</span>
+<span class="fc" id="L269">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L270">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L271">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L272">                .endObject()</span>
+<span class="fc" id="L273">                .toString();</span>
         }
     }
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L277" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L278">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L279">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L280">    }</span>
+<span class="fc" id="L281">    }</span>
 
     private static void requireSha256(String value, String name) {
-<span class="pc bpc" id="L283" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L284">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L284" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L285">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
         }
-<span class="fc" id="L286">    }</span>
+<span class="fc" id="L287">    }</span>
 
     private static void requireNotEvaluated(String value, String name) {
-<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
-<span class="nc" id="L290">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L291">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
         }
-<span class="fc" id="L292">    }</span>
+<span class="fc" id="L293">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolverBackendSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-ir</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.ir</a> &gt; <span class="el_source">SolverBackendSupport.java</span></div><h1>SolverBackendSupport.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.ir;
+
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/** Shared fail-closed compatibility checks for backend adapters. */
+final class SolverBackendSupport {
+    private SolverBackendSupport() {
+    }
+
+    static List&lt;String&gt; issues(
+        Obligation obligation,
+        BackendDescriptor descriptor,
+        boolean supportsAssumptions
+    ) {
+<span class="fc" id="L22">        List&lt;String&gt; issues = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L23">        obligation.theories().stream()</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            .filter(theory -&gt; !descriptor.supportedTheories().contains(theory))</span>
+<span class="fc" id="L25">            .forEach(theory -&gt; issues.add(&quot;UNSUPPORTED_THEORY:&quot; + theory.name()));</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (!descriptor.supportedRelations().contains(obligation.goal().relation())) {</span>
+<span class="nc" id="L27">            issues.add(&quot;UNSUPPORTED_RELATION:&quot; + obligation.goal().relation().name());</span>
+        }
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        if (!descriptor.supportedEvidence().contains(obligation.requestedEvidence())) {</span>
+<span class="nc" id="L30">            issues.add(&quot;UNSUPPORTED_EVIDENCE:&quot; + obligation.requestedEvidence().name());</span>
+        }
+<span class="pc bpc" id="L32" title="1 of 4 branches missed.">        if (!supportsAssumptions &amp;&amp; !obligation.assumptions().isEmpty()) {</span>
+<span class="fc" id="L33">            issues.add(&quot;ASSUMPTIONS_NOT_SUPPORTED&quot;);</span>
+        }
+<span class="fc" id="L35">        return issues.stream().distinct().sorted().toList();</span>
+    }
+
+    static SolverExecution rejectedExecution(
+        Obligation obligation,
+        BackendDescriptor descriptor,
+        List&lt;String&gt; issues,
+        Map&lt;String, String&gt; partialTermMapping
+    ) {
+<span class="fc" id="L44">        SolverTranslation translation = SolverTranslation.create(</span>
+            obligation,
+            descriptor,
+            TranslationStatus.REJECTED,
+            issues,
+            partialTermMapping);
+<span class="fc" id="L50">        SolverResult result = SolverResult.create(</span>
+            obligation,
+            descriptor,
+            ResultStatus.UNSUPPORTED,
+            TranslationStatus.REJECTED,
+<span class="fc" id="L55">            List.of(),</span>
+<span class="fc" id="L56">            translation.issues(),</span>
+            &quot;backend rejected the obligation before execution&quot;,
+<span class="fc" id="L58">            Map.of(),</span>
+            &quot;&quot;);
+<span class="fc" id="L60">        return SolverExecution.create(obligation, translation, result);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
