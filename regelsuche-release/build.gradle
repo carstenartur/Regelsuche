@@ -26,6 +26,13 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+def hiddenRuleReport = project(':app').layout.buildDirectory
+    .file('reports/hidden-rule-pilot/report.json')
+
+project(':app').tasks.named('test') {
+    outputs.file(hiddenRuleReport)
+}
+
 tasks.register('runReleaseReadiness', JavaExec) {
     group = 'verification'
     description = 'Evaluates all Regelsuche 0.2 evidence profiles fail-closed.'
@@ -44,9 +51,7 @@ tasks.register('runReleaseReadinessWithHiddenRuleEvidence', JavaExec) {
     args layout.buildDirectory.dir('reports/release-readiness')
         .get().asFile.absolutePath,
         '--hidden-rule-report',
-        project(':app').layout.buildDirectory
-            .file('reports/hidden-rule-pilot/report.json')
-            .get().asFile.absolutePath
+        hiddenRuleReport.get().asFile.absolutePath
 }
 
 tasks.register('verifyAutonomousCampaignRelease', JavaExec) {
