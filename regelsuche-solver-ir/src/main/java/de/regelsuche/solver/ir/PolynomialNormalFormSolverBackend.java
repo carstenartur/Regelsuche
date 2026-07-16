@@ -44,8 +44,13 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
     }
 
     @Override
-    public SolverResult solve(Obligation obligation) {
+    public SolverExecution execute(Obligation obligation) {
         Objects.requireNonNull(obligation, "obligation");
+        String left = expressions.render(obligation.goal().left());
+        String right = expressions.render(obligation.goal().right());
+        Map<String, String> terms = Map.of(
+            "goal.left", left,
+            "goal.right", right);
         List<String> issues = new ArrayList<>(SolverBackendSupport.issues(
             obligation, DESCRIPTOR, false));
         if (!isPolynomial(obligation.goal().left())
@@ -54,40 +59,54 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
         }
         issues = issues.stream().distinct().sorted().toList();
         if (!issues.isEmpty()) {
-            return SolverBackendSupport.unsupported(obligation, DESCRIPTOR, issues);
+            return SolverBackendSupport.rejectedExecution(
+                obligation, DESCRIPTOR, issues, terms);
         }
 
+        SolverTranslation translation = SolverTranslation.create(
+            obligation,
+            DESCRIPTOR,
+            TranslationStatus.LOSSLESS,
+            List.of(),
+            terms);
+        SolverResult result;
         try {
-            String left = expressions.render(obligation.goal().left());
-            String right = expressions.render(obligation.goal().right());
             service.arePolynomiallyEquivalent(left, right);
             var evidence = service.lastResult();
             if (evidence.status() == ExecutionStatus.DISABLED
                     || evidence.status() == ExecutionStatus.UNAVAILABLE) {
-                return SolverBackendSupport.unsupported(
+                result = SolverResult.create(
                     obligation,
                     DESCRIPTOR,
-                    List.of("BACKEND_" + evidence.status().name()));
+                    ResultStatus.ERROR,
+                    TranslationStatus.LOSSLESS,
+                    List.of("DETERMINISTIC_POLYNOMIAL_NORMAL_FORM"),
+                    List.of(),
+                    "backend " + evidence.status().name().toLowerCase(),
+                    Map.of(),
+                    "");
+            } else {
+                ResultStatus status = status(
+                    evidence.status(), evidence.resultType());
+                String certificate = status == ResultStatus.CONFIRMED
+                        || status == ResultStatus.REFUTED
+                    ? SolverIr.sha256(canonicalPayload(evidence.payload()))
+                    : "";
+                result = SolverResult.create(
+                    obligation,
+                    DESCRIPTOR,
+                    status,
+                    TranslationStatus.LOSSLESS,
+                    List.of(
+                        "DETERMINISTIC_POLYNOMIAL_NORMAL_FORM",
+                        "EXACT_RATIONAL_COEFFICIENTS"),
+                    List.of(),
+                    evidence.detail(),
+                    Map.of(),
+                    certificate);
             }
-            ResultStatus status = status(evidence.status(), evidence.resultType());
-            String certificate = status == ResultStatus.CONFIRMED
-                    || status == ResultStatus.REFUTED
-                ? SolverIr.sha256(canonicalPayload(evidence.payload()))
-                : "";
-            return SolverResult.create(
-                obligation,
-                DESCRIPTOR,
-                status,
-                TranslationStatus.LOSSLESS,
-                List.of(
-                    "DETERMINISTIC_POLYNOMIAL_NORMAL_FORM",
-                    "EXACT_RATIONAL_COEFFICIENTS"),
-                List.of(),
-                evidence.detail(),
-                Map.of(),
-                certificate);
         } catch (RuntimeException exception) {
-            return SolverResult.create(
+            result = SolverResult.create(
                 obligation,
                 DESCRIPTOR,
                 ResultStatus.ERROR,
@@ -98,6 +117,7 @@ public final class PolynomialNormalFormSolverBackend implements SolverBackend {
                 Map.of(),
                 "");
         }
+        return SolverExecution.create(obligation, translation, result);
     }
 
     private static String canonicalPayload(Map<String, Object> payload) {
