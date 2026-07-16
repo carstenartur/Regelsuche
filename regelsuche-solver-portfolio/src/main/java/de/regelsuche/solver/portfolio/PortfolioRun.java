@@ -6,6 +6,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -59,6 +60,7 @@ public record PortfolioRun(
         Objects.requireNonNull(outputDirectory, "outputDirectory");
         try {
             Path executionsDirectory = outputDirectory.resolve("executions");
+            clearDirectory(executionsDirectory);
             Files.createDirectories(executionsDirectory);
             Files.writeString(
                 outputDirectory.resolve("report.json"),
@@ -81,6 +83,17 @@ public record PortfolioRun(
         } catch (IOException exception) {
             throw new UncheckedIOException(
                 "Could not write solver portfolio evidence", exception);
+        }
+    }
+
+    private static void clearDirectory(Path directory) throws IOException {
+        if (!Files.exists(directory)) {
+            return;
+        }
+        try (var paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(path);
+            }
         }
     }
 

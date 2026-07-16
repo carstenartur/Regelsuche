@@ -64,7 +64,7 @@ Conflict blocks promotion automatically. The portfolio-compatible `SolverBackend
     001-other-backend.json
 ```
 
-Every attempt with an `executionHash` must have exactly one retained execution file. Filtered, unavailable, cancelled-before-invocation and budget-skipped attempts remain in `report.json` and do not receive fabricated result artifacts.
+Every attempt with an `executionHash` must have exactly one retained execution file. Filtered, unavailable, cancelled-before-invocation and budget-skipped attempts remain in `report.json` and do not receive fabricated result artifacts. Rewriting a run clears only `executions/`, so shorter subsequent runs cannot retain stale backend results and sibling files such as `request.json` remain intact.
 
 ## Z3 backend
 
@@ -74,7 +74,9 @@ Every attempt with an `executionHash` must have exactly one retained execution f
 - `unknown` remains `UNKNOWN`;
 - timeout remains `TIMEOUT`;
 - unsupported calls, sorts or exponent forms are rejected before process invocation;
-- `unsat` becomes `CONFIRMED` only after a second invocation retrieves a non-empty Z3 proof object, whose canonical payload is hashed as the certificate.
+- division is accepted as lossless only when every nonliteral denominator is covered by a structured strict-sign or `NOT_EQUALS 0` assumption;
+- process errors and `(error ...)` output can never become a certificate;
+- `unsat` becomes `CONFIRMED` only after a second successful invocation retrieves a non-empty Z3 proof object, whose canonical payload is hashed as the certificate.
 
 ## Reproduction
 
