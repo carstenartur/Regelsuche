@@ -9,8 +9,6 @@ import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
-import de.regelsuche.solver.ir.SolverIr.ResultStatus;
-import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationVerifier;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
@@ -173,6 +171,7 @@ final class OpenTargetPromotionEvidenceValidator {
         boolean available = proof.eligibility() == EligibilityStatus.ELIGIBLE
             && proof.proofObligationEmitted()
             && proof.obligation() != null
+            && proof.execution() != null
             && proof.result() != null
             && sha256(proof.evidenceHash());
         if (!available) {
@@ -187,11 +186,17 @@ final class OpenTargetPromotionEvidenceValidator {
             assumptions(conjecture));
         boolean resultMatches = SOLVER_IR.resultBelongsTo(
             proof.obligation(), proof.result());
-        boolean backendAccepted = proof.result().status() == ResultStatus.CONFIRMED
-            && proof.result().translationStatus() == TranslationStatus.LOSSLESS;
-        if (!obligationMatches || !resultMatches || !backendAccepted
+        boolean executionMatches = proof.execution().obligationHash().equals(
+                proof.obligation().contentHash())
+            && proof.execution().result().contentHash().equals(
+                proof.result().contentHash())
+            && proof.execution().translation().contentHash().equals(
+                proof.translation().contentHash());
+        if (!obligationMatches || !resultMatches || !executionMatches
                 || !sha256(proof.obligation().contentHash())
-                || !sha256(proof.result().contentHash())) {
+                || !sha256(proof.translation().contentHash())
+                || !sha256(proof.result().contentHash())
+                || !sha256(proof.execution().contentHash())) {
             blockers.add("proof-obligation-provenance-mismatch");
         }
     }
