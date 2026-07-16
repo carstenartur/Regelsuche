@@ -41,7 +41,6 @@ tasks.register('verifyAutonomousCampaignRelease', JavaExec) {
     mainClass = application.mainClass
     args layout.buildDirectory.dir('reports/release-readiness-verification')
         .get().asFile.absolutePath,
-        '1',
         '--require-ready'
 }
 
