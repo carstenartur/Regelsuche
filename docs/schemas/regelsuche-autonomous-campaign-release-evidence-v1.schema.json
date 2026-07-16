@@ -10,7 +10,8 @@
     "rejectedClusterCount", "alphaDistinctSupport",
     "aggregateMiningComplete", "exactSupportingLineage",
     "mandatorySkippedWorkCount", "heldOutFamilyOrClusterCount",
-    "configuredFreshHoldouts", "executedFreshHoldouts",
+    "configuredPositiveHoldouts", "executedPositiveHoldouts",
+    "configuredNegativeHoldouts", "executedNegativeHoldouts",
     "refutingHoldouts", "counterexampleStrategyCount",
     "counterexamplesFound", "projectNoveltyStatus",
     "externalNoveltyStatus", "symbolicProofStatus",
@@ -18,8 +19,7 @@
     "lifecycleHandoffComplete", "pairedHeldOutUtilityEvaluated",
     "pairedUtilityPermille", "hiddenReferenceIsolated",
     "hiddenRuleBenchmarkComplete", "executableRediscoveryRetained",
-    "domainGenericSearchInterfaceReady", "publicEvidenceReviewed",
-    "evidenceHash"
+    "publicEvidenceReviewed", "evidenceHash"
   ],
   "properties": {
     "schema": { "const": "regelsuche.autonomous-campaign-release-evidence/v1" },
@@ -40,8 +40,10 @@
     "exactSupportingLineage": { "type": "boolean" },
     "mandatorySkippedWorkCount": { "type": "integer", "minimum": 0 },
     "heldOutFamilyOrClusterCount": { "type": "integer", "minimum": 0 },
-    "configuredFreshHoldouts": { "type": "integer", "minimum": 0 },
-    "executedFreshHoldouts": { "type": "integer", "minimum": 0 },
+    "configuredPositiveHoldouts": { "type": "integer", "minimum": 0 },
+    "executedPositiveHoldouts": { "type": "integer", "minimum": 0 },
+    "configuredNegativeHoldouts": { "type": "integer", "minimum": 0 },
+    "executedNegativeHoldouts": { "type": "integer", "minimum": 0 },
     "refutingHoldouts": { "type": "integer", "minimum": 0 },
     "counterexampleStrategyCount": { "type": "integer", "minimum": 0 },
     "counterexamplesFound": { "type": "integer", "minimum": 0 },
@@ -56,7 +58,6 @@
     "hiddenReferenceIsolated": { "type": "boolean" },
     "hiddenRuleBenchmarkComplete": { "type": "boolean" },
     "executableRediscoveryRetained": { "type": "boolean" },
-    "domainGenericSearchInterfaceReady": { "type": "boolean" },
     "publicEvidenceReviewed": { "type": "boolean" },
     "evidenceHash": { "$ref": "#/$defs/sha256" }
   },
