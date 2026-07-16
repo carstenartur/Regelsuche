@@ -1,0 +1,100 @@
+name: Solver IR
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: solver-ir-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Test contracts and write canonical examples
+        run: |
+          ./gradlew \
+            :regelsuche-solver-ir:test \
+            :regelsuche-solver-ir:writeSolverIrExample
+
+      - name: Validate JSON schemas and backend outcomes
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("regelsuche-solver-ir/build/reports/solver-ir")
+          schemas = Path("docs/schemas")
+          obligation_schema = json.loads(
+              (schemas / "regelsuche-solver-obligation-v1.schema.json").read_text()
+          )
+          result_schema = json.loads(
+              (schemas / "regelsuche-solver-result-v1.schema.json").read_text()
+          )
+          obligations = [
+              root / "obligation.json",
+              root / "assumption-obligation.json",
+          ]
+          results = [
+              root / "regelsuche-search-result.json",
+              root / "symbolic-result.json",
+              root / "unsupported-result.json",
+          ]
+          for path in obligations:
+              Draft202012Validator(obligation_schema).validate(
+                  json.loads(path.read_text())
+              )
+          for path in results:
+              Draft202012Validator(result_schema).validate(
+                  json.loads(path.read_text())
+              )
+
+          obligation = json.loads((root / "obligation.json").read_text())
+          search = json.loads((root / "regelsuche-search-result.json").read_text())
+          symbolic = json.loads((root / "symbolic-result.json").read_text())
+          unsupported = json.loads((root / "unsupported-result.json").read_text())
+          manifest = json.loads((root / "manifest.json").read_text())
+
+          assert search["status"] == "CONFIRMED"
+          assert symbolic["status"] == "CONFIRMED"
+          assert search["translationStatus"] == "LOSSLESS"
+          assert symbolic["translationStatus"] == "LOSSLESS"
+          assert search["obligationHash"] == obligation["contentHash"]
+          assert symbolic["obligationHash"] == obligation["contentHash"]
+          assert unsupported["status"] == "UNSUPPORTED"
+          assert unsupported["translationStatus"] == "REJECTED"
+          assert "ASSUMPTIONS_NOT_SUPPORTED" in unsupported["translationIssues"]
+          assert manifest["sameObligationSubmittedToBothBackends"] is True
+          assert manifest["unsupportedBeforeExecution"] is True
+          PY
+
+      - name: Upload canonical contracts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: solver-ir-contracts
+          path: |
+            regelsuche-solver-ir/build/reports/solver-ir/**
+            regelsuche-solver-ir/build/reports/tests/**
+            regelsuche-solver-ir/build/test-results/**
+          if-no-files-found: warn
