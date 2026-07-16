@@ -23,6 +23,14 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+tasks.register('writeSolverIrExample', JavaExec) {
+    group = 'verification'
+    description = 'Writes canonical solver-neutral obligation and result examples.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.solver.ir.SolverIrExampleMain'
+    args layout.buildDirectory.dir('reports/solver-ir').get().asFile.absolutePath
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
