@@ -65,9 +65,12 @@ public final class ReleaseReadinessRunner {
             write(outputDirectory.resolve("profiles.json"), run.profileCatalogJson());
             write(outputDirectory.resolve("evidence-summary.json"),
                 run.evidence().toCanonicalJson());
-            if (run.hiddenRuleEvidence() != null) {
-                write(outputDirectory.resolve("hidden-rule-release-evidence.json"),
-                    run.hiddenRuleEvidence().toCanonicalJson());
+            Path hiddenOutput = outputDirectory.resolve(
+                "hidden-rule-release-evidence.json");
+            if (run.hiddenRuleEvidence() == null) {
+                Files.deleteIfExists(hiddenOutput);
+            } else {
+                write(hiddenOutput, run.hiddenRuleEvidence().toCanonicalJson());
             }
             write(outputDirectory.resolve("release-readiness-report.json"),
                 run.matrix().toCanonicalJson());
