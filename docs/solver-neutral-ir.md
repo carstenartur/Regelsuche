@@ -2,9 +2,22 @@
 
 Issue [#233](https://github.com/carstenartur/Regelsuche/issues/233) führt einen versionierten Vertrag zwischen Discovery, Suche, Oracles und späterer Solver-Orchestrierung ein. Die IR ersetzt weder Discovery Evidence noch ein formales Beweisformat. Sie beschreibt exakt, **welche** mathematische Aussage unter **welchen** Annahmen an ein Backend übergeben wurde und bindet jedes Ergebnis an diese Revision.
 
+## Bewusste inkompatible Ablösung
+
+Regelsuche hat keine externen Nutzer der bisherigen internen Proof-Records. Deshalb wurde keine Kompatibilitätsschicht beibehalten:
+
+- `OpenTargetConjectureProofGate.ProofObligation` wurde entfernt;
+- `regelsuche.open-target-conjecture-proof/v1` wurde durch v2 ersetzt;
+- `proof-obligation.json` wurde entfernt;
+- der Production Lifecycle wurde von v2 auf v3 angehoben;
+- Production Campaign, Promotion und Bridge Qualification verwenden unmittelbar `SolverIr.Obligation` und `SolverIr.SolverResult`;
+- es gibt keinen Legacy-Adapter und keinen alternativen Proof-Pfad.
+
+Damit existiert nur ein autoritatives Obligation-Modell. Alte intern erzeugte Zwischenformate werden nicht gelesen, migriert oder parallel weitergeschrieben.
+
 ## Warum ein eigener Vertrag notwendig ist
 
-Bisher enthielten einzelne Komponenten eigene Formen von Proof Obligations, Ausdrucksstrings und Backend-Ergebnissen. Das funktioniert für einen einzelnen Oracle-Aufruf, erschwert aber:
+Die früheren Komponenten enthielten eigene Formen von Proof Obligations, Ausdrucksstrings und Backend-Ergebnissen. Das erschwerte:
 
 - dieselbe Aufgabe reproduzierbar an mehrere Backends zu senden;
 - Fähigkeiten und nicht unterstützte Theorien vor der Ausführung zu prüfen;
@@ -12,7 +25,7 @@ Bisher enthielten einzelne Komponenten eigene Formen von Proof Obligations, Ausd
 - Refutation, unbekanntes Ergebnis, Timeout und Backendfehler zu unterscheiden;
 - Proof Evidence dauerhaft an eine konkrete Problemrevision zu binden.
 
-Das neue Modul `:regelsuche-solver-ir` liegt zwischen diesen Ebenen. Es hängt von `core`, `search` und `validation` ab; `learning` kann seine Proof Evidence an die stabilen Hashes binden.
+Das Modul `:regelsuche-solver-ir` ist nun die gemeinsame Grenze. Es hängt von `core`, `search` und `validation` ab; `learning`, Autopilot und Promotion referenzieren seine stabilen Hashes und Ergebnisse direkt.
 
 ## Obligation v1
 
@@ -74,7 +87,7 @@ n is integer
 
 in typisierte Prädikate. Eine unbekannte Freitextannahme wird nicht gespeichert und nicht ignoriert, sondern als nicht unterstützte Übersetzung abgelehnt.
 
-Direkte Backend-Adapter müssen anschließend separat erklären, ob sie diese Prädikate tatsächlich verarbeiten. Der aktuelle interne Search-Adapter und der bestehende symbolische Equivalence-Adapter unterstützen noch keine Annahmen. Eine Obligation mit `x != 0` wird daher vor Backend-Ausführung als:
+Jeder Backend-Adapter muss erklären, ob er diese Prädikate tatsächlich verarbeitet. Der aktuelle interne Search-Adapter und der symbolische Equivalence-Adapter unterstützen noch keine Annahmen. Eine Obligation mit `x != 0` wird daher **vor** Backend-Ausführung als:
 
 ```text
 status = UNSUPPORTED
@@ -82,7 +95,7 @@ translationStatus = REJECTED
 translationIssues = [ASSUMPTIONS_NOT_SUPPORTED]
 ```
 
-retained.
+retained. Es gibt keinen Fallback auf einen assumptions-blinden Aufruf.
 
 ## Result v1
 
@@ -99,9 +112,11 @@ Ein Ergebnis unterscheidet:
 
 Zusätzlich wird die Übersetzung separat bewertet:
 
-- `LOSSLESS` — alle IR-Felder wurden unverändert verarbeitet;
-- `APPROXIMATED` — ein bestehender Legacy-Pfad wurde ausgeführt, aber eine Einschränkung ist explizit sichtbar;
+- `LOSSLESS` — alle relevanten IR-Felder wurden unverändert verarbeitet;
+- `APPROXIMATED` — ein Backend führt eine ausdrücklich deklarierte, überprüfbare Approximation aus;
 - `REJECTED` — das Backend wurde wegen inkompatibler Fähigkeiten nicht ausgeführt.
+
+`APPROXIMATED` ist kein Kompatibilitätsmodus. Die aktuellen beiden Backend-Integrationen liefern ausschließlich `LOSSLESS` oder `REJECTED`. Spätere Approximationen müssen ihre Abweichung in `translationIssues` sichtbar machen und dürfen nicht als verlustfreie Bestätigung ausgegeben werden.
 
 Jedes Resultat enthält den Obligation-, Goal- und Assumptions-Hash, Backend-ID und -Version, Invocation-Hash, verwendete Capabilities, sichtbare Übersetzungsprobleme sowie optionale Counterexample- und Certificate-Hashes.
 
@@ -119,21 +134,35 @@ Ein erreichbares Ziel liefert `CONFIRMED` und einen Hash über den retained Such
 
 Der CI-Referenzfall sendet **dieselbe** Obligation `x + 0 = x` an beide Backends. Beide Resultate referenzieren denselben `obligationHash` und bestehen unabhängig.
 
-## Bindung an Open-Target Proof Evidence
+## Open-Target Proof Evidence v2
 
-`OpenTargetConjectureProofGate` behält seinen bestehenden Proof-Vertrag bei und ergänzt:
+Schema: [`regelsuche.open-target-conjecture-proof/v2`](schemas/regelsuche-open-target-conjecture-proof-v2.schema.json)
 
-- `solverObligationHash`;
-- `solverResultHash`;
-- `solverTranslationStatus`.
+`OpenTargetConjectureProofGate` erzeugt unmittelbar eine `SolverIr.Obligation`, übergibt sie an genau ein `SolverBackend` und retains das zugehörige `SolverResult`. Der Report enthält deren Hashes und Backendstatus; er besitzt kein zweites eingebettetes Obligation-Modell.
 
-Die alten Equivalence-Services erhalten nur linke und rechte Expression. Enthält eine bestehende Proof Obligation zusätzliche Annahmen, wird dieser Legacy-Link daher ausdrücklich als `APPROXIMATED` markiert:
+Eine Proof-Evidence gilt nur dann als symbolisch verifiziert, wenn:
+
+- das Resultat zu exakt derselben Obligation gehört;
+- der Backendstatus `CONFIRMED` ist;
+- die Übersetzung `LOSSLESS` ist;
+- keine Proof-Blocker vorliegen.
+
+Nicht unterstützte Annahmen führen zu `INCONCLUSIVE` plus `UNSUPPORTED`-Resultat und blockieren Lifecycle, Qualification und Promotion.
+
+## Production Lifecycle v3
+
+Schema: [`regelsuche.autonomous-production-lifecycle/v3`](schemas/regelsuche-autonomous-production-lifecycle-v3.schema.json)
+
+Die Production Campaign schreibt:
 
 ```text
-LEGACY_BACKEND_DID_NOT_CONSUME_STRUCTURED_ASSUMPTIONS
+proof-report.json
+solver-obligation.json
+solver-result.json
+production-lifecycle-run.json
 ```
 
-Damit bleibt die bisherige Evidence reproduzierbar, ohne fälschlich eine vollständige assumptions-aware Prüfung zu behaupten. Neue direkte Backend-Aufrufe bleiben strenger und antworten in diesem Fall `UNSUPPORTED`.
+`proof-obligation.json` und das Lifecycle-v2-Schema existieren nicht mehr. Campaign-Manifest, Release Readiness und Docker-Reproduktion binden die beiden neuen Solver-Artefakte separat und validieren sie gegen ihre Schemas.
 
 ## Reproduktion
 
@@ -159,6 +188,8 @@ Der Workflow `Solver IR`:
 4. verlangt zwei unabhängige `CONFIRMED`-Resultate für dieselbe Obligation;
 5. verlangt ein fail-closed `UNSUPPORTED` für die assumption-bound Obligation;
 6. archiviert Evidence und Testdiagnosen.
+
+Die Workflows `Autopilot Evidence` und `Release Readiness` validieren zusätzlich Proof Report v2, Production Lifecycle v3 sowie die exakte Hashverkettung von Obligation, Resultat, Proof und Campaign.
 
 ## Bewusste Grenzen des ersten Slices
 
