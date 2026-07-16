@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousLifecycleEvidenceJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">AutonomousLifecycleEvidenceJson.java</span></div><h1>AutonomousLifecycleEvidenceJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.HypothesisCandidate;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofObligation;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.Objects;
+
+/** Canonical rendering for production evidence whose domain records have no JSON writer. */
+final class AutonomousLifecycleEvidenceJson {
+    private AutonomousLifecycleEvidenceJson() {
+    }
+
+    static String validation(EvaluationReport report) {
+<span class="fc" id="L18">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L19">            .property(&quot;schema&quot;, report.schema())</span>
+<span class="fc" id="L20">            .property(&quot;conjectureId&quot;, report.conjectureId())</span>
+<span class="fc" id="L21">            .property(&quot;status&quot;, report.status().name())</span>
+<span class="fc" id="L22">            .property(&quot;compilationStatus&quot;, report.compilationStatus())</span>
+<span class="fc" id="L23">            .property(&quot;dynamicRuleId&quot;, report.dynamicRuleId())</span>
+<span class="fc" id="L24">            .property(&quot;provenanceHash&quot;, report.provenanceHash())</span>
+<span class="fc" id="L25">            .property(&quot;configuredPositiveHoldouts&quot;, report.configuredPositiveHoldouts())</span>
+<span class="fc" id="L26">            .property(&quot;executedPositiveHoldouts&quot;, report.executedPositiveHoldouts())</span>
+<span class="fc" id="L27">            .property(&quot;skippedPositiveHoldouts&quot;, report.skippedPositiveHoldouts())</span>
+<span class="fc" id="L28">            .property(&quot;configuredNegativeHoldouts&quot;, report.configuredNegativeHoldouts())</span>
+<span class="fc" id="L29">            .property(&quot;executedNegativeHoldouts&quot;, report.executedNegativeHoldouts())</span>
+<span class="fc" id="L30">            .property(&quot;skippedNegativeHoldouts&quot;, report.skippedNegativeHoldouts())</span>
+<span class="fc" id="L31">            .array(&quot;positiveResults&quot;, array -&gt; report.positiveResults().forEach(item -&gt;</span>
+<span class="fc" id="L32">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L33">                    .property(&quot;id&quot;, item.id())</span>
+<span class="fc" id="L34">                    .property(&quot;candidateCount&quot;, item.candidateCount())</span>
+<span class="fc" id="L35">                    .property(&quot;equivalentCandidate&quot;, item.equivalentCandidate())</span>
+<span class="fc" id="L36">                    .stringArray(&quot;candidateExpressions&quot;, item.candidateExpressions()))))</span>
+<span class="fc" id="L37">            .array(&quot;negativeResults&quot;, array -&gt; report.negativeResults().forEach(item -&gt;</span>
+<span class="fc" id="L38">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L39">                    .property(&quot;id&quot;, item.id())</span>
+<span class="fc" id="L40">                    .property(&quot;candidateCount&quot;, item.candidateCount())</span>
+<span class="fc" id="L41">                    .property(&quot;noApplication&quot;, item.noApplication())</span>
+<span class="fc" id="L42">                    .stringArray(&quot;candidateExpressions&quot;, item.candidateExpressions()))))</span>
+<span class="fc" id="L43">            .property(&quot;holdoutsComplete&quot;, report.holdoutsComplete())</span>
+<span class="fc" id="L44">            .property(&quot;allHoldoutsPassed&quot;, report.allHoldoutsPassed())</span>
+<span class="fc" id="L45">            .property(&quot;acceptedForProof&quot;, report.acceptedForProof())</span>
+<span class="fc" id="L46">            .stringArray(&quot;blockers&quot;, report.blockers())</span>
+<span class="fc" id="L47">            .property(&quot;proofStatus&quot;, report.proofStatus())</span>
+<span class="fc" id="L48">            .property(&quot;noveltyStatus&quot;, report.noveltyStatus())</span>
+<span class="fc" id="L49">            .endObject()</span>
+<span class="fc" id="L50">            .toString();</span>
+    }
+
+    static String counterexample(String conjectureId, EvaluationReport report) {
+<span class="fc" id="L54">        var evidence = report.counterexample();</span>
+<span class="fc" id="L55">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L56">            .property(&quot;schema&quot;, &quot;regelsuche.open-target-counterexample-evidence/v1&quot;)</span>
+<span class="fc" id="L57">            .property(&quot;conjectureId&quot;, conjectureId)</span>
+<span class="fc" id="L58">            .property(&quot;status&quot;, evidence.status())</span>
+<span class="fc" id="L59">            .stringArray(&quot;attemptedSources&quot;, evidence.attemptedSources())</span>
+<span class="fc" id="L60">            .stringArray(&quot;inferredAssumptions&quot;, evidence.inferredAssumptions())</span>
+<span class="fc" id="L61">            .stringArray(&quot;assignments&quot;, evidence.assignments())</span>
+<span class="fc" id="L62">            .property(&quot;leftValue&quot;, evidence.leftValue())</span>
+<span class="fc" id="L63">            .property(&quot;rightValue&quot;, evidence.rightValue())</span>
+<span class="fc" id="L64">            .property(&quot;explanation&quot;, evidence.explanation())</span>
+<span class="fc" id="L65">            .endObject()</span>
+<span class="fc" id="L66">            .toString();</span>
+    }
+
+    static String novelty(NoveltyReport report) {
+<span class="fc" id="L70">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L71">            .property(&quot;schema&quot;, report.schema())</span>
+<span class="fc" id="L72">            .property(&quot;conjectureId&quot;, report.conjectureId())</span>
+<span class="fc" id="L73">            .property(&quot;status&quot;, report.status().name())</span>
+<span class="fc" id="L74">            .property(&quot;exactSignatureHash&quot;, report.exactSignatureHash())</span>
+<span class="fc" id="L75">            .property(&quot;alphaSignatureHash&quot;, report.alphaSignatureHash())</span>
+<span class="fc" id="L76">            .property(&quot;checkedActiveRules&quot;, report.checkedActiveRules())</span>
+<span class="fc" id="L77">            .property(&quot;checkedPriorCandidates&quot;, report.checkedPriorCandidates())</span>
+<span class="fc" id="L78">            .array(&quot;matches&quot;, array -&gt; report.matches().forEach(match -&gt;</span>
+<span class="nc" id="L79">                array.objectValue(object -&gt; object</span>
+<span class="nc" id="L80">                    .property(&quot;source&quot;, match.source())</span>
+<span class="nc" id="L81">                    .property(&quot;candidateId&quot;, match.candidateId())</span>
+<span class="nc" id="L82">                    .property(&quot;relation&quot;, match.relation().name()))))</span>
+<span class="fc" id="L83">            .property(&quot;externalNoveltyStatus&quot;, report.externalNoveltyStatus())</span>
+<span class="fc" id="L84">            .property(&quot;explanation&quot;, report.explanation())</span>
+<span class="fc" id="L85">            .endObject()</span>
+<span class="fc" id="L86">            .toString();</span>
+    }
+
+    static String proofObligation(ProofObligation obligation) {
+<span class="fc" id="L90">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L91">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L92">            .property(&quot;schema&quot;, obligation.schema())</span>
+<span class="fc" id="L93">            .property(&quot;conjectureId&quot;, obligation.conjectureId())</span>
+<span class="fc" id="L94">            .property(&quot;targetProvided&quot;, obligation.targetProvided())</span>
+<span class="fc" id="L95">            .property(&quot;leftExpression&quot;, obligation.leftExpression())</span>
+<span class="fc" id="L96">            .property(&quot;rightExpression&quot;, obligation.rightExpression())</span>
+<span class="fc" id="L97">            .stringArray(&quot;assumptions&quot;, obligation.assumptions())</span>
+<span class="fc" id="L98">            .property(&quot;obligationHash&quot;, obligation.obligationHash())</span>
+<span class="fc" id="L99">            .endObject()</span>
+<span class="fc" id="L100">            .toString();</span>
+    }
+
+    static String lifecycleCandidate(HypothesisCandidate candidate) {
+<span class="fc" id="L104">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L105">            .property(&quot;schema&quot;, &quot;regelsuche.open-target-lifecycle-candidate/v1&quot;)</span>
+<span class="fc" id="L106">            .property(&quot;id&quot;, candidate.id())</span>
+<span class="fc" id="L107">            .property(&quot;leftPattern&quot;, candidate.leftPattern())</span>
+<span class="fc" id="L108">            .property(&quot;rightPattern&quot;, candidate.rightPattern())</span>
+<span class="fc" id="L109">            .stringArray(&quot;supportingPaths&quot;, candidate.supportingPaths())</span>
+<span class="fc" id="L110">            .array(&quot;supportingExpressions&quot;, array -&gt;</span>
+<span class="fc" id="L111">                candidate.supportingExpressions().stream()</span>
+<span class="fc" id="L112">                    .sorted(Comparator</span>
+<span class="fc" id="L113">                        .comparing(HypothesisCandidate.ExpressionPair::left)</span>
+<span class="fc" id="L114">                        .thenComparing(HypothesisCandidate.ExpressionPair::right))</span>
+<span class="fc" id="L115">                    .forEach(pair -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L116">                        .property(&quot;left&quot;, pair.left())</span>
+<span class="fc" id="L117">                        .property(&quot;right&quot;, pair.right()))))</span>
+<span class="fc" id="L118">            .stringArray(&quot;assumptions&quot;, candidate.assumptions())</span>
+<span class="fc" id="L119">            .property(&quot;noveltyScore&quot;, candidate.noveltyScore())</span>
+<span class="fc" id="L120">            .property(&quot;proofStatus&quot;, candidate.proofStatus().name())</span>
+<span class="fc" id="L121">            .property(&quot;counterexampleStatus&quot;,</span>
+<span class="fc" id="L122">                Boolean.TRUE.equals(candidate.counterexampleStatus()))</span>
+<span class="fc" id="L123">            .property(&quot;counterexampleSearchStatus&quot;,</span>
+<span class="fc" id="L124">                candidate.counterexampleSearchStatus().name())</span>
+<span class="fc" id="L125">            .stringArray(&quot;counterexampleAttemptedSources&quot;,</span>
+<span class="fc" id="L126">                candidate.counterexampleAttemptedSources())</span>
+<span class="fc" id="L127">            .property(&quot;counterexampleExplanation&quot;,</span>
+<span class="fc" id="L128">                candidate.counterexampleExplanation())</span>
+<span class="fc" id="L129">            .stringArray(&quot;parameterRelations&quot;, candidate.parameterRelations())</span>
+<span class="fc" id="L130">            .object(&quot;expressionPlaceholders&quot;, object -&gt;</span>
+<span class="fc" id="L131">                candidate.expressionPlaceholders().entrySet().stream()</span>
+<span class="fc" id="L132">                    .sorted(Map.Entry.comparingByKey())</span>
+<span class="pc" id="L133">                    .forEach(entry -&gt; object.stringArray(</span>
+<span class="nc" id="L134">                        entry.getKey(), entry.getValue())))</span>
+<span class="fc" id="L135">            .property(&quot;createdAt&quot;, candidate.createdAt().toString())</span>
+<span class="fc" id="L136">            .property(&quot;promotionStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L137">            .property(&quot;publicEvidenceStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L138">            .endObject()</span>
+<span class="fc" id="L139">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

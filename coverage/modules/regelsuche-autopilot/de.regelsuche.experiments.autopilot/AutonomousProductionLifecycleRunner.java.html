@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousProductionLifecycleRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-autopilot</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.experiments.autopilot</a> &gt; <span class="el_source">AutonomousProductionLifecycleRunner.java</span></div><h1>AutonomousProductionLifecycleRunner.java</h1><pre class="source lang-java linenums">package de.regelsuche.experiments.autopilot;
+
+import de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2.LifecycleDecision;
+import de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2.LifecycleOutcome;
+import de.regelsuche.experiments.autopilot.AutonomousProductionMiningRunner.MiningRun;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.EvidenceStage;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
+import de.regelsuche.experiments.autopilot.AutonomousStageResourceLedger.StageResourceLedger;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.mining.HypothesisCandidate;
+import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationPlan;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.NegativeHoldout;
+import de.regelsuche.mining.OpenTargetConjectureEvaluator.PositiveHoldout;
+import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
+import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus;
+import de.regelsuche.mining.OpenTargetConjectureProofGate;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
+import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
+import de.regelsuche.mining.OpenTargetHypothesisCandidateAdapter;
+import de.regelsuche.validation.CounterexampleSearchService.CounterexampleBudget;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Executes all downstream production gates after aggregate candidate formation. */
+<span class="fc" id="L39">public final class AutonomousProductionLifecycleRunner {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-production-lifecycle/v2&quot;;
+    private static final String VALIDATION_REVISION =
+        &quot;production-validation-holdouts-348/v1&quot;;
+    private static final int RANDOM_COUNTEREXAMPLE_SAMPLES = 64;
+<span class="fc" id="L45">    private static final Instant LIFECYCLE_CREATED_AT =</span>
+<span class="fc" id="L46">        Instant.parse(&quot;2026-07-15T00:00:00Z&quot;);</span>
+
+    public LifecycleRun runPinned(int parallelism) {
+<span class="fc" id="L49">        return run(new AutonomousProductionMiningRunner().runPinned(parallelism));</span>
+    }
+
+    LifecycleRun run(MiningRun mining) {
+<span class="fc" id="L53">        Objects.requireNonNull(mining, &quot;mining&quot;);</span>
+<span class="fc" id="L54">        var brief = mining.generation().brief();</span>
+<span class="fc" id="L55">        OpenTargetConjecture conjecture = retainedConjecture(mining);</span>
+<span class="fc" id="L56">        String candidateBranchId = retainedCandidateBranchId(mining, conjecture);</span>
+
+<span class="fc" id="L58">        EvaluationPlan plan = evaluationPlan(brief.deterministicSeed());</span>
+<span class="fc" id="L59">        EvaluationReport evaluation = new OpenTargetConjectureEvaluator()</span>
+<span class="fc" id="L60">            .evaluate(conjecture, plan);</span>
+<span class="fc" id="L61">        String validationJson = AutonomousLifecycleEvidenceJson.validation(evaluation);</span>
+<span class="fc" id="L62">        String validationHash = AutonomousResearchBriefV2.hash(validationJson);</span>
+<span class="fc" id="L63">        String counterexampleJson = AutonomousLifecycleEvidenceJson.counterexample(</span>
+<span class="fc" id="L64">            conjecture.conjectureId(), evaluation);</span>
+<span class="fc" id="L65">        String counterexampleHash = AutonomousResearchBriefV2.hash(counterexampleJson);</span>
+
+<span class="fc" id="L67">        NoveltyReport novelty = new OpenTargetConjectureNoveltyChecker().check(</span>
+<span class="fc" id="L68">            conjecture, new KnownRuleRepository(), List.of());</span>
+<span class="fc" id="L69">        String noveltyJson = AutonomousLifecycleEvidenceJson.novelty(novelty);</span>
+<span class="fc" id="L70">        String noveltyHash = AutonomousResearchBriefV2.hash(noveltyJson);</span>
+
+<span class="fc" id="L72">        ProofReport proof = new OpenTargetConjectureProofGate().evaluate(</span>
+            conjecture, evaluation);
+<span class="fc" id="L74">        HypothesisCandidate lifecycleCandidate =</span>
+<span class="fc" id="L75">            new OpenTargetHypothesisCandidateAdapter().adapt(</span>
+                conjecture, evaluation, LIFECYCLE_CREATED_AT);
+<span class="fc" id="L77">        String lifecycleCandidateJson =</span>
+<span class="fc" id="L78">            AutonomousLifecycleEvidenceJson.lifecycleCandidate(lifecycleCandidate);</span>
+<span class="fc" id="L79">        String lifecycleCandidateHash = AutonomousResearchBriefV2.hash(</span>
+            lifecycleCandidateJson);
+<span class="fc" id="L81">        LifecycleDecision lifecycleDecision = AutonomousCandidateLifecycleV2.decide(</span>
+            candidateBranchId, novelty, proof, lifecycleCandidate);
+
+<span class="fc" id="L84">        validateSuccessfulLifecycle(</span>
+            evaluation, novelty, proof, lifecycleCandidate, lifecycleDecision);
+<span class="fc" id="L86">        StageResourceLedger stageLedger = stageLedger(</span>
+            brief,
+            evaluation,
+            validationHash,
+<span class="fc" id="L90">            plan.counterexampleBudget(),</span>
+            counterexampleHash,
+            novelty,
+            noveltyHash,
+            proof,
+            lifecycleDecision);
+<span class="fc" id="L96">        String contentHash = AutonomousResearchBriefV2.hash(</span>
+            SCHEMA
+<span class="fc" id="L98">                + &quot;\nmining=&quot; + mining.contentHash()</span>
+                + &quot;\ncandidateBranch=&quot; + candidateBranchId
+<span class="fc" id="L100">                + &quot;\nconjecture=&quot; + conjecture.conjectureId()</span>
+                + &quot;\nvalidation=&quot; + validationHash
+                + &quot;\ncounterexample=&quot; + counterexampleHash
+                + &quot;\nnovelty=&quot; + noveltyHash
+<span class="fc" id="L104">                + &quot;\nproof=&quot; + proof.evidenceHash()</span>
+<span class="fc" id="L105">                + &quot;\nproofObligation=&quot; + proof.obligation().obligationHash()</span>
+                + &quot;\nlifecycleCandidate=&quot; + lifecycleCandidateHash
+<span class="fc" id="L107">                + &quot;\nlifecycleDecision=&quot; + lifecycleDecision.contentHash()</span>
+<span class="fc" id="L108">                + &quot;\nstageLedger=&quot; + stageLedger.contentHash());</span>
+<span class="fc" id="L109">        return new LifecycleRun(</span>
+            SCHEMA,
+            mining,
+            candidateBranchId,
+            conjecture,
+            evaluation,
+            validationJson,
+            validationHash,
+            counterexampleJson,
+            counterexampleHash,
+            novelty,
+            noveltyJson,
+            noveltyHash,
+            proof,
+            lifecycleCandidate,
+            lifecycleCandidateJson,
+            lifecycleCandidateHash,
+            lifecycleDecision,
+            stageLedger,
+            false,
+            false,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    public void write(Path outputDirectory, LifecycleRun run) {
+<span class="fc" id="L136">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L137">        Objects.requireNonNull(run, &quot;run&quot;);</span>
+        try {
+<span class="fc" id="L139">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L140">            new AutonomousProductionMiningRunner().write(outputDirectory, run.mining());</span>
+<span class="fc" id="L141">            write(outputDirectory.resolve(&quot;validation-report.json&quot;), run.validationJson());</span>
+<span class="fc" id="L142">            write(outputDirectory.resolve(&quot;counterexample-report.json&quot;), run.counterexampleJson());</span>
+<span class="fc" id="L143">            write(outputDirectory.resolve(&quot;project-novelty-report.json&quot;), run.noveltyJson());</span>
+<span class="fc" id="L144">            write(outputDirectory.resolve(&quot;proof-report.json&quot;), run.proof().toCanonicalJson());</span>
+<span class="fc" id="L145">            write(outputDirectory.resolve(&quot;proof-obligation.json&quot;),</span>
+<span class="fc" id="L146">                AutonomousLifecycleEvidenceJson.proofObligation(run.proof().obligation()));</span>
+<span class="fc" id="L147">            write(outputDirectory.resolve(&quot;lifecycle-candidate.json&quot;),</span>
+<span class="fc" id="L148">                run.lifecycleCandidateJson());</span>
+<span class="fc" id="L149">            write(outputDirectory.resolve(&quot;lifecycle-decision.json&quot;),</span>
+<span class="fc" id="L150">                run.lifecycleDecision().toCanonicalJson());</span>
+<span class="fc" id="L151">            write(outputDirectory.resolve(&quot;stage-resource-ledger.json&quot;),</span>
+<span class="fc" id="L152">                run.stageLedger().toCanonicalJson());</span>
+<span class="fc" id="L153">            write(outputDirectory.resolve(&quot;production-lifecycle-run.json&quot;),</span>
+<span class="fc" id="L154">                run.toCanonicalJson());</span>
+<span class="nc" id="L155">        } catch (IOException exception) {</span>
+<span class="nc" id="L156">            throw new UncheckedIOException(</span>
+                &quot;Could not write production lifecycle evidence&quot;, exception);
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">    }</span>
+
+    private static void write(Path path, String content) throws IOException {
+<span class="fc" id="L162">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L163">    }</span>
+
+    private static EvaluationPlan evaluationPlan(long deterministicSeed) {
+<span class="fc" id="L166">        return new EvaluationPlan(</span>
+            VALIDATION_REVISION,
+<span class="fc" id="L168">            List.of(</span>
+                new PositiveHoldout(
+                    &quot;positive-gap-53&quot;,
+                    &quot;(53 + 2) * q + 53 * q&quot;,
+                    &quot;(2 * 53 + 2) * q&quot;),
+                new PositiveHoldout(
+                    &quot;positive-gap-67&quot;,
+                    &quot;(67 + 2) * r + 67 * r&quot;,
+                    &quot;(2 * 67 + 2) * r&quot;),
+                new PositiveHoldout(
+                    &quot;positive-expression-71&quot;,
+                    &quot;(71 + 2) * (u + v) + 71 * (u + v)&quot;,
+                    &quot;(2 * 71 + 2) * (u + v)&quot;)),
+<span class="fc" id="L181">            List.of(</span>
+                new NegativeHoldout(
+                    &quot;negative-gap-three&quot;,
+                    &quot;(53 + 3) * q + 53 * q&quot;),
+                new NegativeHoldout(
+                    &quot;negative-second-coefficient&quot;,
+                    &quot;(67 + 2) * r + 68 * r&quot;),
+                new NegativeHoldout(
+                    &quot;negative-distinct-factor&quot;,
+                    &quot;(71 + 2) * (u + v) + 71 * (u - v)&quot;)),
+            new CounterexampleBudget(
+                RANDOM_COUNTEREXAMPLE_SAMPLES,
+                true,
+                false,
+                deterministicSeed,
+                true,
+                true,
+                0,
+                0L));
+    }
+
+    private static OpenTargetConjecture retainedConjecture(MiningRun mining) {
+<span class="fc" id="L203">        List&lt;OpenTargetConjecture&gt; conjectures = mining.fullBatch()</span>
+<span class="fc" id="L204">            .evidence().report().conjectures();</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (conjectures.size() != 1) {</span>
+<span class="nc" id="L206">            throw new IllegalStateException(</span>
+                &quot;pinned lifecycle slice requires exactly one retained conjecture&quot;);
+        }
+<span class="fc" id="L209">        return conjectures.getFirst();</span>
+    }
+
+    private static String retainedCandidateBranchId(
+        MiningRun mining,
+        OpenTargetConjecture conjecture
+    ) {
+<span class="fc" id="L216">        var outputs = mining.fullBatch().binding().receipt().outputs();</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (outputs.size() != 1</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">                || !conjecture.conjectureId().equals(outputs.getFirst().conjectureId())) {</span>
+<span class="nc" id="L219">            throw new IllegalStateException(</span>
+                &quot;pinned lifecycle slice requires one hash-linked candidate branch&quot;);
+        }
+<span class="fc" id="L222">        return outputs.getFirst().outputBranchId();</span>
+    }
+
+    private static void validateSuccessfulLifecycle(
+        EvaluationReport evaluation,
+        NoveltyReport novelty,
+        ProofReport proof,
+        HypothesisCandidate lifecycleCandidate,
+        LifecycleDecision lifecycleDecision
+    ) {
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (evaluation.status() != EvaluationStatus.ACCEPTED_FOR_PROOF</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                || !evaluation.holdoutsComplete()</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">                || !evaluation.allHoldoutsPassed()</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                || !&quot;NO_COUNTEREXAMPLE_FOUND&quot;.equals(</span>
+<span class="fc" id="L236">                    evaluation.counterexample().status())</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">                || evaluation.counterexample().attemptedSources().isEmpty()</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                || !evaluation.counterexample().inferredAssumptions().isEmpty()</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">                || !evaluation.counterexample().assignments().isEmpty()) {</span>
+<span class="nc" id="L240">            throw new IllegalStateException(</span>
+                &quot;production candidate did not pass validation: &quot; + evaluation);
+        }
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (novelty.status() != NoveltyStatus.NOVEL_WITHIN_PROJECT</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                || !novelty.matches().isEmpty()</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(novelty.externalNoveltyStatus())) {</span>
+<span class="nc" id="L246">            throw new IllegalStateException(</span>
+                &quot;production candidate did not pass project novelty: &quot; + novelty);
+        }
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (proof.proofStatus() != ProofStatus.SYMBOLICALLY_VERIFIED</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                || !proof.proofObligationEmitted()</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                || proof.obligation().targetProvided()</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                || !proof.blockers().isEmpty()</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(proof.formalProofStatus())) {</span>
+<span class="nc" id="L254">            throw new IllegalStateException(</span>
+                &quot;production proof gate did not verify the candidate: &quot; + proof);
+        }
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (!lifecycleCandidate.id().equals(evaluation.conjectureId())</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                || lifecycleDecision.outcome() != LifecycleOutcome.COMPLETED</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">                || lifecycleDecision.terminal()</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                || lifecycleDecision.promotionAttempted()</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">                || lifecycleDecision.publicationAttempted()</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">                || !lifecycleDecision.blockers().isEmpty()) {</span>
+<span class="nc" id="L263">            throw new IllegalStateException(</span>
+                &quot;production candidate did not reach conservative lifecycle completion&quot;);
+        }
+<span class="fc" id="L266">    }</span>
+
+    private static StageResourceLedger stageLedger(
+        AutonomousResearchBriefV2 brief,
+        EvaluationReport evaluation,
+        String validationHash,
+        CounterexampleBudget counterexampleBudget,
+        String counterexampleHash,
+        NoveltyReport novelty,
+        String noveltyHash,
+        ProofReport proof,
+        LifecycleDecision lifecycleDecision
+    ) {
+<span class="fc" id="L279">        return AutonomousStageResourceLedger.create(brief, List.of(</span>
+<span class="fc" id="L280">            AutonomousStageResourceLedger.completed(</span>
+                brief,
+                EvidenceStage.VALIDATION,
+                ResourceKind.VALIDATION_CHECKS,
+<span class="fc" id="L284">                Math.addExact(</span>
+<span class="fc" id="L285">                    evaluation.executedPositiveHoldouts(),</span>
+<span class="fc" id="L286">                    evaluation.executedNegativeHoldouts()),</span>
+                validationHash),
+<span class="fc" id="L288">            AutonomousStageResourceLedger.completed(</span>
+                brief,
+                EvidenceStage.COUNTEREXAMPLE_SEARCH,
+                ResourceKind.COUNTEREXAMPLE_ATTEMPTS,
+<span class="fc" id="L292">                executedCounterexampleAttempts(</span>
+                    counterexampleBudget,
+<span class="fc" id="L294">                    evaluation.counterexample().attemptedSources()),</span>
+                counterexampleHash),
+<span class="fc" id="L296">            AutonomousStageResourceLedger.completed(</span>
+                brief,
+                EvidenceStage.PROJECT_NOVELTY,
+                ResourceKind.NOVELTY_COMPARISONS,
+<span class="fc" id="L300">                Math.addExact(</span>
+<span class="fc" id="L301">                    novelty.checkedActiveRules(),</span>
+<span class="fc" id="L302">                    novelty.checkedPriorCandidates()),</span>
+                noveltyHash),
+<span class="fc" id="L304">            AutonomousStageResourceLedger.completed(</span>
+                brief,
+                EvidenceStage.PROOF,
+                ResourceKind.PROOF_ATTEMPTS,
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                proof.proofObligationEmitted() ? 1L : 0L,</span>
+<span class="fc" id="L309">                proof.evidenceHash()),</span>
+<span class="fc" id="L310">            AutonomousStageResourceLedger.completed(</span>
+                brief,
+                EvidenceStage.LIFECYCLE_HANDOFF,
+                ResourceKind.LIFECYCLE_HANDOFFS,
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                lifecycleDecision.outcome() == LifecycleOutcome.COMPLETED ? 1L : 0L,</span>
+<span class="fc" id="L315">                lifecycleDecision.contentHash())));</span>
+    }
+
+    private static long executedCounterexampleAttempts(
+        CounterexampleBudget budget,
+        List&lt;String&gt; attemptedSources
+    ) {
+<span class="fc" id="L322">        Set&lt;String&gt; sources = new TreeSet&lt;&gt;(attemptedSources);</span>
+<span class="fc" id="L323">        Set&lt;String&gt; expected = Set.of(</span>
+            &quot;numeric-boundary-values&quot;,
+            &quot;rational-samples&quot;,
+            &quot;numeric-random&quot;,
+            &quot;complex-samples&quot;);
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (!sources.equals(expected)) {</span>
+<span class="nc" id="L329">            throw new IllegalStateException(</span>
+                &quot;production counterexample sources differ from the pinned budget: &quot;
+                    + sources);
+        }
+<span class="fc" id="L333">        return 5L + 4L + budget.maxNumericSamples() + 4L;</span>
+    }
+
+    public record LifecycleRun(
+        String schema,
+        MiningRun mining,
+        String candidateBranchId,
+        OpenTargetConjecture conjecture,
+        EvaluationReport evaluation,
+        String validationJson,
+        String validationHash,
+        String counterexampleJson,
+        String counterexampleHash,
+        NoveltyReport novelty,
+        String noveltyJson,
+        String noveltyHash,
+        ProofReport proof,
+        HypothesisCandidate lifecycleCandidate,
+        String lifecycleCandidateJson,
+        String lifecycleCandidateHash,
+        LifecycleDecision lifecycleDecision,
+        StageResourceLedger stageLedger,
+        boolean targetProvided,
+        boolean lifecycleRunIsMathematicalEvidence,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L361">        public LifecycleRun {</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L363">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported production lifecycle schema&quot;);
+            }
+<span class="fc" id="L366">            mining = Objects.requireNonNull(mining, &quot;mining&quot;);</span>
+<span class="fc" id="L367">            requireText(candidateBranchId, &quot;candidateBranchId&quot;);</span>
+<span class="fc" id="L368">            conjecture = Objects.requireNonNull(conjecture, &quot;conjecture&quot;);</span>
+<span class="fc" id="L369">            evaluation = Objects.requireNonNull(evaluation, &quot;evaluation&quot;);</span>
+<span class="fc" id="L370">            requireText(validationJson, &quot;validationJson&quot;);</span>
+<span class="fc" id="L371">            requireSha256(validationHash, &quot;validationHash&quot;);</span>
+<span class="fc" id="L372">            requireText(counterexampleJson, &quot;counterexampleJson&quot;);</span>
+<span class="fc" id="L373">            requireSha256(counterexampleHash, &quot;counterexampleHash&quot;);</span>
+<span class="fc" id="L374">            novelty = Objects.requireNonNull(novelty, &quot;novelty&quot;);</span>
+<span class="fc" id="L375">            requireText(noveltyJson, &quot;noveltyJson&quot;);</span>
+<span class="fc" id="L376">            requireSha256(noveltyHash, &quot;noveltyHash&quot;);</span>
+<span class="fc" id="L377">            proof = Objects.requireNonNull(proof, &quot;proof&quot;);</span>
+<span class="fc" id="L378">            lifecycleCandidate = Objects.requireNonNull(</span>
+                lifecycleCandidate, &quot;lifecycleCandidate&quot;);
+<span class="fc" id="L380">            requireText(lifecycleCandidateJson, &quot;lifecycleCandidateJson&quot;);</span>
+<span class="fc" id="L381">            requireSha256(lifecycleCandidateHash, &quot;lifecycleCandidateHash&quot;);</span>
+<span class="fc" id="L382">            lifecycleDecision = Objects.requireNonNull(</span>
+                lifecycleDecision, &quot;lifecycleDecision&quot;);
+<span class="fc" id="L384">            stageLedger = Objects.requireNonNull(stageLedger, &quot;stageLedger&quot;);</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">            if (!conjecture.conjectureId().equals(evaluation.conjectureId())</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                    || !conjecture.conjectureId().equals(novelty.conjectureId())</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">                    || !conjecture.conjectureId().equals(proof.conjectureId())</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">                    || !conjecture.conjectureId().equals(lifecycleCandidate.id())</span>
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">                    || !candidateBranchId.equals(lifecycleDecision.candidateBranchId())</span>
+<span class="pc bpc" id="L390" title="3 of 6 branches missed.">                    || !mining.generation().brief().contentHash().equals(</span>
+<span class="fc" id="L391">                        stageLedger.briefHash())</span>
+                    || targetProvided
+                    || lifecycleRunIsMathematicalEvidence) {
+<span class="nc" id="L394">                throw new IllegalArgumentException(</span>
+                    &quot;production lifecycle evidence is not consistently linked&quot;);
+            }
+<span class="fc" id="L397">            requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L398">            requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L399">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L400">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L403">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L404">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L405">                .property(&quot;briefHash&quot;, mining.generation().brief().contentHash())</span>
+<span class="fc" id="L406">                .property(&quot;miningRunHash&quot;, mining.contentHash())</span>
+<span class="fc" id="L407">                .property(&quot;candidateBranchId&quot;, candidateBranchId)</span>
+<span class="fc" id="L408">                .property(&quot;conjectureId&quot;, conjecture.conjectureId())</span>
+<span class="fc" id="L409">                .property(&quot;validationHash&quot;, validationHash)</span>
+<span class="fc" id="L410">                .property(&quot;counterexampleHash&quot;, counterexampleHash)</span>
+<span class="fc" id="L411">                .property(&quot;projectNoveltyHash&quot;, noveltyHash)</span>
+<span class="fc" id="L412">                .property(&quot;projectNoveltyStatus&quot;, novelty.status().name())</span>
+<span class="fc" id="L413">                .property(&quot;externalNoveltyStatus&quot;, novelty.externalNoveltyStatus())</span>
+<span class="fc" id="L414">                .property(&quot;proofEvidenceHash&quot;, proof.evidenceHash())</span>
+<span class="fc" id="L415">                .property(&quot;proofObligationHash&quot;,</span>
+<span class="fc" id="L416">                    proof.obligation().obligationHash())</span>
+<span class="fc" id="L417">                .property(&quot;proofStatus&quot;, proof.proofStatus().name())</span>
+<span class="fc" id="L418">                .property(&quot;formalProofStatus&quot;, proof.formalProofStatus())</span>
+<span class="fc" id="L419">                .property(&quot;lifecycleCandidateHash&quot;, lifecycleCandidateHash)</span>
+<span class="fc" id="L420">                .property(&quot;lifecycleDecisionHash&quot;, lifecycleDecision.contentHash())</span>
+<span class="fc" id="L421">                .property(&quot;lifecycleOutcome&quot;, lifecycleDecision.outcome().name())</span>
+<span class="fc" id="L422">                .property(&quot;stageResourceLedgerHash&quot;, stageLedger.contentHash())</span>
+<span class="fc" id="L423">                .property(&quot;targetProvided&quot;, targetProvided)</span>
+<span class="fc" id="L424">                .property(&quot;lifecycleRunIsMathematicalEvidence&quot;,</span>
+                    lifecycleRunIsMathematicalEvidence)
+<span class="fc" id="L426">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L427">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L428">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L429">                .endObject()</span>
+<span class="fc" id="L430">                .toString();</span>
+        }
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L435" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L436">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L438">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L441" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L442">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L444">    }</span>
+
+    private static void requireNotEvaluated(String value, String name) {
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(value)) {</span>
+<span class="nc" id="L448">            throw new IllegalArgumentException(name + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L450">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
