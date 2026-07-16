@@ -5,9 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.release.ReleaseReadinessMatrix.MatrixReport;
+import de.regelsuche.release.ReleaseReadinessMatrix.ProfileResult;
 import de.regelsuche.release.ReleaseReadinessMatrix.ProfileStatus;
+import de.regelsuche.release.ReleaseReadinessMatrix.RequirementCheck;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -116,6 +121,56 @@ class ReleaseReadinessRunnerTest {
             .contains("DOMAIN_GENERIC_SEARCH_INTERFACE"));
         assertFalse(ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN.requirements()
             .contains("FRESH_HOLDOUTS_AT_LEAST_ONE_HUNDRED"));
+    }
+
+    @Test
+    void matrixHashCoversActualValuesButNotSuppliedProfileOrder() {
+        MatrixReport matrix = run.matrix();
+        List<ProfileResult> reversed = new ArrayList<>(matrix.profiles());
+        Collections.reverse(reversed);
+
+        MatrixReport reordered = new MatrixReport(
+            matrix.schema(),
+            matrix.evidenceHash(),
+            reversed,
+            matrix.autonomousCampaignStatus(),
+            matrix.autonomyClaimAuthorized(),
+            matrix.promotionStatus(),
+            matrix.publicEvidenceStatus(),
+            matrix.contentHash());
+        assertEquals(matrix.toCanonicalJson(), reordered.toCanonicalJson());
+
+        ProfileResult autonomy = matrix.result(
+            ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN);
+        List<RequirementCheck> changedChecks = new ArrayList<>(autonomy.checks());
+        RequirementCheck first = changedChecks.getFirst();
+        changedChecks.set(0, new RequirementCheck(
+            first.code(),
+            first.passed(),
+            first.actual() + "-changed",
+            first.required()));
+        ProfileResult changedAutonomy = new ProfileResult(
+            autonomy.profile(),
+            autonomy.status(),
+            autonomy.autonomyClaimAuthorized(),
+            changedChecks,
+            autonomy.blockers());
+        List<ProfileResult> changedProfiles = matrix.profiles().stream()
+            .map(profile -> profile.profile()
+                == ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN
+                    ? changedAutonomy
+                    : profile)
+            .toList();
+
+        assertThrows(IllegalArgumentException.class, () -> new MatrixReport(
+            matrix.schema(),
+            matrix.evidenceHash(),
+            changedProfiles,
+            matrix.autonomousCampaignStatus(),
+            matrix.autonomyClaimAuthorized(),
+            matrix.promotionStatus(),
+            matrix.publicEvidenceStatus(),
+            matrix.contentHash()));
     }
 
     @Test
