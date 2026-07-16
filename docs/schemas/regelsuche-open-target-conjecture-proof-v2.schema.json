@@ -5,7 +5,8 @@
   "type": "object",
   "required": [
     "schema", "conjectureId", "eligibility", "proofStatus",
-    "proofObligationEmitted", "solverObligationHash", "solverResultHash",
+    "proofObligationEmitted", "solverObligationHash",
+    "solverTranslationHash", "solverResultHash", "solverExecutionHash",
     "backendId", "backendVersion", "backendStatus", "translationStatus",
     "backendEvidence", "formalProofStatus", "blockers", "evidenceHash"
   ],
@@ -20,7 +21,13 @@
     "solverObligationHash": {
       "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
     },
+    "solverTranslationHash": {
+      "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
+    },
     "solverResultHash": {
+      "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
+    },
+    "solverExecutionHash": {
       "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
     },
     "backendId": { "type": "string" },
@@ -52,7 +59,9 @@
       "then": {
         "properties": {
           "solverObligationHash": { "$ref": "#/$defs/sha256" },
-          "solverResultHash": { "$ref": "#/$defs/sha256" }
+          "solverTranslationHash": { "$ref": "#/$defs/sha256" },
+          "solverResultHash": { "$ref": "#/$defs/sha256" },
+          "solverExecutionHash": { "$ref": "#/$defs/sha256" }
         }
       }
     },
@@ -66,7 +75,9 @@
           "proofStatus": { "const": "NOT_RUN" },
           "proofObligationEmitted": { "const": false },
           "solverObligationHash": { "const": "" },
+          "solverTranslationHash": { "const": "" },
           "solverResultHash": { "const": "" },
+          "solverExecutionHash": { "const": "" },
           "backendStatus": { "const": "NOT_RUN" },
           "translationStatus": { "const": "NOT_EMITTED" }
         }
