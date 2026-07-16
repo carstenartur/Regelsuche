@@ -51,7 +51,9 @@ jobs:
             release-readiness-run.json; do test -s "$DIR/$file"; done
           for file in production-campaign-manifest.json \
             campaign-resource-ledger.json feedback-reallocation.json \
-            proof-obligation.json; do test -s "$DIR/campaign/$file"; done
+            proof-report.json solver-obligation.json solver-result.json \
+            production-lifecycle-run.json; do test -s "$DIR/campaign/$file"; done
+          test ! -e "$DIR/campaign/proof-obligation.json"
           for file in qualification-suite.json qualification-split-audit.json \
             qualification-evaluation.json qualification-utility.json \
             candidate-qualification-evidence.json \
@@ -107,6 +109,22 @@ jobs:
                   schemas / "regelsuche-release-readiness-run-v1.schema.json",
                   root / "release-readiness-run.json",
               ),
+              (
+                  schemas / "regelsuche-solver-obligation-v1.schema.json",
+                  root / "campaign/solver-obligation.json",
+              ),
+              (
+                  schemas / "regelsuche-solver-result-v1.schema.json",
+                  root / "campaign/solver-result.json",
+              ),
+              (
+                  schemas / "regelsuche-open-target-conjecture-proof-v2.schema.json",
+                  root / "campaign/proof-report.json",
+              ),
+              (
+                  schemas / "regelsuche-autonomous-production-lifecycle-v3.schema.json",
+                  root / "campaign/production-lifecycle-run.json",
+              ),
           ]
           for schema_path, artifact_path in pairs:
               schema = json.loads(schema_path.read_text(encoding="utf-8"))
@@ -114,6 +132,18 @@ jobs:
               Draft202012Validator.check_schema(schema)
               Draft202012Validator(schema).validate(artifact)
               print(f"validated {artifact_path} against {schema_path}")
+
+          obligation = json.loads((root / "campaign/solver-obligation.json").read_text())
+          result = json.loads((root / "campaign/solver-result.json").read_text())
+          proof = json.loads((root / "campaign/proof-report.json").read_text())
+          lifecycle = json.loads((root / "campaign/production-lifecycle-run.json").read_text())
+          assert result["obligationHash"] == obligation["contentHash"]
+          assert proof["solverObligationHash"] == obligation["contentHash"]
+          assert proof["solverResultHash"] == result["contentHash"]
+          assert lifecycle["solverObligationHash"] == obligation["contentHash"]
+          assert lifecycle["solverResultHash"] == result["contentHash"]
+          assert result["status"] == "CONFIRMED"
+          assert result["translationStatus"] == "LOSSLESS"
           PY
 
       - name: Verify independently bound profiles and candidate qualification
