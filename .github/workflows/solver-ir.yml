@@ -35,14 +35,20 @@ jobs:
             :regelsuche-solver-ir:test \
             :regelsuche-solver-ir:writeSolverIrExample
 
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
+
       - name: Validate JSON schemas and backend outcomes
         shell: bash
         run: |
-          python - <<'PY'
+          set -o pipefail
+          python3 - <<'PY' 2>&1 | tee solver-ir-validation.log
           import json
+          from importlib.metadata import version
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
+          print("jsonschema=" + version("jsonschema"))
           root = Path("regelsuche-solver-ir/build/reports/solver-ir")
           schemas = Path("docs/schemas")
           obligation_schema = json.loads(
@@ -51,6 +57,10 @@ jobs:
           result_schema = json.loads(
               (schemas / "regelsuche-solver-result-v1.schema.json").read_text()
           )
+          Draft202012Validator.check_schema(obligation_schema)
+          Draft202012Validator.check_schema(result_schema)
+          print("schemas=valid")
+
           obligations = [
               root / "obligation.json",
               root / "assumption-obligation.json",
@@ -64,10 +74,12 @@ jobs:
               Draft202012Validator(obligation_schema).validate(
                   json.loads(path.read_text())
               )
+              print("validated=" + str(path))
           for path in results:
               Draft202012Validator(result_schema).validate(
                   json.loads(path.read_text())
               )
+              print("validated=" + str(path))
 
           obligation = json.loads((root / "obligation.json").read_text())
           search = json.loads((root / "regelsuche-search-result.json").read_text())
@@ -86,6 +98,7 @@ jobs:
           assert "ASSUMPTIONS_NOT_SUPPORTED" in unsupported["translationIssues"]
           assert manifest["sameObligationSubmittedToBothBackends"] is True
           assert manifest["unsupportedBeforeExecution"] is True
+          print("backend-outcomes=valid")
           PY
 
       - name: Upload canonical contracts
@@ -94,6 +107,7 @@ jobs:
         with:
           name: solver-ir-contracts
           path: |
+            solver-ir-validation.log
             regelsuche-solver-ir/build/reports/solver-ir/**
             regelsuche-solver-ir/build/reports/tests/**
             regelsuche-solver-ir/build/test-results/**
