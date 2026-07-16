@@ -35,8 +35,8 @@ jobs:
           set -o pipefail
           ./gradlew \
             :app:test \
-            :regelsuche-release:runReleaseReadinessWithHiddenRuleEvidence \
             --tests de.regelsuche.docs.HiddenRulePilotCampaignTest \
+            :regelsuche-release:runReleaseReadinessWithHiddenRuleEvidence \
             2>&1 | tee release-readiness-build.log
 
       - name: Require evidence artifacts
