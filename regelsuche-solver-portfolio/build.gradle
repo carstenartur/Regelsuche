@@ -47,10 +47,6 @@ tasks.register('writeSolverPortfolioExample', JavaExec) {
     args layout.buildDirectory.dir('reports/solver-portfolio').get().asFile.absolutePath
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
-}
-
 jacoco {
     toolVersion = '0.8.13'
 }
