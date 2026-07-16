@@ -49,8 +49,7 @@ class ReleaseReadinessRunnerTest {
         assertFalse(run.autonomousCampaignReady());
 
         assertEquals(List.of(
-            "DOMAIN_GENERIC_SEARCH_INTERFACE",
-            "FRESH_HOLDOUTS_AT_LEAST_ONE_HUNDRED",
+            "BALANCED_RELEASE_HOLDOUT_SUITE",
             "HELD_OUT_FAMILY_OR_CLUSTER",
             "PAIRED_HELD_OUT_UTILITY"),
             matrix.result(ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN)
@@ -68,6 +67,10 @@ class ReleaseReadinessRunnerTest {
         assertEquals(2, evidence.seedFamilyCount());
         assertEquals(12, evidence.observationCount());
         assertEquals(11, evidence.alphaDistinctSupport());
+        assertEquals(3, evidence.configuredPositiveHoldouts());
+        assertEquals(3, evidence.executedPositiveHoldouts());
+        assertEquals(3, evidence.configuredNegativeHoldouts());
+        assertEquals(3, evidence.executedNegativeHoldouts());
         assertEquals(6, evidence.configuredFreshHoldouts());
         assertEquals(6, evidence.executedFreshHoldouts());
         assertEquals(4, evidence.counterexampleStrategyCount());
@@ -78,7 +81,6 @@ class ReleaseReadinessRunnerTest {
         assertEquals("SYMBOLICALLY_VERIFIED", evidence.symbolicProofStatus());
         assertEquals("NOT_EVALUATED", evidence.externalNoveltyStatus());
         assertFalse(evidence.pairedHeldOutUtilityEvaluated());
-        assertFalse(evidence.domainGenericSearchInterfaceReady());
 
         Path output = Path.of("build", "reports", "release-readiness");
         runner.write(output, run);
@@ -110,6 +112,10 @@ class ReleaseReadinessRunnerTest {
             "\"promotionStatus\":\"NOT_EVALUATED\""));
         assertTrue(run.matrix().toCanonicalJson().contains(
             "\"publicEvidenceStatus\":\"NOT_EVALUATED\""));
+        assertFalse(ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN.requirements()
+            .contains("DOMAIN_GENERIC_SEARCH_INTERFACE"));
+        assertFalse(ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN.requirements()
+            .contains("FRESH_HOLDOUTS_AT_LEAST_ONE_HUNDRED"));
     }
 
     @Test
