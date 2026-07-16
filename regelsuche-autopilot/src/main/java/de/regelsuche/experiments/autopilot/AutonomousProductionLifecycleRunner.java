@@ -23,6 +23,8 @@ import de.regelsuche.mining.OpenTargetConjectureProofGate;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.mining.OpenTargetHypothesisCandidateAdapter;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.validation.CounterexampleSearchService.CounterexampleBudget;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -38,7 +40,7 @@ import java.util.TreeSet;
 /** Executes all downstream production gates after aggregate candidate formation. */
 public final class AutonomousProductionLifecycleRunner {
     public static final String SCHEMA =
-        "regelsuche.autonomous-production-lifecycle/v2";
+        "regelsuche.autonomous-production-lifecycle/v3";
     private static final String VALIDATION_REVISION =
         "production-validation-holdouts-348/v1";
     private static final int RANDOM_COUNTEREXAMPLE_SAMPLES = 64;
@@ -102,7 +104,8 @@ public final class AutonomousProductionLifecycleRunner {
                 + "\ncounterexample=" + counterexampleHash
                 + "\nnovelty=" + noveltyHash
                 + "\nproof=" + proof.evidenceHash()
-                + "\nproofObligation=" + proof.obligation().obligationHash()
+                + "\nsolverObligation=" + proof.obligation().contentHash()
+                + "\nsolverResult=" + proof.result().contentHash()
                 + "\nlifecycleCandidate=" + lifecycleCandidateHash
                 + "\nlifecycleDecision=" + lifecycleDecision.contentHash()
                 + "\nstageLedger=" + stageLedger.contentHash());
@@ -142,8 +145,10 @@ public final class AutonomousProductionLifecycleRunner {
             write(outputDirectory.resolve("counterexample-report.json"), run.counterexampleJson());
             write(outputDirectory.resolve("project-novelty-report.json"), run.noveltyJson());
             write(outputDirectory.resolve("proof-report.json"), run.proof().toCanonicalJson());
-            write(outputDirectory.resolve("proof-obligation.json"),
-                AutonomousLifecycleEvidenceJson.proofObligation(run.proof().obligation()));
+            write(outputDirectory.resolve("solver-obligation.json"),
+                run.proof().obligation().toCanonicalJson());
+            write(outputDirectory.resolve("solver-result.json"),
+                run.proof().result().toCanonicalJson());
             write(outputDirectory.resolve("lifecycle-candidate.json"),
                 run.lifecycleCandidateJson());
             write(outputDirectory.resolve("lifecycle-decision.json"),
@@ -248,7 +253,12 @@ public final class AutonomousProductionLifecycleRunner {
         }
         if (proof.proofStatus() != ProofStatus.SYMBOLICALLY_VERIFIED
                 || !proof.proofObligationEmitted()
-                || proof.obligation().targetProvided()
+                || proof.obligation() == null
+                || proof.result() == null
+                || proof.result().status() != ResultStatus.CONFIRMED
+                || proof.result().translationStatus() != TranslationStatus.LOSSLESS
+                || !proof.result().obligationHash().equals(
+                    proof.obligation().contentHash())
                 || !proof.blockers().isEmpty()
                 || !"NOT_EVALUATED".equals(proof.formalProofStatus())) {
             throw new IllegalStateException(
@@ -412,9 +422,13 @@ public final class AutonomousProductionLifecycleRunner {
                 .property("projectNoveltyStatus", novelty.status().name())
                 .property("externalNoveltyStatus", novelty.externalNoveltyStatus())
                 .property("proofEvidenceHash", proof.evidenceHash())
-                .property("proofObligationHash",
-                    proof.obligation().obligationHash())
+                .property("solverObligationHash",
+                    proof.obligation().contentHash())
+                .property("solverResultHash", proof.result().contentHash())
                 .property("proofStatus", proof.proofStatus().name())
+                .property("backendStatus", proof.result().status().name())
+                .property("translationStatus",
+                    proof.result().translationStatus().name())
                 .property("formalProofStatus", proof.formalProofStatus())
                 .property("lifecycleCandidateHash", lifecycleCandidateHash)
                 .property("lifecycleDecisionHash", lifecycleDecision.contentHash())

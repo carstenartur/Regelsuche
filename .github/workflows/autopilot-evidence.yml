@@ -91,7 +91,9 @@ jobs:
           test -s "$DIR/counterexample-report.json"
           test -s "$DIR/project-novelty-report.json"
           test -s "$DIR/proof-report.json"
-          test -s "$DIR/proof-obligation.json"
+          test -s "$DIR/solver-obligation.json"
+          test -s "$DIR/solver-result.json"
+          test ! -e "$DIR/proof-obligation.json"
           test -s "$DIR/lifecycle-candidate.json"
           test -s "$DIR/lifecycle-decision.json"
           test -s "$DIR/stage-resource-ledger.json"
@@ -101,6 +103,41 @@ jobs:
           test -s "$DIR/feedback-reallocation.json"
           test -s "$DIR/campaign-resource-ledger.json"
           test -s "$DIR/production-campaign-manifest.json"
+
+      - name: Validate solver IR production artifacts
+        shell: bash
+        run: |
+          python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("regelsuche-autopilot/build/reports/autopilot-production-campaign")
+          schemas = Path("docs/schemas")
+          pairs = [
+              (schemas / "regelsuche-solver-obligation-v1.schema.json", root / "solver-obligation.json"),
+              (schemas / "regelsuche-solver-result-v1.schema.json", root / "solver-result.json"),
+              (schemas / "regelsuche-open-target-conjecture-proof-v2.schema.json", root / "proof-report.json"),
+              (schemas / "regelsuche-autonomous-production-lifecycle-v3.schema.json", root / "production-lifecycle-run.json"),
+          ]
+          for schema_path, artifact_path in pairs:
+              schema = json.loads(schema_path.read_text())
+              artifact = json.loads(artifact_path.read_text())
+              Draft202012Validator.check_schema(schema)
+              Draft202012Validator(schema).validate(artifact)
+          obligation = json.loads((root / "solver-obligation.json").read_text())
+          result = json.loads((root / "solver-result.json").read_text())
+          proof = json.loads((root / "proof-report.json").read_text())
+          lifecycle = json.loads((root / "production-lifecycle-run.json").read_text())
+          assert result["obligationHash"] == obligation["contentHash"]
+          assert proof["solverObligationHash"] == obligation["contentHash"]
+          assert proof["solverResultHash"] == result["contentHash"]
+          assert lifecycle["solverObligationHash"] == obligation["contentHash"]
+          assert lifecycle["solverResultHash"] == result["contentHash"]
+          assert result["status"] == "CONFIRMED"
+          assert result["translationStatus"] == "LOSSLESS"
+          PY
 
       - name: Reproduce complete campaign in Docker
         shell: bash

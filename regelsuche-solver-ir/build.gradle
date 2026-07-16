@@ -15,12 +15,21 @@ java {
 
 dependencies {
     api project(':regelsuche-core')
-    api project(':regelsuche-search')
-    api project(':regelsuche-validation')
-    api project(':regelsuche-solver-ir')
+    implementation project(':regelsuche-search')
+    implementation project(':regelsuche-validation')
+    implementation project(':regelsuche-math-algorithms')
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.0'
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.register('writeSolverIrExample', JavaExec) {
+    group = 'verification'
+    description = 'Writes canonical solver-neutral obligation and result examples.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.solver.ir.SolverIrExampleMain'
+    args layout.buildDirectory.dir('reports/solver-ir').get().asFile.absolutePath
 }
 
 tasks.named('test') {

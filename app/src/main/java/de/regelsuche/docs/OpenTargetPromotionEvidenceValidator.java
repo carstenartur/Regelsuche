@@ -9,6 +9,7 @@ import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.solver.ir.SolverObligationVerifier;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.util.ArrayList;
@@ -18,6 +19,9 @@ import java.util.TreeSet;
 
 /** Validates the independent evidence axes consumed by {@link OpenTargetPromotionGate}. */
 final class OpenTargetPromotionEvidenceValidator {
+    private static final SolverObligationVerifier SOLVER_IR =
+        new SolverObligationVerifier();
+
     private OpenTargetPromotionEvidenceValidator() {
     }
 
@@ -164,26 +168,35 @@ final class OpenTargetPromotionEvidenceValidator {
         OpenTargetConjecture conjecture,
         ProofReport proof
     ) {
-        boolean obligationAvailable = proof.eligibility() == EligibilityStatus.ELIGIBLE
+        boolean available = proof.eligibility() == EligibilityStatus.ELIGIBLE
             && proof.proofObligationEmitted()
             && proof.obligation() != null
+            && proof.execution() != null
+            && proof.result() != null
             && sha256(proof.evidenceHash());
-        if (!obligationAvailable) {
+        if (!available) {
             blockers.add("proof-obligation-ineligible");
             return;
         }
-        boolean identityMatches = conjecture.conjectureId().equals(
-            proof.obligation().conjectureId());
-        boolean relationMatches = conjecture.leftPattern().equals(
-                proof.obligation().leftExpression())
-            && conjecture.rightPattern().equals(proof.obligation().rightExpression());
-        boolean assumptionsMatch = assumptions(conjecture).equals(
-            proof.obligation().assumptions());
-        if (!identityMatches
-                || proof.obligation().targetProvided()
-                || !relationMatches
-                || !assumptionsMatch
-                || !sha256(proof.obligation().obligationHash())) {
+        boolean obligationMatches = SOLVER_IR.matchesEquality(
+            proof.obligation(),
+            conjecture.conjectureId(),
+            conjecture.leftPattern(),
+            conjecture.rightPattern(),
+            assumptions(conjecture));
+        boolean resultMatches = SOLVER_IR.resultBelongsTo(
+            proof.obligation(), proof.result());
+        boolean executionMatches = proof.execution().obligationHash().equals(
+                proof.obligation().contentHash())
+            && proof.execution().result().contentHash().equals(
+                proof.result().contentHash())
+            && proof.execution().translation().contentHash().equals(
+                proof.translation().contentHash());
+        if (!obligationMatches || !resultMatches || !executionMatches
+                || !sha256(proof.obligation().contentHash())
+                || !sha256(proof.translation().contentHash())
+                || !sha256(proof.result().contentHash())
+                || !sha256(proof.execution().contentHash())) {
             blockers.add("proof-obligation-provenance-mismatch");
         }
     }

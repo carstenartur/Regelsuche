@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.solver-translation/v1",
+  "title": "Regelsuche solver backend translation v1",
+  "type": "object",
+  "required": [
+    "schema", "obligationHash", "backendId", "backendVersion",
+    "status", "issues", "termMapping", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.solver-translation/v1" },
+    "obligationHash": { "$ref": "#/$defs/sha256" },
+    "backendId": { "$ref": "#/$defs/nonBlank" },
+    "backendVersion": { "$ref": "#/$defs/nonBlank" },
+    "status": { "enum": ["LOSSLESS", "APPROXIMATED", "REJECTED"] },
+    "issues": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "termMapping": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/nonBlank" }
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "REJECTED" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": { "issues": { "minItems": 1 } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "LOSSLESS" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "termMapping": {
+            "required": ["goal.left", "goal.right"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

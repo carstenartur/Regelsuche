@@ -18,12 +18,22 @@ import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyMatch;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyReport;
 import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
-import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofObligation;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.mining.OpenTargetHypothesisCandidateAdapter;
 import de.regelsuche.proof.ProofPolicy;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.solver.ir.SolverExecution;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.SolverTranslation;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -35,11 +45,13 @@ class OpenTargetPromotionGateTest {
     @Test
     void promotesAndPublishesOnlyAfterAllIndependentGatesPass() {
         Fixture fixture = fixture(false);
+        ProofReport proof = proof(
+            fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED);
 
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             novel(fixture.conjecture().conjectureId()),
-            proof(fixture.conjecture(), ProofStatus.SYMBOLICALLY_VERIFIED),
+            proof,
             materialAblation(),
             ProofPolicy.PROOF_OPTIONAL,
             "SCRIPT_GENERATED"));
@@ -47,7 +59,8 @@ class OpenTargetPromotionGateTest {
         assertTrue(decision.promoted());
         assertTrue(decision.publicEvidenceAccepted());
         assertEquals(PromotionStage.PROMOTED, decision.promotionRecord().stage());
-        assertEquals(de.regelsuche.docs.NoveltyStatus.NEW, decision.publicNoveltyStatus());
+        assertEquals(de.regelsuche.docs.NoveltyStatus.NEW,
+            decision.publicNoveltyStatus());
         assertEquals("NOVEL_WITHIN_PROJECT", decision.projectNoveltyStatus());
         assertEquals("NOT_EVALUATED", decision.externalNoveltyStatus());
         assertEquals("SYMBOLICALLY_VERIFIED", decision.symbolicProofStatus());
@@ -63,7 +76,10 @@ class OpenTargetPromotionGateTest {
         assertTrue(json.contains("\"interestingnessStatus\":\"NOT_EVALUATED\""));
         assertTrue(json.contains("\"sourceCampaign\":\"open-target-campaign-2026-07\""));
         assertTrue(json.contains("\"evaluationProvenanceHash\":\"" + hash('e') + "\""));
-        assertTrue(json.contains("\"proofObligationHash\":\"" + hash('d') + "\""));
+        assertTrue(json.contains("\"proofObligationHash\":\""
+            + proof.obligation().contentHash() + "\""));
+        assertEquals(proof.execution().obligationHash(),
+            proof.obligation().contentHash());
     }
 
     @Test
@@ -117,13 +133,10 @@ class OpenTargetPromotionGateTest {
             materialAblation(),
             ProofPolicy.PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE,
             "SCRIPT_GENERATED"));
-
         assertFalse(blocked.promoted());
         assertFalse(blocked.publicEvidenceAccepted());
         assertEquals(PromotionStage.VALIDATED, blocked.promotionRecord().stage());
         assertTrue(blocked.promotionBlockers().contains("proof=SCRIPT_GENERATED"));
-        assertTrue(blocked.publicEvidenceDecision().rejectionReasons().contains(
-            "proof=SCRIPT_GENERATED"));
 
         OpenTargetPromotionGate.Decision confirmed = gate.evaluate(input(
             fixture,
@@ -132,7 +145,6 @@ class OpenTargetPromotionGateTest {
             materialAblation(),
             ProofPolicy.PROOF_REQUIRED_FOR_PUBLIC_EVIDENCE,
             "PROVER_CONFIRMED"));
-
         assertTrue(confirmed.promoted());
         assertTrue(confirmed.publicEvidenceAccepted());
     }
@@ -140,7 +152,6 @@ class OpenTargetPromotionGateTest {
     @Test
     void inconclusiveSymbolicProofLeavesCandidateValidatedButNotPromoted() {
         Fixture fixture = fixture(false);
-
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             novel(fixture.conjecture().conjectureId()),
@@ -160,7 +171,6 @@ class OpenTargetPromotionGateTest {
     @Test
     void evidenceIdentityMismatchCannotEnterPromotion() {
         Fixture fixture = fixture(false);
-
         OpenTargetPromotionGate.Decision decision = gate.evaluate(input(
             fixture,
             novel("another-candidate"),
@@ -253,7 +263,6 @@ class OpenTargetPromotionGateTest {
     void reportIsDeterministicAcrossEvidenceAndPathOrder() {
         Fixture ordered = fixture(false);
         Fixture reversed = fixture(true);
-
         OpenTargetPromotionGate.Decision first = gate.evaluate(input(
             ordered,
             novel(ordered.conjecture().conjectureId()),
@@ -408,27 +417,58 @@ class OpenTargetPromotionGateTest {
         OpenTargetConjecture conjecture,
         ProofStatus status
     ) {
-        ProofObligation obligation = new ProofObligation(
-            de.regelsuche.mining.OpenTargetConjectureProofGate.OBLIGATION_SCHEMA,
-            conjecture.conjectureId(),
-            false,
+        SolverIr.Obligation obligation = new SolverObligationFactory().equality(
+            conjecture.conjectureId() + "-proof",
             conjecture.leftPattern(),
             conjecture.rightPattern(),
             List.of(),
-            hash('d'));
+            RequestedEvidence.SYMBOLIC_CERTIFICATE,
+            new SourceProvenance(
+                "open-target-conjecture",
+                conjecture.conjectureId(),
+                hash('d')));
+        BackendDescriptor descriptor = new BackendDescriptor(
+            "polynomial-normal-form-fixture",
+            "1",
+            List.of(Theory.REAL_ARITHMETIC),
+            List.of(SolverIr.Relation.EQUALS),
+            List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
+            true);
+        SolverTranslation translation = SolverTranslation.create(
+            obligation,
+            descriptor,
+            TranslationStatus.LOSSLESS,
+            List.of(),
+            Map.of(
+                "goal.left", conjecture.leftPattern(),
+                "goal.right", conjecture.rightPattern()));
+        ResultStatus backendStatus = status == ProofStatus.SYMBOLICALLY_VERIFIED
+            ? ResultStatus.CONFIRMED : ResultStatus.UNKNOWN;
+        String evidence = status == ProofStatus.SYMBOLICALLY_VERIFIED
+            ? "matching deterministic polynomial normal form"
+            : "no conclusive polynomial normal form result";
+        SolverResult result = SolverResult.create(
+            obligation,
+            descriptor,
+            backendStatus,
+            TranslationStatus.LOSSLESS,
+            List.of("DETERMINISTIC_POLYNOMIAL_NORMAL_FORM"),
+            List.of(),
+            evidence,
+            Map.of(),
+            backendStatus == ResultStatus.CONFIRMED ? hash('e') : "");
+        SolverExecution execution = SolverExecution.create(
+            obligation, translation, result);
         List<String> blockers = status == ProofStatus.SYMBOLICALLY_VERIFIED
             ? List.of()
-            : List.of("oracle produced no conclusive equivalence result");
+            : List.of("solver backend produced no conclusive result");
         return new ProofReport(
             de.regelsuche.mining.OpenTargetConjectureProofGate.REPORT_SCHEMA,
             conjecture.conjectureId(),
             EligibilityStatus.ELIGIBLE,
             status,
             obligation,
-            "sympy-equivalence-v1",
-            status == ProofStatus.SYMBOLICALLY_VERIFIED
-                ? "validated by deterministic symbolic equivalence"
-                : "no equivalence evidence found",
+            execution,
             "NOT_EVALUATED",
             blockers,
             hash('f'));

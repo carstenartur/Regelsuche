@@ -11,6 +11,7 @@ COPY regelsuche-core/build.gradle ./regelsuche-core/build.gradle
 COPY regelsuche-egraph/build.gradle ./regelsuche-egraph/build.gradle
 COPY regelsuche-search/build.gradle ./regelsuche-search/build.gradle
 COPY regelsuche-validation/build.gradle ./regelsuche-validation/build.gradle
+COPY regelsuche-solver-ir/build.gradle ./regelsuche-solver-ir/build.gradle
 COPY regelsuche-math-algorithms/build.gradle ./regelsuche-math-algorithms/build.gradle
 COPY regelsuche-math-jas/build.gradle ./regelsuche-math-jas/build.gradle
 COPY regelsuche-persistence/build.gradle ./regelsuche-persistence/build.gradle
@@ -35,6 +36,7 @@ COPY regelsuche-core ./regelsuche-core
 COPY regelsuche-egraph ./regelsuche-egraph
 COPY regelsuche-search ./regelsuche-search
 COPY regelsuche-validation ./regelsuche-validation
+COPY regelsuche-solver-ir ./regelsuche-solver-ir
 COPY regelsuche-math-algorithms ./regelsuche-math-algorithms
 COPY regelsuche-math-jas ./regelsuche-math-jas
 COPY regelsuche-persistence ./regelsuche-persistence

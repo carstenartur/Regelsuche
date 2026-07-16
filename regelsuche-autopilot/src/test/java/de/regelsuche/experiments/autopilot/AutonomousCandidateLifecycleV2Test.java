@@ -16,6 +16,17 @@ import de.regelsuche.mining.OpenTargetConjectureProofGate;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
+import de.regelsuche.solver.ir.SolverExecution;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.SolverTranslation;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -175,16 +186,75 @@ class AutonomousCandidateLifecycleV2Test {
     }
 
     private static ProofReport proofFor(String candidateId, ProofStatus status) {
+        if (status == ProofStatus.NOT_RUN) {
+            return new ProofReport(
+                OpenTargetConjectureProofGate.REPORT_SCHEMA,
+                candidateId,
+                EligibilityStatus.NOT_ELIGIBLE,
+                status,
+                null,
+                null,
+                "NOT_EVALUATED",
+                List.of("characterization blocker"),
+                AutonomousEvidenceDagV2Fixtures.hash(
+                    "proof-" + candidateId + '-' + status));
+        }
+
+        SolverIr.Obligation obligation = new SolverObligationFactory().equality(
+            candidateId + "-proof",
+            "A + B",
+            "B + A",
+            List.of(),
+            RequestedEvidence.SYMBOLIC_CERTIFICATE,
+            new SourceProvenance(
+                "open-target-conjecture",
+                candidateId,
+                AutonomousEvidenceDagV2Fixtures.hash(
+                    "revision-" + candidateId)));
+        BackendDescriptor descriptor = new BackendDescriptor(
+            "characterization-backend",
+            "1",
+            List.of(Theory.REAL_ARITHMETIC),
+            List.of(SolverIr.Relation.EQUALS),
+            List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
+            true);
+        SolverTranslation translation = SolverTranslation.create(
+            obligation,
+            descriptor,
+            TranslationStatus.LOSSLESS,
+            List.of(),
+            Map.of(
+                "goal.left", "A + B",
+                "goal.right", "B + A"));
+        ResultStatus resultStatus = switch (status) {
+            case SYMBOLICALLY_VERIFIED -> ResultStatus.CONFIRMED;
+            case REFUTED -> ResultStatus.REFUTED;
+            case INCONCLUSIVE -> ResultStatus.UNKNOWN;
+            case NOT_RUN -> throw new IllegalStateException();
+        };
+        SolverResult result = SolverResult.create(
+            obligation,
+            descriptor,
+            resultStatus,
+            TranslationStatus.LOSSLESS,
+            List.of("CHARACTERIZATION"),
+            List.of(),
+            status.name(),
+            Map.of(),
+            resultStatus == ResultStatus.CONFIRMED
+                    || resultStatus == ResultStatus.REFUTED
+                ? AutonomousEvidenceDagV2Fixtures.hash(
+                    "certificate-" + candidateId + '-' + status)
+                : "");
+        SolverExecution execution = SolverExecution.create(
+            obligation, translation, result);
         return new ProofReport(
             OpenTargetConjectureProofGate.REPORT_SCHEMA,
             candidateId,
-            status == ProofStatus.NOT_RUN
-                ? EligibilityStatus.NOT_ELIGIBLE
-                : EligibilityStatus.ELIGIBLE,
+            EligibilityStatus.ELIGIBLE,
             status,
-            null,
-            "characterization-backend",
-            status.name(),
+            obligation,
+            execution,
             "NOT_EVALUATED",
             status == ProofStatus.SYMBOLICALLY_VERIFIED
                 ? List.of()

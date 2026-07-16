@@ -4,7 +4,7 @@ Der Autopilot verteilt begrenzte Ressourcen auf bestehende Discovery- und Eviden
 
 ## Ein unterstützter Vertrag
 
-Regelsuche unterstützt nur noch die aktuelle Autopilot-Architektur. Die früheren branch-lokalen v1-Verträge, ihre eingefrorenen Hashes, Schemas und Ausführungsadapter wurden entfernt. Historische Läufe bleiben über den jeweiligen Git-Commit nachvollziehbar; sie begrenzen die aktuelle Architektur nicht mehr.
+Regelsuche unterstützt nur noch die aktuelle Autopilot-Architektur. Frühere interne Verträge, eingefrorene Hashes, Schemas und Ausführungsadapter werden nicht als Kompatibilitätsschicht erhalten. Historische Läufe bleiben über den jeweiligen Git-Commit nachvollziehbar; sie begrenzen die aktuelle Architektur nicht.
 
 Der aktuelle Research Brief ist:
 
@@ -175,7 +175,9 @@ Die Downstream-Kette verwendet direkt die vorhandenen Produktionskomponenten:
 OpenTargetConjectureEvaluator
 → DeterministicCounterexampleSearchService
 → OpenTargetConjectureNoveltyChecker
-→ OpenTargetConjectureProofGate
+→ SolverIr.Obligation
+→ SolverBackend
+→ SolverIr.SolverResult
 → OpenTargetHypothesisCandidateAdapter
 → AutonomousCandidateLifecycleV2
 ```
@@ -193,7 +195,7 @@ Matrixzuweisungen sind in diesem pinned Lauf deaktiviert, weil das generalisiert
 
 Project Novelty wird danach separat gegen die sieben aktiven Regeln des `KnownRuleRepository` geprüft. `NOVEL_WITHIN_PROJECT` ist keine Aussage über externe mathematische Neuheit; `externalNoveltyStatus` bleibt `NOT_EVALUATED`.
 
-Erst ein vollständig akzeptierter Evaluation-Report darf die Proof-Obligation auslösen. `SYMBOLICALLY_VERIFIED` bezeichnet die vorhandene deterministische Äquivalenzprüfung; der separate Formal-Proof-Status bleibt `NOT_EVALUATED`. Der anschließende Adapter erzeugt konservativ nur einen `VALIDATED_BY_EXAMPLES`-Kandidaten und führt weder Promotion noch Veröffentlichung aus.
+Erst ein vollständig akzeptierter Evaluation-Report darf eine solver-neutrale Obligation erzeugen. `SYMBOLICALLY_VERIFIED` setzt ein hashgebundenes `CONFIRMED`-Resultat mit `LOSSLESS`-Übersetzung voraus. Ein nicht unterstütztes Konstrukt oder eine vom Backend nicht verarbeitete Annahme erzeugt `UNSUPPORTED` und blockiert den Lifecycle-Handoff. Der separate Formal-Proof-Status bleibt `NOT_EVALUATED`.
 
 `regelsuche.autonomous-stage-resource-ledger/v2` hält für Validation, Counterexample Search, Project Novelty, Proof und Lifecycle-Handoff jeweils fest:
 
@@ -201,7 +203,7 @@ Erst ein vollständig akzeptierter Evaluation-Report darf die Proof-Obligation a
 configured = executed + skipped + remaining
 ```
 
-`regelsuche.autonomous-production-lifecycle/v2` bindet alle Evidence-Hashes, die Proof-Obligation, den konservativen Lifecycle-Kandidaten, die Lifecycle-Entscheidung und den Ressourcenledger in einem Manifest.
+`regelsuche.autonomous-production-lifecycle/v3` bindet Validation, Counterexample Search, Novelty, `solver-obligation.json`, `solver-result.json`, Proof Report v2, den konservativen Lifecycle-Kandidaten, die Lifecycle-Entscheidung und den Ressourcenledger in einem Manifest. Das frühere Lifecycle-v2-Schema und `proof-obligation.json` werden nicht weitergeführt.
 
 Der vollständige Lauf von der Generation bis zum Lifecycle-Handoff lautet:
 
@@ -221,7 +223,7 @@ Promotion, Public Evidence, externe Novelty und formaler Proof bleiben dabei aus
 
 Die generischen Verträge für Brief, unveränderliche Observation Branches, Aggregate Decisions, Receipts und Evidence DAG liegen in `:regelsuche-experiments`. Das Modul bleibt unabhängig von konkreten Mining-, Novelty-, Proof- und Lifecycle-Typen.
 
-`:regelsuche-autopilot` verbindet diese Verträge mit `:regelsuche-learning`. Eine Architekturprüfung verhindert die Rückabhängigkeit `:regelsuche-experiments → :regelsuche-learning`.
+`:regelsuche-autopilot` verbindet diese Verträge mit `:regelsuche-learning` und der solver-neutralen IR. Eine Architekturprüfung verhindert die Rückabhängigkeit `:regelsuche-experiments → :regelsuche-learning`.
 
 ## CI-Evidence
 
@@ -229,6 +231,6 @@ Der Workflow `Autopilot Evidence` erzeugt und archiviert ausschließlich aktuell
 
 - aus `:regelsuche-experiments`: `brief-v2.json`, `aggregate-decision.json`, `aggregate-receipt.json` und `dag.json`,
 - aus `:regelsuche-autopilot`: die bestehenden Binding-, Lifecycle-, Plan-, Execution-, Lineage- und Round-Charakterisierungen,
-- aus dem produktiven Lauf: Research Brief, Seed-Katalog, unveränderliche Observations, Generation Receipt und Manifest, beide Aggregate Decisions, Mining-Evidence, Bindings, Receipts, Executions und Lineages, Candidate-Formation-Receipt und Evidence DAG sowie Validation-, Counterexample-, Project-Novelty-, Proof-, Proof-Obligation-, Lifecycle-Candidate-, Lifecycle-Decision-, Ressourcenledger- und Lifecycle-Manifest-Artefakte.
+- aus dem produktiven Lauf: Research Brief, Seed-Katalog, unveränderliche Observations, Generation Receipt und Manifest, beide Aggregate Decisions, Mining-Evidence, Bindings, Receipts, Executions und Lineages, Candidate-Formation-Receipt und Evidence DAG sowie Validation-, Counterexample-, Project-Novelty-, `proof-report.json`, `solver-obligation.json`, `solver-result.json`, Lifecycle-Candidate-, Lifecycle-Decision-, Ressourcenledger- und Lifecycle-v3-Artefakte.
 
-Promotion und Public Evidence bleiben in allen Planungs-, Ausführungs- und Lifecycle-Artefakten `NOT_EVALUATED`.
+Der Workflow validiert die Solver-Artefakte gegen Draft-2020-12-Schemas, prüft ihre Hashverkettung und verlangt weiterhin byteidentische Gradle-/Docker-Evidence. Promotion und Public Evidence bleiben `NOT_EVALUATED`.

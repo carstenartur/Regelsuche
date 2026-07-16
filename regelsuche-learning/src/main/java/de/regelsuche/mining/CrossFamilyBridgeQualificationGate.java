@@ -15,6 +15,9 @@ import de.regelsuche.mining.OpenTargetConjectureNoveltyChecker.NoveltyStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofReport;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverObligationVerifier;
 import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.validation.CounterexampleSearchService;
 import java.io.IOException;
@@ -38,6 +41,8 @@ import java.util.TreeSet;
  */
 public final class CrossFamilyBridgeQualificationGate {
     public static final String SCHEMA = "regelsuche.cross-family-bridge-qualification/v1";
+    private static final SolverObligationVerifier SOLVER_IR =
+        new SolverObligationVerifier();
 
     public QualificationReport evaluate(Input input) {
         Objects.requireNonNull(input, "input");
@@ -216,19 +221,24 @@ public final class CrossFamilyBridgeQualificationGate {
                 || proof.proofStatus() != ProofStatus.SYMBOLICALLY_VERIFIED
                 || !proof.blockers().isEmpty()
                 || !proof.proofObligationEmitted()
-                || proof.obligation() == null) {
+                || proof.obligation() == null
+                || proof.result() == null) {
             blockers.add("symbolic proof evidence is not accepted");
             return;
         }
-        boolean obligationMatches = hypothesis.hypothesisId().equals(
-                proof.obligation().conjectureId())
-            && !proof.obligation().targetProvided()
-            && hypothesis.leftPattern().equals(proof.obligation().leftExpression())
-            && hypothesis.rightPattern().equals(proof.obligation().rightExpression())
-            && ordered(hypothesis.assumptions()).equals(
-                ordered(proof.obligation().assumptions()));
-        if (!obligationMatches
-                || !isSha256(proof.obligation().obligationHash())
+        boolean obligationMatches = SOLVER_IR.matchesEquality(
+            proof.obligation(),
+            hypothesis.hypothesisId(),
+            hypothesis.leftPattern(),
+            hypothesis.rightPattern(),
+            ordered(hypothesis.assumptions()));
+        boolean resultMatches = SOLVER_IR.resultBelongsTo(
+            proof.obligation(), proof.result());
+        boolean backendAccepted = proof.result().status() == ResultStatus.CONFIRMED
+            && proof.result().translationStatus() == TranslationStatus.LOSSLESS;
+        if (!obligationMatches || !resultMatches || !backendAccepted
+                || !isSha256(proof.obligation().contentHash())
+                || !isSha256(proof.result().contentHash())
                 || !isSha256(proof.evidenceHash())) {
             blockers.add("proof obligation provenance mismatch");
         }
@@ -273,13 +283,17 @@ public final class CrossFamilyBridgeQualificationGate {
 
     private static boolean assumptionsConsistent(Input input) {
         List<String> expected = ordered(input.hypothesis().assumptions());
-        List<String> proofAssumptions = input.proof().obligation() == null
-            ? List.of()
-            : ordered(input.proof().obligation().assumptions());
+        boolean proofMatches = input.proof().obligation() != null
+            && SOLVER_IR.matchesEquality(
+                input.proof().obligation(),
+                input.hypothesis().hypothesisId(),
+                input.hypothesis().leftPattern(),
+                input.hypothesis().rightPattern(),
+                expected);
         boolean familyAssumptionsClear = input.transfer().familyResults().stream()
             .allMatch(result -> result.inferredAssumptions().isEmpty());
         return expected.equals(ordered(input.lifecycle().assumptions()))
-            && expected.equals(proofAssumptions)
+            && proofMatches
             && familyAssumptionsClear;
     }
 

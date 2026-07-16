@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import de.regelsuche.equivalence.EquivalenceService;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.CounterexampleEvidence;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
@@ -17,6 +16,19 @@ import de.regelsuche.mining.OpenTargetConjectureMiner.PathEvidence;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.EligibilityStatus;
 import de.regelsuche.mining.OpenTargetConjectureProofGate.ProofStatus;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.solver.ir.PolynomialNormalFormSolverBackend;
+import de.regelsuche.solver.ir.SolverBackend;
+import de.regelsuche.solver.ir.SolverExecution;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverTranslation;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -24,87 +36,131 @@ import org.junit.jupiter.api.Test;
 class OpenTargetConjectureProofGateTest {
 
     @Test
-    void emitsTargetFreeObligationOnlyAfterCompleteAcceptedEvaluation() {
-        RecordingOracle oracle = new RecordingOracle(true, "matching normalized coefficients");
-        OpenTargetConjectureProofGate gate = new OpenTargetConjectureProofGate(
-            oracle, "recording-symbolic-oracle-v1");
-
-        var report = gate.evaluate(conjecture(), acceptedEvaluation());
+    void defaultGateExecutesExactPolynomialNormalFormProof() {
+        var report = new OpenTargetConjectureProofGate().evaluate(
+            conjectureWithAssumptions(List.of()), acceptedEvaluation());
 
         assertEquals(EligibilityStatus.ELIGIBLE, report.eligibility());
         assertEquals(ProofStatus.SYMBOLICALLY_VERIFIED, report.proofStatus());
         assertTrue(report.proofObligationEmitted());
-        assertFalse(report.obligation().targetProvided());
-        assertEquals("A * B + A * C", report.obligation().leftExpression());
-        assertEquals("A * (B + C)", report.obligation().rightExpression());
-        assertEquals(List.of("A > 0", "B != 0"), report.obligation().assumptions());
-        assertTrue(report.obligation().obligationHash().startsWith("sha256:"));
-        assertEquals(1, oracle.calls());
-        assertEquals("NOT_EVALUATED", report.formalProofStatus());
+        assertEquals("open-target-factor-common-proof",
+            report.obligation().obligationId());
+        assertEquals("open-target-factor-common",
+            report.obligation().provenance().sourceId());
+        assertEquals(ResultStatus.CONFIRMED, report.result().status());
+        assertEquals(TranslationStatus.LOSSLESS,
+            report.translation().status());
+        assertEquals("A * B + A * C",
+            report.translation().termMapping().get("goal.left"));
+        assertEquals("A * (B + C)",
+            report.translation().termMapping().get("goal.right"));
+        assertEquals("polynomial-normal-form", report.result().backendId());
+        assertEquals("matching deterministic polynomial normal form",
+            report.result().message());
+        assertTrue(report.result().usedCapabilities().contains(
+            "DETERMINISTIC_POLYNOMIAL_NORMAL_FORM"));
+        assertEquals(report.obligation().contentHash(),
+            report.execution().obligationHash());
         assertTrue(report.blockers().isEmpty());
-        assertEquals(report.toCanonicalJson(), report.toCanonicalJson());
-        assertTrue(report.toCanonicalJson().contains("\"targetProvided\":false"));
-        assertFalse(report.toCanonicalJson().contains("targetExpression"));
+        assertTrue(report.toCanonicalJson().contains(
+            "\"schema\":\"regelsuche.open-target-conjecture-proof/v2\""));
+        assertTrue(report.toCanonicalJson().contains(
+            "\"solverTranslationHash\":\"sha256:"));
+        assertTrue(report.toCanonicalJson().contains(
+            "\"solverExecutionHash\":\"sha256:"));
+        assertFalse(report.toCanonicalJson().contains("targetProvided"));
+        assertFalse(report.toCanonicalJson().contains("leftExpression"));
     }
 
     @Test
-    void rejectedCandidateCannotEmitAnObligationOrCallTheOracle() {
-        RecordingOracle oracle = new RecordingOracle(true, "should not run");
-        OpenTargetConjectureProofGate gate = new OpenTargetConjectureProofGate(
-            oracle, "recording-symbolic-oracle-v1");
-        EvaluationReport rejected = evaluation(EvaluationStatus.REJECTED, List.of("counterexample found"));
+    void unsupportedAssumptionsBlockBeforeNormalFormExecution() {
+        var report = new OpenTargetConjectureProofGate(
+            new PolynomialNormalFormSolverBackend())
+            .evaluate(conjecture(), acceptedEvaluation());
 
-        var report = gate.evaluate(conjecture(), rejected);
+        assertEquals(EligibilityStatus.ELIGIBLE, report.eligibility());
+        assertEquals(ProofStatus.INCONCLUSIVE, report.proofStatus());
+        assertEquals(ResultStatus.UNSUPPORTED, report.result().status());
+        assertEquals(TranslationStatus.REJECTED,
+            report.translation().status());
+        assertTrue(report.translation().issues().contains(
+            "ASSUMPTIONS_NOT_SUPPORTED"));
+        assertEquals(report.translation().issues(),
+            report.result().translationIssues());
+        assertTrue(report.blockers().getFirst().contains(
+            "ASSUMPTIONS_NOT_SUPPORTED"));
+        assertTrue(report.result().message().contains("before execution"));
+    }
+
+    @Test
+    void rejectedCandidateCannotEmitAnObligationOrCallBackend() {
+        RecordingBackend backend = new RecordingBackend(ResultStatus.CONFIRMED);
+        EvaluationReport rejected = evaluation(
+            EvaluationStatus.REJECTED, List.of("counterexample found"));
+
+        var report = new OpenTargetConjectureProofGate(backend)
+            .evaluate(conjecture(), rejected);
 
         assertEquals(EligibilityStatus.NOT_ELIGIBLE, report.eligibility());
         assertEquals(ProofStatus.NOT_RUN, report.proofStatus());
         assertFalse(report.proofObligationEmitted());
         assertNull(report.obligation());
-        assertEquals(0, oracle.calls());
-        assertTrue(report.blockers().contains("candidate is not accepted for proof"));
-        assertTrue(report.blockers().contains("candidate evaluation contains blockers"));
-        assertTrue(report.toCanonicalJson().contains("\"obligation\":null"));
+        assertNull(report.execution());
+        assertNull(report.translation());
+        assertNull(report.result());
+        assertEquals(0, backend.calls());
+        assertTrue(report.blockers().contains(
+            "candidate is not accepted for proof"));
     }
 
     @Test
-    void distinguishesRefutationFromInconclusiveOracleResult() {
+    void distinguishesLosslessRefutationFromUnknownResult() {
         var refuted = new OpenTargetConjectureProofGate(
-            new RecordingOracle(false, "not equivalent under deterministic samples"),
-            "refuting-oracle-v1").evaluate(conjecture(), acceptedEvaluation());
-        var inconclusive = new OpenTargetConjectureProofGate(
-            new RecordingOracle(false, "no equivalence evidence found"),
-            "inconclusive-oracle-v1").evaluate(conjecture(), acceptedEvaluation());
+            new RecordingBackend(ResultStatus.REFUTED))
+            .evaluate(conjectureWithAssumptions(List.of()), acceptedEvaluation());
+        var unknown = new OpenTargetConjectureProofGate(
+            new RecordingBackend(ResultStatus.UNKNOWN))
+            .evaluate(conjectureWithAssumptions(List.of()), acceptedEvaluation());
 
         assertEquals(ProofStatus.REFUTED, refuted.proofStatus());
-        assertEquals(List.of("oracle refuted the conjecture"), refuted.blockers());
-        assertEquals(ProofStatus.INCONCLUSIVE, inconclusive.proofStatus());
-        assertEquals(
-            List.of("oracle produced no conclusive equivalence result"),
-            inconclusive.blockers());
+        assertEquals(ResultStatus.REFUTED, refuted.result().status());
+        assertEquals(ProofStatus.INCONCLUSIVE, unknown.proofStatus());
+        assertEquals(ResultStatus.UNKNOWN, unknown.result().status());
     }
 
     @Test
-    void assumptionOrderDoesNotChangeObligationOrEvidenceHashes() {
-        OpenTargetConjecture normal = conjectureWithAssumptions(List.of("B != 0", "A > 0"));
-        OpenTargetConjecture reversed = conjectureWithAssumptions(List.of("A > 0", "B != 0"));
-        RecordingOracle firstOracle = new RecordingOracle(true, "verified");
-        RecordingOracle secondOracle = new RecordingOracle(true, "verified");
-
+    void assumptionOrderDoesNotChangeCanonicalExecutionRejection() {
         var first = new OpenTargetConjectureProofGate(
-            firstOracle, "stable-oracle-v1").evaluate(normal, acceptedEvaluation());
+            new PolynomialNormalFormSolverBackend())
+            .evaluate(
+                conjectureWithAssumptions(List.of("B != 0", "A > 0")),
+                acceptedEvaluation());
         var second = new OpenTargetConjectureProofGate(
-            secondOracle, "stable-oracle-v1").evaluate(reversed, acceptedEvaluation());
+            new PolynomialNormalFormSolverBackend())
+            .evaluate(
+                conjectureWithAssumptions(List.of("A > 0", "B != 0")),
+                acceptedEvaluation());
 
-        assertEquals(first.obligation().obligationHash(), second.obligation().obligationHash());
+        assertEquals(first.obligation().contentHash(),
+            second.obligation().contentHash());
+        assertEquals(first.translation().contentHash(),
+            second.translation().contentHash());
+        assertEquals(first.result().contentHash(), second.result().contentHash());
+        assertEquals(first.execution().contentHash(),
+            second.execution().contentHash());
         assertEquals(first.evidenceHash(), second.evidenceHash());
-        assertEquals(first.toCanonicalJson(), second.toCanonicalJson());
+        assertEquals(ResultStatus.UNSUPPORTED, first.result().status());
+        assertEquals(TranslationStatus.REJECTED,
+            first.translation().status());
     }
 
     private static OpenTargetConjecture conjecture() {
         return conjectureWithAssumptions(List.of("B != 0", "A > 0"));
     }
 
-    private static OpenTargetConjecture conjectureWithAssumptions(List<String> assumptions) {
+    private static OpenTargetConjecture conjectureWithAssumptions(
+        List<String> assumptions
+    ) {
         PathEvidence path = new PathEvidence(
             "path-1",
             List.of("x * 2 + x * 3", "x * (2 + 3)"),
@@ -177,25 +233,50 @@ class OpenTargetConjectureProofGateTest {
             "NOT_EVALUATED");
     }
 
-    private static final class RecordingOracle implements EquivalenceService {
-        private final boolean equivalent;
-        private final String evidence;
+    private static final class RecordingBackend implements SolverBackend {
+        private final ResultStatus status;
         private int calls;
 
-        private RecordingOracle(boolean equivalent, String evidence) {
-            this.equivalent = equivalent;
-            this.evidence = evidence;
+        private RecordingBackend(ResultStatus status) {
+            this.status = status;
         }
 
         @Override
-        public boolean areEquivalent(String leftExpression, String rightExpression) {
+        public BackendDescriptor descriptor() {
+            return new BackendDescriptor(
+                "recording-backend",
+                "1",
+                List.of(Theory.REAL_ARITHMETIC),
+                List.of(Relation.EQUALS),
+                List.of(RequestedEvidence.SYMBOLIC_CERTIFICATE),
+                true);
+        }
+
+        @Override
+        public SolverExecution execute(Obligation obligation) {
             calls++;
-            return equivalent;
-        }
-
-        @Override
-        public String evidence(String leftExpression, String rightExpression) {
-            return evidence;
+            SolverTranslation translation = SolverTranslation.create(
+                obligation,
+                descriptor(),
+                TranslationStatus.LOSSLESS,
+                List.of(),
+                Map.of(
+                    "goal.left", obligation.goal().left().canonicalMaterial(),
+                    "goal.right", obligation.goal().right().canonicalMaterial()));
+            SolverResult result = SolverResult.create(
+                obligation,
+                descriptor(),
+                status,
+                TranslationStatus.LOSSLESS,
+                List.of("RECORDING_BACKEND"),
+                List.of(),
+                status.name(),
+                Map.of(),
+                status == ResultStatus.CONFIRMED
+                    || status == ResultStatus.REFUTED
+                    ? SolverIr.sha256("certificate-" + status.name())
+                    : "");
+            return SolverExecution.create(obligation, translation, result);
         }
 
         private int calls() {
