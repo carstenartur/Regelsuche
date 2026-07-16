@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HiddenRuleBenchmarkReleaseEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">HiddenRuleBenchmarkReleaseEvidence.java</span></div><h1>HiddenRuleBenchmarkReleaseEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+
+/** Factual release-profile adapter over the retained hidden-rule benchmark report. */
+public record HiddenRuleBenchmarkReleaseEvidence(
+    String schema,
+    String sourceSchema,
+    String sourceReportHash,
+    int cases,
+    int families,
+    int frozenCandidates,
+    int materialAblations,
+    int acceptedCases,
+    int rediscoveredCases,
+    int configuredNegativeHoldouts,
+    int executedNegativeHoldouts,
+    int skippedNegativeHoldouts,
+    int falsePositiveHoldouts,
+    int generatedValidationExamples,
+    int counterexampleSearches,
+    int splitCollisionCount,
+    int leakageViolationCount,
+    int acceptedIncompleteHoldoutCount,
+    int executableRediscoveryCount,
+    boolean hiddenReferenceIsolated,
+    boolean benchmarkComplete,
+    boolean executableRediscoveryRetained,
+    String evidenceHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.hidden-rule-release-evidence/v1&quot;;
+    public static final String SOURCE_SCHEMA =
+        &quot;regelsuche.hidden-rule-benchmark/v2&quot;;
+
+<span class="fc" id="L48">    public HiddenRuleBenchmarkReleaseEvidence {</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        if (!SCHEMA.equals(schema) || !SOURCE_SCHEMA.equals(sourceSchema)) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(</span>
+                &quot;unsupported hidden-rule release evidence schema&quot;);
+        }
+<span class="fc" id="L53">        requireSha256(sourceReportHash, &quot;sourceReportHash&quot;);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (int value : new int[] {</span>
+                cases,
+                families,
+                frozenCandidates,
+                materialAblations,
+                acceptedCases,
+                rediscoveredCases,
+                configuredNegativeHoldouts,
+                executedNegativeHoldouts,
+                skippedNegativeHoldouts,
+                falsePositiveHoldouts,
+                generatedValidationExamples,
+                counterexampleSearches,
+                splitCollisionCount,
+                leakageViolationCount,
+                acceptedIncompleteHoldoutCount,
+                executableRediscoveryCount}) {
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if (value &lt; 0) {</span>
+<span class="nc" id="L72">                throw new IllegalArgumentException(</span>
+                    &quot;hidden-rule release evidence counts must be non-negative&quot;);
+            }
+        }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (configuredNegativeHoldouts</span>
+                != executedNegativeHoldouts + skippedNegativeHoldouts) {
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;hidden-rule negative holdouts must balance configured = executed + skipped&quot;);
+        }
+<span class="pc bpc" id="L81" title="4 of 8 branches missed.">        if (acceptedCases &gt; cases</span>
+                || rediscoveredCases &gt; cases
+                || frozenCandidates &gt; cases
+                || executableRediscoveryCount &gt; acceptedCases) {
+<span class="nc" id="L85">            throw new IllegalArgumentException(</span>
+                &quot;hidden-rule evidence counts exceed the retained benchmark cases&quot;);
+        }
+<span class="fc" id="L88">        String expectedHash = canonicalHash(</span>
+            schema,
+            sourceSchema,
+            sourceReportHash,
+            cases,
+            families,
+            frozenCandidates,
+            materialAblations,
+            acceptedCases,
+            rediscoveredCases,
+            configuredNegativeHoldouts,
+            executedNegativeHoldouts,
+            skippedNegativeHoldouts,
+            falsePositiveHoldouts,
+            generatedValidationExamples,
+            counterexampleSearches,
+            splitCollisionCount,
+            leakageViolationCount,
+            acceptedIncompleteHoldoutCount,
+            executableRediscoveryCount,
+            hiddenReferenceIsolated,
+            benchmarkComplete,
+            executableRediscoveryRetained);
+<span class="fc" id="L111">        requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (!expectedHash.equals(evidenceHash)) {</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(</span>
+                &quot;hidden-rule release evidence hash does not match canonical fields&quot;);
+        }
+<span class="fc" id="L116">    }</span>
+
+    public static HiddenRuleBenchmarkReleaseEvidence read(Path reportPath) {
+<span class="fc" id="L119">        Objects.requireNonNull(reportPath, &quot;reportPath&quot;);</span>
+        try {
+<span class="fc" id="L121">            String raw = Files.readString(reportPath, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L122">            JsonNode root = new ObjectMapper().readTree(raw);</span>
+<span class="fc" id="L123">            String sourceSchema = text(root, &quot;schema&quot;);</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (!SOURCE_SCHEMA.equals(sourceSchema)) {</span>
+<span class="nc" id="L125">                throw new IllegalArgumentException(</span>
+                    &quot;unexpected hidden-rule benchmark schema: &quot; + sourceSchema);
+            }
+<span class="fc" id="L128">            JsonNode summary = requiredObject(root, &quot;summary&quot;);</span>
+<span class="fc" id="L129">            JsonNode caseNodes = requiredArray(root, &quot;cases&quot;);</span>
+
+<span class="fc" id="L131">            int cases = integer(summary, &quot;cases&quot;);</span>
+<span class="fc" id="L132">            int families = integer(summary, &quot;families&quot;);</span>
+<span class="fc" id="L133">            int frozenCandidates = integer(summary, &quot;frozenCandidates&quot;);</span>
+<span class="fc" id="L134">            int materialAblations = integer(summary, &quot;materialAblations&quot;);</span>
+<span class="fc" id="L135">            int acceptedCases = integer(summary, &quot;acceptedCases&quot;);</span>
+<span class="fc" id="L136">            int rediscoveredCases = integer(summary, &quot;rediscoveredCases&quot;);</span>
+<span class="fc" id="L137">            int configuredNegatives = integer(summary, &quot;negativeHoldouts&quot;);</span>
+<span class="fc" id="L138">            int executedNegatives = integer(summary, &quot;evaluatedNegativeHoldouts&quot;);</span>
+<span class="fc" id="L139">            int skippedNegatives = integer(summary, &quot;skippedNegativeHoldouts&quot;);</span>
+<span class="fc" id="L140">            int falsePositives = integer(summary, &quot;falsePositiveHoldouts&quot;);</span>
+<span class="fc" id="L141">            int validationExamples = integer(summary, &quot;generatedValidationExamples&quot;);</span>
+<span class="fc" id="L142">            int counterexampleSearches = integer(summary, &quot;counterexampleSearches&quot;);</span>
+
+<span class="fc" id="L144">            Set&lt;String&gt; familyNames = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L145">            int derivedFrozen = 0;</span>
+<span class="fc" id="L146">            int derivedAccepted = 0;</span>
+<span class="fc" id="L147">            int derivedRediscovered = 0;</span>
+<span class="fc" id="L148">            int derivedConfiguredNegatives = 0;</span>
+<span class="fc" id="L149">            int derivedExecutedNegatives = 0;</span>
+<span class="fc" id="L150">            int derivedFalsePositives = 0;</span>
+<span class="fc" id="L151">            int splitCollisions = 0;</span>
+<span class="fc" id="L152">            int leakageViolations = 0;</span>
+<span class="fc" id="L153">            int acceptedIncomplete = 0;</span>
+<span class="fc" id="L154">            int executableRediscoveries = 0;</span>
+
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            for (JsonNode caseNode : caseNodes) {</span>
+<span class="fc" id="L157">                familyNames.add(text(caseNode, &quot;family&quot;));</span>
+<span class="fc" id="L158">                boolean frozen = bool(caseNode, &quot;candidateFrozen&quot;);</span>
+<span class="fc" id="L159">                boolean accepted = bool(caseNode, &quot;accepted&quot;);</span>
+<span class="fc" id="L160">                boolean splitPassed = bool(caseNode, &quot;splitPassed&quot;);</span>
+<span class="fc" id="L161">                boolean holdoutsComplete = bool(caseNode, &quot;holdoutsComplete&quot;);</span>
+<span class="fc" id="L162">                boolean holdoutsPassed = bool(caseNode, &quot;holdoutsPassed&quot;);</span>
+<span class="fc" id="L163">                boolean validationPassed = bool(caseNode, &quot;validationPassed&quot;);</span>
+<span class="fc" id="L164">                String relation = text(caseNode, &quot;candidateRelation&quot;);</span>
+<span class="fc" id="L165">                JsonNode split = requiredObject(caseNode, &quot;split&quot;);</span>
+<span class="fc" id="L166">                JsonNode splitNegatives = requiredArray(split, &quot;negatives&quot;);</span>
+<span class="fc" id="L167">                JsonNode collisions = requiredArray(split, &quot;collisions&quot;);</span>
+<span class="fc" id="L168">                JsonNode holdouts = requiredObject(caseNode, &quot;holdouts&quot;);</span>
+<span class="fc" id="L169">                JsonNode executedNegativeCases = requiredArray(holdouts, &quot;negatives&quot;);</span>
+<span class="fc" id="L170">                JsonNode leakage = requiredArray(caseNode, &quot;leakageViolations&quot;);</span>
+<span class="fc" id="L171">                JsonNode candidate = requiredObject(caseNode, &quot;candidate&quot;);</span>
+
+<span class="fc" id="L173">                derivedConfiguredNegatives += splitNegatives.size();</span>
+<span class="fc" id="L174">                derivedExecutedNegatives += executedNegativeCases.size();</span>
+<span class="fc" id="L175">                splitCollisions += collisions.size();</span>
+<span class="fc" id="L176">                leakageViolations += leakage.size();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                if (frozen) {</span>
+<span class="fc" id="L178">                    derivedFrozen++;</span>
+                }
+<span class="pc bpc" id="L180" title="2 of 4 branches missed.">                if (!&quot;NONE&quot;.equals(relation) &amp;&amp; !&quot;DIFFERENT&quot;.equals(relation)) {</span>
+<span class="fc" id="L181">                    derivedRediscovered++;</span>
+                }
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                for (JsonNode negative : executedNegativeCases) {</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                    if (!bool(negative, &quot;noApplication&quot;)) {</span>
+<span class="fc" id="L185">                        derivedFalsePositives++;</span>
+                    }
+<span class="fc" id="L187">                }</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                if (accepted) {</span>
+<span class="fc" id="L189">                    derivedAccepted++;</span>
+<span class="pc bpc" id="L190" title="3 of 8 branches missed.">                    if (!splitPassed || !holdoutsComplete || !holdoutsPassed</span>
+                            || !validationPassed
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                            || splitNegatives.size() != executedNegativeCases.size()) {</span>
+<span class="fc" id="L193">                        acceptedIncomplete++;</span>
+                    }
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                    if (frozen</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                            &amp;&amp; bool(candidate, &quot;present&quot;)</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                            &amp;&amp; nonBlank(candidate.path(&quot;dynamicRuleId&quot;).asText(&quot;&quot;))</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                            &amp;&amp; !&quot;NONE&quot;.equals(relation)</span>
+<span class="pc bpc" id="L199" title="4 of 10 branches missed.">                            &amp;&amp; !&quot;DIFFERENT&quot;.equals(relation)</span>
+                            &amp;&amp; splitPassed
+                            &amp;&amp; holdoutsComplete
+                            &amp;&amp; holdoutsPassed
+                            &amp;&amp; validationPassed) {
+<span class="fc" id="L204">                        executableRediscoveries++;</span>
+                    }
+                }
+<span class="fc" id="L207">            }</span>
+
+<span class="fc" id="L209">            requireEqual(cases, caseNodes.size(), &quot;cases&quot;);</span>
+<span class="fc" id="L210">            requireEqual(families, familyNames.size(), &quot;families&quot;);</span>
+<span class="fc" id="L211">            requireEqual(frozenCandidates, derivedFrozen, &quot;frozenCandidates&quot;);</span>
+<span class="fc" id="L212">            requireEqual(acceptedCases, derivedAccepted, &quot;acceptedCases&quot;);</span>
+<span class="fc" id="L213">            requireEqual(rediscoveredCases, derivedRediscovered, &quot;rediscoveredCases&quot;);</span>
+<span class="fc" id="L214">            requireEqual(configuredNegatives, derivedConfiguredNegatives,</span>
+                &quot;negativeHoldouts&quot;);
+<span class="fc" id="L216">            requireEqual(executedNegatives, derivedExecutedNegatives,</span>
+                &quot;evaluatedNegativeHoldouts&quot;);
+<span class="fc" id="L218">            requireEqual(skippedNegatives,</span>
+                derivedConfiguredNegatives - derivedExecutedNegatives,
+                &quot;skippedNegativeHoldouts&quot;);
+<span class="fc" id="L221">            requireEqual(falsePositives, derivedFalsePositives,</span>
+                &quot;falsePositiveHoldouts&quot;);
+
+<span class="pc bpc" id="L224" title="1 of 4 branches missed.">            boolean isolated = splitCollisions == 0</span>
+                &amp;&amp; leakageViolations == 0
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                &amp;&amp; !raw.toLowerCase(Locale.ROOT).contains(&quot;hidden_&quot;);</span>
+<span class="pc bpc" id="L227" title="7 of 16 branches missed.">            boolean complete = cases &gt;= 20</span>
+                &amp;&amp; families &gt;= 3
+                &amp;&amp; acceptedCases &gt;= 1
+                &amp;&amp; validationExamples &gt; 0
+                &amp;&amp; counterexampleSearches &gt;= acceptedCases
+                &amp;&amp; acceptedIncomplete == 0
+                &amp;&amp; falsePositives == 0
+                &amp;&amp; configuredNegatives
+                    == executedNegatives + skippedNegatives;
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            boolean executable = executableRediscoveries &gt;= 1;</span>
+<span class="fc" id="L237">            String reportHash = AutonomousResearchBriefV2.hash(raw);</span>
+<span class="fc" id="L238">            String evidenceHash = canonicalHash(</span>
+                SCHEMA,
+                sourceSchema,
+                reportHash,
+                cases,
+                families,
+                frozenCandidates,
+                materialAblations,
+                acceptedCases,
+                rediscoveredCases,
+                configuredNegatives,
+                executedNegatives,
+                skippedNegatives,
+                falsePositives,
+                validationExamples,
+                counterexampleSearches,
+                splitCollisions,
+                leakageViolations,
+                acceptedIncomplete,
+                executableRediscoveries,
+                isolated,
+                complete,
+                executable);
+<span class="fc" id="L261">            return new HiddenRuleBenchmarkReleaseEvidence(</span>
+                SCHEMA,
+                sourceSchema,
+                reportHash,
+                cases,
+                families,
+                frozenCandidates,
+                materialAblations,
+                acceptedCases,
+                rediscoveredCases,
+                configuredNegatives,
+                executedNegatives,
+                skippedNegatives,
+                falsePositives,
+                validationExamples,
+                counterexampleSearches,
+                splitCollisions,
+                leakageViolations,
+                acceptedIncomplete,
+                executableRediscoveries,
+                isolated,
+                complete,
+                executable,
+                evidenceHash);
+<span class="nc" id="L285">        } catch (IOException exception) {</span>
+<span class="nc" id="L286">            throw new UncheckedIOException(</span>
+                &quot;Could not read hidden-rule benchmark evidence&quot;, exception);
+        }
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L292">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L293">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L294">            .property(&quot;sourceSchema&quot;, sourceSchema)</span>
+<span class="fc" id="L295">            .property(&quot;sourceReportHash&quot;, sourceReportHash)</span>
+<span class="fc" id="L296">            .property(&quot;cases&quot;, cases)</span>
+<span class="fc" id="L297">            .property(&quot;families&quot;, families)</span>
+<span class="fc" id="L298">            .property(&quot;frozenCandidates&quot;, frozenCandidates)</span>
+<span class="fc" id="L299">            .property(&quot;materialAblations&quot;, materialAblations)</span>
+<span class="fc" id="L300">            .property(&quot;acceptedCases&quot;, acceptedCases)</span>
+<span class="fc" id="L301">            .property(&quot;rediscoveredCases&quot;, rediscoveredCases)</span>
+<span class="fc" id="L302">            .property(&quot;configuredNegativeHoldouts&quot;, configuredNegativeHoldouts)</span>
+<span class="fc" id="L303">            .property(&quot;executedNegativeHoldouts&quot;, executedNegativeHoldouts)</span>
+<span class="fc" id="L304">            .property(&quot;skippedNegativeHoldouts&quot;, skippedNegativeHoldouts)</span>
+<span class="fc" id="L305">            .property(&quot;falsePositiveHoldouts&quot;, falsePositiveHoldouts)</span>
+<span class="fc" id="L306">            .property(&quot;generatedValidationExamples&quot;, generatedValidationExamples)</span>
+<span class="fc" id="L307">            .property(&quot;counterexampleSearches&quot;, counterexampleSearches)</span>
+<span class="fc" id="L308">            .property(&quot;splitCollisionCount&quot;, splitCollisionCount)</span>
+<span class="fc" id="L309">            .property(&quot;leakageViolationCount&quot;, leakageViolationCount)</span>
+<span class="fc" id="L310">            .property(&quot;acceptedIncompleteHoldoutCount&quot;,</span>
+                acceptedIncompleteHoldoutCount)
+<span class="fc" id="L312">            .property(&quot;executableRediscoveryCount&quot;, executableRediscoveryCount)</span>
+<span class="fc" id="L313">            .property(&quot;hiddenReferenceIsolated&quot;, hiddenReferenceIsolated)</span>
+<span class="fc" id="L314">            .property(&quot;benchmarkComplete&quot;, benchmarkComplete)</span>
+<span class="fc" id="L315">            .property(&quot;executableRediscoveryRetained&quot;,</span>
+                executableRediscoveryRetained)
+<span class="fc" id="L317">            .property(&quot;evidenceHash&quot;, evidenceHash)</span>
+<span class="fc" id="L318">            .endObject()</span>
+<span class="fc" id="L319">            .toString();</span>
+    }
+
+    private static String canonicalHash(
+        String schema,
+        String sourceSchema,
+        String sourceReportHash,
+        int cases,
+        int families,
+        int frozenCandidates,
+        int materialAblations,
+        int acceptedCases,
+        int rediscoveredCases,
+        int configuredNegativeHoldouts,
+        int executedNegativeHoldouts,
+        int skippedNegativeHoldouts,
+        int falsePositiveHoldouts,
+        int generatedValidationExamples,
+        int counterexampleSearches,
+        int splitCollisionCount,
+        int leakageViolationCount,
+        int acceptedIncompleteHoldoutCount,
+        int executableRediscoveryCount,
+        boolean hiddenReferenceIsolated,
+        boolean benchmarkComplete,
+        boolean executableRediscoveryRetained
+    ) {
+<span class="fc" id="L346">        return AutonomousResearchBriefV2.hash(</span>
+            schema
+                + &quot;\nsourceSchema=&quot; + sourceSchema
+                + &quot;\nsourceReportHash=&quot; + sourceReportHash
+                + &quot;\ncases=&quot; + cases
+                + &quot;\nfamilies=&quot; + families
+                + &quot;\nfrozenCandidates=&quot; + frozenCandidates
+                + &quot;\nmaterialAblations=&quot; + materialAblations
+                + &quot;\nacceptedCases=&quot; + acceptedCases
+                + &quot;\nrediscoveredCases=&quot; + rediscoveredCases
+                + &quot;\nconfiguredNegativeHoldouts=&quot; + configuredNegativeHoldouts
+                + &quot;\nexecutedNegativeHoldouts=&quot; + executedNegativeHoldouts
+                + &quot;\nskippedNegativeHoldouts=&quot; + skippedNegativeHoldouts
+                + &quot;\nfalsePositiveHoldouts=&quot; + falsePositiveHoldouts
+                + &quot;\ngeneratedValidationExamples=&quot; + generatedValidationExamples
+                + &quot;\ncounterexampleSearches=&quot; + counterexampleSearches
+                + &quot;\nsplitCollisionCount=&quot; + splitCollisionCount
+                + &quot;\nleakageViolationCount=&quot; + leakageViolationCount
+                + &quot;\nacceptedIncompleteHoldoutCount=&quot;
+                    + acceptedIncompleteHoldoutCount
+                + &quot;\nexecutableRediscoveryCount=&quot; + executableRediscoveryCount
+                + &quot;\nhiddenReferenceIsolated=&quot; + hiddenReferenceIsolated
+                + &quot;\nbenchmarkComplete=&quot; + benchmarkComplete
+                + &quot;\nexecutableRediscoveryRetained=&quot;
+                    + executableRediscoveryRetained);
+    }
+
+    private static JsonNode requiredObject(JsonNode node, String field) {
+<span class="fc" id="L374">        JsonNode value = node.path(field);</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (!value.isObject()) {</span>
+<span class="nc" id="L376">            throw new IllegalArgumentException(field + &quot; must be an object&quot;);</span>
+        }
+<span class="fc" id="L378">        return value;</span>
+    }
+
+    private static JsonNode requiredArray(JsonNode node, String field) {
+<span class="fc" id="L382">        JsonNode value = node.path(field);</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">        if (!value.isArray()) {</span>
+<span class="nc" id="L384">            throw new IllegalArgumentException(field + &quot; must be an array&quot;);</span>
+        }
+<span class="fc" id="L386">        return value;</span>
+    }
+
+    private static String text(JsonNode node, String field) {
+<span class="fc" id="L390">        String value = node.path(field).asText(&quot;&quot;);</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        if (!nonBlank(value)) {</span>
+<span class="nc" id="L392">            throw new IllegalArgumentException(field + &quot; must be non-blank&quot;);</span>
+        }
+<span class="fc" id="L394">        return value;</span>
+    }
+
+    private static int integer(JsonNode node, String field) {
+<span class="fc" id="L398">        JsonNode value = node.path(field);</span>
+<span class="pc bpc" id="L399" title="2 of 4 branches missed.">        if (!value.canConvertToInt() || value.intValue() &lt; 0) {</span>
+<span class="nc" id="L400">            throw new IllegalArgumentException(</span>
+                field + &quot; must be a non-negative integer&quot;);
+        }
+<span class="fc" id="L403">        return value.intValue();</span>
+    }
+
+    private static boolean bool(JsonNode node, String field) {
+<span class="fc" id="L407">        JsonNode value = node.path(field);</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">        if (!value.isBoolean()) {</span>
+<span class="nc" id="L409">            throw new IllegalArgumentException(field + &quot; must be boolean&quot;);</span>
+        }
+<span class="fc" id="L411">        return value.booleanValue();</span>
+    }
+
+    private static boolean nonBlank(String value) {
+<span class="pc bpc" id="L415" title="2 of 4 branches missed.">        return value != null &amp;&amp; !value.isBlank();</span>
+    }
+
+    private static void requireEqual(int declared, int derived, String name) {
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        if (declared != derived) {</span>
+<span class="fc" id="L420">            throw new IllegalArgumentException(</span>
+                name + &quot; does not match retained case evidence: &quot;
+                    + declared + &quot; != &quot; + derived);
+        }
+<span class="fc" id="L424">    }</span>
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L427" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L428">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L430">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

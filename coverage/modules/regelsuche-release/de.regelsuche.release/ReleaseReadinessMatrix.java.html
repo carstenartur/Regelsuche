@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReleaseReadinessMatrix.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">ReleaseReadinessMatrix.java</span></div><h1>ReleaseReadinessMatrix.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
 
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
 import de.regelsuche.json.JsonWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +12,9 @@ import java.util.Objects;
 public final class ReleaseReadinessMatrix {
     public static final String SCHEMA =
         &quot;regelsuche.release-readiness-matrix/v1&quot;;
+<span class="fc" id="L15">    public static final String NO_HIDDEN_RULE_EVIDENCE_HASH =</span>
+<span class="fc" id="L16">        AutonomousResearchBriefV2.hash(</span>
+            &quot;regelsuche.hidden-rule-release-evidence/NOT_PROVIDED&quot;);
     private static final int MIN_RELEASE_POSITIVE_HOLDOUTS = 12;
     private static final int MIN_RELEASE_NEGATIVE_HOLDOUTS = 12;
 
@@ -20,230 +24,276 @@ public final class ReleaseReadinessMatrix {
     public static MatrixReport evaluate(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="fc" id="L23">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
-<span class="fc" id="L24">        List&lt;ProfileResult&gt; results = Arrays.stream(</span>
-<span class="fc" id="L25">                ReleaseEvidenceProfile.values())</span>
-<span class="fc" id="L26">            .map(profile -&gt; evaluate(profile, evidence))</span>
-<span class="fc" id="L27">            .sorted(Comparator.comparing(result -&gt; result.profile().name()))</span>
-<span class="fc" id="L28">            .toList();</span>
-<span class="fc" id="L29">        ProfileResult autonomy = findResult(</span>
+<span class="fc" id="L27">        return evaluate(evidence, null);</span>
+    }
+
+    public static MatrixReport evaluate(
+        AutonomousCampaignReleaseEvidence evidence,
+        HiddenRuleBenchmarkReleaseEvidence hiddenRuleEvidence
+    ) {
+<span class="fc" id="L34">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        String hiddenRuleEvidenceHash = hiddenRuleEvidence == null</span>
+<span class="fc" id="L36">            ? NO_HIDDEN_RULE_EVIDENCE_HASH</span>
+<span class="pc" id="L37">            : hiddenRuleEvidence.evidenceHash();</span>
+<span class="fc" id="L38">        List&lt;ProfileResult&gt; results = Arrays.stream(</span>
+<span class="fc" id="L39">                ReleaseEvidenceProfile.values())</span>
+<span class="fc" id="L40">            .map(profile -&gt; evaluate(profile, evidence, hiddenRuleEvidence))</span>
+<span class="fc" id="L41">            .sorted(Comparator.comparing(result -&gt; result.profile().name()))</span>
+<span class="fc" id="L42">            .toList();</span>
+<span class="fc" id="L43">        ProfileResult autonomy = findResult(</span>
             results, ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN);
-<span class="fc" id="L31">        return new MatrixReport(</span>
+<span class="fc" id="L45">        return new MatrixReport(</span>
             SCHEMA,
-<span class="fc" id="L33">            evidence.evidenceHash(),</span>
+<span class="fc" id="L47">            evidence.evidenceHash(),</span>
+            hiddenRuleEvidenceHash,
             results,
-<span class="fc" id="L35">            autonomy.status(),</span>
-<span class="fc" id="L36">            autonomy.autonomyClaimAuthorized(),</span>
+<span class="fc" id="L50">            autonomy.status(),</span>
+<span class="fc" id="L51">            autonomy.autonomyClaimAuthorized(),</span>
             &quot;NOT_EVALUATED&quot;,
             &quot;NOT_EVALUATED&quot;,
-<span class="fc" id="L39">            matrixHash(evidence.evidenceHash(), results, autonomy.status()));</span>
+<span class="fc" id="L54">            matrixHash(</span>
+<span class="fc" id="L55">                evidence.evidenceHash(),</span>
+                hiddenRuleEvidenceHash,
+                results,
+<span class="fc" id="L58">                autonomy.status()));</span>
     }
 
     private static ProfileResult evaluate(
         ReleaseEvidenceProfile profile,
-        AutonomousCampaignReleaseEvidence evidence
+        AutonomousCampaignReleaseEvidence evidence,
+        HiddenRuleBenchmarkReleaseEvidence hiddenRuleEvidence
     ) {
-<span class="fc bfc" id="L46" title="All 5 branches covered.">        List&lt;RequirementCheck&gt; checks = switch (profile) {</span>
-<span class="fc" id="L47">            case SEARCH_REPRODUCIBILITY -&gt; searchChecks(evidence);</span>
-<span class="fc" id="L48">            case HIDDEN_RULE_REDISCOVERY -&gt; hiddenRuleChecks(evidence);</span>
-<span class="fc" id="L49">            case OPEN_TARGET_DISCOVERY -&gt; openTargetChecks(evidence);</span>
-<span class="fc" id="L50">            case AUTONOMOUS_CAMPAIGN -&gt; autonomousCampaignChecks(evidence);</span>
-<span class="fc" id="L51">            case EXTERNAL_NOVELTY_REVIEW -&gt; externalNoveltyChecks(evidence);</span>
+<span class="fc bfc" id="L66" title="All 5 branches covered.">        List&lt;RequirementCheck&gt; checks = switch (profile) {</span>
+<span class="fc" id="L67">            case SEARCH_REPRODUCIBILITY -&gt; searchChecks(evidence);</span>
+<span class="fc" id="L68">            case HIDDEN_RULE_REDISCOVERY -&gt; hiddenRuleChecks(hiddenRuleEvidence);</span>
+<span class="fc" id="L69">            case OPEN_TARGET_DISCOVERY -&gt; openTargetChecks(evidence);</span>
+<span class="fc" id="L70">            case AUTONOMOUS_CAMPAIGN -&gt; autonomousCampaignChecks(evidence);</span>
+<span class="fc" id="L71">            case EXTERNAL_NOVELTY_REVIEW -&gt; externalNoveltyChecks(evidence);</span>
         };
-<span class="fc bfc" id="L53" title="All 2 branches covered.">        ProfileStatus status = checks.stream().allMatch(RequirementCheck::passed)</span>
-<span class="fc" id="L54">            ? ProfileStatus.READY</span>
-<span class="fc" id="L55">            : ProfileStatus.BLOCKED;</span>
-<span class="fc" id="L56">        return new ProfileResult(</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        ProfileStatus status = checks.stream().allMatch(RequirementCheck::passed)</span>
+<span class="fc" id="L74">            ? ProfileStatus.READY</span>
+<span class="fc" id="L75">            : ProfileStatus.BLOCKED;</span>
+<span class="fc" id="L76">        return new ProfileResult(</span>
             profile,
             status,
-<span class="pc bpc" id="L59" title="1 of 4 branches missed.">            profile.authorizesAutonomyClaim() &amp;&amp; status == ProfileStatus.READY,</span>
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">            profile.authorizesAutonomyClaim() &amp;&amp; status == ProfileStatus.READY,</span>
             checks,
-<span class="fc" id="L61">            checks.stream()</span>
-<span class="fc bfc" id="L62" title="All 2 branches covered.">                .filter(check -&gt; !check.passed())</span>
-<span class="fc" id="L63">                .map(RequirementCheck::code)</span>
-<span class="fc" id="L64">                .sorted()</span>
-<span class="fc" id="L65">                .toList());</span>
+<span class="fc" id="L81">            checks.stream()</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                .filter(check -&gt; !check.passed())</span>
+<span class="fc" id="L83">                .map(RequirementCheck::code)</span>
+<span class="fc" id="L84">                .sorted()</span>
+<span class="fc" id="L85">                .toList());</span>
     }
 
     private static List&lt;RequirementCheck&gt; searchChecks(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="fc" id="L71">        return List.of(</span>
-<span class="fc" id="L72">            check(&quot;PINNED_INPUTS&quot;, true,</span>
+<span class="fc" id="L91">        return List.of(</span>
+<span class="fc" id="L92">            check(&quot;PINNED_INPUTS&quot;, true,</span>
                 &quot;versioned production brief&quot;, &quot;versioned production brief&quot;),
-<span class="fc" id="L74">            check(&quot;TARGET_FREE&quot;, evidence.targetFree(),</span>
-<span class="fc" id="L75">                evidence.targetFree(), true),</span>
-<span class="fc" id="L76">            check(&quot;CANONICAL_MANIFEST&quot;,</span>
-<span class="fc" id="L77">                isSha256(evidence.campaignManifestHash()),</span>
-<span class="fc" id="L78">                evidence.campaignManifestHash(), &quot;sha256&quot;),</span>
-<span class="fc" id="L79">            check(&quot;THREE_CLEAN_RUNS&quot;,</span>
-<span class="pc bpc" id="L80" title="2 of 4 branches missed.">                evidence.cleanRunCount() &gt;= 3 &amp;&amp; evidence.cleanRunsIdentical(),</span>
-<span class="fc" id="L81">                cleanRunSummary(evidence),</span>
+<span class="fc" id="L94">            check(&quot;TARGET_FREE&quot;, evidence.targetFree(),</span>
+<span class="fc" id="L95">                evidence.targetFree(), true),</span>
+<span class="fc" id="L96">            check(&quot;CANONICAL_MANIFEST&quot;,</span>
+<span class="fc" id="L97">                isSha256(evidence.campaignManifestHash()),</span>
+<span class="fc" id="L98">                evidence.campaignManifestHash(), &quot;sha256&quot;),</span>
+<span class="fc" id="L99">            check(&quot;THREE_CLEAN_RUNS&quot;,</span>
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">                evidence.cleanRunCount() &gt;= 3 &amp;&amp; evidence.cleanRunsIdentical(),</span>
+<span class="fc" id="L101">                cleanRunSummary(evidence),</span>
                 &quot;&gt;=3 identical canonical manifests&quot;));
     }
 
     private static List&lt;RequirementCheck&gt; hiddenRuleChecks(
-        AutonomousCampaignReleaseEvidence evidence
+        HiddenRuleBenchmarkReleaseEvidence evidence
     ) {
-<span class="fc" id="L88">        return List.of(</span>
-<span class="fc" id="L89">            check(&quot;HIDDEN_REFERENCE_ISOLATED&quot;,</span>
-<span class="fc" id="L90">                evidence.hiddenReferenceIsolated(),</span>
-<span class="fc" id="L91">                evidence.hiddenReferenceIsolated(), true),</span>
-<span class="fc" id="L92">            check(&quot;HIDDEN_RULE_BENCHMARK_COMPLETE&quot;,</span>
-<span class="fc" id="L93">                evidence.hiddenRuleBenchmarkComplete(),</span>
-<span class="fc" id="L94">                evidence.hiddenRuleBenchmarkComplete(), true),</span>
-<span class="fc" id="L95">            check(&quot;EXECUTABLE_REDISCOVERY&quot;,</span>
-<span class="fc" id="L96">                evidence.executableRediscoveryRetained(),</span>
-<span class="fc" id="L97">                evidence.executableRediscoveryRetained(), true));</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (evidence == null) {</span>
+<span class="fc" id="L109">            return List.of(</span>
+<span class="fc" id="L110">                check(&quot;HIDDEN_REFERENCE_ISOLATED&quot;, false,</span>
+<span class="fc" id="L111">                    &quot;NOT_PROVIDED&quot;, true),</span>
+<span class="fc" id="L112">                check(&quot;HIDDEN_RULE_BENCHMARK_COMPLETE&quot;, false,</span>
+<span class="fc" id="L113">                    &quot;NOT_PROVIDED&quot;, true),</span>
+<span class="fc" id="L114">                check(&quot;EXECUTABLE_REDISCOVERY&quot;, false,</span>
+                    &quot;NOT_PROVIDED&quot;, &quot;&gt;=1 retained executable rediscovery&quot;));
+        }
+<span class="nc" id="L117">        return List.of(</span>
+<span class="nc" id="L118">            check(&quot;HIDDEN_REFERENCE_ISOLATED&quot;,</span>
+<span class="nc" id="L119">                evidence.hiddenReferenceIsolated(),</span>
+<span class="nc" id="L120">                &quot;isolated=&quot; + evidence.hiddenReferenceIsolated()</span>
+<span class="nc" id="L121">                    + &quot;; splitCollisions=&quot; + evidence.splitCollisionCount()</span>
+<span class="nc" id="L122">                    + &quot;; leakageViolations=&quot; + evidence.leakageViolationCount(),</span>
+                &quot;isolated=true; splitCollisions=0; leakageViolations=0&quot;),
+<span class="nc" id="L124">            check(&quot;HIDDEN_RULE_BENCHMARK_COMPLETE&quot;,</span>
+<span class="nc" id="L125">                evidence.benchmarkComplete(),</span>
+<span class="nc" id="L126">                hiddenRuleSummary(evidence),</span>
+                &quot;&gt;=20 cases; &gt;=3 families; complete accepted cases; &quot;
+                    + &quot;zero false positives; balanced negative holdouts&quot;),
+<span class="nc" id="L129">            check(&quot;EXECUTABLE_REDISCOVERY&quot;,</span>
+<span class="nc" id="L130">                evidence.executableRediscoveryRetained(),</span>
+<span class="nc" id="L131">                evidence.executableRediscoveryCount(),</span>
+                &quot;&gt;=1 retained executable rediscovery&quot;));
+    }
+
+    private static String hiddenRuleSummary(
+        HiddenRuleBenchmarkReleaseEvidence evidence
+    ) {
+<span class="nc" id="L138">        return &quot;cases=&quot; + evidence.cases()</span>
+<span class="nc" id="L139">            + &quot;; families=&quot; + evidence.families()</span>
+<span class="nc" id="L140">            + &quot;; accepted=&quot; + evidence.acceptedCases()</span>
+<span class="nc" id="L141">            + &quot;; rediscovered=&quot; + evidence.rediscoveredCases()</span>
+<span class="nc" id="L142">            + &quot;; negatives=&quot; + evidence.executedNegativeHoldouts()</span>
+<span class="nc" id="L143">                + '/' + evidence.configuredNegativeHoldouts()</span>
+<span class="nc" id="L144">            + &quot;; skipped=&quot; + evidence.skippedNegativeHoldouts()</span>
+<span class="nc" id="L145">            + &quot;; falsePositives=&quot; + evidence.falsePositiveHoldouts()</span>
+            + &quot;; acceptedIncomplete=&quot;
+<span class="nc" id="L147">                + evidence.acceptedIncompleteHoldoutCount();</span>
     }
 
     private static List&lt;RequirementCheck&gt; openTargetChecks(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="fc" id="L103">        return List.of(</span>
-<span class="fc" id="L104">            check(&quot;TARGET_FREE&quot;, evidence.targetFree(),</span>
-<span class="fc" id="L105">                evidence.targetFree(), true),</span>
-<span class="fc" id="L106">            check(&quot;MULTI_FAMILY_OBSERVATIONS&quot;,</span>
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                evidence.seedFamilyCount() &gt;= 2</span>
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                    &amp;&amp; evidence.observationCount() &gt;= 12,</span>
-<span class="fc" id="L109">                evidence.seedFamilyCount() + &quot; families / &quot;</span>
-<span class="fc" id="L110">                    + evidence.observationCount() + &quot; observations&quot;,</span>
+<span class="fc" id="L153">        return List.of(</span>
+<span class="fc" id="L154">            check(&quot;TARGET_FREE&quot;, evidence.targetFree(),</span>
+<span class="fc" id="L155">                evidence.targetFree(), true),</span>
+<span class="fc" id="L156">            check(&quot;MULTI_FAMILY_OBSERVATIONS&quot;,</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                evidence.seedFamilyCount() &gt;= 2</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                    &amp;&amp; evidence.observationCount() &gt;= 12,</span>
+<span class="fc" id="L159">                evidence.seedFamilyCount() + &quot; families / &quot;</span>
+<span class="fc" id="L160">                    + evidence.observationCount() + &quot; observations&quot;,</span>
                 &quot;&gt;=2 families / &gt;=12 observations&quot;),
-<span class="fc" id="L112">            check(&quot;AGGREGATE_MINING&quot;, evidence.aggregateMiningComplete(),</span>
-<span class="fc" id="L113">                evidence.aggregateMiningComplete(), true),</span>
-<span class="fc" id="L114">            check(&quot;EXACT_LINEAGE&quot;, evidence.exactSupportingLineage(),</span>
-<span class="fc" id="L115">                evidence.exactSupportingLineage(), true),</span>
-<span class="fc" id="L116">            check(&quot;REJECTION_EVIDENCE&quot;,</span>
-<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                evidence.rejectedClusterCount() &gt;= 1,</span>
-<span class="fc" id="L118">                evidence.rejectedClusterCount(), &quot;&gt;=1&quot;),</span>
-<span class="fc" id="L119">            check(&quot;VALIDATION_COMPLETE&quot;,</span>
-<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                developmentHoldoutsComplete(evidence)</span>
-<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                    &amp;&amp; evidence.refutingHoldouts() == 0,</span>
-<span class="fc" id="L122">                holdoutSummary(evidence),</span>
+<span class="fc" id="L162">            check(&quot;AGGREGATE_MINING&quot;, evidence.aggregateMiningComplete(),</span>
+<span class="fc" id="L163">                evidence.aggregateMiningComplete(), true),</span>
+<span class="fc" id="L164">            check(&quot;EXACT_LINEAGE&quot;, evidence.exactSupportingLineage(),</span>
+<span class="fc" id="L165">                evidence.exactSupportingLineage(), true),</span>
+<span class="fc" id="L166">            check(&quot;REJECTION_EVIDENCE&quot;,</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                evidence.rejectedClusterCount() &gt;= 1,</span>
+<span class="fc" id="L168">                evidence.rejectedClusterCount(), &quot;&gt;=1&quot;),</span>
+<span class="fc" id="L169">            check(&quot;VALIDATION_COMPLETE&quot;,</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                developmentHoldoutsComplete(evidence)</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                    &amp;&amp; evidence.refutingHoldouts() == 0,</span>
+<span class="fc" id="L172">                holdoutSummary(evidence),</span>
                 &quot;all configured positive and negative holdouts; zero refuting&quot;),
-<span class="fc" id="L124">            check(&quot;COUNTEREXAMPLE_SEARCH_COMPLETE&quot;,</span>
-<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                evidence.counterexampleStrategyCount() &gt;= 2</span>
-<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                    &amp;&amp; evidence.counterexamplesFound() == 0,</span>
-<span class="fc" id="L127">                evidence.counterexampleStrategyCount()</span>
-<span class="fc" id="L128">                    + &quot; strategies; found=&quot; + evidence.counterexamplesFound(),</span>
+<span class="fc" id="L174">            check(&quot;COUNTEREXAMPLE_SEARCH_COMPLETE&quot;,</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                evidence.counterexampleStrategyCount() &gt;= 2</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                    &amp;&amp; evidence.counterexamplesFound() == 0,</span>
+<span class="fc" id="L177">                evidence.counterexampleStrategyCount()</span>
+<span class="fc" id="L178">                    + &quot; strategies; found=&quot; + evidence.counterexamplesFound(),</span>
                 &quot;&gt;=2 strategies; zero counterexamples&quot;),
-<span class="fc" id="L130">            check(&quot;PROJECT_NOVELTY_COMPLETE&quot;,</span>
-<span class="fc" id="L131">                &quot;NOVEL_WITHIN_PROJECT&quot;.equals(</span>
-<span class="fc" id="L132">                    evidence.projectNoveltyStatus()),</span>
-<span class="fc" id="L133">                evidence.projectNoveltyStatus(), &quot;NOVEL_WITHIN_PROJECT&quot;),</span>
-<span class="fc" id="L134">            check(&quot;SYMBOLIC_PROOF_COMPLETE&quot;,</span>
-<span class="fc" id="L135">                &quot;SYMBOLICALLY_VERIFIED&quot;.equals(</span>
-<span class="fc" id="L136">                    evidence.symbolicProofStatus()),</span>
-<span class="fc" id="L137">                evidence.symbolicProofStatus(), &quot;SYMBOLICALLY_VERIFIED&quot;),</span>
-<span class="fc" id="L138">            check(&quot;LIFECYCLE_HANDOFF_COMPLETE&quot;,</span>
-<span class="fc" id="L139">                evidence.lifecycleHandoffComplete(),</span>
-<span class="fc" id="L140">                evidence.lifecycleHandoffComplete(), true));</span>
+<span class="fc" id="L180">            check(&quot;PROJECT_NOVELTY_COMPLETE&quot;,</span>
+<span class="fc" id="L181">                &quot;NOVEL_WITHIN_PROJECT&quot;.equals(</span>
+<span class="fc" id="L182">                    evidence.projectNoveltyStatus()),</span>
+<span class="fc" id="L183">                evidence.projectNoveltyStatus(), &quot;NOVEL_WITHIN_PROJECT&quot;),</span>
+<span class="fc" id="L184">            check(&quot;SYMBOLIC_PROOF_COMPLETE&quot;,</span>
+<span class="fc" id="L185">                &quot;SYMBOLICALLY_VERIFIED&quot;.equals(</span>
+<span class="fc" id="L186">                    evidence.symbolicProofStatus()),</span>
+<span class="fc" id="L187">                evidence.symbolicProofStatus(), &quot;SYMBOLICALLY_VERIFIED&quot;),</span>
+<span class="fc" id="L188">            check(&quot;LIFECYCLE_HANDOFF_COMPLETE&quot;,</span>
+<span class="fc" id="L189">                evidence.lifecycleHandoffComplete(),</span>
+<span class="fc" id="L190">                evidence.lifecycleHandoffComplete(), true));</span>
     }
 
     private static List&lt;RequirementCheck&gt; autonomousCampaignChecks(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="fc" id="L146">        List&lt;RequirementCheck&gt; checks = new ArrayList&lt;&gt;(openTargetChecks(evidence));</span>
-<span class="fc bfc" id="L147" title="All 2 branches covered.">        checks.removeIf(check -&gt; check.code().equals(&quot;VALIDATION_COMPLETE&quot;)</span>
-<span class="fc bfc" id="L148" title="All 2 branches covered.">            || check.code().equals(&quot;COUNTEREXAMPLE_SEARCH_COMPLETE&quot;));</span>
-<span class="fc" id="L149">        checks.add(check(&quot;NO_MANDATORY_SKIPPED_WORK&quot;,</span>
-<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            evidence.mandatorySkippedWorkCount() == 0,</span>
-<span class="fc" id="L151">            evidence.mandatorySkippedWorkCount(), 0));</span>
-<span class="fc" id="L152">        checks.add(check(&quot;ALPHA_DISTINCT_SUPPORT_AT_LEAST_THREE&quot;,</span>
-<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            evidence.alphaDistinctSupport() &gt;= 3,</span>
-<span class="fc" id="L154">            evidence.alphaDistinctSupport(), &quot;&gt;=3&quot;));</span>
-<span class="fc" id="L155">        checks.add(check(&quot;HELD_OUT_FAMILY_OR_CLUSTER&quot;,</span>
-<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            evidence.heldOutFamilyOrClusterCount() &gt;= 1,</span>
-<span class="fc" id="L157">            evidence.heldOutFamilyOrClusterCount(), &quot;&gt;=1&quot;));</span>
-<span class="fc" id="L158">        checks.add(check(&quot;BALANCED_RELEASE_HOLDOUT_SUITE&quot;,</span>
-<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            releaseHoldoutsComplete(evidence)</span>
-<span class="pc bnc" id="L160" title="All 2 branches missed.">                &amp;&amp; evidence.refutingHoldouts() == 0,</span>
-<span class="fc" id="L161">            holdoutSummary(evidence),</span>
+<span class="fc" id="L196">        List&lt;RequirementCheck&gt; checks = new ArrayList&lt;&gt;(openTargetChecks(evidence));</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        checks.removeIf(check -&gt; check.code().equals(&quot;VALIDATION_COMPLETE&quot;)</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            || check.code().equals(&quot;COUNTEREXAMPLE_SEARCH_COMPLETE&quot;));</span>
+<span class="fc" id="L199">        checks.add(check(&quot;NO_MANDATORY_SKIPPED_WORK&quot;,</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            evidence.mandatorySkippedWorkCount() == 0,</span>
+<span class="fc" id="L201">            evidence.mandatorySkippedWorkCount(), 0));</span>
+<span class="fc" id="L202">        checks.add(check(&quot;ALPHA_DISTINCT_SUPPORT_AT_LEAST_THREE&quot;,</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            evidence.alphaDistinctSupport() &gt;= 3,</span>
+<span class="fc" id="L204">            evidence.alphaDistinctSupport(), &quot;&gt;=3&quot;));</span>
+<span class="fc" id="L205">        checks.add(check(&quot;HELD_OUT_FAMILY_OR_CLUSTER&quot;,</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            evidence.heldOutFamilyOrClusterCount() &gt;= 1,</span>
+<span class="fc" id="L207">            evidence.heldOutFamilyOrClusterCount(), &quot;&gt;=1&quot;));</span>
+<span class="fc" id="L208">        checks.add(check(&quot;BALANCED_RELEASE_HOLDOUT_SUITE&quot;,</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            releaseHoldoutsComplete(evidence)</span>
+<span class="pc bnc" id="L210" title="All 2 branches missed.">                &amp;&amp; evidence.refutingHoldouts() == 0,</span>
+<span class="fc" id="L211">            holdoutSummary(evidence),</span>
             &quot;&gt;=&quot; + MIN_RELEASE_POSITIVE_HOLDOUTS + &quot; positive and &gt;=&quot;
                 + MIN_RELEASE_NEGATIVE_HOLDOUTS
                 + &quot; negative; fully executed; zero refuting&quot;));
-<span class="fc" id="L165">        checks.add(check(&quot;MULTIPLE_COUNTEREXAMPLE_STRATEGIES&quot;,</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">            evidence.counterexampleStrategyCount() &gt;= 2,</span>
-<span class="fc" id="L167">            evidence.counterexampleStrategyCount(), &quot;&gt;=2&quot;));</span>
-<span class="fc" id="L168">        checks.add(check(&quot;NO_REFUTATION&quot;,</span>
-<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            evidence.refutingHoldouts() == 0</span>
-<span class="pc bpc" id="L170" title="1 of 2 branches missed.">                &amp;&amp; evidence.counterexamplesFound() == 0,</span>
-<span class="fc" id="L171">            &quot;holdouts=&quot; + evidence.refutingHoldouts()</span>
-<span class="fc" id="L172">                + &quot;; counterexamples=&quot; + evidence.counterexamplesFound(),</span>
+<span class="fc" id="L215">        checks.add(check(&quot;MULTIPLE_COUNTEREXAMPLE_STRATEGIES&quot;,</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">            evidence.counterexampleStrategyCount() &gt;= 2,</span>
+<span class="fc" id="L217">            evidence.counterexampleStrategyCount(), &quot;&gt;=2&quot;));</span>
+<span class="fc" id="L218">        checks.add(check(&quot;NO_REFUTATION&quot;,</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            evidence.refutingHoldouts() == 0</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                &amp;&amp; evidence.counterexamplesFound() == 0,</span>
+<span class="fc" id="L221">            &quot;holdouts=&quot; + evidence.refutingHoldouts()</span>
+<span class="fc" id="L222">                + &quot;; counterexamples=&quot; + evidence.counterexamplesFound(),</span>
             &quot;zero&quot;));
-<span class="fc" id="L174">        checks.add(check(&quot;NO_UNRESOLVED_ASSUMPTIONS&quot;,</span>
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            evidence.unresolvedAssumptionCount() == 0,</span>
-<span class="fc" id="L176">            evidence.unresolvedAssumptionCount(), 0));</span>
-<span class="fc" id="L177">        checks.add(check(&quot;PAIRED_HELD_OUT_UTILITY&quot;,</span>
-<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            evidence.pairedHeldOutUtilityEvaluated()</span>
-<span class="pc bnc" id="L179" title="All 2 branches missed.">                &amp;&amp; evidence.pairedUtilityPermille() &gt; 0,</span>
-<span class="fc" id="L180">            &quot;evaluated=&quot; + evidence.pairedHeldOutUtilityEvaluated()</span>
-<span class="fc" id="L181">                + &quot;; gainPermille=&quot; + evidence.pairedUtilityPermille(),</span>
+<span class="fc" id="L224">        checks.add(check(&quot;NO_UNRESOLVED_ASSUMPTIONS&quot;,</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            evidence.unresolvedAssumptionCount() == 0,</span>
+<span class="fc" id="L226">            evidence.unresolvedAssumptionCount(), 0));</span>
+<span class="fc" id="L227">        checks.add(check(&quot;PAIRED_HELD_OUT_UTILITY&quot;,</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            evidence.pairedHeldOutUtilityEvaluated()</span>
+<span class="pc bnc" id="L229" title="All 2 branches missed.">                &amp;&amp; evidence.pairedUtilityPermille() &gt; 0,</span>
+<span class="fc" id="L230">            &quot;evaluated=&quot; + evidence.pairedHeldOutUtilityEvaluated()</span>
+<span class="fc" id="L231">                + &quot;; gainPermille=&quot; + evidence.pairedUtilityPermille(),</span>
             &quot;evaluated with positive held-out gain&quot;));
-<span class="fc" id="L183">        checks.add(check(&quot;THREE_CLEAN_RUNS&quot;,</span>
-<span class="pc bpc" id="L184" title="2 of 4 branches missed.">            evidence.cleanRunCount() &gt;= 3 &amp;&amp; evidence.cleanRunsIdentical(),</span>
-<span class="fc" id="L185">            cleanRunSummary(evidence),</span>
+<span class="fc" id="L233">        checks.add(check(&quot;THREE_CLEAN_RUNS&quot;,</span>
+<span class="pc bpc" id="L234" title="2 of 4 branches missed.">            evidence.cleanRunCount() &gt;= 3 &amp;&amp; evidence.cleanRunsIdentical(),</span>
+<span class="fc" id="L235">            cleanRunSummary(evidence),</span>
             &quot;&gt;=3 identical canonical manifests&quot;));
-<span class="fc" id="L187">        return checks.stream()</span>
-<span class="fc" id="L188">            .sorted(Comparator.comparing(RequirementCheck::code))</span>
-<span class="fc" id="L189">            .toList();</span>
+<span class="fc" id="L237">        return checks.stream()</span>
+<span class="fc" id="L238">            .sorted(Comparator.comparing(RequirementCheck::code))</span>
+<span class="fc" id="L239">            .toList();</span>
     }
 
     private static List&lt;RequirementCheck&gt; externalNoveltyChecks(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="fc" id="L195">        return List.of(</span>
-<span class="fc" id="L196">            check(&quot;PROJECT_NOVELTY_COMPLETE&quot;,</span>
-<span class="fc" id="L197">                &quot;NOVEL_WITHIN_PROJECT&quot;.equals(</span>
-<span class="fc" id="L198">                    evidence.projectNoveltyStatus()),</span>
-<span class="fc" id="L199">                evidence.projectNoveltyStatus(), &quot;NOVEL_WITHIN_PROJECT&quot;),</span>
-<span class="fc" id="L200">            check(&quot;EXTERNAL_NOVELTY_REVIEWED&quot;,</span>
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                !&quot;NOT_EVALUATED&quot;.equals(evidence.externalNoveltyStatus()),</span>
-<span class="fc" id="L202">                evidence.externalNoveltyStatus(), &quot;externally reviewed verdict&quot;),</span>
-<span class="fc" id="L203">            check(&quot;PUBLIC_EVIDENCE_REVIEWED&quot;,</span>
-<span class="fc" id="L204">                evidence.publicEvidenceReviewed(),</span>
-<span class="fc" id="L205">                evidence.publicEvidenceReviewed(), true));</span>
+<span class="fc" id="L245">        return List.of(</span>
+<span class="fc" id="L246">            check(&quot;PROJECT_NOVELTY_COMPLETE&quot;,</span>
+<span class="fc" id="L247">                &quot;NOVEL_WITHIN_PROJECT&quot;.equals(</span>
+<span class="fc" id="L248">                    evidence.projectNoveltyStatus()),</span>
+<span class="fc" id="L249">                evidence.projectNoveltyStatus(), &quot;NOVEL_WITHIN_PROJECT&quot;),</span>
+<span class="fc" id="L250">            check(&quot;EXTERNAL_NOVELTY_REVIEWED&quot;,</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                !&quot;NOT_EVALUATED&quot;.equals(evidence.externalNoveltyStatus()),</span>
+<span class="fc" id="L252">                evidence.externalNoveltyStatus(), &quot;externally reviewed verdict&quot;),</span>
+<span class="fc" id="L253">            check(&quot;PUBLIC_EVIDENCE_REVIEWED&quot;,</span>
+<span class="fc" id="L254">                evidence.publicEvidenceReviewed(),</span>
+<span class="fc" id="L255">                evidence.publicEvidenceReviewed(), true));</span>
     }
 
     private static boolean developmentHoldoutsComplete(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        return evidence.configuredPositiveHoldouts() &gt; 0</span>
-<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            &amp;&amp; evidence.configuredNegativeHoldouts() &gt; 0</span>
-<span class="fc" id="L213">            &amp;&amp; evidence.executedPositiveHoldouts()</span>
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                == evidence.configuredPositiveHoldouts()</span>
-<span class="fc" id="L215">            &amp;&amp; evidence.executedNegativeHoldouts()</span>
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                == evidence.configuredNegativeHoldouts();</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        return evidence.configuredPositiveHoldouts() &gt; 0</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            &amp;&amp; evidence.configuredNegativeHoldouts() &gt; 0</span>
+<span class="fc" id="L263">            &amp;&amp; evidence.executedPositiveHoldouts()</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">                == evidence.configuredPositiveHoldouts()</span>
+<span class="fc" id="L265">            &amp;&amp; evidence.executedNegativeHoldouts()</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                == evidence.configuredNegativeHoldouts();</span>
     }
 
     private static boolean releaseHoldoutsComplete(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        return evidence.configuredPositiveHoldouts()</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        return evidence.configuredPositiveHoldouts()</span>
                 &gt;= MIN_RELEASE_POSITIVE_HOLDOUTS
-<span class="nc bnc" id="L224" title="All 2 branches missed.">            &amp;&amp; evidence.configuredNegativeHoldouts()</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">            &amp;&amp; evidence.configuredNegativeHoldouts()</span>
                 &gt;= MIN_RELEASE_NEGATIVE_HOLDOUTS
-<span class="nc" id="L226">            &amp;&amp; evidence.executedPositiveHoldouts()</span>
-<span class="nc bnc" id="L227" title="All 2 branches missed.">                == evidence.configuredPositiveHoldouts()</span>
-<span class="nc" id="L228">            &amp;&amp; evidence.executedNegativeHoldouts()</span>
-<span class="pc bnc" id="L229" title="All 2 branches missed.">                == evidence.configuredNegativeHoldouts();</span>
+<span class="nc" id="L276">            &amp;&amp; evidence.executedPositiveHoldouts()</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">                == evidence.configuredPositiveHoldouts()</span>
+<span class="nc" id="L278">            &amp;&amp; evidence.executedNegativeHoldouts()</span>
+<span class="pc bnc" id="L279" title="All 2 branches missed.">                == evidence.configuredNegativeHoldouts();</span>
     }
 
     private static String holdoutSummary(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="fc" id="L235">        return &quot;positive=&quot; + evidence.executedPositiveHoldouts() + '/'</span>
-<span class="fc" id="L236">            + evidence.configuredPositiveHoldouts()</span>
-<span class="fc" id="L237">            + &quot;; negative=&quot; + evidence.executedNegativeHoldouts() + '/'</span>
-<span class="fc" id="L238">            + evidence.configuredNegativeHoldouts()</span>
-<span class="fc" id="L239">            + &quot;; refuting=&quot; + evidence.refutingHoldouts();</span>
+<span class="fc" id="L285">        return &quot;positive=&quot; + evidence.executedPositiveHoldouts() + '/'</span>
+<span class="fc" id="L286">            + evidence.configuredPositiveHoldouts()</span>
+<span class="fc" id="L287">            + &quot;; negative=&quot; + evidence.executedNegativeHoldouts() + '/'</span>
+<span class="fc" id="L288">            + evidence.configuredNegativeHoldouts()</span>
+<span class="fc" id="L289">            + &quot;; refuting=&quot; + evidence.refutingHoldouts();</span>
     }
 
     private static String cleanRunSummary(
         AutonomousCampaignReleaseEvidence evidence
     ) {
-<span class="fc" id="L245">        return evidence.cleanRunCount() + &quot; runs; identical=&quot;</span>
-<span class="fc" id="L246">            + evidence.cleanRunsIdentical();</span>
+<span class="fc" id="L295">        return evidence.cleanRunCount() + &quot; runs; identical=&quot;</span>
+<span class="fc" id="L296">            + evidence.cleanRunsIdentical();</span>
     }
 
     private static RequirementCheck check(
@@ -252,32 +302,34 @@ public final class ReleaseReadinessMatrix {
         Object actual,
         Object required
     ) {
-<span class="fc" id="L255">        return new RequirementCheck(</span>
+<span class="fc" id="L305">        return new RequirementCheck(</span>
             code,
             passed,
-<span class="fc" id="L258">            String.valueOf(actual),</span>
-<span class="fc" id="L259">            String.valueOf(required));</span>
+<span class="fc" id="L308">            String.valueOf(actual),</span>
+<span class="fc" id="L309">            String.valueOf(required));</span>
     }
 
     private static String matrixHash(
         String evidenceHash,
+        String hiddenRuleEvidenceHash,
         List&lt;ProfileResult&gt; profiles,
         ProfileStatus autonomyStatus
     ) {
-<span class="fc" id="L267">        List&lt;String&gt; canonicalProfiles = profiles.stream()</span>
-<span class="fc" id="L268">            .sorted(Comparator.comparing(result -&gt; result.profile().name()))</span>
-<span class="fc" id="L269">            .map(ProfileResult::canonicalMaterial)</span>
-<span class="fc" id="L270">            .toList();</span>
-<span class="fc" id="L271">        return de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.hash(</span>
+<span class="fc" id="L318">        List&lt;String&gt; canonicalProfiles = profiles.stream()</span>
+<span class="fc" id="L319">            .sorted(Comparator.comparing(result -&gt; result.profile().name()))</span>
+<span class="fc" id="L320">            .map(ProfileResult::canonicalMaterial)</span>
+<span class="fc" id="L321">            .toList();</span>
+<span class="fc" id="L322">        return AutonomousResearchBriefV2.hash(</span>
             SCHEMA
                 + &quot;\nevidence=&quot; + evidenceHash
+                + &quot;\nhiddenRuleEvidence=&quot; + hiddenRuleEvidenceHash
                 + &quot;\nprofiles=&quot; + canonicalProfiles
-<span class="fc" id="L275">                + &quot;\nautonomy=&quot; + autonomyStatus.name());</span>
+<span class="fc" id="L327">                + &quot;\nautonomy=&quot; + autonomyStatus.name());</span>
     }
 
-<span class="fc" id="L278">    public enum ProfileStatus {</span>
-<span class="fc" id="L279">        READY,</span>
-<span class="fc" id="L280">        BLOCKED</span>
+<span class="fc" id="L330">    public enum ProfileStatus {</span>
+<span class="fc" id="L331">        READY,</span>
+<span class="fc" id="L332">        BLOCKED</span>
     }
 
     public record RequirementCheck(
@@ -286,14 +338,14 @@ public final class ReleaseReadinessMatrix {
         String actual,
         String required
     ) {
-<span class="fc" id="L289">        public RequirementCheck {</span>
-<span class="fc" id="L290">            requireText(code, &quot;code&quot;);</span>
-<span class="fc" id="L291">            requireText(actual, &quot;actual&quot;);</span>
-<span class="fc" id="L292">            requireText(required, &quot;required&quot;);</span>
-<span class="fc" id="L293">        }</span>
+<span class="fc" id="L341">        public RequirementCheck {</span>
+<span class="fc" id="L342">            requireText(code, &quot;code&quot;);</span>
+<span class="fc" id="L343">            requireText(actual, &quot;actual&quot;);</span>
+<span class="fc" id="L344">            requireText(required, &quot;required&quot;);</span>
+<span class="fc" id="L345">        }</span>
 
         String canonicalMaterial() {
-<span class="fc" id="L296">            return code + &quot;|passed=&quot; + passed</span>
+<span class="fc" id="L348">            return code + &quot;|passed=&quot; + passed</span>
                 + &quot;|actual=&quot; + actual
                 + &quot;|required=&quot; + required;
         }
@@ -306,31 +358,31 @@ public final class ReleaseReadinessMatrix {
         List&lt;RequirementCheck&gt; checks,
         List&lt;String&gt; blockers
     ) {
-<span class="fc" id="L309">        public ProfileResult {</span>
-<span class="fc" id="L310">            Objects.requireNonNull(profile, &quot;profile&quot;);</span>
-<span class="fc" id="L311">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="pc bpc" id="L312" title="1 of 2 branches missed.">            checks = checks == null</span>
-<span class="nc" id="L313">                ? List.of()</span>
-<span class="fc" id="L314">                : checks.stream()</span>
-<span class="fc" id="L315">                    .sorted(Comparator.comparing(RequirementCheck::code))</span>
-<span class="fc" id="L316">                    .toList();</span>
-<span class="pc bpc" id="L317" title="1 of 2 branches missed.">            blockers = blockers == null</span>
-<span class="nc" id="L318">                ? List.of()</span>
-<span class="fc" id="L319">                : blockers.stream().distinct().sorted().toList();</span>
-<span class="pc bpc" id="L320" title="1 of 4 branches missed.">            if (checks.isEmpty()</span>
-<span class="pc bpc" id="L321" title="1 of 2 branches missed.">                    || (status == ProfileStatus.READY) != blockers.isEmpty()</span>
+<span class="fc" id="L361">        public ProfileResult {</span>
+<span class="fc" id="L362">            Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L363">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            checks = checks == null</span>
+<span class="nc" id="L365">                ? List.of()</span>
+<span class="fc" id="L366">                : checks.stream()</span>
+<span class="fc" id="L367">                    .sorted(Comparator.comparing(RequirementCheck::code))</span>
+<span class="fc" id="L368">                    .toList();</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            blockers = blockers == null</span>
+<span class="nc" id="L370">                ? List.of()</span>
+<span class="fc" id="L371">                : blockers.stream().distinct().sorted().toList();</span>
+<span class="pc bpc" id="L372" title="1 of 4 branches missed.">            if (checks.isEmpty()</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                    || (status == ProfileStatus.READY) != blockers.isEmpty()</span>
                     || autonomyClaimAuthorized
-<span class="pc bpc" id="L323" title="2 of 6 branches missed.">                        != (profile.authorizesAutonomyClaim()</span>
+<span class="pc bpc" id="L375" title="2 of 6 branches missed.">                        != (profile.authorizesAutonomyClaim()</span>
                             &amp;&amp; status == ProfileStatus.READY)) {
-<span class="nc" id="L325">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L377">                throw new IllegalArgumentException(</span>
                     &quot;profile result status, blockers or claim authority is inconsistent&quot;);
             }
-<span class="fc" id="L328">        }</span>
+<span class="fc" id="L380">        }</span>
 
         String canonicalMaterial() {
-<span class="fc" id="L331">            return profile.name() + '|' + status.name() + '|'</span>
+<span class="fc" id="L383">            return profile.name() + '|' + status.name() + '|'</span>
                 + autonomyClaimAuthorized + '|'
-<span class="fc" id="L333">                + checks.stream().map(RequirementCheck::canonicalMaterial).toList()</span>
+<span class="fc" id="L385">                + checks.stream().map(RequirementCheck::canonicalMaterial).toList()</span>
                 + '|' + blockers;
         }
     }
@@ -338,6 +390,7 @@ public final class ReleaseReadinessMatrix {
     public record MatrixReport(
         String schema,
         String evidenceHash,
+        String hiddenRuleEvidenceHash,
         List&lt;ProfileResult&gt; profiles,
         ProfileStatus autonomousCampaignStatus,
         boolean autonomyClaimAuthorized,
@@ -345,75 +398,80 @@ public final class ReleaseReadinessMatrix {
         String publicEvidenceStatus,
         String contentHash
     ) {
-<span class="fc" id="L348">        public MatrixReport {</span>
-<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L350">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L401">        public MatrixReport {</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L403">                throw new IllegalArgumentException(</span>
                     &quot;unsupported release-readiness matrix schema&quot;);
             }
-<span class="fc" id="L353">            requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
-<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            profiles = profiles == null</span>
-<span class="nc" id="L355">                ? List.of()</span>
-<span class="fc" id="L356">                : profiles.stream()</span>
-<span class="fc" id="L357">                    .sorted(Comparator.comparing(result -&gt; result.profile().name()))</span>
-<span class="fc" id="L358">                    .toList();</span>
-<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            if (profiles.size() != ReleaseEvidenceProfile.values().length</span>
-<span class="fc" id="L360">                    || profiles.stream().map(ProfileResult::profile).distinct().count()</span>
-<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                        != profiles.size()) {</span>
-<span class="nc" id="L362">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L406">            requireSha256(evidenceHash, &quot;evidenceHash&quot;);</span>
+<span class="fc" id="L407">            requireSha256(hiddenRuleEvidenceHash, &quot;hiddenRuleEvidenceHash&quot;);</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">            profiles = profiles == null</span>
+<span class="nc" id="L409">                ? List.of()</span>
+<span class="fc" id="L410">                : profiles.stream()</span>
+<span class="fc" id="L411">                    .sorted(Comparator.comparing(result -&gt; result.profile().name()))</span>
+<span class="fc" id="L412">                    .toList();</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">            if (profiles.size() != ReleaseEvidenceProfile.values().length</span>
+<span class="fc" id="L414">                    || profiles.stream().map(ProfileResult::profile).distinct().count()</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">                        != profiles.size()) {</span>
+<span class="nc" id="L416">                throw new IllegalArgumentException(</span>
                     &quot;matrix must contain every release evidence profile exactly once&quot;);
             }
-<span class="fc" id="L365">            ProfileResult autonomy = findResult(</span>
+<span class="fc" id="L419">            ProfileResult autonomy = findResult(</span>
                 profiles, ReleaseEvidenceProfile.AUTONOMOUS_CAMPAIGN);
-<span class="pc bpc" id="L367" title="1 of 2 branches missed.">            if (autonomousCampaignStatus != autonomy.status()</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">            if (autonomousCampaignStatus != autonomy.status()</span>
                     || autonomyClaimAuthorized
-<span class="pc bpc" id="L369" title="1 of 2 branches missed.">                        != autonomy.autonomyClaimAuthorized()) {</span>
-<span class="nc" id="L370">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                        != autonomy.autonomyClaimAuthorized()) {</span>
+<span class="nc" id="L424">                throw new IllegalArgumentException(</span>
                     &quot;matrix autonomy summary is inconsistent&quot;);
             }
-<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            if (!&quot;NOT_EVALUATED&quot;.equals(promotionStatus)</span>
-<span class="pc bpc" id="L374" title="1 of 2 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(publicEvidenceStatus)) {</span>
-<span class="nc" id="L375">                throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">            if (!&quot;NOT_EVALUATED&quot;.equals(promotionStatus)</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(publicEvidenceStatus)) {</span>
+<span class="nc" id="L429">                throw new IllegalArgumentException(</span>
                     &quot;release matrix cannot promote or publish evidence&quot;);
             }
-<span class="fc" id="L378">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L379">            String expectedHash = matrixHash(</span>
-                evidenceHash, profiles, autonomousCampaignStatus);
-<span class="fc bfc" id="L381" title="All 2 branches covered.">            if (!expectedHash.equals(contentHash)) {</span>
-<span class="fc" id="L382">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L432">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L433">            String expectedHash = matrixHash(</span>
+                evidenceHash,
+                hiddenRuleEvidenceHash,
+                profiles,
+                autonomousCampaignStatus);
+<span class="fc bfc" id="L438" title="All 2 branches covered.">            if (!expectedHash.equals(contentHash)) {</span>
+<span class="fc" id="L439">                throw new IllegalArgumentException(</span>
                     &quot;release matrix content hash does not match canonical semantics&quot;);
             }
-<span class="fc" id="L385">        }</span>
+<span class="fc" id="L442">        }</span>
 
         public ProfileResult result(ReleaseEvidenceProfile profile) {
-<span class="fc" id="L388">            return findResult(profiles, profile);</span>
+<span class="fc" id="L445">            return findResult(profiles, profile);</span>
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L392">            return new JsonWriter().beginObject()</span>
-<span class="fc" id="L393">                .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L394">                .property(&quot;evidenceHash&quot;, evidenceHash)</span>
-<span class="fc" id="L395">                .array(&quot;profiles&quot;, array -&gt; profiles.forEach(result -&gt;</span>
-<span class="fc" id="L396">                    array.objectValue(object -&gt; object</span>
-<span class="fc" id="L397">                        .property(&quot;profile&quot;, result.profile().name())</span>
-<span class="fc" id="L398">                        .property(&quot;claim&quot;, result.profile().claim())</span>
-<span class="fc" id="L399">                        .property(&quot;status&quot;, result.status().name())</span>
-<span class="fc" id="L400">                        .property(&quot;authorizesAutonomyClaim&quot;,</span>
-<span class="fc" id="L401">                            result.autonomyClaimAuthorized())</span>
-<span class="fc" id="L402">                        .array(&quot;checks&quot;, checks -&gt; result.checks().forEach(check -&gt;</span>
-<span class="fc" id="L403">                            checks.objectValue(item -&gt; item</span>
-<span class="fc" id="L404">                                .property(&quot;code&quot;, check.code())</span>
-<span class="fc" id="L405">                                .property(&quot;passed&quot;, check.passed())</span>
-<span class="fc" id="L406">                                .property(&quot;actual&quot;, check.actual())</span>
-<span class="fc" id="L407">                                .property(&quot;required&quot;, check.required()))))</span>
-<span class="fc" id="L408">                        .stringArray(&quot;blockers&quot;, result.blockers()))))</span>
-<span class="fc" id="L409">                .property(&quot;autonomousCampaignStatus&quot;,</span>
-<span class="fc" id="L410">                    autonomousCampaignStatus.name())</span>
-<span class="fc" id="L411">                .property(&quot;autonomyClaimAuthorized&quot;, autonomyClaimAuthorized)</span>
-<span class="fc" id="L412">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
-<span class="fc" id="L413">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
-<span class="fc" id="L414">                .property(&quot;contentHash&quot;, contentHash)</span>
-<span class="fc" id="L415">                .endObject()</span>
-<span class="fc" id="L416">                .toString();</span>
+<span class="fc" id="L449">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L450">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L451">                .property(&quot;evidenceHash&quot;, evidenceHash)</span>
+<span class="fc" id="L452">                .property(&quot;hiddenRuleEvidenceHash&quot;, hiddenRuleEvidenceHash)</span>
+<span class="fc" id="L453">                .array(&quot;profiles&quot;, array -&gt; profiles.forEach(result -&gt;</span>
+<span class="fc" id="L454">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L455">                        .property(&quot;profile&quot;, result.profile().name())</span>
+<span class="fc" id="L456">                        .property(&quot;claim&quot;, result.profile().claim())</span>
+<span class="fc" id="L457">                        .property(&quot;status&quot;, result.status().name())</span>
+<span class="fc" id="L458">                        .property(&quot;authorizesAutonomyClaim&quot;,</span>
+<span class="fc" id="L459">                            result.autonomyClaimAuthorized())</span>
+<span class="fc" id="L460">                        .array(&quot;checks&quot;, checks -&gt; result.checks().forEach(check -&gt;</span>
+<span class="fc" id="L461">                            checks.objectValue(item -&gt; item</span>
+<span class="fc" id="L462">                                .property(&quot;code&quot;, check.code())</span>
+<span class="fc" id="L463">                                .property(&quot;passed&quot;, check.passed())</span>
+<span class="fc" id="L464">                                .property(&quot;actual&quot;, check.actual())</span>
+<span class="fc" id="L465">                                .property(&quot;required&quot;, check.required()))))</span>
+<span class="fc" id="L466">                        .stringArray(&quot;blockers&quot;, result.blockers()))))</span>
+<span class="fc" id="L467">                .property(&quot;autonomousCampaignStatus&quot;,</span>
+<span class="fc" id="L468">                    autonomousCampaignStatus.name())</span>
+<span class="fc" id="L469">                .property(&quot;autonomyClaimAuthorized&quot;, autonomyClaimAuthorized)</span>
+<span class="fc" id="L470">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L471">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L472">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L473">                .endObject()</span>
+<span class="fc" id="L474">                .toString();</span>
         }
     }
 
@@ -421,26 +479,26 @@ public final class ReleaseReadinessMatrix {
         List&lt;ProfileResult&gt; profiles,
         ReleaseEvidenceProfile profile
     ) {
-<span class="fc" id="L424">        return profiles.stream()</span>
-<span class="fc bfc" id="L425" title="All 2 branches covered.">            .filter(result -&gt; result.profile() == profile)</span>
-<span class="fc" id="L426">            .findFirst()</span>
-<span class="fc" id="L427">            .orElseThrow();</span>
+<span class="fc" id="L482">        return profiles.stream()</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            .filter(result -&gt; result.profile() == profile)</span>
+<span class="fc" id="L484">            .findFirst()</span>
+<span class="fc" id="L485">            .orElseThrow();</span>
     }
 
     private static boolean isSha256(String value) {
-<span class="pc bpc" id="L431" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="pc bpc" id="L489" title="2 of 4 branches missed.">        return value != null &amp;&amp; value.matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
     }
 
     private static void requireSha256(String value, String name) {
-<span class="pc bpc" id="L435" title="1 of 2 branches missed.">        if (!isSha256(value)) {</span>
-<span class="nc" id="L436">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">        if (!isSha256(value)) {</span>
+<span class="nc" id="L494">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
         }
-<span class="fc" id="L438">    }</span>
+<span class="fc" id="L496">    }</span>
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L441" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L442">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L499" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L500">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L444">    }</span>
+<span class="fc" id="L502">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
