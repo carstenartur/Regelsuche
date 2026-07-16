@@ -58,8 +58,8 @@ jobs:
               'docs/schemas/regelsuche-solver-portfolio-report-v1.schema.json'
           ).read_text())
           Draft202012Validator.check_schema(schema)
-          formal = json.loads((root / 'formal-report.json').read_text())
-          guidance = json.loads((root / 'guidance-report.json').read_text())
+          formal = json.loads((root / 'formal/report.json').read_text())
+          guidance = json.loads((root / 'guidance/report.json').read_text())
           Draft202012Validator(schema).validate(formal)
           Draft202012Validator(schema).validate(guidance)
           manifest = json.loads((root / 'manifest.json').read_text())
@@ -75,8 +75,22 @@ jobs:
           assert guidance['selectedBackendId'] == 'regelsuche-search'
           assert formal['telemetryNotice'] == \
               'EXECUTION_TELEMETRY_NOT_MATHEMATICAL_EVIDENCE'
+
+          traced_hashes = {
+              attempt['executionHash'] for attempt in formal['attempts']
+              if attempt['executionHash']
+          }
+          execution_files = sorted((root / 'formal/executions').glob('*.json'))
+          retained_hashes = {
+              json.loads(path.read_text())['contentHash']
+              for path in execution_files
+          }
+          assert retained_hashes == traced_hashes
+          assert formal['selectedExecutionHash'] in retained_hashes
+
           assert manifest['allThreeRolesConfigured'] is True
           assert manifest['formalMultiStage'] is True
+          assert manifest['allFormalExecutionsRetained'] is True
           assert manifest['formalProofAuthorized'] is True
           assert manifest['searchGuidanceExecuted'] is True
           print('solver-portfolio-contract=valid')
