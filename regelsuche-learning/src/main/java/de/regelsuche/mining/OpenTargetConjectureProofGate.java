@@ -9,6 +9,7 @@ import de.regelsuche.solver.ir.SolverIr;
 import de.regelsuche.solver.ir.SolverIr.Obligation;
 import de.regelsuche.solver.ir.SolverIr.ResultStatus;
 import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverObligationFactory;
 import de.regelsuche.solver.ir.SymPySolverBackend;
 import java.nio.charset.StandardCharsets;
@@ -34,7 +35,8 @@ public final class OpenTargetConjectureProofGate {
         this(new SymPySolverBackend());
     }
 
-    OpenTargetConjectureProofGate(SolverBackend backend) {
+    /** Creates a gate for one explicit backend; used by solver portfolios. */
+    public OpenTargetConjectureProofGate(SolverBackend backend) {
         this.backend = Objects.requireNonNull(backend, "backend");
     }
 
@@ -57,31 +59,18 @@ public final class OpenTargetConjectureProofGate {
         }
 
         List<String> assumptions = assumptions(conjecture);
-        Obligation obligation;
-        try {
-            obligation = obligations.equality(
-                conjecture.conjectureId() + "-proof",
-                conjecture.leftPattern(),
-                conjecture.rightPattern(),
-                assumptions,
-                SolverIr.RequestedEvidence.SYMBOLIC_CERTIFICATE,
-                new SolverIr.SourceProvenance(
-                    "open-target-conjecture",
-                    conjecture.conjectureId(),
-                    conjectureRevisionHash(conjecture, assumptions)));
-        } catch (IllegalArgumentException exception) {
-            return report(
+        Obligation obligation = obligations.equality(
+            conjecture.conjectureId() + "-proof",
+            conjecture.leftPattern(),
+            conjecture.rightPattern(),
+            assumptions,
+            SolverIr.RequestedEvidence.SYMBOLIC_CERTIFICATE,
+            new SolverIr.SourceProvenance(
+                "open-target-conjecture",
                 conjecture.conjectureId(),
-                EligibilityStatus.ELIGIBLE,
-                ProofStatus.INCONCLUSIVE,
-                null,
-                null,
-                List.of("solver IR translation rejected: " + exception.getMessage()),
-                "NOT_EVALUATED");
-        }
-
+                conjectureRevisionHash(conjecture, assumptions)));
         SolverResult result = backend.solve(obligation);
-        ProofStatus status = proofStatus(result.status());
+        ProofStatus status = proofStatus(result);
         return report(
             conjecture.conjectureId(),
             EligibilityStatus.ELIGIBLE,
@@ -185,8 +174,11 @@ public final class OpenTargetConjectureProofGate {
                 + "\nsupport=" + conjecture.supportingObservationIds());
     }
 
-    private static ProofStatus proofStatus(ResultStatus status) {
-        return switch (status) {
+    private static ProofStatus proofStatus(SolverResult result) {
+        if (result.translationStatus() != TranslationStatus.LOSSLESS) {
+            return ProofStatus.INCONCLUSIVE;
+        }
+        return switch (result.status()) {
             case CONFIRMED -> ProofStatus.SYMBOLICALLY_VERIFIED;
             case REFUTED -> ProofStatus.REFUTED;
             case UNKNOWN, TIMEOUT, UNSUPPORTED, ERROR -> ProofStatus.INCONCLUSIVE;
@@ -194,6 +186,14 @@ public final class OpenTargetConjectureProofGate {
     }
 
     private static List<String> resultBlockers(SolverResult result) {
+        if (result.translationStatus() != TranslationStatus.LOSSLESS) {
+            return List.of(
+                "solver translation is not lossless: "
+                    + result.translationStatus().name()
+                    + (result.translationIssues().isEmpty()
+                        ? ""
+                        : " (" + String.join(",", result.translationIssues()) + ')'));
+        }
         return switch (result.status()) {
             case CONFIRMED -> List.of();
             case REFUTED -> List.of("solver backend refuted the conjecture");
@@ -253,6 +253,7 @@ public final class OpenTargetConjectureProofGate {
                 .distinct().sorted().toList();
             formalProofStatus = formalProofStatus == null
                 ? "NOT_EVALUATED" : formalProofStatus;
+            boolean emitted = obligation != null && result != null;
             if ((obligation == null) != (result == null)) {
                 throw new IllegalArgumentException(
                     "proof obligation and solver result must be present together");
@@ -263,9 +264,25 @@ public final class OpenTargetConjectureProofGate {
                     "solver result belongs to another obligation");
             }
             if (eligibility == EligibilityStatus.NOT_ELIGIBLE
-                    && (obligation != null || proofStatus != ProofStatus.NOT_RUN)) {
+                    && (emitted || proofStatus != ProofStatus.NOT_RUN)) {
                 throw new IllegalArgumentException(
                     "ineligible proof cannot emit or execute an obligation");
+            }
+            if (eligibility == EligibilityStatus.ELIGIBLE && !emitted) {
+                throw new IllegalArgumentException(
+                    "eligible proof must emit and execute one obligation");
+            }
+            if (proofStatus == ProofStatus.SYMBOLICALLY_VERIFIED
+                    && (result.status() != ResultStatus.CONFIRMED
+                        || result.translationStatus() != TranslationStatus.LOSSLESS)) {
+                throw new IllegalArgumentException(
+                    "symbolic verification requires a lossless confirmed result");
+            }
+            if (proofStatus == ProofStatus.REFUTED
+                    && (result.status() != ResultStatus.REFUTED
+                        || result.translationStatus() != TranslationStatus.LOSSLESS)) {
+                throw new IllegalArgumentException(
+                    "refutation requires a lossless refuted result");
             }
             if (evidenceHash == null
                     || !evidenceHash.matches("sha256:[0-9a-f]{64}")) {
