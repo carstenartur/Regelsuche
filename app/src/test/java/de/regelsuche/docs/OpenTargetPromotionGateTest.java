@@ -456,7 +456,7 @@ class OpenTargetPromotionGateTest {
             List.of(),
             evidence,
             Map.of(),
-            backendStatus == ResultStatus.CONFIRMED ? hash('g') : "");
+            backendStatus == ResultStatus.CONFIRMED ? hash('e') : "");
         SolverExecution execution = SolverExecution.create(
             obligation, translation, result);
         List<String> blockers = status == ProofStatus.SYMBOLICALLY_VERIFIED
