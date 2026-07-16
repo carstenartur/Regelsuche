@@ -3,11 +3,11 @@ package de.regelsuche.release;
 import de.regelsuche.experiments.autopilot.AutonomousCandidateLifecycleV2.LifecycleOutcome;
 import de.regelsuche.experiments.autopilot.AutonomousEvidenceDagV2.CandidateOutput;
 import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner.CampaignRun;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
 import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.ResourceKind;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -62,9 +62,17 @@ public record AutonomousCampaignReleaseEvidence(
             : cleanRunManifestHashes.stream().sorted().toList();
         cleanRunManifestHashes.forEach(hash -> requireSha256(
             hash, "cleanRunManifestHashes"));
-        if (cleanRunCount != cleanRunManifestHashes.size()) {
+        if (cleanRunManifestHashes.isEmpty()
+                || cleanRunCount != cleanRunManifestHashes.size()
+                || !cleanRunManifestHashes.contains(campaignManifestHash)) {
             throw new IllegalArgumentException(
-                "cleanRunCount must match retained run hashes");
+                "clean runs must retain the campaign manifest and match their count");
+        }
+        boolean calculatedIdentical = cleanRunManifestHashes.stream()
+            .distinct().count() == 1L;
+        if (cleanRunsIdentical != calculatedIdentical) {
+            throw new IllegalArgumentException(
+                "cleanRunsIdentical must match the retained manifest hashes");
         }
         for (int value : List.of(
                 seedFamilyCount,
@@ -93,11 +101,54 @@ public record AutonomousCampaignReleaseEvidence(
             throw new IllegalArgumentException(
                 "executed holdouts cannot exceed configured holdouts");
         }
+        if (!pairedHeldOutUtilityEvaluated && pairedUtilityPermille != 0) {
+            throw new IllegalArgumentException(
+                "unevaluated paired utility cannot report a gain");
+        }
         requireText(projectNoveltyStatus, "projectNoveltyStatus");
         requireText(externalNoveltyStatus, "externalNoveltyStatus");
         requireText(symbolicProofStatus, "symbolicProofStatus");
         requireText(formalProofStatus, "formalProofStatus");
         requireSha256(evidenceHash, "evidenceHash");
+        String expectedHash = canonicalHash(
+            schema,
+            campaignManifestHash,
+            cleanRunManifestHashes,
+            cleanRunCount,
+            cleanRunsIdentical,
+            targetFree,
+            seedFamilyCount,
+            observationCount,
+            candidateCount,
+            rejectedClusterCount,
+            alphaDistinctSupport,
+            aggregateMiningComplete,
+            exactSupportingLineage,
+            mandatorySkippedWorkCount,
+            heldOutFamilyOrClusterCount,
+            configuredPositiveHoldouts,
+            executedPositiveHoldouts,
+            configuredNegativeHoldouts,
+            executedNegativeHoldouts,
+            refutingHoldouts,
+            counterexampleStrategyCount,
+            counterexamplesFound,
+            projectNoveltyStatus,
+            externalNoveltyStatus,
+            symbolicProofStatus,
+            formalProofStatus,
+            unresolvedAssumptionCount,
+            lifecycleHandoffComplete,
+            pairedHeldOutUtilityEvaluated,
+            pairedUtilityPermille,
+            hiddenReferenceIsolated,
+            hiddenRuleBenchmarkComplete,
+            executableRediscoveryRetained,
+            publicEvidenceReviewed);
+        if (!expectedHash.equals(evidenceHash)) {
+            throw new IllegalArgumentException(
+                "release evidence hash does not match canonical fields");
+        }
     }
 
     public static AutonomousCampaignReleaseEvidence from(
@@ -141,46 +192,48 @@ public record AutonomousCampaignReleaseEvidence(
             .attemptedSources().stream().distinct().sorted().toList();
         List<String> inferredAssumptions = evaluation.counterexample()
             .inferredAssumptions().stream().distinct().sorted().toList();
-        String evidenceMaterial = SCHEMA
-            + "\ncampaign=" + run.contentHash()
-            + "\nruns=" + runHashes
-            + "\ntargetFree=" + !run.targetProvided()
-            + "\nfamilies=" + run.seedFamilyCount()
-            + "\nobservations=" + run.observationCount()
-            + "\ncandidates=" + run.candidateCount()
-            + "\nrejected=" + run.rejectedClusterCount()
-            + "\nalphaSupport=" + conjecture.distinctAlphaSupport()
-            + "\nlineage=" + exactLineage(output, conjecture)
-            + "\nmandatorySkipped=" + skippedMandatory
-            + "\npositiveHoldouts=" + executedPositive + '/' + configuredPositive
-            + "\nnegativeHoldouts=" + executedNegative + '/' + configuredNegative
-            + "\nrefutingHoldouts=" + refutingHoldouts
-            + "\ncounterexampleStrategies=" + counterexampleSources
-            + "\ncounterexamples=" + counterexamples
-            + "\nprojectNovelty=" + run.lifecycle().novelty().status().name()
-            + "\nexternalNovelty="
-                + run.lifecycle().novelty().externalNoveltyStatus()
-            + "\nsymbolicProof=" + run.lifecycle().proof().proofStatus().name()
-            + "\nformalProof=" + run.lifecycle().proof().formalProofStatus()
-            + "\nunresolvedAssumptions=" + inferredAssumptions
-            + "\nlifecycle=" + run.lifecycle().lifecycleDecision().outcome().name();
-        return new AutonomousCampaignReleaseEvidence(
+
+        String campaignHash = run.contentHash();
+        boolean targetFree = !run.targetProvided();
+        int seedFamilies = run.seedFamilyCount();
+        int observations = run.observationCount();
+        int candidates = run.candidateCount();
+        int rejectedClusters = run.rejectedClusterCount();
+        int alphaSupport = conjecture.distinctAlphaSupport();
+        boolean aggregateComplete = run.lifecycle().mining().fullBatch()
+            .binding().receipt().outputs().size() == 1;
+        boolean lineageExact = exactLineage(output, conjecture);
+        int heldOutFamilies = 0;
+        String projectNovelty = run.lifecycle().novelty().status().name();
+        String externalNovelty = run.lifecycle().novelty().externalNoveltyStatus();
+        String symbolicProof = run.lifecycle().proof().proofStatus().name();
+        String formalProof = run.lifecycle().proof().formalProofStatus();
+        int unresolvedAssumptions = inferredAssumptions.size();
+        boolean lifecycleComplete = run.lifecycle().lifecycleDecision().outcome()
+            == LifecycleOutcome.COMPLETED;
+        boolean pairedUtilityEvaluated = false;
+        int pairedUtility = 0;
+        boolean hiddenReferenceIsolated = false;
+        boolean hiddenBenchmarkComplete = false;
+        boolean executableRediscovery = false;
+        boolean publicEvidenceReviewed = false;
+
+        String evidenceHash = canonicalHash(
             SCHEMA,
-            run.contentHash(),
+            campaignHash,
             runHashes,
             runs.size(),
             identicalRuns,
-            !run.targetProvided(),
-            run.seedFamilyCount(),
-            run.observationCount(),
-            run.candidateCount(),
-            run.rejectedClusterCount(),
-            conjecture.distinctAlphaSupport(),
-            run.lifecycle().mining().fullBatch().binding().receipt()
-                .outputs().size() == 1,
-            exactLineage(output, conjecture),
+            targetFree,
+            seedFamilies,
+            observations,
+            candidates,
+            rejectedClusters,
+            alphaSupport,
+            aggregateComplete,
+            lineageExact,
             skippedMandatory,
-            0,
+            heldOutFamilies,
             configuredPositive,
             executedPositive,
             configuredNegative,
@@ -188,21 +241,55 @@ public record AutonomousCampaignReleaseEvidence(
             refutingHoldouts,
             counterexampleSources.size(),
             counterexamples,
-            run.lifecycle().novelty().status().name(),
-            run.lifecycle().novelty().externalNoveltyStatus(),
-            run.lifecycle().proof().proofStatus().name(),
-            run.lifecycle().proof().formalProofStatus(),
-            inferredAssumptions.size(),
-            run.lifecycle().lifecycleDecision().outcome()
-                == LifecycleOutcome.COMPLETED,
-            false,
-            0,
-            false,
-            false,
-            false,
-            false,
-            de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2.hash(
-                evidenceMaterial));
+            projectNovelty,
+            externalNovelty,
+            symbolicProof,
+            formalProof,
+            unresolvedAssumptions,
+            lifecycleComplete,
+            pairedUtilityEvaluated,
+            pairedUtility,
+            hiddenReferenceIsolated,
+            hiddenBenchmarkComplete,
+            executableRediscovery,
+            publicEvidenceReviewed);
+
+        return new AutonomousCampaignReleaseEvidence(
+            SCHEMA,
+            campaignHash,
+            runHashes,
+            runs.size(),
+            identicalRuns,
+            targetFree,
+            seedFamilies,
+            observations,
+            candidates,
+            rejectedClusters,
+            alphaSupport,
+            aggregateComplete,
+            lineageExact,
+            skippedMandatory,
+            heldOutFamilies,
+            configuredPositive,
+            executedPositive,
+            configuredNegative,
+            executedNegative,
+            refutingHoldouts,
+            counterexampleSources.size(),
+            counterexamples,
+            projectNovelty,
+            externalNovelty,
+            symbolicProof,
+            formalProof,
+            unresolvedAssumptions,
+            lifecycleComplete,
+            pairedUtilityEvaluated,
+            pairedUtility,
+            hiddenReferenceIsolated,
+            hiddenBenchmarkComplete,
+            executableRediscovery,
+            publicEvidenceReviewed,
+            evidenceHash);
     }
 
     public int configuredFreshHoldouts() {
@@ -211,6 +298,79 @@ public record AutonomousCampaignReleaseEvidence(
 
     public int executedFreshHoldouts() {
         return Math.addExact(executedPositiveHoldouts, executedNegativeHoldouts);
+    }
+
+    private static String canonicalHash(
+        String schema,
+        String campaignManifestHash,
+        List<String> cleanRunManifestHashes,
+        int cleanRunCount,
+        boolean cleanRunsIdentical,
+        boolean targetFree,
+        int seedFamilyCount,
+        int observationCount,
+        int candidateCount,
+        int rejectedClusterCount,
+        int alphaDistinctSupport,
+        boolean aggregateMiningComplete,
+        boolean exactSupportingLineage,
+        int mandatorySkippedWorkCount,
+        int heldOutFamilyOrClusterCount,
+        int configuredPositiveHoldouts,
+        int executedPositiveHoldouts,
+        int configuredNegativeHoldouts,
+        int executedNegativeHoldouts,
+        int refutingHoldouts,
+        int counterexampleStrategyCount,
+        int counterexamplesFound,
+        String projectNoveltyStatus,
+        String externalNoveltyStatus,
+        String symbolicProofStatus,
+        String formalProofStatus,
+        int unresolvedAssumptionCount,
+        boolean lifecycleHandoffComplete,
+        boolean pairedHeldOutUtilityEvaluated,
+        int pairedUtilityPermille,
+        boolean hiddenReferenceIsolated,
+        boolean hiddenRuleBenchmarkComplete,
+        boolean executableRediscoveryRetained,
+        boolean publicEvidenceReviewed
+    ) {
+        String material = schema
+            + "\ncampaignManifestHash=" + campaignManifestHash
+            + "\ncleanRunManifestHashes=" + cleanRunManifestHashes
+            + "\ncleanRunCount=" + cleanRunCount
+            + "\ncleanRunsIdentical=" + cleanRunsIdentical
+            + "\ntargetFree=" + targetFree
+            + "\nseedFamilyCount=" + seedFamilyCount
+            + "\nobservationCount=" + observationCount
+            + "\ncandidateCount=" + candidateCount
+            + "\nrejectedClusterCount=" + rejectedClusterCount
+            + "\nalphaDistinctSupport=" + alphaDistinctSupport
+            + "\naggregateMiningComplete=" + aggregateMiningComplete
+            + "\nexactSupportingLineage=" + exactSupportingLineage
+            + "\nmandatorySkippedWorkCount=" + mandatorySkippedWorkCount
+            + "\nheldOutFamilyOrClusterCount=" + heldOutFamilyOrClusterCount
+            + "\nconfiguredPositiveHoldouts=" + configuredPositiveHoldouts
+            + "\nexecutedPositiveHoldouts=" + executedPositiveHoldouts
+            + "\nconfiguredNegativeHoldouts=" + configuredNegativeHoldouts
+            + "\nexecutedNegativeHoldouts=" + executedNegativeHoldouts
+            + "\nrefutingHoldouts=" + refutingHoldouts
+            + "\ncounterexampleStrategyCount=" + counterexampleStrategyCount
+            + "\ncounterexamplesFound=" + counterexamplesFound
+            + "\nprojectNoveltyStatus=" + projectNoveltyStatus
+            + "\nexternalNoveltyStatus=" + externalNoveltyStatus
+            + "\nsymbolicProofStatus=" + symbolicProofStatus
+            + "\nformalProofStatus=" + formalProofStatus
+            + "\nunresolvedAssumptionCount=" + unresolvedAssumptionCount
+            + "\nlifecycleHandoffComplete=" + lifecycleHandoffComplete
+            + "\npairedHeldOutUtilityEvaluated=" + pairedHeldOutUtilityEvaluated
+            + "\npairedUtilityPermille=" + pairedUtilityPermille
+            + "\nhiddenReferenceIsolated=" + hiddenReferenceIsolated
+            + "\nhiddenRuleBenchmarkComplete=" + hiddenRuleBenchmarkComplete
+            + "\nexecutableRediscoveryRetained=" + executableRediscoveryRetained
+            + "\npublicEvidenceReviewed=" + publicEvidenceReviewed;
+        return AutonomousResearchBriefV2.hash(material);
     }
 
     private static OpenTargetConjecture retainedConjecture(CampaignRun run) {
