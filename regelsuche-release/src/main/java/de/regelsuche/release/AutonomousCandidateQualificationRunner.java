@@ -284,8 +284,8 @@ public final class AutonomousCandidateQualificationRunner {
             .stringArray("counterexampleAssignments",
                 report.counterexample().assignments())
             .stringArray("blockers", report.blockers())
-            .property("promotionStatus", report.promotionStatus())
-            .property("publicEvidenceStatus", report.publicEvidenceStatus())
+            .property("proofStatus", report.proofStatus())
+            .property("noveltyStatus", report.noveltyStatus())
             .endObject().toString();
     }
 
