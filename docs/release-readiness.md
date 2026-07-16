@@ -18,10 +18,16 @@ Nur `AUTONOMOUS_CAMPAIGN` kann den Release-0.2-Autonomie-Claim autorisieren. Ext
 
 ## Ausführung
 
-Der vollständige Matrixlauf startet drei reale Production Campaigns mit unterschiedlichen Parallelitätsgraden, vergleicht ihre kanonischen Manifest-Hashes und erzeugt die Release-Evidence:
+Der Campaign-only-Matrixlauf startet drei reale Production Campaigns mit unterschiedlichen Parallelitätsgraden und bleibt für nicht bereitgestellte Evidence fail-closed:
 
 ```bash
 ./gradlew :regelsuche-release:runReleaseReadiness
+```
+
+Der vollständige aktuelle Referenzlauf erzeugt zusätzlich den leak-freien Hidden-Rule-Bericht aus #227 und bindet ihn als eigenständige Evidence-Achse:
+
+```bash
+./gradlew :regelsuche-release:runReleaseReadinessWithHiddenRuleEvidence
 ```
 
 Ausgabe:
@@ -34,11 +40,12 @@ Enthalten sind:
 
 - `profiles.json` — versionierter Profilkatalog;
 - `evidence-summary.json` — aus retained Campaign-Artefakten abgeleitete Fakten;
+- `hidden-rule-release-evidence.json` — aus dem retained Hidden-Rule-Benchmark abgeleitete, hashgebundene Release-Fakten;
 - `release-readiness-report.json` — alle Soll-/Ist-Prüfungen und Blocker;
 - `release-readiness-run.json` — äußeres hashgebundenes Run-Manifest;
 - `campaign/` — vollständige retained Production-Campaign-Evidence.
 
-Der strikte Gate-Befehl lautet:
+Der strikte Autonomie-Gate-Befehl lautet:
 
 ```bash
 ./gradlew :regelsuche-release:verifyAutonomousCampaignRelease
@@ -46,9 +53,9 @@ Der strikte Gate-Befehl lautet:
 
 Er schlägt fehl, solange `AUTONOMOUS_CAMPAIGN` nicht `READY` ist. Ein `BLOCKED`-Report ist dagegen ein gültiges Ergebnis des normalen Matrixlaufs und kein erfundener Buildfehler.
 
-## Aktuell gebundene Evidence
+## Aktuell gebundene Campaign-Evidence
 
-Der Release-Adapter übernimmt ausschließlich Fakten aus der vollständigen Production Campaign:
+Der Campaign-Adapter übernimmt ausschließlich Fakten aus der vollständigen Production Campaign:
 
 - ein versionierter targetfreier Research Brief;
 - zwei Seed-Familien und zwölf immutable Observations;
@@ -62,7 +69,22 @@ Der Release-Adapter übernimmt ausschließlich Fakten aus der vollständigen Pro
 - vollständige Budgets, Feedback und Campaign-Manifest;
 - drei reale Clean Runs mit identischen kanonischen Outputs.
 
-Nicht vorhandene oder nicht gebundene Evidence wird als `false`, `0` oder `NOT_EVALUATED` retained. Der Adapter setzt keine Release-Anforderung aufgrund eines geschlossenen Issues oder einer Dokumentationsbehauptung auf bestanden.
+Nicht vorhandene oder nicht gebundene Evidence wird als `false`, `0`, `NOT_EVALUATED` oder über einen versionierten `NOT_PROVIDED`-Hash retained. Kein Adapter setzt eine Release-Anforderung aufgrund eines geschlossenen Issues oder einer Dokumentationsbehauptung auf bestanden.
+
+## Hidden-Rule-Rediscovery
+
+`HiddenRuleBenchmarkReleaseEvidence` liest den bestehenden kanonischen Bericht `regelsuche.hidden-rule-benchmark/v2`. Der Adapter führt keine zweite Rediscovery aus, sondern prüft den retained Report erneut:
+
+- deklarierte Summary-Werte stimmen mit den einzelnen Fällen überein;
+- vier Familien und zwanzig Fälle sind vorhanden;
+- Split-Kollisionen und Leakage-Verstöße bleiben sichtbar;
+- konfigurierte negative Holdouts entsprechen ausgeführten plus explizit übersprungenen Fällen;
+- akzeptierte Fälle besitzen vollständige, bestandene Holdouts und Validation;
+- False Positives blockieren das Profil;
+- mindestens eine akzeptierte ausführbare Rediscovery ist retained;
+- Source-Report und abgeleitete Release-Evidence besitzen getrennte kanonische Hashes.
+
+Der aktuelle #227-Referenzbericht enthält 20 Fälle aus 4 Familien, 19 akzeptierte ausführbare Rediscoveries, 40 konfigurierte negative Holdouts, 38 ausgeführte, 2 explizit übersprungene und 0 False Positives. Damit wird `HIDDEN_RULE_REDISCOVERY` `READY`, ohne den Autonomie-Claim zu beeinflussen.
 
 ## Aktueller Autonomie-Status
 
@@ -72,17 +94,13 @@ Der technische Production-Campaign-Nachweis ist abgeschlossen. Der stärkere Rel
 2. eine versionierte, ausgeglichene Release-Holdout-Suite mit mindestens zwölf positiven und zwölf negativen Fällen, vollständig ausgeführt und ohne Refutation;
 3. eine Paired Held-out Utility-Auswertung mit positivem, vorab definiertem Nutzen ohne Korrektheitsverlust.
 
-Die Zahl der Holdouts ist kein universeller mathematischer Wahrheitsmaßstab. Sie ist eine Mindestgröße für dieses Release-Profil und wird durch strukturelle Trennung, Positiv-/Negativbalance, Counterexample Search und Proof ergänzt.
+Diese drei Achsen gehören zu Issue #359. Die Zahl der Holdouts ist kein universeller mathematischer Wahrheitsmaßstab. Sie ist eine Mindestgröße für dieses Release-Profil und wird durch strukturelle Trennung, Positiv-/Negativbalance, Counterexample Search und Proof ergänzt.
 
 ## Bewusste Entkopplungen
 
 ### Domain-generische Discovery
 
 Die generische `DiscoveryDomain<State, Candidate, Certificate>`-Architektur aus Issue #224 ist ein eigenständiges Erweiterungsziel. Regelsuche 0.2 darf den nachgewiesenen algebraischen Autonomie-Claim freigeben, ohne bereits eine zweite mathematische Objektklasse zu unterstützen.
-
-### Hidden-rule Rediscovery
-
-Das Profil bleibt getrennt vom Autonomie-Claim. Vorhandene Hidden-rule-Benchmark-Evidence muss über einen eigenen Adapter gebunden werden; der Production-Campaign-Adapter darf sie nicht allein aufgrund von Repository-Status behaupten.
 
 ### Interestingness
 
@@ -96,11 +114,12 @@ Projekt-Novelty wird intern geprüft. Externe mathematische Novelty und Public E
 
 Der Workflow `Release Readiness`:
 
-1. kompiliert und testet `:regelsuche-release`;
-2. führt den realen Matrixlauf aus;
-3. verlangt alle Release- und Campaign-Artefakte;
-4. prüft, dass exakt fünf Profile ausgegeben werden;
-5. prüft den aktuellen fail-closed Autonomie-Status und seine Blocker;
-6. archiviert Evidence und Diagnosen.
+1. erzeugt den bestehenden Hidden-Rule-Benchmarkbericht;
+2. führt drei reale Production Campaigns aus;
+3. bindet Campaign- und Hidden-Rule-Evidence über getrennte Hashes;
+4. verlangt alle Release-, Benchmark- und Campaign-Artefakte;
+5. prüft `HIDDEN_RULE_REDISCOVERY` und `OPEN_TARGET_DISCOVERY` als `READY`;
+6. prüft, dass `AUTONOMOUS_CAMPAIGN` weiterhin exakt durch die drei #359-Achsen blockiert ist;
+7. archiviert Evidence und Diagnosen.
 
-Sobald die fehlende Qualifikation implementiert ist, wird derselbe Gate-Vertrag auf `READY` umgestellt; es entsteht kein zweiter Release-Pfad.
+Issue #359 muss denselben unveränderten Autonomie-Gate-Vertrag auf `READY` bringen; es entsteht kein zweiter Release-Pfad.
