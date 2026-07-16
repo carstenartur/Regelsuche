@@ -1,0 +1,88 @@
+package de.regelsuche.solver.ir;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
+/** Writes an annotated, deterministic two-backend solver IR example. */
+public final class SolverIrExampleMain {
+    private SolverIrExampleMain() {
+    }
+
+    public static void main(String[] args) {
+        Path output = args.length == 0
+            ? Path.of("build", "reports", "solver-ir")
+            : Path.of(args[0]);
+        SolverObligationFactory factory = new SolverObligationFactory();
+        SourceProvenance provenance = new SourceProvenance(
+            "documentation-example",
+            "solver-neutral-ir",
+            SolverIr.sha256("solver-neutral-ir-example/v1"));
+        Obligation obligation = factory.equality(
+            "additive-identity",
+            "x + 0",
+            "x",
+            List.of(),
+            RequestedEvidence.DECISION,
+            provenance);
+        SolverResult search = new RegelsucheSearchBackend().solve(obligation);
+        SolverResult symbolic = new SymPySolverBackend().solve(obligation);
+
+        Obligation assumptionBound = factory.equality(
+            "division-identity",
+            "x / x",
+            "1",
+            List.of("x != 0"),
+            RequestedEvidence.DECISION,
+            provenance);
+        SolverResult unsupported = new RegelsucheSearchBackend().solve(assumptionBound);
+        write(output, obligation, search, symbolic, assumptionBound, unsupported);
+    }
+
+    private static void write(
+        Path output,
+        Obligation obligation,
+        SolverResult search,
+        SolverResult symbolic,
+        Obligation assumptionBound,
+        SolverResult unsupported
+    ) {
+        try {
+            Files.createDirectories(output);
+            write(output.resolve("obligation.json"), obligation.toCanonicalJson());
+            write(output.resolve("regelsuche-search-result.json"), search.toCanonicalJson());
+            write(output.resolve("symbolic-result.json"), symbolic.toCanonicalJson());
+            write(output.resolve("assumption-obligation.json"),
+                assumptionBound.toCanonicalJson());
+            write(output.resolve("unsupported-result.json"),
+                unsupported.toCanonicalJson());
+            String manifest = new JsonWriter().beginObject()
+                .property("schema", "regelsuche.solver-ir-example/v1")
+                .property("obligationHash", obligation.contentHash())
+                .property("searchResultHash", search.contentHash())
+                .property("symbolicResultHash", symbolic.contentHash())
+                .property("sameObligationSubmittedToBothBackends",
+                    search.obligationHash().equals(symbolic.obligationHash()))
+                .property("assumptionObligationHash", assumptionBound.contentHash())
+                .property("unsupportedResultHash", unsupported.contentHash())
+                .property("unsupportedBeforeExecution",
+                    unsupported.status() == SolverIr.ResultStatus.UNSUPPORTED)
+                .endObject().toString();
+            write(output.resolve("manifest.json"), manifest);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("could not write solver IR example", exception);
+        }
+    }
+
+    private static void write(Path path, String value) throws IOException {
+        Files.writeString(path, value, StandardCharsets.UTF_8);
+    }
+}
