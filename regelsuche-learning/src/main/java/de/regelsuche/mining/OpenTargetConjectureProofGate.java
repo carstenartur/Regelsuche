@@ -1,51 +1,41 @@
 package de.regelsuche.mining;
 
-import de.regelsuche.equivalence.EquivalenceService;
-import de.regelsuche.equivalence.SymPyEquivalenceService;
 import de.regelsuche.json.JsonWriter;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationReport;
 import de.regelsuche.mining.OpenTargetConjectureEvaluator.EvaluationStatus;
 import de.regelsuche.mining.OpenTargetConjectureMiner.OpenTargetConjecture;
-import de.regelsuche.solver.ir.LegacySolverEvidenceLinker;
+import de.regelsuche.solver.ir.SolverBackend;
 import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
 import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.solver.ir.SymPySolverBackend;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Emits and checks a proof obligation only after an open-target candidate passed
- * compilation, fresh holdouts and counterexample search.
- *
- * <p>The oracle receives an already-formed relation. It cannot construct the
- * search path, conjecture or ranking, and its result never flows back into mining.</p>
+ * Emits and evaluates one solver-neutral proof obligation only after an
+ * open-target candidate passed validation and counterexample search.
  */
 public final class OpenTargetConjectureProofGate {
-    public static final String REPORT_SCHEMA = "regelsuche.open-target-conjecture-proof/v1";
-    public static final String OBLIGATION_SCHEMA =
-        "regelsuche.open-target-conjecture-proof-obligation/v1";
+    public static final String REPORT_SCHEMA =
+        "regelsuche.open-target-conjecture-proof/v2";
 
-    private final EquivalenceService oracle;
-    private final String backendId;
-    private final SolverObligationFactory solverObligations =
+    private final SolverBackend backend;
+    private final SolverObligationFactory obligations =
         new SolverObligationFactory();
-    private final LegacySolverEvidenceLinker solverEvidence =
-        new LegacySolverEvidenceLinker();
 
     public OpenTargetConjectureProofGate() {
-        this(new SymPyEquivalenceService(), "sympy-equivalence-v1");
+        this(new SymPySolverBackend());
     }
 
-    OpenTargetConjectureProofGate(EquivalenceService oracle, String backendId) {
-        this.oracle = Objects.requireNonNull(oracle, "oracle");
-        if (backendId == null || backendId.isBlank()) {
-            throw new IllegalArgumentException("backendId must not be blank");
-        }
-        this.backendId = backendId;
+    OpenTargetConjectureProofGate(SolverBackend backend) {
+        this.backend = Objects.requireNonNull(backend, "backend");
     }
 
     public ProofReport evaluate(
@@ -61,127 +51,81 @@ public final class OpenTargetConjectureProofGate {
                 EligibilityStatus.NOT_ELIGIBLE,
                 ProofStatus.NOT_RUN,
                 null,
-                "",
-                blockers,
-                "NOT_EVALUATED",
                 null,
-                null);
+                blockers,
+                "NOT_EVALUATED");
         }
 
-        List<String> assumptions = conjecture.evidence().stream()
-            .flatMap(item -> item.paths().stream())
-            .flatMap(path -> path.assumptions().stream())
-            .filter(value -> value != null && !value.isBlank())
-            .distinct()
-            .sorted()
-            .toList();
-        ProofObligation obligation = new ProofObligation(
-            OBLIGATION_SCHEMA,
-            conjecture.conjectureId(),
-            false,
-            conjecture.leftPattern(),
-            conjecture.rightPattern(),
-            assumptions,
-            obligationHash(conjecture.leftPattern(), conjecture.rightPattern(), assumptions));
-
-        SolverIr.Obligation solverObligation;
+        List<String> assumptions = assumptions(conjecture);
+        Obligation obligation;
         try {
-            solverObligation = solverObligations.equality(
+            obligation = obligations.equality(
                 conjecture.conjectureId() + "-proof",
-                obligation.leftExpression(),
-                obligation.rightExpression(),
+                conjecture.leftPattern(),
+                conjecture.rightPattern(),
                 assumptions,
                 SolverIr.RequestedEvidence.SYMBOLIC_CERTIFICATE,
                 new SolverIr.SourceProvenance(
                     "open-target-conjecture",
                     conjecture.conjectureId(),
-                    obligation.obligationHash()));
+                    conjectureRevisionHash(conjecture, assumptions)));
         } catch (IllegalArgumentException exception) {
             return report(
                 conjecture.conjectureId(),
                 EligibilityStatus.ELIGIBLE,
                 ProofStatus.INCONCLUSIVE,
-                obligation,
-                "",
-                List.of("solver IR translation rejected: " + exception.getMessage()),
-                "NOT_EVALUATED",
                 null,
-                null);
+                null,
+                List.of("solver IR translation rejected: " + exception.getMessage()),
+                "NOT_EVALUATED");
         }
 
-        boolean equivalent = oracle.areEquivalent(
-            obligation.leftExpression(), obligation.rightExpression());
-        String backendEvidence = oracle.evidence(
-            obligation.leftExpression(), obligation.rightExpression());
-        ProofStatus status = classify(equivalent, backendEvidence);
-        List<String> resultBlockers = switch (status) {
-            case SYMBOLICALLY_VERIFIED -> List.of();
-            case REFUTED -> List.of("oracle refuted the conjecture");
-            case INCONCLUSIVE -> List.of("oracle produced no conclusive equivalence result");
-            case NOT_RUN -> throw new IllegalStateException("eligible proof must run the oracle");
-        };
-        SolverIr.SolverResult solverResult = solverEvidence.link(
-            solverObligation,
-            backendId,
-            "legacy-v1",
-            equivalent,
-            backendEvidence);
+        SolverResult result = backend.solve(obligation);
+        ProofStatus status = proofStatus(result.status());
         return report(
             conjecture.conjectureId(),
             EligibilityStatus.ELIGIBLE,
             status,
             obligation,
-            backendEvidence,
-            resultBlockers,
-            "NOT_EVALUATED",
-            solverObligation,
-            solverResult);
+            result,
+            resultBlockers(result),
+            "NOT_EVALUATED");
     }
 
-    private ProofReport report(
+    private static ProofReport report(
         String conjectureId,
         EligibilityStatus eligibility,
         ProofStatus status,
-        ProofObligation obligation,
-        String backendEvidence,
+        Obligation obligation,
+        SolverResult result,
         List<String> blockers,
-        String formalProofStatus,
-        SolverIr.Obligation solverObligation,
-        SolverIr.SolverResult solverResult
+        String formalProofStatus
     ) {
-        List<String> orderedBlockers = blockers.stream().distinct().sorted().toList();
-        String solverObligationHash = solverObligation == null
-            ? "" : solverObligation.contentHash();
-        String solverResultHash = solverResult == null
-            ? "" : solverResult.contentHash();
-        String solverTranslationStatus = solverResult == null
-            ? "NOT_EMITTED" : solverResult.translationStatus().name();
-        String evidenceMaterial = REPORT_SCHEMA
-            + "\nconjecture=" + conjectureId
-            + "\neligibility=" + eligibility
-            + "\nproof=" + status
-            + "\nbackend=" + backendId
-            + "\nobligation=" + (obligation == null ? "" : obligation.obligationHash())
-            + "\nevidence=" + (backendEvidence == null ? "" : backendEvidence)
-            + "\nformal=" + formalProofStatus
-            + "\nsolverObligation=" + solverObligationHash
-            + "\nsolverResult=" + solverResultHash
-            + "\nsolverTranslation=" + solverTranslationStatus
-            + "\nblockers=" + String.join("\u0001", orderedBlockers);
+        List<String> orderedBlockers = blockers.stream()
+            .filter(value -> value != null && !value.isBlank())
+            .distinct()
+            .sorted()
+            .toList();
+        String evidenceHash = hash(
+            REPORT_SCHEMA
+                + "\nconjecture=" + conjectureId
+                + "\neligibility=" + eligibility.name()
+                + "\nproof=" + status.name()
+                + "\nobligation="
+                    + (obligation == null ? "" : obligation.contentHash())
+                + "\nresult=" + (result == null ? "" : result.contentHash())
+                + "\nformal=" + formalProofStatus
+                + "\nblockers=" + orderedBlockers);
         return new ProofReport(
             REPORT_SCHEMA,
             conjectureId,
             eligibility,
             status,
             obligation,
-            backendId,
-            backendEvidence == null ? "" : backendEvidence,
+            result,
             formalProofStatus,
             orderedBlockers,
-            solverObligationHash,
-            solverResultHash,
-            solverTranslationStatus,
-            hash(evidenceMaterial));
+            evidenceHash);
     }
 
     private static List<String> eligibilityBlockers(
@@ -217,29 +161,49 @@ public final class OpenTargetConjectureProofGate {
         return List.copyOf(blockers);
     }
 
-    private static ProofStatus classify(boolean equivalent, String evidence) {
-        if (equivalent) {
-            return ProofStatus.SYMBOLICALLY_VERIFIED;
-        }
-        String normalized = evidence == null ? "" : evidence.toLowerCase(Locale.ROOT);
-        if (normalized.contains("not equivalent")
-                || normalized.contains("counterexample")
-                || normalized.contains("refut")) {
-            return ProofStatus.REFUTED;
-        }
-        return ProofStatus.INCONCLUSIVE;
+    private static List<String> assumptions(OpenTargetConjecture conjecture) {
+        return conjecture.evidence().stream()
+            .flatMap(item -> item.paths().stream())
+            .flatMap(path -> path.assumptions().stream())
+            .filter(value -> value != null && !value.isBlank())
+            .map(value -> value.trim().replaceAll("\\s+", " "))
+            .distinct()
+            .sorted()
+            .toList();
     }
 
-    private static String obligationHash(
-        String leftExpression,
-        String rightExpression,
+    private static String conjectureRevisionHash(
+        OpenTargetConjecture conjecture,
         List<String> assumptions
     ) {
-        return hash(OBLIGATION_SCHEMA
-            + "\ntargetProvided=false"
-            + "\nleft=" + leftExpression.trim().replaceAll("\\s+", " ")
-            + "\nright=" + rightExpression.trim().replaceAll("\\s+", " ")
-            + "\nassumptions=" + String.join("\u0001", assumptions));
+        return hash(
+            "conjecture=" + conjecture.conjectureId()
+                + "\nleft=" + conjecture.leftPattern()
+                + "\nright=" + conjecture.rightPattern()
+                + "\nparameters=" + conjecture.parameterRelations()
+                + "\nassumptions=" + assumptions
+                + "\nsupport=" + conjecture.supportingObservationIds());
+    }
+
+    private static ProofStatus proofStatus(ResultStatus status) {
+        return switch (status) {
+            case CONFIRMED -> ProofStatus.SYMBOLICALLY_VERIFIED;
+            case REFUTED -> ProofStatus.REFUTED;
+            case UNKNOWN, TIMEOUT, UNSUPPORTED, ERROR -> ProofStatus.INCONCLUSIVE;
+        };
+    }
+
+    private static List<String> resultBlockers(SolverResult result) {
+        return switch (result.status()) {
+            case CONFIRMED -> List.of();
+            case REFUTED -> List.of("solver backend refuted the conjecture");
+            case UNKNOWN -> List.of("solver backend produced no conclusive result");
+            case TIMEOUT -> List.of("solver backend timed out");
+            case UNSUPPORTED -> List.of(
+                "solver backend does not support obligation: "
+                    + String.join(",", result.translationIssues()));
+            case ERROR -> List.of("solver backend failed: " + result.message());
+        };
     }
 
     private static String hash(String material) {
@@ -264,129 +228,88 @@ public final class OpenTargetConjectureProofGate {
         NOT_RUN
     }
 
-    public record ProofObligation(
-        String schema,
-        String conjectureId,
-        boolean targetProvided,
-        String leftExpression,
-        String rightExpression,
-        List<String> assumptions,
-        String obligationHash
-    ) {
-        public ProofObligation {
-            if (!OBLIGATION_SCHEMA.equals(schema)) {
-                throw new IllegalArgumentException("unsupported proof-obligation schema");
-            }
-            if (targetProvided) {
-                throw new IllegalArgumentException("open-target proof obligation must not contain a target");
-            }
-            if (conjectureId == null || conjectureId.isBlank()
-                    || leftExpression == null || leftExpression.isBlank()
-                    || rightExpression == null || rightExpression.isBlank()) {
-                throw new IllegalArgumentException("proof obligation fields must not be blank");
-            }
-            assumptions = assumptions == null ? List.of() : assumptions.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .distinct()
-                .sorted()
-                .toList();
-            if (obligationHash == null || !obligationHash.startsWith("sha256:")) {
-                throw new IllegalArgumentException("obligationHash must be SHA-256");
-            }
-        }
-    }
-
     public record ProofReport(
         String schema,
         String conjectureId,
         EligibilityStatus eligibility,
         ProofStatus proofStatus,
-        ProofObligation obligation,
-        String backendId,
-        String backendEvidence,
+        Obligation obligation,
+        SolverResult result,
         String formalProofStatus,
         List<String> blockers,
-        String solverObligationHash,
-        String solverResultHash,
-        String solverTranslationStatus,
         String evidenceHash
     ) {
         public ProofReport {
             if (!REPORT_SCHEMA.equals(schema)) {
                 throw new IllegalArgumentException("unsupported proof-report schema");
             }
+            if (conjectureId == null || conjectureId.isBlank()) {
+                throw new IllegalArgumentException("conjectureId must not be blank");
+            }
             Objects.requireNonNull(eligibility, "eligibility");
             Objects.requireNonNull(proofStatus, "proofStatus");
-            blockers = blockers == null ? List.of() : List.copyOf(blockers);
-            backendEvidence = backendEvidence == null ? "" : backendEvidence;
-            formalProofStatus = formalProofStatus == null ? "NOT_EVALUATED" : formalProofStatus;
-            solverObligationHash = solverObligationHash == null ? "" : solverObligationHash;
-            solverResultHash = solverResultHash == null ? "" : solverResultHash;
-            solverTranslationStatus = solverTranslationStatus == null
-                ? "NOT_EMITTED" : solverTranslationStatus;
-            if (!solverObligationHash.isEmpty()
-                    && !solverObligationHash.matches("sha256:[0-9a-f]{64}")) {
-                throw new IllegalArgumentException("solverObligationHash must be SHA-256");
+            blockers = blockers == null ? List.of() : blockers.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .distinct().sorted().toList();
+            formalProofStatus = formalProofStatus == null
+                ? "NOT_EVALUATED" : formalProofStatus;
+            if ((obligation == null) != (result == null)) {
+                throw new IllegalArgumentException(
+                    "proof obligation and solver result must be present together");
             }
-            if (!solverResultHash.isEmpty()
-                    && !solverResultHash.matches("sha256:[0-9a-f]{64}")) {
-                throw new IllegalArgumentException("solverResultHash must be SHA-256");
+            if (result != null
+                    && !result.obligationHash().equals(obligation.contentHash())) {
+                throw new IllegalArgumentException(
+                    "solver result belongs to another obligation");
             }
-            if (evidenceHash == null || !evidenceHash.startsWith("sha256:")) {
+            if (eligibility == EligibilityStatus.NOT_ELIGIBLE
+                    && (obligation != null || proofStatus != ProofStatus.NOT_RUN)) {
+                throw new IllegalArgumentException(
+                    "ineligible proof cannot emit or execute an obligation");
+            }
+            if (evidenceHash == null
+                    || !evidenceHash.matches("sha256:[0-9a-f]{64}")) {
                 throw new IllegalArgumentException("evidenceHash must be SHA-256");
             }
-        }
-
-        public ProofReport(
-            String schema,
-            String conjectureId,
-            EligibilityStatus eligibility,
-            ProofStatus proofStatus,
-            ProofObligation obligation,
-            String backendId,
-            String backendEvidence,
-            String formalProofStatus,
-            List<String> blockers,
-            String evidenceHash
-        ) {
-            this(
-                schema, conjectureId, eligibility, proofStatus, obligation,
-                backendId, backendEvidence, formalProofStatus, blockers,
-                "", "", "NOT_EMITTED", evidenceHash);
         }
 
         public boolean proofObligationEmitted() {
             return obligation != null;
         }
 
+        public String backendId() {
+            return result == null ? "" : result.backendId();
+        }
+
+        public String backendEvidence() {
+            return result == null ? "" : result.message();
+        }
+
         public String toCanonicalJson() {
-            JsonWriter json = new JsonWriter().beginObject()
+            return new JsonWriter().beginObject()
                 .property("schema", schema)
                 .property("conjectureId", conjectureId)
                 .property("eligibility", eligibility.name())
                 .property("proofStatus", proofStatus.name())
                 .property("proofObligationEmitted", proofObligationEmitted())
-                .property("backendId", backendId)
-                .property("backendEvidence", backendEvidence)
+                .property("solverObligationHash",
+                    obligation == null ? "" : obligation.contentHash())
+                .property("solverResultHash",
+                    result == null ? "" : result.contentHash())
+                .property("backendId", backendId())
+                .property("backendVersion",
+                    result == null ? "" : result.backendVersion())
+                .property("backendStatus",
+                    result == null ? "NOT_RUN" : result.status().name())
+                .property("translationStatus",
+                    result == null ? "NOT_EMITTED"
+                        : result.translationStatus().name())
+                .property("backendEvidence", backendEvidence())
                 .property("formalProofStatus", formalProofStatus)
                 .stringArray("blockers", blockers)
-                .property("solverObligationHash", solverObligationHash)
-                .property("solverResultHash", solverResultHash)
-                .property("solverTranslationStatus", solverTranslationStatus)
-                .property("evidenceHash", evidenceHash);
-            if (obligation == null) {
-                json.nullProperty("obligation");
-            } else {
-                json.object("obligation", object -> object
-                    .property("schema", obligation.schema())
-                    .property("conjectureId", obligation.conjectureId())
-                    .property("targetProvided", obligation.targetProvided())
-                    .property("leftExpression", obligation.leftExpression())
-                    .property("rightExpression", obligation.rightExpression())
-                    .stringArray("assumptions", obligation.assumptions())
-                    .property("obligationHash", obligation.obligationHash()));
-            }
-            return json.endObject().toString();
+                .property("evidenceHash", evidenceHash)
+                .endObject()
+                .toString();
         }
     }
 }
