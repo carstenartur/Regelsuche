@@ -22,9 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
@@ -150,6 +148,7 @@ public final class DomainDiscoveryExportVerifier {
             exportDirectory, "exportDirectory");
         Path directory = supplied.toAbsolutePath().normalize();
         try {
+            requireNoSymbolicLinksInAncestry(directory);
             if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)
                     || Files.isSymbolicLink(directory)) {
                 throw failure("export directory is not a local regular directory");
@@ -192,6 +191,7 @@ public final class DomainDiscoveryExportVerifier {
             if (!Arrays.equals(firstManifest.bytes(), finalManifest.bytes())) {
                 throw failure("export manifest changed during verification");
             }
+            requireNoSymbolicLinksInAncestry(directory);
             requireExactDirectory(directory, expectedEntries);
 
             Verification verification = Verification.create(
@@ -205,6 +205,22 @@ public final class DomainDiscoveryExportVerifier {
             throw new ExportVerificationException(
                 "generic domain export verification failed for " + directory,
                 exception);
+        }
+    }
+
+    private static void requireNoSymbolicLinksInAncestry(Path directory)
+            throws IOException {
+        Path root = directory.getRoot();
+        if (root == null) {
+            throw failure("export directory must be absolute");
+        }
+        Path current = root;
+        for (Path component : directory) {
+            current = current.resolve(component);
+            if (Files.isSymbolicLink(current)) {
+                throw failure(
+                    "export directory path traverses a symbolic link: " + current);
+            }
         }
     }
 
@@ -510,24 +526,27 @@ public final class DomainDiscoveryExportVerifier {
     ) throws IOException {
         Set<String> actual = new HashSet<>();
         try (var entries = Files.list(directory)) {
-            for (Path entry : entries.toList()) {
+            var iterator = entries.iterator();
+            while (iterator.hasNext()) {
+                Path entry = iterator.next();
                 if (Files.isSymbolicLink(entry)
                         || !Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS)) {
                     throw failure(
                         "export contains a non-regular or symbolic-link entry: "
                             + entry.getFileName());
                 }
-                actual.add(entry.getFileName().toString());
+                String name = entry.getFileName().toString();
+                if (!expected.contains(name)) {
+                    throw failure("export contains an unexpected entry: " + name);
+                }
+                actual.add(name);
             }
         }
         if (!actual.equals(expected)) {
             Set<String> missing = new HashSet<>(expected);
             missing.removeAll(actual);
-            Set<String> unexpected = new HashSet<>(actual);
-            unexpected.removeAll(expected);
             throw failure(
-                "export directory entries do not match manifest; missing="
-                    + missing + ", unexpected=" + unexpected);
+                "export directory is missing manifest entries: " + missing);
         }
     }
 
