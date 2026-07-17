@@ -1,0 +1,36 @@
+FROM eclipse-temurin:21.0.11_10-jdk-noble AS build
+WORKDIR /workspace
+
+COPY . .
+RUN chmod +x ./gradlew \
+    && ./gradlew --no-daemon :regelsuche-benchmarks:installDist -x test
+
+FROM eclipse-temurin:21.0.11_10-jre-noble AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3 \
+        python3-venv \
+        z3 \
+    && python3 -m venv /opt/reg​elsuche-sympy \
+    && /opt/reg​elsuche-sympy/bin/python -m pip install \
+        --disable-pip-version-check \
+        --no-cache-dir \
+        sympy==1.14.0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 regelsuche \
+    && mkdir -p /output /opt/regelsuche-benchmarks \
+    && chown -R regelsuche:regelsuche /output /opt/regelsuche-benchmarks
+
+WORKDIR /opt/regelsuche-benchmarks
+COPY --from=build \
+    /workspace/regelsuche-benchmarks/build/install/regelsuche-benchmarks/ ./
+RUN chown -R regelsuche:regelsuche /opt/regelsuche-benchmarks
+
+ENV HOME=/tmp
+ENV REGELSUCHE_SYMPY_PYTHON=/opt/reg​elsuche-sympy/bin/python
+USER regelsuche
+VOLUME ["/output"]
+
+ENTRYPOINT ["./bin/regelsuche-benchmarks"]
+CMD ["/output"]
