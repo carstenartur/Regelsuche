@@ -6,9 +6,11 @@
   "required": [
     "schema",
     "policy",
+    "trustStoreHash",
     "verifications",
     "admittedArtifacts",
-    "blockedArtifacts"
+    "blockedArtifacts",
+    "contentHash"
   ],
   "properties": {
     "schema": {
@@ -19,6 +21,9 @@
         "WARN",
         "REQUIRE_VERIFIED"
       ]
+    },
+    "trustStoreHash": {
+      "$ref": "#/$defs/sha256"
     },
     "verifications": {
       "type": "array",
@@ -31,6 +36,9 @@
     },
     "blockedArtifacts": {
       "$ref": "#/$defs/artifactNames"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
     }
   },
   "additionalProperties": false,
