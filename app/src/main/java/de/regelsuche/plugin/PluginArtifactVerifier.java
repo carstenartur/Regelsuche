@@ -2,10 +2,15 @@ package de.regelsuche.plugin;
 
 import de.regelsuche.plugin.PluginArtifactVerification.Status;
 import de.regelsuche.plugin.PluginTrustStore.PublisherKey;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -18,10 +23,22 @@ import java.util.Optional;
 
 /** Verifies detached Ed25519 signatures before plugin bytecode is loaded. */
 public final class PluginArtifactVerifier {
+    private static final int BUFFER_SIZE = 8192;
+
     private final PluginTrustStore trustStore;
+    private final long maxArtifactBytes;
 
     public PluginArtifactVerifier(PluginTrustStore trustStore) {
+        this(trustStore, PluginArtifactTrustConfig.DEFAULT_MAX_ARTIFACT_BYTES);
+    }
+
+    public PluginArtifactVerifier(PluginTrustStore trustStore, long maxArtifactBytes) {
         this.trustStore = Objects.requireNonNull(trustStore, "trustStore");
+        if (maxArtifactBytes < 1 || maxArtifactBytes > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                "maxArtifactBytes must be in [1," + Integer.MAX_VALUE + "]");
+        }
+        this.maxArtifactBytes = maxArtifactBytes;
     }
 
     public PluginArtifactVerification verify(Path artifact) {
@@ -31,7 +48,8 @@ public final class PluginArtifactVerifier {
     /**
      * Reads the artifact once and returns the exact byte snapshot that was
      * verified. Admission gates must materialize these bytes rather than copy
-     * the source path again, avoiding a verify-then-swap race.
+     * the source path again, avoiding a verify-then-swap race. Both the
+     * pre-read size and the streamed byte count are bounded.
      */
     public ArtifactSnapshot snapshot(Path artifact) {
         Objects.requireNonNull(artifact, "artifact");
@@ -39,37 +57,29 @@ public final class PluginArtifactVerifier {
             ? artifact.toString()
             : artifact.getFileName().toString();
         if (!Files.isRegularFile(artifact, LinkOption.NOFOLLOW_LINKS)) {
-            return new ArtifactSnapshot(result(
+            return rejectedSnapshot(
                 artifactFileName,
-                "",
-                "",
                 Status.UNREADABLE,
-                false,
-                false,
-                false,
-                "",
-                "",
-                List.of("ARTIFACT_NOT_A_REGULAR_FILE")
-            ), new byte[0]);
+                "ARTIFACT_NOT_A_REGULAR_FILE"
+            );
         }
 
-        final byte[] artifactBytes;
-        try {
-            artifactBytes = Files.readAllBytes(artifact);
-        } catch (IOException exception) {
-            return new ArtifactSnapshot(result(
+        ArtifactRead artifactRead = readBoundedArtifact(artifact);
+        if (artifactRead.status() == ArtifactReadStatus.TOO_LARGE) {
+            return rejectedSnapshot(
                 artifactFileName,
-                "",
-                "",
-                Status.UNREADABLE,
-                false,
-                false,
-                false,
-                "",
-                "",
-                List.of("ARTIFACT_UNREADABLE")
-            ), new byte[0]);
+                Status.ARTIFACT_TOO_LARGE,
+                "ARTIFACT_EXCEEDS_MAX_BYTES"
+            );
         }
+        if (artifactRead.status() == ArtifactReadStatus.UNREADABLE) {
+            return rejectedSnapshot(
+                artifactFileName,
+                Status.UNREADABLE,
+                "ARTIFACT_UNREADABLE"
+            );
+        }
+        byte[] artifactBytes = artifactRead.bytes();
 
         String artifactHash = sha256(artifactBytes);
         Path manifestPath = PluginSignatureManifest.sidecarFor(artifact);
@@ -253,6 +263,58 @@ public final class PluginArtifactVerifier {
         }
     }
 
+    private ArtifactSnapshot rejectedSnapshot(
+        String artifactFileName,
+        Status status,
+        String warning
+    ) {
+        return new ArtifactSnapshot(result(
+            artifactFileName,
+            "",
+            "",
+            status,
+            false,
+            false,
+            false,
+            "",
+            "",
+            List.of(warning)
+        ), new byte[0]);
+    }
+
+    private ArtifactRead readBoundedArtifact(Path artifact) {
+        try {
+            long declaredSize = Files.size(artifact);
+            if (declaredSize > maxArtifactBytes) {
+                return new ArtifactRead(ArtifactReadStatus.TOO_LARGE, new byte[0]);
+            }
+            int initialCapacity = (int) Math.min(declaredSize, BUFFER_SIZE);
+            ByteArrayOutputStream output = new ByteArrayOutputStream(initialCapacity);
+            try (SeekableByteChannel channel = Files.newByteChannel(
+                    artifact,
+                    StandardOpenOption.READ,
+                    LinkOption.NOFOLLOW_LINKS);
+                 InputStream input = Channels.newInputStream(channel)) {
+                byte[] buffer = new byte[BUFFER_SIZE];
+                long total = 0;
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    total += read;
+                    if (total > maxArtifactBytes) {
+                        return new ArtifactRead(
+                            ArtifactReadStatus.TOO_LARGE,
+                            new byte[0]
+                        );
+                    }
+                    output.write(buffer, 0, read);
+                }
+            }
+            return new ArtifactRead(ArtifactReadStatus.READ, output.toByteArray());
+        } catch (IOException | SecurityException exception) {
+            return new ArtifactRead(ArtifactReadStatus.UNREADABLE, new byte[0]);
+        }
+    }
+
     private boolean verifySignature(PluginSignatureManifest manifest, PublisherKey key) {
         try {
             Signature verifier = Signature.getInstance(PluginSignatureManifest.ALGORITHM);
@@ -288,6 +350,24 @@ public final class PluginArtifactVerifier {
             keyId,
             warnings
         );
+    }
+
+    private enum ArtifactReadStatus {
+        READ,
+        TOO_LARGE,
+        UNREADABLE
+    }
+
+    private record ArtifactRead(ArtifactReadStatus status, byte[] bytes) {
+        private ArtifactRead {
+            Objects.requireNonNull(status, "status");
+            bytes = bytes == null ? new byte[0] : bytes.clone();
+        }
+
+        @Override
+        public byte[] bytes() {
+            return bytes.clone();
+        }
     }
 
     public record ArtifactSnapshot(
