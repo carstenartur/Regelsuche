@@ -68,6 +68,11 @@ public record PluginArtifactIndexSignature(
             throw new IllegalArgumentException(
                 "Ed25519 signatures must contain exactly 64 bytes");
         }
+        if (!Base64.getEncoder().encodeToString(decodedSignature)
+                .equals(signatureBase64)) {
+            throw new IllegalArgumentException(
+                "signatureBase64 must use canonical padded base64");
+        }
     }
 
     public static PluginArtifactIndexSignature create(
