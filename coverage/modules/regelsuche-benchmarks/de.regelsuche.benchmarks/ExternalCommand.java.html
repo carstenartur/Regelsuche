@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ExternalCommand.java</span></div><h1>ExternalCommand.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+
+/** Small trusted-process adapter shared by external benchmark baselines. */
+final class ExternalCommand {
+    private ExternalCommand() {
+    }
+
+    static Output run(List&lt;String&gt; command, Duration timeout) {
+<span class="fc" id="L16">        Objects.requireNonNull(command, &quot;command&quot;);</span>
+<span class="fc" id="L17">        Objects.requireNonNull(timeout, &quot;timeout&quot;);</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (command.isEmpty()) {</span>
+<span class="nc" id="L19">            throw new IllegalArgumentException(&quot;command must not be empty&quot;);</span>
+        }
+<span class="fc" id="L21">        long timeoutMillis = Math.max(100L, timeout.toMillis());</span>
+        Process process;
+        try {
+<span class="fc" id="L24">            process = new ProcessBuilder(command)</span>
+<span class="fc" id="L25">                .redirectErrorStream(false)</span>
+<span class="nc" id="L26">                .start();</span>
+<span class="fc" id="L27">        } catch (IOException exception) {</span>
+<span class="fc" id="L28">            return new Output(false, false, -1, &quot;&quot;, exception.getMessage());</span>
+<span class="nc" id="L29">        }</span>
+        try {
+<span class="nc" id="L31">            process.getOutputStream().close();</span>
+<span class="nc" id="L32">        } catch (IOException ignored) {</span>
+            // The benchmark commands do not use stdin.
+<span class="nc" id="L34">        }</span>
+
+        boolean finished;
+        try {
+<span class="nc" id="L38">            finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);</span>
+<span class="nc" id="L39">        } catch (InterruptedException exception) {</span>
+<span class="nc" id="L40">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L41">            process.destroyForcibly();</span>
+<span class="nc" id="L42">            return new Output(</span>
+                true, false, -1, &quot;&quot;, &quot;Interrupted while waiting for external command&quot;);
+<span class="nc" id="L44">        }</span>
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (!finished) {</span>
+<span class="nc" id="L46">            process.destroyForcibly();</span>
+            try {
+<span class="nc" id="L48">                process.waitFor(2, TimeUnit.SECONDS);</span>
+<span class="nc" id="L49">            } catch (InterruptedException ignored) {</span>
+<span class="nc" id="L50">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L51">            }</span>
+<span class="nc" id="L52">            return new Output(</span>
+                true,
+                true,
+                -1,
+<span class="nc" id="L56">                read(process.getInputStream()),</span>
+<span class="nc" id="L57">                read(process.getErrorStream()));</span>
+        }
+<span class="nc" id="L59">        return new Output(</span>
+            true,
+            false,
+<span class="nc" id="L62">            process.exitValue(),</span>
+<span class="nc" id="L63">            read(process.getInputStream()),</span>
+<span class="nc" id="L64">            read(process.getErrorStream()));</span>
+    }
+
+    private static String read(java.io.InputStream stream) {
+<span class="nc" id="L68">        try (stream) {</span>
+<span class="nc" id="L69">            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L70">        } catch (IOException exception) {</span>
+<span class="nc" id="L71">            return &quot;&quot;;</span>
+        }
+    }
+
+    record Output(
+        boolean available,
+        boolean timedOut,
+        int exitCode,
+        String stdout,
+        String stderr
+    ) {
+<span class="fc" id="L82">        Output {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">            stdout = stdout == null ? &quot;&quot; : stdout;</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            stderr = stderr == null ? &quot;&quot; : stderr;</span>
+<span class="fc" id="L85">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

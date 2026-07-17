@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComparativeBenchmarkMain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ComparativeBenchmarkMain.java</span></div><h1>ComparativeBenchmarkMain.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.benchmarks.ComparativeBenchmark.ClaimStatus;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
+import java.nio.file.Path;
+
+/** Writes the real initial #235 bundle and fails closed on incomplete baselines. */
+public final class ComparativeBenchmarkMain {
+    private ComparativeBenchmarkMain() {
+    }
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L14" title="All 2 branches missed.">        Path output = args.length == 0</span>
+<span class="nc" id="L15">            ? Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;comparative-benchmarks&quot;)</span>
+<span class="nc" id="L16">            : Path.of(args[0]);</span>
+<span class="nc" id="L17">        var report = ComparativeBenchmarkRunner.system().run();</span>
+<span class="nc" id="L18">        new ComparativeBenchmarkBundleWriter().write(output, report);</span>
+
+<span class="nc" id="L20">        long searchResults = report.results().stream()</span>
+<span class="nc bnc" id="L21" title="All 2 branches missed.">            .filter(result -&gt; result.track()</span>
+                == Track.TARGET_DIRECTED_SEARCH)
+<span class="nc" id="L23">            .count();</span>
+<span class="nc" id="L24">        long validationResults = report.results().stream()</span>
+<span class="nc bnc" id="L25" title="All 2 branches missed.">            .filter(result -&gt; result.track()</span>
+                == Track.EQUALITY_VALIDATION)
+<span class="nc" id="L27">            .count();</span>
+<span class="nc bnc" id="L28" title="All 4 branches missed.">        if (searchResults != 9L || validationResults != 6L) {</span>
+<span class="nc" id="L29">            throw new IllegalStateException(</span>
+                &quot;unexpected comparative result counts: search=&quot;
+                    + searchResults + &quot;, validation=&quot; + validationResults);
+        }
+<span class="nc bnc" id="L33" title="All 2 branches missed.">        if (report.results().stream().anyMatch(result -&gt;</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">                result.disposition() != Disposition.EXECUTED</span>
+<span class="nc bnc" id="L35" title="All 2 branches missed.">                    || !result.correct())) {</span>
+<span class="nc" id="L36">            throw new IllegalStateException(</span>
+                &quot;comparative benchmark contains incomplete or incorrect results: &quot;
+<span class="nc" id="L38">                    + report.toCanonicalJson());</span>
+        }
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (report.claims().stream().anyMatch(claim -&gt;</span>
+<span class="nc bnc" id="L41" title="All 2 branches missed.">                claim.status() != ClaimStatus.SUPPORTED)) {</span>
+<span class="nc" id="L42">            throw new IllegalStateException(</span>
+                &quot;comparative capability claim is not supported: &quot;
+<span class="nc" id="L44">                    + report.toCanonicalJson());</span>
+        }
+<span class="nc" id="L46">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

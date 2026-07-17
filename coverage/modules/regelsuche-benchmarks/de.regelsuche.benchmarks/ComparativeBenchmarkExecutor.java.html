@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComparativeBenchmarkExecutor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ComparativeBenchmarkExecutor.java</span></div><h1>ComparativeBenchmarkExecutor.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.benchmarks.ComparativeBenchmark.Case;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Configuration;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
+import de.regelsuche.benchmarks.ComparativeBenchmark.EvidenceMetrics;
+import de.regelsuche.benchmarks.ComparativeBenchmark.ObservedVerdict;
+import de.regelsuche.benchmarks.ComparativeBenchmark.ResourceMetrics;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.ValidationSystem;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.solver.ir.SolverExecution;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SourceProvenance;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverObligationFactory;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Executes one case/system pair while keeping runtime outside canonical metrics. */
+<span class="fc" id="L31">final class ComparativeBenchmarkExecutor {</span>
+<span class="fc" id="L32">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L33">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L35">    private final SolverObligationFactory obligations =</span>
+        new SolverObligationFactory();
+
+    Result runSearch(
+        SearchSystem system,
+        Configuration configuration,
+        Case benchmarkCase
+    ) {
+<span class="fc" id="L43">        CountingEngine engine = new CountingEngine(</span>
+            new AstRewriteTransformationEngine());
+<span class="fc" id="L45">        SearchProblem problem = new SearchProblem(</span>
+<span class="fc" id="L46">            benchmarkCase.inputExpression(),</span>
+            engine,
+            scorer,
+            canonicalizer,
+            ComparativeBenchmarkCatalog.SEARCH_BUDGET)
+<span class="fc" id="L51">            .withTarget(SearchProblem.SearchTarget</span>
+<span class="fc" id="L52">                .syntaxExact(benchmarkCase.targetExpression()));</span>
+<span class="fc" id="L53">        List&lt;SearchState&gt; states = system.strategy().search(problem);</span>
+<span class="fc" id="L54">        SearchState reached = states.stream()</span>
+<span class="fc" id="L55">            .filter(state -&gt; normalize(state.expression()).equals(</span>
+<span class="fc" id="L56">                normalize(benchmarkCase.targetExpression())))</span>
+<span class="fc" id="L57">            .findFirst()</span>
+<span class="fc" id="L58">            .orElse(null);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        ObservedVerdict verdict = reached == null</span>
+<span class="nc" id="L60">            ? ObservedVerdict.UNKNOWN</span>
+<span class="fc" id="L61">            : ObservedVerdict.TARGET_REACHED;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        int pathLength = reached == null ? -1 : reached.depth();</span>
+<span class="fc" id="L63">        ResourceMetrics resources = new ResourceMetrics(</span>
+            1,
+            1,
+            0,
+            0,
+<span class="fc" id="L68">            states.size(),</span>
+<span class="fc" id="L69">            engine.generatedTransformations(),</span>
+            pathLength,
+<span class="fc" id="L71">            engine.invocations(),</span>
+            1,
+            1);
+<span class="fc" id="L74">        EvidenceMetrics evidence = new EvidenceMetrics(</span>
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_REQUESTED&quot;,
+            &quot;&quot;,
+<span class="fc" id="L79">            List.of());</span>
+<span class="fc" id="L80">        String traceHash = SolverIr.sha256(</span>
+<span class="fc" id="L81">            &quot;system=&quot; + system.id()</span>
+<span class="fc" id="L82">                + &quot;\ncase=&quot; + benchmarkCase.contentHash()</span>
+<span class="fc" id="L83">                + &quot;\nstates=&quot; + states.stream()</span>
+<span class="fc" id="L84">                    .map(SearchState::expression).toList()</span>
+                + &quot;\nreachedPath=&quot;
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                    + (reached == null ? List.of() : reached.path())</span>
+                + &quot;\nruleIds=&quot;
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                    + (reached == null ? List.of() : reached.appliedRuleIds()));</span>
+<span class="fc" id="L89">        return Result.create(</span>
+            configuration,
+            benchmarkCase,
+            Disposition.EXECUTED,
+            verdict,
+            resources,
+            evidence,
+<span class="fc" id="L96">            Map.of(</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                &quot;targetReached&quot;, reached == null ? 0L : 1L,</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                &quot;reachedDepth&quot;, reached == null ? 0L : (long) reached.depth(),</span>
+<span class="fc" id="L99">                &quot;engineInvocations&quot;, (long) engine.invocations()),</span>
+<span class="fc" id="L100">            List.of(traceHash));</span>
+    }
+
+    Result runValidation(
+        ValidationSystem system,
+        Configuration configuration,
+        Case benchmarkCase
+    ) {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!system.available()) {</span>
+<span class="fc" id="L109">            return Result.create(</span>
+                configuration,
+                benchmarkCase,
+                Disposition.FILTERED_UNSUPPORTED,
+                ObservedVerdict.UNSUPPORTED,
+                new ResourceMetrics(
+                    1, 0, 1, 0, 0, 0, -1, 0, 1, 0),
+                new EvidenceMetrics(
+                    &quot;UNSUPPORTED&quot;,
+                    &quot;NOT_EVALUATED&quot;,
+                    &quot;NOT_REQUESTED&quot;,
+                    &quot;&quot;,
+<span class="fc" id="L121">                    List.of(&quot;BACKEND_UNAVAILABLE&quot;)),</span>
+<span class="fc" id="L122">                Map.of(&quot;backendAvailable&quot;, 0L),</span>
+<span class="fc" id="L123">                List.of());</span>
+        }
+
+<span class="fc" id="L126">        var obligation = obligations.equality(</span>
+<span class="fc" id="L127">            &quot;comparative-&quot; + benchmarkCase.id(),</span>
+<span class="fc" id="L128">            benchmarkCase.inputExpression(),</span>
+<span class="fc" id="L129">            benchmarkCase.targetExpression(),</span>
+<span class="fc" id="L130">            benchmarkCase.assumptions(),</span>
+            RequestedEvidence.SYMBOLIC_CERTIFICATE,
+            new SourceProvenance(
+                &quot;comparative-benchmark&quot;,
+<span class="fc" id="L134">                benchmarkCase.id(),</span>
+<span class="fc" id="L135">                benchmarkCase.contentHash()));</span>
+<span class="fc" id="L136">        SolverExecution execution = system.backend().execute(obligation);</span>
+<span class="fc" id="L137">        ResultStatus status = execution.result().status();</span>
+<span class="fc" id="L138">        Disposition disposition = disposition(status);</span>
+<span class="fc" id="L139">        ObservedVerdict verdict = verdict(status);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        int executedWork = disposition == Disposition.FILTERED_UNSUPPORTED</span>
+<span class="pc" id="L141">            ? 0 : 1;</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        int skippedWork = disposition == Disposition.FILTERED_UNSUPPORTED</span>
+<span class="pc" id="L143">            ? 1 : 0;</span>
+        int completedMandatory = status == ResultStatus.CONFIRMED
+<span class="pc bpc" id="L145" title="1 of 4 branches missed.">                || status == ResultStatus.REFUTED</span>
+<span class="pc" id="L146">            ? 1 : 0;</span>
+<span class="fc" id="L147">        ResourceMetrics resources = new ResourceMetrics(</span>
+            1,
+            executedWork,
+            skippedWork,
+            0,
+            0,
+            0,
+            -1,
+            executedWork,
+            1,
+            completedMandatory);
+<span class="fc" id="L158">        String certificate = execution.result().certificateHash();</span>
+<span class="fc" id="L159">        EvidenceMetrics evidence = new EvidenceMetrics(</span>
+<span class="fc" id="L160">            status.name(),</span>
+<span class="fc" id="L161">            counterexampleStatus(execution),</span>
+<span class="fc" id="L162">            proofStatus(execution),</span>
+            certificate,
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">            status == ResultStatus.UNSUPPORTED</span>
+<span class="nc" id="L165">                ? execution.result().translationIssues()</span>
+<span class="fc" id="L166">                : List.of());</span>
+<span class="fc" id="L167">        return Result.create(</span>
+            configuration,
+            benchmarkCase,
+            disposition,
+            verdict,
+            resources,
+            evidence,
+<span class="fc" id="L174">            Map.of(</span>
+<span class="fc" id="L175">                &quot;backendAvailable&quot;, 1L,</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">                &quot;certificatePresent&quot;, certificate.isBlank() ? 0L : 1L,</span>
+                &quot;counterexampleEntries&quot;,
+<span class="fc" id="L178">                    (long) execution.result().counterexample().size(),</span>
+                &quot;translationLossless&quot;,
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                    execution.translation().status()</span>
+<span class="pc" id="L181">                        == TranslationStatus.LOSSLESS ? 1L : 0L),</span>
+<span class="fc" id="L182">            List.of(</span>
+<span class="fc" id="L183">                obligation.contentHash(),</span>
+<span class="fc" id="L184">                execution.translation().contentHash(),</span>
+<span class="fc" id="L185">                execution.result().contentHash(),</span>
+<span class="fc" id="L186">                execution.contentHash()));</span>
+    }
+
+    private static Disposition disposition(ResultStatus status) {
+<span class="pc bpc" id="L190" title="3 of 4 branches missed.">        return switch (status) {</span>
+<span class="fc" id="L191">            case CONFIRMED, REFUTED, UNKNOWN -&gt; Disposition.EXECUTED;</span>
+<span class="nc" id="L192">            case UNSUPPORTED -&gt; Disposition.FILTERED_UNSUPPORTED;</span>
+<span class="nc" id="L193">            case TIMEOUT -&gt; Disposition.TIMED_OUT;</span>
+<span class="nc" id="L194">            case ERROR -&gt; Disposition.FAILED;</span>
+        };
+    }
+
+    private static ObservedVerdict verdict(ResultStatus status) {
+<span class="pc bpc" id="L199" title="4 of 6 branches missed.">        return switch (status) {</span>
+<span class="fc" id="L200">            case CONFIRMED -&gt; ObservedVerdict.CONFIRMED;</span>
+<span class="fc" id="L201">            case REFUTED -&gt; ObservedVerdict.REFUTED;</span>
+<span class="nc" id="L202">            case UNKNOWN -&gt; ObservedVerdict.UNKNOWN;</span>
+<span class="nc" id="L203">            case UNSUPPORTED -&gt; ObservedVerdict.UNSUPPORTED;</span>
+<span class="nc" id="L204">            case TIMEOUT -&gt; ObservedVerdict.TIMEOUT;</span>
+<span class="nc" id="L205">            case ERROR -&gt; ObservedVerdict.ERROR;</span>
+        };
+    }
+
+    private static String counterexampleStatus(SolverExecution execution) {
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (execution.result().status() != ResultStatus.REFUTED) {</span>
+<span class="fc" id="L211">            return &quot;NOT_REQUESTED&quot;;</span>
+        }
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        return execution.result().counterexample().isEmpty()</span>
+<span class="fc" id="L214">            ? &quot;NON_EQUIVALENCE_CERTIFICATE_RETAINED&quot;</span>
+<span class="nc" id="L215">            : &quot;COUNTERMODEL_RETAINED&quot;;</span>
+    }
+
+    private static String proofStatus(SolverExecution execution) {
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (execution.result().certificateHash().isBlank()) {</span>
+<span class="nc" id="L220">            return &quot;NOT_REQUESTED&quot;;</span>
+        }
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        return &quot;z3-smt-proof&quot;.equals(execution.result().backendId())</span>
+<span class="pc bnc" id="L223" title="All 2 branches missed.">                &amp;&amp; execution.result().status() == ResultStatus.CONFIRMED</span>
+<span class="nc" id="L224">            ? &quot;FORMAL_CERTIFICATE_RETAINED&quot;</span>
+<span class="fc" id="L225">            : &quot;VALIDATION_CERTIFICATE_RETAINED&quot;;</span>
+    }
+
+    private static String normalize(String value) {
+<span class="fc" id="L229">        return Objects.requireNonNull(value, &quot;value&quot;)</span>
+<span class="fc" id="L230">            .trim()</span>
+<span class="fc" id="L231">            .replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static final class CountingEngine
+            implements TransformationEngine {
+        private final TransformationEngine delegate;
+        private int invocations;
+        private int generatedTransformations;
+
+<span class="fc" id="L240">        private CountingEngine(TransformationEngine delegate) {</span>
+<span class="fc" id="L241">            this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L242">        }</span>
+
+        @Override
+        public List&lt;Transformation&gt; transform(String expression) {
+<span class="fc" id="L246">            List&lt;Transformation&gt; result = delegate.transform(expression);</span>
+<span class="fc" id="L247">            invocations++;</span>
+<span class="fc" id="L248">            generatedTransformations += result.size();</span>
+<span class="fc" id="L249">            return result;</span>
+        }
+
+        private int invocations() {
+<span class="fc" id="L253">            return invocations;</span>
+        }
+
+        private int generatedTransformations() {
+<span class="fc" id="L257">            return generatedTransformations;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

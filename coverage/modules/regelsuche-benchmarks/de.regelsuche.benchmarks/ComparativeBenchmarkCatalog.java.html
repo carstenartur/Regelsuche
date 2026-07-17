@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComparativeBenchmarkCatalog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ComparativeBenchmarkCatalog.java</span></div><h1>ComparativeBenchmarkCatalog.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.benchmarks.ComparativeBenchmark.Case;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Configuration;
+import de.regelsuche.benchmarks.ComparativeBenchmark.CoverageGap;
+import de.regelsuche.benchmarks.ComparativeBenchmark.ExpectedVerdict;
+import de.regelsuche.benchmarks.ComparativeBenchmark.InformationParityManifest;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Role;
+import de.regelsuche.benchmarks.ComparativeBenchmark.SystemKind;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.ValidationSystem;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import java.util.List;
+
+/** Pinned information regimes, cases, configurations and visible coverage gaps. */
+final class ComparativeBenchmarkCatalog {
+<span class="fc" id="L20">    static final SearchHeuristic SEARCH_BUDGET =</span>
+        new SearchHeuristic(4, 80, 1, 2, 40, 8);
+
+    private ComparativeBenchmarkCatalog() {
+    }
+
+    static List&lt;Case&gt; searchCases() {
+<span class="fc" id="L27">        return List.of(</span>
+<span class="fc" id="L28">            Case.create(</span>
+                &quot;target-add-zero&quot;,
+                Track.TARGET_DIRECTED_SEARCH,
+                &quot;identity&quot;,
+                &quot;x + 0&quot;,
+                &quot;x&quot;,
+<span class="fc" id="L34">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L36">            Case.create(</span>
+                &quot;target-multiply-one&quot;,
+                Track.TARGET_DIRECTED_SEARCH,
+                &quot;identity&quot;,
+                &quot;x * 1&quot;,
+                &quot;x&quot;,
+<span class="fc" id="L42">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED),
+<span class="fc" id="L44">            Case.create(</span>
+                &quot;target-composed-identities&quot;,
+                Track.TARGET_DIRECTED_SEARCH,
+                &quot;identity-composition&quot;,
+                &quot;(x + 0) * 1&quot;,
+                &quot;x&quot;,
+<span class="fc" id="L50">                List.of(),</span>
+                ExpectedVerdict.TARGET_REACHED));
+    }
+
+    static List&lt;Case&gt; validationCases() {
+<span class="fc" id="L55">        return List.of(</span>
+<span class="fc" id="L56">            Case.create(</span>
+                &quot;polynomial-square-confirmed&quot;,
+                Track.EQUALITY_VALIDATION,
+                &quot;polynomial&quot;,
+                &quot;(x + 1)^2&quot;,
+                &quot;x^2 + 2*x + 1&quot;,
+<span class="fc" id="L62">                List.of(),</span>
+                ExpectedVerdict.CONFIRMED),
+<span class="fc" id="L64">            Case.create(</span>
+                &quot;polynomial-shift-refuted&quot;,
+                Track.EQUALITY_VALIDATION,
+                &quot;polynomial&quot;,
+                &quot;x + 1&quot;,
+                &quot;x + 2&quot;,
+<span class="fc" id="L70">                List.of(),</span>
+                ExpectedVerdict.REFUTED));
+    }
+
+    static InformationParityManifest searchParity(List&lt;Case&gt; cases) {
+<span class="fc" id="L75">        return InformationParityManifest.create(</span>
+            &quot;target-directed-shared-budget/v1&quot;,
+            Track.TARGET_DIRECTED_SEARCH,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+<span class="fc" id="L84">            corpusHash(cases),</span>
+<span class="fc" id="L85">            searchInventoryHash(),</span>
+<span class="fc" id="L86">            searchBudgetHash(),</span>
+<span class="fc" id="L87">            notApplicable(&quot;research-brief&quot;),</span>
+<span class="fc" id="L88">            notApplicable(&quot;qualification-split&quot;),</span>
+<span class="fc" id="L89">            List.of(&quot;TARGET_REACHABILITY&quot;));</span>
+    }
+
+    static InformationParityManifest validationParity(List&lt;Case&gt; cases) {
+<span class="fc" id="L93">        return InformationParityManifest.create(</span>
+            &quot;shared-polynomial-equality/v1&quot;,
+            Track.EQUALITY_VALIDATION,
+            true,
+            false,
+            false,
+            false,
+            false,
+            false,
+<span class="fc" id="L102">            corpusHash(cases),</span>
+<span class="fc" id="L103">            SolverIr.sha256(</span>
+                &quot;fragment=real-polynomial-equality/v1&quot;
+                    + &quot;\nassumptions=none&quot;
+                    + &quot;\nrequestedEvidence=SYMBOLIC_CERTIFICATE&quot;),
+<span class="fc" id="L107">            SolverIr.sha256(</span>
+                &quot;configuredWork=1&quot;
+                    + &quot;\nmandatoryEvaluations=1&quot;
+                    + &quot;\nprocessTimeoutMillis=20000&quot;),
+<span class="fc" id="L111">            notApplicable(&quot;research-brief&quot;),</span>
+<span class="fc" id="L112">            notApplicable(&quot;qualification-split&quot;),</span>
+<span class="fc" id="L113">            List.of(&quot;EQUALITY_DECISION&quot;));</span>
+    }
+
+    static Configuration searchConfiguration(
+        SearchSystem system,
+        InformationParityManifest parity
+    ) {
+<span class="fc" id="L120">        return Configuration.create(</span>
+<span class="fc" id="L121">            &quot;search-&quot; + system.id(),</span>
+            Track.TARGET_DIRECTED_SEARCH,
+            SystemKind.REGELSUCHE,
+<span class="fc" id="L124">            List.of(Role.SEARCH),</span>
+<span class="fc" id="L125">            parity.contentHash(),</span>
+<span class="fc" id="L126">            system.id(),</span>
+<span class="fc" id="L127">            system.version(),</span>
+<span class="fc" id="L128">            SolverIr.sha256(</span>
+<span class="fc" id="L129">                &quot;search-strategy=&quot; + system.strategy().getClass().getName()),</span>
+<span class="fc" id="L130">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
+<span class="fc" id="L131">            SolverIr.sha256(</span>
+                &quot;java=21\nsearch-kernel=regelsuche-search/v1&quot;),
+            true,
+<span class="fc" id="L134">            system.limitations());</span>
+    }
+
+    static Configuration validationConfiguration(
+        ValidationSystem system,
+        InformationParityManifest parity
+    ) {
+<span class="fc" id="L141">        return Configuration.create(</span>
+<span class="fc" id="L142">            &quot;validation-&quot; + system.backend().descriptor().backendId(),</span>
+            Track.EQUALITY_VALIDATION,
+<span class="fc" id="L144">            system.kind(),</span>
+<span class="fc" id="L145">            system.roles(),</span>
+<span class="fc" id="L146">            parity.contentHash(),</span>
+<span class="fc" id="L147">            system.backend().descriptor().backendId(),</span>
+<span class="fc" id="L148">            system.backend().descriptor().backendVersion(),</span>
+<span class="fc" id="L149">            SolverIr.sha256(&quot;direct-equality-validation/v1&quot;),</span>
+<span class="fc" id="L150">            SolverIr.sha256(&quot;NO_MODEL&quot;),</span>
+<span class="fc" id="L151">            SolverIr.sha256(system.environmentIdentity()),</span>
+<span class="fc" id="L152">            system.backend().descriptor().deterministic(),</span>
+<span class="fc" id="L153">            system.limitations());</span>
+    }
+
+    static List&lt;CoverageGap&gt; coverageGaps() {
+<span class="fc" id="L157">        return List.of(</span>
+<span class="fc" id="L158">            CoverageGap.create(</span>
+                Track.HIDDEN_RULE_REDISCOVERY,
+                &quot;The initial slice does not yet replay the leak-free #227 manifest.&quot;,
+<span class="fc" id="L161">                List.of(</span>
+                    &quot;PINNED_HIDDEN_RULE_MANIFEST&quot;,
+                    &quot;NEGATIVE_HOLDOUT_EXECUTIONS&quot;,
+                    &quot;POST_HOC_REFERENCE_RELATION&quot;)),
+<span class="fc" id="L165">            CoverageGap.create(</span>
+                Track.OPEN_TARGET_DISCOVERY,
+                &quot;No external target-free conjecture generator has yet been run under information parity.&quot;,
+<span class="fc" id="L168">                List.of(</span>
+                    &quot;TARGET_FREE_EXTERNAL_BASELINE&quot;,
+                    &quot;ZERO_TO_MANY_CANDIDATE_OUTPUTS&quot;,
+                    &quot;PROJECT_NOVELTY_AND_FALSIFICATION&quot;)),
+<span class="fc" id="L172">            CoverageGap.create(</span>
+                Track.CROSS_FAMILY_TRANSFER,
+                &quot;The fully held-out #222 transfer split is not part of the first executable slice.&quot;,
+<span class="fc" id="L175">                List.of(</span>
+                    &quot;FAMILY_BLIND_FORMATION&quot;,
+                    &quot;HELD_OUT_TRANSFER_RESULTS&quot;,
+                    &quot;PAIRED_UTILITY&quot;)),
+<span class="fc" id="L179">            CoverageGap.create(</span>
+                Track.AUTONOMOUS_CAMPAIGN,
+                &quot;Controller baselines have not yet consumed the pinned #355 research brief and budget ledger.&quot;,
+<span class="fc" id="L182">                List.of(</span>
+                    &quot;COMMON_RESEARCH_BRIEF&quot;,
+                    &quot;COMMON_RESOURCE_LEDGER&quot;,
+                    &quot;COMPLETE_RECEIPT_DAG&quot;)),
+<span class="fc" id="L186">            CoverageGap.create(</span>
+                Track.DISCOVERY_COMPONENT_ABLATION,
+                &quot;At least three production discovery-component ablations remain to be measured.&quot;,
+<span class="fc" id="L189">                List.of(</span>
+                    &quot;THREE_COMPONENT_ABLATIONS&quot;,
+                    &quot;IDENTICAL_INPUT_EVIDENCE&quot;,
+                    &quot;SEPARATE_CORRECTNESS_AND_UTILITY&quot;)),
+<span class="fc" id="L193">            CoverageGap.create(</span>
+                Track.CONTROLLER_ABLATION,
+                &quot;At least two autonomous-controller ablations remain to be measured.&quot;,
+<span class="fc" id="L196">                List.of(</span>
+                    &quot;TWO_CONTROLLER_ABLATIONS&quot;,
+                    &quot;BALANCED_RESOURCE_ACCOUNTING&quot;,
+                    &quot;DETERMINISTIC_NEXT_PLAN&quot;)));
+    }
+
+    private static String corpusHash(List&lt;Case&gt; cases) {
+<span class="fc" id="L203">        return SolverIr.sha256(</span>
+<span class="fc" id="L204">            cases.stream().map(Case::contentHash).sorted().toList().toString());</span>
+    }
+
+    private static String searchInventoryHash() {
+<span class="fc" id="L208">        List&lt;String&gt; ruleIds = new AstRewriteTransformationEngine().rules()</span>
+<span class="fc" id="L209">            .stream()</span>
+<span class="fc" id="L210">            .map(rule -&gt; rule.id())</span>
+<span class="fc" id="L211">            .sorted()</span>
+<span class="fc" id="L212">            .toList();</span>
+<span class="fc" id="L213">        return SolverIr.sha256(ruleIds.toString());</span>
+    }
+
+    private static String searchBudgetHash() {
+<span class="fc" id="L217">        return SolverIr.sha256(</span>
+<span class="fc" id="L218">            &quot;maxDepth=&quot; + SEARCH_BUDGET.maxDepth()</span>
+                + &quot;\nmaxVisitedExpressions=&quot;
+<span class="fc" id="L220">                    + SEARCH_BUDGET.maxVisitedExpressions()</span>
+                + &quot;\nmaxExpandingSteps=&quot;
+<span class="fc" id="L222">                    + SEARCH_BUDGET.maxExpandingSteps()</span>
+                + &quot;\nmaxCandidatesPerState=&quot;
+<span class="fc" id="L224">                    + SEARCH_BUDGET.maxCandidatesPerState()</span>
+<span class="fc" id="L225">                + &quot;\nbeamWidth=&quot; + SEARCH_BUDGET.beamWidth());</span>
+    }
+
+    private static String notApplicable(String name) {
+<span class="fc" id="L229">        return SolverIr.sha256(&quot;NOT_APPLICABLE:&quot; + name);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComparativeBenchmarkBundleWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ComparativeBenchmarkBundleWriter.java</span></div><h1>ComparativeBenchmarkBundleWriter.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.benchmarks.ComparativeBenchmark.CapabilityClaim;
+import de.regelsuche.benchmarks.ComparativeBenchmark.CoverageGap;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+
+/** Replaces one complete canonical comparative-benchmark evidence bundle. */
+<span class="fc" id="L18">public final class ComparativeBenchmarkBundleWriter {</span>
+
+    public void write(Path outputDirectory, Report report) {
+<span class="fc" id="L21">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L22">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="fc" id="L23">        requireCompleteTrackMatrices(report);</span>
+        try {
+<span class="fc" id="L25">            clearContents(outputDirectory);</span>
+<span class="fc" id="L26">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L27">            writeFile(</span>
+<span class="fc" id="L28">                outputDirectory.resolve(&quot;report.json&quot;),</span>
+<span class="fc" id="L29">                report.toCanonicalJson());</span>
+
+<span class="fc bfc" id="L31" title="All 2 branches covered.">            for (var manifest : report.parityManifests()) {</span>
+<span class="fc" id="L32">                writeFile(</span>
+<span class="fc" id="L33">                    outputDirectory.resolve(&quot;parity-manifests&quot;)</span>
+<span class="fc" id="L34">                        .resolve(safe(manifest.id()) + &quot;.json&quot;),</span>
+<span class="fc" id="L35">                    manifest.toCanonicalJson());</span>
+<span class="fc" id="L36">            }</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            for (var configuration : report.configurations()) {</span>
+<span class="fc" id="L38">                writeFile(</span>
+<span class="fc" id="L39">                    outputDirectory.resolve(&quot;configurations&quot;)</span>
+<span class="fc" id="L40">                        .resolve(safe(configuration.id()) + &quot;.json&quot;),</span>
+<span class="fc" id="L41">                    configuration.toCanonicalJson());</span>
+<span class="fc" id="L42">            }</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">            for (var benchmarkCase : report.cases()) {</span>
+<span class="fc" id="L44">                writeFile(</span>
+<span class="fc" id="L45">                    outputDirectory.resolve(&quot;cases&quot;)</span>
+<span class="fc" id="L46">                        .resolve(safe(benchmarkCase.id()) + &quot;.json&quot;),</span>
+<span class="fc" id="L47">                    benchmarkCase.toCanonicalJson());</span>
+<span class="fc" id="L48">            }</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            for (int index = 0; index &lt; report.results().size(); index++) {</span>
+<span class="fc" id="L50">                var result = report.results().get(index);</span>
+<span class="fc" id="L51">                String filename = String.format(</span>
+                    &quot;%03d-%s-%s.json&quot;,
+<span class="fc" id="L53">                    index,</span>
+<span class="fc" id="L54">                    shortHash(result.configurationHash()),</span>
+<span class="fc" id="L55">                    shortHash(result.caseHash()));</span>
+<span class="fc" id="L56">                writeFile(</span>
+<span class="fc" id="L57">                    outputDirectory.resolve(&quot;results&quot;).resolve(filename),</span>
+<span class="fc" id="L58">                    result.toCanonicalJson());</span>
+            }
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            for (CapabilityClaim claim : report.claims()) {</span>
+<span class="fc" id="L61">                writeFile(</span>
+<span class="fc" id="L62">                    outputDirectory.resolve(&quot;claims&quot;)</span>
+<span class="fc" id="L63">                        .resolve(safe(claim.id()) + &quot;.json&quot;),</span>
+<span class="fc" id="L64">                    claimJson(claim));</span>
+<span class="fc" id="L65">            }</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            for (CoverageGap gap : report.coverageGaps()) {</span>
+<span class="nc" id="L67">                writeFile(</span>
+<span class="nc" id="L68">                    outputDirectory.resolve(&quot;coverage-gaps&quot;)</span>
+<span class="nc" id="L69">                        .resolve(gap.track().name().toLowerCase() + &quot;.json&quot;),</span>
+<span class="nc" id="L70">                    gapJson(gap));</span>
+<span class="nc" id="L71">            }</span>
+<span class="nc" id="L72">        } catch (IOException exception) {</span>
+<span class="nc" id="L73">            throw new UncheckedIOException(</span>
+                &quot;Could not write comparative benchmark evidence&quot;, exception);
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * Requires the Cartesian product of every configuration and every case in
+     * the same track. A partially executed benchmark must never replace a prior
+     * complete evidence bundle.
+     */
+    private static void requireCompleteTrackMatrices(Report report) {
+<span class="fc" id="L84">        Set&lt;String&gt; expected = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (var configuration : report.configurations()) {</span>
+<span class="fc" id="L86">            boolean hasCase = false;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (var benchmarkCase : report.cases()) {</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (benchmarkCase.track() == configuration.track()) {</span>
+<span class="fc" id="L89">                    hasCase = true;</span>
+<span class="fc" id="L90">                    expected.add(pair(</span>
+<span class="fc" id="L91">                        configuration.contentHash(), benchmarkCase.contentHash()));</span>
+                }
+<span class="fc" id="L93">            }</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (!hasCase) {</span>
+<span class="nc" id="L95">                throw new IllegalArgumentException(</span>
+                    &quot;comparative configuration has no case in its track: &quot;
+<span class="nc" id="L97">                        + configuration.id());</span>
+            }
+<span class="fc" id="L99">        }</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (var benchmarkCase : report.cases()) {</span>
+<span class="fc" id="L101">            boolean hasConfiguration = report.configurations().stream()</span>
+<span class="fc" id="L102">                .anyMatch(configuration -&gt;</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                    configuration.track() == benchmarkCase.track());</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (!hasConfiguration) {</span>
+<span class="nc" id="L105">                throw new IllegalArgumentException(</span>
+                    &quot;comparative case has no configuration in its track: &quot;
+<span class="nc" id="L107">                        + benchmarkCase.id());</span>
+            }
+<span class="fc" id="L109">        }</span>
+
+<span class="fc" id="L111">        Set&lt;String&gt; actual = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L112">        report.results().forEach(result -&gt; actual.add(pair(</span>
+<span class="fc" id="L113">            result.configurationHash(), result.caseHash())));</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (!actual.equals(expected)) {</span>
+<span class="fc" id="L115">            Set&lt;String&gt; missing = new HashSet&lt;&gt;(expected);</span>
+<span class="fc" id="L116">            missing.removeAll(actual);</span>
+<span class="fc" id="L117">            Set&lt;String&gt; unexpected = new HashSet&lt;&gt;(actual);</span>
+<span class="fc" id="L118">            unexpected.removeAll(expected);</span>
+<span class="fc" id="L119">            throw new IllegalArgumentException(</span>
+                &quot;comparative result matrix is incomplete; missing=&quot; + missing
+                    + &quot;; unexpected=&quot; + unexpected);
+        }
+<span class="fc" id="L123">    }</span>
+
+    private static String pair(String configurationHash, String caseHash) {
+<span class="fc" id="L126">        return configurationHash + '|' + caseHash;</span>
+    }
+
+    private static String claimJson(CapabilityClaim claim) {
+<span class="fc" id="L130">        return claim.write(new JsonWriter().beginObject())</span>
+<span class="fc" id="L131">            .endObject()</span>
+<span class="fc" id="L132">            .toString();</span>
+    }
+
+    private static String gapJson(CoverageGap gap) {
+<span class="nc" id="L136">        return gap.write(new JsonWriter().beginObject())</span>
+<span class="nc" id="L137">            .endObject()</span>
+<span class="nc" id="L138">            .toString();</span>
+    }
+
+    private static void writeFile(Path path, String content)
+            throws IOException {
+<span class="fc" id="L143">        Files.createDirectories(path.toAbsolutePath().normalize().getParent());</span>
+<span class="fc" id="L144">        Files.writeString(path, content, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * Deletes every previous evidence entry while preserving the requested root.
+     * The root may be a Docker volume mount and therefore must never be removed.
+     */
+    private static void clearContents(Path directory) throws IOException {
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (!Files.exists(directory)) {</span>
+<span class="nc" id="L153">            return;</span>
+        }
+<span class="fc" id="L155">        Path normalizedRoot = directory.toAbsolutePath().normalize();</span>
+<span class="fc" id="L156">        try (var paths = Files.walk(normalizedRoot)) {</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            for (Path path : paths</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                    .filter(item -&gt; !item.equals(normalizedRoot))</span>
+<span class="fc" id="L159">                    .sorted(Comparator.reverseOrder())</span>
+<span class="fc" id="L160">                    .toList()) {</span>
+<span class="fc" id="L161">                Files.delete(path);</span>
+<span class="fc" id="L162">            }</span>
+        }
+<span class="fc" id="L164">    }</span>
+
+    private static String safe(String value) {
+<span class="fc" id="L167">        return value.replaceAll(&quot;[^A-Za-z0-9._-]&quot;, &quot;_&quot;);</span>
+    }
+
+    private static String shortHash(String value) {
+<span class="fc" id="L171">        return value.substring(&quot;sha256:&quot;.length(), &quot;sha256:&quot;.length() + 12);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
