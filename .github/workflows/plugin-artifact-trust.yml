@@ -64,9 +64,11 @@ jobs:
             --quiet \
             jsonschema==4.25.1
           python3 - <<'PY'
+          import copy
           import hashlib
           import json
           from pathlib import Path
+          from jsonschema.exceptions import ValidationError
           from jsonschema.validators import validator_for
 
           schema_paths = [
@@ -76,11 +78,13 @@ jobs:
               Path('docs/schemas/regelsuche-plugin-artifact-gate-v1.schema.json'),
           ]
           schemas = {}
+          validators = {}
           for path in schema_paths:
               schema = json.loads(path.read_text(encoding='utf-8'))
               validator_for(schema).check_schema(schema)
               assert schema.get('additionalProperties') is False
               schemas[schema['$id']] = schema
+              validators[schema['$id']] = validator_for(schema)(schema)
 
           report_dir = Path('app/build/reports/plugin-artifact-trust')
           instances = {
@@ -94,7 +98,7 @@ jobs:
                   (report_dir / 'gate-result.json').read_text(encoding='utf-8')),
           }
           for schema_id, instance in instances.items():
-              validator_for(schemas[schema_id])(schemas[schema_id]).validate(instance)
+              validators[schema_id].validate(instance)
 
           verification = instances['regelsuche.plugin-artifact-verification/v1']
           assert verification['status'] == 'VERIFIED_TRUSTED'
@@ -129,6 +133,41 @@ jobs:
           ).encode('utf-8')
           expected_gate_hash = 'sha256:' + hashlib.sha256(gate_bytes).hexdigest()
           assert gate['contentHash'] == expected_gate_hash
+
+          # Schema parity with the Java model: a verified signature cannot be
+          # represented as untrusted in either the standalone or embedded form.
+          invalid_verification = copy.deepcopy(verification)
+          invalid_verification['trusted'] = False
+          for schema_id, invalid_instance in (
+              ('regelsuche.plugin-artifact-verification/v1', invalid_verification),
+              ('regelsuche.plugin-artifact-gate/v1', {
+                  **gate,
+                  'verifications': [invalid_verification],
+              }),
+          ):
+              try:
+                  validators[schema_id].validate(invalid_instance)
+              except ValidationError:
+                  pass
+              else:
+                  raise AssertionError(
+                      f'{schema_id} accepted signatureVerified=true with trusted=false')
+
+          # Oversized artifacts are first-class blocked evidence, not omitted or
+          # collapsed into a generic unreadable status.
+          oversized = copy.deepcopy(verification)
+          oversized.update({
+              'artifactSha256': '',
+              'manifestFileName': '',
+              'status': 'ARTIFACT_TOO_LARGE',
+              'signaturePresent': False,
+              'signatureVerified': False,
+              'trusted': False,
+              'publisherId': '',
+              'keyId': '',
+              'warnings': ['ARTIFACT_EXCEEDS_MAX_BYTES'],
+          })
+          validators['regelsuche.plugin-artifact-verification/v1'].validate(oversized)
           PY
 
       - name: Upload trust evidence and diagnostics
