@@ -10,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 /** Replaces one complete canonical comparative-benchmark evidence bundle. */
 public final class ComparativeBenchmarkBundleWriter {
@@ -18,6 +20,7 @@ public final class ComparativeBenchmarkBundleWriter {
     public void write(Path outputDirectory, Report report) {
         Objects.requireNonNull(outputDirectory, "outputDirectory");
         Objects.requireNonNull(report, "report");
+        requireCompleteTrackMatrices(report);
         try {
             clearContents(outputDirectory);
             Files.createDirectories(outputDirectory);
@@ -70,6 +73,57 @@ public final class ComparativeBenchmarkBundleWriter {
             throw new UncheckedIOException(
                 "Could not write comparative benchmark evidence", exception);
         }
+    }
+
+    /**
+     * Requires the Cartesian product of every configuration and every case in
+     * the same track. A partially executed benchmark must never replace a prior
+     * complete evidence bundle.
+     */
+    private static void requireCompleteTrackMatrices(Report report) {
+        Set<String> expected = new HashSet<>();
+        for (var configuration : report.configurations()) {
+            boolean hasCase = false;
+            for (var benchmarkCase : report.cases()) {
+                if (benchmarkCase.track() == configuration.track()) {
+                    hasCase = true;
+                    expected.add(pair(
+                        configuration.contentHash(), benchmarkCase.contentHash()));
+                }
+            }
+            if (!hasCase) {
+                throw new IllegalArgumentException(
+                    "comparative configuration has no case in its track: "
+                        + configuration.id());
+            }
+        }
+        for (var benchmarkCase : report.cases()) {
+            boolean hasConfiguration = report.configurations().stream()
+                .anyMatch(configuration ->
+                    configuration.track() == benchmarkCase.track());
+            if (!hasConfiguration) {
+                throw new IllegalArgumentException(
+                    "comparative case has no configuration in its track: "
+                        + benchmarkCase.id());
+            }
+        }
+
+        Set<String> actual = new HashSet<>();
+        report.results().forEach(result -> actual.add(pair(
+            result.configurationHash(), result.caseHash())));
+        if (!actual.equals(expected)) {
+            Set<String> missing = new HashSet<>(expected);
+            missing.removeAll(actual);
+            Set<String> unexpected = new HashSet<>(actual);
+            unexpected.removeAll(expected);
+            throw new IllegalArgumentException(
+                "comparative result matrix is incomplete; missing=" + missing
+                    + "; unexpected=" + unexpected);
+        }
+    }
+
+    private static String pair(String configurationHash, String caseHash) {
+        return configurationHash + '|' + caseHash;
     }
 
     private static String claimJson(CapabilityClaim claim) {
