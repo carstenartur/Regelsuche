@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.discovery-domain-descriptor/v1",
+  "title": "Regelsuche discovery domain descriptor v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "domainId",
+    "revision",
+    "stateType",
+    "candidateType",
+    "certificateType",
+    "generatorId",
+    "stateCodecId",
+    "operatorIds",
+    "invariantIds",
+    "objectiveId",
+    "candidateExtractorId",
+    "candidateCodecId",
+    "counterexampleGeneratorId",
+    "evaluatorId",
+    "certificateCodecId",
+    "certificateRendererId",
+    "evidenceAdapterId",
+    "deterministic",
+    "semanticRoles",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.discovery-domain-descriptor/v1"
+    },
+    "domainId": { "$ref": "#/$defs/identifier" },
+    "revision": { "$ref": "#/$defs/identifier" },
+    "stateType": { "$ref": "#/$defs/identifier" },
+    "candidateType": { "$ref": "#/$defs/identifier" },
+    "certificateType": { "$ref": "#/$defs/identifier" },
+    "generatorId": { "$ref": "#/$defs/identifier" },
+    "stateCodecId": { "$ref": "#/$defs/identifier" },
+    "operatorIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "invariantIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "objectiveId": { "$ref": "#/$defs/identifier" },
+    "candidateExtractorId": { "$ref": "#/$defs/identifier" },
+    "candidateCodecId": { "$ref": "#/$defs/identifier" },
+    "counterexampleGeneratorId": { "$ref": "#/$defs/identifier" },
+    "evaluatorId": { "$ref": "#/$defs/identifier" },
+    "certificateCodecId": { "$ref": "#/$defs/identifier" },
+    "certificateRendererId": { "$ref": "#/$defs/identifier" },
+    "evidenceAdapterId": { "$ref": "#/$defs/identifier" },
+    "deterministic": { "const": true },
+    "semanticRoles": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "GENERATION",
+          "CANONICALIZATION",
+          "INVARIANT_CHECKING",
+          "SEARCH",
+          "CANDIDATE_FORMATION",
+          "COUNTEREXAMPLE_SEARCH",
+          "VALIDATION",
+          "CERTIFICATE_RENDERING",
+          "EVIDENCE_ADAPTATION"
+        ]
+      },
+      "allOf": [
+        { "contains": { "const": "GENERATION" } },
+        { "contains": { "const": "CANONICALIZATION" } },
+        { "contains": { "const": "INVARIANT_CHECKING" } },
+        { "contains": { "const": "SEARCH" } },
+        { "contains": { "const": "CANDIDATE_FORMATION" } },
+        { "contains": { "const": "COUNTEREXAMPLE_SEARCH" } },
+        { "contains": { "const": "VALIDATION" } },
+        { "contains": { "const": "CERTIFICATE_RENDERING" } },
+        { "contains": { "const": "EVIDENCE_ADAPTATION" } }
+      ]
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
