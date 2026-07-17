@@ -35,15 +35,19 @@ jobs:
           sudo apt-get install -y --no-install-recommends z3
           z3 -version
 
-      - name: Test portfolio and write real reference trace
+      - name: Test portfolio, proof consumer and real reference trace
         shell: bash
         run: |
-          set -o pipefail
+          set -e -o pipefail
           ./gradlew \
             :regelsuche-solver-portfolio:test \
             :regelsuche-solver-portfolio:z3IntegrationTest \
             :regelsuche-solver-portfolio:writeSolverPortfolioExample \
             2>&1 | tee solver-portfolio-gradle.log
+          ./gradlew \
+            :app:test \
+            --tests de.regelsuche.proof.OpenTargetProofPortfolioIntegrationTest \
+            2>&1 | tee -a solver-portfolio-gradle.log
 
       - name: Validate canonical portfolio evidence
         run: |
@@ -162,4 +166,5 @@ jobs:
             regelsuche-solver-portfolio/build/reports/solver-portfolio/**
             regelsuche-solver-portfolio/build/reports/tests/**
             regelsuche-solver-portfolio/build/test-results/**
+            app/build/test-results/test/TEST-de.regelsuche.proof.OpenTargetProofPortfolioIntegrationTest.xml
           if-no-files-found: warn
