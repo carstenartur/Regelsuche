@@ -253,15 +253,22 @@ public record PluginArtifactIndex(
     }
 
     private static void validateRequiredDependencies(List<Entry> entries) {
+        Map<String, Set<String>> publishedVersions = new LinkedHashMap<>();
+        for (Entry item : entries) {
+            publishedVersions.computeIfAbsent(
+                dependencyKey(item.kind(), item.componentId()),
+                ignored -> new HashSet<>()).add(item.version());
+        }
         for (Entry item : entries) {
             for (Dependency dependency : item.dependencies()) {
                 if (dependency.optional()) {
                     continue;
                 }
-                boolean published = entries.stream().anyMatch(candidate ->
-                    candidate.kind() == dependency.kind()
-                        && candidate.componentId().equals(dependency.componentId())
-                        && dependency.matches(candidate.version()));
+                Set<String> versions = publishedVersions.get(
+                    dependencyKey(dependency.kind(), dependency.componentId()));
+                boolean published = versions != null
+                    && ("any".equals(dependency.versionConstraint())
+                        || versions.contains(dependency.versionConstraint().substring(1)));
                 if (!published) {
                     throw new IllegalArgumentException(
                         "required dependency is not published: " + dependency.kind()
@@ -270,6 +277,10 @@ public record PluginArtifactIndex(
                 }
             }
         }
+    }
+
+    private static String dependencyKey(ArtifactKind kind, String componentId) {
+        return kind + "\u0000" + componentId;
     }
 
     private static String json(Object value) {
