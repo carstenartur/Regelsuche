@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionGenomeCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionGenomeCodec.java</span></div><h1>EvolutionGenomeCodec.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.evolution.EvolutionGenome.AssumptionTemplate;
+import de.regelsuche.evolution.EvolutionGenome.EvidenceObligation;
+import de.regelsuche.evolution.EvolutionGenome.FeatureWeight;
+import de.regelsuche.evolution.EvolutionGenome.FitnessSignal;
+import de.regelsuche.evolution.EvolutionGenome.GuardPolicy;
+import de.regelsuche.evolution.EvolutionGenome.Objective;
+import de.regelsuche.evolution.EvolutionGenome.ResourceBudget;
+import de.regelsuche.evolution.EvolutionGenome.RewriteGene;
+import de.regelsuche.evolution.EvolutionGenome.SourceSplit;
+import de.regelsuche.evolution.EvolutionGenome.TrainingScope;
+import de.regelsuche.transform.RewriteKind;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+
+/** Strict JSON round-trip codec for replaying versioned evolution genomes. */
+<span class="fc" id="L27">public final class EvolutionGenomeCodec {</span>
+<span class="fc" id="L28">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L29">        .findAndRegisterModules()</span>
+<span class="fc" id="L30">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+    public String write(EvolutionGenome genome) {
+<span class="fc" id="L33">        return Objects.requireNonNull(genome, &quot;genome&quot;).toCanonicalJson();</span>
+    }
+
+    public Path write(Path output, EvolutionGenome genome) {
+<span class="nc" id="L37">        Objects.requireNonNull(output, &quot;output&quot;);</span>
+        try {
+<span class="nc" id="L39">            Path parent = output.toAbsolutePath().normalize().getParent();</span>
+<span class="nc bnc" id="L40" title="All 2 branches missed.">            if (parent != null) {</span>
+<span class="nc" id="L41">                Files.createDirectories(parent);</span>
+            }
+<span class="nc" id="L43">            Files.writeString(output, write(genome), StandardCharsets.UTF_8);</span>
+<span class="nc" id="L44">            return output;</span>
+<span class="nc" id="L45">        } catch (IOException exception) {</span>
+<span class="nc" id="L46">            throw new IllegalStateException(&quot;Unable to write evolution genome&quot;, exception);</span>
+        }
+    }
+
+    public EvolutionGenome read(String json) {
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(&quot;genome JSON must not be blank&quot;);</span>
+        }
+        try {
+<span class="fc" id="L55">            return toGenome(JSON.readValue(json, GenomeDto.class));</span>
+<span class="fc" id="L56">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L57">            throw new IllegalArgumentException(&quot;Invalid evolution genome JSON&quot;, exception);</span>
+        }
+    }
+
+    public EvolutionGenome read(Path input) {
+<span class="nc" id="L62">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+        try {
+<span class="nc" id="L64">            return read(Files.readString(input, StandardCharsets.UTF_8));</span>
+<span class="nc" id="L65">        } catch (IOException exception) {</span>
+<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;Unable to read evolution genome&quot;, exception);</span>
+        }
+    }
+
+    private static EvolutionGenome toGenome(GenomeDto dto) {
+<span class="fc" id="L71">        Objects.requireNonNull(dto, &quot;genome payload&quot;);</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!EvolutionGenome.SCHEMA.equals(dto.schema)) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(&quot;unsupported evolution genome schema&quot;);</span>
+        }
+<span class="fc" id="L75">        TrainingScope scope = new TrainingScope(</span>
+<span class="fc" id="L76">            enumValue(SourceSplit.class, require(dto.trainingScope, &quot;trainingScope&quot;).sourceSplit),</span>
+            dto.trainingScope.corpusHash,
+            dto.trainingScope.familyPartitionHash,
+            dto.trainingScope.signaturePartitionHash,
+            dto.trainingScope.featureSchemaHash);
+<span class="fc" id="L81">        List&lt;RewriteGene&gt; rewrites = list(dto.rewrites).stream()</span>
+<span class="fc" id="L82">            .map(EvolutionGenomeCodec::toRewrite)</span>
+<span class="fc" id="L83">            .toList();</span>
+<span class="fc" id="L84">        List&lt;FeatureWeight&gt; features = list(dto.rankingFeatures).stream()</span>
+<span class="fc" id="L85">            .map(item -&gt; new FeatureWeight(</span>
+<span class="fc" id="L86">                enumValue(FitnessSignal.class, item.signal),</span>
+                item.weightPermille))
+<span class="fc" id="L88">            .toList();</span>
+<span class="fc" id="L89">        GuardDto guards = require(dto.guardPolicy, &quot;guardPolicy&quot;);</span>
+<span class="fc" id="L90">        GuardPolicy guardPolicy = new GuardPolicy(</span>
+            guards.rejectCycles,
+            guards.rejectUnboundedGrowth,
+            guards.requireApplicabilityChecks,
+            guards.enforceDuplicateSuppression,
+            guards.deterministicTieBreaking);
+<span class="fc" id="L96">        BudgetDto budget = require(dto.budget, &quot;budget&quot;);</span>
+<span class="fc" id="L97">        ResourceBudget resourceBudget = new ResourceBudget(</span>
+            budget.maxProgramLength,
+            budget.maxAstNodes,
+            budget.maxAstGrowthPerStep,
+            budget.maxApplicationsPerPath,
+            budget.maxCandidatesPerState);
+<span class="fc" id="L103">        return new EvolutionGenome(</span>
+            dto.schema,
+<span class="fc" id="L105">            enumValue(Objective.class, dto.objective),</span>
+            scope,
+            rewrites,
+            features,
+            guardPolicy,
+            resourceBudget,
+<span class="fc" id="L111">            list(dto.requiredCapabilities),</span>
+<span class="fc" id="L112">            list(dto.seedGenomeHashes),</span>
+            dto.alphaStructuralHash,
+            dto.contentHash);
+    }
+
+    private static RewriteGene toRewrite(RewriteDto dto) {
+<span class="fc" id="L118">        Objects.requireNonNull(dto, &quot;rewrite entry&quot;);</span>
+<span class="fc" id="L119">        List&lt;AssumptionTemplate&gt; assumptions = list(dto.assumptions).stream()</span>
+<span class="pc" id="L120">            .map(item -&gt; new AssumptionTemplate(</span>
+<span class="nc" id="L121">                enumValue(Assumption.Kind.class, item.kind),</span>
+                item.expression,
+<span class="nc" id="L123">                list(item.symbols)))</span>
+<span class="fc" id="L124">            .toList();</span>
+<span class="fc" id="L125">        List&lt;EvidenceObligation&gt; obligations = list(dto.evidenceObligations).stream()</span>
+<span class="fc" id="L126">            .map(value -&gt; enumValue(EvidenceObligation.class, value))</span>
+<span class="fc" id="L127">            .toList();</span>
+<span class="fc" id="L128">        return new RewriteGene(</span>
+            dto.geneId,
+            dto.sourcePattern,
+            dto.targetPattern,
+<span class="fc" id="L132">            enumValue(RewriteKind.class, dto.kind),</span>
+            dto.reversible,
+            dto.estimatedCostDelta,
+            dto.maxApplicationsPerPath,
+            dto.maxAstGrowth,
+            assumptions,
+            obligations);
+    }
+
+    private static &lt;T&gt; T require(T value, String name) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L143">            throw new IllegalArgumentException(name + &quot; is required&quot;);</span>
+        }
+<span class="fc" id="L145">        return value;</span>
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; list(List&lt;T&gt; values) {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        return values == null ? List.of() : List.copyOf(values);</span>
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; E enumValue(Class&lt;E&gt; type, String value) {
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L154">            throw new IllegalArgumentException(type.getSimpleName() + &quot; value is required&quot;);</span>
+        }
+        try {
+<span class="fc" id="L157">            return Enum.valueOf(type, value);</span>
+<span class="nc" id="L158">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L159">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L160">                &quot;Unsupported &quot; + type.getSimpleName() + &quot;: &quot; + value,</span>
+                exception);
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L166">    public static final class GenomeDto {</span>
+        public String schema;
+        public String objective;
+        public TrainingScopeDto trainingScope;
+        public List&lt;RewriteDto&gt; rewrites;
+        public List&lt;FeatureDto&gt; rankingFeatures;
+        public GuardDto guardPolicy;
+        public BudgetDto budget;
+        public List&lt;String&gt; requiredCapabilities;
+        public List&lt;String&gt; seedGenomeHashes;
+        public String alphaStructuralHash;
+        public String contentHash;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L181">    public static final class TrainingScopeDto {</span>
+        public String sourceSplit;
+        public String corpusHash;
+        public String familyPartitionHash;
+        public String signaturePartitionHash;
+        public String featureSchemaHash;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L190">    public static final class RewriteDto {</span>
+        public String geneId;
+        public String sourcePattern;
+        public String targetPattern;
+        public String kind;
+        public boolean reversible;
+        public int estimatedCostDelta;
+        public int maxApplicationsPerPath;
+        public int maxAstGrowth;
+        public List&lt;AssumptionDto&gt; assumptions;
+        public List&lt;String&gt; evidenceObligations;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="nc" id="L204">    public static final class AssumptionDto {</span>
+        public String kind;
+        public String expression;
+        public List&lt;String&gt; symbols;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L211">    public static final class FeatureDto {</span>
+        public String signal;
+        public int weightPermille;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L217">    public static final class GuardDto {</span>
+        public boolean rejectCycles;
+        public boolean rejectUnboundedGrowth;
+        public boolean requireApplicabilityChecks;
+        public boolean enforceDuplicateSuppression;
+        public boolean deterministicTieBreaking;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L226">    public static final class BudgetDto {</span>
+        public int maxProgramLength;
+        public int maxAstNodes;
+        public int maxAstGrowthPerStep;
+        public int maxApplicationsPerPath;
+        public int maxCandidatesPerState;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

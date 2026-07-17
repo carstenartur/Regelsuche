@@ -1,0 +1,658 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionGenome.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionGenome.java</span></div><h1>EvolutionGenome.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.transform.RewriteKind;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Versioned, canonical and independently serializable genome for bounded
+ * evolutionary search.
+ *
+ * &lt;p&gt;The content hash binds the full TRAIN provenance and seed lineage. The
+ * alpha-structural hash intentionally excludes provenance and placeholder names
+ * so structurally identical candidates can be suppressed across populations.&lt;/p&gt;
+ */
+public record EvolutionGenome(
+    String schema,
+    Objective objective,
+    TrainingScope trainingScope,
+    List&lt;RewriteGene&gt; rewrites,
+    List&lt;FeatureWeight&gt; rankingFeatures,
+    GuardPolicy guardPolicy,
+    ResourceBudget budget,
+    List&lt;String&gt; requiredCapabilities,
+    List&lt;String&gt; seedGenomeHashes,
+    String alphaStructuralHash,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-genome/v1&quot;;
+<span class="fc" id="L44">    private static final Pattern PLACEHOLDER =</span>
+<span class="fc" id="L45">        Pattern.compile(&quot;\\?([A-Za-z][A-Za-z0-9_]*)&quot;);</span>
+<span class="fc" id="L46">    private static final Pattern GENE_ID =</span>
+<span class="fc" id="L47">        Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+<span class="fc" id="L48">    private static final Pattern CAPABILITY =</span>
+<span class="fc" id="L49">        Pattern.compile(&quot;[a-z][a-z0-9.-]{1,127}&quot;);</span>
+<span class="fc" id="L50">    private static final Pattern SHA256 =</span>
+<span class="fc" id="L51">        Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+
+<span class="fc" id="L53">    public EvolutionGenome {</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;unsupported evolution genome schema&quot;);</span>
+        }
+<span class="fc" id="L57">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L58">        Objects.requireNonNull(trainingScope, &quot;trainingScope&quot;);</span>
+<span class="fc" id="L59">        rewrites = normalizeRewrites(rewrites);</span>
+<span class="fc" id="L60">        rankingFeatures = normalizeFeatures(rankingFeatures);</span>
+<span class="fc" id="L61">        Objects.requireNonNull(guardPolicy, &quot;guardPolicy&quot;);</span>
+<span class="fc" id="L62">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L63">        requiredCapabilities = normalizeCapabilities(requiredCapabilities);</span>
+<span class="fc" id="L64">        seedGenomeHashes = normalizeHashes(seedGenomeHashes, &quot;seedGenomeHashes&quot;);</span>
+<span class="fc" id="L65">        requireSha256(alphaStructuralHash, &quot;alphaStructuralHash&quot;);</span>
+<span class="fc" id="L66">        requireSha256(contentHash, &quot;contentHash&quot;);</span>
+
+<span class="fc" id="L68">        String expectedAlpha = hash(alphaStructuralMaterial(</span>
+            objective,
+            rewrites,
+            rankingFeatures,
+            guardPolicy,
+            budget,
+            requiredCapabilities));
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (!expectedAlpha.equals(alphaStructuralHash)) {</span>
+<span class="fc" id="L76">            throw new IllegalArgumentException(&quot;alphaStructuralHash does not match genome structure&quot;);</span>
+        }
+<span class="fc" id="L78">        String expectedContent = hash(canonicalPayload(</span>
+            objective,
+            trainingScope,
+            rewrites,
+            rankingFeatures,
+            guardPolicy,
+            budget,
+            requiredCapabilities,
+            seedGenomeHashes,
+            alphaStructuralHash));
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (!expectedContent.equals(contentHash)) {</span>
+<span class="nc" id="L89">            throw new IllegalArgumentException(&quot;contentHash does not match genome payload&quot;);</span>
+        }
+<span class="fc" id="L91">    }</span>
+
+    public static EvolutionGenome create(
+        Objective objective,
+        TrainingScope trainingScope,
+        List&lt;RewriteGene&gt; rewrites,
+        List&lt;FeatureWeight&gt; rankingFeatures,
+        GuardPolicy guardPolicy,
+        ResourceBudget budget,
+        List&lt;String&gt; requiredCapabilities,
+        List&lt;String&gt; seedGenomeHashes
+    ) {
+<span class="fc" id="L103">        List&lt;RewriteGene&gt; normalizedRewrites = normalizeRewrites(rewrites);</span>
+<span class="fc" id="L104">        List&lt;FeatureWeight&gt; normalizedFeatures = normalizeFeatures(rankingFeatures);</span>
+<span class="fc" id="L105">        List&lt;String&gt; normalizedCapabilities = normalizeCapabilities(requiredCapabilities);</span>
+<span class="fc" id="L106">        List&lt;String&gt; normalizedSeeds = normalizeHashes(seedGenomeHashes, &quot;seedGenomeHashes&quot;);</span>
+<span class="fc" id="L107">        String alphaHash = hash(alphaStructuralMaterial(</span>
+            objective,
+            normalizedRewrites,
+            normalizedFeatures,
+            guardPolicy,
+            budget,
+            normalizedCapabilities));
+<span class="fc" id="L114">        String payload = canonicalPayload(</span>
+            objective,
+            trainingScope,
+            normalizedRewrites,
+            normalizedFeatures,
+            guardPolicy,
+            budget,
+            normalizedCapabilities,
+            normalizedSeeds,
+            alphaHash);
+<span class="fc" id="L124">        return new EvolutionGenome(</span>
+            SCHEMA,
+            objective,
+            trainingScope,
+            normalizedRewrites,
+            normalizedFeatures,
+            guardPolicy,
+            budget,
+            normalizedCapabilities,
+            normalizedSeeds,
+            alphaHash,
+<span class="fc" id="L135">            hash(payload));</span>
+    }
+
+    public EvolutionGenome withRewrites(List&lt;RewriteGene&gt; replacements) {
+<span class="fc" id="L139">        return recreate(replacements, rankingFeatures, guardPolicy, budget);</span>
+    }
+
+    public EvolutionGenome withRankingFeatures(List&lt;FeatureWeight&gt; replacements) {
+<span class="fc" id="L143">        return recreate(rewrites, replacements, guardPolicy, budget);</span>
+    }
+
+    public EvolutionGenome withGuardPolicy(GuardPolicy replacement) {
+<span class="nc" id="L147">        return recreate(rewrites, rankingFeatures, replacement, budget);</span>
+    }
+
+    public EvolutionGenome withBudget(ResourceBudget replacement) {
+<span class="nc" id="L151">        return recreate(rewrites, rankingFeatures, guardPolicy, replacement);</span>
+    }
+
+    private EvolutionGenome recreate(
+        List&lt;RewriteGene&gt; replacementRewrites,
+        List&lt;FeatureWeight&gt; replacementFeatures,
+        GuardPolicy replacementGuards,
+        ResourceBudget replacementBudget
+    ) {
+<span class="fc" id="L160">        List&lt;String&gt; lineage = new ArrayList&lt;&gt;(seedGenomeHashes);</span>
+<span class="fc" id="L161">        lineage.add(contentHash);</span>
+<span class="fc" id="L162">        return create(</span>
+            objective,
+            trainingScope,
+            replacementRewrites,
+            replacementFeatures,
+            replacementGuards,
+            replacementBudget,
+            requiredCapabilities,
+            lineage);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L174">        return render(</span>
+            objective,
+            trainingScope,
+            rewrites,
+            rankingFeatures,
+            guardPolicy,
+            budget,
+            requiredCapabilities,
+            seedGenomeHashes,
+            alphaStructuralHash,
+            contentHash);
+    }
+
+    static String normalizePattern(String pattern) {
+<span class="fc" id="L188">        requireText(pattern, &quot;pattern&quot;);</span>
+<span class="fc" id="L189">        return pattern.replaceAll(&quot;\\s+&quot;, &quot;&quot;);</span>
+    }
+
+    static Set&lt;String&gt; placeholders(String value) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        Matcher matcher = PLACEHOLDER.matcher(value == null ? &quot;&quot; : value);</span>
+<span class="fc" id="L194">        Set&lt;String&gt; result = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L196">            result.add(&quot;?&quot; + matcher.group(1));</span>
+        }
+<span class="fc" id="L198">        return Set.copyOf(result);</span>
+    }
+
+    static String transformPlaceholders(String value, UnaryOperator&lt;String&gt; transformer) {
+<span class="fc" id="L202">        Matcher matcher = PLACEHOLDER.matcher(value);</span>
+<span class="fc" id="L203">        StringBuffer output = new StringBuffer();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L205">            String token = &quot;?&quot; + matcher.group(1);</span>
+<span class="fc" id="L206">            matcher.appendReplacement(output, Matcher.quoteReplacement(transformer.apply(token)));</span>
+<span class="fc" id="L207">        }</span>
+<span class="fc" id="L208">        matcher.appendTail(output);</span>
+<span class="fc" id="L209">        return output.toString();</span>
+    }
+
+    static String hash(String value) {
+        try {
+<span class="fc" id="L214">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L215">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L216">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L217">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L218">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
+<span class="nc" id="L224">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L226">    }</span>
+
+    private static String canonicalPayload(
+        Objective objective,
+        TrainingScope trainingScope,
+        List&lt;RewriteGene&gt; rewrites,
+        List&lt;FeatureWeight&gt; features,
+        GuardPolicy guardPolicy,
+        ResourceBudget budget,
+        List&lt;String&gt; capabilities,
+        List&lt;String&gt; seedHashes,
+        String alphaHash
+    ) {
+<span class="fc" id="L239">        return render(</span>
+            objective,
+            trainingScope,
+            rewrites,
+            features,
+            guardPolicy,
+            budget,
+            capabilities,
+            seedHashes,
+            alphaHash,
+            null);
+    }
+
+    private static String render(
+        Objective objective,
+        TrainingScope trainingScope,
+        List&lt;RewriteGene&gt; rewrites,
+        List&lt;FeatureWeight&gt; features,
+        GuardPolicy guardPolicy,
+        ResourceBudget budget,
+        List&lt;String&gt; capabilities,
+        List&lt;String&gt; seedHashes,
+        String alphaHash,
+        String contentHash
+    ) {
+<span class="fc" id="L264">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L265">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L266">            .property(&quot;objective&quot;, objective.name())</span>
+<span class="fc" id="L267">            .object(&quot;trainingScope&quot;, object -&gt; writeTrainingScope(object, trainingScope))</span>
+<span class="fc" id="L268">            .array(&quot;rewrites&quot;, array -&gt; rewrites.forEach(gene -&gt;</span>
+<span class="fc" id="L269">                array.objectValue(object -&gt; writeRewrite(object, gene))))</span>
+<span class="fc" id="L270">            .array(&quot;rankingFeatures&quot;, array -&gt; features.forEach(feature -&gt;</span>
+<span class="fc" id="L271">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L272">                    .property(&quot;signal&quot;, feature.signal().name())</span>
+<span class="fc" id="L273">                    .property(&quot;weightPermille&quot;, feature.weightPermille()))))</span>
+<span class="fc" id="L274">            .object(&quot;guardPolicy&quot;, object -&gt; writeGuardPolicy(object, guardPolicy))</span>
+<span class="fc" id="L275">            .object(&quot;budget&quot;, object -&gt; writeBudget(object, budget))</span>
+<span class="fc" id="L276">            .stringArray(&quot;requiredCapabilities&quot;, capabilities)</span>
+<span class="fc" id="L277">            .stringArray(&quot;seedGenomeHashes&quot;, seedHashes)</span>
+<span class="fc" id="L278">            .property(&quot;alphaStructuralHash&quot;, alphaHash);</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L280">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L282">        return json.endObject().toString();</span>
+    }
+
+    private static void writeTrainingScope(JsonWriter json, TrainingScope scope) {
+<span class="fc" id="L286">        json.property(&quot;sourceSplit&quot;, scope.sourceSplit().name())</span>
+<span class="fc" id="L287">            .property(&quot;corpusHash&quot;, scope.corpusHash())</span>
+<span class="fc" id="L288">            .property(&quot;familyPartitionHash&quot;, scope.familyPartitionHash())</span>
+<span class="fc" id="L289">            .property(&quot;signaturePartitionHash&quot;, scope.signaturePartitionHash())</span>
+<span class="fc" id="L290">            .property(&quot;featureSchemaHash&quot;, scope.featureSchemaHash());</span>
+<span class="fc" id="L291">    }</span>
+
+    private static void writeRewrite(JsonWriter json, RewriteGene gene) {
+<span class="fc" id="L294">        json.property(&quot;geneId&quot;, gene.geneId())</span>
+<span class="fc" id="L295">            .property(&quot;sourcePattern&quot;, gene.sourcePattern())</span>
+<span class="fc" id="L296">            .property(&quot;targetPattern&quot;, gene.targetPattern())</span>
+<span class="fc" id="L297">            .property(&quot;kind&quot;, gene.kind().name())</span>
+<span class="fc" id="L298">            .property(&quot;reversible&quot;, gene.reversible())</span>
+<span class="fc" id="L299">            .property(&quot;estimatedCostDelta&quot;, gene.estimatedCostDelta())</span>
+<span class="fc" id="L300">            .property(&quot;maxApplicationsPerPath&quot;, gene.maxApplicationsPerPath())</span>
+<span class="fc" id="L301">            .property(&quot;maxAstGrowth&quot;, gene.maxAstGrowth())</span>
+<span class="fc" id="L302">            .array(&quot;assumptions&quot;, array -&gt; gene.assumptions().forEach(assumption -&gt;</span>
+<span class="fc" id="L303">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L304">                    .property(&quot;kind&quot;, assumption.kind().name())</span>
+<span class="fc" id="L305">                    .property(&quot;expression&quot;, assumption.expression())</span>
+<span class="fc" id="L306">                    .stringArray(&quot;symbols&quot;, assumption.symbols()))))</span>
+<span class="fc" id="L307">            .stringArray(&quot;evidenceObligations&quot;, gene.evidenceObligations().stream()</span>
+<span class="fc" id="L308">                .map(Enum::name)</span>
+<span class="fc" id="L309">                .toList());</span>
+<span class="fc" id="L310">    }</span>
+
+    private static void writeGuardPolicy(JsonWriter json, GuardPolicy policy) {
+<span class="fc" id="L313">        json.property(&quot;rejectCycles&quot;, policy.rejectCycles())</span>
+<span class="fc" id="L314">            .property(&quot;rejectUnboundedGrowth&quot;, policy.rejectUnboundedGrowth())</span>
+<span class="fc" id="L315">            .property(&quot;requireApplicabilityChecks&quot;, policy.requireApplicabilityChecks())</span>
+<span class="fc" id="L316">            .property(&quot;enforceDuplicateSuppression&quot;, policy.enforceDuplicateSuppression())</span>
+<span class="fc" id="L317">            .property(&quot;deterministicTieBreaking&quot;, policy.deterministicTieBreaking());</span>
+<span class="fc" id="L318">    }</span>
+
+    private static void writeBudget(JsonWriter json, ResourceBudget value) {
+<span class="fc" id="L321">        json.property(&quot;maxProgramLength&quot;, value.maxProgramLength())</span>
+<span class="fc" id="L322">            .property(&quot;maxAstNodes&quot;, value.maxAstNodes())</span>
+<span class="fc" id="L323">            .property(&quot;maxAstGrowthPerStep&quot;, value.maxAstGrowthPerStep())</span>
+<span class="fc" id="L324">            .property(&quot;maxApplicationsPerPath&quot;, value.maxApplicationsPerPath())</span>
+<span class="fc" id="L325">            .property(&quot;maxCandidatesPerState&quot;, value.maxCandidatesPerState());</span>
+<span class="fc" id="L326">    }</span>
+
+    private static String alphaStructuralMaterial(
+        Objective objective,
+        List&lt;RewriteGene&gt; rewrites,
+        List&lt;FeatureWeight&gt; features,
+        GuardPolicy guardPolicy,
+        ResourceBudget budget,
+        List&lt;String&gt; capabilities
+    ) {
+<span class="fc" id="L336">        List&lt;String&gt; alphaGenes = rewrites.stream()</span>
+<span class="fc" id="L337">            .map(EvolutionGenome::alphaGeneMaterial)</span>
+<span class="fc" id="L338">            .sorted()</span>
+<span class="fc" id="L339">            .toList();</span>
+<span class="fc" id="L340">        return SCHEMA</span>
+<span class="fc" id="L341">            + &quot;\nobjective=&quot; + objective.name()</span>
+            + &quot;\nrewrites=&quot; + alphaGenes
+            + &quot;\nfeatures=&quot; + features
+<span class="fc" id="L344">            + &quot;\nguards=&quot; + guardPolicy.canonicalMaterial()</span>
+<span class="fc" id="L345">            + &quot;\nbudget=&quot; + budget.canonicalMaterial()</span>
+            + &quot;\ncapabilities=&quot; + capabilities;
+    }
+
+    private static String alphaGeneMaterial(RewriteGene gene) {
+<span class="fc" id="L350">        Map&lt;String, String&gt; placeholders = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L351">        UnaryOperator&lt;String&gt; alpha = token -&gt; placeholders.computeIfAbsent(</span>
+            token,
+<span class="fc" id="L353">            ignored -&gt; &quot;?P&quot; + placeholders.size());</span>
+<span class="fc" id="L354">        String source = transformPlaceholders(gene.sourcePattern(), alpha);</span>
+<span class="fc" id="L355">        String target = transformPlaceholders(gene.targetPattern(), alpha);</span>
+<span class="fc" id="L356">        List&lt;String&gt; assumptions = gene.assumptions().stream()</span>
+<span class="fc" id="L357">            .map(item -&gt; item.kind().name()</span>
+<span class="fc" id="L358">                + &quot;:&quot; + transformPlaceholders(item.expression(), alpha)</span>
+<span class="fc" id="L359">                + &quot;:&quot; + item.symbols().stream()</span>
+<span class="fc" id="L360">                    .map(symbol -&gt; transformPlaceholders(symbol, alpha))</span>
+<span class="fc" id="L361">                    .sorted()</span>
+<span class="fc" id="L362">                    .toList())</span>
+<span class="fc" id="L363">            .sorted()</span>
+<span class="fc" id="L364">            .toList();</span>
+<span class="fc" id="L365">        return source + &quot;-&gt;&quot; + target</span>
+<span class="fc" id="L366">            + &quot;|&quot; + gene.kind().name()</span>
+<span class="fc" id="L367">            + &quot;|rev=&quot; + gene.reversible()</span>
+<span class="fc" id="L368">            + &quot;|cost=&quot; + gene.estimatedCostDelta()</span>
+<span class="fc" id="L369">            + &quot;|applications=&quot; + gene.maxApplicationsPerPath()</span>
+<span class="fc" id="L370">            + &quot;|growth=&quot; + gene.maxAstGrowth()</span>
+            + &quot;|assumptions=&quot; + assumptions
+<span class="fc" id="L372">            + &quot;|obligations=&quot; + gene.evidenceObligations();</span>
+    }
+
+    private static List&lt;RewriteGene&gt; normalizeRewrites(List&lt;RewriteGene&gt; values) {
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        List&lt;RewriteGene&gt; result = values == null</span>
+<span class="nc" id="L377">            ? List.of()</span>
+<span class="fc" id="L378">            : values.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L379">                .sorted(Comparator.comparing(RewriteGene::geneId))</span>
+<span class="fc" id="L380">                .toList();</span>
+<span class="fc" id="L381">        long distinct = result.stream().map(RewriteGene::geneId).distinct().count();</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (distinct != result.size()) {</span>
+<span class="nc" id="L383">            throw new IllegalArgumentException(&quot;rewrite gene IDs must be unique&quot;);</span>
+        }
+<span class="fc" id="L385">        return result;</span>
+    }
+
+    private static List&lt;FeatureWeight&gt; normalizeFeatures(List&lt;FeatureWeight&gt; values) {
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">        List&lt;FeatureWeight&gt; result = values == null</span>
+<span class="nc" id="L390">            ? List.of()</span>
+<span class="fc" id="L391">            : values.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L392">                .sorted(Comparator.comparing(item -&gt; item.signal().name()))</span>
+<span class="fc" id="L393">                .toList();</span>
+<span class="fc" id="L394">        long distinct = result.stream().map(FeatureWeight::signal).distinct().count();</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (distinct != result.size()) {</span>
+<span class="nc" id="L396">            throw new IllegalArgumentException(&quot;ranking feature signals must be unique&quot;);</span>
+        }
+<span class="fc" id="L398">        return result;</span>
+    }
+
+    private static List&lt;String&gt; normalizeCapabilities(List&lt;String&gt; values) {
+<span class="fc" id="L402">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;();</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (values != null) {</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            for (String value : values) {</span>
+<span class="fc" id="L405">                requireText(value, &quot;required capability&quot;);</span>
+<span class="fc" id="L406">                String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                if (!CAPABILITY.matcher(normalized).matches()) {</span>
+<span class="nc" id="L408">                    throw new IllegalArgumentException(&quot;invalid capability: &quot; + value);</span>
+                }
+<span class="fc" id="L410">                result.add(normalized);</span>
+<span class="fc" id="L411">            }</span>
+        }
+<span class="fc" id="L413">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;String&gt; normalizeHashes(List&lt;String&gt; values, String name) {
+<span class="fc" id="L417">        TreeSet&lt;String&gt; result = new TreeSet&lt;&gt;();</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">        if (values != null) {</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">            for (String value : values) {</span>
+<span class="fc" id="L420">                requireSha256(value, name);</span>
+<span class="fc" id="L421">                result.add(value);</span>
+<span class="fc" id="L422">            }</span>
+        }
+<span class="fc" id="L424">        return List.copyOf(result);</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L428" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L429">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L431">    }</span>
+
+<span class="fc" id="L433">    public enum Objective {</span>
+<span class="fc" id="L434">        OPEN_TARGET_OPERATOR,</span>
+<span class="fc" id="L435">        TARGET_DIRECTED_POLICY</span>
+    }
+
+<span class="fc" id="L438">    public enum SourceSplit {</span>
+<span class="fc" id="L439">        TRAIN</span>
+    }
+
+<span class="fc" id="L442">    public enum FitnessSignal {</span>
+<span class="fc" id="L443">        UNSEEN_TRAIN_CASES_SOLVED(false, 1),</span>
+<span class="fc" id="L444">        PROVISIONAL_PATH_REDUCTION(false, 1),</span>
+<span class="fc" id="L445">        OPEN_TARGET_SUPPORT_DIVERSITY(false, 1),</span>
+<span class="fc" id="L446">        STRUCTURAL_NOVELTY(false, 1),</span>
+<span class="fc" id="L447">        ASSUMPTION_SIMPLICITY(false, 1),</span>
+<span class="fc" id="L448">        PROOF_COST(false, -1),</span>
+<span class="fc" id="L449">        RUNTIME_COST(false, -1),</span>
+<span class="fc" id="L450">        CANDIDATE_COMPLEXITY(false, -1),</span>
+<span class="fc" id="L451">        COUNTEREXAMPLE_RISK(false, -1),</span>
+<span class="fc" id="L452">        REGRESSION_RISK(false, -1),</span>
+<span class="fc" id="L453">        INCOMPLETE_EVIDENCE(false, -1),</span>
+<span class="fc" id="L454">        DECLARED_TARGET_DISTANCE(true, -1),</span>
+<span class="fc" id="L455">        DECLARED_GOAL_MATCH(true, 1);</span>
+
+        private final boolean targetDirected;
+        private final int expectedSign;
+
+<span class="fc" id="L460">        FitnessSignal(boolean targetDirected, int expectedSign) {</span>
+<span class="fc" id="L461">            this.targetDirected = targetDirected;</span>
+<span class="fc" id="L462">            this.expectedSign = expectedSign;</span>
+<span class="fc" id="L463">        }</span>
+
+        public boolean targetDirected() {
+<span class="fc" id="L466">            return targetDirected;</span>
+        }
+
+        public int expectedSign() {
+<span class="fc" id="L470">            return expectedSign;</span>
+        }
+    }
+
+<span class="fc" id="L474">    public enum EvidenceObligation {</span>
+<span class="fc" id="L475">        SEMANTIC_VALIDATION,</span>
+<span class="fc" id="L476">        COUNTEREXAMPLE_SEARCH,</span>
+<span class="fc" id="L477">        PROOF_OR_CERTIFICATE,</span>
+<span class="fc" id="L478">        NOVELTY_REVIEW,</span>
+<span class="fc" id="L479">        HOLDOUT_EVALUATION</span>
+    }
+
+    public record TrainingScope(
+        SourceSplit sourceSplit,
+        String corpusHash,
+        String familyPartitionHash,
+        String signaturePartitionHash,
+        String featureSchemaHash
+    ) {
+<span class="fc" id="L489">        public TrainingScope {</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">            if (sourceSplit != SourceSplit.TRAIN) {</span>
+<span class="nc" id="L491">                throw new IllegalArgumentException(&quot;genome formation is restricted to TRAIN&quot;);</span>
+            }
+<span class="fc" id="L493">            requireSha256(corpusHash, &quot;corpusHash&quot;);</span>
+<span class="fc" id="L494">            requireSha256(familyPartitionHash, &quot;familyPartitionHash&quot;);</span>
+<span class="fc" id="L495">            requireSha256(signaturePartitionHash, &quot;signaturePartitionHash&quot;);</span>
+<span class="fc" id="L496">            requireSha256(featureSchemaHash, &quot;featureSchemaHash&quot;);</span>
+<span class="fc" id="L497">        }</span>
+    }
+
+    public record AssumptionTemplate(
+        Assumption.Kind kind,
+        String expression,
+        List&lt;String&gt; symbols
+    ) {
+<span class="fc" id="L505">        public AssumptionTemplate {</span>
+<span class="fc" id="L506">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L507">            requireText(expression, &quot;assumption expression&quot;);</span>
+<span class="fc" id="L508">            expression = expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L509" title="1 of 2 branches missed.">            symbols = symbols == null</span>
+<span class="nc" id="L510">                ? List.of()</span>
+<span class="fc" id="L511">                : symbols.stream()</span>
+<span class="fc" id="L512">                    .filter(Objects::nonNull)</span>
+<span class="fc" id="L513">                    .map(String::trim)</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">                    .filter(value -&gt; !value.isEmpty())</span>
+<span class="fc" id="L515">                    .distinct()</span>
+<span class="fc" id="L516">                    .sorted()</span>
+<span class="fc" id="L517">                    .toList();</span>
+<span class="fc" id="L518">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L521">            return kind.name() + &quot;|&quot; + expression + &quot;|&quot; + symbols;</span>
+        }
+    }
+
+    public record RewriteGene(
+        String geneId,
+        String sourcePattern,
+        String targetPattern,
+        RewriteKind kind,
+        boolean reversible,
+        int estimatedCostDelta,
+        int maxApplicationsPerPath,
+        int maxAstGrowth,
+        List&lt;AssumptionTemplate&gt; assumptions,
+        List&lt;EvidenceObligation&gt; evidenceObligations
+    ) {
+<span class="fc" id="L537">        public RewriteGene {</span>
+<span class="fc" id="L538">            requireText(geneId, &quot;geneId&quot;);</span>
+<span class="fc" id="L539">            geneId = geneId.trim().toLowerCase(java.util.Locale.ROOT);</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">            if (!GENE_ID.matcher(geneId).matches()) {</span>
+<span class="nc" id="L541">                throw new IllegalArgumentException(&quot;invalid geneId: &quot; + geneId);</span>
+            }
+<span class="fc" id="L543">            sourcePattern = normalizePattern(sourcePattern);</span>
+<span class="fc" id="L544">            targetPattern = normalizePattern(targetPattern);</span>
+<span class="fc" id="L545">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L546" title="2 of 4 branches missed.">            if (estimatedCostDelta &lt; -1000 || estimatedCostDelta &gt; 1000) {</span>
+<span class="nc" id="L547">                throw new IllegalArgumentException(&quot;estimatedCostDelta must be in [-1000,1000]&quot;);</span>
+            }
+<span class="pc bpc" id="L549" title="2 of 4 branches missed.">            if (maxApplicationsPerPath &lt; 1 || maxApplicationsPerPath &gt; 1024) {</span>
+<span class="nc" id="L550">                throw new IllegalArgumentException(&quot;maxApplicationsPerPath must be in [1,1024]&quot;);</span>
+            }
+<span class="pc bpc" id="L552" title="2 of 4 branches missed.">            if (maxAstGrowth &lt; 0 || maxAstGrowth &gt; 1024) {</span>
+<span class="nc" id="L553">                throw new IllegalArgumentException(&quot;maxAstGrowth must be in [0,1024]&quot;);</span>
+            }
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">            assumptions = assumptions == null</span>
+<span class="nc" id="L556">                ? List.of()</span>
+<span class="fc" id="L557">                : assumptions.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L558">                    .distinct()</span>
+<span class="fc" id="L559">                    .sorted(Comparator.comparing(AssumptionTemplate::canonicalMaterial))</span>
+<span class="fc" id="L560">                    .toList();</span>
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">            evidenceObligations = evidenceObligations == null</span>
+<span class="nc" id="L562">                ? List.of()</span>
+<span class="fc" id="L563">                : evidenceObligations.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L564">                    .distinct()</span>
+<span class="fc" id="L565">                    .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L566">                    .toList();</span>
+<span class="fc" id="L567">        }</span>
+
+        public RewriteGene withPatterns(String source, String target) {
+<span class="fc" id="L570">            return new RewriteGene(</span>
+                geneId,
+                source,
+                target,
+                kind,
+                reversible,
+                estimatedCostDelta,
+                maxApplicationsPerPath,
+                maxAstGrowth,
+                assumptions,
+                evidenceObligations);
+        }
+
+        public RewriteGene withAssumptions(List&lt;AssumptionTemplate&gt; replacements) {
+<span class="fc" id="L584">            return new RewriteGene(</span>
+                geneId,
+                sourcePattern,
+                targetPattern,
+                kind,
+                reversible,
+                estimatedCostDelta,
+                maxApplicationsPerPath,
+                maxAstGrowth,
+                replacements,
+                evidenceObligations);
+        }
+    }
+
+    public record FeatureWeight(FitnessSignal signal, int weightPermille) {
+<span class="fc" id="L599">        public FeatureWeight {</span>
+<span class="fc" id="L600">            Objects.requireNonNull(signal, &quot;signal&quot;);</span>
+<span class="pc bpc" id="L601" title="3 of 6 branches missed.">            if (weightPermille &lt; -1000 || weightPermille &gt; 1000 || weightPermille == 0) {</span>
+<span class="nc" id="L602">                throw new IllegalArgumentException(&quot;weightPermille must be non-zero in [-1000,1000]&quot;);</span>
+            }
+<span class="fc" id="L604">        }</span>
+    }
+
+<span class="fc" id="L607">    public record GuardPolicy(</span>
+        boolean rejectCycles,
+        boolean rejectUnboundedGrowth,
+        boolean requireApplicabilityChecks,
+        boolean enforceDuplicateSuppression,
+        boolean deterministicTieBreaking
+    ) {
+        public static GuardPolicy strictDefault() {
+<span class="fc" id="L615">            return new GuardPolicy(true, true, true, true, true);</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L619">            return rejectCycles + &quot;|&quot; + rejectUnboundedGrowth + &quot;|&quot;</span>
+                + requireApplicabilityChecks + &quot;|&quot; + enforceDuplicateSuppression
+                + &quot;|&quot; + deterministicTieBreaking;
+        }
+    }
+
+    public record ResourceBudget(
+        int maxProgramLength,
+        int maxAstNodes,
+        int maxAstGrowthPerStep,
+        int maxApplicationsPerPath,
+        int maxCandidatesPerState
+    ) {
+<span class="fc" id="L632">        public ResourceBudget {</span>
+<span class="fc" id="L633">            requireRange(maxProgramLength, 1, 1024, &quot;maxProgramLength&quot;);</span>
+<span class="fc" id="L634">            requireRange(maxAstNodes, 1, 100_000, &quot;maxAstNodes&quot;);</span>
+<span class="fc" id="L635">            requireRange(maxAstGrowthPerStep, 0, 1024, &quot;maxAstGrowthPerStep&quot;);</span>
+<span class="fc" id="L636">            requireRange(maxApplicationsPerPath, 1, 100_000, &quot;maxApplicationsPerPath&quot;);</span>
+<span class="fc" id="L637">            requireRange(maxCandidatesPerState, 1, 100_000, &quot;maxCandidatesPerState&quot;);</span>
+<span class="fc" id="L638">        }</span>
+
+        public static ResourceBudget conservativeDefault() {
+<span class="fc" id="L641">            return new ResourceBudget(16, 256, 12, 32, 80);</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L645">            return maxProgramLength + &quot;|&quot; + maxAstNodes + &quot;|&quot;</span>
+                + maxAstGrowthPerStep + &quot;|&quot; + maxApplicationsPerPath
+                + &quot;|&quot; + maxCandidatesPerState;
+        }
+    }
+
+    private static void requireRange(int value, int minimum, int maximum, String name) {
+<span class="pc bpc" id="L652" title="2 of 4 branches missed.">        if (value &lt; minimum || value &gt; maximum) {</span>
+<span class="nc" id="L653">            throw new IllegalArgumentException(</span>
+                name + &quot; must be in [&quot; + minimum + &quot;,&quot; + maximum + &quot;]&quot;);
+        }
+<span class="fc" id="L656">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

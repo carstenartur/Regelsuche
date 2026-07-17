@@ -1,0 +1,670 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionGenomeValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionGenomeValidator.java</span></div><h1>EvolutionGenomeValidator.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.transform.PatternExpr;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Hard preflight gate for genomes and individual mutation steps. */
+<span class="fc" id="L15">public final class EvolutionGenomeValidator {</span>
+    public static final String SCHEMA = &quot;regelsuche.evolution-preflight/v1&quot;;
+
+    public ValidationReport validate(EvolutionGenome genome) {
+<span class="fc" id="L19">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L20">        List&lt;ValidationBlocker&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L21">        validateGuardPolicy(genome, blockers);</span>
+<span class="fc" id="L22">        validateProgramBudget(genome, blockers);</span>
+<span class="fc" id="L23">        validateFeatures(genome, blockers);</span>
+<span class="fc" id="L24">        validateRewrites(genome, blockers);</span>
+<span class="fc" id="L25">        return report(genome, blockers);</span>
+    }
+
+    public ValidationReport validateMutation(
+        EvolutionGenome parent,
+        EvolutionGenome child,
+        EvolutionMutationKind kind
+    ) {
+<span class="fc" id="L33">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="fc" id="L34">        Objects.requireNonNull(child, &quot;child&quot;);</span>
+<span class="fc" id="L35">        Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L36">        List&lt;ValidationBlocker&gt; blockers = new ArrayList&lt;&gt;(validate(child).blockers());</span>
+
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (parent.contentHash().equals(child.contentHash())) {</span>
+<span class="nc" id="L39">            blockers.add(blocker(</span>
+                BlockerCode.IDENTITY_MUTATION,
+                &quot;mutation&quot;,
+                &quot;child content hash equals parent&quot;));
+        }
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (parent.alphaStructuralHash().equals(child.alphaStructuralHash())) {</span>
+<span class="nc" id="L45">            blockers.add(blocker(</span>
+                BlockerCode.ALPHA_EQUIVALENT_MUTATION,
+                &quot;mutation&quot;,
+                &quot;child is alpha-equivalent to parent&quot;));
+        }
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (!child.seedGenomeHashes().contains(parent.contentHash())) {</span>
+<span class="nc" id="L51">            blockers.add(blocker(</span>
+                BlockerCode.MISSING_PARENT_LINEAGE,
+                &quot;seedGenomeHashes&quot;,
+                &quot;parent content hash is not recorded&quot;));
+        }
+<span class="fc" id="L56">        requireUnchanged(parent.objective(), child.objective(),</span>
+            BlockerCode.OBJECTIVE_CHANGED, &quot;objective&quot;, blockers);
+<span class="fc" id="L58">        requireUnchanged(parent.trainingScope(), child.trainingScope(),</span>
+            BlockerCode.TRAINING_SCOPE_CHANGED, &quot;trainingScope&quot;, blockers);
+<span class="fc" id="L60">        requireUnchanged(parent.guardPolicy(), child.guardPolicy(),</span>
+            BlockerCode.GUARD_POLICY_CHANGED, &quot;guardPolicy&quot;, blockers);
+<span class="fc" id="L62">        requireUnchanged(parent.budget(), child.budget(),</span>
+            BlockerCode.BUDGET_CHANGED, &quot;budget&quot;, blockers);
+<span class="fc" id="L64">        requireUnchanged(parent.requiredCapabilities(), child.requiredCapabilities(),</span>
+            BlockerCode.CAPABILITY_SET_CHANGED, &quot;requiredCapabilities&quot;, blockers);
+
+<span class="fc" id="L67">        validateMutationShape(parent, child, kind, blockers);</span>
+<span class="fc" id="L68">        validateNoGuardWeakening(parent, child, kind, blockers);</span>
+<span class="fc" id="L69">        return report(child, blockers);</span>
+    }
+
+    private static void validateGuardPolicy(
+        EvolutionGenome genome,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="fc" id="L76">        EvolutionGenome.GuardPolicy policy = genome.guardPolicy();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (!policy.rejectCycles()) {</span>
+<span class="nc" id="L78">            blockers.add(blocker(BlockerCode.CYCLE_GUARD_DISABLED,</span>
+                &quot;guardPolicy.rejectCycles&quot;, &quot;cycle rejection is mandatory&quot;));
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (!policy.rejectUnboundedGrowth()) {</span>
+<span class="nc" id="L82">            blockers.add(blocker(BlockerCode.GROWTH_GUARD_DISABLED,</span>
+                &quot;guardPolicy.rejectUnboundedGrowth&quot;, &quot;growth rejection is mandatory&quot;));
+        }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (!policy.requireApplicabilityChecks()) {</span>
+<span class="fc" id="L86">            blockers.add(blocker(BlockerCode.APPLICABILITY_GUARD_DISABLED,</span>
+                &quot;guardPolicy.requireApplicabilityChecks&quot;,
+                &quot;applicability checks are mandatory&quot;));
+        }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (!policy.enforceDuplicateSuppression()) {</span>
+<span class="nc" id="L91">            blockers.add(blocker(BlockerCode.DUPLICATE_GUARD_DISABLED,</span>
+                &quot;guardPolicy.enforceDuplicateSuppression&quot;,
+                &quot;duplicate suppression is mandatory&quot;));
+        }
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (!policy.deterministicTieBreaking()) {</span>
+<span class="fc" id="L96">            blockers.add(blocker(BlockerCode.NONDETERMINISTIC_TIE_BREAKING,</span>
+                &quot;guardPolicy.deterministicTieBreaking&quot;,
+                &quot;deterministic tie-breaking is mandatory&quot;));
+        }
+<span class="fc" id="L100">    }</span>
+
+    private static void validateProgramBudget(
+        EvolutionGenome genome,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (genome.rewrites().isEmpty()) {</span>
+<span class="nc" id="L107">            blockers.add(blocker(BlockerCode.EMPTY_PROGRAM,</span>
+                &quot;rewrites&quot;, &quot;at least one executable rewrite is required&quot;));
+        }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (genome.rewrites().size() &gt; genome.budget().maxProgramLength()) {</span>
+<span class="nc" id="L111">            blockers.add(blocker(BlockerCode.PROGRAM_LENGTH_EXCEEDED,</span>
+                &quot;rewrites&quot;,
+<span class="nc" id="L113">                genome.rewrites().size() + &quot;&gt;&quot; + genome.budget().maxProgramLength()));</span>
+        }
+<span class="fc" id="L115">    }</span>
+
+    private static void validateFeatures(
+        EvolutionGenome genome,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (genome.rankingFeatures().isEmpty()) {</span>
+<span class="nc" id="L122">            blockers.add(blocker(BlockerCode.EMPTY_FITNESS,</span>
+                &quot;rankingFeatures&quot;, &quot;at least one decomposable signal is required&quot;));
+        }
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (genome.objective() == EvolutionGenome.Objective.OPEN_TARGET_OPERATOR) {</span>
+<span class="fc" id="L126">            genome.rankingFeatures().stream()</span>
+<span class="fc" id="L127">                .filter(feature -&gt; feature.signal().targetDirected())</span>
+<span class="fc" id="L128">                .forEach(feature -&gt; blockers.add(blocker(</span>
+                    BlockerCode.TARGET_SIGNAL_IN_OPEN_TARGET_GENOME,
+<span class="fc" id="L130">                    &quot;rankingFeatures.&quot; + feature.signal().name(),</span>
+                    &quot;target-directed signal is forbidden for open-target evolution&quot;)));
+        }
+<span class="fc" id="L133">        genome.rankingFeatures().stream()</span>
+<span class="fc" id="L134">            .filter(feature -&gt; Integer.signum(feature.weightPermille())</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                != feature.signal().expectedSign())</span>
+<span class="fc" id="L136">            .forEach(feature -&gt; blockers.add(blocker(</span>
+                BlockerCode.INVALID_FEATURE_DIRECTION,
+<span class="fc" id="L138">                &quot;rankingFeatures.&quot; + feature.signal().name(),</span>
+                &quot;weight sign contradicts declared signal direction&quot;)));
+<span class="fc" id="L140">    }</span>
+
+    private static void validateRewrites(
+        EvolutionGenome genome,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="fc" id="L146">        Map&lt;String, ParsedRewrite&gt; parsed = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (EvolutionGenome.RewriteGene gene : genome.rewrites()) {</span>
+<span class="fc" id="L148">            ParsedRewrite item = parse(gene, blockers);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (item != null) {</span>
+<span class="fc" id="L150">                parsed.put(gene.geneId(), item);</span>
+<span class="fc" id="L151">                validateRewrite(genome, gene, item, blockers);</span>
+            }
+<span class="fc" id="L153">        }</span>
+<span class="fc" id="L154">        validateDuplicatesAndCycles(parsed, blockers);</span>
+<span class="fc" id="L155">    }</span>
+
+    private static ParsedRewrite parse(
+        EvolutionGenome.RewriteGene gene,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+        PatternExpr source;
+        PatternExpr target;
+        try {
+<span class="fc" id="L164">            source = EvolutionGenomeCompiler.parsePattern(gene.sourcePattern());</span>
+<span class="nc" id="L165">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L166">            blockers.add(blocker(BlockerCode.UNPARSABLE_SOURCE,</span>
+<span class="nc" id="L167">                gene.geneId() + &quot;.sourcePattern&quot;, exception.getMessage()));</span>
+<span class="nc" id="L168">            return null;</span>
+<span class="fc" id="L169">        }</span>
+        try {
+<span class="fc" id="L171">            target = EvolutionGenomeCompiler.parsePattern(gene.targetPattern());</span>
+<span class="nc" id="L172">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L173">            blockers.add(blocker(BlockerCode.UNPARSABLE_TARGET,</span>
+<span class="nc" id="L174">                gene.geneId() + &quot;.targetPattern&quot;, exception.getMessage()));</span>
+<span class="nc" id="L175">            return null;</span>
+<span class="fc" id="L176">        }</span>
+<span class="fc" id="L177">        return new ParsedRewrite(gene, source, target,</span>
+<span class="fc" id="L178">            alphaPair(gene.sourcePattern(), gene.targetPattern()));</span>
+    }
+
+    private static void validateRewrite(
+        EvolutionGenome genome,
+        EvolutionGenome.RewriteGene gene,
+        ParsedRewrite parsed,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="fc" id="L187">        Set&lt;String&gt; sourcePlaceholders = EvolutionGenome.placeholders(gene.sourcePattern());</span>
+<span class="fc" id="L188">        Set&lt;String&gt; targetPlaceholders = EvolutionGenome.placeholders(gene.targetPattern());</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (String placeholder : targetPlaceholders) {</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (!sourcePlaceholders.contains(placeholder)) {</span>
+<span class="fc" id="L191">                blockers.add(blocker(BlockerCode.UNBOUND_TARGET_PLACEHOLDER,</span>
+<span class="fc" id="L192">                    gene.geneId() + &quot;.targetPattern&quot;, placeholder));</span>
+            }
+<span class="fc" id="L194">        }</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (EvolutionGenome.AssumptionTemplate assumption : gene.assumptions()) {</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            if (assumption.kind() == de.regelsuche.assumption.Assumption.Kind.UNKNOWN</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                    || assumption.kind() == de.regelsuche.assumption.Assumption.Kind.DOMAIN</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                    || assumption.kind() == de.regelsuche.assumption.Assumption.Kind.CUSTOM) {</span>
+<span class="nc" id="L199">                blockers.add(blocker(BlockerCode.UNSUPPORTED_ASSUMPTION_KIND,</span>
+<span class="nc" id="L200">                    gene.geneId() + &quot;.assumptions&quot;, assumption.kind().name()));</span>
+            }
+<span class="fc" id="L202">            Set&lt;String&gt; used = new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L203">                EvolutionGenome.placeholders(assumption.expression()));</span>
+<span class="fc" id="L204">            assumption.symbols().forEach(symbol -&gt;</span>
+<span class="fc" id="L205">                used.addAll(EvolutionGenome.placeholders(symbol)));</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            for (String placeholder : used) {</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                if (!sourcePlaceholders.contains(placeholder)) {</span>
+<span class="nc" id="L208">                    blockers.add(blocker(BlockerCode.UNBOUND_ASSUMPTION_PLACEHOLDER,</span>
+<span class="nc" id="L209">                        gene.geneId() + &quot;.assumptions&quot;, placeholder));</span>
+                }
+<span class="fc" id="L211">            }</span>
+<span class="fc" id="L212">        }</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (parsed.source().equals(parsed.target())) {</span>
+<span class="nc" id="L214">            blockers.add(blocker(BlockerCode.IDENTITY_REWRITE,</span>
+<span class="nc" id="L215">                gene.geneId(), &quot;source and target patterns are identical&quot;));</span>
+        }
+
+<span class="fc" id="L218">        int sourceNodes = EvolutionGenomeCompiler.nodeCount(parsed.source());</span>
+<span class="fc" id="L219">        int targetNodes = EvolutionGenomeCompiler.nodeCount(parsed.target());</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (sourceNodes &gt; genome.budget().maxAstNodes()</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">                || targetNodes &gt; genome.budget().maxAstNodes()) {</span>
+<span class="nc" id="L222">            blockers.add(blocker(BlockerCode.AST_NODE_BUDGET_EXCEEDED,</span>
+<span class="nc" id="L223">                gene.geneId(),</span>
+<span class="nc" id="L224">                Math.max(sourceNodes, targetNodes) + &quot;&gt;&quot; + genome.budget().maxAstNodes()));</span>
+        }
+<span class="fc" id="L226">        int growth = targetNodes - sourceNodes;</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (growth &gt; gene.maxAstGrowth()) {</span>
+<span class="nc" id="L228">            blockers.add(blocker(BlockerCode.GENE_GROWTH_EXCEEDED,</span>
+<span class="nc" id="L229">                gene.geneId(), growth + &quot;&gt;&quot; + gene.maxAstGrowth()));</span>
+        }
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (growth &gt; genome.budget().maxAstGrowthPerStep()) {</span>
+<span class="nc" id="L232">            blockers.add(blocker(BlockerCode.PROGRAM_GROWTH_EXCEEDED,</span>
+<span class="nc" id="L233">                gene.geneId(), growth + &quot;&gt;&quot; + genome.budget().maxAstGrowthPerStep()));</span>
+        }
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (gene.maxApplicationsPerPath() &gt; genome.budget().maxApplicationsPerPath()) {</span>
+<span class="nc" id="L236">            blockers.add(blocker(BlockerCode.APPLICATION_BUDGET_EXCEEDED,</span>
+<span class="nc" id="L237">                gene.geneId(),</span>
+<span class="nc" id="L238">                gene.maxApplicationsPerPath() + &quot;&gt;&quot;</span>
+<span class="nc" id="L239">                    + genome.budget().maxApplicationsPerPath()));</span>
+        }
+<span class="fc" id="L241">        requireObligation(gene, EvolutionGenome.EvidenceObligation.SEMANTIC_VALIDATION,</span>
+            blockers);
+<span class="fc" id="L243">        requireObligation(gene, EvolutionGenome.EvidenceObligation.COUNTEREXAMPLE_SEARCH,</span>
+            blockers);
+<span class="fc" id="L245">        requireObligation(gene, EvolutionGenome.EvidenceObligation.PROOF_OR_CERTIFICATE,</span>
+            blockers);
+<span class="fc" id="L247">        requireObligation(gene, EvolutionGenome.EvidenceObligation.HOLDOUT_EVALUATION,</span>
+            blockers);
+<span class="fc" id="L249">    }</span>
+
+    private static void requireObligation(
+        EvolutionGenome.RewriteGene gene,
+        EvolutionGenome.EvidenceObligation obligation,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (!gene.evidenceObligations().contains(obligation)) {</span>
+<span class="nc" id="L257">            blockers.add(blocker(BlockerCode.MISSING_EVIDENCE_OBLIGATION,</span>
+<span class="nc" id="L258">                gene.geneId() + &quot;.evidenceObligations&quot;, obligation.name()));</span>
+        }
+<span class="fc" id="L260">    }</span>
+
+    private static void validateDuplicatesAndCycles(
+        Map&lt;String, ParsedRewrite&gt; parsed,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="fc" id="L266">        Map&lt;String, String&gt; pairOwners = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (ParsedRewrite rewrite : parsed.values()) {</span>
+<span class="fc" id="L268">            String previous = pairOwners.putIfAbsent(rewrite.alphaPair(), rewrite.gene().geneId());</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            if (previous != null) {</span>
+<span class="fc" id="L270">                blockers.add(blocker(BlockerCode.DUPLICATE_STRUCTURAL_REWRITE,</span>
+<span class="fc" id="L271">                    rewrite.gene().geneId(), &quot;alpha-equivalent to &quot; + previous));</span>
+            }
+<span class="fc" id="L273">        }</span>
+<span class="fc" id="L274">        List&lt;ParsedRewrite&gt; items = List.copyOf(parsed.values());</span>
+<span class="fc" id="L275">        Map&lt;String, List&lt;CycleEdge&gt;&gt; graph = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (ParsedRewrite item : items) {</span>
+<span class="fc" id="L277">            graph.computeIfAbsent(item.alphaSource(), ignored -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L278">                .add(new CycleEdge(item.alphaTarget(), item.gene().geneId()));</span>
+<span class="fc" id="L279">        }</span>
+<span class="fc" id="L280">        graph.values().forEach(edges -&gt; edges.sort(</span>
+<span class="fc" id="L281">            Comparator.comparing(CycleEdge::geneId)</span>
+<span class="fc" id="L282">                .thenComparing(CycleEdge::target)));</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        for (ParsedRewrite item : items) {</span>
+<span class="fc" id="L284">            List&lt;String&gt; returnPath = findPath(</span>
+<span class="fc" id="L285">                item.alphaTarget(),</span>
+<span class="fc" id="L286">                item.alphaSource(),</span>
+                graph,
+                new LinkedHashSet&lt;&gt;(),
+<span class="fc" id="L289">                items.size());</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            if (returnPath != null) {</span>
+<span class="fc" id="L291">                List&lt;String&gt; cycle = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L292">                cycle.add(item.gene().geneId());</span>
+<span class="fc" id="L293">                cycle.addAll(returnPath);</span>
+<span class="fc" id="L294">                blockers.add(blocker(BlockerCode.REWRITE_CYCLE,</span>
+<span class="fc" id="L295">                    item.gene().geneId(), &quot;cycle=&quot; + cycle));</span>
+            }
+<span class="fc" id="L297">        }</span>
+<span class="fc" id="L298">    }</span>
+
+    private static List&lt;String&gt; findPath(
+        String current,
+        String target,
+        Map&lt;String, List&lt;CycleEdge&gt;&gt; graph,
+        Set&lt;String&gt; visited,
+        int remainingDepth
+    ) {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (current.equals(target)) {</span>
+<span class="fc" id="L308">            return List.of();</span>
+        }
+<span class="pc bpc" id="L310" title="2 of 4 branches missed.">        if (remainingDepth &lt;= 0 || !visited.add(current)) {</span>
+<span class="nc" id="L311">            return null;</span>
+        }
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        for (CycleEdge edge : graph.getOrDefault(current, List.of())) {</span>
+<span class="fc" id="L314">            List&lt;String&gt; suffix = findPath(</span>
+<span class="fc" id="L315">                edge.target(),</span>
+                target,
+                graph,
+                new LinkedHashSet&lt;&gt;(visited),
+                remainingDepth - 1);
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (suffix != null) {</span>
+<span class="fc" id="L321">                List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L322">                result.add(edge.geneId());</span>
+<span class="fc" id="L323">                result.addAll(suffix);</span>
+<span class="fc" id="L324">                return result;</span>
+            }
+<span class="nc" id="L326">        }</span>
+<span class="fc" id="L327">        return null;</span>
+    }
+
+    private static void validateMutationShape(
+        EvolutionGenome parent,
+        EvolutionGenome child,
+        EvolutionMutationKind kind,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="fc" id="L336">        int rewriteDelta = child.rewrites().size() - parent.rewrites().size();</span>
+<span class="fc" id="L337">        int featureDelta = child.rankingFeatures().size() - parent.rankingFeatures().size();</span>
+<span class="fc" id="L338">        int assumptionDelta = totalAssumptions(child) - totalAssumptions(parent);</span>
+
+<span class="pc bpc" id="L340" title="2 of 7 branches missed.">        switch (kind) {</span>
+            case COMPOSE_REWRITES -&gt; {
+<span class="nc" id="L342">                requireDelta(rewriteDelta, 1, &quot;rewrites&quot;, blockers);</span>
+<span class="nc" id="L343">                requireDelta(featureDelta, 0, &quot;rankingFeatures&quot;, blockers);</span>
+<span class="nc" id="L344">            }</span>
+            case ADD_ASSUMPTION -&gt; {
+<span class="fc" id="L346">                requireDelta(rewriteDelta, 0, &quot;rewrites&quot;, blockers);</span>
+<span class="fc" id="L347">                requireDelta(assumptionDelta, 1, &quot;assumptions&quot;, blockers);</span>
+<span class="fc" id="L348">                requireDelta(featureDelta, 0, &quot;rankingFeatures&quot;, blockers);</span>
+<span class="fc" id="L349">            }</span>
+            case REMOVE_ASSUMPTION -&gt; {
+<span class="fc" id="L351">                requireDelta(rewriteDelta, 0, &quot;rewrites&quot;, blockers);</span>
+<span class="fc" id="L352">                requireDelta(assumptionDelta, -1, &quot;assumptions&quot;, blockers);</span>
+<span class="fc" id="L353">                requireDelta(featureDelta, 0, &quot;rankingFeatures&quot;, blockers);</span>
+<span class="fc" id="L354">            }</span>
+            case ADD_RANKING_FEATURE -&gt; {
+<span class="fc" id="L356">                requireDelta(rewriteDelta, 0, &quot;rewrites&quot;, blockers);</span>
+<span class="fc" id="L357">                requireDelta(featureDelta, 1, &quot;rankingFeatures&quot;, blockers);</span>
+<span class="fc" id="L358">            }</span>
+            case REMOVE_RANKING_FEATURE -&gt; {
+<span class="fc" id="L360">                requireDelta(rewriteDelta, 0, &quot;rewrites&quot;, blockers);</span>
+<span class="fc" id="L361">                requireDelta(featureDelta, -1, &quot;rankingFeatures&quot;, blockers);</span>
+<span class="fc" id="L362">            }</span>
+            case GENERALIZE_PLACEHOLDER, SPECIALIZE_PLACEHOLDER, REVERSE_REWRITE -&gt; {
+<span class="fc" id="L364">                requireDelta(rewriteDelta, 0, &quot;rewrites&quot;, blockers);</span>
+<span class="fc" id="L365">                requireDelta(featureDelta, 0, &quot;rankingFeatures&quot;, blockers);</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                if (changedGeneCount(parent, child) != 1) {</span>
+<span class="nc" id="L367">                    blockers.add(blocker(BlockerCode.INVALID_MUTATION_SHAPE,</span>
+                        &quot;rewrites&quot;, &quot;exactly one rewrite gene must change&quot;));
+                }
+            }
+        }
+<span class="fc" id="L372">    }</span>
+
+    private static void validateNoGuardWeakening(
+        EvolutionGenome parent,
+        EvolutionGenome child,
+        EvolutionMutationKind kind,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="fc" id="L380">        Map&lt;String, EvolutionGenome.RewriteGene&gt; children = child.rewrites().stream()</span>
+<span class="fc" id="L381">            .collect(java.util.stream.Collectors.toMap(</span>
+                EvolutionGenome.RewriteGene::geneId,
+<span class="fc" id="L383">                value -&gt; value));</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        for (EvolutionGenome.RewriteGene parentGene : parent.rewrites()) {</span>
+<span class="fc" id="L385">            EvolutionGenome.RewriteGene childGene = children.get(parentGene.geneId());</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">            if (childGene == null) {</span>
+<span class="nc" id="L387">                continue;</span>
+            }
+<span class="fc" id="L389">            Set&lt;EvolutionGenome.AssumptionTemplate&gt; removed = new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L390">                parentGene.assumptions());</span>
+<span class="fc" id="L391">            removed.removeAll(childGene.assumptions());</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">            if (!removed.isEmpty()) {</span>
+<span class="fc" id="L393">                blockers.add(blocker(BlockerCode.GUARD_WEAKENING_REQUIRES_CERTIFICATE,</span>
+<span class="fc" id="L394">                    parentGene.geneId() + &quot;.assumptions&quot;,</span>
+<span class="fc" id="L395">                    &quot;removed=&quot; + removed.stream()</span>
+<span class="fc" id="L396">                        .map(EvolutionGenome.AssumptionTemplate::canonicalMaterial)</span>
+<span class="fc" id="L397">                        .sorted()</span>
+<span class="fc" id="L398">                        .toList()</span>
+<span class="fc" id="L399">                        + &quot;, mutation=&quot; + kind.name()));</span>
+            }
+<span class="fc" id="L401">        }</span>
+<span class="fc" id="L402">    }</span>
+
+    private static int totalAssumptions(EvolutionGenome genome) {
+<span class="fc" id="L405">        return genome.rewrites().stream()</span>
+<span class="fc" id="L406">            .mapToInt(gene -&gt; gene.assumptions().size())</span>
+<span class="fc" id="L407">            .sum();</span>
+    }
+
+    private static int changedGeneCount(
+        EvolutionGenome parent,
+        EvolutionGenome child
+    ) {
+<span class="fc" id="L414">        Map&lt;String, EvolutionGenome.RewriteGene&gt; parentGenes = parent.rewrites().stream()</span>
+<span class="fc" id="L415">            .collect(java.util.stream.Collectors.toMap(</span>
+                EvolutionGenome.RewriteGene::geneId,
+<span class="fc" id="L417">                value -&gt; value));</span>
+<span class="fc" id="L418">        Map&lt;String, EvolutionGenome.RewriteGene&gt; childGenes = child.rewrites().stream()</span>
+<span class="fc" id="L419">            .collect(java.util.stream.Collectors.toMap(</span>
+                EvolutionGenome.RewriteGene::geneId,
+<span class="fc" id="L421">                value -&gt; value));</span>
+<span class="fc" id="L422">        Set&lt;String&gt; ids = new LinkedHashSet&lt;&gt;(parentGenes.keySet());</span>
+<span class="fc" id="L423">        ids.addAll(childGenes.keySet());</span>
+<span class="fc" id="L424">        int changed = 0;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        for (String id : ids) {</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">            if (!Objects.equals(parentGenes.get(id), childGenes.get(id))) {</span>
+<span class="fc" id="L427">                changed++;</span>
+            }
+<span class="fc" id="L429">        }</span>
+<span class="fc" id="L430">        return changed;</span>
+    }
+
+    private static void requireDelta(
+        int actual,
+        int expected,
+        String location,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">        if (actual != expected) {</span>
+<span class="nc" id="L440">            blockers.add(blocker(BlockerCode.INVALID_MUTATION_SHAPE,</span>
+                location, &quot;delta=&quot; + actual + &quot;, expected=&quot; + expected));
+        }
+<span class="fc" id="L443">    }</span>
+
+    private static void requireUnchanged(
+        Object parent,
+        Object child,
+        BlockerCode code,
+        String location,
+        List&lt;ValidationBlocker&gt; blockers
+    ) {
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">        if (!Objects.equals(parent, child)) {</span>
+<span class="nc" id="L453">            blockers.add(blocker(code, location, &quot;field cannot change in v1 mutation&quot;));</span>
+        }
+<span class="fc" id="L455">    }</span>
+
+    private static AlphaPair alphaPair(String source, String target) {
+<span class="fc" id="L458">        Map&lt;String, String&gt; mapping = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L459">        java.util.function.UnaryOperator&lt;String&gt; alpha = token -&gt; mapping.computeIfAbsent(</span>
+            token,
+<span class="fc" id="L461">            ignored -&gt; &quot;?P&quot; + mapping.size());</span>
+<span class="fc" id="L462">        String normalizedSource = EvolutionGenome.transformPlaceholders(source, alpha);</span>
+<span class="fc" id="L463">        String normalizedTarget = EvolutionGenome.transformPlaceholders(target, alpha);</span>
+<span class="fc" id="L464">        PatternExpr sourcePattern = EvolutionGenomeCompiler.parsePattern(normalizedSource);</span>
+<span class="fc" id="L465">        PatternExpr targetPattern = EvolutionGenomeCompiler.parsePattern(normalizedTarget);</span>
+<span class="fc" id="L466">        return new AlphaPair(</span>
+<span class="fc" id="L467">            EvolutionGenomeCompiler.renderPattern(sourcePattern),</span>
+<span class="fc" id="L468">            EvolutionGenomeCompiler.renderPattern(targetPattern));</span>
+    }
+
+    private static ValidationReport report(
+        EvolutionGenome genome,
+        List&lt;ValidationBlocker&gt; values
+    ) {
+<span class="fc" id="L475">        List&lt;ValidationBlocker&gt; blockers = values.stream()</span>
+<span class="fc" id="L476">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L477">            .distinct()</span>
+<span class="fc" id="L478">            .sorted(Comparator</span>
+<span class="fc" id="L479">                .comparing((ValidationBlocker item) -&gt; item.code().name())</span>
+<span class="fc" id="L480">                .thenComparing(ValidationBlocker::location)</span>
+<span class="fc" id="L481">                .thenComparing(ValidationBlocker::detail))</span>
+<span class="fc" id="L482">            .toList();</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        ValidationStatus status = blockers.isEmpty()</span>
+<span class="fc" id="L484">            ? ValidationStatus.ACCEPTED</span>
+<span class="fc" id="L485">            : ValidationStatus.REJECTED;</span>
+<span class="fc" id="L486">        String payload = renderReport(</span>
+<span class="fc" id="L487">            genome.contentHash(),</span>
+<span class="fc" id="L488">            genome.alphaStructuralHash(),</span>
+            status,
+            blockers,
+            null);
+<span class="fc" id="L492">        return new ValidationReport(</span>
+            SCHEMA,
+<span class="fc" id="L494">            genome.contentHash(),</span>
+<span class="fc" id="L495">            genome.alphaStructuralHash(),</span>
+            status,
+            blockers,
+<span class="fc" id="L498">            EvolutionGenome.hash(payload));</span>
+    }
+
+    private static String renderReport(
+        String genomeHash,
+        String alphaHash,
+        ValidationStatus status,
+        List&lt;ValidationBlocker&gt; blockers,
+        String contentHash
+    ) {
+<span class="fc" id="L508">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L509">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L510">            .property(&quot;genomeHash&quot;, genomeHash)</span>
+<span class="fc" id="L511">            .property(&quot;alphaStructuralHash&quot;, alphaHash)</span>
+<span class="fc" id="L512">            .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L513">            .array(&quot;blockers&quot;, array -&gt; blockers.forEach(item -&gt;</span>
+<span class="fc" id="L514">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L515">                    .property(&quot;code&quot;, item.code().name())</span>
+<span class="fc" id="L516">                    .property(&quot;location&quot;, item.location())</span>
+<span class="fc" id="L517">                    .property(&quot;detail&quot;, item.detail()))));</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L519">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L521">        return json.endObject().toString();</span>
+    }
+
+    private static ValidationBlocker blocker(
+        BlockerCode code,
+        String location,
+        String detail
+    ) {
+<span class="fc" id="L529">        return new ValidationBlocker(code, location, detail);</span>
+    }
+
+<span class="fc" id="L532">    public enum ValidationStatus {</span>
+<span class="fc" id="L533">        ACCEPTED,</span>
+<span class="fc" id="L534">        REJECTED</span>
+    }
+
+<span class="fc" id="L537">    public enum BlockerCode {</span>
+<span class="fc" id="L538">        EMPTY_PROGRAM,</span>
+<span class="fc" id="L539">        PROGRAM_LENGTH_EXCEEDED,</span>
+<span class="fc" id="L540">        EMPTY_FITNESS,</span>
+<span class="fc" id="L541">        TARGET_SIGNAL_IN_OPEN_TARGET_GENOME,</span>
+<span class="fc" id="L542">        INVALID_FEATURE_DIRECTION,</span>
+<span class="fc" id="L543">        CYCLE_GUARD_DISABLED,</span>
+<span class="fc" id="L544">        GROWTH_GUARD_DISABLED,</span>
+<span class="fc" id="L545">        APPLICABILITY_GUARD_DISABLED,</span>
+<span class="fc" id="L546">        DUPLICATE_GUARD_DISABLED,</span>
+<span class="fc" id="L547">        NONDETERMINISTIC_TIE_BREAKING,</span>
+<span class="fc" id="L548">        UNPARSABLE_SOURCE,</span>
+<span class="fc" id="L549">        UNPARSABLE_TARGET,</span>
+<span class="fc" id="L550">        UNBOUND_TARGET_PLACEHOLDER,</span>
+<span class="fc" id="L551">        UNBOUND_ASSUMPTION_PLACEHOLDER,</span>
+<span class="fc" id="L552">        UNSUPPORTED_ASSUMPTION_KIND,</span>
+<span class="fc" id="L553">        IDENTITY_REWRITE,</span>
+<span class="fc" id="L554">        AST_NODE_BUDGET_EXCEEDED,</span>
+<span class="fc" id="L555">        GENE_GROWTH_EXCEEDED,</span>
+<span class="fc" id="L556">        PROGRAM_GROWTH_EXCEEDED,</span>
+<span class="fc" id="L557">        APPLICATION_BUDGET_EXCEEDED,</span>
+<span class="fc" id="L558">        MISSING_EVIDENCE_OBLIGATION,</span>
+<span class="fc" id="L559">        DUPLICATE_STRUCTURAL_REWRITE,</span>
+<span class="fc" id="L560">        REWRITE_CYCLE,</span>
+<span class="fc" id="L561">        IDENTITY_MUTATION,</span>
+<span class="fc" id="L562">        ALPHA_EQUIVALENT_MUTATION,</span>
+<span class="fc" id="L563">        MISSING_PARENT_LINEAGE,</span>
+<span class="fc" id="L564">        OBJECTIVE_CHANGED,</span>
+<span class="fc" id="L565">        TRAINING_SCOPE_CHANGED,</span>
+<span class="fc" id="L566">        GUARD_POLICY_CHANGED,</span>
+<span class="fc" id="L567">        BUDGET_CHANGED,</span>
+<span class="fc" id="L568">        CAPABILITY_SET_CHANGED,</span>
+<span class="fc" id="L569">        INVALID_MUTATION_SHAPE,</span>
+<span class="fc" id="L570">        GUARD_WEAKENING_REQUIRES_CERTIFICATE</span>
+    }
+
+    public record ValidationBlocker(
+        BlockerCode code,
+        String location,
+        String detail
+    ) {
+<span class="fc" id="L578">        public ValidationBlocker {</span>
+<span class="fc" id="L579">            Objects.requireNonNull(code, &quot;code&quot;);</span>
+<span class="pc bpc" id="L580" title="2 of 4 branches missed.">            if (location == null || location.isBlank()) {</span>
+<span class="nc" id="L581">                throw new IllegalArgumentException(&quot;location must not be blank&quot;);</span>
+            }
+<span class="pc bpc" id="L583" title="2 of 4 branches missed.">            if (detail == null || detail.isBlank()) {</span>
+<span class="nc" id="L584">                throw new IllegalArgumentException(&quot;detail must not be blank&quot;);</span>
+            }
+<span class="fc" id="L586">        }</span>
+    }
+
+    public record ValidationReport(
+        String schema,
+        String genomeHash,
+        String alphaStructuralHash,
+        ValidationStatus status,
+        List&lt;ValidationBlocker&gt; blockers,
+        String contentHash
+    ) {
+<span class="fc" id="L597">        public ValidationReport {</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L599">                throw new IllegalArgumentException(&quot;unsupported preflight schema&quot;);</span>
+            }
+<span class="fc" id="L601">            EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L602">            EvolutionGenome.requireSha256(alphaStructuralHash, &quot;alphaStructuralHash&quot;);</span>
+<span class="fc" id="L603">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">            blockers = blockers == null</span>
+<span class="nc" id="L605">                ? List.of()</span>
+<span class="fc" id="L606">                : blockers.stream().filter(Objects::nonNull).distinct()</span>
+<span class="fc" id="L607">                    .sorted(Comparator</span>
+<span class="fc" id="L608">                        .comparing((ValidationBlocker item) -&gt; item.code().name())</span>
+<span class="fc" id="L609">                        .thenComparing(ValidationBlocker::location)</span>
+<span class="fc" id="L610">                        .thenComparing(ValidationBlocker::detail))</span>
+<span class="fc" id="L611">                    .toList();</span>
+<span class="fc" id="L612">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L613">            String expected = EvolutionGenome.hash(renderReport(</span>
+                genomeHash,
+                alphaStructuralHash,
+                status,
+                blockers,
+                null));
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L620">                throw new IllegalArgumentException(&quot;preflight contentHash mismatch&quot;);</span>
+            }
+<span class="fc" id="L622">        }</span>
+
+        public boolean accepted() {
+<span class="fc bfc" id="L625" title="All 2 branches covered.">            return status == ValidationStatus.ACCEPTED;</span>
+        }
+
+        public List&lt;BlockerCode&gt; blockerCodes() {
+<span class="fc" id="L629">            return blockers.stream().map(ValidationBlocker::code).distinct().toList();</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L633">            return renderReport(</span>
+                genomeHash,
+                alphaStructuralHash,
+                status,
+                blockers,
+                contentHash);
+        }
+    }
+
+<span class="fc" id="L642">    private record CycleEdge(String target, String geneId) {</span>
+    }
+
+<span class="fc" id="L645">    private record AlphaPair(String source, String target) {</span>
+        private String material() {
+<span class="fc" id="L647">            return source + &quot;-&gt;&quot; + target;</span>
+        }
+    }
+
+<span class="fc" id="L651">    private record ParsedRewrite(</span>
+        EvolutionGenome.RewriteGene gene,
+        PatternExpr source,
+        PatternExpr target,
+        AlphaPair normalizedPair
+    ) {
+        private String alphaSource() {
+<span class="fc" id="L658">            return normalizedPair.source();</span>
+        }
+
+        private String alphaTarget() {
+<span class="fc" id="L662">            return normalizedPair.target();</span>
+        }
+
+        private String alphaPair() {
+<span class="fc" id="L666">            return normalizedPair.material();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,864 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeterministicGenomeMutator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">DeterministicGenomeMutator.java</span></div><h1>DeterministicGenomeMutator.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.transform.PatternExpr;
+import de.regelsuche.transform.RewriteKind;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Deterministic, bounded mutation enumeration with complete lineage records. */
+public final class DeterministicGenomeMutator {
+    public static final String SCHEMA = &quot;regelsuche.evolution-mutation-batch/v1&quot;;
+<span class="fc" id="L22">    private static final Pattern NUMBER = Pattern.compile(</span>
+        &quot;(?&lt;![A-Za-z0-9_.])(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?![A-Za-z0-9_.])&quot;);
+
+    private final EvolutionGenomeValidator validator;
+
+    public DeterministicGenomeMutator() {
+<span class="fc" id="L28">        this(new EvolutionGenomeValidator());</span>
+<span class="fc" id="L29">    }</span>
+
+<span class="fc" id="L31">    public DeterministicGenomeMutator(EvolutionGenomeValidator validator) {</span>
+<span class="fc" id="L32">        this.validator = Objects.requireNonNull(validator, &quot;validator&quot;);</span>
+<span class="fc" id="L33">    }</span>
+
+    public MutationBatch mutate(
+        EvolutionGenome parent,
+        MutationCatalog catalog,
+        long seed,
+        MutationLimits limits
+    ) {
+<span class="fc" id="L41">        Objects.requireNonNull(parent, &quot;parent&quot;);</span>
+<span class="fc" id="L42">        Objects.requireNonNull(catalog, &quot;catalog&quot;);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="fc" id="L44">        EvolutionGenomeValidator.ValidationReport parentReport = validator.validate(parent);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!parentReport.accepted()) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L47">                &quot;parent genome failed preflight: &quot; + parentReport.blockerCodes());</span>
+        }
+
+<span class="fc" id="L50">        List&lt;Proposal&gt; proposals = generate(parent, catalog).stream()</span>
+<span class="fc" id="L51">            .sorted(Comparator.comparing(Proposal::key))</span>
+<span class="fc" id="L52">            .toList();</span>
+<span class="fc" id="L53">        List&lt;Proposal&gt; ordered = rotate(proposals, seed).stream()</span>
+<span class="fc" id="L54">            .limit(limits.maxProposals())</span>
+<span class="fc" id="L55">            .toList();</span>
+
+<span class="fc" id="L57">        List&lt;MutationAttempt&gt; attempts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L58">        List&lt;EvolutionGenome&gt; accepted = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L59">        Set&lt;String&gt; structuralHashes = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L60">        structuralHashes.add(parent.alphaStructuralHash());</span>
+
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (int index = 0; index &lt; ordered.size(); index++) {</span>
+<span class="fc" id="L63">            Proposal proposal = ordered.get(index);</span>
+<span class="fc" id="L64">            MutationAttempt attempt = evaluate(</span>
+                parent,
+                proposal,
+                index + 1,
+                structuralHashes,
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                accepted.size() &lt; limits.maxAccepted());</span>
+<span class="fc" id="L70">            attempts.add(attempt);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (attempt.status() == MutationStatus.ACCEPTED) {</span>
+<span class="fc" id="L72">                EvolutionGenome child = proposal.factory().get();</span>
+<span class="fc" id="L73">                accepted.add(child);</span>
+<span class="fc" id="L74">                structuralHashes.add(child.alphaStructuralHash());</span>
+            }
+        }
+<span class="fc" id="L77">        return MutationBatch.create(parent, seed, limits, attempts, accepted);</span>
+    }
+
+    private MutationAttempt evaluate(
+        EvolutionGenome parent,
+        Proposal proposal,
+        int ordinal,
+        Set&lt;String&gt; structuralHashes,
+        boolean acceptanceCapacity
+    ) {
+        EvolutionGenome child;
+        try {
+<span class="fc" id="L89">            child = proposal.factory().get();</span>
+<span class="nc" id="L90">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L91">            return new MutationAttempt(</span>
+                ordinal,
+<span class="nc" id="L93">                proposal.kind(),</span>
+<span class="nc" id="L94">                proposal.key(),</span>
+                MutationStatus.REJECTED,
+                null,
+                null,
+<span class="nc" id="L98">                List.of(&quot;CONSTRUCTION_FAILED:&quot; + stableMessage(exception)));</span>
+<span class="fc" id="L99">        }</span>
+<span class="fc" id="L100">        EvolutionGenomeValidator.ValidationReport report =</span>
+<span class="fc" id="L101">            validator.validateMutation(parent, child, proposal.kind());</span>
+<span class="fc" id="L102">        List&lt;String&gt; blockers = report.blockers().stream()</span>
+<span class="fc" id="L103">            .map(item -&gt; item.code().name() + &quot;:&quot; + item.location() + &quot;:&quot; + item.detail())</span>
+<span class="fc" id="L104">            .collect(java.util.stream.Collectors.toCollection(ArrayList::new));</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (structuralHashes.contains(child.alphaStructuralHash())) {</span>
+<span class="nc" id="L106">            blockers.add(&quot;STRUCTURAL_DIVERSITY_DUPLICATE:alphaStructuralHash&quot;);</span>
+        }
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (!acceptanceCapacity) {</span>
+<span class="nc" id="L109">            blockers.add(&quot;ACCEPTED_BUDGET_EXHAUSTED:maxAccepted&quot;);</span>
+        }
+<span class="fc" id="L111">        blockers = blockers.stream().distinct().sorted().toList();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        MutationStatus status = blockers.isEmpty()</span>
+<span class="fc" id="L113">            ? MutationStatus.ACCEPTED</span>
+<span class="fc" id="L114">            : MutationStatus.REJECTED;</span>
+<span class="fc" id="L115">        return new MutationAttempt(</span>
+            ordinal,
+<span class="fc" id="L117">            proposal.kind(),</span>
+<span class="fc" id="L118">            proposal.key(),</span>
+            status,
+<span class="fc" id="L120">            child.contentHash(),</span>
+<span class="fc" id="L121">            child.alphaStructuralHash(),</span>
+            blockers);
+    }
+
+    private static List&lt;Proposal&gt; generate(
+        EvolutionGenome parent,
+        MutationCatalog catalog
+    ) {
+<span class="fc" id="L129">        List&lt;Proposal&gt; proposals = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L130">        addReverseProposals(parent, proposals);</span>
+<span class="fc" id="L131">        addGeneralizationProposals(parent, proposals);</span>
+<span class="fc" id="L132">        addSpecializationProposals(parent, catalog, proposals);</span>
+<span class="fc" id="L133">        addCompositionProposals(parent, proposals);</span>
+<span class="fc" id="L134">        addAssumptionProposals(parent, catalog, proposals);</span>
+<span class="fc" id="L135">        addFeatureProposals(parent, catalog, proposals);</span>
+<span class="fc" id="L136">        return proposals;</span>
+    }
+
+    private static void addReverseProposals(
+        EvolutionGenome parent,
+        List&lt;Proposal&gt; proposals
+    ) {
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (EvolutionGenome.RewriteGene gene : parent.rewrites()) {</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (!gene.reversible()) {</span>
+<span class="nc" id="L145">                continue;</span>
+            }
+<span class="fc" id="L147">            String key = &quot;reverse:&quot; + gene.geneId();</span>
+<span class="fc" id="L148">            proposals.add(new Proposal(</span>
+                EvolutionMutationKind.REVERSE_REWRITE,
+                key,
+<span class="fc" id="L151">                () -&gt; parent.withRewrites(replaceGene(</span>
+<span class="fc" id="L152">                    parent.rewrites(),</span>
+<span class="fc" id="L153">                    gene.withPatterns(gene.targetPattern(), gene.sourcePattern())))));</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">    }</span>
+
+    private static void addGeneralizationProposals(
+        EvolutionGenome parent,
+        List&lt;Proposal&gt; proposals
+    ) {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (EvolutionGenome.RewriteGene gene : parent.rewrites()) {</span>
+<span class="fc" id="L162">            Set&lt;String&gt; numbers = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L163">            collectNumbers(gene.sourcePattern(), numbers);</span>
+<span class="fc" id="L164">            collectNumbers(gene.targetPattern(), numbers);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">            for (String number : numbers) {</span>
+<span class="fc" id="L166">                String placeholder = nextPlaceholder(gene, &quot;K&quot;);</span>
+<span class="fc" id="L167">                String key = &quot;generalize:&quot; + gene.geneId() + &quot;:&quot; + number;</span>
+<span class="fc" id="L168">                proposals.add(new Proposal(</span>
+                    EvolutionMutationKind.GENERALIZE_PLACEHOLDER,
+                    key,
+<span class="fc" id="L171">                    () -&gt; parent.withRewrites(replaceGene(</span>
+<span class="fc" id="L172">                        parent.rewrites(),</span>
+<span class="fc" id="L173">                        mutateNumber(gene, number, placeholder)))));</span>
+<span class="fc" id="L174">            }</span>
+<span class="fc" id="L175">        }</span>
+<span class="fc" id="L176">    }</span>
+
+    private static void addSpecializationProposals(
+        EvolutionGenome parent,
+        MutationCatalog catalog,
+        List&lt;Proposal&gt; proposals
+    ) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (EvolutionGenome.RewriteGene gene : parent.rewrites()) {</span>
+<span class="fc" id="L184">            List&lt;String&gt; placeholders = EvolutionGenome.placeholders(gene.sourcePattern())</span>
+<span class="fc" id="L185">                .stream().sorted().toList();</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            for (String placeholder : placeholders) {</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                for (int constant : catalog.specializationConstants()) {</span>
+<span class="fc" id="L188">                    String key = &quot;specialize:&quot; + gene.geneId() + &quot;:&quot;</span>
+<span class="fc" id="L189">                        + placeholder.substring(1) + &quot;:&quot; + constant;</span>
+<span class="fc" id="L190">                    proposals.add(new Proposal(</span>
+                        EvolutionMutationKind.SPECIALIZE_PLACEHOLDER,
+                        key,
+<span class="fc" id="L193">                        () -&gt; parent.withRewrites(replaceGene(</span>
+<span class="fc" id="L194">                            parent.rewrites(),</span>
+<span class="fc" id="L195">                            replacePlaceholder(gene, placeholder, Integer.toString(constant))))));</span>
+<span class="fc" id="L196">                }</span>
+<span class="fc" id="L197">            }</span>
+<span class="fc" id="L198">        }</span>
+<span class="fc" id="L199">    }</span>
+
+    private static void addCompositionProposals(
+        EvolutionGenome parent,
+        List&lt;Proposal&gt; proposals
+    ) {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (EvolutionGenome.RewriteGene first : parent.rewrites()) {</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            for (EvolutionGenome.RewriteGene second : parent.rewrites()) {</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                if (first.geneId().equals(second.geneId())) {</span>
+<span class="fc" id="L208">                    continue;</span>
+                }
+<span class="nc" id="L210">                Composition composition = compose(first, second);</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                if (composition == null) {</span>
+<span class="nc" id="L212">                    continue;</span>
+                }
+<span class="nc" id="L214">                String key = &quot;compose:&quot; + first.geneId() + &quot;:&quot; + second.geneId();</span>
+<span class="nc" id="L215">                proposals.add(new Proposal(</span>
+                    EvolutionMutationKind.COMPOSE_REWRITES,
+                    key,
+                    () -&gt; {
+<span class="nc" id="L219">                        List&lt;EvolutionGenome.RewriteGene&gt; genes =</span>
+<span class="nc" id="L220">                            new ArrayList&lt;&gt;(parent.rewrites());</span>
+<span class="nc" id="L221">                        genes.add(composition.gene());</span>
+<span class="nc" id="L222">                        return parent.withRewrites(genes);</span>
+                    }));
+<span class="nc" id="L224">            }</span>
+<span class="fc" id="L225">        }</span>
+<span class="fc" id="L226">    }</span>
+
+    private static void addAssumptionProposals(
+        EvolutionGenome parent,
+        MutationCatalog catalog,
+        List&lt;Proposal&gt; proposals
+    ) {
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (EvolutionGenome.RewriteGene gene : parent.rewrites()) {</span>
+<span class="fc" id="L234">            Set&lt;String&gt; sourcePlaceholders = EvolutionGenome.placeholders(gene.sourcePattern());</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            for (EvolutionGenome.AssumptionTemplate assumption : catalog.assumptions()) {</span>
+<span class="fc" id="L236">                Set&lt;String&gt; used = new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L237">                    EvolutionGenome.placeholders(assumption.expression()));</span>
+<span class="fc" id="L238">                assumption.symbols().forEach(symbol -&gt;</span>
+<span class="fc" id="L239">                    used.addAll(EvolutionGenome.placeholders(symbol)));</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                if (!sourcePlaceholders.containsAll(used)</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                        || gene.assumptions().contains(assumption)) {</span>
+<span class="nc" id="L242">                    continue;</span>
+                }
+<span class="fc" id="L244">                String key = &quot;add-assumption:&quot; + gene.geneId() + &quot;:&quot;</span>
+<span class="fc" id="L245">                    + EvolutionGenome.hash(assumption.canonicalMaterial()).substring(7, 19);</span>
+<span class="fc" id="L246">                proposals.add(new Proposal(</span>
+                    EvolutionMutationKind.ADD_ASSUMPTION,
+                    key,
+<span class="fc" id="L249">                    () -&gt; parent.withRewrites(replaceGene(</span>
+<span class="fc" id="L250">                        parent.rewrites(),</span>
+<span class="fc" id="L251">                        gene.withAssumptions(append(gene.assumptions(), assumption))))));</span>
+<span class="fc" id="L252">            }</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for (EvolutionGenome.AssumptionTemplate assumption : gene.assumptions()) {</span>
+<span class="fc" id="L254">                String key = &quot;remove-assumption:&quot; + gene.geneId() + &quot;:&quot;</span>
+<span class="fc" id="L255">                    + EvolutionGenome.hash(assumption.canonicalMaterial()).substring(7, 19);</span>
+<span class="fc" id="L256">                proposals.add(new Proposal(</span>
+                    EvolutionMutationKind.REMOVE_ASSUMPTION,
+                    key,
+<span class="fc" id="L259">                    () -&gt; parent.withRewrites(replaceGene(</span>
+<span class="fc" id="L260">                        parent.rewrites(),</span>
+<span class="fc" id="L261">                        gene.withAssumptions(remove(gene.assumptions(), assumption))))));</span>
+<span class="fc" id="L262">            }</span>
+<span class="fc" id="L263">        }</span>
+<span class="fc" id="L264">    }</span>
+
+    private static void addFeatureProposals(
+        EvolutionGenome parent,
+        MutationCatalog catalog,
+        List&lt;Proposal&gt; proposals
+    ) {
+<span class="fc" id="L271">        Set&lt;EvolutionGenome.FitnessSignal&gt; present = parent.rankingFeatures().stream()</span>
+<span class="fc" id="L272">            .map(EvolutionGenome.FeatureWeight::signal)</span>
+<span class="fc" id="L273">            .collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        for (EvolutionGenome.FeatureWeight feature : catalog.rankingFeatures()) {</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">            if (present.contains(feature.signal())) {</span>
+<span class="nc" id="L276">                continue;</span>
+            }
+<span class="fc" id="L278">            String key = &quot;add-feature:&quot; + feature.signal().name();</span>
+<span class="fc" id="L279">            proposals.add(new Proposal(</span>
+                EvolutionMutationKind.ADD_RANKING_FEATURE,
+                key,
+<span class="fc" id="L282">                () -&gt; parent.withRankingFeatures(</span>
+<span class="fc" id="L283">                    append(parent.rankingFeatures(), feature))));</span>
+<span class="fc" id="L284">        }</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        if (parent.rankingFeatures().size() &gt; 1) {</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            for (EvolutionGenome.FeatureWeight feature : parent.rankingFeatures()) {</span>
+<span class="fc" id="L287">                String key = &quot;remove-feature:&quot; + feature.signal().name();</span>
+<span class="fc" id="L288">                proposals.add(new Proposal(</span>
+                    EvolutionMutationKind.REMOVE_RANKING_FEATURE,
+                    key,
+<span class="fc" id="L291">                    () -&gt; parent.withRankingFeatures(</span>
+<span class="fc" id="L292">                        remove(parent.rankingFeatures(), feature))));</span>
+<span class="fc" id="L293">            }</span>
+        }
+<span class="fc" id="L295">    }</span>
+
+    private static EvolutionGenome.RewriteGene mutateNumber(
+        EvolutionGenome.RewriteGene gene,
+        String number,
+        String placeholder
+    ) {
+<span class="fc" id="L302">        String source = replaceNumber(gene.sourcePattern(), number, placeholder);</span>
+<span class="fc" id="L303">        String target = replaceNumber(gene.targetPattern(), number, placeholder);</span>
+<span class="fc" id="L304">        List&lt;EvolutionGenome.AssumptionTemplate&gt; assumptions = gene.assumptions().stream()</span>
+<span class="fc" id="L305">            .map(item -&gt; new EvolutionGenome.AssumptionTemplate(</span>
+<span class="fc" id="L306">                item.kind(),</span>
+<span class="fc" id="L307">                replaceNumber(item.expression(), number, placeholder),</span>
+<span class="fc" id="L308">                item.symbols().stream()</span>
+<span class="fc" id="L309">                    .map(symbol -&gt; replaceNumber(symbol, number, placeholder))</span>
+<span class="fc" id="L310">                    .toList()))</span>
+<span class="fc" id="L311">            .toList();</span>
+<span class="fc" id="L312">        return new EvolutionGenome.RewriteGene(</span>
+<span class="fc" id="L313">            gene.geneId(),</span>
+            source,
+            target,
+<span class="fc" id="L316">            gene.kind(),</span>
+<span class="fc" id="L317">            gene.reversible(),</span>
+<span class="fc" id="L318">            gene.estimatedCostDelta(),</span>
+<span class="fc" id="L319">            gene.maxApplicationsPerPath(),</span>
+<span class="fc" id="L320">            gene.maxAstGrowth(),</span>
+            assumptions,
+<span class="fc" id="L322">            gene.evidenceObligations());</span>
+    }
+
+    private static EvolutionGenome.RewriteGene replacePlaceholder(
+        EvolutionGenome.RewriteGene gene,
+        String placeholder,
+        String replacement
+    ) {
+<span class="fc" id="L330">        java.util.function.UnaryOperator&lt;String&gt; replace = token -&gt;</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            token.equals(placeholder) ? replacement : token;</span>
+<span class="fc" id="L332">        List&lt;EvolutionGenome.AssumptionTemplate&gt; assumptions = gene.assumptions().stream()</span>
+<span class="fc" id="L333">            .map(item -&gt; new EvolutionGenome.AssumptionTemplate(</span>
+<span class="fc" id="L334">                item.kind(),</span>
+<span class="fc" id="L335">                EvolutionGenome.transformPlaceholders(item.expression(), replace),</span>
+<span class="fc" id="L336">                item.symbols().stream()</span>
+<span class="fc" id="L337">                    .map(symbol -&gt; EvolutionGenome.transformPlaceholders(symbol, replace))</span>
+<span class="fc" id="L338">                    .toList()))</span>
+<span class="fc" id="L339">            .toList();</span>
+<span class="fc" id="L340">        return new EvolutionGenome.RewriteGene(</span>
+<span class="fc" id="L341">            gene.geneId(),</span>
+<span class="fc" id="L342">            EvolutionGenome.transformPlaceholders(gene.sourcePattern(), replace),</span>
+<span class="fc" id="L343">            EvolutionGenome.transformPlaceholders(gene.targetPattern(), replace),</span>
+<span class="fc" id="L344">            gene.kind(),</span>
+<span class="fc" id="L345">            gene.reversible(),</span>
+<span class="fc" id="L346">            gene.estimatedCostDelta(),</span>
+<span class="fc" id="L347">            gene.maxApplicationsPerPath(),</span>
+<span class="fc" id="L348">            gene.maxAstGrowth(),</span>
+            assumptions,
+<span class="fc" id="L350">            gene.evidenceObligations());</span>
+    }
+
+    private static Composition compose(
+        EvolutionGenome.RewriteGene first,
+        EvolutionGenome.RewriteGene second
+    ) {
+        PatternExpr intermediate;
+        PatternExpr secondSource;
+        PatternExpr secondTarget;
+        try {
+<span class="nc" id="L361">            intermediate = EvolutionGenomeCompiler.parsePattern(first.targetPattern());</span>
+<span class="nc" id="L362">            secondSource = EvolutionGenomeCompiler.parsePattern(second.sourcePattern());</span>
+<span class="nc" id="L363">            secondTarget = EvolutionGenomeCompiler.parsePattern(second.targetPattern());</span>
+<span class="nc" id="L364">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L365">            return null;</span>
+<span class="nc" id="L366">        }</span>
+<span class="nc" id="L367">        Map&lt;String, PatternExpr&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        if (!unify(secondSource, intermediate, bindings)) {</span>
+<span class="nc" id="L369">            return null;</span>
+        }
+        PatternExpr composedTarget;
+        try {
+<span class="nc" id="L373">            composedTarget = instantiate(secondTarget, bindings);</span>
+<span class="nc" id="L374">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L375">            return null;</span>
+<span class="nc" id="L376">        }</span>
+<span class="nc" id="L377">        List&lt;EvolutionGenome.AssumptionTemplate&gt; assumptions = new ArrayList&lt;&gt;(</span>
+<span class="nc" id="L378">            first.assumptions());</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        for (EvolutionGenome.AssumptionTemplate assumption : second.assumptions()) {</span>
+<span class="nc" id="L380">            assumptions.add(instantiate(assumption, bindings));</span>
+<span class="nc" id="L381">        }</span>
+<span class="nc" id="L382">        List&lt;EvolutionGenome.EvidenceObligation&gt; obligations = new ArrayList&lt;&gt;(</span>
+<span class="nc" id="L383">            first.evidenceObligations());</span>
+<span class="nc" id="L384">        obligations.addAll(second.evidenceObligations());</span>
+<span class="nc" id="L385">        String identity = first.geneId() + &quot;|&quot; + second.geneId();</span>
+<span class="nc" id="L386">        String geneId = &quot;compose_&quot; + EvolutionGenome.hash(identity).substring(7, 23);</span>
+<span class="nc" id="L387">        EvolutionGenome.RewriteGene gene = new EvolutionGenome.RewriteGene(</span>
+            geneId,
+<span class="nc" id="L389">            first.sourcePattern(),</span>
+<span class="nc" id="L390">            EvolutionGenomeCompiler.renderPattern(composedTarget),</span>
+<span class="nc" id="L391">            mergeKind(first.kind(), second.kind()),</span>
+            false,
+<span class="nc" id="L393">            clamp(first.estimatedCostDelta() + second.estimatedCostDelta(), -1000, 1000),</span>
+<span class="nc" id="L394">            Math.min(first.maxApplicationsPerPath(), second.maxApplicationsPerPath()),</span>
+<span class="nc" id="L395">            Math.min(1024, first.maxAstGrowth() + second.maxAstGrowth()),</span>
+            assumptions,
+            obligations);
+<span class="nc" id="L398">        return new Composition(gene);</span>
+    }
+
+    private static boolean unify(
+        PatternExpr pattern,
+        PatternExpr value,
+        Map&lt;String, PatternExpr&gt; bindings
+    ) {
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="nc" id="L407">            PatternExpr existing = bindings.putIfAbsent(placeholder.name(), value);</span>
+<span class="nc bnc" id="L408" title="All 4 branches missed.">            return existing == null || existing.equals(value);</span>
+        }
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralNumber number) {</span>
+<span class="nc" id="L411">            return value instanceof PatternExpr.LiteralNumber other</span>
+<span class="nc bnc" id="L412" title="All 4 branches missed.">                &amp;&amp; number.value() == other.value();</span>
+        }
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.LiteralVariable variable) {</span>
+<span class="nc" id="L415">            return value instanceof PatternExpr.LiteralVariable other</span>
+<span class="nc bnc" id="L416" title="All 4 branches missed.">                &amp;&amp; variable.name().equals(other.name());</span>
+        }
+<span class="nc bnc" id="L418" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="nc" id="L419">            return value instanceof PatternExpr.Operation other</span>
+<span class="nc bnc" id="L420" title="All 2 branches missed.">                &amp;&amp; operation.operator() == other.operator()</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">                &amp;&amp; unify(operation.left(), other.left(), bindings)</span>
+<span class="nc bnc" id="L422" title="All 4 branches missed.">                &amp;&amp; unify(operation.right(), other.right(), bindings);</span>
+        }
+<span class="nc" id="L424">        PatternExpr.Function function = (PatternExpr.Function) pattern;</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        if (!(value instanceof PatternExpr.Function other)</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">                || !function.name().equals(other.name())</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">                || function.arguments().size() != other.arguments().size()) {</span>
+<span class="nc" id="L428">            return false;</span>
+        }
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        for (int index = 0; index &lt; function.arguments().size(); index++) {</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">            if (!unify(</span>
+<span class="nc" id="L432">                    function.arguments().get(index),</span>
+<span class="nc" id="L433">                    other.arguments().get(index),</span>
+                    bindings)) {
+<span class="nc" id="L435">                return false;</span>
+            }
+        }
+<span class="nc" id="L438">        return true;</span>
+    }
+
+    private static PatternExpr instantiate(
+        PatternExpr pattern,
+        Map&lt;String, PatternExpr&gt; bindings
+    ) {
+<span class="nc bnc" id="L445" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.Placeholder placeholder) {</span>
+<span class="nc" id="L446">            PatternExpr value = bindings.get(placeholder.name());</span>
+<span class="nc bnc" id="L447" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L448">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L449">                    &quot;unbound composition placeholder &quot; + placeholder.name());</span>
+            }
+<span class="nc" id="L451">            return value;</span>
+        }
+<span class="nc bnc" id="L453" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.Operation operation) {</span>
+<span class="nc" id="L454">            return PatternExpr.op(</span>
+<span class="nc" id="L455">                operation.operator(),</span>
+<span class="nc" id="L456">                instantiate(operation.left(), bindings),</span>
+<span class="nc" id="L457">                instantiate(operation.right(), bindings));</span>
+        }
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        if (pattern instanceof PatternExpr.Function function) {</span>
+<span class="nc" id="L460">            PatternExpr[] arguments = function.arguments().stream()</span>
+<span class="nc" id="L461">                .map(argument -&gt; instantiate(argument, bindings))</span>
+<span class="nc" id="L462">                .toArray(PatternExpr[]::new);</span>
+<span class="nc" id="L463">            return PatternExpr.fn(function.name(), arguments);</span>
+        }
+<span class="nc" id="L465">        return pattern;</span>
+    }
+
+    private static EvolutionGenome.AssumptionTemplate instantiate(
+        EvolutionGenome.AssumptionTemplate assumption,
+        Map&lt;String, PatternExpr&gt; bindings
+    ) {
+<span class="nc" id="L472">        java.util.function.UnaryOperator&lt;String&gt; replace = token -&gt; {</span>
+<span class="nc" id="L473">            PatternExpr value = bindings.get(token.substring(1));</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L475">                throw new IllegalArgumentException(</span>
+                    &quot;unbound assumption placeholder &quot; + token);
+            }
+<span class="nc" id="L478">            return EvolutionGenomeCompiler.renderPattern(value);</span>
+        };
+<span class="nc" id="L480">        return new EvolutionGenome.AssumptionTemplate(</span>
+<span class="nc" id="L481">            assumption.kind(),</span>
+<span class="nc" id="L482">            EvolutionGenome.transformPlaceholders(assumption.expression(), replace),</span>
+<span class="nc" id="L483">            assumption.symbols().stream()</span>
+<span class="nc" id="L484">                .map(symbol -&gt; EvolutionGenome.transformPlaceholders(symbol, replace))</span>
+<span class="nc" id="L485">                .toList());</span>
+    }
+
+    private static RewriteKind mergeKind(RewriteKind first, RewriteKind second) {
+<span class="nc bnc" id="L489" title="All 4 branches missed.">        if (first == RewriteKind.EXPAND || second == RewriteKind.EXPAND) {</span>
+<span class="nc" id="L490">            return RewriteKind.EXPAND;</span>
+        }
+<span class="nc bnc" id="L492" title="All 4 branches missed.">        if (first == RewriteKind.FACTOR || second == RewriteKind.FACTOR) {</span>
+<span class="nc" id="L493">            return RewriteKind.FACTOR;</span>
+        }
+<span class="nc bnc" id="L495" title="All 4 branches missed.">        if (first == RewriteKind.SIMPLIFY || second == RewriteKind.SIMPLIFY) {</span>
+<span class="nc" id="L496">            return RewriteKind.SIMPLIFY;</span>
+        }
+<span class="nc" id="L498">        return RewriteKind.NORMALIZE;</span>
+    }
+
+    private static void collectNumbers(String value, Set&lt;String&gt; output) {
+<span class="fc" id="L502">        Matcher matcher = NUMBER.matcher(value);</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L504">            output.add(matcher.group());</span>
+        }
+<span class="fc" id="L506">    }</span>
+
+    private static String replaceNumber(
+        String value,
+        String number,
+        String replacement
+    ) {
+<span class="fc" id="L513">        Matcher matcher = NUMBER.matcher(value);</span>
+<span class="fc" id="L514">        StringBuffer output = new StringBuffer();</span>
+<span class="fc bfc" id="L515" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L516">            matcher.appendReplacement(</span>
+                output,
+<span class="fc" id="L518">                Matcher.quoteReplacement(</span>
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">                    matcher.group().equals(number) ? replacement : matcher.group()));</span>
+        }
+<span class="fc" id="L521">        matcher.appendTail(output);</span>
+<span class="fc" id="L522">        return output.toString();</span>
+    }
+
+    private static String nextPlaceholder(
+        EvolutionGenome.RewriteGene gene,
+        String prefix
+    ) {
+<span class="fc" id="L529">        Set&lt;String&gt; used = new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L530">            EvolutionGenome.placeholders(gene.sourcePattern()));</span>
+<span class="fc" id="L531">        used.addAll(EvolutionGenome.placeholders(gene.targetPattern()));</span>
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">        for (int index = 0; index &lt; 10_000; index++) {</span>
+<span class="fc" id="L533">            String candidate = &quot;?&quot; + prefix + index;</span>
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">            if (!used.contains(candidate)) {</span>
+<span class="fc" id="L535">                return candidate;</span>
+            }
+        }
+<span class="nc" id="L538">        throw new IllegalStateException(&quot;placeholder namespace exhausted&quot;);</span>
+    }
+
+    private static List&lt;EvolutionGenome.RewriteGene&gt; replaceGene(
+        List&lt;EvolutionGenome.RewriteGene&gt; genes,
+        EvolutionGenome.RewriteGene replacement
+    ) {
+<span class="fc" id="L545">        return genes.stream()</span>
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">            .map(gene -&gt; gene.geneId().equals(replacement.geneId())</span>
+<span class="fc" id="L547">                ? replacement</span>
+<span class="nc" id="L548">                : gene)</span>
+<span class="fc" id="L549">            .toList();</span>
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; append(List&lt;T&gt; values, T value) {
+<span class="fc" id="L553">        List&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L554">        result.add(value);</span>
+<span class="fc" id="L555">        return result;</span>
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; remove(List&lt;T&gt; values, T value) {
+<span class="fc" id="L559">        List&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L560">        result.remove(value);</span>
+<span class="fc" id="L561">        return result;</span>
+    }
+
+    private static List&lt;Proposal&gt; rotate(List&lt;Proposal&gt; values, long seed) {
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L566">            return List.of();</span>
+        }
+<span class="fc" id="L568">        int offset = (int) Math.floorMod(mix(seed), values.size());</span>
+<span class="fc" id="L569">        List&lt;Proposal&gt; result = new ArrayList&lt;&gt;(values.size());</span>
+<span class="fc" id="L570">        result.addAll(values.subList(offset, values.size()));</span>
+<span class="fc" id="L571">        result.addAll(values.subList(0, offset));</span>
+<span class="fc" id="L572">        return result;</span>
+    }
+
+    private static long mix(long value) {
+<span class="fc" id="L576">        long mixed = value + 0x9E3779B97F4A7C15L;</span>
+<span class="fc" id="L577">        mixed = (mixed ^ (mixed &gt;&gt;&gt; 30)) * 0xBF58476D1CE4E5B9L;</span>
+<span class="fc" id="L578">        mixed = (mixed ^ (mixed &gt;&gt;&gt; 27)) * 0x94D049BB133111EBL;</span>
+<span class="fc" id="L579">        return mixed ^ (mixed &gt;&gt;&gt; 31);</span>
+    }
+
+    private static int clamp(int value, int minimum, int maximum) {
+<span class="nc" id="L583">        return Math.max(minimum, Math.min(maximum, value));</span>
+    }
+
+    private static String stableMessage(RuntimeException exception) {
+<span class="nc" id="L587">        String message = exception.getMessage();</span>
+<span class="nc" id="L588">        return exception.getClass().getSimpleName()</span>
+<span class="nc bnc" id="L589" title="All 4 branches missed.">            + (message == null || message.isBlank() ? &quot;&quot; : &quot;:&quot; + message);</span>
+    }
+
+<span class="fc" id="L592">    public enum MutationStatus {</span>
+<span class="fc" id="L593">        ACCEPTED,</span>
+<span class="fc" id="L594">        REJECTED</span>
+    }
+
+    public record MutationLimits(int maxProposals, int maxAccepted) {
+<span class="fc" id="L598">        public MutationLimits {</span>
+<span class="pc bpc" id="L599" title="2 of 4 branches missed.">            if (maxProposals &lt; 1 || maxProposals &gt; 100_000) {</span>
+<span class="nc" id="L600">                throw new IllegalArgumentException(&quot;maxProposals must be in [1,100000]&quot;);</span>
+            }
+<span class="pc bpc" id="L602" title="2 of 4 branches missed.">            if (maxAccepted &lt; 1 || maxAccepted &gt; maxProposals) {</span>
+<span class="nc" id="L603">                throw new IllegalArgumentException(</span>
+                    &quot;maxAccepted must be in [1,maxProposals]&quot;);
+            }
+<span class="fc" id="L606">        }</span>
+
+        public static MutationLimits conservativeDefault() {
+<span class="nc" id="L609">            return new MutationLimits(128, 16);</span>
+        }
+    }
+
+    public record MutationCatalog(
+        List&lt;EvolutionGenome.AssumptionTemplate&gt; assumptions,
+        List&lt;EvolutionGenome.FeatureWeight&gt; rankingFeatures,
+        List&lt;Integer&gt; specializationConstants
+    ) {
+<span class="fc" id="L618">        public MutationCatalog {</span>
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">            assumptions = assumptions == null</span>
+<span class="nc" id="L620">                ? List.of()</span>
+<span class="fc" id="L621">                : assumptions.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L622">                    .distinct()</span>
+<span class="fc" id="L623">                    .sorted(Comparator.comparing(</span>
+                        EvolutionGenome.AssumptionTemplate::canonicalMaterial))
+<span class="fc" id="L625">                    .toList();</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">            rankingFeatures = rankingFeatures == null</span>
+<span class="nc" id="L627">                ? List.of()</span>
+<span class="fc" id="L628">                : rankingFeatures.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L629">                    .collect(java.util.stream.Collectors.toMap(</span>
+                        EvolutionGenome.FeatureWeight::signal,
+<span class="fc" id="L631">                        value -&gt; value,</span>
+<span class="nc" id="L632">                        (left, right) -&gt; left,</span>
+                        LinkedHashMap::new))
+<span class="fc" id="L634">                    .values().stream()</span>
+<span class="pc" id="L635">                    .sorted(Comparator.comparing(item -&gt; item.signal().name()))</span>
+<span class="fc" id="L636">                    .toList();</span>
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">            specializationConstants = specializationConstants == null</span>
+<span class="nc" id="L638">                ? List.of(0, 1, 2, 3)</span>
+<span class="fc" id="L639">                : specializationConstants.stream()</span>
+<span class="fc" id="L640">                    .filter(Objects::nonNull)</span>
+<span class="pc bpc" id="L641" title="2 of 4 branches missed.">                    .filter(value -&gt; value &gt;= -1000 &amp;&amp; value &lt;= 1000)</span>
+<span class="fc" id="L642">                    .distinct()</span>
+<span class="fc" id="L643">                    .sorted()</span>
+<span class="fc" id="L644">                    .toList();</span>
+<span class="fc" id="L645">        }</span>
+
+        public static MutationCatalog empty() {
+<span class="fc" id="L648">            return new MutationCatalog(List.of(), List.of(), List.of(0, 1, 2, 3));</span>
+        }
+    }
+
+    public record MutationAttempt(
+        int ordinal,
+        EvolutionMutationKind kind,
+        String proposalKey,
+        MutationStatus status,
+        String childGenomeHash,
+        String childAlphaStructuralHash,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L661">        public MutationAttempt {</span>
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">            if (ordinal &lt; 1) {</span>
+<span class="nc" id="L663">                throw new IllegalArgumentException(&quot;ordinal must be positive&quot;);</span>
+            }
+<span class="fc" id="L665">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L666" title="2 of 4 branches missed.">            if (proposalKey == null || proposalKey.isBlank()) {</span>
+<span class="nc" id="L667">                throw new IllegalArgumentException(&quot;proposalKey must not be blank&quot;);</span>
+            }
+<span class="fc" id="L669">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">            if (childGenomeHash != null) {</span>
+<span class="fc" id="L671">                EvolutionGenome.requireSha256(childGenomeHash, &quot;childGenomeHash&quot;);</span>
+<span class="fc" id="L672">                EvolutionGenome.requireSha256(</span>
+                    childAlphaStructuralHash,
+                    &quot;childAlphaStructuralHash&quot;);
+<span class="nc bnc" id="L675" title="All 2 branches missed.">            } else if (childAlphaStructuralHash != null) {</span>
+<span class="nc" id="L676">                throw new IllegalArgumentException(</span>
+                    &quot;child structural hash requires child genome hash&quot;);
+            }
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">            blockers = blockers == null</span>
+<span class="nc" id="L680">                ? List.of()</span>
+<span class="fc" id="L681">                : blockers.stream().filter(Objects::nonNull)</span>
+<span class="fc" id="L682">                    .distinct().sorted().toList();</span>
+<span class="pc bpc" id="L683" title="1 of 4 branches missed.">            if (status == MutationStatus.ACCEPTED &amp;&amp; !blockers.isEmpty()) {</span>
+<span class="nc" id="L684">                throw new IllegalArgumentException(&quot;accepted mutation cannot have blockers&quot;);</span>
+            }
+<span class="pc bpc" id="L686" title="1 of 4 branches missed.">            if (status == MutationStatus.REJECTED &amp;&amp; blockers.isEmpty()) {</span>
+<span class="nc" id="L687">                throw new IllegalArgumentException(&quot;rejected mutation requires blockers&quot;);</span>
+            }
+<span class="fc" id="L689">        }</span>
+    }
+
+    public record MutationBatch(
+        String schema,
+        String parentGenomeHash,
+        String parentAlphaStructuralHash,
+        long seed,
+        MutationLimits limits,
+        List&lt;MutationAttempt&gt; attempts,
+        List&lt;EvolutionGenome&gt; acceptedChildren,
+        String contentHash
+    ) {
+<span class="fc" id="L702">        public MutationBatch {</span>
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L704">                throw new IllegalArgumentException(&quot;unsupported mutation batch schema&quot;);</span>
+            }
+<span class="fc" id="L706">            EvolutionGenome.requireSha256(parentGenomeHash, &quot;parentGenomeHash&quot;);</span>
+<span class="fc" id="L707">            EvolutionGenome.requireSha256(</span>
+                parentAlphaStructuralHash,
+                &quot;parentAlphaStructuralHash&quot;);
+<span class="fc" id="L710">            Objects.requireNonNull(limits, &quot;limits&quot;);</span>
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">            attempts = attempts == null</span>
+<span class="nc" id="L712">                ? List.of()</span>
+<span class="fc" id="L713">                : attempts.stream()</span>
+<span class="fc" id="L714">                    .sorted(Comparator.comparingInt(MutationAttempt::ordinal))</span>
+<span class="fc" id="L715">                    .toList();</span>
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">            acceptedChildren = acceptedChildren == null</span>
+<span class="nc" id="L717">                ? List.of()</span>
+<span class="fc" id="L718">                : List.copyOf(acceptedChildren);</span>
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">            if (attempts.size() &gt; limits.maxProposals()) {</span>
+<span class="nc" id="L720">                throw new IllegalArgumentException(&quot;attempt count exceeds maxProposals&quot;);</span>
+            }
+<span class="fc bfc" id="L722" title="All 2 branches covered.">            for (int index = 0; index &lt; attempts.size(); index++) {</span>
+<span class="pc bpc" id="L723" title="1 of 2 branches missed.">                if (attempts.get(index).ordinal() != index + 1) {</span>
+<span class="nc" id="L724">                    throw new IllegalArgumentException(&quot;attempt ordinals must be contiguous&quot;);</span>
+                }
+            }
+<span class="pc bpc" id="L727" title="1 of 2 branches missed.">            if (acceptedChildren.size() &gt; limits.maxAccepted()) {</span>
+<span class="nc" id="L728">                throw new IllegalArgumentException(&quot;accepted child count exceeds maxAccepted&quot;);</span>
+            }
+<span class="fc" id="L730">            List&lt;String&gt; acceptedAttemptHashes = attempts.stream()</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">                .filter(item -&gt; item.status() == MutationStatus.ACCEPTED)</span>
+<span class="fc" id="L732">                .map(MutationAttempt::childGenomeHash)</span>
+<span class="fc" id="L733">                .toList();</span>
+<span class="fc" id="L734">            List&lt;String&gt; acceptedChildHashes = acceptedChildren.stream()</span>
+<span class="fc" id="L735">                .map(EvolutionGenome::contentHash)</span>
+<span class="fc" id="L736">                .toList();</span>
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">            if (!acceptedAttemptHashes.equals(acceptedChildHashes)) {</span>
+<span class="nc" id="L738">                throw new IllegalArgumentException(</span>
+                    &quot;accepted attempts and accepted children are inconsistent&quot;);
+            }
+<span class="fc" id="L741">            long distinctStructures = acceptedChildren.stream()</span>
+<span class="fc" id="L742">                .map(EvolutionGenome::alphaStructuralHash)</span>
+<span class="fc" id="L743">                .distinct()</span>
+<span class="fc" id="L744">                .count();</span>
+<span class="pc bpc" id="L745" title="1 of 2 branches missed.">            if (distinctStructures != acceptedChildren.size()) {</span>
+<span class="nc" id="L746">                throw new IllegalArgumentException(&quot;accepted children must be structurally unique&quot;);</span>
+            }
+<span class="pc bpc" id="L748" title="1 of 2 branches missed.">            if (acceptedChildren.stream().anyMatch(child -&gt;</span>
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">                    !child.seedGenomeHashes().contains(parentGenomeHash))) {</span>
+<span class="nc" id="L750">                throw new IllegalArgumentException(&quot;accepted child is missing parent lineage&quot;);</span>
+            }
+<span class="fc" id="L752">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L753">            String expected = EvolutionGenome.hash(renderBatch(</span>
+                parentGenomeHash,
+                parentAlphaStructuralHash,
+                seed,
+                limits,
+                attempts,
+                acceptedChildren,
+                null));
+<span class="pc bpc" id="L761" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L762">                throw new IllegalArgumentException(&quot;mutation batch contentHash mismatch&quot;);</span>
+            }
+<span class="fc" id="L764">        }</span>
+
+        private static MutationBatch create(
+            EvolutionGenome parent,
+            long seed,
+            MutationLimits limits,
+            List&lt;MutationAttempt&gt; attempts,
+            List&lt;EvolutionGenome&gt; accepted
+        ) {
+<span class="fc" id="L773">            String payload = renderBatch(</span>
+<span class="fc" id="L774">                parent.contentHash(),</span>
+<span class="fc" id="L775">                parent.alphaStructuralHash(),</span>
+                seed,
+                limits,
+                attempts,
+                accepted,
+                null);
+<span class="fc" id="L781">            return new MutationBatch(</span>
+                SCHEMA,
+<span class="fc" id="L783">                parent.contentHash(),</span>
+<span class="fc" id="L784">                parent.alphaStructuralHash(),</span>
+                seed,
+                limits,
+                attempts,
+                accepted,
+<span class="fc" id="L789">                EvolutionGenome.hash(payload));</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L793">            return renderBatch(</span>
+                parentGenomeHash,
+                parentAlphaStructuralHash,
+                seed,
+                limits,
+                attempts,
+                acceptedChildren,
+                contentHash);
+        }
+
+        public List&lt;String&gt; acceptedGenomeHashes() {
+<span class="fc" id="L804">            return acceptedChildren.stream().map(EvolutionGenome::contentHash).toList();</span>
+        }
+    }
+
+    private static String renderBatch(
+        String parentHash,
+        String parentAlphaHash,
+        long seed,
+        MutationLimits limits,
+        List&lt;MutationAttempt&gt; attempts,
+        List&lt;EvolutionGenome&gt; accepted,
+        String contentHash
+    ) {
+<span class="fc" id="L817">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L818">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L819">            .property(&quot;parentGenomeHash&quot;, parentHash)</span>
+<span class="fc" id="L820">            .property(&quot;parentAlphaStructuralHash&quot;, parentAlphaHash)</span>
+<span class="fc" id="L821">            .property(&quot;seed&quot;, seed)</span>
+<span class="fc" id="L822">            .object(&quot;limits&quot;, object -&gt; object</span>
+<span class="fc" id="L823">                .property(&quot;maxProposals&quot;, limits.maxProposals())</span>
+<span class="fc" id="L824">                .property(&quot;maxAccepted&quot;, limits.maxAccepted()))</span>
+<span class="fc" id="L825">            .array(&quot;attempts&quot;, array -&gt; attempts.forEach(attempt -&gt;</span>
+<span class="fc" id="L826">                array.objectValue(object -&gt; writeAttempt(object, attempt))))</span>
+<span class="fc" id="L827">            .stringArray(&quot;acceptedGenomeHashes&quot;, accepted.stream()</span>
+<span class="fc" id="L828">                .map(EvolutionGenome::contentHash)</span>
+<span class="fc" id="L829">                .toList())</span>
+<span class="fc" id="L830">            .stringArray(&quot;acceptedAlphaStructuralHashes&quot;, accepted.stream()</span>
+<span class="fc" id="L831">                .map(EvolutionGenome::alphaStructuralHash)</span>
+<span class="fc" id="L832">                .toList());</span>
+<span class="fc bfc" id="L833" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L834">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L836">        return json.endObject().toString();</span>
+    }
+
+    private static void writeAttempt(JsonWriter json, MutationAttempt attempt) {
+<span class="fc" id="L840">        json.property(&quot;ordinal&quot;, attempt.ordinal())</span>
+<span class="fc" id="L841">            .property(&quot;kind&quot;, attempt.kind().name())</span>
+<span class="fc" id="L842">            .property(&quot;proposalKey&quot;, attempt.proposalKey())</span>
+<span class="fc" id="L843">            .property(&quot;status&quot;, attempt.status().name());</span>
+<span class="pc bpc" id="L844" title="1 of 2 branches missed.">        if (attempt.childGenomeHash() == null) {</span>
+<span class="nc" id="L845">            json.nullProperty(&quot;childGenomeHash&quot;)</span>
+<span class="nc" id="L846">                .nullProperty(&quot;childAlphaStructuralHash&quot;);</span>
+        } else {
+<span class="fc" id="L848">            json.property(&quot;childGenomeHash&quot;, attempt.childGenomeHash())</span>
+<span class="fc" id="L849">                .property(&quot;childAlphaStructuralHash&quot;, attempt.childAlphaStructuralHash());</span>
+        }
+<span class="fc" id="L851">        json.stringArray(&quot;blockers&quot;, attempt.blockers());</span>
+<span class="fc" id="L852">    }</span>
+
+<span class="fc" id="L854">    private record Proposal(</span>
+        EvolutionMutationKind kind,
+        String key,
+        Supplier&lt;EvolutionGenome&gt; factory
+    ) {
+    }
+
+<span class="nc" id="L861">    private record Composition(EvolutionGenome.RewriteGene gene) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
