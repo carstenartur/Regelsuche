@@ -1,0 +1,87 @@
+name: Apply Domain Generic Review Fix
+
+on:
+  push:
+    branches: [ "issue-224-domain-generic-qualification" ]
+    paths:
+      - '.github/workflows/branch-fix-domain-generic-review.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: issue-224-domain-generic-qualification
+          fetch-depth: 0
+
+      - name: Canonicalize duplicate summaries and strengthen characterization
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              'regelsuche-release/src/main/java/de/regelsuche/release/'
+              'DomainGenericDiscoveryQualification.java')
+          text = source.read_text(encoding='utf-8')
+          old = (
+              '        List<DomainSummary> domains = exports.stream()\n'
+              '            .map(DomainGenericDiscoveryQualification::summarize)\n'
+              '            .sorted(Comparator.comparing(DomainSummary::domainId))\n'
+              '            .toList();\n'
+          )
+          new = (
+              '        List<DomainSummary> domains = exports.stream()\n'
+              '            .map(DomainGenericDiscoveryQualification::summarize)\n'
+              '            .distinct()\n'
+              '            .sorted(Comparator.comparing(DomainSummary::domainId))\n'
+              '            .toList();\n'
+          )
+          if text.count(old) != 1:
+              raise SystemExit('domain-summary mapping marker not found exactly once')
+          source.write_text(text.replace(old, new), encoding='utf-8')
+
+          test = Path(
+              'regelsuche-release/src/test/java/de/regelsuche/release/'
+              'DomainGenericQualificationRunnerTest.java')
+          text = test.read_text(encoding='utf-8')
+          old = (
+              '        assertEquals(QualificationStatus.BLOCKED, blocked.status());\n'
+              '        assertFalse(blocked.domainGenericClaimAuthorized());\n'
+          )
+          new = (
+              '        assertEquals(QualificationStatus.BLOCKED, blocked.status());\n'
+              '        assertEquals(1, blocked.domains().size());\n'
+              '        assertFalse(blocked.domainGenericClaimAuthorized());\n'
+          )
+          if text.count(old) != 1:
+              raise SystemExit('duplicate-domain assertion marker not found exactly once')
+          test.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+      - name: Verify review fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :regelsuche-release:test \
+            --tests de.regelsuche.release.DomainGenericQualificationRunnerTest \
+            --rerun-tasks \
+            --console=plain
+
+      - name: Commit review fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/branch-fix-domain-generic-review.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix(release): canonicalize duplicate domain summaries'
+          git push origin HEAD:issue-224-domain-generic-qualification
