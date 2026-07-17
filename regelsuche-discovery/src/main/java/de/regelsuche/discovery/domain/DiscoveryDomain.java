@@ -145,12 +145,14 @@ public interface DiscoveryDomain<S, C, K> {
             String payload,
             String sourceReference
         ) {
-            return SCHEMA
-                + "\nseedId=" + DomainCanonical.requireIdentifier(seedId, "seedId")
-                + "\ndomainId=" + DomainCanonical.requireIdentifier(domainId, "domainId")
-                + "\npayload=" + DomainCanonical.requireText(payload, "payload")
-                + "\nsourceReference="
-                + DomainCanonical.requireText(sourceReference, "sourceReference");
+            return DomainCanonical.canonicalMap(Map.of(
+                "schema", SCHEMA,
+                "seedId", DomainCanonical.requireIdentifier(seedId, "seedId"),
+                "domainId", DomainCanonical.requireIdentifier(domainId, "domainId"),
+                "payload", DomainCanonical.requireText(payload, "payload"),
+                "sourceReference",
+                    DomainCanonical.requireText(sourceReference, "sourceReference")
+            ));
         }
     }
 
