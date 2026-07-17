@@ -148,7 +148,7 @@ public record PluginArtifactIndex(
     private static Entry entry(EntryDto dto) {
         Objects.requireNonNull(dto, "artifact index entry");
         ArtifactKind kind = enumValue(ArtifactKind.class, dto.kind, "artifact kind");
-        List<Dependency> dependencies = list(dto.dependencies).stream()
+        List<Dependency> parsedDependencies = list(dto.dependencies).stream()
             .map(item -> new Dependency(
                 item.kind == null || item.kind.isBlank()
                     ? kind
@@ -166,7 +166,7 @@ public record PluginArtifactIndex(
             dto.minimumCoreVersion,
             dto.maximumCoreVersionExclusive,
             list(dto.capabilities),
-            dependencies,
+            parsedDependencies,
             dto.artifactFileName,
             dto.artifactSha256,
             dto.artifactUri,
@@ -327,8 +327,8 @@ public record PluginArtifactIndex(
                 throw new IllegalArgumentException(
                     "maximumCoreVersionExclusive must exceed minimumCoreVersion");
             }
-            capabilities = capabilities(capabilities);
-            dependencies = dependencies(dependencies);
+            capabilities = PluginArtifactIndex.capabilities(capabilities);
+            dependencies = PluginArtifactIndex.dependencies(dependencies);
             artifactFileName = fileName(artifactFileName, kind);
             artifactSha256 = sha256(artifactSha256, "artifactSha256");
             artifactUri = uri(artifactUri, "artifactUri", false);
@@ -384,8 +384,10 @@ public record PluginArtifactIndex(
                 minimumCoreVersion, "minimumCoreVersion");
             String normalizedMaximum = optionalVersion(
                 maximumCoreVersionExclusive, "maximumCoreVersionExclusive");
-            List<String> normalizedCapabilities = capabilities(capabilities);
-            List<Dependency> normalizedDependencies = dependencies(dependencies);
+            List<String> normalizedCapabilities =
+                PluginArtifactIndex.capabilities(capabilities);
+            List<Dependency> normalizedDependencies =
+                PluginArtifactIndex.dependencies(dependencies);
             String normalizedFileName = fileName(artifactFileName, kind);
             String normalizedHash = sha256(artifactSha256, "artifactSha256");
             String normalizedArtifactUri = uri(artifactUri, "artifactUri", false);
@@ -674,8 +676,10 @@ public record PluginArtifactIndex(
             List<String> prerelease = matcher.group(4) == null
                 ? List.of()
                 : List.of(matcher.group(4).split("\\."));
-            for (String identifier : prerelease) {
-                if (numeric(identifier) && identifier.length() > 1 && identifier.startsWith("0")) {
+            for (String prereleaseIdentifier : prerelease) {
+                if (numeric(prereleaseIdentifier)
+                        && prereleaseIdentifier.length() > 1
+                        && prereleaseIdentifier.startsWith("0")) {
                     throw new IllegalArgumentException(
                         field + " has a numeric prerelease identifier with a leading zero");
                 }
