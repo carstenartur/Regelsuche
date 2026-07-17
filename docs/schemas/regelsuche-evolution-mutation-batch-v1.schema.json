@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-mutation-batch/v1",
+  "title": "Regelsuche deterministic mutation batch v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "parentGenomeHash",
+    "parentAlphaStructuralHash",
+    "seed",
+    "limits",
+    "attempts",
+    "acceptedGenomeHashes",
+    "acceptedAlphaStructuralHashes",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-mutation-batch/v1"
+    },
+    "parentGenomeHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "parentAlphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "limits": {
+      "type": "object",
+      "required": [
+        "maxProposals",
+        "maxAccepted"
+      ],
+      "properties": {
+        "maxProposals": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "maxAccepted": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        }
+      },
+      "additionalProperties": false
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ordinal",
+          "kind",
+          "proposalKey",
+          "status",
+          "childGenomeHash",
+          "childAlphaStructuralHash",
+          "blockers"
+        ],
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "enum": [
+              "GENERALIZE_PLACEHOLDER",
+              "SPECIALIZE_PLACEHOLDER",
+              "COMPOSE_REWRITES",
+              "ADD_ASSUMPTION",
+              "REMOVE_ASSUMPTION",
+              "REVERSE_REWRITE",
+              "ADD_RANKING_FEATURE",
+              "REMOVE_RANKING_FEATURE"
+            ]
+          },
+          "proposalKey": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "ACCEPTED",
+              "REJECTED"
+            ]
+          },
+          "childGenomeHash": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "childAlphaStructuralHash": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/sha256"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blockers": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "acceptedGenomeHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "acceptedAlphaStructuralHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}
