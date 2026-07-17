@@ -57,14 +57,14 @@ public record PluginArtifactIndexSignature(
         if (signatureBase64 == null || signatureBase64.isBlank()) {
             throw new IllegalArgumentException("signatureBase64 must not be blank");
         }
-        final byte[] signature;
+        byte[] decodedSignature;
         try {
-            signature = Base64.getDecoder().decode(signatureBase64);
+            decodedSignature = Base64.getDecoder().decode(signatureBase64);
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException(
                 "signatureBase64 is not valid base64", exception);
         }
-        if (signature.length != 64) {
+        if (decodedSignature.length != 64) {
             throw new IllegalArgumentException(
                 "Ed25519 signatures must contain exactly 64 bytes");
         }
