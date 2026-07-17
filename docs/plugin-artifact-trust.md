@@ -147,7 +147,9 @@ Für jedes gefundene JAR entsteht
 
 `PluginArtifactGate.GateResult` hält zusätzlich die vollständig bilanzierten
 Listen `admittedArtifacts` und `blockedArtifacts`. Jede Verification muss genau
-in einer dieser Listen erscheinen.
+in einer dieser Listen erscheinen. Der kanonische Gate-Report verwendet
+`regelsuche.plugin-artifact-gate/v1`; CI validiert die vollständige Bilanz und
+die referenzierte Einzelverifikation.
 
 Die Felder `signatureVerified` und `trustedSource` im historischen
 `PluginRuntime`-Katalog bleiben aus Kompatibilitätsgründen bestehen. Für den
@@ -175,5 +177,6 @@ ersetzt.
 - `docs/schemas/regelsuche-plugin-signature-v1.schema.json`
 - `docs/schemas/regelsuche-plugin-trust-store-v1.schema.json`
 - `docs/schemas/regelsuche-plugin-artifact-verification-v1.schema.json`
+- `docs/schemas/regelsuche-plugin-artifact-gate-v1.schema.json`
 
 Die Java-Parser sind zusätzlich strikt gegenüber unbekannten JSON-Feldern.
