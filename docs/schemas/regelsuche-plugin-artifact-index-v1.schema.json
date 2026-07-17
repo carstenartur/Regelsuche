@@ -47,7 +47,12 @@
     },
     "semver": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+    },
+    "uri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^(?:[Hh][Tt][Tt][Pp][Ss]://|[Ff][Ii][Ll][Ee]:/(?:$|[^/].*|//.*))"
     },
     "uriOrEmpty": {
       "oneOf": [
@@ -55,9 +60,7 @@
           "const": ""
         },
         {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^(https://|file:/)"
+          "$ref": "#/$defs/uri"
         }
       ]
     },
@@ -87,7 +90,7 @@
             },
             {
               "type": "string",
-              "pattern": "^=(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+              "pattern": "^=(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
             }
           ]
         },
@@ -172,17 +175,13 @@
           "$ref": "#/$defs/sha256"
         },
         "artifactUri": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^(https://|file:/)"
+          "$ref": "#/$defs/uri"
         },
         "signatureManifestUri": {
           "$ref": "#/$defs/uriOrEmpty"
         },
         "provenanceUri": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^(https://|file:/)"
+          "$ref": "#/$defs/uri"
         },
         "publisherId": {
           "$ref": "#/$defs/identifier"
@@ -209,10 +208,7 @@
                 "pattern": "(?i)\\.jar$"
               },
               "signatureManifestUri": {
-                "type": "string",
-                "minLength": 1,
-                "format": "uri",
-                "pattern": "^(https://|file:/)"
+                "$ref": "#/$defs/uri"
               }
             }
           }
