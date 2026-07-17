@@ -2,7 +2,15 @@ package de.regelsuche.release;
 
 import java.nio.file.Path;
 
-/** Command-line entry point for the separate domain-generic qualification. */
+/**
+ * Command-line entry point for the separate domain-generic qualification.
+ *
+ * <p>The command writes the canonical profile catalog, qualification report,
+ * run receipt and all retained domain exports below the selected output
+ * directory. It exits with an exception unless the dedicated domain-generic
+ * claim is authorized; it never authorizes the algebraic autonomous-campaign
+ * claim.</p>
+ */
 public final class DomainGenericQualificationMain {
     private DomainGenericQualificationMain() {
     }
