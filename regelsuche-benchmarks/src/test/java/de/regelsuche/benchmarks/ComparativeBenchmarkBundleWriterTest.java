@@ -12,7 +12,10 @@ import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
 import de.regelsuche.search.strategy.BestFirstSearchStrategy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.List;
+import java.util.Set;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,34 +25,7 @@ class ComparativeBenchmarkBundleWriterTest {
     void rewriteRemovesStaleArtifactsAndRetainsEveryCanonicalObject(
         @TempDir Path directory
     ) throws Exception {
-        var benchmarkCase = ComparativeBenchmarkCatalog.searchCases().getFirst();
-        var parity = ComparativeBenchmarkCatalog.searchParity(
-            List.of(benchmarkCase));
-        var system = new SearchSystem(
-            "best-first",
-            "test",
-            new BestFirstSearchStrategy(),
-            List.of());
-        var configuration =
-            ComparativeBenchmarkCatalog.searchConfiguration(system, parity);
-        var result = new ComparativeBenchmarkExecutor().runSearch(
-            system, configuration, benchmarkCase);
-        var claim = CapabilityClaim.create(
-            "single-search-result",
-            Track.TARGET_DIRECTED_SEARCH,
-            ClaimStatus.SUPPORTED,
-            "the pinned search target was reached",
-            List.of(result.contentHash()),
-            List.of("SINGLE_CASE_TEST"));
-        Report report = Report.create(
-            "bundle-writer-test/v1",
-            List.of(parity),
-            List.of(configuration),
-            List.of(benchmarkCase),
-            List.of(result),
-            List.of(claim),
-            List.of());
-
+        Report report = singleResultReport();
         ComparativeBenchmarkBundleWriter writer =
             new ComparativeBenchmarkBundleWriter();
         writer.write(directory, report);
@@ -71,5 +47,59 @@ class ComparativeBenchmarkBundleWriterTest {
         try (var resultFiles = Files.list(directory.resolve("results"))) {
             assertEquals(1L, resultFiles.count());
         }
+    }
+
+    @Test
+    void replacesContentsWithoutDeletingNonRemovableOutputRoot(
+        @TempDir Path parent
+    ) throws Exception {
+        Assumptions.assumeTrue(
+            Files.getFileStore(parent).supportsFileAttributeView("posix"));
+        Path output = Files.createDirectory(parent.resolve("mounted-output"));
+        Files.writeString(output.resolve("stale.json"), "stale");
+        Set<PosixFilePermission> original = Files.getPosixFilePermissions(parent);
+        Set<PosixFilePermission> readOnlyParent = Set.of(
+            PosixFilePermission.OWNER_READ,
+            PosixFilePermission.OWNER_EXECUTE);
+        Files.setPosixFilePermissions(parent, readOnlyParent);
+        try {
+            new ComparativeBenchmarkBundleWriter().write(
+                output, singleResultReport());
+            assertTrue(Files.isDirectory(output));
+            assertFalse(Files.exists(output.resolve("stale.json")));
+            assertTrue(Files.isRegularFile(output.resolve("report.json")));
+        } finally {
+            Files.setPosixFilePermissions(parent, original);
+        }
+    }
+
+    private static Report singleResultReport() {
+        var benchmarkCase = ComparativeBenchmarkCatalog.searchCases().getFirst();
+        var parity = ComparativeBenchmarkCatalog.searchParity(
+            List.of(benchmarkCase));
+        var system = new SearchSystem(
+            "best-first",
+            "test",
+            new BestFirstSearchStrategy(),
+            List.of());
+        var configuration =
+            ComparativeBenchmarkCatalog.searchConfiguration(system, parity);
+        var result = new ComparativeBenchmarkExecutor().runSearch(
+            system, configuration, benchmarkCase);
+        var claim = CapabilityClaim.create(
+            "single-search-result",
+            Track.TARGET_DIRECTED_SEARCH,
+            ClaimStatus.SUPPORTED,
+            "the pinned search target was reached",
+            List.of(result.contentHash()),
+            List.of("SINGLE_CASE_TEST"));
+        return Report.create(
+            "bundle-writer-test/v1",
+            List.of(parity),
+            List.of(configuration),
+            List.of(benchmarkCase),
+            List.of(result),
+            List.of(claim),
+            List.of());
     }
 }
