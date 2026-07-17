@@ -8,6 +8,8 @@ on:
       - 'regelsuche-solver-ir/**'
       - 'regelsuche-solver-portfolio/**'
       - 'docs/schemas/regelsuche-comparative-benchmark-v1.schema.json'
+      - 'docs/discovery-benchmarks.md'
+      - 'Dockerfile.comparative-benchmarks'
       - '.github/workflows/comparative-benchmarks.yml'
       - 'settings.gradle'
       - 'gradle/**'
@@ -18,6 +20,8 @@ on:
       - 'regelsuche-solver-ir/**'
       - 'regelsuche-solver-portfolio/**'
       - 'docs/schemas/regelsuche-comparative-benchmark-v1.schema.json'
+      - 'docs/discovery-benchmarks.md'
+      - 'Dockerfile.comparative-benchmarks'
       - '.github/workflows/comparative-benchmarks.yml'
       - 'settings.gradle'
       - 'gradle/**'
@@ -34,6 +38,7 @@ jobs:
   comparative:
     name: track-scoped parity and external baselines
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
@@ -211,9 +216,34 @@ jobs:
               raise AssertionError('schema accepted correct filtered result')
           PY
 
-      - name: Require byte-identical repeated evidence
+      - name: Require byte-identical repeated Gradle evidence
         shell: bash
         run: diff -ru build/reports/comparative-ci/run-a build/reports/comparative-ci/run-b
+
+      - name: Build pinned comparative benchmark image
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build \
+            -f Dockerfile.comparative-benchmarks \
+            -t regelsuche-comparative-benchmarks . \
+            2>&1 | tee build/reports/comparative-ci/docker-build.log
+
+      - name: Reproduce canonical evidence in Docker
+        shell: bash
+        run: |
+          mkdir -p build/reports/comparative-ci/run-docker
+          chmod 0777 build/reports/comparative-ci/run-docker
+          set -o pipefail
+          docker run --rm \
+            -v "$PWD/build/reports/comparative-ci/run-docker:/output" \
+            regelsuche-comparative-benchmarks \
+            /output \
+            2>&1 | tee build/reports/comparative-ci/docker-run.log
+
+      - name: Require byte-identical Gradle and Docker evidence
+        shell: bash
+        run: diff -ru build/reports/comparative-ci/run-a build/reports/comparative-ci/run-docker
 
       - name: Upload comparative evidence and diagnostics
         if: always()
