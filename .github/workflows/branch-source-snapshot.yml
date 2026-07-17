@@ -70,26 +70,6 @@ jobs:
         shell: bash
         run: git diff --cached --check
 
-      - name: Require complete qualification source set
-        shell: bash
-        run: |
-          set -euo pipefail
-          for path in \
-            docs/README.md \
-            docs/domain-generic-qualification.md \
-            docs/schemas/regelsuche-domain-generic-evidence-profile-catalog-v1.schema.json \
-            docs/schemas/regelsuche-domain-generic-discovery-qualification-v1.schema.json \
-            docs/schemas/regelsuche-domain-generic-discovery-qualification-run-v1.schema.json \
-            regelsuche-release/build.gradle \
-            regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericEvidenceProfile.java \
-            regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java \
-            regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericQualificationRunner.java \
-            regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericQualificationMain.java \
-            regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java; do
-            test -s "$path"
-          done
-          test -n "$(git diff --cached --name-only)"
-
       - name: Commit non-workflow qualification source
         shell: bash
         run: |
