@@ -168,11 +168,12 @@ unabhängig:
 - Revisions-, Verification- und Checkpoint-Hashes;
 - Sequenz-, Vorgänger- und Checkpoint-Bindungen.
 
-Lokale Reproduktion:
+Lokale Reproduktion einschließlich strikter Duplicate-Field-Charakterisierung:
 
 ```bash
 ./gradlew :app:test \
-  --tests de.regelsuche.plugin.PluginTrustStoreRevisionTest
+  --tests de.regelsuche.plugin.PluginTrustStoreRevisionTest \
+  --tests de.regelsuche.plugin.PluginTrustStoreRevisionStrictJsonTest
 ```
 
 Schemas:
