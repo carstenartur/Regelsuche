@@ -197,5 +197,8 @@ ersetzt.
 - `docs/schemas/regelsuche-plugin-artifact-verification-v1.schema.json`
 - `docs/schemas/regelsuche-plugin-artifact-gate-v1.schema.json`
 
-Die Java-Parser sind zusätzlich strikt gegenüber unbekannten JSON-Feldern,
-doppelten Feldern und nachgestellten JSON-Werten.
+Die Revision- und Checkpoint-Parser sind zusätzlich strikt gegenüber
+unbekannten JSON-Feldern, doppelten Feldern und nachgestellten JSON-Werten.
+Die älteren Trust-Store- und Artefaktmanifest-Parser behalten ihre jeweils
+dokumentierten Verträge und werden hier nicht pauschal als gleich streng
+klassifiziert.
