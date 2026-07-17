@@ -125,21 +125,11 @@ public final class PluginArtifactResolver {
             if (selected == null) {
                 continue;
             }
-            Coordinate dependencyCoordinate = new Coordinate(
-                selected.kind(), selected.componentId());
-            if (context.visiting.contains(dependencyCoordinate)) {
-                String diagnostic = (dependency.optional()
-                    ? "optional-dependency-cycle:"
-                    : "dependency-cycle:")
-                    + cycle(context.stack, dependencyCoordinate);
-                if (dependency.optional()) {
-                    context.warnings.add(diagnostic);
-                } else {
-                    context.blockers.add(diagnostic);
-                }
-                continue;
+            if (dependency.optional()) {
+                visitOptional(dependency, entry, selected, context);
+            } else {
+                visit(selected, context);
             }
-            visit(selected, context);
         }
         context.stack.removeLast();
         context.visiting.remove(current);
@@ -148,6 +138,58 @@ public final class PluginArtifactResolver {
                     && item.componentId().equals(entry.componentId()))) {
             context.ordered.add(entry);
         }
+    }
+
+    /**
+     * Optional branches are transactional. A present-but-cyclic, conflicting or
+     * otherwise unresolvable optional dependency is rolled back and retained as
+     * a warning; it cannot poison the required installation plan.
+     */
+    private static void visitOptional(
+        Dependency dependency,
+        Entry parent,
+        Entry selected,
+        ResolutionContext context
+    ) {
+        Map<Coordinate, Entry> selectedBefore = new TreeMap<>(context.selected);
+        List<Entry> orderedBefore = new ArrayList<>(context.ordered);
+        Set<Coordinate> visitingBefore = new HashSet<>(context.visiting);
+        Deque<Coordinate> stackBefore = new ArrayDeque<>(context.stack);
+        int blockerStart = context.blockers.size();
+        int warningStart = context.warnings.size();
+
+        visit(selected, context);
+        if (context.blockers.size() == blockerStart) {
+            return;
+        }
+
+        List<String> rejectedBlockers = messages(new ArrayList<>(
+            context.blockers.subList(blockerStart, context.blockers.size())));
+        List<String> rejectedWarnings = messages(new ArrayList<>(
+            context.warnings.subList(warningStart, context.warnings.size())));
+        context.blockers.subList(blockerStart, context.blockers.size()).clear();
+        context.warnings.subList(warningStart, context.warnings.size()).clear();
+        context.selected.clear();
+        context.selected.putAll(selectedBefore);
+        context.ordered.clear();
+        context.ordered.addAll(orderedBefore);
+        context.visiting.clear();
+        context.visiting.addAll(visitingBefore);
+        context.stack.clear();
+        context.stack.addAll(stackBefore);
+
+        StringBuilder warning = new StringBuilder("optional-dependency-rejected:")
+            .append(parent.artifactId())
+            .append("->")
+            .append(coordinate(dependency.kind(), dependency.componentId()))
+            .append("@")
+            .append(dependency.versionConstraint())
+            .append(":blockers=")
+            .append(String.join("|", rejectedBlockers));
+        if (!rejectedWarnings.isEmpty()) {
+            warning.append(":warnings=").append(String.join("|", rejectedWarnings));
+        }
+        context.warnings.add(warning.toString());
     }
 
     private static Entry selectDependency(
