@@ -5,15 +5,12 @@ import de.regelsuche.mining.InterestingnessIndependentReviewStudy.CandidateCase;
 import de.regelsuche.mining.InterestingnessIndependentReviewStudy.StudyPlan;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /**
@@ -40,14 +37,7 @@ public final class InterestingnessIndependentReviewIntake {
         String priorHash = priorLabeledEvaluationHash == null
             ? ""
             : priorLabeledEvaluationHash;
-        if (revision == 1 && !priorHash.isEmpty()) {
-            throw new IllegalArgumentException(
-                "revision 1 must not declare a prior labeled evaluation");
-        }
-        if (revision > 1) {
-            InterestingnessIndependentReviewStudy.requireSha256(
-                priorHash, "priorLabeledEvaluationHash");
-        }
+        validateRevision(revision, priorHash);
 
         List<ReviewSubmission> submissions = orderedSubmissions(suppliedSubmissions);
         Map<String, Long> reviewIdCounts = submissions.stream()
@@ -76,15 +66,17 @@ public final class InterestingnessIndependentReviewIntake {
                 reviewIdCounts,
                 reviewerCandidateCounts))
             .toList();
-        List<CandidateReviewStatus> candidateStatuses = candidateStatuses(plan, decisions);
-        EvidenceStatus evidenceStatus = decisions.stream().anyMatch(
-            item -> item.outcome() == IntakeOutcome.COUNTED_EXPERT_REVIEW)
-            ? EvidenceStatus.EXTERNAL_REVIEW_COLLECTION
-            : EvidenceStatus.DEVELOPMENT_ONLY;
+        int minimumReviews = plan.reviewProtocol().minimumIndependentExpertReviews();
+        List<CandidateReviewStatus> candidateStatuses = candidateStatuses(
+            plan, decisions, minimumReviews);
+        EvidenceStatus evidenceStatus = evidenceStatus(decisions);
 
         String labeledEvaluationHash = InterestingnessIndependentReviewStudy.sha256(
             InterestingnessIndependentReviewStudy.canonicalBytes(labeledPayload(
-                plan,
+                plan.contentHash(),
+                plan.predictiveCorpusHash(),
+                plan.thresholdLockHash(),
+                minimumReviews,
                 revision,
                 priorHash,
                 decisions,
@@ -92,7 +84,10 @@ public final class InterestingnessIndependentReviewIntake {
                 evidenceStatus
             )));
         Map<String, Object> reportPayload = reportPayload(
-            plan,
+            plan.contentHash(),
+            plan.predictiveCorpusHash(),
+            plan.thresholdLockHash(),
+            minimumReviews,
             revision,
             priorHash,
             decisions,
@@ -107,6 +102,7 @@ public final class InterestingnessIndependentReviewIntake {
             plan.contentHash(),
             plan.predictiveCorpusHash(),
             plan.thresholdLockHash(),
+            minimumReviews,
             revision,
             priorHash,
             evidenceStatus,
@@ -201,6 +197,7 @@ public final class InterestingnessIndependentReviewIntake {
             )));
         return new IntakeDecision(
             submission.reviewId(),
+            submission.studyPlanHash(),
             submission.caseId(),
             submission.candidateId(),
             submission.reviewerHash(),
@@ -217,9 +214,23 @@ public final class InterestingnessIndependentReviewIntake {
         );
     }
 
+    private static EvidenceStatus evidenceStatus(List<IntakeDecision> decisions) {
+        boolean counted = decisions.stream()
+            .anyMatch(item -> item.outcome() == IntakeOutcome.COUNTED_EXPERT_REVIEW);
+        boolean development = decisions.stream()
+            .anyMatch(item -> item.outcome() == IntakeOutcome.DEVELOPMENT_ONLY);
+        if (counted && development) {
+            return EvidenceStatus.MIXED_WITH_DEVELOPMENT_FIXTURES;
+        }
+        return counted
+            ? EvidenceStatus.EXTERNAL_REVIEW_COLLECTION
+            : EvidenceStatus.DEVELOPMENT_ONLY;
+    }
+
     private static List<CandidateReviewStatus> candidateStatuses(
         StudyPlan plan,
-        List<IntakeDecision> decisions
+        List<IntakeDecision> decisions,
+        int minimumReviews
     ) {
         Map<String, List<IntakeDecision>> byCandidate = decisions.stream()
             .collect(Collectors.groupingBy(
@@ -243,17 +254,6 @@ public final class InterestingnessIndependentReviewIntake {
             int rejected = (int) candidateDecisions.stream()
                 .filter(item -> item.outcome() == IntakeOutcome.REJECTED)
                 .count();
-            CandidateCollectionStatus status;
-            if (counted >= plan.reviewProtocol().minimumIndependentExpertReviews()
-                    && blind == counted) {
-                status = CandidateCollectionStatus.READY_FOR_CONSENSUS;
-            } else if (counted > 0) {
-                status = CandidateCollectionStatus.INSUFFICIENT_EXPERT_REVIEWS;
-            } else if (development > 0) {
-                status = CandidateCollectionStatus.DEVELOPMENT_ONLY;
-            } else {
-                status = CandidateCollectionStatus.NO_ACCEPTED_REVIEWS;
-            }
             statuses.add(new CandidateReviewStatus(
                 candidateCase.caseId(),
                 candidateCase.candidateId(),
@@ -262,10 +262,29 @@ public final class InterestingnessIndependentReviewIntake {
                 blind,
                 development,
                 rejected,
-                status
+                expectedCollectionStatus(
+                    counted, blind, development, minimumReviews)
             ));
         }
         return List.copyOf(statuses);
+    }
+
+    private static CandidateCollectionStatus expectedCollectionStatus(
+        int counted,
+        int blind,
+        int development,
+        int minimumReviews
+    ) {
+        if (counted >= minimumReviews && blind == counted) {
+            return CandidateCollectionStatus.READY_FOR_CONSENSUS;
+        }
+        if (counted > 0) {
+            return CandidateCollectionStatus.INSUFFICIENT_EXPERT_REVIEWS;
+        }
+        if (development > 0) {
+            return CandidateCollectionStatus.DEVELOPMENT_ONLY;
+        }
+        return CandidateCollectionStatus.NO_ACCEPTED_REVIEWS;
     }
 
     private static Map<String, Object> decisionPayload(
@@ -280,7 +299,10 @@ public final class InterestingnessIndependentReviewIntake {
     }
 
     private static Map<String, Object> labeledPayload(
-        StudyPlan plan,
+        String studyPlanHash,
+        String predictiveCorpusHash,
+        String thresholdLockHash,
+        int minimumReviews,
         int revision,
         String priorHash,
         List<IntakeDecision> decisions,
@@ -289,9 +311,10 @@ public final class InterestingnessIndependentReviewIntake {
     ) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("schema", "regelsuche.independent-review-labeled-evaluation/v1");
-        payload.put("studyPlanHash", plan.contentHash());
-        payload.put("predictiveCorpusHash", plan.predictiveCorpusHash());
-        payload.put("thresholdLockHash", plan.thresholdLockHash());
+        payload.put("studyPlanHash", studyPlanHash);
+        payload.put("predictiveCorpusHash", predictiveCorpusHash);
+        payload.put("thresholdLockHash", thresholdLockHash);
+        payload.put("minimumIndependentExpertReviews", minimumReviews);
         payload.put("revision", revision);
         payload.put("priorLabeledEvaluationHash", priorHash);
         payload.put("evidenceStatus", evidenceStatus.name());
@@ -302,7 +325,10 @@ public final class InterestingnessIndependentReviewIntake {
     }
 
     private static Map<String, Object> reportPayload(
-        StudyPlan plan,
+        String studyPlanHash,
+        String predictiveCorpusHash,
+        String thresholdLockHash,
+        int minimumReviews,
         int revision,
         String priorHash,
         List<IntakeDecision> decisions,
@@ -311,7 +337,10 @@ public final class InterestingnessIndependentReviewIntake {
         String labeledEvaluationHash
     ) {
         Map<String, Object> payload = new LinkedHashMap<>(labeledPayload(
-            plan,
+            studyPlanHash,
+            predictiveCorpusHash,
+            thresholdLockHash,
+            minimumReviews,
             revision,
             priorHash,
             decisions,
@@ -338,7 +367,8 @@ public final class InterestingnessIndependentReviewIntake {
 
     public enum EvidenceStatus {
         EXTERNAL_REVIEW_COLLECTION,
-        DEVELOPMENT_ONLY
+        DEVELOPMENT_ONLY,
+        MIXED_WITH_DEVELOPMENT_FIXTURES
     }
 
     public enum CandidateCollectionStatus {
@@ -407,6 +437,7 @@ public final class InterestingnessIndependentReviewIntake {
 
     public record IntakeDecision(
         String reviewId,
+        String studyPlanHash,
         String caseId,
         String candidateId,
         String reviewerHash,
@@ -422,21 +453,32 @@ public final class InterestingnessIndependentReviewIntake {
         String contentHash
     ) {
         public IntakeDecision {
-            reviewId = InterestingnessIndependentReviewStudy.requireIdentifier(
-                reviewId, "reviewId");
-            caseId = InterestingnessIndependentReviewStudy.requireIdentifier(caseId, "caseId");
-            candidateId = InterestingnessIndependentReviewStudy.requireIdentifier(
-                candidateId, "candidateId");
-            reviewerHash = InterestingnessIndependentReviewStudy.requireSha256(
-                reviewerHash, "reviewerHash");
-            Objects.requireNonNull(origin, "origin");
-            requirePermille(relevancePermille, "relevancePermille");
-            requirePermille(confidencePermille, "confidencePermille");
-            rationaleCodes = rationaleCodes == null ? List.of() : List.copyOf(rationaleCodes);
-            qualificationEvidenceHash = optionalHash(
-                qualificationEvidenceHash, "qualificationEvidenceHash");
-            independenceAttestationHash = optionalHash(
-                independenceAttestationHash, "independenceAttestationHash");
+            ReviewSubmission submission = new ReviewSubmission(
+                reviewId,
+                studyPlanHash,
+                caseId,
+                candidateId,
+                reviewerHash,
+                origin,
+                blindReview,
+                relevancePermille,
+                confidencePermille,
+                rationaleCodes,
+                qualificationEvidenceHash,
+                independenceAttestationHash
+            );
+            reviewId = submission.reviewId();
+            studyPlanHash = submission.studyPlanHash();
+            caseId = submission.caseId();
+            candidateId = submission.candidateId();
+            reviewerHash = submission.reviewerHash();
+            origin = submission.origin();
+            blindReview = submission.blindReview();
+            relevancePermille = submission.relevancePermille();
+            confidencePermille = submission.confidencePermille();
+            rationaleCodes = submission.rationaleCodes();
+            qualificationEvidenceHash = submission.qualificationEvidenceHash();
+            independenceAttestationHash = submission.independenceAttestationHash();
             Objects.requireNonNull(outcome, "outcome");
             blockers = blockers == null ? List.of() : blockers.stream()
                 .distinct().sorted().toList();
@@ -444,34 +486,19 @@ public final class InterestingnessIndependentReviewIntake {
                 contentHash, "contentHash");
             String expected = InterestingnessIndependentReviewStudy.sha256(
                 InterestingnessIndependentReviewStudy.canonicalBytes(decisionPayload(
-                    new ReviewSubmission(
-                        reviewId,
-                        "sha256:" + "0".repeat(64),
-                        caseId,
-                        candidateId,
-                        reviewerHash,
-                        origin,
-                        blindReview,
-                        relevancePermille,
-                        confidencePermille,
-                        rationaleCodes,
-                        qualificationEvidenceHash,
-                        independenceAttestationHash
-                    ),
+                    submission,
                     outcome,
                     blockers
                 )));
-            // Decision hashes are checked by the enclosing report because the
-            // studyPlanHash is intentionally not duplicated in this record.
-            if (expected.equals(contentHash)) {
-                // No-op: this branch documents that a zero study hash cannot
-                // accidentally validate a decision from a real study.
+            if (!expected.equals(contentHash)) {
+                throw new IllegalArgumentException("intake decision contentHash mismatch");
             }
         }
 
         Map<String, Object> toMap() {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("reviewId", reviewId);
+            payload.put("studyPlanHash", studyPlanHash);
             payload.put("caseId", caseId);
             payload.put("candidateId", candidateId);
             payload.put("reviewerHash", reviewerHash);
@@ -534,6 +561,7 @@ public final class InterestingnessIndependentReviewIntake {
         String studyPlanHash,
         String predictiveCorpusHash,
         String thresholdLockHash,
+        int minimumIndependentExpertReviews,
         int revision,
         String priorLabeledEvaluationHash,
         EvidenceStatus evidenceStatus,
@@ -554,19 +582,11 @@ public final class InterestingnessIndependentReviewIntake {
                 predictiveCorpusHash, "predictiveCorpusHash");
             thresholdLockHash = InterestingnessIndependentReviewStudy.requireSha256(
                 thresholdLockHash, "thresholdLockHash");
-            if (revision < 1) {
-                throw new IllegalArgumentException("revision must be positive");
-            }
-            priorLabeledEvaluationHash = priorLabeledEvaluationHash == null
-                ? "" : priorLabeledEvaluationHash;
-            if (revision == 1 && !priorLabeledEvaluationHash.isEmpty()) {
+            if (minimumIndependentExpertReviews < 2) {
                 throw new IllegalArgumentException(
-                    "revision 1 must not have a prior labeled evaluation");
+                    "minimumIndependentExpertReviews must be at least 2");
             }
-            if (revision > 1) {
-                InterestingnessIndependentReviewStudy.requireSha256(
-                    priorLabeledEvaluationHash, "priorLabeledEvaluationHash");
-            }
+            validateRevision(revision, priorLabeledEvaluationHash);
             Objects.requireNonNull(evidenceStatus, "evidenceStatus");
             decisions = decisions == null ? List.of() : decisions.stream()
                 .sorted(Comparator.comparing(IntakeDecision::caseId)
@@ -579,8 +599,26 @@ public final class InterestingnessIndependentReviewIntake {
                     .sorted(Comparator.comparing((CandidateReviewStatus item) -> item.split().name())
                         .thenComparing(CandidateReviewStatus::caseId))
                     .toList();
+            validateEvidenceStatus(evidenceStatus, decisions);
+            validateCandidateStatusCounts(
+                candidateStatuses, decisions, minimumIndependentExpertReviews);
             labeledEvaluationHash = InterestingnessIndependentReviewStudy.requireSha256(
                 labeledEvaluationHash, "labeledEvaluationHash");
+            String expectedLabeledHash = InterestingnessIndependentReviewStudy.sha256(
+                InterestingnessIndependentReviewStudy.canonicalBytes(labeledPayload(
+                    studyPlanHash,
+                    predictiveCorpusHash,
+                    thresholdLockHash,
+                    minimumIndependentExpertReviews,
+                    revision,
+                    priorLabeledEvaluationHash,
+                    decisions,
+                    candidateStatuses,
+                    evidenceStatus
+                )));
+            if (!expectedLabeledHash.equals(labeledEvaluationHash)) {
+                throw new IllegalArgumentException("labeledEvaluationHash mismatch");
+            }
             if (!"NOT_EVALUATED".equals(promotionStatus)
                     || !"NOT_EVALUATED".equals(publicEvidenceStatus)) {
                 throw new IllegalArgumentException(
@@ -588,6 +626,22 @@ public final class InterestingnessIndependentReviewIntake {
             }
             contentHash = InterestingnessIndependentReviewStudy.requireSha256(
                 contentHash, "contentHash");
+            String expectedContentHash = InterestingnessIndependentReviewStudy.sha256(
+                InterestingnessIndependentReviewStudy.canonicalBytes(reportPayload(
+                    studyPlanHash,
+                    predictiveCorpusHash,
+                    thresholdLockHash,
+                    minimumIndependentExpertReviews,
+                    revision,
+                    priorLabeledEvaluationHash,
+                    decisions,
+                    candidateStatuses,
+                    evidenceStatus,
+                    labeledEvaluationHash
+                )));
+            if (!expectedContentHash.equals(contentHash)) {
+                throw new IllegalArgumentException("intake report contentHash mismatch");
+            }
         }
 
         public long countedExpertReviews() {
@@ -596,28 +650,89 @@ public final class InterestingnessIndependentReviewIntake {
                 .count();
         }
 
-        public boolean allCandidatesReadyForConsensus() {
-            return !candidateStatuses.isEmpty() && candidateStatuses.stream()
-                .allMatch(item -> item.status() == CandidateCollectionStatus.READY_FOR_CONSENSUS);
+        public boolean eligibleForEmpiricalConsensus() {
+            return evidenceStatus == EvidenceStatus.EXTERNAL_REVIEW_COLLECTION
+                && !candidateStatuses.isEmpty()
+                && candidateStatuses.stream().allMatch(
+                    item -> item.status() == CandidateCollectionStatus.READY_FOR_CONSENSUS);
         }
 
         public String toCanonicalJson() {
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("schema", schema);
-            payload.put("studyPlanHash", studyPlanHash);
-            payload.put("predictiveCorpusHash", predictiveCorpusHash);
-            payload.put("thresholdLockHash", thresholdLockHash);
-            payload.put("revision", revision);
-            payload.put("priorLabeledEvaluationHash", priorLabeledEvaluationHash);
-            payload.put("evidenceStatus", evidenceStatus.name());
-            payload.put("decisions", decisions.stream().map(IntakeDecision::toMap).toList());
-            payload.put("candidateStatuses", candidateStatuses.stream()
-                .map(CandidateReviewStatus::toMap).toList());
-            payload.put("labeledEvaluationHash", labeledEvaluationHash);
-            payload.put("promotionStatus", promotionStatus);
-            payload.put("publicEvidenceStatus", publicEvidenceStatus);
+            Map<String, Object> payload = reportPayload(
+                studyPlanHash,
+                predictiveCorpusHash,
+                thresholdLockHash,
+                minimumIndependentExpertReviews,
+                revision,
+                priorLabeledEvaluationHash,
+                decisions,
+                candidateStatuses,
+                evidenceStatus,
+                labeledEvaluationHash
+            );
             payload.put("contentHash", contentHash);
             return InterestingnessIndependentReviewStudy.canonicalJson(payload);
+        }
+    }
+
+    private static void validateRevision(int revision, String priorHash) {
+        String normalized = priorHash == null ? "" : priorHash;
+        if (revision < 1) {
+            throw new IllegalArgumentException("revision must be positive");
+        }
+        if (revision == 1 && !normalized.isEmpty()) {
+            throw new IllegalArgumentException(
+                "revision 1 must not declare a prior labeled evaluation");
+        }
+        if (revision > 1) {
+            InterestingnessIndependentReviewStudy.requireSha256(
+                normalized, "priorLabeledEvaluationHash");
+        }
+    }
+
+    private static void validateEvidenceStatus(
+        EvidenceStatus status,
+        List<IntakeDecision> decisions
+    ) {
+        if (status != evidenceStatus(decisions)) {
+            throw new IllegalArgumentException("evidenceStatus disagrees with decisions");
+        }
+    }
+
+    private static void validateCandidateStatusCounts(
+        List<CandidateReviewStatus> statuses,
+        List<IntakeDecision> decisions,
+        int minimumReviews
+    ) {
+        Set<String> uniqueCases = new java.util.HashSet<>();
+        Set<String> uniqueCandidates = new java.util.HashSet<>();
+        for (CandidateReviewStatus status : statuses) {
+            if (!uniqueCases.add(status.caseId()) || !uniqueCandidates.add(status.candidateId())) {
+                throw new IllegalArgumentException("duplicate candidate review status");
+            }
+            List<IntakeDecision> relevant = decisions.stream()
+                .filter(item -> item.caseId().equals(status.caseId()))
+                .filter(item -> item.candidateId().equals(status.candidateId()))
+                .toList();
+            int counted = (int) relevant.stream()
+                .filter(item -> item.outcome() == IntakeOutcome.COUNTED_EXPERT_REVIEW).count();
+            int blind = (int) relevant.stream()
+                .filter(item -> item.outcome() == IntakeOutcome.COUNTED_EXPERT_REVIEW)
+                .filter(IntakeDecision::blindReview).count();
+            int development = (int) relevant.stream()
+                .filter(item -> item.outcome() == IntakeOutcome.DEVELOPMENT_ONLY).count();
+            int rejected = (int) relevant.stream()
+                .filter(item -> item.outcome() == IntakeOutcome.REJECTED).count();
+            if (status.countedExpertReviews() != counted
+                    || status.blindExpertReviews() != blind
+                    || status.developmentFixtureReviews() != development
+                    || status.rejectedReviews() != rejected
+                    || status.status() != expectedCollectionStatus(
+                        counted, blind, development, minimumReviews)) {
+                throw new IllegalArgumentException(
+                    "candidate review status disagrees with intake decisions: "
+                        + status.caseId());
+            }
         }
     }
 
