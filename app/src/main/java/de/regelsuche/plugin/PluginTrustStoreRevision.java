@@ -1,7 +1,9 @@
 package de.regelsuche.plugin;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
@@ -39,7 +41,10 @@ public record PluginTrustStoreRevision(
         "regelsuche.plugin-trust-store-revision/v1";
     public static final String ALGORITHM = PluginSignatureManifest.ALGORITHM;
 
-    private static final ObjectMapper JSON = new ObjectMapper()
+    private static final ObjectMapper JSON = new ObjectMapper(
+        JsonFactory.builder()
+            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+            .build())
         .findAndRegisterModules()
         .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);

@@ -1,7 +1,9 @@
 package de.regelsuche.plugin;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.plugin.PluginTrustStore.PublisherKey;
@@ -237,6 +239,10 @@ public final class PluginTrustStoreRevisionVerifier {
         }
     }
 
+    private static String hash(byte[] value) {
+        return PluginArtifactVerifier.sha256(value);
+    }
+
     private static String hash(String value) {
         return PluginArtifactVerifier.sha256(value.getBytes(StandardCharsets.UTF_8));
     }
@@ -267,7 +273,10 @@ public final class PluginTrustStoreRevisionVerifier {
     ) {
         public static final String SCHEMA =
             "regelsuche.plugin-trust-store-chain-checkpoint/v1";
-        private static final ObjectMapper JSON = new ObjectMapper()
+        private static final ObjectMapper JSON = new ObjectMapper(
+            JsonFactory.builder()
+                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+                .build())
             .findAndRegisterModules()
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
