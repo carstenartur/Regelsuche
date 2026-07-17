@@ -21,6 +21,7 @@
 - [Plugin-Signatur-Schema v1](schemas/regelsuche-plugin-signature-v1.schema.json)
 - [Plugin-Trust-Store-Schema v1](schemas/regelsuche-plugin-trust-store-v1.schema.json)
 - [Plugin-Artefakt-Verifikations-Schema v1](schemas/regelsuche-plugin-artifact-verification-v1.schema.json)
+- [Plugin-Artefakt-Gate-Schema v1](schemas/regelsuche-plugin-artifact-gate-v1.schema.json)
 - [Plugin-API](plugin-api.md) — Java-Vertrag, Registries, Paketierung und Starter-Template.
 - [Regeldateien](rule-files.md) — `.regelsuche`-/`.rules`-DSL, Profile, Import/Export und Debugging.
 - [Makros](macros.md) — vom Autor deklarierte Makros als Suchkanten.
