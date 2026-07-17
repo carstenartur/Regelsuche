@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-artifact-index-verification/v1",
+  "title": "Regelsuche plugin artifact index trust verification v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "indexId",
+    "revision",
+    "indexContentHash",
+    "signatureContentHash",
+    "trustStoreContentHash",
+    "status",
+    "signatureVerified",
+    "trusted",
+    "curatorId",
+    "keyId",
+    "warnings",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-artifact-index-verification/v1"
+    },
+    "indexId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "revision": {
+      "$ref": "#/$defs/identifier"
+    },
+    "indexContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "signatureContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trustStoreContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "status": {
+      "enum": [
+        "INDEX_ID_MISMATCH",
+        "REVISION_MISMATCH",
+        "INDEX_HASH_MISMATCH",
+        "CURATOR_MISMATCH",
+        "UNKNOWN_CURATOR",
+        "UNKNOWN_KEY",
+        "REVOKED_KEY",
+        "KEY_ALGORITHM_MISMATCH",
+        "INVALID_SIGNATURE",
+        "VERIFIED_RETIRED_KEY",
+        "VERIFIED_TRUSTED"
+      ]
+    },
+    "signatureVerified": {
+      "type": "boolean"
+    },
+    "trusted": {
+      "type": "boolean"
+    },
+    "curatorId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "keyId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "warnings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "VERIFIED_RETIRED_KEY",
+              "VERIFIED_TRUSTED"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "signatureVerified": {
+            "const": true
+          },
+          "trusted": {
+            "const": true
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "signatureVerified": {
+            "const": false
+          },
+          "trusted": {
+            "const": false
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
