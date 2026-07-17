@@ -1,0 +1,881 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainDiscoveryExportVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainDiscoveryExportVerifier.java</span></div><h1>DomainDiscoveryExportVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
+import de.regelsuche.discovery.domain.DomainDiscoveryExport.ArtifactRole;
+import de.regelsuche.discovery.domain.DomainDiscoveryExport.DomainExportManifest;
+import de.regelsuche.discovery.domain.DomainDiscoveryExport.ExportArtifact;
+import de.regelsuche.json.JsonWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Verifies and snapshots one manifest-bound generic domain export.
+ *
+ * &lt;p&gt;The verifier never follows symbolic links and never exposes paths that a
+ * consumer must read again. Every retained file is bounded, read once, checked
+ * against the manifest and returned as an immutable byte snapshot. It validates
+ * the cross-document identity bindings, but it does not upgrade discovery
+ * validation to proof, novelty, promotion or Public Evidence.&lt;/p&gt;
+ */
+public final class DomainDiscoveryExportVerifier {
+    public static final long DEFAULT_MAX_MANIFEST_BYTES = 1_048_576L;
+    public static final long DEFAULT_MAX_ARTIFACT_BYTES = 67_108_864L;
+
+<span class="fc" id="L46">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L47">        JsonFactory.builder()</span>
+<span class="fc" id="L48">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L49">            .build())</span>
+<span class="fc" id="L50">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L51">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+
+<span class="fc" id="L53">    private static final Set&lt;String&gt; DESCRIPTOR_FIELDS = Set.of(</span>
+        &quot;schema&quot;,
+        &quot;domainId&quot;,
+        &quot;revision&quot;,
+        &quot;stateType&quot;,
+        &quot;candidateType&quot;,
+        &quot;certificateType&quot;,
+        &quot;generatorId&quot;,
+        &quot;stateCodecId&quot;,
+        &quot;operatorIds&quot;,
+        &quot;invariantIds&quot;,
+        &quot;objectiveId&quot;,
+        &quot;candidateExtractorId&quot;,
+        &quot;candidateCodecId&quot;,
+        &quot;counterexampleGeneratorId&quot;,
+        &quot;evaluatorId&quot;,
+        &quot;certificateCodecId&quot;,
+        &quot;certificateRendererId&quot;,
+        &quot;evidenceAdapterId&quot;,
+        &quot;deterministic&quot;,
+        &quot;semanticRoles&quot;,
+        &quot;contentHash&quot;);
+<span class="fc" id="L75">    private static final Set&lt;String&gt; EVIDENCE_FIELDS = Set.of(</span>
+        &quot;schema&quot;,
+        &quot;campaignId&quot;,
+        &quot;domain&quot;,
+        &quot;seed&quot;,
+        &quot;budget&quot;,
+        &quot;outcome&quot;,
+        &quot;summary&quot;,
+        &quot;states&quot;,
+        &quot;transitions&quot;,
+        &quot;candidateAttempts&quot;,
+        &quot;resources&quot;,
+        &quot;selectedCandidateHash&quot;,
+        &quot;certificate&quot;,
+        &quot;domainEvidence&quot;,
+        &quot;proofStatus&quot;,
+        &quot;externalNoveltyStatus&quot;,
+        &quot;promotionStatus&quot;,
+        &quot;publicEvidenceStatus&quot;,
+        &quot;contentHash&quot;);
+<span class="fc" id="L95">    private static final Set&lt;String&gt; SEED_FIELDS = Set.of(</span>
+        &quot;schema&quot;,
+        &quot;seedId&quot;,
+        &quot;domainId&quot;,
+        &quot;payload&quot;,
+        &quot;sourceReference&quot;,
+        &quot;contentHash&quot;);
+<span class="fc" id="L102">    private static final Set&lt;String&gt; HANDOFF_FIELDS = Set.of(</span>
+        &quot;schema&quot;,
+        &quot;handoffId&quot;,
+        &quot;sourceKind&quot;,
+        &quot;campaignId&quot;,
+        &quot;domainId&quot;,
+        &quot;domainRevision&quot;,
+        &quot;domainContractHash&quot;,
+        &quot;inputHash&quot;,
+        &quot;sourceEvidenceHash&quot;,
+        &quot;stage&quot;,
+        &quot;disposition&quot;,
+        &quot;selectedCandidateHash&quot;,
+        &quot;certificateHash&quot;,
+        &quot;resources&quot;,
+        &quot;metadata&quot;,
+        &quot;proofStatus&quot;,
+        &quot;externalNoveltyStatus&quot;,
+        &quot;promotionStatus&quot;,
+        &quot;publicEvidenceStatus&quot;,
+        &quot;contentHash&quot;);
+
+    private final long maxManifestBytes;
+    private final long maxArtifactBytes;
+
+    public DomainDiscoveryExportVerifier() {
+<span class="fc" id="L128">        this(DEFAULT_MAX_MANIFEST_BYTES, DEFAULT_MAX_ARTIFACT_BYTES);</span>
+<span class="fc" id="L129">    }</span>
+
+    public DomainDiscoveryExportVerifier(
+        long maxManifestBytes,
+        long maxArtifactBytes
+<span class="fc" id="L134">    ) {</span>
+<span class="fc" id="L135">        this.maxManifestBytes = boundedLimit(</span>
+            maxManifestBytes, &quot;maxManifestBytes&quot;);
+<span class="fc" id="L137">        this.maxArtifactBytes = boundedLimit(</span>
+            maxArtifactBytes, &quot;maxArtifactBytes&quot;);
+<span class="fc" id="L139">    }</span>
+
+    /**
+     * Returns an authority-bearing immutable snapshot only after every check
+     * succeeds. Invalid, incomplete, oversized, symlinked or changing exports
+     * throw {@link ExportVerificationException}.
+     */
+    public VerifiedDomainExport requireVerified(Path exportDirectory) {
+<span class="fc" id="L147">        Path supplied = Objects.requireNonNull(</span>
+            exportDirectory, &quot;exportDirectory&quot;);
+<span class="fc" id="L149">        Path directory = supplied.toAbsolutePath().normalize();</span>
+        try {
+<span class="fc" id="L151">            requireNoSymbolicLinksInAncestry(directory);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                    || Files.isSymbolicLink(directory)) {</span>
+<span class="nc" id="L154">                throw failure(&quot;export directory is not a local regular directory&quot;);</span>
+            }
+
+<span class="fc" id="L157">            Path manifestPath = directory.resolve(</span>
+                DomainDiscoveryExport.MANIFEST_FILE_NAME);
+<span class="fc" id="L159">            Snapshot firstManifest = readSnapshot(</span>
+                manifestPath,
+                maxManifestBytes,
+                &quot;export manifest&quot;);
+<span class="fc" id="L163">            DomainExportManifest manifest = parseManifest(firstManifest.bytes());</span>
+<span class="fc" id="L164">            Set&lt;String&gt; expectedEntries = expectedEntries(manifest);</span>
+<span class="fc" id="L165">            requireExactDirectory(directory, expectedEntries);</span>
+
+<span class="fc" id="L167">            EnumMap&lt;ArtifactRole, Snapshot&gt; snapshots =</span>
+                new EnumMap&lt;&gt;(ArtifactRole.class);
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            for (ExportArtifact artifact : manifest.artifacts()) {</span>
+<span class="fc" id="L170">                Snapshot snapshot = readSnapshot(</span>
+<span class="fc" id="L171">                    directory.resolve(artifact.fileName()),</span>
+                    maxArtifactBytes,
+<span class="fc" id="L173">                    artifact.role().name());</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                if (snapshot.byteLength() != artifact.byteLength()) {</span>
+<span class="fc" id="L175">                    throw failure(</span>
+<span class="fc" id="L176">                        artifact.fileName() + &quot; byte length does not match manifest&quot;);</span>
+                }
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                if (!snapshot.byteHash().equals(artifact.byteHash())) {</span>
+<span class="nc" id="L179">                    throw failure(</span>
+<span class="nc" id="L180">                        artifact.fileName() + &quot; byte hash does not match manifest&quot;);</span>
+                }
+<span class="fc" id="L182">                snapshots.put(artifact.role(), snapshot);</span>
+<span class="fc" id="L183">            }</span>
+
+<span class="fc" id="L185">            validateIdentities(manifest, snapshots);</span>
+
+<span class="fc" id="L187">            Snapshot finalManifest = readSnapshot(</span>
+                manifestPath,
+                maxManifestBytes,
+                &quot;export manifest&quot;);
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">            if (!Arrays.equals(firstManifest.bytes(), finalManifest.bytes())) {</span>
+<span class="nc" id="L192">                throw failure(&quot;export manifest changed during verification&quot;);</span>
+            }
+<span class="fc" id="L194">            requireNoSymbolicLinksInAncestry(directory);</span>
+<span class="fc" id="L195">            requireExactDirectory(directory, expectedEntries);</span>
+
+<span class="fc" id="L197">            Verification verification = Verification.create(</span>
+                manifest,
+<span class="fc" id="L199">                firstManifest.byteHash(),</span>
+                snapshots);
+<span class="fc" id="L201">            return new VerifiedDomainExport(manifest, verification, snapshots);</span>
+<span class="fc" id="L202">        } catch (ExportVerificationException exception) {</span>
+<span class="fc" id="L203">            throw exception;</span>
+<span class="nc" id="L204">        } catch (IOException | RuntimeException exception) {</span>
+<span class="nc" id="L205">            throw new ExportVerificationException(</span>
+                &quot;generic domain export verification failed for &quot; + directory,
+                exception);
+        }
+    }
+
+    private static void requireNoSymbolicLinksInAncestry(Path directory)
+            throws IOException {
+<span class="fc" id="L213">        Path root = directory.getRoot();</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L215">            throw failure(&quot;export directory must be absolute&quot;);</span>
+        }
+<span class="fc" id="L217">        Path current = root;</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        for (Path component : directory) {</span>
+<span class="fc" id="L219">            current = current.resolve(component);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (Files.isSymbolicLink(current)) {</span>
+<span class="fc" id="L221">                throw failure(</span>
+                    &quot;export directory path traverses a symbolic link: &quot; + current);
+            }
+<span class="fc" id="L224">        }</span>
+<span class="fc" id="L225">    }</span>
+
+    private static DomainExportManifest parseManifest(byte[] bytes) {
+        final ManifestDto dto;
+        try {
+<span class="fc" id="L230">            dto = JSON.readValue(bytes, ManifestDto.class);</span>
+<span class="nc" id="L231">        } catch (IOException exception) {</span>
+<span class="nc" id="L232">            throw new ExportVerificationException(</span>
+                &quot;invalid generic domain export manifest&quot;, exception);
+<span class="fc" id="L234">        }</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (dto == null) {</span>
+<span class="nc" id="L236">            throw failure(&quot;generic domain export manifest must not be empty&quot;);</span>
+        }
+<span class="fc" id="L238">        List&lt;ExportArtifact&gt; artifacts = requiredList(</span>
+<span class="fc" id="L239">            dto.artifacts, &quot;artifacts&quot;).stream()</span>
+<span class="fc" id="L240">            .map(DomainDiscoveryExportVerifier::artifact)</span>
+<span class="fc" id="L241">            .toList();</span>
+        try {
+<span class="fc" id="L243">            return new DomainExportManifest(</span>
+                dto.schema,
+                dto.campaignId,
+                dto.domainId,
+                dto.domainRevision,
+                dto.domainDescriptorHash,
+                dto.discoveryEvidenceHash,
+                dto.lifecycleHandoffHash,
+                artifacts,
+                dto.commitProtocol,
+                dto.contentHash);
+<span class="nc" id="L254">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L255">            throw new ExportVerificationException(</span>
+                &quot;generic domain export manifest contract is invalid&quot;, exception);
+        }
+    }
+
+    private static ExportArtifact artifact(ArtifactDto dto) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (dto == null) {</span>
+<span class="nc" id="L262">            throw failure(&quot;manifest artifacts must not contain null&quot;);</span>
+        }
+        final ArtifactRole role;
+        try {
+<span class="fc" id="L266">            role = ArtifactRole.valueOf(dto.role);</span>
+<span class="nc" id="L267">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L268">            throw new ExportVerificationException(</span>
+                &quot;unsupported generic domain export artifact role: &quot; + dto.role,
+                exception);
+<span class="fc" id="L271">        }</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if (dto.byteLength == null) {</span>
+<span class="nc" id="L273">            throw failure(&quot;manifest artifact byteLength must be present&quot;);</span>
+        }
+        try {
+<span class="fc" id="L276">            return new ExportArtifact(</span>
+                dto.fileName,
+                role,
+                dto.sourceContentHash,
+                dto.byteHash,
+<span class="fc" id="L281">                dto.byteLength);</span>
+<span class="nc" id="L282">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L283">            throw new ExportVerificationException(</span>
+                &quot;invalid generic domain export artifact: &quot; + role,
+                exception);
+        }
+    }
+
+    private static void validateIdentities(
+        DomainExportManifest manifest,
+        Map&lt;ArtifactRole, Snapshot&gt; snapshots
+    ) {
+<span class="fc" id="L293">        JsonNode descriptor = parseObject(</span>
+<span class="fc" id="L294">            snapshots.get(ArtifactRole.DOMAIN_DESCRIPTOR),</span>
+            &quot;domain descriptor&quot;);
+<span class="fc" id="L296">        JsonNode evidence = parseObject(</span>
+<span class="fc" id="L297">            snapshots.get(ArtifactRole.DISCOVERY_EVIDENCE),</span>
+            &quot;domain discovery evidence&quot;);
+<span class="fc" id="L299">        JsonNode handoff = parseObject(</span>
+<span class="fc" id="L300">            snapshots.get(ArtifactRole.LIFECYCLE_HANDOFF),</span>
+            &quot;discovery lifecycle handoff&quot;);
+
+<span class="fc" id="L303">        requireExactFields(descriptor, DESCRIPTOR_FIELDS, &quot;domain descriptor&quot;);</span>
+<span class="fc" id="L304">        requireTextEquals(</span>
+            descriptor,
+            &quot;schema&quot;,
+            DiscoveryDomainDescriptor.SCHEMA,
+            &quot;domain descriptor&quot;);
+<span class="fc" id="L309">        requireTextEquals(</span>
+            descriptor,
+            &quot;domainId&quot;,
+<span class="fc" id="L312">            manifest.domainId(),</span>
+            &quot;domain descriptor&quot;);
+<span class="fc" id="L314">        requireTextEquals(</span>
+            descriptor,
+            &quot;revision&quot;,
+<span class="fc" id="L317">            manifest.domainRevision(),</span>
+            &quot;domain descriptor&quot;);
+<span class="fc" id="L319">        requireTextEquals(</span>
+            descriptor,
+            &quot;contentHash&quot;,
+<span class="fc" id="L322">            manifest.domainDescriptorHash(),</span>
+            &quot;domain descriptor&quot;);
+
+<span class="fc" id="L325">        requireExactFields(evidence, EVIDENCE_FIELDS, &quot;domain discovery evidence&quot;);</span>
+<span class="fc" id="L326">        requireTextEquals(</span>
+            evidence,
+            &quot;schema&quot;,
+            DomainDiscoveryEvidence.SCHEMA,
+            &quot;domain discovery evidence&quot;);
+<span class="fc" id="L331">        requireTextEquals(</span>
+            evidence,
+            &quot;campaignId&quot;,
+<span class="fc" id="L334">            manifest.campaignId(),</span>
+            &quot;domain discovery evidence&quot;);
+<span class="fc" id="L336">        requireTextEquals(</span>
+            evidence,
+            &quot;contentHash&quot;,
+<span class="fc" id="L339">            manifest.discoveryEvidenceHash(),</span>
+            &quot;domain discovery evidence&quot;);
+<span class="fc" id="L341">        JsonNode evidenceDomain = requiredObject(</span>
+            evidence, &quot;domain&quot;, &quot;domain discovery evidence&quot;);
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (!descriptor.equals(evidenceDomain)) {</span>
+<span class="nc" id="L344">            throw failure(</span>
+                &quot;domain discovery evidence does not embed the retained descriptor&quot;);
+        }
+<span class="fc" id="L347">        JsonNode seed = requiredObject(</span>
+            evidence, &quot;seed&quot;, &quot;domain discovery evidence&quot;);
+<span class="fc" id="L349">        requireExactFields(seed, SEED_FIELDS, &quot;discovery seed&quot;);</span>
+<span class="fc" id="L350">        requireTextEquals(</span>
+            seed,
+            &quot;schema&quot;,
+            DiscoverySeed.SCHEMA,
+            &quot;discovery seed&quot;);
+<span class="fc" id="L355">        requireTextEquals(</span>
+            seed,
+            &quot;domainId&quot;,
+<span class="fc" id="L358">            manifest.domainId(),</span>
+            &quot;discovery seed&quot;);
+<span class="fc" id="L360">        String seedHash = requiredText(seed, &quot;contentHash&quot;, &quot;discovery seed&quot;);</span>
+<span class="fc" id="L361">        DomainCanonical.requireSha256(seedHash, &quot;seed contentHash&quot;);</span>
+<span class="fc" id="L362">        requireNotEvaluated(evidence, &quot;proofStatus&quot;, &quot;domain discovery evidence&quot;);</span>
+<span class="fc" id="L363">        requireNotEvaluated(</span>
+            evidence, &quot;externalNoveltyStatus&quot;, &quot;domain discovery evidence&quot;);
+<span class="fc" id="L365">        requireNotEvaluated(</span>
+            evidence, &quot;promotionStatus&quot;, &quot;domain discovery evidence&quot;);
+<span class="fc" id="L367">        requireNotEvaluated(</span>
+            evidence, &quot;publicEvidenceStatus&quot;, &quot;domain discovery evidence&quot;);
+
+<span class="fc" id="L370">        requireExactFields(handoff, HANDOFF_FIELDS, &quot;discovery lifecycle handoff&quot;);</span>
+<span class="fc" id="L371">        requireTextEquals(</span>
+            handoff,
+            &quot;schema&quot;,
+            DiscoveryLifecycleHandoff.SCHEMA,
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L376">        requireTextEquals(</span>
+            handoff,
+            &quot;sourceKind&quot;,
+<span class="fc" id="L379">            DiscoveryLifecycleHandoff.SourceKind.DOMAIN_DISCOVERY_EVIDENCE.name(),</span>
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L381">        requireTextEquals(</span>
+            handoff,
+            &quot;stage&quot;,
+<span class="fc" id="L384">            DiscoveryLifecycleHandoff.Stage.DISCOVERY_VALIDATION.name(),</span>
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L386">        requireTextEquals(</span>
+            handoff,
+            &quot;campaignId&quot;,
+<span class="fc" id="L389">            manifest.campaignId(),</span>
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L391">        requireTextEquals(</span>
+            handoff,
+            &quot;domainId&quot;,
+<span class="fc" id="L394">            manifest.domainId(),</span>
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L396">        requireTextEquals(</span>
+            handoff,
+            &quot;domainRevision&quot;,
+<span class="fc" id="L399">            manifest.domainRevision(),</span>
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L401">        requireTextEquals(</span>
+            handoff,
+            &quot;domainContractHash&quot;,
+<span class="fc" id="L404">            manifest.domainDescriptorHash(),</span>
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L406">        requireTextEquals(</span>
+            handoff,
+            &quot;inputHash&quot;,
+            seedHash,
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L411">        requireTextEquals(</span>
+            handoff,
+            &quot;sourceEvidenceHash&quot;,
+<span class="fc" id="L414">            manifest.discoveryEvidenceHash(),</span>
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L416">        requireTextEquals(</span>
+            handoff,
+            &quot;contentHash&quot;,
+<span class="fc" id="L419">            manifest.lifecycleHandoffHash(),</span>
+            &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L421">        requireNotEvaluated(handoff, &quot;proofStatus&quot;, &quot;discovery lifecycle handoff&quot;);</span>
+<span class="fc" id="L422">        requireNotEvaluated(</span>
+            handoff, &quot;externalNoveltyStatus&quot;, &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L424">        requireNotEvaluated(</span>
+            handoff, &quot;promotionStatus&quot;, &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L426">        requireNotEvaluated(</span>
+            handoff, &quot;publicEvidenceStatus&quot;, &quot;discovery lifecycle handoff&quot;);
+<span class="fc" id="L428">    }</span>
+
+    private static JsonNode parseObject(Snapshot snapshot, String label) {
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">        if (snapshot == null) {</span>
+<span class="nc" id="L432">            throw failure(&quot;missing retained &quot; + label);</span>
+        }
+        try {
+<span class="fc" id="L435">            JsonNode node = JSON.readTree(snapshot.bytes());</span>
+<span class="pc bpc" id="L436" title="2 of 4 branches missed.">            if (node == null || !node.isObject()) {</span>
+<span class="nc" id="L437">                throw failure(label + &quot; must be a JSON object&quot;);</span>
+            }
+<span class="fc" id="L439">            return node;</span>
+<span class="fc" id="L440">        } catch (IOException exception) {</span>
+<span class="fc" id="L441">            throw new ExportVerificationException(</span>
+                label + &quot; is not strict JSON&quot;, exception);
+        }
+    }
+
+    private static void requireExactFields(
+        JsonNode node,
+        Set&lt;String&gt; expected,
+        String label
+    ) {
+<span class="fc" id="L451">        Set&lt;String&gt; actual = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L452">        node.fieldNames().forEachRemaining(actual::add);</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">        if (!actual.equals(expected)) {</span>
+<span class="nc" id="L454">            Set&lt;String&gt; missing = new HashSet&lt;&gt;(expected);</span>
+<span class="nc" id="L455">            missing.removeAll(actual);</span>
+<span class="nc" id="L456">            Set&lt;String&gt; unknown = new HashSet&lt;&gt;(actual);</span>
+<span class="nc" id="L457">            unknown.removeAll(expected);</span>
+<span class="nc" id="L458">            throw failure(</span>
+                label + &quot; fields do not match contract; missing=&quot; + missing
+                    + &quot;, unknown=&quot; + unknown);
+        }
+<span class="fc" id="L462">    }</span>
+
+    private static JsonNode requiredObject(
+        JsonNode node,
+        String field,
+        String label
+    ) {
+<span class="fc" id="L469">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L470" title="2 of 4 branches missed.">        if (value == null || !value.isObject()) {</span>
+<span class="nc" id="L471">            throw failure(label + &quot;.&quot; + field + &quot; must be an object&quot;);</span>
+        }
+<span class="fc" id="L473">        return value;</span>
+    }
+
+    private static String requiredText(
+        JsonNode node,
+        String field,
+        String label
+    ) {
+<span class="fc" id="L481">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L482" title="2 of 4 branches missed.">        if (value == null || !value.isTextual()) {</span>
+<span class="nc" id="L483">            throw failure(label + &quot;.&quot; + field + &quot; must be text&quot;);</span>
+        }
+<span class="fc" id="L485">        return value.textValue();</span>
+    }
+
+    private static void requireTextEquals(
+        JsonNode node,
+        String field,
+        String expected,
+        String label
+    ) {
+<span class="fc" id="L494">        String actual = requiredText(node, field, label);</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">        if (!expected.equals(actual)) {</span>
+<span class="fc" id="L496">            throw failure(</span>
+                label + &quot;.&quot; + field + &quot; mismatch: expected &quot; + expected
+                    + &quot; but found &quot; + actual);
+        }
+<span class="fc" id="L500">    }</span>
+
+    private static void requireNotEvaluated(
+        JsonNode node,
+        String field,
+        String label
+    ) {
+<span class="fc" id="L507">        requireTextEquals(</span>
+            node,
+            field,
+            DomainDiscoveryEvidence.NOT_EVALUATED,
+            label);
+<span class="fc" id="L512">    }</span>
+
+    private static Set&lt;String&gt; expectedEntries(DomainExportManifest manifest) {
+<span class="fc" id="L515">        Set&lt;String&gt; expected = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L516">        expected.add(DomainDiscoveryExport.MANIFEST_FILE_NAME);</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        for (ExportArtifact artifact : manifest.artifacts()) {</span>
+<span class="fc" id="L518">            expected.add(artifact.fileName());</span>
+<span class="fc" id="L519">        }</span>
+<span class="fc" id="L520">        return Set.copyOf(expected);</span>
+    }
+
+    private static void requireExactDirectory(
+        Path directory,
+        Set&lt;String&gt; expected
+    ) throws IOException {
+<span class="fc" id="L527">        Set&lt;String&gt; actual = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L528">        try (var entries = Files.list(directory)) {</span>
+<span class="fc" id="L529">            var iterator = entries.iterator();</span>
+<span class="fc bfc" id="L530" title="All 2 branches covered.">            while (iterator.hasNext()) {</span>
+<span class="fc" id="L531">                Path entry = iterator.next();</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">                if (Files.isSymbolicLink(entry)</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">                        || !Files.isRegularFile(entry, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L534">                    throw failure(</span>
+                        &quot;export contains a non-regular or symbolic-link entry: &quot;
+<span class="fc" id="L536">                            + entry.getFileName());</span>
+                }
+<span class="fc" id="L538">                String name = entry.getFileName().toString();</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">                if (!expected.contains(name)) {</span>
+<span class="fc" id="L540">                    throw failure(&quot;export contains an unexpected entry: &quot; + name);</span>
+                }
+<span class="fc" id="L542">                actual.add(name);</span>
+<span class="fc" id="L543">            }</span>
+        }
+<span class="fc bfc" id="L545" title="All 2 branches covered.">        if (!actual.equals(expected)) {</span>
+<span class="fc" id="L546">            Set&lt;String&gt; missing = new HashSet&lt;&gt;(expected);</span>
+<span class="fc" id="L547">            missing.removeAll(actual);</span>
+<span class="fc" id="L548">            throw failure(</span>
+                &quot;export directory is missing manifest entries: &quot; + missing);
+        }
+<span class="fc" id="L551">    }</span>
+
+    private static Snapshot readSnapshot(
+        Path path,
+        long maximumBytes,
+        String label
+    ) throws IOException {
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(path)</span>
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">                || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L560">            throw failure(label + &quot; is missing, non-regular or a symbolic link&quot;);</span>
+        }
+<span class="fc" id="L562">        long declaredSize = Files.size(path);</span>
+<span class="pc bpc" id="L563" title="1 of 4 branches missed.">        if (declaredSize &lt; 1L || declaredSize &gt; maximumBytes) {</span>
+<span class="fc" id="L564">            throw failure(</span>
+                label + &quot; byte length &quot; + declaredSize
+                    + &quot; is outside the configured bound &quot; + maximumBytes);
+        }
+<span class="fc" id="L568">        int initialCapacity = (int) Math.min(declaredSize, 8192L);</span>
+<span class="fc" id="L569">        ByteArrayOutputStream output = new ByteArrayOutputStream(initialCapacity);</span>
+<span class="fc" id="L570">        long total = 0L;</span>
+<span class="fc" id="L571">        try (SeekableByteChannel channel = Files.newByteChannel(</span>
+                path,
+                StandardOpenOption.READ,
+                LinkOption.NOFOLLOW_LINKS);
+<span class="fc" id="L575">             InputStream input = Channels.newInputStream(channel)) {</span>
+<span class="fc" id="L576">            byte[] buffer = new byte[8192];</span>
+            int read;
+<span class="fc bfc" id="L578" title="All 2 branches covered.">            while ((read = input.read(buffer)) != -1) {</span>
+<span class="fc" id="L579">                total = Math.addExact(total, read);</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">                if (total &gt; maximumBytes) {</span>
+<span class="nc" id="L581">                    throw failure(label + &quot; exceeded its configured byte bound&quot;);</span>
+                }
+<span class="fc" id="L583">                output.write(buffer, 0, read);</span>
+            }
+        }
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">        if (total != declaredSize) {</span>
+<span class="nc" id="L587">            throw failure(label + &quot; changed length while being read&quot;);</span>
+        }
+<span class="fc" id="L589">        byte[] bytes = output.toByteArray();</span>
+<span class="fc" id="L590">        return new Snapshot(bytes, sha256(bytes), total);</span>
+    }
+
+    private static long boundedLimit(long value, String field) {
+<span class="fc bfc" id="L594" title="All 4 branches covered.">        if (value &lt; 1L || value &gt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L595">            throw new IllegalArgumentException(</span>
+                field + &quot; must be in [1,&quot; + Integer.MAX_VALUE + &quot;]&quot;);
+        }
+<span class="fc" id="L598">        return value;</span>
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+<span class="fc" id="L603">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L604">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L605">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L606">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; requiredList(List&lt;T&gt; values, String field) {
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L612">            throw failure(field + &quot; must be present&quot;);</span>
+        }
+<span class="fc" id="L614">        return values;</span>
+    }
+
+    private static ExportVerificationException failure(String message) {
+<span class="fc" id="L618">        return new ExportVerificationException(message);</span>
+    }
+
+    public static final class ExportVerificationException extends SecurityException {
+        public ExportVerificationException(String message) {
+<span class="fc" id="L623">            super(message);</span>
+<span class="fc" id="L624">        }</span>
+
+        public ExportVerificationException(String message, Throwable cause) {
+<span class="fc" id="L627">            super(message, cause);</span>
+<span class="fc" id="L628">        }</span>
+    }
+
+    /** Canonical receipt for the checks completed over one byte snapshot. */
+    public record Verification(
+        String schema,
+        String manifestContentHash,
+        String manifestByteHash,
+        String campaignId,
+        String domainId,
+        String domainRevision,
+        String domainDescriptorHash,
+        String discoveryEvidenceHash,
+        String lifecycleHandoffHash,
+        String artifactSetHash,
+        int verifiedArtifactCount,
+        String identityBindingStatus,
+        String mathematicalValidationStatus,
+        String contentHash
+    ) {
+        public static final String SCHEMA =
+            &quot;regelsuche.domain-discovery-export-verification/v1&quot;;
+        public static final String VERIFIED = &quot;VERIFIED&quot;;
+        public static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+
+<span class="fc" id="L653">        public Verification {</span>
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L655">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported domain export verification schema&quot;);
+            }
+<span class="fc" id="L658">            DomainCanonical.requireSha256(</span>
+                manifestContentHash, &quot;manifestContentHash&quot;);
+<span class="fc" id="L660">            DomainCanonical.requireSha256(manifestByteHash, &quot;manifestByteHash&quot;);</span>
+<span class="fc" id="L661">            campaignId = DomainCanonical.requireIdentifier(campaignId, &quot;campaignId&quot;);</span>
+<span class="fc" id="L662">            domainId = DomainCanonical.requireIdentifier(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L663">            domainRevision = DomainCanonical.requireIdentifier(</span>
+                domainRevision, &quot;domainRevision&quot;);
+<span class="fc" id="L665">            DomainCanonical.requireSha256(</span>
+                domainDescriptorHash, &quot;domainDescriptorHash&quot;);
+<span class="fc" id="L667">            DomainCanonical.requireSha256(</span>
+                discoveryEvidenceHash, &quot;discoveryEvidenceHash&quot;);
+<span class="fc" id="L669">            DomainCanonical.requireSha256(</span>
+                lifecycleHandoffHash, &quot;lifecycleHandoffHash&quot;);
+<span class="fc" id="L671">            DomainCanonical.requireSha256(artifactSetHash, &quot;artifactSetHash&quot;);</span>
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">            if (verifiedArtifactCount != ArtifactRole.values().length) {</span>
+<span class="nc" id="L673">                throw new IllegalArgumentException(</span>
+                    &quot;verification must cover every export artifact role&quot;);
+            }
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">            if (!VERIFIED.equals(identityBindingStatus)) {</span>
+<span class="nc" id="L677">                throw new IllegalArgumentException(</span>
+                    &quot;identityBindingStatus must be VERIFIED&quot;);
+            }
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">            if (!NOT_EVALUATED.equals(mathematicalValidationStatus)) {</span>
+<span class="nc" id="L681">                throw new IllegalArgumentException(</span>
+                    &quot;mathematicalValidationStatus must remain NOT_EVALUATED&quot;);
+            }
+<span class="fc" id="L684">            DomainCanonical.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L685">            String expected = verificationHash(</span>
+                manifestContentHash,
+                manifestByteHash,
+                campaignId,
+                domainId,
+                domainRevision,
+                domainDescriptorHash,
+                discoveryEvidenceHash,
+                lifecycleHandoffHash,
+                artifactSetHash,
+                verifiedArtifactCount,
+                identityBindingStatus,
+                mathematicalValidationStatus);
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L699">                throw new IllegalArgumentException(</span>
+                    &quot;domain export verification contentHash mismatch&quot;);
+            }
+<span class="fc" id="L702">        }</span>
+
+        private static Verification create(
+            DomainExportManifest manifest,
+            String manifestByteHash,
+            Map&lt;ArtifactRole, Snapshot&gt; snapshots
+        ) {
+<span class="fc" id="L709">            List&lt;String&gt; artifactMaterial = snapshots.entrySet().stream()</span>
+<span class="fc" id="L710">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L711">                .map(entry -&gt; entry.getKey().name() + '|'</span>
+<span class="fc" id="L712">                    + entry.getValue().byteHash() + '|'</span>
+<span class="fc" id="L713">                    + entry.getValue().byteLength())</span>
+<span class="fc" id="L714">                .toList();</span>
+<span class="fc" id="L715">            String artifactSetHash = DomainCanonical.sha256(</span>
+<span class="fc" id="L716">                DomainCanonical.canonicalList(artifactMaterial));</span>
+<span class="fc" id="L717">            String hash = verificationHash(</span>
+<span class="fc" id="L718">                manifest.contentHash(),</span>
+                manifestByteHash,
+<span class="fc" id="L720">                manifest.campaignId(),</span>
+<span class="fc" id="L721">                manifest.domainId(),</span>
+<span class="fc" id="L722">                manifest.domainRevision(),</span>
+<span class="fc" id="L723">                manifest.domainDescriptorHash(),</span>
+<span class="fc" id="L724">                manifest.discoveryEvidenceHash(),</span>
+<span class="fc" id="L725">                manifest.lifecycleHandoffHash(),</span>
+                artifactSetHash,
+<span class="fc" id="L727">                snapshots.size(),</span>
+                VERIFIED,
+                NOT_EVALUATED);
+<span class="fc" id="L730">            return new Verification(</span>
+                SCHEMA,
+<span class="fc" id="L732">                manifest.contentHash(),</span>
+                manifestByteHash,
+<span class="fc" id="L734">                manifest.campaignId(),</span>
+<span class="fc" id="L735">                manifest.domainId(),</span>
+<span class="fc" id="L736">                manifest.domainRevision(),</span>
+<span class="fc" id="L737">                manifest.domainDescriptorHash(),</span>
+<span class="fc" id="L738">                manifest.discoveryEvidenceHash(),</span>
+<span class="fc" id="L739">                manifest.lifecycleHandoffHash(),</span>
+                artifactSetHash,
+<span class="fc" id="L741">                snapshots.size(),</span>
+                VERIFIED,
+                NOT_EVALUATED,
+                hash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L748">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L749">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L750">                .property(&quot;manifestContentHash&quot;, manifestContentHash)</span>
+<span class="fc" id="L751">                .property(&quot;manifestByteHash&quot;, manifestByteHash)</span>
+<span class="fc" id="L752">                .property(&quot;campaignId&quot;, campaignId)</span>
+<span class="fc" id="L753">                .property(&quot;domainId&quot;, domainId)</span>
+<span class="fc" id="L754">                .property(&quot;domainRevision&quot;, domainRevision)</span>
+<span class="fc" id="L755">                .property(&quot;domainDescriptorHash&quot;, domainDescriptorHash)</span>
+<span class="fc" id="L756">                .property(&quot;discoveryEvidenceHash&quot;, discoveryEvidenceHash)</span>
+<span class="fc" id="L757">                .property(&quot;lifecycleHandoffHash&quot;, lifecycleHandoffHash)</span>
+<span class="fc" id="L758">                .property(&quot;artifactSetHash&quot;, artifactSetHash)</span>
+<span class="fc" id="L759">                .property(&quot;verifiedArtifactCount&quot;, verifiedArtifactCount)</span>
+<span class="fc" id="L760">                .property(&quot;identityBindingStatus&quot;, identityBindingStatus)</span>
+<span class="fc" id="L761">                .property(&quot;mathematicalValidationStatus&quot;, mathematicalValidationStatus)</span>
+<span class="fc" id="L762">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L763">                .endObject()</span>
+<span class="fc" id="L764">                .toString();</span>
+        }
+
+        private static String verificationHash(
+            String manifestContentHash,
+            String manifestByteHash,
+            String campaignId,
+            String domainId,
+            String domainRevision,
+            String domainDescriptorHash,
+            String discoveryEvidenceHash,
+            String lifecycleHandoffHash,
+            String artifactSetHash,
+            int verifiedArtifactCount,
+            String identityBindingStatus,
+            String mathematicalValidationStatus
+        ) {
+<span class="fc" id="L781">            return DomainCanonical.sha256(DomainCanonical.canonicalMap(Map.ofEntries(</span>
+<span class="fc" id="L782">                Map.entry(&quot;schema&quot;, SCHEMA),</span>
+<span class="fc" id="L783">                Map.entry(&quot;manifestContentHash&quot;, manifestContentHash),</span>
+<span class="fc" id="L784">                Map.entry(&quot;manifestByteHash&quot;, manifestByteHash),</span>
+<span class="fc" id="L785">                Map.entry(&quot;campaignId&quot;, campaignId),</span>
+<span class="fc" id="L786">                Map.entry(&quot;domainId&quot;, domainId),</span>
+<span class="fc" id="L787">                Map.entry(&quot;domainRevision&quot;, domainRevision),</span>
+<span class="fc" id="L788">                Map.entry(&quot;domainDescriptorHash&quot;, domainDescriptorHash),</span>
+<span class="fc" id="L789">                Map.entry(&quot;discoveryEvidenceHash&quot;, discoveryEvidenceHash),</span>
+<span class="fc" id="L790">                Map.entry(&quot;lifecycleHandoffHash&quot;, lifecycleHandoffHash),</span>
+<span class="fc" id="L791">                Map.entry(&quot;artifactSetHash&quot;, artifactSetHash),</span>
+<span class="fc" id="L792">                Map.entry(&quot;verifiedArtifactCount&quot;,</span>
+<span class="fc" id="L793">                    Integer.toString(verifiedArtifactCount)),</span>
+<span class="fc" id="L794">                Map.entry(&quot;identityBindingStatus&quot;, identityBindingStatus),</span>
+<span class="fc" id="L795">                Map.entry(&quot;mathematicalValidationStatus&quot;,</span>
+                    mathematicalValidationStatus))));
+        }
+    }
+
+    /** Immutable verified byte snapshot; callers never need to re-read paths. */
+    public static final class VerifiedDomainExport {
+        private final DomainExportManifest manifest;
+        private final Verification verification;
+        private final EnumMap&lt;ArtifactRole, byte[]&gt; artifacts;
+
+        private VerifiedDomainExport(
+            DomainExportManifest manifest,
+            Verification verification,
+            Map&lt;ArtifactRole, Snapshot&gt; snapshots
+<span class="fc" id="L810">        ) {</span>
+<span class="fc" id="L811">            this.manifest = Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="fc" id="L812">            this.verification = Objects.requireNonNull(</span>
+                verification, &quot;verification&quot;);
+<span class="fc" id="L814">            this.artifacts = new EnumMap&lt;&gt;(ArtifactRole.class);</span>
+<span class="fc bfc" id="L815" title="All 2 branches covered.">            for (Map.Entry&lt;ArtifactRole, Snapshot&gt; entry : snapshots.entrySet()) {</span>
+<span class="fc" id="L816">                this.artifacts.put(entry.getKey(), entry.getValue().bytes());</span>
+<span class="fc" id="L817">            }</span>
+<span class="pc bpc" id="L818" title="1 of 2 branches missed.">            if (this.artifacts.size() != ArtifactRole.values().length</span>
+<span class="pc bpc" id="L819" title="1 of 2 branches missed.">                    || !verification.contentHash().matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L820">                throw new IllegalArgumentException(</span>
+                    &quot;verified domain export requires complete trusted snapshots&quot;);
+            }
+<span class="fc" id="L823">        }</span>
+
+        public DomainExportManifest manifest() {
+<span class="fc" id="L826">            return manifest;</span>
+        }
+
+        public Verification verification() {
+<span class="fc" id="L830">            return verification;</span>
+        }
+
+        public byte[] artifactBytes(ArtifactRole role) {
+<span class="fc" id="L834">            byte[] bytes = artifacts.get(Objects.requireNonNull(role, &quot;role&quot;));</span>
+<span class="pc bpc" id="L835" title="1 of 2 branches missed.">            if (bytes == null) {</span>
+<span class="nc" id="L836">                throw new IllegalArgumentException(&quot;artifact role is not retained: &quot; + role);</span>
+            }
+<span class="fc" id="L838">            return bytes.clone();</span>
+        }
+    }
+
+    private record Snapshot(byte[] bytes, String byteHash, long byteLength) {
+<span class="fc" id="L843">        private Snapshot {</span>
+<span class="pc bpc" id="L844" title="1 of 2 branches missed.">            bytes = bytes == null ? new byte[0] : bytes.clone();</span>
+<span class="fc" id="L845">            DomainCanonical.requireSha256(byteHash, &quot;byteHash&quot;);</span>
+<span class="pc bpc" id="L846" title="2 of 4 branches missed.">            if (bytes.length != byteLength || byteLength &lt; 1L) {</span>
+<span class="nc" id="L847">                throw new IllegalArgumentException(</span>
+                    &quot;snapshot length must match retained bytes&quot;);
+            }
+<span class="fc" id="L850">        }</span>
+
+        @Override
+        public byte[] bytes() {
+<span class="fc" id="L854">            return bytes.clone();</span>
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L859">    public static final class ManifestDto {</span>
+        public String schema;
+        public String campaignId;
+        public String domainId;
+        public String domainRevision;
+        public String domainDescriptorHash;
+        public String discoveryEvidenceHash;
+        public String lifecycleHandoffHash;
+        public List&lt;ArtifactDto&gt; artifacts;
+        public String commitProtocol;
+        public String contentHash;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L873">    public static final class ArtifactDto {</span>
+        public String fileName;
+        public String role;
+        public String sourceContentHash;
+        public String byteHash;
+        public Long byteLength;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -355,8 +355,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L355">        String profileName = stringValue(body, &quot;profile&quot;, SearchProfile.FAST_SIMPLIFY.name()).toUpperCase(Locale.ROOT);</span>
 <span class="fc" id="L356">        String goalName = stringValue(body, &quot;goal&quot;, &quot;&quot;).toUpperCase(Locale.ROOT);</span>
 <span class="fc bfc" id="L357" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="nc" id="L358">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
-<span class="nc" id="L359">            return;</span>
+<span class="fc" id="L358">            sendStatus(exchange, 400, &quot;expression must not be blank&quot;);</span>
+<span class="fc" id="L359">            return;</span>
         }
         InputType type;
         SearchProfile profile;
@@ -368,8 +368,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L368">                ? profile.defaultGoal()</span>
 <span class="fc" id="L369">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L370">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="fc" id="L372">            return;</span>
+<span class="nc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="nc" id="L372">            return;</span>
 <span class="fc" id="L373">        }</span>
 <span class="fc" id="L374">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1420,8 +1420,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1420">        String matchId = stringValue(body, &quot;matchId&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1421">        int matchIndex = intValue(body, &quot;matchIndex&quot;, -1);</span>
 <span class="pc bpc" id="L1422" title="4 of 8 branches missed.">        if (expression.isBlank() || pathKey.isBlank() || (matchId.isBlank() &amp;&amp; matchIndex &lt; 0)) {</span>
-<span class="nc" id="L1423">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
-<span class="nc" id="L1424">            return;</span>
+<span class="fc" id="L1423">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
+<span class="fc" id="L1424">            return;</span>
         }
 
 <span class="fc" id="L1427">        de.regelsuche.ide.RuleInspectionService service = new de.regelsuche.ide.RuleInspectionService();</span>
@@ -1605,8 +1605,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1605">            level = de.regelsuche.didactic.DifficultyLevel.valueOf(</span>
 <span class="fc" id="L1606">                difficulty.toUpperCase(Locale.ROOT));</span>
 <span class="fc" id="L1607">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L1608">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
-<span class="fc" id="L1609">            return;</span>
+<span class="nc" id="L1608">            sendStatus(exchange, 400, &quot;invalid difficulty: &quot; + difficulty);</span>
+<span class="nc" id="L1609">            return;</span>
 <span class="fc" id="L1610">        }</span>
 <span class="fc" id="L1611">        de.regelsuche.didactic.StudentStepValidator.Result result =</span>
 <span class="fc" id="L1612">            didacticStepValidator.validate(currentExpression, studentStep, level);</span>
@@ -1649,8 +1649,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1649">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1650">            .findFirst();</span>
 <span class="fc bfc" id="L1651" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1652">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1653">            return;</span>
+<span class="nc" id="L1652">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1653">            return;</span>
         }
 <span class="fc" id="L1655">        Map&lt;String, Object&gt; body = readJsonObject(exchange);</span>
 <span class="fc" id="L1656">        String currentExpression = stringValue(body, &quot;currentExpression&quot;, &quot;&quot;);</span>
@@ -1738,8 +1738,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1738">            .filter(t -&gt; t.id().equals(pathId))</span>
 <span class="fc" id="L1739">            .findFirst();</span>
 <span class="fc bfc" id="L1740" title="All 2 branches covered.">        if (match.isEmpty()) {</span>
-<span class="fc" id="L1741">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
-<span class="fc" id="L1742">            return;</span>
+<span class="nc" id="L1741">            sendStatus(exchange, 404, &quot;path not found&quot;);</span>
+<span class="nc" id="L1742">            return;</span>
         }
 <span class="fc" id="L1744">        var derivation = match.get();</span>
 <span class="fc" id="L1745">        JsonWriter writer = new JsonWriter();</span>
@@ -1799,8 +1799,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1799">            default          -&gt; null;</span>
         };
 <span class="fc bfc" id="L1801" title="All 2 branches covered.">        if (body == null) {</span>
-<span class="fc" id="L1802">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
-<span class="fc" id="L1803">            return;</span>
+<span class="nc" id="L1802">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="nc" id="L1803">            return;</span>
         }
 <span class="fc" id="L1805">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
 <span class="fc" id="L1806">    }</span>
@@ -2453,8 +2453,8 @@ public class WebWorkbenchServer {
             }
 <span class="nc" id="L2454">            return;</span>
         }
-<span class="fc" id="L2456">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
-<span class="fc" id="L2457">    }</span>
+<span class="nc" id="L2456">        sendStatus(exchange, 404, &quot;unknown proof endpoint: &quot; + path);</span>
+<span class="nc" id="L2457">    }</span>
 
     private void handleProofJobList(HttpExchange exchange) throws IOException {
 <span class="fc" id="L2460">        var jobs = proofWorkbenchService.listJobs();</span>
@@ -2476,8 +2476,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L2477">        int priority = intValue(body, &quot;priority&quot;, 0);</span>
 <span class="fc bfc" id="L2478" title="All 2 branches covered.">        if (priority &lt; 0) {</span>
-<span class="nc" id="L2479">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
-<span class="nc" id="L2480">            return;</span>
+<span class="fc" id="L2479">            sendStatus(exchange, 400, &quot;priority must be &gt;= 0&quot;);</span>
+<span class="fc" id="L2480">            return;</span>
         }
 <span class="fc" id="L2482">        String worker = stringValue(body, &quot;worker&quot;, &quot;&quot;).trim();</span>
 <span class="fc bfc" id="L2483" title="All 2 branches covered.">        if (!worker.isEmpty()) {</span>
