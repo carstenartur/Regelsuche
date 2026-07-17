@@ -3,6 +3,7 @@ package de.regelsuche.plugin;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -23,10 +24,14 @@ public final class PluginArtifactGate {
 
     private final PluginArtifactVerifier verifier;
     private final PluginTrustPolicy policy;
+    private final String trustStoreHash;
 
     public PluginArtifactGate(PluginTrustStore trustStore, PluginTrustPolicy policy) {
-        this.verifier = new PluginArtifactVerifier(Objects.requireNonNull(trustStore, "trustStore"));
+        PluginTrustStore effectiveTrustStore = Objects.requireNonNull(trustStore, "trustStore");
+        this.verifier = new PluginArtifactVerifier(effectiveTrustStore);
         this.policy = policy == null ? PluginTrustPolicy.WARN : policy;
+        this.trustStoreHash = PluginArtifactVerifier.sha256(
+            effectiveTrustStore.toCanonicalJson().getBytes(StandardCharsets.UTF_8));
     }
 
     public GateResult materialize(Path sourceDirectory, Path stagingDirectory) {
@@ -69,7 +74,7 @@ public final class PluginArtifactGate {
                 blocked.add(verification.artifactFileName());
             }
         }
-        return new GateResult(policy, verifications, admitted, blocked);
+        return GateResult.create(policy, trustStoreHash, verifications, admitted, blocked);
     }
 
     private List<Path> listArtifacts(Path sourceDirectory) {
@@ -88,46 +93,128 @@ public final class PluginArtifactGate {
     }
 
     public record GateResult(
+        String schema,
         PluginTrustPolicy policy,
+        String trustStoreHash,
         List<PluginArtifactVerification> verifications,
         List<String> admittedArtifacts,
-        List<String> blockedArtifacts
+        List<String> blockedArtifacts,
+        String contentHash
     ) {
+        public static final String SCHEMA = "regelsuche.plugin-artifact-gate/v1";
+
         public GateResult {
+            if (!SCHEMA.equals(schema)) {
+                throw new IllegalArgumentException("unsupported plugin artifact gate schema");
+            }
             Objects.requireNonNull(policy, "policy");
-            verifications = verifications == null ? List.of() : verifications.stream()
-                .sorted(Comparator.comparing(PluginArtifactVerification::artifactFileName))
-                .toList();
+            trustStoreHash = PluginSignatureManifest.requireSha256(
+                trustStoreHash, "trustStoreHash");
+            verifications = normalizeVerifications(verifications);
             admittedArtifacts = normalizeNames(admittedArtifacts);
             blockedArtifacts = normalizeNames(blockedArtifacts);
-            if (admittedArtifacts.stream().anyMatch(blockedArtifacts::contains)) {
-                throw new IllegalArgumentException("an artifact cannot be both admitted and blocked");
-            }
-            List<String> accounted = new ArrayList<>(admittedArtifacts);
-            accounted.addAll(blockedArtifacts);
-            List<String> expected = verifications.stream()
-                .map(PluginArtifactVerification::artifactFileName)
-                .sorted()
-                .toList();
-            if (!accounted.stream().sorted().toList().equals(expected)) {
-                throw new IllegalArgumentException("gate result does not account for every verified artifact");
+            validateAccounting(verifications, admittedArtifacts, blockedArtifacts);
+            String expectedHash = contentHash(
+                policy,
+                trustStoreHash,
+                verifications,
+                admittedArtifacts,
+                blockedArtifacts
+            );
+            if (!expectedHash.equals(contentHash)) {
+                throw new IllegalArgumentException("plugin artifact gate contentHash mismatch");
             }
         }
 
+        public static GateResult create(
+            PluginTrustPolicy policy,
+            String trustStoreHash,
+            List<PluginArtifactVerification> verifications,
+            List<String> admittedArtifacts,
+            List<String> blockedArtifacts
+        ) {
+            Objects.requireNonNull(policy, "policy");
+            String normalizedTrustStoreHash = PluginSignatureManifest.requireSha256(
+                trustStoreHash, "trustStoreHash");
+            List<PluginArtifactVerification> normalizedVerifications =
+                normalizeVerifications(verifications);
+            List<String> normalizedAdmitted = normalizeNames(admittedArtifacts);
+            List<String> normalizedBlocked = normalizeNames(blockedArtifacts);
+            validateAccounting(
+                normalizedVerifications,
+                normalizedAdmitted,
+                normalizedBlocked
+            );
+            return new GateResult(
+                SCHEMA,
+                policy,
+                normalizedTrustStoreHash,
+                normalizedVerifications,
+                normalizedAdmitted,
+                normalizedBlocked,
+                contentHash(
+                    policy,
+                    normalizedTrustStoreHash,
+                    normalizedVerifications,
+                    normalizedAdmitted,
+                    normalizedBlocked
+                )
+            );
+        }
+
         public String toCanonicalJson() {
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("schema", "regelsuche.plugin-artifact-gate/v1");
-            payload.put("policy", policy.name());
-            payload.put("verifications", verifications.stream()
-                .map(GateResult::verificationPayload)
-                .toList());
-            payload.put("admittedArtifacts", admittedArtifacts);
-            payload.put("blockedArtifacts", blockedArtifacts);
+            Map<String, Object> payload = basePayload(
+                policy,
+                trustStoreHash,
+                verifications,
+                admittedArtifacts,
+                blockedArtifacts
+            );
+            payload.put("contentHash", contentHash);
             try {
                 return JSON.writeValueAsString(payload) + "\n";
             } catch (JsonProcessingException exception) {
                 throw new IllegalStateException("Unable to serialize plugin artifact gate result", exception);
             }
+        }
+
+        private static String contentHash(
+            PluginTrustPolicy policy,
+            String trustStoreHash,
+            List<PluginArtifactVerification> verifications,
+            List<String> admittedArtifacts,
+            List<String> blockedArtifacts
+        ) {
+            try {
+                return PluginArtifactVerifier.sha256(JSON.writeValueAsBytes(basePayload(
+                    policy,
+                    trustStoreHash,
+                    verifications,
+                    admittedArtifacts,
+                    blockedArtifacts
+                )));
+            } catch (JsonProcessingException exception) {
+                throw new IllegalStateException("Unable to hash plugin artifact gate result", exception);
+            }
+        }
+
+        private static Map<String, Object> basePayload(
+            PluginTrustPolicy policy,
+            String trustStoreHash,
+            List<PluginArtifactVerification> verifications,
+            List<String> admittedArtifacts,
+            List<String> blockedArtifacts
+        ) {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("schema", SCHEMA);
+            payload.put("policy", policy.name());
+            payload.put("trustStoreHash", trustStoreHash);
+            payload.put("verifications", verifications.stream()
+                .map(GateResult::verificationPayload)
+                .toList());
+            payload.put("admittedArtifacts", admittedArtifacts);
+            payload.put("blockedArtifacts", blockedArtifacts);
+            return payload;
         }
 
         private static Map<String, Object> verificationPayload(PluginArtifactVerification verification) {
@@ -145,6 +232,34 @@ public final class PluginArtifactGate {
             payload.put("warnings", verification.warnings());
             payload.put("contentHash", verification.contentHash());
             return payload;
+        }
+
+        private static List<PluginArtifactVerification> normalizeVerifications(
+            List<PluginArtifactVerification> values
+        ) {
+            return values == null ? List.of() : values.stream()
+                .map(value -> Objects.requireNonNull(value, "verification"))
+                .sorted(Comparator.comparing(PluginArtifactVerification::artifactFileName))
+                .toList();
+        }
+
+        private static void validateAccounting(
+            List<PluginArtifactVerification> verifications,
+            List<String> admittedArtifacts,
+            List<String> blockedArtifacts
+        ) {
+            if (admittedArtifacts.stream().anyMatch(blockedArtifacts::contains)) {
+                throw new IllegalArgumentException("an artifact cannot be both admitted and blocked");
+            }
+            List<String> accounted = new ArrayList<>(admittedArtifacts);
+            accounted.addAll(blockedArtifacts);
+            List<String> expected = verifications.stream()
+                .map(PluginArtifactVerification::artifactFileName)
+                .sorted()
+                .toList();
+            if (!accounted.stream().sorted().toList().equals(expected)) {
+                throw new IllegalArgumentException("gate result does not account for every verified artifact");
+            }
         }
 
         private static List<String> normalizeNames(List<String> values) {
