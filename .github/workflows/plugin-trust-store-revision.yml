@@ -8,6 +8,7 @@ on:
       - 'app/src/main/java/de/regelsuche/plugin/PluginTrustStoreRevision.java'
       - 'app/src/main/java/de/regelsuche/plugin/PluginTrustStoreRevisionVerifier.java'
       - 'app/src/test/java/de/regelsuche/plugin/PluginTrustStoreRevisionTest.java'
+      - 'app/src/test/java/de/regelsuche/plugin/PluginTrustStoreRevisionStrictJsonTest.java'
       - 'docs/plugin-trust-store-revisions.md'
       - 'docs/schemas/regelsuche-plugin-trust-store-v1.schema.json'
       - 'docs/schemas/regelsuche-plugin-trust-store-revision-v1.schema.json'
@@ -21,6 +22,7 @@ on:
       - 'app/src/main/java/de/regelsuche/plugin/PluginTrustStoreRevision.java'
       - 'app/src/main/java/de/regelsuche/plugin/PluginTrustStoreRevisionVerifier.java'
       - 'app/src/test/java/de/regelsuche/plugin/PluginTrustStoreRevisionTest.java'
+      - 'app/src/test/java/de/regelsuche/plugin/PluginTrustStoreRevisionStrictJsonTest.java'
       - 'docs/plugin-trust-store-revisions.md'
       - 'docs/schemas/regelsuche-plugin-trust-store-v1.schema.json'
       - 'docs/schemas/regelsuche-plugin-trust-store-revision-v1.schema.json'
@@ -59,6 +61,7 @@ jobs:
           set -o pipefail
           ./gradlew :app:test \
             --tests de.regelsuche.plugin.PluginTrustStoreRevisionTest \
+            --tests de.regelsuche.plugin.PluginTrustStoreRevisionStrictJsonTest \
             --rerun-tasks \
             --stacktrace \
             --console=plain 2>&1 \
@@ -81,6 +84,7 @@ jobs:
             /tmp/plugin-trust-store-revision-first/
           ./gradlew :app:test \
             --tests de.regelsuche.plugin.PluginTrustStoreRevisionTest \
+            --tests de.regelsuche.plugin.PluginTrustStoreRevisionStrictJsonTest \
             --rerun-tasks
           for name in \
             root-trust-store \
