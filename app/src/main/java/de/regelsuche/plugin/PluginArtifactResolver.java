@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.regelsuche.plugin.PluginArtifactIndex.ArtifactKind;
 import de.regelsuche.plugin.PluginArtifactIndex.Dependency;
 import de.regelsuche.plugin.PluginArtifactIndex.Entry;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -44,47 +43,41 @@ public final class PluginArtifactResolver {
         if (root != null) {
             visit(root, context);
         }
-        List<String> blockers = context.blockers.stream().distinct().sorted().toList();
-        List<String> warnings = context.warnings.stream().distinct().sorted().toList();
-        ResolutionStatus status = blockers.isEmpty() && root != null
+        List<String> blockers = messages(context.blockers);
+        List<String> warnings = messages(context.warnings);
+        ResolutionStatus status = root != null && blockers.isEmpty()
             ? ResolutionStatus.RESOLVED
             : ResolutionStatus.UNRESOLVED;
-        List<ResolutionStep> plan = status == ResolutionStatus.RESOLVED
-            ? numbered(context.ordered)
-            : List.of();
-        String rootHash = status == ResolutionStatus.RESOLVED
-            ? root.identityHash()
-            : "";
         return ResolutionReceipt.create(
             index.contentHash(),
             request,
             status,
-            rootHash,
-            plan,
+            status == ResolutionStatus.RESOLVED ? root.identityHash() : "",
+            status == ResolutionStatus.RESOLVED ? numbered(context.ordered) : List.of(),
             blockers,
             warnings);
     }
 
     private static Entry selectRoot(ResolutionContext context) {
         ResolutionRequest request = context.request;
-        List<Entry> coordinate = context.index.componentVersions(
+        List<Entry> versions = context.index.componentVersions(
             request.kind(), request.componentId());
-        if (coordinate.isEmpty()) {
+        if (versions.isEmpty()) {
             context.blockers.add("component-not-published:"
                 + coordinate(request.kind(), request.componentId()));
             return null;
         }
         if (request.selectionMode() == SelectionMode.EXACT) {
-            coordinate = coordinate.stream()
+            versions = versions.stream()
                 .filter(item -> item.version().equals(request.requestedVersion()))
                 .toList();
-            if (coordinate.isEmpty()) {
+            if (versions.isEmpty()) {
                 context.blockers.add("requested-version-not-published:"
                     + request.requestedVersion());
                 return null;
             }
         }
-        List<Entry> coreCompatible = coordinate.stream()
+        List<Entry> coreCompatible = versions.stream()
             .filter(item -> item.supportsCore(request.coreVersion()))
             .toList();
         if (coreCompatible.isEmpty()) {
@@ -110,30 +103,46 @@ public final class PluginArtifactResolver {
     }
 
     private static void visit(Entry entry, ResolutionContext context) {
-        Coordinate coordinate = new Coordinate(entry.kind(), entry.componentId());
-        Entry existing = context.selected.get(coordinate);
+        Coordinate current = new Coordinate(entry.kind(), entry.componentId());
+        if (context.visiting.contains(current)) {
+            context.blockers.add("dependency-cycle:" + cycle(context.stack, current));
+            return;
+        }
+        Entry existing = context.selected.get(current);
         if (existing != null) {
             if (!existing.version().equals(entry.version())) {
                 context.blockers.add("dependency-version-conflict:"
-                    + coordinate + ":" + existing.version() + "<>" + entry.version());
+                    + current + ":" + existing.version() + "<>" + entry.version());
             }
             return;
         }
-        if (context.visiting.contains(coordinate)) {
-            context.blockers.add("dependency-cycle:" + cycle(context.stack, coordinate));
-            return;
-        }
-        context.visiting.add(coordinate);
-        context.stack.addLast(coordinate);
-        context.selected.put(coordinate, entry);
+
+        context.visiting.add(current);
+        context.stack.addLast(current);
+        context.selected.put(current, entry);
         for (Dependency dependency : entry.dependencies()) {
             Entry selected = selectDependency(dependency, entry, context);
-            if (selected != null) {
-                visit(selected, context);
+            if (selected == null) {
+                continue;
             }
+            Coordinate dependencyCoordinate = new Coordinate(
+                selected.kind(), selected.componentId());
+            if (context.visiting.contains(dependencyCoordinate)) {
+                String diagnostic = (dependency.optional()
+                    ? "optional-dependency-cycle:"
+                    : "dependency-cycle:")
+                    + cycle(context.stack, dependencyCoordinate);
+                if (dependency.optional()) {
+                    context.warnings.add(diagnostic);
+                } else {
+                    context.blockers.add(diagnostic);
+                }
+                continue;
+            }
+            visit(selected, context);
         }
         context.stack.removeLast();
-        context.visiting.remove(coordinate);
+        context.visiting.remove(current);
         if (context.ordered.stream().noneMatch(item ->
                 item.kind() == entry.kind()
                     && item.componentId().equals(entry.componentId()))) {
@@ -146,28 +155,27 @@ public final class PluginArtifactResolver {
         Entry parent,
         ResolutionContext context
     ) {
-        List<Entry> coordinate = context.index.componentVersions(
-            dependency.kind(), dependency.componentId());
-        List<Entry> matching = coordinate.stream()
+        List<Entry> matching = context.index.componentVersions(
+                dependency.kind(), dependency.componentId()).stream()
             .filter(item -> dependency.matches(item.version()))
             .filter(item -> item.supportsCore(context.request.coreVersion()))
             .filter(item -> item.apiVersion().equals(context.request.apiVersion()))
             .toList();
-        if (matching.isEmpty()) {
-            String diagnostic = (dependency.optional()
-                ? "optional-dependency-unavailable:"
-                : "required-dependency-unavailable:")
-                + parent.artifactId() + "->"
-                + coordinate(dependency.kind(), dependency.componentId())
-                + "@" + dependency.versionConstraint();
-            if (dependency.optional()) {
-                context.warnings.add(diagnostic);
-            } else {
-                context.blockers.add(diagnostic);
-            }
-            return null;
+        if (!matching.isEmpty()) {
+            return matching.getFirst();
         }
-        return matching.getFirst();
+        String diagnostic = (dependency.optional()
+            ? "optional-dependency-unavailable:"
+            : "required-dependency-unavailable:")
+            + parent.artifactId() + "->"
+            + coordinate(dependency.kind(), dependency.componentId())
+            + "@" + dependency.versionConstraint();
+        if (dependency.optional()) {
+            context.warnings.add(diagnostic);
+        } else {
+            context.blockers.add(diagnostic);
+        }
+        return null;
     }
 
     private static List<ResolutionStep> numbered(List<Entry> entries) {
@@ -180,12 +188,12 @@ public final class PluginArtifactResolver {
 
     private static String cycle(Deque<Coordinate> stack, Coordinate repeated) {
         List<Coordinate> path = new ArrayList<>();
-        boolean retain = false;
+        boolean copy = false;
         for (Coordinate item : stack) {
             if (item.equals(repeated)) {
-                retain = true;
+                copy = true;
             }
-            if (retain) {
+            if (copy) {
                 path.add(item);
             }
         }
@@ -214,7 +222,7 @@ public final class PluginArtifactResolver {
         }
     }
 
-    private static List<String> normalizedIdentifiers(List<String> values, String field) {
+    private static List<String> identifiers(List<String> values, String field) {
         if (values == null) {
             return List.of();
         }
@@ -228,7 +236,7 @@ public final class PluginArtifactResolver {
             .toList();
     }
 
-    private static List<String> normalizedMessages(List<String> values) {
+    private static List<String> messages(List<String> values) {
         if (values == null) {
             return List.of();
         }
@@ -265,23 +273,17 @@ public final class PluginArtifactResolver {
     ) {
         public ResolutionRequest {
             if (!REQUEST_SCHEMA.equals(schema)) {
-                throw new IllegalArgumentException("unsupported artifact resolution request schema");
+                throw new IllegalArgumentException(
+                    "unsupported artifact resolution request schema");
             }
             requestId = PluginSignatureManifest.requireIdentifier(requestId, "requestId");
             Objects.requireNonNull(kind, "kind");
             componentId = PluginSignatureManifest.requireIdentifier(componentId, "componentId");
             Objects.requireNonNull(selectionMode, "selectionMode");
-            requestedVersion = requestedVersion == null ? "" : requestedVersion.trim();
-            if (selectionMode == SelectionMode.EXACT) {
-                requestedVersion = PluginArtifactIndex.requireVersion(
-                    requestedVersion, "requestedVersion");
-            } else if (!requestedVersion.isEmpty()) {
-                throw new IllegalArgumentException(
-                    "LATEST_COMPATIBLE request must not provide requestedVersion");
-            }
+            requestedVersion = normalizeRequestedVersion(selectionMode, requestedVersion);
             coreVersion = PluginArtifactIndex.requireVersion(coreVersion, "coreVersion");
             apiVersion = PluginSignatureManifest.requireIdentifier(apiVersion, "apiVersion");
-            requiredCapabilities = normalizedIdentifiers(
+            requiredCapabilities = identifiers(
                 requiredCapabilities, "required capability");
             contentHash = PluginSignatureManifest.requireSha256(contentHash, "contentHash");
             String expected = hash(basePayload(
@@ -294,7 +296,8 @@ public final class PluginArtifactResolver {
                 apiVersion,
                 requiredCapabilities));
             if (!expected.equals(contentHash)) {
-                throw new IllegalArgumentException("artifact resolution request contentHash mismatch");
+                throw new IllegalArgumentException(
+                    "artifact resolution request contentHash mismatch");
             }
         }
 
@@ -353,19 +356,13 @@ public final class PluginArtifactResolver {
             String normalizedComponent = PluginSignatureManifest.requireIdentifier(
                 componentId, "componentId");
             Objects.requireNonNull(selectionMode, "selectionMode");
-            String normalizedVersion = requestedVersion == null ? "" : requestedVersion.trim();
-            if (selectionMode == SelectionMode.EXACT) {
-                normalizedVersion = PluginArtifactIndex.requireVersion(
-                    normalizedVersion, "requestedVersion");
-            } else if (!normalizedVersion.isEmpty()) {
-                throw new IllegalArgumentException(
-                    "LATEST_COMPATIBLE request must not provide requestedVersion");
-            }
+            String normalizedVersion = normalizeRequestedVersion(
+                selectionMode, requestedVersion);
             String normalizedCore = PluginArtifactIndex.requireVersion(
                 coreVersion, "coreVersion");
             String normalizedApi = PluginSignatureManifest.requireIdentifier(
                 apiVersion, "apiVersion");
-            List<String> normalizedCapabilities = normalizedIdentifiers(
+            List<String> normalizedCapabilities = identifiers(
                 requiredCapabilities, "required capability");
             String contentHash = hash(basePayload(
                 normalizedRequest,
@@ -425,6 +422,22 @@ public final class PluginArtifactResolver {
             payload.put("requiredCapabilities", requiredCapabilities);
             return payload;
         }
+
+        private static String normalizeRequestedVersion(
+            SelectionMode mode,
+            String value
+        ) {
+            String normalized = value == null ? "" : value.trim();
+            if (mode == SelectionMode.EXACT) {
+                return PluginArtifactIndex.requireVersion(
+                    normalized, "requestedVersion");
+            }
+            if (!normalized.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "LATEST_COMPATIBLE request must not provide requestedVersion");
+            }
+            return "";
+        }
     }
 
     public record ResolutionStep(
@@ -456,7 +469,8 @@ public final class PluginArtifactResolver {
                 artifactSha256, "artifactSha256");
             if (artifactUri == null || artifactUri.isBlank()
                     || provenanceUri == null || provenanceUri.isBlank()) {
-                throw new IllegalArgumentException("artifact and provenance URIs are required");
+                throw new IllegalArgumentException(
+                    "artifact and provenance URIs are required");
             }
             signatureManifestUri = signatureManifestUri == null ? "" : signatureManifestUri;
             publisherId = PluginSignatureManifest.requireIdentifier(publisherId, "publisherId");
@@ -513,22 +527,18 @@ public final class PluginArtifactResolver {
     ) {
         public ResolutionReceipt {
             if (!RECEIPT_SCHEMA.equals(schema)) {
-                throw new IllegalArgumentException("unsupported artifact resolution schema");
+                throw new IllegalArgumentException(
+                    "unsupported artifact resolution schema");
             }
             indexContentHash = PluginSignatureManifest.requireSha256(
                 indexContentHash, "indexContentHash");
             Objects.requireNonNull(request, "request");
             Objects.requireNonNull(status, "status");
-            rootArtifactIdentityHash = rootArtifactIdentityHash == null
-                ? ""
-                : rootArtifactIdentityHash;
-            if (!rootArtifactIdentityHash.isEmpty()) {
-                rootArtifactIdentityHash = PluginSignatureManifest.requireSha256(
-                    rootArtifactIdentityHash, "rootArtifactIdentityHash");
-            }
+            rootArtifactIdentityHash = optionalHash(
+                rootArtifactIdentityHash, "rootArtifactIdentityHash");
             plan = normalizePlan(plan);
-            blockers = normalizedMessages(blockers);
-            warnings = normalizedMessages(warnings);
+            blockers = messages(blockers);
+            warnings = messages(warnings);
             requireStatus(networkAccessStatus, NOT_PERFORMED, "networkAccessStatus");
             requireStatus(installationStatus, NOT_PERFORMED, "installationStatus");
             requireStatus(trustVerificationStatus, NOT_EVALUATED, "trustVerificationStatus");
@@ -543,7 +553,8 @@ public final class PluginArtifactResolver {
                 blockers,
                 warnings));
             if (!expected.equals(contentHash)) {
-                throw new IllegalArgumentException("artifact resolution contentHash mismatch");
+                throw new IllegalArgumentException(
+                    "artifact resolution contentHash mismatch");
             }
         }
 
@@ -560,14 +571,11 @@ public final class PluginArtifactResolver {
                 indexContentHash, "indexContentHash");
             Objects.requireNonNull(request, "request");
             Objects.requireNonNull(status, "status");
-            String rootHash = rootArtifactIdentityHash == null ? "" : rootArtifactIdentityHash;
-            if (!rootHash.isEmpty()) {
-                rootHash = PluginSignatureManifest.requireSha256(
-                    rootHash, "rootArtifactIdentityHash");
-            }
+            String rootHash = optionalHash(
+                rootArtifactIdentityHash, "rootArtifactIdentityHash");
             List<ResolutionStep> normalizedPlan = normalizePlan(plan);
-            List<String> normalizedBlockers = normalizedMessages(blockers);
-            List<String> normalizedWarnings = normalizedMessages(warnings);
+            List<String> normalizedBlockers = messages(blockers);
+            List<String> normalizedWarnings = messages(warnings);
             validateDisposition(status, rootHash, normalizedPlan, normalizedBlockers);
             String contentHash = hash(basePayload(
                 indexHash,
@@ -641,12 +649,14 @@ public final class PluginArtifactResolver {
             for (int index = 0; index < plan.size(); index++) {
                 ResolutionStep step = plan.get(index);
                 if (step.order() != index + 1) {
-                    throw new IllegalArgumentException("resolution plan order must be contiguous");
+                    throw new IllegalArgumentException(
+                        "resolution plan order must be contiguous");
                 }
                 String coordinate = coordinate(step.kind(), step.componentId());
                 if (!coordinates.add(coordinate)) {
                     throw new IllegalArgumentException(
-                        "resolution plan selects a component more than once: " + coordinate);
+                        "resolution plan selects a component more than once: "
+                            + coordinate);
                 }
             }
             return List.copyOf(plan);
@@ -659,7 +669,9 @@ public final class PluginArtifactResolver {
             List<String> blockers
         ) {
             if (status == ResolutionStatus.RESOLVED) {
-                if (rootArtifactIdentityHash.isEmpty() || plan.isEmpty() || !blockers.isEmpty()) {
+                if (rootArtifactIdentityHash.isEmpty()
+                        || plan.isEmpty()
+                        || !blockers.isEmpty()) {
                     throw new IllegalArgumentException(
                         "resolved receipt requires root, plan and no blockers");
                 }
@@ -675,7 +687,18 @@ public final class PluginArtifactResolver {
             }
         }
 
-        private static void requireStatus(String value, String expected, String field) {
+        private static String optionalHash(String value, String field) {
+            if (value == null || value.isBlank()) {
+                return "";
+            }
+            return PluginSignatureManifest.requireSha256(value, field);
+        }
+
+        private static void requireStatus(
+            String value,
+            String expected,
+            String field
+        ) {
             if (!expected.equals(value)) {
                 throw new IllegalArgumentException(field + " must be " + expected);
             }
