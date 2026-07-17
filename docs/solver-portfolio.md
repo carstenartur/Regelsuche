@@ -52,7 +52,7 @@ Under `INDEPENDENT_CONFIRMATION`, an early refutation does not stop the remainin
 - retention of filtered, skipped, cached and executed attempts;
 - explicit `CONFLICT` whenever lossless mathematical `CONFIRMED` and `REFUTED` executions coexist.
 
-Conflict blocks promotion automatically. The portfolio-compatible `SolverBackend` facade returns the exact selected formal execution to existing proof consumers. When no backend reaches the requested evidence level it returns a synthetic non-confirming execution and preserves the complete report separately through `lastRun()`.
+Every `REFUTED` result and every `CONFLICT` block automatic promotion, regardless of whether the caller requested validation, counterexample search, symbolic confirmation or formal proof. The portfolio-compatible `SolverBackend` facade returns the exact selected formal execution to existing proof consumers. When no backend reaches the requested evidence level it returns a synthetic non-confirming execution and preserves the complete report separately through `lastRun()`.
 
 `PortfolioRun.write(...)` uses one authoritative evidence layout for an exact request:
 
