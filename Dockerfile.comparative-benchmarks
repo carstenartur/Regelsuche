@@ -11,7 +11,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         python3 \
         python3-venv \
-        z3 \
+        z3=4.8.12-3.1build1 \
     && python3 -m venv /opt/regelsuche-sympy \
     && /opt/regelsuche-sympy/bin/python -m pip install \
         --disable-pip-version-check \
