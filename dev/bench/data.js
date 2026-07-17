@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784236115608,
+  "lastUpdate": 1784263682051,
   "repoUrl": "https://github.com/carstenartur/Regelsuche",
   "entries": {
     "Regelsuche JMH Benchmarks": [
@@ -4650,6 +4650,90 @@ window.BENCHMARK_DATA = {
           {
             "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
             "value": 1004.2645972457182,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "25f0b362bb31fd5c4f6b42daee98f802c1c5da60",
+          "message": "Add capability-aware solver portfolio and orchestration (#365)\n\nAdd one capability-aware orchestration layer over the solver-neutral IR. Implement deterministic portfolio policies, explicit backend roles and capabilities, budgets, timeout and cancellation, exact semantic caching, conflict aggregation, real Z3 proof/countermodel execution, proof-consumer integration, complete hash-linked evidence retention, fail-closed promotion semantics and reproducible CI validation.\n\nNo legacy compatibility or parallel problem/evidence format is retained.\n\nCloses #234.",
+          "timestamp": "2026-07-17T05:47:34+02:00",
+          "tree_id": "016dd2c44670b9a51fc173f7ac758b8014bd493f",
+          "url": "https://github.com/carstenartur/Regelsuche/commit/25f0b362bb31fd5c4f6b42daee98f802c1c5da60"
+        },
+        "date": 1784263678718,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+            "value": 3.09026155709887,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+            "value": 8.511314938056243,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+            "value": 3713.8622530864195,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+            "value": 5.982186509970657,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+            "value": 1778.3955589414725,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+            "value": 507.37126561299357,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+            "value": 2.196600965062651,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+            "value": 100.35228311863229,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+            "value": 214.99861079079994,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
+            "value": 1030.1245140120184,
             "unit": "us/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
