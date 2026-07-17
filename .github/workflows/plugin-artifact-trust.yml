@@ -41,10 +41,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Verify signed, tampered, unsigned and revoked artifact contracts
+      - name: Verify signed, tampered, unsigned, revoked and rotated artifact contracts
         run: |
           ./gradlew :app:test \
             --tests 'de.regelsuche.plugin.PluginArtifactTrust*' \
+            --tests de.regelsuche.plugin.PluginTrustStoreRotationTest \
             --rerun-tasks
 
       - name: Require retained canonical trust evidence
