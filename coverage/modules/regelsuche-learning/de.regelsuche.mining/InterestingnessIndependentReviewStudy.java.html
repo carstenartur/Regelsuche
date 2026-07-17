@@ -1,0 +1,564 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessIndependentReviewStudy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessIndependentReviewStudy.java</span></div><h1>InterestingnessIndependentReviewStudy.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.mining.InterestingnessAcceptanceGate.Thresholds;
+import de.regelsuche.mining.InterestingnessCalibrationCorpus.CorpusSplit;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+
+/**
+ * Pre-registers an independently reviewed interestingness study before labels
+ * are collected.
+ *
+ * &lt;p&gt;The plan binds candidate artifacts, assessments, structural splits,
+ * reviewer qualification rules, blinded instructions, scales, rationale codes
+ * and acceptance thresholds. It deliberately contains no relevance labels,
+ * reviewer identities or TEST outcomes.&lt;/p&gt;
+ */
+<span class="fc" id="L30">public final class InterestingnessIndependentReviewStudy {</span>
+    public static final String SCHEMA = &quot;regelsuche.independent-review-study-plan/v1&quot;;
+    public static final int MIN_CASES_PER_SPLIT = 2;
+
+<span class="fc" id="L34">    private static final Pattern SHA256 = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L35">    private static final Pattern IDENTIFIER = Pattern.compile(&quot;[A-Za-z0-9][A-Za-z0-9._:-]{1,127}&quot;);</span>
+<span class="fc" id="L36">    private static final List&lt;InterestingnessProfile&gt; REQUIRED_PROFILES = List.of(</span>
+        InterestingnessProfile.THEORY_DISCOVERY,
+        InterestingnessProfile.SEARCH_REUSE
+    );
+<span class="fc" id="L40">    private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();</span>
+
+    public StudyPlan freeze(
+        String studyId,
+        List&lt;CandidateCase&gt; cases,
+        ReviewProtocol protocol,
+        Thresholds thresholds,
+        List&lt;ExposureRecord&gt; historicalExposures
+    ) {
+<span class="fc" id="L49">        String normalizedStudyId = requireIdentifier(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L50">        List&lt;CandidateCase&gt; orderedCases = orderedCases(cases);</span>
+<span class="fc" id="L51">        List&lt;ExposureRecord&gt; orderedExposures = orderedExposures(historicalExposures);</span>
+<span class="fc" id="L52">        Objects.requireNonNull(protocol, &quot;protocol&quot;);</span>
+<span class="fc" id="L53">        Objects.requireNonNull(thresholds, &quot;thresholds&quot;);</span>
+
+<span class="fc" id="L55">        validateCases(orderedCases);</span>
+<span class="fc" id="L56">        validateSplitIsolation(orderedCases);</span>
+<span class="fc" id="L57">        validateFreshTestCases(orderedCases, orderedExposures);</span>
+
+<span class="fc" id="L59">        String predictiveCorpusHash = sha256(canonicalBytes(predictivePayload(orderedCases)));</span>
+<span class="fc" id="L60">        String thresholdLockHash = sha256(canonicalBytes(thresholdPayload(thresholds)));</span>
+<span class="fc" id="L61">        Map&lt;String, Object&gt; payload = planPayload(</span>
+            normalizedStudyId,
+            orderedCases,
+            protocol,
+            thresholds,
+            thresholdLockHash,
+            orderedExposures,
+            predictiveCorpusHash
+        );
+<span class="fc" id="L70">        String contentHash = sha256(canonicalBytes(payload));</span>
+<span class="fc" id="L71">        return new StudyPlan(</span>
+            SCHEMA,
+            normalizedStudyId,
+            StudyStatus.FROZEN_BEFORE_REVIEW,
+            orderedCases,
+            protocol,
+            thresholds,
+            thresholdLockHash,
+            orderedExposures,
+            predictiveCorpusHash,
+            &quot;NOT_COLLECTED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash
+        );
+    }
+
+    private static List&lt;CandidateCase&gt; orderedCases(List&lt;CandidateCase&gt; values) {
+<span class="fc" id="L89">        Objects.requireNonNull(values, &quot;cases&quot;);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L91">            throw new IllegalArgumentException(&quot;cases must not contain null&quot;);</span>
+        }
+<span class="fc" id="L93">        return values.stream()</span>
+<span class="fc" id="L94">            .sorted(Comparator.comparing((CandidateCase item) -&gt; item.split().name())</span>
+<span class="fc" id="L95">                .thenComparing(CandidateCase::caseId))</span>
+<span class="fc" id="L96">            .toList();</span>
+    }
+
+    private static List&lt;ExposureRecord&gt; orderedExposures(List&lt;ExposureRecord&gt; values) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        return values == null ? List.of() : values.stream()</span>
+<span class="fc" id="L101">            .map(item -&gt; Objects.requireNonNull(item, &quot;exposure&quot;))</span>
+<span class="fc" id="L102">            .sorted(Comparator.comparing(ExposureRecord::candidateArtifactHash)</span>
+<span class="pc" id="L103">                .thenComparing(item -&gt; item.kind().name())</span>
+<span class="fc" id="L104">                .thenComparing(ExposureRecord::sourceStudyHash))</span>
+<span class="fc" id="L105">            .toList();</span>
+    }
+
+    private static void validateCases(List&lt;CandidateCase&gt; cases) {
+<span class="fc" id="L109">        Set&lt;String&gt; caseIds = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L110">        Set&lt;String&gt; candidateIds = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L111">        Set&lt;String&gt; artifactHashes = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (CandidateCase item : cases) {</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (!caseIds.add(item.caseId())) {</span>
+<span class="nc" id="L114">                throw new IllegalArgumentException(&quot;duplicate caseId: &quot; + item.caseId());</span>
+            }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (!candidateIds.add(item.candidateId())) {</span>
+<span class="nc" id="L117">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L118">                    &quot;candidate appears more than once: &quot; + item.candidateId());</span>
+            }
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if (!artifactHashes.add(item.candidateArtifactHash())) {</span>
+<span class="nc" id="L121">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L122">                    &quot;candidate artifact appears more than once: &quot; + item.candidateArtifactHash());</span>
+            }
+<span class="fc" id="L124">        }</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (CorpusSplit split : CorpusSplit.values()) {</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            long count = cases.stream().filter(item -&gt; item.split() == split).count();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (count &lt; MIN_CASES_PER_SPLIT) {</span>
+<span class="nc" id="L128">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L129">                    split.name() + &quot; requires at least &quot; + MIN_CASES_PER_SPLIT + &quot; cases&quot;);</span>
+            }
+        }
+<span class="fc" id="L132">    }</span>
+
+    private static void validateSplitIsolation(List&lt;CandidateCase&gt; cases) {
+<span class="fc" id="L135">        Set&lt;String&gt; calibrationFamilies = splitValues(cases, CorpusSplit.CALIBRATION, true);</span>
+<span class="fc" id="L136">        Set&lt;String&gt; testFamilies = splitValues(cases, CorpusSplit.TEST, true);</span>
+<span class="fc" id="L137">        Set&lt;String&gt; familyOverlap = new TreeSet&lt;&gt;(calibrationFamilies);</span>
+<span class="fc" id="L138">        familyOverlap.retainAll(testFamilies);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (!familyOverlap.isEmpty()) {</span>
+<span class="fc" id="L140">            throw new IllegalArgumentException(</span>
+                &quot;candidate families cross calibration/test: &quot; + familyOverlap);
+        }
+
+<span class="fc" id="L144">        Set&lt;String&gt; calibrationSignatures = splitValues(cases, CorpusSplit.CALIBRATION, false);</span>
+<span class="fc" id="L145">        Set&lt;String&gt; testSignatures = splitValues(cases, CorpusSplit.TEST, false);</span>
+<span class="fc" id="L146">        Set&lt;String&gt; signatureOverlap = new TreeSet&lt;&gt;(calibrationSignatures);</span>
+<span class="fc" id="L147">        signatureOverlap.retainAll(testSignatures);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (!signatureOverlap.isEmpty()) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(</span>
+                &quot;structural signatures cross calibration/test: &quot; + signatureOverlap);
+        }
+<span class="fc" id="L152">    }</span>
+
+    private static Set&lt;String&gt; splitValues(
+        List&lt;CandidateCase&gt; cases,
+        CorpusSplit split,
+        boolean family
+    ) {
+<span class="fc" id="L159">        Set&lt;String&gt; values = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L160">        cases.stream()</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            .filter(item -&gt; item.split() == split)</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            .map(item -&gt; family ? item.candidateFamily() : item.structuralSignatureHash())</span>
+<span class="fc" id="L163">            .forEach(values::add);</span>
+<span class="fc" id="L164">        return values;</span>
+    }
+
+    private static void validateFreshTestCases(
+        List&lt;CandidateCase&gt; cases,
+        List&lt;ExposureRecord&gt; exposures
+    ) {
+<span class="fc" id="L171">        Set&lt;String&gt; exposed = exposures.stream()</span>
+<span class="fc" id="L172">            .map(ExposureRecord::candidateArtifactHash)</span>
+<span class="fc" id="L173">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L174">        List&lt;String&gt; reused = cases.stream()</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            .filter(item -&gt; item.split() == CorpusSplit.TEST)</span>
+<span class="fc" id="L176">            .filter(item -&gt; exposed.contains(item.candidateArtifactHash()))</span>
+<span class="fc" id="L177">            .map(CandidateCase::caseId)</span>
+<span class="fc" id="L178">            .sorted()</span>
+<span class="fc" id="L179">            .toList();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (!reused.isEmpty()) {</span>
+<span class="fc" id="L181">            throw new IllegalArgumentException(</span>
+                &quot;previously exposed artifacts cannot count as fresh TEST: &quot; + reused);
+        }
+<span class="fc" id="L184">    }</span>
+
+    private static Map&lt;String, Object&gt; predictivePayload(List&lt;CandidateCase&gt; cases) {
+<span class="fc" id="L187">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L188">        payload.put(&quot;schema&quot;, &quot;regelsuche.independent-review-predictive-corpus/v1&quot;);</span>
+<span class="fc" id="L189">        payload.put(&quot;minimumCasesPerSplit&quot;, MIN_CASES_PER_SPLIT);</span>
+<span class="fc" id="L190">        payload.put(&quot;cases&quot;, cases.stream().map(CandidateCase::toMap).toList());</span>
+<span class="fc" id="L191">        return payload;</span>
+    }
+
+    private static Map&lt;String, Object&gt; thresholdPayload(Thresholds thresholds) {
+<span class="fc" id="L195">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L196">        payload.put(&quot;minimumTestCases&quot;, thresholds.minimumTestCases());</span>
+<span class="fc" id="L197">        payload.put(&quot;minimumCalibrationAgreementPermille&quot;,</span>
+<span class="fc" id="L198">            thresholds.minimumCalibrationAgreementPermille());</span>
+<span class="fc" id="L199">        payload.put(&quot;minimumTestAgreementPermille&quot;,</span>
+<span class="fc" id="L200">            thresholds.minimumTestAgreementPermille());</span>
+<span class="fc" id="L201">        payload.put(&quot;minimumProfileOrderAgreementPermille&quot;,</span>
+<span class="fc" id="L202">            thresholds.minimumProfileOrderAgreementPermille());</span>
+<span class="fc" id="L203">        payload.put(&quot;minimumLeaveOneOutStabilityPermille&quot;,</span>
+<span class="fc" id="L204">            thresholds.minimumLeaveOneOutStabilityPermille());</span>
+<span class="fc" id="L205">        payload.put(&quot;requireStableTopCandidate&quot;, thresholds.requireStableTopCandidate());</span>
+<span class="fc" id="L206">        payload.put(&quot;requireNonEmptyParetoFront&quot;, thresholds.requireNonEmptyParetoFront());</span>
+<span class="fc" id="L207">        return payload;</span>
+    }
+
+    private static Map&lt;String, Object&gt; planPayload(
+        String studyId,
+        List&lt;CandidateCase&gt; cases,
+        ReviewProtocol protocol,
+        Thresholds thresholds,
+        String thresholdLockHash,
+        List&lt;ExposureRecord&gt; exposures,
+        String predictiveCorpusHash
+    ) {
+<span class="fc" id="L219">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L220">        payload.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L221">        payload.put(&quot;studyId&quot;, studyId);</span>
+<span class="fc" id="L222">        payload.put(&quot;status&quot;, StudyStatus.FROZEN_BEFORE_REVIEW.name());</span>
+<span class="fc" id="L223">        payload.put(&quot;cases&quot;, cases.stream().map(CandidateCase::toMap).toList());</span>
+<span class="fc" id="L224">        payload.put(&quot;reviewProtocol&quot;, protocol.toMap());</span>
+<span class="fc" id="L225">        payload.put(&quot;acceptanceThresholds&quot;, thresholdPayload(thresholds));</span>
+<span class="fc" id="L226">        payload.put(&quot;thresholdLockHash&quot;, thresholdLockHash);</span>
+<span class="fc" id="L227">        payload.put(&quot;historicalExposures&quot;, exposures.stream().map(ExposureRecord::toMap).toList());</span>
+<span class="fc" id="L228">        payload.put(&quot;predictiveCorpusHash&quot;, predictiveCorpusHash);</span>
+<span class="fc" id="L229">        payload.put(&quot;labelsStatus&quot;, &quot;NOT_COLLECTED&quot;);</span>
+<span class="fc" id="L230">        payload.put(&quot;promotionStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L231">        payload.put(&quot;publicEvidenceStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L232">        return payload;</span>
+    }
+
+<span class="fc" id="L235">    public enum StudyStatus {</span>
+<span class="fc" id="L236">        FROZEN_BEFORE_REVIEW</span>
+    }
+
+<span class="fc" id="L239">    public enum ExposureKind {</span>
+<span class="fc" id="L240">        PRIOR_EXPERT_REVIEW,</span>
+<span class="fc" id="L241">        PUBLIC_PRESENTATION,</span>
+<span class="fc" id="L242">        DEVELOPMENT_EVALUATION,</span>
+<span class="fc" id="L243">        PRIOR_HELD_OUT_USE</span>
+    }
+
+    public record CandidateCase(
+        String caseId,
+        String candidateId,
+        CorpusSplit split,
+        String candidateFamily,
+        String structuralSignatureHash,
+        String assessmentContentHash,
+        String candidateArtifactHash,
+        String blindedPresentationHash
+    ) {
+<span class="fc" id="L256">        public CandidateCase {</span>
+<span class="fc" id="L257">            caseId = requireIdentifier(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L258">            candidateId = requireIdentifier(candidateId, &quot;candidateId&quot;);</span>
+<span class="fc" id="L259">            Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L260">            candidateFamily = requireIdentifier(candidateFamily, &quot;candidateFamily&quot;);</span>
+<span class="fc" id="L261">            structuralSignatureHash = requireSha256(</span>
+                structuralSignatureHash, &quot;structuralSignatureHash&quot;);
+<span class="fc" id="L263">            assessmentContentHash = requireSha256(</span>
+                assessmentContentHash, &quot;assessmentContentHash&quot;);
+<span class="fc" id="L265">            candidateArtifactHash = requireSha256(</span>
+                candidateArtifactHash, &quot;candidateArtifactHash&quot;);
+<span class="fc" id="L267">            blindedPresentationHash = requireSha256(</span>
+                blindedPresentationHash, &quot;blindedPresentationHash&quot;);
+<span class="fc" id="L269">        }</span>
+
+        Map&lt;String, Object&gt; toMap() {
+<span class="fc" id="L272">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L273">            payload.put(&quot;caseId&quot;, caseId);</span>
+<span class="fc" id="L274">            payload.put(&quot;candidateId&quot;, candidateId);</span>
+<span class="fc" id="L275">            payload.put(&quot;split&quot;, split.name());</span>
+<span class="fc" id="L276">            payload.put(&quot;candidateFamily&quot;, candidateFamily);</span>
+<span class="fc" id="L277">            payload.put(&quot;structuralSignatureHash&quot;, structuralSignatureHash);</span>
+<span class="fc" id="L278">            payload.put(&quot;assessmentContentHash&quot;, assessmentContentHash);</span>
+<span class="fc" id="L279">            payload.put(&quot;candidateArtifactHash&quot;, candidateArtifactHash);</span>
+<span class="fc" id="L280">            payload.put(&quot;blindedPresentationHash&quot;, blindedPresentationHash);</span>
+<span class="fc" id="L281">            return payload;</span>
+        }
+    }
+
+    public record ReviewProtocol(
+        int minimumIndependentExpertReviews,
+        boolean blindReviewRequired,
+        boolean oneReviewPerReviewerAndCandidate,
+        boolean reviewerIdentitiesStoredAsHashesOnly,
+        boolean testLabelsExcludedFromSelection,
+        String reviewerHashSaltCommitment,
+        String reviewerInstructionsHash,
+        List&lt;String&gt; qualificationCriteria,
+        List&lt;Integer&gt; relevanceScalePermille,
+        List&lt;Integer&gt; confidenceScalePermille,
+        List&lt;String&gt; rationaleCodes,
+        List&lt;InterestingnessProfile&gt; profiles,
+        String correctionPolicy
+    ) {
+        public static final String CORRECTION_POLICY =
+            &quot;NEW_LABELED_EVALUATION_IDENTITY&quot;;
+
+<span class="fc" id="L303">        public ReviewProtocol {</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">            if (minimumIndependentExpertReviews &lt; 2) {</span>
+<span class="nc" id="L305">                throw new IllegalArgumentException(</span>
+                    &quot;minimumIndependentExpertReviews must be at least 2&quot;);
+            }
+<span class="pc bpc" id="L308" title="4 of 8 branches missed.">            if (!blindReviewRequired</span>
+                    || !oneReviewPerReviewerAndCandidate
+                    || !reviewerIdentitiesStoredAsHashesOnly
+                    || !testLabelsExcludedFromSelection) {
+<span class="nc" id="L312">                throw new IllegalArgumentException(</span>
+                    &quot;v1 independent review safeguards must all be enabled&quot;);
+            }
+<span class="fc" id="L315">            reviewerHashSaltCommitment = requireSha256(</span>
+                reviewerHashSaltCommitment, &quot;reviewerHashSaltCommitment&quot;);
+<span class="fc" id="L317">            reviewerInstructionsHash = requireSha256(</span>
+                reviewerInstructionsHash, &quot;reviewerInstructionsHash&quot;);
+<span class="fc" id="L319">            qualificationCriteria = orderedIdentifiers(</span>
+                qualificationCriteria, &quot;qualificationCriteria&quot;, 1);
+<span class="fc" id="L321">            relevanceScalePermille = orderedScale(</span>
+                relevanceScalePermille, &quot;relevanceScalePermille&quot;);
+<span class="fc" id="L323">            confidenceScalePermille = orderedScale(</span>
+                confidenceScalePermille, &quot;confidenceScalePermille&quot;);
+<span class="fc" id="L325">            rationaleCodes = orderedIdentifiers(rationaleCodes, &quot;rationaleCodes&quot;, 2);</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            profiles = profiles == null ? List.of() : profiles.stream()</span>
+<span class="fc" id="L327">                .map(item -&gt; Objects.requireNonNull(item, &quot;profile&quot;))</span>
+<span class="fc" id="L328">                .distinct()</span>
+<span class="fc" id="L329">                .sorted()</span>
+<span class="fc" id="L330">                .toList();</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            if (!profiles.equals(REQUIRED_PROFILES.stream().sorted().toList())) {</span>
+<span class="nc" id="L332">                throw new IllegalArgumentException(</span>
+                    &quot;both unchanged v1 interestingness profiles are required&quot;);
+            }
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">            if (!CORRECTION_POLICY.equals(correctionPolicy)) {</span>
+<span class="nc" id="L336">                throw new IllegalArgumentException(&quot;unsupported correctionPolicy&quot;);</span>
+            }
+<span class="fc" id="L338">        }</span>
+
+        public static ReviewProtocol conservative(
+            String saltCommitment,
+            String instructionsHash,
+            List&lt;String&gt; qualificationCriteria,
+            List&lt;String&gt; rationaleCodes
+        ) {
+<span class="fc" id="L346">            return new ReviewProtocol(</span>
+                2,
+                true,
+                true,
+                true,
+                true,
+                saltCommitment,
+                instructionsHash,
+                qualificationCriteria,
+<span class="fc" id="L355">                List.of(0, 250, 500, 750, 1000),</span>
+<span class="fc" id="L356">                List.of(0, 250, 500, 750, 1000),</span>
+                rationaleCodes,
+                REQUIRED_PROFILES,
+                CORRECTION_POLICY
+            );
+        }
+
+        Map&lt;String, Object&gt; toMap() {
+<span class="fc" id="L364">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L365">            payload.put(&quot;minimumIndependentExpertReviews&quot;, minimumIndependentExpertReviews);</span>
+<span class="fc" id="L366">            payload.put(&quot;blindReviewRequired&quot;, blindReviewRequired);</span>
+<span class="fc" id="L367">            payload.put(&quot;oneReviewPerReviewerAndCandidate&quot;, oneReviewPerReviewerAndCandidate);</span>
+<span class="fc" id="L368">            payload.put(&quot;reviewerIdentitiesStoredAsHashesOnly&quot;,</span>
+<span class="fc" id="L369">                reviewerIdentitiesStoredAsHashesOnly);</span>
+<span class="fc" id="L370">            payload.put(&quot;testLabelsExcludedFromSelection&quot;, testLabelsExcludedFromSelection);</span>
+<span class="fc" id="L371">            payload.put(&quot;reviewerHashSaltCommitment&quot;, reviewerHashSaltCommitment);</span>
+<span class="fc" id="L372">            payload.put(&quot;reviewerInstructionsHash&quot;, reviewerInstructionsHash);</span>
+<span class="fc" id="L373">            payload.put(&quot;qualificationCriteria&quot;, qualificationCriteria);</span>
+<span class="fc" id="L374">            payload.put(&quot;relevanceScalePermille&quot;, relevanceScalePermille);</span>
+<span class="fc" id="L375">            payload.put(&quot;confidenceScalePermille&quot;, confidenceScalePermille);</span>
+<span class="fc" id="L376">            payload.put(&quot;rationaleCodes&quot;, rationaleCodes);</span>
+<span class="fc" id="L377">            payload.put(&quot;profiles&quot;, profiles.stream().map(Enum::name).toList());</span>
+<span class="fc" id="L378">            payload.put(&quot;correctionPolicy&quot;, correctionPolicy);</span>
+<span class="fc" id="L379">            return payload;</span>
+        }
+    }
+
+    public record ExposureRecord(
+        String candidateArtifactHash,
+        ExposureKind kind,
+        String sourceStudyHash
+    ) {
+<span class="fc" id="L388">        public ExposureRecord {</span>
+<span class="fc" id="L389">            candidateArtifactHash = requireSha256(</span>
+                candidateArtifactHash, &quot;candidateArtifactHash&quot;);
+<span class="fc" id="L391">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L392">            sourceStudyHash = requireSha256(sourceStudyHash, &quot;sourceStudyHash&quot;);</span>
+<span class="fc" id="L393">        }</span>
+
+        Map&lt;String, Object&gt; toMap() {
+<span class="nc" id="L396">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc" id="L397">            payload.put(&quot;candidateArtifactHash&quot;, candidateArtifactHash);</span>
+<span class="nc" id="L398">            payload.put(&quot;kind&quot;, kind.name());</span>
+<span class="nc" id="L399">            payload.put(&quot;sourceStudyHash&quot;, sourceStudyHash);</span>
+<span class="nc" id="L400">            return payload;</span>
+        }
+    }
+
+    public record StudyPlan(
+        String schema,
+        String studyId,
+        StudyStatus status,
+        List&lt;CandidateCase&gt; cases,
+        ReviewProtocol reviewProtocol,
+        Thresholds acceptanceThresholds,
+        String thresholdLockHash,
+        List&lt;ExposureRecord&gt; historicalExposures,
+        String predictiveCorpusHash,
+        String labelsStatus,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L419">        public StudyPlan {</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L421">                throw new IllegalArgumentException(&quot;unsupported independent review study schema&quot;);</span>
+            }
+<span class="fc" id="L423">            studyId = requireIdentifier(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L424">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L425">            cases = orderedCases(cases);</span>
+<span class="fc" id="L426">            Objects.requireNonNull(reviewProtocol, &quot;reviewProtocol&quot;);</span>
+<span class="fc" id="L427">            Objects.requireNonNull(acceptanceThresholds, &quot;acceptanceThresholds&quot;);</span>
+<span class="fc" id="L428">            thresholdLockHash = requireSha256(thresholdLockHash, &quot;thresholdLockHash&quot;);</span>
+<span class="fc" id="L429">            historicalExposures = orderedExposures(historicalExposures);</span>
+<span class="fc" id="L430">            predictiveCorpusHash = requireSha256(</span>
+                predictiveCorpusHash, &quot;predictiveCorpusHash&quot;);
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">            if (!&quot;NOT_COLLECTED&quot;.equals(labelsStatus)</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(promotionStatus)</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(publicEvidenceStatus)) {</span>
+<span class="nc" id="L435">                throw new IllegalArgumentException(</span>
+                    &quot;frozen plan cannot contain labels, promotion or public evidence&quot;);
+            }
+<span class="fc" id="L438">            contentHash = requireSha256(contentHash, &quot;contentHash&quot;);</span>
+
+<span class="fc" id="L440">            validateCases(cases);</span>
+<span class="fc" id="L441">            validateSplitIsolation(cases);</span>
+<span class="fc" id="L442">            validateFreshTestCases(cases, historicalExposures);</span>
+<span class="fc" id="L443">            String expectedPredictiveHash = sha256(</span>
+<span class="fc" id="L444">                canonicalBytes(predictivePayload(cases)));</span>
+<span class="pc bpc" id="L445" title="1 of 2 branches missed.">            if (!expectedPredictiveHash.equals(predictiveCorpusHash)) {</span>
+<span class="nc" id="L446">                throw new IllegalArgumentException(&quot;predictiveCorpusHash mismatch&quot;);</span>
+            }
+<span class="fc" id="L448">            String expectedThresholdHash = sha256(</span>
+<span class="fc" id="L449">                canonicalBytes(thresholdPayload(acceptanceThresholds)));</span>
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">            if (!expectedThresholdHash.equals(thresholdLockHash)) {</span>
+<span class="nc" id="L451">                throw new IllegalArgumentException(&quot;thresholdLockHash mismatch&quot;);</span>
+            }
+<span class="fc" id="L453">            String expectedContentHash = sha256(canonicalBytes(planPayload(</span>
+                studyId,
+                cases,
+                reviewProtocol,
+                acceptanceThresholds,
+                thresholdLockHash,
+                historicalExposures,
+                predictiveCorpusHash
+            )));
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            if (!expectedContentHash.equals(contentHash)) {</span>
+<span class="fc" id="L463">                throw new IllegalArgumentException(&quot;study contentHash mismatch&quot;);</span>
+            }
+<span class="fc" id="L465">        }</span>
+
+        public CandidateCase requireCase(String caseId) {
+<span class="nc" id="L468">            return cases.stream()</span>
+<span class="nc" id="L469">                .filter(item -&gt; item.caseId().equals(caseId))</span>
+<span class="nc" id="L470">                .findFirst()</span>
+<span class="nc" id="L471">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+                    &quot;unknown review case: &quot; + caseId));
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L476">            Map&lt;String, Object&gt; payload = planPayload(</span>
+                studyId,
+                cases,
+                reviewProtocol,
+                acceptanceThresholds,
+                thresholdLockHash,
+                historicalExposures,
+                predictiveCorpusHash
+            );
+<span class="fc" id="L485">            payload.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L486">            return canonicalJson(payload);</span>
+        }
+    }
+
+    static byte[] canonicalBytes(Map&lt;String, Object&gt; payload) {
+        try {
+<span class="fc" id="L492">            return JSON.writeValueAsBytes(payload);</span>
+<span class="nc" id="L493">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L494">            throw new IllegalStateException(&quot;Unable to encode independent review study&quot;, exception);</span>
+        }
+    }
+
+    static String canonicalJson(Map&lt;String, Object&gt; payload) {
+        try {
+<span class="fc" id="L500">            return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L501">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L502">            throw new IllegalStateException(&quot;Unable to encode independent review study&quot;, exception);</span>
+        }
+    }
+
+    static String sha256(byte[] value) {
+        try {
+<span class="fc" id="L508">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(</span>
+<span class="fc" id="L509">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value));</span>
+<span class="nc" id="L510">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L511">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    static String requireSha256(String value, String field) {
+<span class="pc bpc" id="L516" title="1 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
+<span class="fc" id="L517">            throw new IllegalArgumentException(field + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L519">        return value;</span>
+    }
+
+    static String requireIdentifier(String value, String field) {
+<span class="pc bpc" id="L523" title="2 of 4 branches missed.">        if (value == null || !IDENTIFIER.matcher(value).matches()) {</span>
+<span class="nc" id="L524">            throw new IllegalArgumentException(field + &quot; is not a valid identifier&quot;);</span>
+        }
+<span class="fc" id="L526">        return value;</span>
+    }
+
+    private static List&lt;String&gt; orderedIdentifiers(
+        List&lt;String&gt; values,
+        String field,
+        int minimum
+    ) {
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L535">            throw new IllegalArgumentException(field + &quot; must not be null&quot;);</span>
+        }
+<span class="fc" id="L537">        List&lt;String&gt; ordered = values.stream()</span>
+<span class="fc" id="L538">            .map(value -&gt; requireIdentifier(value, field))</span>
+<span class="fc" id="L539">            .distinct()</span>
+<span class="fc" id="L540">            .sorted()</span>
+<span class="fc" id="L541">            .toList();</span>
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">        if (ordered.size() &lt; minimum) {</span>
+<span class="nc" id="L543">            throw new IllegalArgumentException(</span>
+                field + &quot; requires at least &quot; + minimum + &quot; values&quot;);
+        }
+<span class="fc" id="L546">        return ordered;</span>
+    }
+
+    private static List&lt;Integer&gt; orderedScale(List&lt;Integer&gt; values, String field) {
+<span class="pc bpc" id="L550" title="2 of 4 branches missed.">        if (values == null || values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L551">            throw new IllegalArgumentException(field + &quot; must not contain null&quot;);</span>
+        }
+<span class="fc" id="L553">        List&lt;Integer&gt; ordered = values.stream().distinct().sorted().toList();</span>
+<span class="pc bpc" id="L554" title="3 of 6 branches missed.">        if (ordered.size() &lt; 3 || ordered.getFirst() != 0 || ordered.getLast() != 1000) {</span>
+<span class="nc" id="L555">            throw new IllegalArgumentException(</span>
+                field + &quot; must contain at least three values including 0 and 1000&quot;);
+        }
+<span class="pc bpc" id="L558" title="3 of 6 branches missed.">        if (ordered.stream().anyMatch(value -&gt; value &lt; 0 || value &gt; 1000)) {</span>
+<span class="nc" id="L559">            throw new IllegalArgumentException(field + &quot; values must be in [0,1000]&quot;);</span>
+        }
+<span class="fc" id="L561">        return ordered;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
