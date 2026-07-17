@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 class DeclaredPortfolioBackendEvidenceTest {
 
     @Test
-    void proofCapableBackendCannotConfirmWithoutCertificate() {
+    void uncertifiedConfirmationIsRetainedButCannotSatisfyFormalProof() {
         Obligation obligation = new SolverObligationFactory().equality(
             "uncertified-formal-proof",
             "x + 0",
@@ -108,14 +108,19 @@ class DeclaredPortfolioBackendEvidenceTest {
             new DeclaredPortfolioBackend(uncertified, profile)))
             .execute(request);
 
-        assertEquals(PortfolioOutcome.ERROR, run.report().outcome());
+        assertEquals(PortfolioOutcome.INCONCLUSIVE, run.report().outcome());
         assertFalse(run.report().proofAuthorized());
         assertTrue(run.report().promotionBlocked());
-        assertEquals(AttemptDisposition.FAILED,
+        assertEquals(AttemptDisposition.EXECUTED,
             run.report().attempts().getFirst().disposition());
-        assertTrue(run.report().attempts().getFirst().issues().stream()
-            .anyMatch(issue -> issue.contains("certificate")));
-        assertTrue(run.executions().isEmpty());
+        assertEquals("CONFIRMED",
+            run.report().attempts().getFirst().resultStatus());
+        assertTrue(run.report().attempts().getFirst().issues().isEmpty());
+        assertEquals(1, run.executions().size());
+        assertEquals(ResultStatus.CONFIRMED,
+            run.executions().getFirst().result().status());
+        assertTrue(run.executions().getFirst().result().certificateHash().isEmpty());
+        assertTrue(run.report().selectedExecutionHash().isEmpty());
         assertNull(run.selectedExecution());
     }
 }
