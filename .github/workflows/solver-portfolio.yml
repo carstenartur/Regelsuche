@@ -45,7 +45,7 @@ jobs:
             :regelsuche-solver-portfolio:writeSolverPortfolioExample \
             2>&1 | tee solver-portfolio-gradle.log
 
-      - name: Validate canonical portfolio report
+      - name: Validate canonical portfolio evidence
         run: |
           python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
           python3 - <<'PY'
@@ -54,15 +54,84 @@ jobs:
           from jsonschema import Draft202012Validator
 
           root = Path('regelsuche-solver-portfolio/build/reports/solver-portfolio')
-          schema = json.loads(Path(
-              'docs/schemas/regelsuche-solver-portfolio-report-v1.schema.json'
-          ).read_text())
-          Draft202012Validator.check_schema(schema)
-          formal = json.loads((root / 'formal/report.json').read_text())
-          guidance = json.loads((root / 'guidance/report.json').read_text())
-          Draft202012Validator(schema).validate(formal)
-          Draft202012Validator(schema).validate(guidance)
-          manifest = json.loads((root / 'manifest.json').read_text())
+          schemas = Path('docs/schemas')
+
+          report_schema = json.loads((schemas /
+              'regelsuche-solver-portfolio-report-v1.schema.json').read_text())
+          obligation_schema = json.loads((schemas /
+              'regelsuche-solver-obligation-v1.schema.json').read_text())
+          translation_schema = json.loads((schemas /
+              'regelsuche-solver-translation-v1.schema.json').read_text())
+          result_schema = json.loads((schemas /
+              'regelsuche-solver-result-v1.schema.json').read_text())
+          execution_schema = json.loads((schemas /
+              'regelsuche-solver-execution-v1.schema.json').read_text())
+
+          for schema in (
+              report_schema,
+              obligation_schema,
+              translation_schema,
+              result_schema,
+              execution_schema,
+          ):
+              Draft202012Validator.check_schema(schema)
+
+          def load(path):
+              return json.loads(path.read_text())
+
+          def validate_run(name):
+              run_root = root / name
+              obligation = load(run_root / 'obligation.json')
+              request = load(run_root / 'request.json')
+              report = load(run_root / 'report.json')
+              Draft202012Validator(obligation_schema).validate(obligation)
+              Draft202012Validator(report_schema).validate(report)
+
+              assert request['obligationHash'] == obligation['contentHash']
+              assert report['obligationHash'] == obligation['contentHash']
+              assert report['requestHash'] == request['contentHash']
+
+              traced_hashes = {
+                  attempt['executionHash'] for attempt in report['attempts']
+                  if attempt['executionHash']
+              }
+              retained_hashes = set()
+              execution_directories = sorted(
+                  path for path in (run_root / 'executions').iterdir()
+                  if path.is_dir()
+              )
+              for attempt_root in execution_directories:
+                  translation = load(attempt_root / 'translation.json')
+                  result = load(attempt_root / 'result.json')
+                  execution = load(attempt_root / 'execution.json')
+                  Draft202012Validator(translation_schema).validate(translation)
+                  Draft202012Validator(result_schema).validate(result)
+                  Draft202012Validator(execution_schema).validate(execution)
+
+                  assert translation['obligationHash'] == obligation['contentHash']
+                  assert result['obligationHash'] == obligation['contentHash']
+                  assert execution['obligationHash'] == obligation['contentHash']
+                  assert execution['translationHash'] == translation['contentHash']
+                  assert execution['resultHash'] == result['contentHash']
+                  assert execution['backendId'] == translation['backendId']
+                  assert execution['backendId'] == result['backendId']
+                  assert execution['backendVersion'] == translation['backendVersion']
+                  assert execution['backendVersion'] == result['backendVersion']
+                  assert execution['translationStatus'] == translation['status']
+                  assert execution['translationStatus'] == result['translationStatus']
+                  assert execution['resultStatus'] == result['status']
+                  retained_hashes.add(execution['contentHash'])
+
+              assert retained_hashes == traced_hashes
+              assert len(execution_directories) == len(retained_hashes)
+              selected = report['selectedExecutionHash']
+              if selected:
+                  assert selected in retained_hashes
+              return report
+
+          formal = validate_run('formal')
+          guidance = validate_run('guidance')
+          manifest = load(root / 'manifest.json')
 
           assert formal['outcome'] == 'CONFIRMED'
           assert formal['proofAuthorized'] is True
@@ -75,19 +144,6 @@ jobs:
           assert guidance['selectedBackendId'] == 'regelsuche-search'
           assert formal['telemetryNotice'] == \
               'EXECUTION_TELEMETRY_NOT_MATHEMATICAL_EVIDENCE'
-
-          traced_hashes = {
-              attempt['executionHash'] for attempt in formal['attempts']
-              if attempt['executionHash']
-          }
-          execution_files = sorted((root / 'formal/executions').glob('*.json'))
-          retained_hashes = {
-              json.loads(path.read_text())['contentHash']
-              for path in execution_files
-          }
-          assert retained_hashes == traced_hashes
-          assert formal['selectedExecutionHash'] in retained_hashes
-
           assert manifest['allThreeRolesConfigured'] is True
           assert manifest['formalMultiStage'] is True
           assert manifest['allFormalExecutionsRetained'] is True
