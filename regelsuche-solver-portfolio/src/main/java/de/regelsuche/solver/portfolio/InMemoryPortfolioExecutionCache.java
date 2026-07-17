@@ -1,6 +1,7 @@
 package de.regelsuche.solver.portfolio;
 
 import de.regelsuche.solver.ir.SolverExecution;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,8 +19,12 @@ public final class InMemoryPortfolioExecutionCache implements PortfolioExecution
 
     @Override
     public void put(String cacheKey, SolverExecution execution) {
-        entries.put(
-            Objects.requireNonNull(cacheKey),
-            Objects.requireNonNull(execution));
+        Objects.requireNonNull(cacheKey, "cacheKey");
+        Objects.requireNonNull(execution, "execution");
+        ResultStatus status = execution.result().status();
+        if (status == ResultStatus.TIMEOUT || status == ResultStatus.ERROR) {
+            return;
+        }
+        entries.put(cacheKey, execution);
     }
 }
