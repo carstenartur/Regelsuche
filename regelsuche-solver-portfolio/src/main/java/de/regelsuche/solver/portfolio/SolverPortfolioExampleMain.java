@@ -67,15 +67,8 @@ public final class SolverPortfolioExampleMain {
                 "reference search portfolio did not confirm");
         }
 
-        Path formalOutput = output.resolve("formal");
-        Files.createDirectories(formalOutput);
-        write(formalOutput.resolve("request.json"), formalRequest.toCanonicalJson());
-        formalRun.write(formalOutput);
-
-        Path guidanceOutput = output.resolve("guidance");
-        Files.createDirectories(guidanceOutput);
-        write(guidanceOutput.resolve("request.json"), guidanceRequest.toCanonicalJson());
-        guidanceRun.write(guidanceOutput);
+        formalRun.write(output.resolve("formal"), formalRequest);
+        guidanceRun.write(output.resolve("guidance"), guidanceRequest);
 
         Path profilesOutput = output.resolve("profiles");
         Files.createDirectories(profilesOutput);
