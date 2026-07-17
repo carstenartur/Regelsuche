@@ -58,11 +58,17 @@ jobs:
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
       - name: Verify immutable signed index and deterministic resolution contracts
+        shell: bash
         run: |
+          mkdir -p app/build/reports/plugin-artifact-index
+          set -o pipefail
           ./gradlew :app:test \
             --tests 'de.regelsuche.plugin.PluginArtifactIndex*' \
             --tests de.regelsuche.plugin.PluginArtifactResolverTest \
-            --rerun-tasks
+            --rerun-tasks \
+            --stacktrace \
+            --console=plain 2>&1 \
+            | tee app/build/reports/plugin-artifact-index/targeted-test.log
 
       - name: Require retained canonical evidence
         run: |
