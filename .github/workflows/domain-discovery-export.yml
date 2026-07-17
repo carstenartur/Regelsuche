@@ -4,38 +4,48 @@ on:
   push:
     branches: [ "main" ]
     paths:
+      - 'regelsuche-discovery/build.gradle'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainDiscoveryExport.java'
+      - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainDiscoveryExportVerifier.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainDiscoveryEvidence.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoff.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DiscoveryDomainDescriptor.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/ExpressionRewriteDiscoveryDomain.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/FiniteDifferenceSequenceDomain.java'
       - 'regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainDiscoveryExportTest.java'
+      - 'regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainDiscoveryExportVerifierTest.java'
       - 'docs/README.md'
       - 'docs/generic-discovery-domains.md'
       - 'docs/domain-discovery-export.md'
+      - 'docs/domain-discovery-export-verification.md'
       - 'docs/schemas/regelsuche-discovery-domain-descriptor-v1.schema.json'
       - 'docs/schemas/regelsuche-domain-discovery-evidence-v1.schema.json'
       - 'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'
       - 'docs/schemas/regelsuche-domain-discovery-export-v1.schema.json'
+      - 'docs/schemas/regelsuche-domain-discovery-export-verification-v1.schema.json'
       - '.github/workflows/domain-discovery-export.yml'
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "issue-224-generic-domain-export" ]
     paths:
+      - 'regelsuche-discovery/build.gradle'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainDiscoveryExport.java'
+      - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainDiscoveryExportVerifier.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DomainDiscoveryEvidence.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoff.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DiscoveryDomainDescriptor.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/ExpressionRewriteDiscoveryDomain.java'
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/FiniteDifferenceSequenceDomain.java'
       - 'regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainDiscoveryExportTest.java'
+      - 'regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DomainDiscoveryExportVerifierTest.java'
       - 'docs/README.md'
       - 'docs/generic-discovery-domains.md'
       - 'docs/domain-discovery-export.md'
+      - 'docs/domain-discovery-export-verification.md'
       - 'docs/schemas/regelsuche-discovery-domain-descriptor-v1.schema.json'
       - 'docs/schemas/regelsuche-domain-discovery-evidence-v1.schema.json'
       - 'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'
       - 'docs/schemas/regelsuche-domain-discovery-export-v1.schema.json'
+      - 'docs/schemas/regelsuche-domain-discovery-export-verification-v1.schema.json'
       - '.github/workflows/domain-discovery-export.yml'
   workflow_dispatch:
 
@@ -62,33 +72,43 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.1.0
 
-      - name: Verify generic domain export contracts
+      - name: Verify generic domain export and snapshot contracts
         run: |
           ./gradlew :regelsuche-discovery:test \
             --tests de.regelsuche.discovery.domain.DomainDiscoveryExportTest \
+            --tests de.regelsuche.discovery.domain.DomainDiscoveryExportVerifierTest \
             --rerun-tasks
 
-      - name: Require complete expression and sequence exports
+      - name: Require complete expression and sequence evidence
         run: |
           for domain in expression sequence; do
             for name in domain evidence lifecycle-handoff export-manifest; do
               test -s "regelsuche-discovery/build/reports/domain-discovery-export/${domain}/${name}.json"
+              test -s "regelsuche-discovery/build/reports/domain-discovery-export-verification/${domain}/${name}.json"
             done
+            test -s "regelsuche-discovery/build/reports/domain-discovery-export-verification/${domain}/verification.json"
           done
 
-      - name: Require byte-identical repeated exports
+      - name: Require byte-identical repeated exports and verification receipts
         run: |
           cp -a \
             regelsuche-discovery/build/reports/domain-discovery-export \
             /tmp/domain-discovery-export-first
+          cp -a \
+            regelsuche-discovery/build/reports/domain-discovery-export-verification \
+            /tmp/domain-discovery-export-verification-first
           ./gradlew :regelsuche-discovery:test \
             --tests de.regelsuche.discovery.domain.DomainDiscoveryExportTest \
+            --tests de.regelsuche.discovery.domain.DomainDiscoveryExportVerifierTest \
             --rerun-tasks
           diff -ru \
             /tmp/domain-discovery-export-first \
             regelsuche-discovery/build/reports/domain-discovery-export
+          diff -ru \
+            /tmp/domain-discovery-export-verification-first \
+            regelsuche-discovery/build/reports/domain-discovery-export-verification
 
-      - name: Validate schemas, roots, bytes and representation boundary
+      - name: Validate schemas, roots, bytes, receipts and representation boundary
         shell: bash
         run: |
           python3 -m venv .venv-domain-discovery-export
@@ -107,6 +127,15 @@ jobs:
           def sha256(data):
               return 'sha256:' + hashlib.sha256(data).hexdigest()
 
+          def canonical_map(values):
+              return '|'.join(
+                  f'{len(key)}:{key}={len(value)}:{value}'
+                  for key, value in sorted(values.items())
+              )
+
+          def canonical_list(values):
+              return '|'.join(f'{len(value)}:{value}' for value in values)
+
           def expect_rejection(validator, value, label):
               try:
                   validator.validate(value)
@@ -120,6 +149,7 @@ jobs:
               'evidence': 'regelsuche-domain-discovery-evidence-v1.schema.json',
               'handoff': 'regelsuche-discovery-lifecycle-handoff-v1.schema.json',
               'manifest': 'regelsuche-domain-discovery-export-v1.schema.json',
+              'verification': 'regelsuche-domain-discovery-export-verification-v1.schema.json',
           }
           validators = {}
           for name, file_name in schemas.items():
@@ -128,7 +158,6 @@ jobs:
               assert schema.get('additionalProperties') is False
               validators[name] = Draft202012Validator(schema)
 
-          root = Path('regelsuche-discovery/build/reports/domain-discovery-export')
           expected_domains = {
               'expression': 'expression-rewrite',
               'sequence': 'integer-sequence-finite-difference',
@@ -142,6 +171,11 @@ jobs:
               'states',
               'path',
           }
+          role_order = [
+              'DOMAIN_DESCRIPTOR',
+              'DISCOVERY_EVIDENCE',
+              'LIFECYCLE_HANDOFF',
+          ]
 
           def nested_keys(value):
               if isinstance(value, dict):
@@ -152,8 +186,7 @@ jobs:
                   for nested in value:
                       yield from nested_keys(nested)
 
-          for directory_name, expected_domain in expected_domains.items():
-              directory = root / directory_name
+          def validate_export(directory, expected_domain):
               paths = {
                   'descriptor': directory / 'domain.json',
                   'evidence': directory / 'evidence.json',
@@ -187,23 +220,20 @@ jobs:
               assert handoff['domainContractHash'] == descriptor['contentHash']
               assert handoff['inputHash'] == evidence['seed']['contentHash']
               assert handoff['sourceEvidenceHash'] == evidence['contentHash']
-              for status in (
-                  'proofStatus',
-                  'externalNoveltyStatus',
-                  'promotionStatus',
-                  'publicEvidenceStatus',
-              ):
-                  assert handoff[status] == 'NOT_EVALUATED'
+              for report in (evidence, handoff):
+                  for status in (
+                      'proofStatus',
+                      'externalNoveltyStatus',
+                      'promotionStatus',
+                      'publicEvidenceStatus',
+                  ):
+                      assert report[status] == 'NOT_EVALUATED'
 
               artifacts = manifest['artifacts']
               assert [item['fileName'] for item in artifacts] == sorted(
                   item['fileName'] for item in artifacts)
               by_role = {item['role']: item for item in artifacts}
-              assert set(by_role) == {
-                  'DOMAIN_DESCRIPTOR',
-                  'DISCOVERY_EVIDENCE',
-                  'LIFECYCLE_HANDOFF',
-              }
+              assert set(by_role) == set(role_order)
               expected = {
                   'DOMAIN_DESCRIPTOR': (paths['descriptor'], descriptor['contentHash']),
                   'DISCOVERY_EVIDENCE': (paths['evidence'], evidence['contentHash']),
@@ -253,6 +283,55 @@ jobs:
                   invalid_handoff,
                   'handoff with representation payload',
               )
+              return paths, manifest, by_role
+
+          writer_root = Path(
+              'regelsuche-discovery/build/reports/domain-discovery-export')
+          verification_root = Path(
+              'regelsuche-discovery/build/reports/domain-discovery-export-verification')
+
+          for directory_name, expected_domain in expected_domains.items():
+              validate_export(writer_root / directory_name, expected_domain)
+              paths, manifest, by_role = validate_export(
+                  verification_root / directory_name,
+                  expected_domain,
+              )
+              verification_path = (
+                  verification_root / directory_name / 'verification.json')
+              verification = json.loads(
+                  verification_path.read_text(encoding='utf-8'))
+              validators['verification'].validate(verification)
+              assert verification['manifestContentHash'] == manifest['contentHash']
+              assert verification['manifestByteHash'] == sha256(
+                  paths['manifest'].read_bytes())
+              assert verification['campaignId'] == manifest['campaignId']
+              assert verification['domainId'] == manifest['domainId']
+              assert verification['domainRevision'] == manifest['domainRevision']
+              assert verification['domainDescriptorHash'] == \
+                  manifest['domainDescriptorHash']
+              assert verification['discoveryEvidenceHash'] == \
+                  manifest['discoveryEvidenceHash']
+              assert verification['lifecycleHandoffHash'] == \
+                  manifest['lifecycleHandoffHash']
+              snapshot_material = [
+                  f"{role}|{by_role[role]['byteHash']}|"
+                  f"{by_role[role]['byteLength']}"
+                  for role in role_order
+              ]
+              assert verification['artifactSetHash'] == sha256(
+                  canonical_list(snapshot_material).encode('utf-8'))
+              assert verification['verifiedArtifactCount'] == 3
+              assert verification['identityBindingStatus'] == 'VERIFIED'
+              assert verification['mathematicalValidationStatus'] == \
+                  'NOT_EVALUATED'
+              verification_values = {
+                  key: str(value).lower() if isinstance(value, bool) else str(value)
+                  for key, value in verification.items()
+                  if key != 'contentHash'
+              }
+              assert verification['contentHash'] == sha256(
+                  canonical_map(verification_values).encode('utf-8'))
+              assert forbidden_keys.isdisjoint(set(nested_keys(verification)))
           PY
 
       - name: Upload domain export evidence and diagnostics
@@ -262,8 +341,10 @@ jobs:
           name: domain-discovery-export-evidence
           path: |
             regelsuche-discovery/build/reports/domain-discovery-export/**
+            regelsuche-discovery/build/reports/domain-discovery-export-verification/**
             regelsuche-discovery/build/reports/tests/**
             regelsuche-discovery/build/test-results/**
             docs/schemas/regelsuche-domain-discovery-export-v1.schema.json
+            docs/schemas/regelsuche-domain-discovery-export-verification-v1.schema.json
             docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json
           if-no-files-found: warn
