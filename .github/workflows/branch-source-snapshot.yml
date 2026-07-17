@@ -5,6 +5,9 @@ on:
     branches: [ "issue-224-domain-generic-qualification" ]
     paths:
       - '.github/workflows/branch-source-snapshot.yml'
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
