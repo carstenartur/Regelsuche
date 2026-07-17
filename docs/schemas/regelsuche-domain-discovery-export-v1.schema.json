@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.domain-discovery-export/v1",
+  "title": "Regelsuche generic domain discovery export v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "campaignId",
+    "domainId",
+    "domainRevision",
+    "domainDescriptorHash",
+    "discoveryEvidenceHash",
+    "lifecycleHandoffHash",
+    "artifacts",
+    "commitProtocol",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.domain-discovery-export/v1"
+    },
+    "campaignId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainRevision": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainDescriptorHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "discoveryEvidenceHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "lifecycleHandoffHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "DOMAIN_DESCRIPTOR"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "DISCOVERY_EVIDENCE"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "LIFECYCLE_HANDOFF"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          }
+        }
+      ]
+    },
+    "commitProtocol": {
+      "const": "MANIFEST_LAST_ATOMIC_RENAME"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "fileName",
+        "role",
+        "sourceContentHash",
+        "byteHash",
+        "byteLength"
+      ],
+      "properties": {
+        "fileName": {
+          "enum": [
+            "domain.json",
+            "evidence.json",
+            "lifecycle-handoff.json"
+          ]
+        },
+        "role": {
+          "enum": [
+            "DOMAIN_DESCRIPTOR",
+            "DISCOVERY_EVIDENCE",
+            "LIFECYCLE_HANDOFF"
+          ]
+        },
+        "sourceContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "DOMAIN_DESCRIPTOR"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "domain.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "DISCOVERY_EVIDENCE"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "evidence.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "LIFECYCLE_HANDOFF"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "lifecycle-handoff.json"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}
