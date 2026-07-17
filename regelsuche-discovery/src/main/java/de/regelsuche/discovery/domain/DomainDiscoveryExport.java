@@ -226,7 +226,8 @@ public final class DomainDiscoveryExport {
     ) {
         public ExportArtifact {
             Objects.requireNonNull(role, "role");
-            if (!role.fileName().equals(fileName)
+            if (fileName == null
+                    || !role.fileName().equals(fileName)
                     || fileName.contains("/")
                     || fileName.contains("\\")
                     || MANIFEST_FILE_NAME.equals(fileName)) {
