@@ -1,0 +1,509 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExpressionRewriteDiscoveryDomain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">ExpressionRewriteDiscoveryDomain.java</span></div><h1>ExpressionRewriteDiscoveryDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateContext;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateEvaluator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateExtractor;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CanonicalCodec;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CertificateRenderer;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CertificateRendering;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleResult;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DomainPayload;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Evaluation;
+import de.regelsuche.discovery.domain.DiscoveryDomain.EvidenceAdapter;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Invariant;
+import de.regelsuche.discovery.domain.DiscoveryDomain.InvariantResult;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Objective;
+import de.regelsuche.discovery.domain.DiscoveryDomain.ObjectiveAssessment;
+import de.regelsuche.discovery.domain.DiscoveryDomain.PathStep;
+import de.regelsuche.discovery.domain.DiscoveryDomain.StateGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Successor;
+import de.regelsuche.discovery.domain.DiscoveryDomain.TransitionOperator;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.Transformation;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Adapter that exposes the existing AST rewrite machinery through the generic domain contract. */
+public final class ExpressionRewriteDiscoveryDomain implements DiscoveryDomain&lt;
+    ExpressionRewriteDiscoveryDomain.ExpressionState,
+    ExpressionRewriteDiscoveryDomain.ExpressionCandidate,
+    ExpressionRewriteDiscoveryDomain.ExpressionTraceCertificate
+&gt; {
+    public static final String DOMAIN_ID = &quot;expression-rewrite&quot;;
+    public static final String REVISION = &quot;v1&quot;;
+
+    private final String expectedTarget;
+<span class="fc" id="L45">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L46">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+<span class="fc" id="L47">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+    private final AstRewriteTransformationEngine rewriteEngine;
+
+<span class="fc" id="L50">    private final StateGenerator&lt;ExpressionState&gt; generator = new StateGenerator&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L53">            return &quot;expression-seed-generator/v1&quot;;</span>
+        }
+
+        @Override
+        public List&lt;ExpressionState&gt; generate(DiscoverySeed seed) {
+<span class="fc" id="L58">            return List.of(new ExpressionState(format(seed.payload())));</span>
+        }
+    };
+
+<span class="fc" id="L62">    private final CanonicalCodec&lt;ExpressionState&gt; stateCodec = new CanonicalCodec&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L65">            return &quot;expression-syntax-codec/v1&quot;;</span>
+        }
+
+        @Override
+        public String canonicalForm(ExpressionState value) {
+<span class="fc" id="L70">            return format(value.expression());</span>
+        }
+    };
+
+<span class="fc" id="L74">    private final List&lt;Invariant&lt;ExpressionState&gt;&gt; invariants = List.of(</span>
+<span class="fc" id="L75">        new Invariant&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L78">                return &quot;expression-parseable/v1&quot;;</span>
+            }
+
+            @Override
+            public InvariantResult check(ExpressionState state) {
+                try {
+<span class="fc" id="L84">                    parser.parseTerm(state.expression());</span>
+<span class="fc" id="L85">                    return InvariantResult.pass();</span>
+<span class="nc" id="L86">                } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L87">                    return InvariantResult.fail(&quot;unparseable-expression&quot;);</span>
+                }
+            }
+        },
+<span class="fc" id="L91">        new Invariant&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L94">                return &quot;expression-bounded-size/v1&quot;;</span>
+            }
+
+            @Override
+            public InvariantResult check(ExpressionState state) {
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                return canonicalizer.astNodeCount(state.expression()) &lt;= 256</span>
+<span class="fc" id="L100">                    ? InvariantResult.pass()</span>
+<span class="nc" id="L101">                    : InvariantResult.fail(&quot;ast-node-count&gt;256&quot;);</span>
+            }
+        }
+    );
+
+<span class="fc" id="L106">    private final List&lt;TransitionOperator&lt;ExpressionState&gt;&gt; operators = List.of(</span>
+<span class="fc" id="L107">        new TransitionOperator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L110">                return &quot;existing-ast-rewrite-engine/v1&quot;;</span>
+            }
+
+            @Override
+            public List&lt;Successor&lt;ExpressionState&gt;&gt; apply(ExpressionState state) {
+<span class="fc" id="L115">                return rewriteEngine.transform(state.expression()).stream()</span>
+<span class="fc" id="L116">                    .map(ExpressionRewriteDiscoveryDomain.this::toSuccessor)</span>
+<span class="fc" id="L117">                    .toList();</span>
+            }
+        }
+    );
+
+<span class="fc" id="L122">    private final Objective&lt;ExpressionState&gt; objective = new Objective&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L125">            return &quot;expected-expression-objective/v1&quot;;</span>
+        }
+
+        @Override
+        public ObjectiveAssessment assess(ExpressionState state) {
+<span class="fc" id="L130">            String canonicalState = stateCodec.canonicalForm(state);</span>
+<span class="fc" id="L131">            boolean ready = canonicalState.equals(expectedTarget);</span>
+<span class="fc" id="L132">            int weighted = scorer.score(canonicalState).weightedTotal();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            int score = ready ? 1_000_000 : 100_000 - weighted;</span>
+<span class="fc" id="L134">            return new ObjectiveAssessment(</span>
+                score,
+                ready,
+<span class="fc" id="L137">                Map.of(</span>
+                    &quot;expectedTarget&quot;, expectedTarget,
+<span class="fc" id="L139">                    &quot;weightedExpressionScore&quot;, Integer.toString(weighted),</span>
+<span class="fc" id="L140">                    &quot;syntacticTargetMatch&quot;, Boolean.toString(ready)));</span>
+        }
+    };
+
+<span class="fc" id="L144">    private final CandidateExtractor&lt;ExpressionState, ExpressionCandidate&gt; candidateExtractor =</span>
+<span class="fc" id="L145">        new CandidateExtractor&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L148">                return &quot;expression-path-candidate-extractor/v1&quot;;</span>
+            }
+
+            @Override
+            public ExpressionCandidate extract(CandidateContext&lt;ExpressionState&gt; context) {
+<span class="fc" id="L153">                List&lt;String&gt; rules = context.path().stream()</span>
+<span class="fc" id="L154">                    .map(PathStep::actionId)</span>
+<span class="fc" id="L155">                    .toList();</span>
+<span class="fc" id="L156">                List&lt;String&gt; assumptions = context.path().stream()</span>
+<span class="fc" id="L157">                    .flatMap(step -&gt; step.assumptions().stream())</span>
+<span class="fc" id="L158">                    .distinct()</span>
+<span class="fc" id="L159">                    .sorted()</span>
+<span class="fc" id="L160">                    .toList();</span>
+<span class="fc" id="L161">                boolean preserving = context.path().stream()</span>
+<span class="fc" id="L162">                    .allMatch(PathStep::semanticsPreserving);</span>
+<span class="fc" id="L163">                return new ExpressionCandidate(</span>
+<span class="fc" id="L164">                    context.initialState().expression(),</span>
+<span class="fc" id="L165">                    context.currentState().expression(),</span>
+                    rules,
+                    assumptions,
+                    preserving);
+            }
+        };
+
+<span class="fc" id="L172">    private final CanonicalCodec&lt;ExpressionCandidate&gt; candidateCodec = new CanonicalCodec&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L175">            return &quot;expression-candidate-codec/v1&quot;;</span>
+        }
+
+        @Override
+        public String canonicalForm(ExpressionCandidate value) {
+<span class="fc" id="L180">            return &quot;source=&quot; + format(value.sourceExpression())</span>
+<span class="fc" id="L181">                + &quot;\ntarget=&quot; + format(value.targetExpression())</span>
+<span class="fc" id="L182">                + &quot;\nrules=&quot; + DomainCanonical.canonicalList(value.ruleIds())</span>
+<span class="fc" id="L183">                + &quot;\nassumptions=&quot; + DomainCanonical.canonicalList(value.assumptions())</span>
+<span class="fc" id="L184">                + &quot;\nsemanticsPreserving=&quot; + value.allSemanticsPreserving();</span>
+        }
+    };
+
+<span class="fc" id="L188">    private final CounterexampleGenerator&lt;ExpressionCandidate&gt; counterexampleGenerator =</span>
+<span class="fc" id="L189">        new CounterexampleGenerator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L192">                return &quot;expression-transition-audit/v1&quot;;</span>
+            }
+
+            @Override
+            public CounterexampleResult search(
+                ExpressionCandidate candidate,
+                int attemptBudget
+            ) {
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                if (!candidate.allSemanticsPreserving()) {</span>
+<span class="nc" id="L201">                    return CounterexampleResult.found(</span>
+                        1,
+                        &quot;path contains a transition not marked semantics-preserving&quot;,
+<span class="nc" id="L204">                        Map.of(&quot;auditedRules&quot;, &quot;1&quot;));</span>
+                }
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                if (candidate.ruleIds().isEmpty()) {</span>
+<span class="nc" id="L207">                    return CounterexampleResult.inconclusive(</span>
+                        0,
+                        &quot;candidate has no retained rewrite step&quot;,
+<span class="nc" id="L210">                        Map.of(&quot;auditedRules&quot;, &quot;0&quot;));</span>
+                }
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                if (candidate.ruleIds().size() &gt; attemptBudget) {</span>
+<span class="nc" id="L213">                    return CounterexampleResult.inconclusive(</span>
+                        attemptBudget,
+                        &quot;transition audit budget is smaller than the retained path&quot;,
+<span class="nc" id="L216">                        Map.of(</span>
+<span class="nc" id="L217">                            &quot;auditedRules&quot;, Integer.toString(attemptBudget),</span>
+<span class="nc" id="L218">                            &quot;requiredRules&quot;, Integer.toString(candidate.ruleIds().size())));</span>
+                }
+<span class="fc" id="L220">                return CounterexampleResult.noneFound(</span>
+<span class="fc" id="L221">                    candidate.ruleIds().size(),</span>
+<span class="fc" id="L222">                    Map.of(</span>
+<span class="fc" id="L223">                        &quot;auditedRules&quot;, Integer.toString(candidate.ruleIds().size()),</span>
+                        &quot;auditKind&quot;, &quot;transition-metadata&quot;));
+            }
+        };
+
+<span class="fc" id="L228">    private final CandidateEvaluator&lt;ExpressionCandidate, ExpressionTraceCertificate&gt; evaluator =</span>
+<span class="fc" id="L229">        new CandidateEvaluator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L232">                return &quot;expression-canonical-equivalence-evaluator/v1&quot;;</span>
+            }
+
+            @Override
+            public Evaluation&lt;ExpressionTraceCertificate&gt; evaluate(
+                ExpressionCandidate candidate
+            ) {
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">                if (!candidate.allSemanticsPreserving()) {</span>
+<span class="nc" id="L240">                    return Evaluation.refuted(</span>
+                        &quot;retained path contains a non-preserving transition&quot;,
+<span class="nc" id="L242">                        Map.of());</span>
+                }
+<span class="fc" id="L244">                String sourceCanonical = canonicalizer.canonicalize(</span>
+<span class="fc" id="L245">                    candidate.sourceExpression());</span>
+<span class="fc" id="L246">                String targetCanonical = canonicalizer.canonicalize(</span>
+<span class="fc" id="L247">                    candidate.targetExpression());</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                if (!sourceCanonical.equals(targetCanonical)) {</span>
+<span class="nc" id="L249">                    return Evaluation.inconclusive(</span>
+                        &quot;strong canonical forms differ&quot;,
+<span class="nc" id="L251">                        Map.of(</span>
+                            &quot;sourceCanonical&quot;, sourceCanonical,
+                            &quot;targetCanonical&quot;, targetCanonical));
+                }
+<span class="fc" id="L255">                ExpressionTraceCertificate certificate = new ExpressionTraceCertificate(</span>
+<span class="fc" id="L256">                    DomainCanonical.sha256(sourceCanonical),</span>
+<span class="fc" id="L257">                    DomainCanonical.sha256(targetCanonical),</span>
+<span class="fc" id="L258">                    candidate.ruleIds(),</span>
+<span class="fc" id="L259">                    candidate.assumptions(),</span>
+                    &quot;VALIDATION_EVIDENCE_NOT_FORMAL_PROOF&quot;);
+<span class="fc" id="L261">                return Evaluation.confirmed(</span>
+                    certificate,
+                    &quot;existing AST rewrite path reaches a canonically equivalent target&quot;,
+<span class="fc" id="L264">                    Map.of(</span>
+                        &quot;sourceCanonical&quot;, sourceCanonical,
+                        &quot;targetCanonical&quot;, targetCanonical,
+<span class="fc" id="L267">                        &quot;ruleCount&quot;, Integer.toString(candidate.ruleIds().size())));</span>
+            }
+        };
+
+<span class="fc" id="L271">    private final CanonicalCodec&lt;ExpressionTraceCertificate&gt; certificateCodec =</span>
+<span class="fc" id="L272">        new CanonicalCodec&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L275">                return &quot;expression-trace-certificate-codec/v1&quot;;</span>
+            }
+
+            @Override
+            public String canonicalForm(ExpressionTraceCertificate value) {
+<span class="fc" id="L280">                return &quot;sourceHash=&quot; + value.sourceCanonicalHash()</span>
+<span class="fc" id="L281">                    + &quot;\ntargetHash=&quot; + value.targetCanonicalHash()</span>
+<span class="fc" id="L282">                    + &quot;\nrules=&quot; + DomainCanonical.canonicalList(value.ruleIds())</span>
+<span class="fc" id="L283">                    + &quot;\nassumptions=&quot; + DomainCanonical.canonicalList(value.assumptions())</span>
+<span class="fc" id="L284">                    + &quot;\nstrength=&quot; + value.evidenceStrength();</span>
+            }
+        };
+
+<span class="fc" id="L288">    private final CertificateRenderer&lt;ExpressionTraceCertificate&gt; certificateRenderer =</span>
+<span class="fc" id="L289">        new CertificateRenderer&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L292">                return &quot;expression-trace-certificate-renderer/v1&quot;;</span>
+            }
+
+            @Override
+            public CertificateRendering render(ExpressionTraceCertificate certificate) {
+<span class="fc" id="L297">                String text = &quot;source=&quot; + certificate.sourceCanonicalHash()</span>
+<span class="fc" id="L298">                    + &quot;\ntarget=&quot; + certificate.targetCanonicalHash()</span>
+<span class="fc" id="L299">                    + &quot;\nrules=&quot; + String.join(&quot; -&gt; &quot;, certificate.ruleIds())</span>
+<span class="fc" id="L300">                    + &quot;\nassumptions=&quot; + String.join(&quot;, &quot;, certificate.assumptions())</span>
+<span class="fc" id="L301">                    + &quot;\nstrength=&quot; + certificate.evidenceStrength();</span>
+<span class="fc" id="L302">                return new CertificateRendering(</span>
+                    &quot;CANONICAL_EQUIVALENCE_TRACE&quot;,
+                    &quot;text/plain&quot;,
+                    text);
+            }
+        };
+
+<span class="fc" id="L309">    private final EvidenceAdapter&lt;ExpressionState, ExpressionCandidate, ExpressionTraceCertificate&gt;</span>
+<span class="fc" id="L310">        evidenceAdapter = new EvidenceAdapter&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L313">                return &quot;expression-domain-evidence-adapter/v1&quot;;</span>
+            }
+
+            @Override
+            public DomainPayload adapt(
+                Optional&lt;ExpressionState&gt; initialState,
+                Optional&lt;ExpressionCandidate&gt; candidate,
+                Optional&lt;ExpressionTraceCertificate&gt; certificate
+            ) {
+<span class="fc" id="L322">                LinkedHashMap&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L323">                values.put(&quot;initialExpression&quot;, initialState</span>
+<span class="fc" id="L324">                    .map(ExpressionState::expression)</span>
+<span class="fc" id="L325">                    .orElse(&quot;NOT_AVAILABLE&quot;));</span>
+<span class="fc" id="L326">                values.put(&quot;expectedTarget&quot;, expectedTarget);</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                values.put(&quot;candidateStatus&quot;, candidate.isPresent()</span>
+<span class="fc" id="L328">                    ? &quot;SELECTED&quot;</span>
+<span class="nc" id="L329">                    : &quot;NOT_SELECTED&quot;);</span>
+<span class="fc" id="L330">                values.put(&quot;candidateTarget&quot;, candidate</span>
+<span class="fc" id="L331">                    .map(ExpressionCandidate::targetExpression)</span>
+<span class="fc" id="L332">                    .orElse(&quot;NOT_AVAILABLE&quot;));</span>
+<span class="fc" id="L333">                values.put(&quot;ruleCount&quot;, candidate</span>
+<span class="fc" id="L334">                    .map(value -&gt; Integer.toString(value.ruleIds().size()))</span>
+<span class="fc" id="L335">                    .orElse(&quot;0&quot;));</span>
+<span class="fc" id="L336">                values.put(&quot;allSemanticsPreserving&quot;, candidate</span>
+<span class="fc" id="L337">                    .map(value -&gt; Boolean.toString(value.allSemanticsPreserving()))</span>
+<span class="fc" id="L338">                    .orElse(&quot;NOT_EVALUATED&quot;));</span>
+<span class="fc" id="L339">                values.put(&quot;certificateStrength&quot;, certificate</span>
+<span class="fc" id="L340">                    .map(ExpressionTraceCertificate::evidenceStrength)</span>
+<span class="fc" id="L341">                    .orElse(&quot;NOT_EVALUATED&quot;));</span>
+<span class="fc" id="L342">                values.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L343">                return new DomainPayload(&quot;expression-rewrite-evidence/v1&quot;, values);</span>
+            }
+        };
+
+    public ExpressionRewriteDiscoveryDomain(String expectedTarget) {
+<span class="fc" id="L348">        this(expectedTarget, new AstRewriteTransformationEngine());</span>
+<span class="fc" id="L349">    }</span>
+
+    public ExpressionRewriteDiscoveryDomain(
+        String expectedTarget,
+        AstRewriteTransformationEngine rewriteEngine
+<span class="fc" id="L354">    ) {</span>
+<span class="fc" id="L355">        this.expectedTarget = format(</span>
+<span class="fc" id="L356">            DomainCanonical.requireText(expectedTarget, &quot;expectedTarget&quot;));</span>
+<span class="fc" id="L357">        this.rewriteEngine = Objects.requireNonNull(rewriteEngine, &quot;rewriteEngine&quot;);</span>
+<span class="fc" id="L358">    }</span>
+
+    @Override
+    public String domainId() {
+<span class="fc" id="L362">        return DOMAIN_ID;</span>
+    }
+
+    @Override
+    public String revision() {
+<span class="fc" id="L367">        return REVISION;</span>
+    }
+
+    @Override
+    public String stateType() {
+<span class="fc" id="L372">        return &quot;expression-state/v1&quot;;</span>
+    }
+
+    @Override
+    public String candidateType() {
+<span class="fc" id="L377">        return &quot;expression-rewrite-candidate/v1&quot;;</span>
+    }
+
+    @Override
+    public String certificateType() {
+<span class="fc" id="L382">        return &quot;expression-trace-certificate/v1&quot;;</span>
+    }
+
+    @Override
+    public StateGenerator&lt;ExpressionState&gt; generator() {
+<span class="fc" id="L387">        return generator;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;ExpressionState&gt; stateCodec() {
+<span class="fc" id="L392">        return stateCodec;</span>
+    }
+
+    @Override
+    public List&lt;Invariant&lt;ExpressionState&gt;&gt; invariants() {
+<span class="fc" id="L397">        return invariants;</span>
+    }
+
+    @Override
+    public List&lt;TransitionOperator&lt;ExpressionState&gt;&gt; operators() {
+<span class="fc" id="L402">        return operators;</span>
+    }
+
+    @Override
+    public Objective&lt;ExpressionState&gt; objective() {
+<span class="fc" id="L407">        return objective;</span>
+    }
+
+    @Override
+    public CandidateExtractor&lt;ExpressionState, ExpressionCandidate&gt; candidateExtractor() {
+<span class="fc" id="L412">        return candidateExtractor;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;ExpressionCandidate&gt; candidateCodec() {
+<span class="fc" id="L417">        return candidateCodec;</span>
+    }
+
+    @Override
+    public CounterexampleGenerator&lt;ExpressionCandidate&gt; counterexampleGenerator() {
+<span class="fc" id="L422">        return counterexampleGenerator;</span>
+    }
+
+    @Override
+    public CandidateEvaluator&lt;ExpressionCandidate, ExpressionTraceCertificate&gt; evaluator() {
+<span class="fc" id="L427">        return evaluator;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;ExpressionTraceCertificate&gt; certificateCodec() {
+<span class="fc" id="L432">        return certificateCodec;</span>
+    }
+
+    @Override
+    public CertificateRenderer&lt;ExpressionTraceCertificate&gt; certificateRenderer() {
+<span class="fc" id="L437">        return certificateRenderer;</span>
+    }
+
+    @Override
+    public EvidenceAdapter&lt;ExpressionState, ExpressionCandidate, ExpressionTraceCertificate&gt;
+            evidenceAdapter() {
+<span class="fc" id="L443">        return evidenceAdapter;</span>
+    }
+
+    private Successor&lt;ExpressionState&gt; toSuccessor(Transformation transformation) {
+<span class="fc" id="L447">        LinkedHashMap&lt;String, String&gt; metadata = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L448">        metadata.put(&quot;rewriteKind&quot;, transformation.kind().name());</span>
+<span class="fc" id="L449">        metadata.put(&quot;applicationKey&quot;, transformation.applicationKey());</span>
+<span class="fc" id="L450">        metadata.put(&quot;packId&quot;, transformation.packId());</span>
+<span class="fc" id="L451">        metadata.put(&quot;license&quot;, transformation.license());</span>
+<span class="fc" id="L452">        metadata.put(&quot;mayIncreaseComplexity&quot;,</span>
+<span class="fc" id="L453">            Boolean.toString(transformation.mayIncreaseComplexity()));</span>
+<span class="fc" id="L454">        return new Successor&lt;&gt;(</span>
+<span class="fc" id="L455">            transformation.rule(),</span>
+<span class="fc" id="L456">            new ExpressionState(format(transformation.transformedExpression())),</span>
+<span class="fc" id="L457">            transformation.estimatedCostDelta(),</span>
+<span class="fc" id="L458">            transformation.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L459">            transformation.assumptions(),</span>
+            metadata);
+    }
+
+    private String format(String expression) {
+<span class="fc" id="L464">        return ExpressionFormatter.format(parser.parseTerm(expression));</span>
+    }
+
+    public record ExpressionState(String expression) {
+<span class="fc" id="L468">        public ExpressionState {</span>
+<span class="fc" id="L469">            DomainCanonical.requireText(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L470">        }</span>
+    }
+
+    public record ExpressionCandidate(
+        String sourceExpression,
+        String targetExpression,
+        List&lt;String&gt; ruleIds,
+        List&lt;String&gt; assumptions,
+        boolean allSemanticsPreserving
+    ) {
+<span class="fc" id="L480">        public ExpressionCandidate {</span>
+<span class="fc" id="L481">            DomainCanonical.requireText(sourceExpression, &quot;sourceExpression&quot;);</span>
+<span class="fc" id="L482">            DomainCanonical.requireText(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            ruleIds = ruleIds == null ? List.of() : List.copyOf(ruleIds);</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">            for (String ruleId : ruleIds) {</span>
+<span class="fc" id="L485">                DomainCanonical.requireIdentifier(ruleId, &quot;ruleId&quot;);</span>
+<span class="fc" id="L486">            }</span>
+<span class="fc" id="L487">            assumptions = DomainCanonical.sortedDistinct(assumptions);</span>
+<span class="fc" id="L488">        }</span>
+    }
+
+    public record ExpressionTraceCertificate(
+        String sourceCanonicalHash,
+        String targetCanonicalHash,
+        List&lt;String&gt; ruleIds,
+        List&lt;String&gt; assumptions,
+        String evidenceStrength
+    ) {
+<span class="fc" id="L498">        public ExpressionTraceCertificate {</span>
+<span class="fc" id="L499">            DomainCanonical.requireSha256(</span>
+                sourceCanonicalHash, &quot;sourceCanonicalHash&quot;);
+<span class="fc" id="L501">            DomainCanonical.requireSha256(</span>
+                targetCanonicalHash, &quot;targetCanonicalHash&quot;);
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">            ruleIds = ruleIds == null ? List.of() : List.copyOf(ruleIds);</span>
+<span class="fc" id="L504">            assumptions = DomainCanonical.sortedDistinct(assumptions);</span>
+<span class="fc" id="L505">            DomainCanonical.requireIdentifier(evidenceStrength, &quot;evidenceStrength&quot;);</span>
+<span class="fc" id="L506">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainCanonical.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainCanonical.java</span></div><h1>DomainCanonical.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+final class DomainCanonical {
+    private DomainCanonical() {
+    }
+
+    static String sha256(String material) {
+<span class="fc" id="L18">        Objects.requireNonNull(material, &quot;material&quot;);</span>
+        try {
+<span class="fc" id="L20">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L21">                .digest(material.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L22">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L23">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L24">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    static String requireText(String value, String name) {
+<span class="pc bpc" id="L29" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L30">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L32">        return value;</span>
+    }
+
+    static String requireIdentifier(String value, String name) {
+<span class="fc" id="L36">        requireText(value, name);</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (!value.matches(&quot;[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}&quot;)) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(name + &quot; contains unsupported characters: &quot; + value);</span>
+        }
+<span class="fc" id="L40">        return value;</span>
+    }
+
+    static String requireSha256(String value, String name) {
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L45">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L47">        return value;</span>
+    }
+
+    static Map&lt;String, String&gt; sortedMap(Map&lt;String, String&gt; values) {
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L52">            return Map.of();</span>
+        }
+<span class="fc" id="L54">        LinkedHashMap&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L55">        values.entrySet().stream()</span>
+<span class="fc" id="L56">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L57">            .forEach(entry -&gt; {</span>
+<span class="fc" id="L58">                requireText(entry.getKey(), &quot;map key&quot;);</span>
+<span class="fc" id="L59">                Objects.requireNonNull(entry.getValue(), &quot;map value&quot;);</span>
+<span class="fc" id="L60">                result.put(entry.getKey(), entry.getValue());</span>
+<span class="fc" id="L61">            });</span>
+<span class="fc" id="L62">        return java.util.Collections.unmodifiableMap(result);</span>
+    }
+
+    static List&lt;String&gt; sortedDistinct(List&lt;String&gt; values) {
+<span class="pc bpc" id="L66" title="1 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="fc" id="L67">            return List.of();</span>
+        }
+<span class="fc" id="L69">        return values.stream()</span>
+<span class="fc" id="L70">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L71">            .map(String::trim)</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isEmpty())</span>
+<span class="fc" id="L73">            .distinct()</span>
+<span class="fc" id="L74">            .sorted()</span>
+<span class="fc" id="L75">            .toList();</span>
+    }
+
+    static &lt;T&gt; List&lt;T&gt; sortedCopy(List&lt;T&gt; values, Comparator&lt;? super T&gt; comparator) {
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L80">            return List.of();</span>
+        }
+<span class="fc" id="L82">        ArrayList&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L83">        result.sort(comparator);</span>
+<span class="fc" id="L84">        return List.copyOf(result);</span>
+    }
+
+    static String canonicalMap(Map&lt;String, String&gt; values) {
+<span class="fc" id="L88">        return sortedMap(values).entrySet().stream()</span>
+<span class="fc" id="L89">            .map(entry -&gt; entry.getKey().length() + &quot;:&quot; + entry.getKey()</span>
+<span class="fc" id="L90">                + &quot;=&quot; + entry.getValue().length() + &quot;:&quot; + entry.getValue())</span>
+<span class="fc" id="L91">            .collect(java.util.stream.Collectors.joining(&quot;|&quot;));</span>
+    }
+
+    static String canonicalList(List&lt;String&gt; values) {
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="fc" id="L96">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L98">        return values.stream()</span>
+<span class="fc" id="L99">            .map(value -&gt; {</span>
+<span class="fc" id="L100">                String normalized = Objects.requireNonNull(value, &quot;list value&quot;);</span>
+<span class="fc" id="L101">                return normalized.length() + &quot;:&quot; + normalized;</span>
+            })
+<span class="fc" id="L103">            .collect(java.util.stream.Collectors.joining(&quot;|&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

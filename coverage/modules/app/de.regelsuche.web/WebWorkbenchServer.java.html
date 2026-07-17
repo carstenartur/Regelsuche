@@ -1420,8 +1420,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1420">        String matchId = stringValue(body, &quot;matchId&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1421">        int matchIndex = intValue(body, &quot;matchIndex&quot;, -1);</span>
 <span class="pc bpc" id="L1422" title="4 of 8 branches missed.">        if (expression.isBlank() || pathKey.isBlank() || (matchId.isBlank() &amp;&amp; matchIndex &lt; 0)) {</span>
-<span class="fc" id="L1423">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
-<span class="fc" id="L1424">            return;</span>
+<span class="nc" id="L1423">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
+<span class="nc" id="L1424">            return;</span>
         }
 
 <span class="fc" id="L1427">        de.regelsuche.ide.RuleInspectionService service = new de.regelsuche.ide.RuleInspectionService();</span>

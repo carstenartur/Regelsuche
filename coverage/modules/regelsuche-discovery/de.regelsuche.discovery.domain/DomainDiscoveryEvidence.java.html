@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainDiscoveryEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainDiscoveryEvidence.java</span></div><h1>DomainDiscoveryEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleStatus;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoveryBudget;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DomainPayload;
+import de.regelsuche.discovery.domain.DiscoveryDomain.RenderedCertificate;
+import de.regelsuche.json.JsonWriter;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Canonical, domain-neutral execution evidence for one bounded discovery run. */
+public final class DomainDiscoveryEvidence {
+    public static final String SCHEMA = &quot;regelsuche.domain-discovery-evidence/v1&quot;;
+    public static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+
+    private final String campaignId;
+    private final DiscoveryDomainDescriptor descriptor;
+    private final DiscoverySeed seed;
+    private final DiscoveryBudget budget;
+    private final Outcome outcome;
+    private final List&lt;StateTrace&gt; states;
+    private final List&lt;TransitionTrace&gt; transitions;
+    private final List&lt;CandidateAttempt&gt; candidateAttempts;
+    private final List&lt;ResourceLine&gt; resources;
+    private final String selectedCandidateHash;
+    private final RenderedCertificate certificate;
+    private final DomainPayload domainEvidence;
+    private final String contentHash;
+
+    public DomainDiscoveryEvidence(
+        String campaignId,
+        DiscoveryDomainDescriptor descriptor,
+        DiscoverySeed seed,
+        DiscoveryBudget budget,
+        Outcome outcome,
+        List&lt;StateTrace&gt; states,
+        List&lt;TransitionTrace&gt; transitions,
+        List&lt;CandidateAttempt&gt; candidateAttempts,
+        List&lt;ResourceLine&gt; resources,
+        String selectedCandidateHash,
+        RenderedCertificate certificate,
+        DomainPayload domainEvidence
+<span class="fc" id="L46">    ) {</span>
+<span class="fc" id="L47">        this.campaignId = DomainCanonical.requireIdentifier(campaignId, &quot;campaignId&quot;);</span>
+<span class="fc" id="L48">        this.descriptor = Objects.requireNonNull(descriptor, &quot;descriptor&quot;);</span>
+<span class="fc" id="L49">        this.seed = Objects.requireNonNull(seed, &quot;seed&quot;);</span>
+<span class="fc" id="L50">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L51">        this.outcome = Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (!descriptor.domainId().equals(seed.domainId())) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;descriptor and seed domains do not match&quot;);
+        }
+<span class="fc" id="L56">        this.states = DomainCanonical.sortedCopy(</span>
+            states,
+<span class="fc" id="L58">            Comparator.comparingInt(StateTrace::sequence));</span>
+<span class="fc" id="L59">        this.transitions = DomainCanonical.sortedCopy(</span>
+            transitions,
+<span class="fc" id="L61">            Comparator.comparingInt(TransitionTrace::sequence));</span>
+<span class="fc" id="L62">        this.candidateAttempts = DomainCanonical.sortedCopy(</span>
+            candidateAttempts,
+<span class="fc" id="L64">            Comparator.comparingInt(CandidateAttempt::sequence));</span>
+<span class="fc" id="L65">        this.resources = DomainCanonical.sortedCopy(</span>
+            resources,
+<span class="fc" id="L67">            Comparator.comparing(line -&gt; line.resource().name()));</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        this.selectedCandidateHash = selectedCandidateHash == null</span>
+<span class="nc" id="L69">            ? &quot;&quot;</span>
+<span class="fc" id="L70">            : selectedCandidateHash;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (!this.selectedCandidateHash.isEmpty()) {</span>
+<span class="fc" id="L72">            DomainCanonical.requireSha256(</span>
+                this.selectedCandidateHash, &quot;selectedCandidateHash&quot;);
+        }
+<span class="fc" id="L75">        this.certificate = certificate;</span>
+<span class="fc" id="L76">        this.domainEvidence = Objects.requireNonNull(domainEvidence, &quot;domainEvidence&quot;);</span>
+<span class="fc" id="L77">        validateOutcomeConsistency();</span>
+<span class="fc" id="L78">        this.contentHash = DomainCanonical.sha256(render(false));</span>
+<span class="fc" id="L79">    }</span>
+
+    private void validateOutcomeConsistency() {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (outcome == Outcome.CONFIRMED) {</span>
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">            if (selectedCandidateHash.isEmpty() || certificate == null) {</span>
+<span class="nc" id="L84">                throw new IllegalArgumentException(</span>
+                    &quot;confirmed evidence requires selected candidate and certificate&quot;);
+            }
+<span class="fc" id="L87">            boolean retained = candidateAttempts.stream().anyMatch(attempt -&gt;</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                attempt.candidateHash().equals(selectedCandidateHash)</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                    &amp;&amp; attempt.disposition() == AttemptDisposition.CONFIRMED</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                    &amp;&amp; attempt.certificateHash().equals(certificate.contentHash()));</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (!retained) {</span>
+<span class="nc" id="L92">                throw new IllegalArgumentException(</span>
+                    &quot;confirmed evidence must retain its selected candidate attempt&quot;);
+            }
+<span class="pc bpc" id="L95" title="2 of 4 branches missed.">        } else if (!selectedCandidateHash.isEmpty() || certificate != null) {</span>
+<span class="nc" id="L96">            throw new IllegalArgumentException(</span>
+                &quot;non-confirmed evidence must not select a candidate or certificate&quot;);
+        }
+<span class="fc" id="L99">        long uniqueStates = states.stream().map(StateTrace::stateHash).distinct().count();</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (uniqueStates != states.size()) {</span>
+<span class="nc" id="L101">            throw new IllegalArgumentException(&quot;state traces must be unique by stateHash&quot;);</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (ResourceLine line : resources) {</span>
+<span class="fc" id="L104">            line.validateBalance();</span>
+<span class="fc" id="L105">        }</span>
+<span class="fc" id="L106">    }</span>
+
+    public String campaignId() {
+<span class="nc" id="L109">        return campaignId;</span>
+    }
+
+    public DiscoveryDomainDescriptor descriptor() {
+<span class="nc" id="L113">        return descriptor;</span>
+    }
+
+    public DiscoverySeed seed() {
+<span class="nc" id="L117">        return seed;</span>
+    }
+
+    public DiscoveryBudget budget() {
+<span class="nc" id="L121">        return budget;</span>
+    }
+
+    public Outcome outcome() {
+<span class="fc" id="L125">        return outcome;</span>
+    }
+
+    public List&lt;StateTrace&gt; states() {
+<span class="nc" id="L129">        return states;</span>
+    }
+
+    public List&lt;TransitionTrace&gt; transitions() {
+<span class="fc" id="L133">        return transitions;</span>
+    }
+
+    public List&lt;CandidateAttempt&gt; candidateAttempts() {
+<span class="fc" id="L137">        return candidateAttempts;</span>
+    }
+
+    public List&lt;ResourceLine&gt; resources() {
+<span class="fc" id="L141">        return resources;</span>
+    }
+
+    public String selectedCandidateHash() {
+<span class="fc" id="L145">        return selectedCandidateHash;</span>
+    }
+
+    public RenderedCertificate certificate() {
+<span class="fc" id="L149">        return certificate;</span>
+    }
+
+    public DomainPayload domainEvidence() {
+<span class="nc" id="L153">        return domainEvidence;</span>
+    }
+
+    public String contentHash() {
+<span class="fc" id="L157">        return contentHash;</span>
+    }
+
+    public String proofStatus() {
+<span class="fc" id="L161">        return NOT_EVALUATED;</span>
+    }
+
+    public String externalNoveltyStatus() {
+<span class="fc" id="L165">        return NOT_EVALUATED;</span>
+    }
+
+    public String promotionStatus() {
+<span class="fc" id="L169">        return NOT_EVALUATED;</span>
+    }
+
+    public String publicEvidenceStatus() {
+<span class="fc" id="L173">        return NOT_EVALUATED;</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L177">        return render(true);</span>
+    }
+
+    private String render(boolean includeHash) {
+<span class="fc" id="L181">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L182">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L183">            .property(&quot;campaignId&quot;, campaignId)</span>
+<span class="fc" id="L184">            .object(&quot;domain&quot;, descriptor::writeTo)</span>
+<span class="fc" id="L185">            .object(&quot;seed&quot;, this::writeSeed)</span>
+<span class="fc" id="L186">            .object(&quot;budget&quot;, this::writeBudget)</span>
+<span class="fc" id="L187">            .property(&quot;outcome&quot;, outcome.name())</span>
+<span class="fc" id="L188">            .object(&quot;summary&quot;, summary -&gt; summary</span>
+<span class="fc" id="L189">                .property(&quot;exploredStates&quot;, states.size())</span>
+<span class="fc" id="L190">                .property(&quot;generatedTransitions&quot;, transitions.size())</span>
+<span class="fc" id="L191">                .property(&quot;acceptedTransitions&quot;, transitions.stream()</span>
+<span class="fc" id="L192">                    .filter(TransitionTrace::accepted).count())</span>
+<span class="fc" id="L193">                .property(&quot;rejectedTransitions&quot;, transitions.stream()</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                    .filter(transition -&gt; !transition.accepted()).count())</span>
+<span class="fc" id="L195">                .property(&quot;candidateAttempts&quot;, candidateAttempts.size())</span>
+<span class="fc" id="L196">                .property(&quot;counterexampleAttempts&quot;, candidateAttempts.stream()</span>
+<span class="fc" id="L197">                    .mapToInt(CandidateAttempt::counterexampleAttempts).sum()))</span>
+<span class="fc" id="L198">            .array(&quot;states&quot;, array -&gt; states.forEach(state -&gt;</span>
+<span class="fc" id="L199">                array.objectValue(object -&gt; writeState(object, state))))</span>
+<span class="fc" id="L200">            .array(&quot;transitions&quot;, array -&gt; transitions.forEach(transition -&gt;</span>
+<span class="fc" id="L201">                array.objectValue(object -&gt; writeTransition(object, transition))))</span>
+<span class="fc" id="L202">            .array(&quot;candidateAttempts&quot;, array -&gt; candidateAttempts.forEach(attempt -&gt;</span>
+<span class="fc" id="L203">                array.objectValue(object -&gt; writeAttempt(object, attempt))))</span>
+<span class="fc" id="L204">            .array(&quot;resources&quot;, array -&gt; resources.forEach(line -&gt;</span>
+<span class="fc" id="L205">                array.objectValue(object -&gt; writeResource(object, line))));</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (selectedCandidateHash.isEmpty()) {</span>
+<span class="fc" id="L207">            json.nullProperty(&quot;selectedCandidateHash&quot;);</span>
+        } else {
+<span class="fc" id="L209">            json.property(&quot;selectedCandidateHash&quot;, selectedCandidateHash);</span>
+        }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (certificate == null) {</span>
+<span class="fc" id="L212">            json.nullProperty(&quot;certificate&quot;);</span>
+        } else {
+<span class="fc" id="L214">            json.object(&quot;certificate&quot;, this::writeCertificate);</span>
+        }
+<span class="fc" id="L216">        json.object(&quot;domainEvidence&quot;, this::writeDomainEvidence)</span>
+<span class="fc" id="L217">            .property(&quot;proofStatus&quot;, NOT_EVALUATED)</span>
+<span class="fc" id="L218">            .property(&quot;externalNoveltyStatus&quot;, NOT_EVALUATED)</span>
+<span class="fc" id="L219">            .property(&quot;promotionStatus&quot;, NOT_EVALUATED)</span>
+<span class="fc" id="L220">            .property(&quot;publicEvidenceStatus&quot;, NOT_EVALUATED);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (includeHash) {</span>
+<span class="fc" id="L222">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L224">        return json.endObject().toString();</span>
+    }
+
+    private void writeSeed(JsonWriter json) {
+<span class="fc" id="L228">        json.property(&quot;schema&quot;, seed.schema())</span>
+<span class="fc" id="L229">            .property(&quot;seedId&quot;, seed.seedId())</span>
+<span class="fc" id="L230">            .property(&quot;domainId&quot;, seed.domainId())</span>
+<span class="fc" id="L231">            .property(&quot;payload&quot;, seed.payload())</span>
+<span class="fc" id="L232">            .property(&quot;sourceReference&quot;, seed.sourceReference())</span>
+<span class="fc" id="L233">            .property(&quot;contentHash&quot;, seed.contentHash());</span>
+<span class="fc" id="L234">    }</span>
+
+    private void writeBudget(JsonWriter json) {
+<span class="fc" id="L237">        json.property(&quot;maxDepth&quot;, budget.maxDepth())</span>
+<span class="fc" id="L238">            .property(&quot;maxExploredStates&quot;, budget.maxExploredStates())</span>
+<span class="fc" id="L239">            .property(&quot;maxGeneratedSuccessors&quot;, budget.maxGeneratedSuccessors())</span>
+<span class="fc" id="L240">            .property(&quot;maxCandidatesPerState&quot;, budget.maxCandidatesPerState())</span>
+<span class="fc" id="L241">            .property(&quot;maxCandidateAttempts&quot;, budget.maxCandidateAttempts())</span>
+<span class="fc" id="L242">            .property(&quot;maxCounterexampleAttempts&quot;, budget.maxCounterexampleAttempts());</span>
+<span class="fc" id="L243">    }</span>
+
+    private static void writeState(JsonWriter json, StateTrace state) {
+<span class="fc" id="L246">        json.property(&quot;sequence&quot;, state.sequence())</span>
+<span class="fc" id="L247">            .property(&quot;stateHash&quot;, state.stateHash())</span>
+<span class="fc" id="L248">            .property(&quot;canonicalState&quot;, state.canonicalState())</span>
+<span class="fc" id="L249">            .property(&quot;depth&quot;, state.depth())</span>
+<span class="fc" id="L250">            .property(&quot;objectiveScore&quot;, state.objectiveScore())</span>
+<span class="fc" id="L251">            .property(&quot;candidateReady&quot;, state.candidateReady());</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (state.parentStateHash().isEmpty()) {</span>
+<span class="fc" id="L253">            json.nullProperty(&quot;parentStateHash&quot;);</span>
+        } else {
+<span class="fc" id="L255">            json.property(&quot;parentStateHash&quot;, state.parentStateHash());</span>
+        }
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (state.actionId().isEmpty()) {</span>
+<span class="fc" id="L258">            json.nullProperty(&quot;actionId&quot;);</span>
+        } else {
+<span class="fc" id="L260">            json.property(&quot;actionId&quot;, state.actionId());</span>
+        }
+<span class="fc" id="L262">        writeMapArray(json, &quot;objectiveMetrics&quot;, state.objectiveMetrics());</span>
+<span class="fc" id="L263">    }</span>
+
+    private static void writeTransition(JsonWriter json, TransitionTrace transition) {
+<span class="fc" id="L266">        json.property(&quot;sequence&quot;, transition.sequence())</span>
+<span class="fc" id="L267">            .property(&quot;fromStateHash&quot;, transition.fromStateHash())</span>
+<span class="fc" id="L268">            .property(&quot;toStateHash&quot;, transition.toStateHash())</span>
+<span class="fc" id="L269">            .property(&quot;actionId&quot;, transition.actionId())</span>
+<span class="fc" id="L270">            .property(&quot;cost&quot;, transition.cost())</span>
+<span class="fc" id="L271">            .property(&quot;semanticsPreserving&quot;, transition.semanticsPreserving())</span>
+<span class="fc" id="L272">            .property(&quot;accepted&quot;, transition.accepted())</span>
+<span class="fc" id="L273">            .stringArray(&quot;assumptions&quot;, transition.assumptions())</span>
+<span class="fc" id="L274">            .stringArray(&quot;blockers&quot;, transition.blockers());</span>
+<span class="fc" id="L275">        writeMapArray(json, &quot;metadata&quot;, transition.metadata());</span>
+<span class="fc" id="L276">    }</span>
+
+    private static void writeAttempt(JsonWriter json, CandidateAttempt attempt) {
+<span class="fc" id="L279">        json.property(&quot;sequence&quot;, attempt.sequence())</span>
+<span class="fc" id="L280">            .property(&quot;candidateHash&quot;, attempt.candidateHash())</span>
+<span class="fc" id="L281">            .property(&quot;disposition&quot;, attempt.disposition().name())</span>
+<span class="fc" id="L282">            .property(&quot;counterexampleStatus&quot;, attempt.counterexampleStatus().name())</span>
+<span class="fc" id="L283">            .property(&quot;counterexampleAttempts&quot;, attempt.counterexampleAttempts())</span>
+<span class="fc" id="L284">            .property(&quot;counterexampleWitness&quot;, attempt.counterexampleWitness())</span>
+<span class="fc" id="L285">            .property(&quot;evaluationStatus&quot;, attempt.evaluationStatus().name())</span>
+<span class="fc" id="L286">            .property(&quot;evaluationSummary&quot;, attempt.evaluationSummary());</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (attempt.certificateHash().isEmpty()) {</span>
+<span class="fc" id="L288">            json.nullProperty(&quot;certificateHash&quot;);</span>
+        } else {
+<span class="fc" id="L290">            json.property(&quot;certificateHash&quot;, attempt.certificateHash());</span>
+        }
+<span class="fc" id="L292">        writeMapArray(json, &quot;metrics&quot;, attempt.metrics());</span>
+<span class="fc" id="L293">    }</span>
+
+    private static void writeResource(JsonWriter json, ResourceLine line) {
+<span class="fc" id="L296">        json.property(&quot;resource&quot;, line.resource().name())</span>
+<span class="fc" id="L297">            .property(&quot;configured&quot;, line.configured())</span>
+<span class="fc" id="L298">            .property(&quot;executed&quot;, line.executed())</span>
+<span class="fc" id="L299">            .property(&quot;skipped&quot;, line.skipped())</span>
+<span class="fc" id="L300">            .property(&quot;remaining&quot;, line.remaining());</span>
+<span class="fc" id="L301">    }</span>
+
+    private void writeCertificate(JsonWriter json) {
+<span class="fc" id="L304">        json.property(&quot;kind&quot;, certificate.kind())</span>
+<span class="fc" id="L305">            .property(&quot;format&quot;, certificate.format())</span>
+<span class="fc" id="L306">            .property(&quot;certificateObjectHash&quot;, certificate.certificateObjectHash())</span>
+<span class="fc" id="L307">            .property(&quot;rendered&quot;, certificate.rendered())</span>
+<span class="fc" id="L308">            .property(&quot;contentHash&quot;, certificate.contentHash());</span>
+<span class="fc" id="L309">    }</span>
+
+    private void writeDomainEvidence(JsonWriter json) {
+<span class="fc" id="L312">        json.property(&quot;type&quot;, domainEvidence.type());</span>
+<span class="fc" id="L313">        writeMapArray(json, &quot;properties&quot;, domainEvidence.properties());</span>
+<span class="fc" id="L314">    }</span>
+
+    private static void writeMapArray(
+        JsonWriter json,
+        String property,
+        Map&lt;String, String&gt; values
+    ) {
+<span class="fc" id="L321">        json.array(property, array -&gt; values.forEach((key, value) -&gt;</span>
+<span class="fc" id="L322">            array.objectValue(object -&gt; object</span>
+<span class="fc" id="L323">                .property(&quot;key&quot;, key)</span>
+<span class="fc" id="L324">                .property(&quot;value&quot;, value))));</span>
+<span class="fc" id="L325">    }</span>
+
+<span class="fc" id="L327">    public enum Outcome {</span>
+<span class="fc" id="L328">        CONFIRMED,</span>
+<span class="fc" id="L329">        REFUTED,</span>
+<span class="fc" id="L330">        INCONCLUSIVE,</span>
+<span class="fc" id="L331">        UNSUPPORTED,</span>
+<span class="fc" id="L332">        BUDGET_EXHAUSTED,</span>
+<span class="fc" id="L333">        INVALID_SEED</span>
+    }
+
+<span class="fc" id="L336">    public enum AttemptDisposition {</span>
+<span class="fc" id="L337">        CONFIRMED,</span>
+<span class="fc" id="L338">        REFUTED_BY_COUNTEREXAMPLE,</span>
+<span class="fc" id="L339">        REFUTED_BY_EVALUATOR,</span>
+<span class="fc" id="L340">        INCONCLUSIVE,</span>
+<span class="fc" id="L341">        UNSUPPORTED</span>
+    }
+
+<span class="fc" id="L344">    public enum EvaluationDisposition {</span>
+<span class="fc" id="L345">        NOT_RUN,</span>
+<span class="fc" id="L346">        CONFIRMED,</span>
+<span class="fc" id="L347">        REFUTED,</span>
+<span class="fc" id="L348">        INCONCLUSIVE,</span>
+<span class="fc" id="L349">        UNSUPPORTED</span>
+    }
+
+<span class="fc" id="L352">    public enum Resource {</span>
+<span class="fc" id="L353">        EXPLORED_STATES,</span>
+<span class="fc" id="L354">        GENERATED_SUCCESSORS,</span>
+<span class="fc" id="L355">        CANDIDATE_EVALUATIONS,</span>
+<span class="fc" id="L356">        COUNTEREXAMPLE_ATTEMPTS,</span>
+<span class="fc" id="L357">        CERTIFICATE_ATTEMPTS</span>
+    }
+
+    public record StateTrace(
+        int sequence,
+        String stateHash,
+        String canonicalState,
+        int depth,
+        int objectiveScore,
+        boolean candidateReady,
+        String parentStateHash,
+        String actionId,
+        Map&lt;String, String&gt; objectiveMetrics
+    ) {
+<span class="fc" id="L371">        public StateTrace {</span>
+<span class="pc bpc" id="L372" title="2 of 4 branches missed.">            if (sequence &lt; 1 || depth &lt; 0) {</span>
+<span class="nc" id="L373">                throw new IllegalArgumentException(</span>
+                    &quot;state sequence must be positive and depth non-negative&quot;);
+            }
+<span class="fc" id="L376">            DomainCanonical.requireSha256(stateHash, &quot;stateHash&quot;);</span>
+<span class="fc" id="L377">            DomainCanonical.requireText(canonicalState, &quot;canonicalState&quot;);</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            parentStateHash = parentStateHash == null ? &quot;&quot; : parentStateHash;</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">            if (!parentStateHash.isEmpty()) {</span>
+<span class="fc" id="L380">                DomainCanonical.requireSha256(parentStateHash, &quot;parentStateHash&quot;);</span>
+            }
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">            actionId = actionId == null ? &quot;&quot; : actionId;</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            if (!actionId.isEmpty()) {</span>
+<span class="fc" id="L384">                DomainCanonical.requireIdentifier(actionId, &quot;actionId&quot;);</span>
+            }
+<span class="fc" id="L386">            objectiveMetrics = DomainCanonical.sortedMap(objectiveMetrics);</span>
+<span class="fc" id="L387">        }</span>
+    }
+
+    public record TransitionTrace(
+        int sequence,
+        String fromStateHash,
+        String toStateHash,
+        String actionId,
+        int cost,
+        boolean semanticsPreserving,
+        List&lt;String&gt; assumptions,
+        Map&lt;String, String&gt; metadata,
+        boolean accepted,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L402">        public TransitionTrace {</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            if (sequence &lt; 1) {</span>
+<span class="nc" id="L404">                throw new IllegalArgumentException(</span>
+                    &quot;transition sequence must be positive&quot;);
+            }
+<span class="fc" id="L407">            DomainCanonical.requireSha256(fromStateHash, &quot;fromStateHash&quot;);</span>
+<span class="fc" id="L408">            DomainCanonical.requireSha256(toStateHash, &quot;toStateHash&quot;);</span>
+<span class="fc" id="L409">            DomainCanonical.requireIdentifier(actionId, &quot;actionId&quot;);</span>
+<span class="fc" id="L410">            assumptions = DomainCanonical.sortedDistinct(assumptions);</span>
+<span class="fc" id="L411">            metadata = DomainCanonical.sortedMap(metadata);</span>
+<span class="fc" id="L412">            blockers = DomainCanonical.sortedDistinct(blockers);</span>
+<span class="pc bpc" id="L413" title="1 of 4 branches missed.">            if (accepted &amp;&amp; !blockers.isEmpty()) {</span>
+<span class="nc" id="L414">                throw new IllegalArgumentException(</span>
+                    &quot;accepted transition must not contain blockers&quot;);
+            }
+<span class="pc bpc" id="L417" title="1 of 4 branches missed.">            if (!accepted &amp;&amp; blockers.isEmpty()) {</span>
+<span class="nc" id="L418">                throw new IllegalArgumentException(</span>
+                    &quot;rejected transition requires a blocker&quot;);
+            }
+<span class="fc" id="L421">        }</span>
+    }
+
+    public record CandidateAttempt(
+        int sequence,
+        String candidateHash,
+        AttemptDisposition disposition,
+        CounterexampleStatus counterexampleStatus,
+        int counterexampleAttempts,
+        String counterexampleWitness,
+        EvaluationDisposition evaluationStatus,
+        String evaluationSummary,
+        String certificateHash,
+        Map&lt;String, String&gt; metrics
+    ) {
+<span class="fc" id="L436">        public CandidateAttempt {</span>
+<span class="pc bpc" id="L437" title="2 of 4 branches missed.">            if (sequence &lt; 1 || counterexampleAttempts &lt; 0) {</span>
+<span class="nc" id="L438">                throw new IllegalArgumentException(</span>
+                    &quot;candidate sequence must be positive and attempts non-negative&quot;);
+            }
+<span class="fc" id="L441">            DomainCanonical.requireSha256(candidateHash, &quot;candidateHash&quot;);</span>
+<span class="fc" id="L442">            Objects.requireNonNull(disposition, &quot;disposition&quot;);</span>
+<span class="fc" id="L443">            Objects.requireNonNull(counterexampleStatus, &quot;counterexampleStatus&quot;);</span>
+<span class="pc bpc" id="L444" title="1 of 2 branches missed.">            counterexampleWitness = counterexampleWitness == null</span>
+<span class="nc" id="L445">                ? &quot;&quot;</span>
+<span class="fc" id="L446">                : counterexampleWitness;</span>
+<span class="fc" id="L447">            Objects.requireNonNull(evaluationStatus, &quot;evaluationStatus&quot;);</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            evaluationSummary = evaluationSummary == null ? &quot;&quot; : evaluationSummary;</span>
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">            certificateHash = certificateHash == null ? &quot;&quot; : certificateHash;</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">            if (!certificateHash.isEmpty()) {</span>
+<span class="fc" id="L451">                DomainCanonical.requireSha256(certificateHash, &quot;certificateHash&quot;);</span>
+            }
+<span class="fc" id="L453">            metrics = DomainCanonical.sortedMap(metrics);</span>
+<span class="pc bpc" id="L454" title="1 of 4 branches missed.">            if (disposition == AttemptDisposition.CONFIRMED</span>
+                    &amp;&amp; (evaluationStatus != EvaluationDisposition.CONFIRMED
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                        || certificateHash.isEmpty())) {</span>
+<span class="nc" id="L457">                throw new IllegalArgumentException(</span>
+                    &quot;confirmed candidate attempt requires confirmed evaluation and certificate&quot;);
+            }
+<span class="fc" id="L460">        }</span>
+    }
+
+    public record ResourceLine(
+        Resource resource,
+        int configured,
+        int executed,
+        int skipped,
+        int remaining
+    ) {
+<span class="fc" id="L470">        public ResourceLine {</span>
+<span class="fc" id="L471">            Objects.requireNonNull(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L472" title="4 of 8 branches missed.">            if (configured &lt; 0 || executed &lt; 0 || skipped &lt; 0 || remaining &lt; 0) {</span>
+<span class="nc" id="L473">                throw new IllegalArgumentException(</span>
+                    &quot;resource counts must be non-negative&quot;);
+            }
+<span class="fc" id="L476">            validateBalance();</span>
+<span class="fc" id="L477">        }</span>
+
+        void validateBalance() {
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">            if (configured != executed + skipped + remaining) {</span>
+<span class="nc" id="L481">                throw new IllegalArgumentException(</span>
+                    resource + &quot; resource line is unbalanced&quot;);
+            }
+<span class="fc" id="L484">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

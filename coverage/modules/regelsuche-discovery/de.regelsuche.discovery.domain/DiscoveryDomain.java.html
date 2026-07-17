@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryDomain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DiscoveryDomain.java</span></div><h1>DiscoveryDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Domain-neutral contract for one bounded mathematical discovery domain.
+ *
+ * &lt;p&gt;The contract intentionally separates generation, canonical identity,
+ * invariants, search operators, objectives, candidate construction,
+ * counterexample search, validation, certificate rendering and evidence
+ * adaptation. A runner may orchestrate these roles, but no single role is
+ * allowed to stand in for mathematical proof, novelty or promotion.&lt;/p&gt;
+ */
+public interface DiscoveryDomain&lt;S, C, K&gt; {
+    String domainId();
+
+    String revision();
+
+    String stateType();
+
+    String candidateType();
+
+    String certificateType();
+
+    StateGenerator&lt;S&gt; generator();
+
+    CanonicalCodec&lt;S&gt; stateCodec();
+
+    List&lt;Invariant&lt;S&gt;&gt; invariants();
+
+    List&lt;TransitionOperator&lt;S&gt;&gt; operators();
+
+    Objective&lt;S&gt; objective();
+
+    CandidateExtractor&lt;S, C&gt; candidateExtractor();
+
+    CanonicalCodec&lt;C&gt; candidateCodec();
+
+    CounterexampleGenerator&lt;C&gt; counterexampleGenerator();
+
+    CandidateEvaluator&lt;C, K&gt; evaluator();
+
+    CanonicalCodec&lt;K&gt; certificateCodec();
+
+    CertificateRenderer&lt;K&gt; certificateRenderer();
+
+    EvidenceAdapter&lt;S, C, K&gt; evidenceAdapter();
+
+    default DiscoveryDomainDescriptor descriptor() {
+<span class="fc" id="L53">        return DiscoveryDomainDescriptor.from(this);</span>
+    }
+
+    interface IdentifiedComponent {
+        String id();
+    }
+
+    interface StateGenerator&lt;S&gt; extends IdentifiedComponent {
+        List&lt;S&gt; generate(DiscoverySeed seed);
+    }
+
+    interface CanonicalCodec&lt;T&gt; extends IdentifiedComponent {
+        String canonicalForm(T value);
+
+        default String contentHash(T value) {
+<span class="fc" id="L68">            return DomainCanonical.sha256(canonicalForm(Objects.requireNonNull(value, &quot;value&quot;)));</span>
+        }
+    }
+
+    interface Invariant&lt;S&gt; extends IdentifiedComponent {
+        InvariantResult check(S state);
+    }
+
+    interface TransitionOperator&lt;S&gt; extends IdentifiedComponent {
+        List&lt;Successor&lt;S&gt;&gt; apply(S state);
+    }
+
+    interface Objective&lt;S&gt; extends IdentifiedComponent {
+        ObjectiveAssessment assess(S state);
+    }
+
+    interface CandidateExtractor&lt;S, C&gt; extends IdentifiedComponent {
+        C extract(CandidateContext&lt;S&gt; context);
+    }
+
+    interface CounterexampleGenerator&lt;C&gt; extends IdentifiedComponent {
+        CounterexampleResult search(C candidate, int attemptBudget);
+    }
+
+    interface CandidateEvaluator&lt;C, K&gt; extends IdentifiedComponent {
+        Evaluation&lt;K&gt; evaluate(C candidate);
+    }
+
+    interface CertificateRenderer&lt;K&gt; extends IdentifiedComponent {
+        CertificateRendering render(K certificate);
+    }
+
+    interface EvidenceAdapter&lt;S, C, K&gt; extends IdentifiedComponent {
+        DomainPayload adapt(Optional&lt;S&gt; initialState, Optional&lt;C&gt; candidate, Optional&lt;K&gt; certificate);
+    }
+
+    record DiscoverySeed(
+        String schema,
+        String seedId,
+        String domainId,
+        String payload,
+        String sourceReference,
+        String contentHash
+    ) {
+        public static final String SCHEMA = &quot;regelsuche.discovery-seed/v1&quot;;
+
+<span class="fc" id="L114">        public DiscoverySeed {</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L116">                throw new IllegalArgumentException(&quot;unsupported discovery seed schema&quot;);</span>
+            }
+<span class="fc" id="L118">            DomainCanonical.requireIdentifier(seedId, &quot;seedId&quot;);</span>
+<span class="fc" id="L119">            DomainCanonical.requireIdentifier(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L120">            DomainCanonical.requireText(payload, &quot;payload&quot;);</span>
+<span class="fc" id="L121">            DomainCanonical.requireText(sourceReference, &quot;sourceReference&quot;);</span>
+<span class="fc" id="L122">            DomainCanonical.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L123">            String expected = DomainCanonical.sha256(canonicalMaterial(</span>
+                seedId, domainId, payload, sourceReference));
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L126">                throw new IllegalArgumentException(&quot;discovery seed contentHash mismatch&quot;);</span>
+            }
+<span class="fc" id="L128">        }</span>
+
+        public static DiscoverySeed create(
+            String seedId,
+            String domainId,
+            String payload,
+            String sourceReference
+        ) {
+<span class="fc" id="L136">            String hash = DomainCanonical.sha256(canonicalMaterial(</span>
+                seedId, domainId, payload, sourceReference));
+<span class="fc" id="L138">            return new DiscoverySeed(</span>
+                SCHEMA, seedId, domainId, payload, sourceReference, hash);
+        }
+
+        private static String canonicalMaterial(
+            String seedId,
+            String domainId,
+            String payload,
+            String sourceReference
+        ) {
+<span class="fc" id="L148">            return DomainCanonical.canonicalMap(Map.of(</span>
+                &quot;schema&quot;, SCHEMA,
+<span class="fc" id="L150">                &quot;seedId&quot;, DomainCanonical.requireIdentifier(seedId, &quot;seedId&quot;),</span>
+<span class="fc" id="L151">                &quot;domainId&quot;, DomainCanonical.requireIdentifier(domainId, &quot;domainId&quot;),</span>
+<span class="fc" id="L152">                &quot;payload&quot;, DomainCanonical.requireText(payload, &quot;payload&quot;),</span>
+                &quot;sourceReference&quot;,
+<span class="fc" id="L154">                    DomainCanonical.requireText(sourceReference, &quot;sourceReference&quot;)</span>
+            ));
+        }
+    }
+
+    record DiscoveryBudget(
+        int maxDepth,
+        int maxExploredStates,
+        int maxGeneratedSuccessors,
+        int maxCandidatesPerState,
+        int maxCandidateAttempts,
+        int maxCounterexampleAttempts
+    ) {
+<span class="fc" id="L167">        public DiscoveryBudget {</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (maxDepth &lt; 0) {</span>
+<span class="nc" id="L169">                throw new IllegalArgumentException(&quot;maxDepth must be non-negative&quot;);</span>
+            }
+<span class="pc bpc" id="L171" title="5 of 10 branches missed.">            if (maxExploredStates &lt; 1</span>
+                    || maxGeneratedSuccessors &lt; 1
+                    || maxCandidatesPerState &lt; 1
+                    || maxCandidateAttempts &lt; 1
+                    || maxCounterexampleAttempts &lt; 1) {
+<span class="nc" id="L176">                throw new IllegalArgumentException(&quot;discovery budgets must be positive&quot;);</span>
+            }
+<span class="fc" id="L178">        }</span>
+    }
+
+    record InvariantResult(boolean accepted, List&lt;String&gt; blockers) {
+<span class="fc" id="L182">        public InvariantResult {</span>
+<span class="fc" id="L183">            blockers = DomainCanonical.sortedDistinct(blockers);</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">            if (accepted &amp;&amp; !blockers.isEmpty()) {</span>
+<span class="nc" id="L185">                throw new IllegalArgumentException(</span>
+                    &quot;accepted invariant result must not contain blockers&quot;);
+            }
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">            if (!accepted &amp;&amp; blockers.isEmpty()) {</span>
+<span class="nc" id="L189">                throw new IllegalArgumentException(</span>
+                    &quot;rejected invariant result must contain a blocker&quot;);
+            }
+<span class="fc" id="L192">        }</span>
+
+        public static InvariantResult pass() {
+<span class="fc" id="L195">            return new InvariantResult(true, List.of());</span>
+        }
+
+        public static InvariantResult fail(String blocker) {
+<span class="fc" id="L199">            return new InvariantResult(false, List.of(blocker));</span>
+        }
+    }
+
+    record Successor&lt;S&gt;(
+        String actionId,
+        S state,
+        int cost,
+        boolean semanticsPreserving,
+        List&lt;String&gt; assumptions,
+        Map&lt;String, String&gt; metadata
+    ) {
+<span class="fc" id="L211">        public Successor {</span>
+<span class="fc" id="L212">            DomainCanonical.requireIdentifier(actionId, &quot;actionId&quot;);</span>
+<span class="fc" id="L213">            Objects.requireNonNull(state, &quot;state&quot;);</span>
+<span class="pc bpc" id="L214" title="2 of 4 branches missed.">            if (cost &lt; -1_000_000 || cost &gt; 1_000_000) {</span>
+<span class="nc" id="L215">                throw new IllegalArgumentException(&quot;successor cost is outside bounded range&quot;);</span>
+            }
+<span class="fc" id="L217">            assumptions = DomainCanonical.sortedDistinct(assumptions);</span>
+<span class="fc" id="L218">            metadata = DomainCanonical.sortedMap(metadata);</span>
+<span class="fc" id="L219">        }</span>
+    }
+
+    record ObjectiveAssessment(
+        int score,
+        boolean candidateReady,
+        Map&lt;String, String&gt; metrics
+    ) {
+<span class="fc" id="L227">        public ObjectiveAssessment {</span>
+<span class="fc" id="L228">            metrics = DomainCanonical.sortedMap(metrics);</span>
+<span class="fc" id="L229">        }</span>
+    }
+
+    record PathStep&lt;S&gt;(
+        String fromStateHash,
+        String actionId,
+        S toState,
+        String toStateHash,
+        int cost,
+        boolean semanticsPreserving,
+        List&lt;String&gt; assumptions,
+        Map&lt;String, String&gt; metadata
+    ) {
+<span class="fc" id="L242">        public PathStep {</span>
+<span class="fc" id="L243">            DomainCanonical.requireSha256(fromStateHash, &quot;fromStateHash&quot;);</span>
+<span class="fc" id="L244">            DomainCanonical.requireIdentifier(actionId, &quot;actionId&quot;);</span>
+<span class="fc" id="L245">            Objects.requireNonNull(toState, &quot;toState&quot;);</span>
+<span class="fc" id="L246">            DomainCanonical.requireSha256(toStateHash, &quot;toStateHash&quot;);</span>
+<span class="fc" id="L247">            assumptions = DomainCanonical.sortedDistinct(assumptions);</span>
+<span class="fc" id="L248">            metadata = DomainCanonical.sortedMap(metadata);</span>
+<span class="fc" id="L249">        }</span>
+    }
+
+    record CandidateContext&lt;S&gt;(
+        S initialState,
+        S currentState,
+        List&lt;PathStep&lt;S&gt;&gt; path
+    ) {
+<span class="fc" id="L257">        public CandidateContext {</span>
+<span class="fc" id="L258">            Objects.requireNonNull(initialState, &quot;initialState&quot;);</span>
+<span class="fc" id="L259">            Objects.requireNonNull(currentState, &quot;currentState&quot;);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
+<span class="fc" id="L261">        }</span>
+    }
+
+<span class="fc" id="L264">    enum CounterexampleStatus {</span>
+<span class="fc" id="L265">        NONE_FOUND,</span>
+<span class="fc" id="L266">        FOUND,</span>
+<span class="fc" id="L267">        INCONCLUSIVE,</span>
+<span class="fc" id="L268">        UNSUPPORTED</span>
+    }
+
+    record CounterexampleResult(
+        CounterexampleStatus status,
+        int attempts,
+        String witness,
+        Map&lt;String, String&gt; metrics
+    ) {
+<span class="fc" id="L277">        public CounterexampleResult {</span>
+<span class="fc" id="L278">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">            if (attempts &lt; 0) {</span>
+<span class="nc" id="L280">                throw new IllegalArgumentException(&quot;attempts must be non-negative&quot;);</span>
+            }
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">            witness = witness == null ? &quot;&quot; : witness;</span>
+<span class="fc" id="L283">            metrics = DomainCanonical.sortedMap(metrics);</span>
+<span class="pc bpc" id="L284" title="3 of 4 branches missed.">            if (status == CounterexampleStatus.FOUND &amp;&amp; witness.isBlank()) {</span>
+<span class="nc" id="L285">                throw new IllegalArgumentException(</span>
+                    &quot;counterexample status FOUND requires a witness&quot;);
+            }
+<span class="fc" id="L288">        }</span>
+
+        public static CounterexampleResult noneFound(
+            int attempts,
+            Map&lt;String, String&gt; metrics
+        ) {
+<span class="fc" id="L294">            return new CounterexampleResult(</span>
+                CounterexampleStatus.NONE_FOUND, attempts, &quot;&quot;, metrics);
+        }
+
+        public static CounterexampleResult found(
+            int attempts,
+            String witness,
+            Map&lt;String, String&gt; metrics
+        ) {
+<span class="nc" id="L303">            return new CounterexampleResult(</span>
+                CounterexampleStatus.FOUND, attempts, witness, metrics);
+        }
+
+        public static CounterexampleResult inconclusive(
+            int attempts,
+            String summary,
+            Map&lt;String, String&gt; metrics
+        ) {
+<span class="fc" id="L312">            return new CounterexampleResult(</span>
+                CounterexampleStatus.INCONCLUSIVE, attempts, summary, metrics);
+        }
+
+        public static CounterexampleResult unsupported(String summary) {
+<span class="nc" id="L317">            return new CounterexampleResult(</span>
+<span class="nc" id="L318">                CounterexampleStatus.UNSUPPORTED, 0, summary, Map.of());</span>
+        }
+    }
+
+<span class="fc" id="L322">    enum EvaluationStatus {</span>
+<span class="fc" id="L323">        CONFIRMED,</span>
+<span class="fc" id="L324">        REFUTED,</span>
+<span class="fc" id="L325">        INCONCLUSIVE,</span>
+<span class="fc" id="L326">        UNSUPPORTED</span>
+    }
+
+    record Evaluation&lt;K&gt;(
+        EvaluationStatus status,
+        K certificate,
+        String summary,
+        Map&lt;String, String&gt; metrics
+    ) {
+<span class="fc" id="L335">        public Evaluation {</span>
+<span class="fc" id="L336">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            summary = summary == null ? &quot;&quot; : summary;</span>
+<span class="fc" id="L338">            metrics = DomainCanonical.sortedMap(metrics);</span>
+<span class="pc bpc" id="L339" title="1 of 4 branches missed.">            if (status == EvaluationStatus.CONFIRMED &amp;&amp; certificate == null) {</span>
+<span class="nc" id="L340">                throw new IllegalArgumentException(</span>
+                    &quot;confirmed evaluation requires a certificate object&quot;);
+            }
+<span class="pc bpc" id="L343" title="1 of 4 branches missed.">            if (status != EvaluationStatus.CONFIRMED &amp;&amp; certificate != null) {</span>
+<span class="nc" id="L344">                throw new IllegalArgumentException(</span>
+                    &quot;non-confirmed evaluation must not carry a certificate object&quot;);
+            }
+<span class="fc" id="L347">        }</span>
+
+        public static &lt;K&gt; Evaluation&lt;K&gt; confirmed(
+            K certificate,
+            String summary,
+            Map&lt;String, String&gt; metrics
+        ) {
+<span class="fc" id="L354">            return new Evaluation&lt;&gt;(</span>
+                EvaluationStatus.CONFIRMED,
+<span class="fc" id="L356">                Objects.requireNonNull(certificate, &quot;certificate&quot;),</span>
+                summary,
+                metrics);
+        }
+
+        public static &lt;K&gt; Evaluation&lt;K&gt; refuted(
+            String summary,
+            Map&lt;String, String&gt; metrics
+        ) {
+<span class="fc" id="L365">            return new Evaluation&lt;&gt;(</span>
+                EvaluationStatus.REFUTED, null, summary, metrics);
+        }
+
+        public static &lt;K&gt; Evaluation&lt;K&gt; inconclusive(
+            String summary,
+            Map&lt;String, String&gt; metrics
+        ) {
+<span class="nc" id="L373">            return new Evaluation&lt;&gt;(</span>
+                EvaluationStatus.INCONCLUSIVE, null, summary, metrics);
+        }
+
+        public static &lt;K&gt; Evaluation&lt;K&gt; unsupported(
+            String summary,
+            Map&lt;String, String&gt; metrics
+        ) {
+<span class="nc" id="L381">            return new Evaluation&lt;&gt;(</span>
+                EvaluationStatus.UNSUPPORTED, null, summary, metrics);
+        }
+    }
+
+    record CertificateRendering(
+        String kind,
+        String format,
+        String rendered
+    ) {
+<span class="fc" id="L391">        public CertificateRendering {</span>
+<span class="fc" id="L392">            DomainCanonical.requireIdentifier(kind, &quot;certificate kind&quot;);</span>
+<span class="fc" id="L393">            DomainCanonical.requireIdentifier(format, &quot;certificate format&quot;);</span>
+<span class="fc" id="L394">            DomainCanonical.requireText(rendered, &quot;rendered certificate&quot;);</span>
+<span class="fc" id="L395">        }</span>
+    }
+
+    record RenderedCertificate(
+        String kind,
+        String format,
+        String certificateObjectHash,
+        String rendered,
+        String contentHash
+    ) {
+<span class="fc" id="L405">        public RenderedCertificate {</span>
+<span class="fc" id="L406">            DomainCanonical.requireIdentifier(kind, &quot;certificate kind&quot;);</span>
+<span class="fc" id="L407">            DomainCanonical.requireIdentifier(format, &quot;certificate format&quot;);</span>
+<span class="fc" id="L408">            DomainCanonical.requireSha256(</span>
+                certificateObjectHash, &quot;certificateObjectHash&quot;);
+<span class="fc" id="L410">            DomainCanonical.requireText(rendered, &quot;rendered certificate&quot;);</span>
+<span class="fc" id="L411">            DomainCanonical.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L412">            String expected = DomainCanonical.sha256(</span>
+                kind + &quot;\n&quot; + format + &quot;\n&quot; + certificateObjectHash
+                    + &quot;\n&quot; + rendered);
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L416">                throw new IllegalArgumentException(</span>
+                    &quot;rendered certificate contentHash mismatch&quot;);
+            }
+<span class="fc" id="L419">        }</span>
+
+        public static RenderedCertificate create(
+            CertificateRendering rendering,
+            String certificateObjectHash
+        ) {
+<span class="fc" id="L425">            Objects.requireNonNull(rendering, &quot;rendering&quot;);</span>
+<span class="fc" id="L426">            DomainCanonical.requireSha256(</span>
+                certificateObjectHash, &quot;certificateObjectHash&quot;);
+<span class="fc" id="L428">            String hash = DomainCanonical.sha256(</span>
+<span class="fc" id="L429">                rendering.kind() + &quot;\n&quot; + rendering.format() + &quot;\n&quot;</span>
+<span class="fc" id="L430">                    + certificateObjectHash + &quot;\n&quot; + rendering.rendered());</span>
+<span class="fc" id="L431">            return new RenderedCertificate(</span>
+<span class="fc" id="L432">                rendering.kind(),</span>
+<span class="fc" id="L433">                rendering.format(),</span>
+                certificateObjectHash,
+<span class="fc" id="L435">                rendering.rendered(),</span>
+                hash);
+        }
+    }
+
+    record DomainPayload(String type, Map&lt;String, String&gt; properties) {
+<span class="fc" id="L441">        public DomainPayload {</span>
+<span class="fc" id="L442">            DomainCanonical.requireIdentifier(type, &quot;domain payload type&quot;);</span>
+<span class="fc" id="L443">            properties = DomainCanonical.sortedMap(properties);</span>
+<span class="fc" id="L444">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

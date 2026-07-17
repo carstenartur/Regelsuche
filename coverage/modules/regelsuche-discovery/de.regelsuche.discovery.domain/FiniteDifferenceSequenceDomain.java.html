@@ -1,0 +1,648 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FiniteDifferenceSequenceDomain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">FiniteDifferenceSequenceDomain.java</span></div><h1>FiniteDifferenceSequenceDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateContext;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateEvaluator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateExtractor;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CanonicalCodec;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CertificateRenderer;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CertificateRendering;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleResult;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DomainPayload;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Evaluation;
+import de.regelsuche.discovery.domain.DiscoveryDomain.EvidenceAdapter;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Invariant;
+import de.regelsuche.discovery.domain.DiscoveryDomain.InvariantResult;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Objective;
+import de.regelsuche.discovery.domain.DiscoveryDomain.ObjectiveAssessment;
+import de.regelsuche.discovery.domain.DiscoveryDomain.StateGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Successor;
+import de.regelsuche.discovery.domain.DiscoveryDomain.TransitionOperator;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Small non-expression discovery domain for integer sequences.
+ *
+ * &lt;p&gt;The domain searches finite-difference rows until it finds a constant row,
+ * constructs the corresponding polynomial-difference recurrence, checks the
+ * observed prefix for counterexamples and validates against an independently
+ * supplied holdout suffix. The retained certificate is a finite-difference
+ * witness, not a formal proof or external novelty claim.&lt;/p&gt;
+ */
+<span class="fc" id="L38">public final class FiniteDifferenceSequenceDomain implements DiscoveryDomain&lt;</span>
+    FiniteDifferenceSequenceDomain.SequenceState,
+    FiniteDifferenceSequenceDomain.FiniteDifferenceCandidate,
+    FiniteDifferenceSequenceDomain.FiniteDifferenceCertificate
+&gt; {
+    public static final String DOMAIN_ID = &quot;integer-sequence-finite-difference&quot;;
+    public static final String REVISION = &quot;v1&quot;;
+
+<span class="fc" id="L46">    private final StateGenerator&lt;SequenceState&gt; generator = new StateGenerator&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L49">            return &quot;finite-difference-sequence-generator/v1&quot;;</span>
+        }
+
+        @Override
+        public List&lt;SequenceState&gt; generate(DiscoverySeed seed) {
+<span class="fc" id="L54">            ParsedSequence parsed = parsePayload(seed.payload());</span>
+<span class="fc" id="L55">            return List.of(new SequenceState(</span>
+<span class="fc" id="L56">                parsed.observed(),</span>
+<span class="fc" id="L57">                parsed.holdout(),</span>
+<span class="fc" id="L58">                List.of(parsed.observed())));</span>
+        }
+    };
+
+<span class="fc" id="L62">    private final CanonicalCodec&lt;SequenceState&gt; stateCodec = new CanonicalCodec&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L65">            return &quot;finite-difference-state-codec/v1&quot;;</span>
+        }
+
+        @Override
+        public String canonicalForm(SequenceState value) {
+<span class="fc" id="L70">            return &quot;observed=&quot; + canonicalNumbers(value.observed())</span>
+<span class="fc" id="L71">                + &quot;\nholdout=&quot; + canonicalNumbers(value.holdout())</span>
+<span class="fc" id="L72">                + &quot;\nrows=&quot; + value.rows().stream()</span>
+<span class="fc" id="L73">                    .map(FiniteDifferenceSequenceDomain::canonicalNumbers)</span>
+<span class="fc" id="L74">                    .collect(java.util.stream.Collectors.joining(&quot;|&quot;));</span>
+        }
+    };
+
+<span class="fc" id="L78">    private final List&lt;Invariant&lt;SequenceState&gt;&gt; invariants = List.of(</span>
+<span class="fc" id="L79">        new Invariant&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L82">                return &quot;finite-difference-row-shape/v1&quot;;</span>
+            }
+
+            @Override
+            public InvariantResult check(SequenceState state) {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                if (state.rows().isEmpty()</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                        || !state.rows().getFirst().equals(state.observed())) {</span>
+<span class="nc" id="L89">                    return InvariantResult.fail(&quot;first-row-does-not-match-observed&quot;);</span>
+                }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                for (int index = 1; index &lt; state.rows().size(); index++) {</span>
+<span class="fc" id="L92">                    List&lt;Long&gt; previous = state.rows().get(index - 1);</span>
+<span class="fc" id="L93">                    List&lt;Long&gt; current = state.rows().get(index);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                    if (current.size() != previous.size() - 1) {</span>
+<span class="nc" id="L95">                        return InvariantResult.fail(&quot;row-length-does-not-decrease-by-one&quot;);</span>
+                    }
+                    List&lt;Long&gt; expected;
+                    try {
+<span class="fc" id="L99">                        expected = difference(previous);</span>
+<span class="nc" id="L100">                    } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L101">                        return InvariantResult.fail(&quot;difference-overflow&quot;);</span>
+<span class="fc" id="L102">                    }</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                    if (!expected.equals(current)) {</span>
+<span class="nc" id="L104">                        return InvariantResult.fail(&quot;row-is-not-the-previous-finite-difference&quot;);</span>
+                    }
+                }
+<span class="fc" id="L107">                return InvariantResult.pass();</span>
+            }
+        },
+<span class="fc" id="L110">        new Invariant&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L113">                return &quot;finite-difference-support/v1&quot;;</span>
+            }
+
+            @Override
+            public InvariantResult check(SequenceState state) {
+<span class="fc" id="L118">                int order = state.rows().size() - 1;</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                return state.observed().size() &gt;= order + 2</span>
+<span class="fc" id="L120">                    ? InvariantResult.pass()</span>
+<span class="fc" id="L121">                    : InvariantResult.fail(&quot;insufficient-observed-support-for-order&quot;);</span>
+            }
+        }
+    );
+
+<span class="fc" id="L126">    private final List&lt;TransitionOperator&lt;SequenceState&gt;&gt; operators = List.of(</span>
+<span class="fc" id="L127">        new TransitionOperator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L130">                return &quot;finite-difference-operator/v1&quot;;</span>
+            }
+
+            @Override
+            public List&lt;Successor&lt;SequenceState&gt;&gt; apply(SequenceState state) {
+<span class="fc" id="L135">                List&lt;Long&gt; last = state.rows().getLast();</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                if (last.size() &lt; 2) {</span>
+<span class="nc" id="L137">                    return List.of();</span>
+                }
+                List&lt;Long&gt; next;
+                try {
+<span class="fc" id="L141">                    next = difference(last);</span>
+<span class="nc" id="L142">                } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L143">                    return List.of();</span>
+<span class="fc" id="L144">                }</span>
+<span class="fc" id="L145">                List&lt;List&lt;Long&gt;&gt; rows = new ArrayList&lt;&gt;(state.rows());</span>
+<span class="fc" id="L146">                rows.add(next);</span>
+<span class="fc" id="L147">                int order = rows.size() - 1;</span>
+<span class="fc" id="L148">                return List.of(new Successor&lt;&gt;(</span>
+                    &quot;finite-difference-order-&quot; + order,
+<span class="fc" id="L150">                    new SequenceState(state.observed(), state.holdout(), rows),</span>
+                    1,
+                    true,
+<span class="fc" id="L153">                    List.of(),</span>
+<span class="fc" id="L154">                    Map.of(</span>
+<span class="fc" id="L155">                        &quot;differenceOrder&quot;, Integer.toString(order),</span>
+<span class="fc" id="L156">                        &quot;rowLength&quot;, Integer.toString(next.size()))));</span>
+            }
+        }
+    );
+
+<span class="fc" id="L161">    private final Objective&lt;SequenceState&gt; objective = new Objective&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L164">            return &quot;constant-finite-difference-objective/v1&quot;;</span>
+        }
+
+        @Override
+        public ObjectiveAssessment assess(SequenceState state) {
+<span class="fc" id="L169">            int order = state.rows().size() - 1;</span>
+<span class="fc" id="L170">            List&lt;Long&gt; last = state.rows().getLast();</span>
+<span class="fc bfc" id="L171" title="All 4 branches covered.">            boolean constant = order &gt;= 1 &amp;&amp; isConstant(last);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            int score = constant ? 1_000_000 - order * 1_000 : order * 100;</span>
+<span class="fc" id="L173">            LinkedHashMap&lt;String, String&gt; metrics = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L174">            metrics.put(&quot;differenceOrder&quot;, Integer.toString(order));</span>
+<span class="fc" id="L175">            metrics.put(&quot;lastRowLength&quot;, Integer.toString(last.size()));</span>
+<span class="fc" id="L176">            metrics.put(&quot;constantDifference&quot;, Boolean.toString(constant));</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            if (constant) {</span>
+<span class="fc" id="L178">                metrics.put(&quot;constantValue&quot;, Long.toString(last.getFirst()));</span>
+            }
+<span class="fc" id="L180">            return new ObjectiveAssessment(score, constant, metrics);</span>
+        }
+    };
+
+<span class="fc" id="L184">    private final CandidateExtractor&lt;SequenceState, FiniteDifferenceCandidate&gt; candidateExtractor =</span>
+<span class="fc" id="L185">        new CandidateExtractor&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L188">                return &quot;finite-difference-candidate-extractor/v1&quot;;</span>
+            }
+
+            @Override
+            public FiniteDifferenceCandidate extract(CandidateContext&lt;SequenceState&gt; context) {
+<span class="fc" id="L193">                SequenceState state = context.currentState();</span>
+<span class="fc" id="L194">                int order = state.rows().size() - 1;</span>
+<span class="fc" id="L195">                List&lt;Long&gt; initialDifferences = state.rows().stream()</span>
+<span class="fc" id="L196">                    .map(List::getFirst)</span>
+<span class="fc" id="L197">                    .toList();</span>
+<span class="fc" id="L198">                return new FiniteDifferenceCandidate(</span>
+                    order,
+                    initialDifferences,
+<span class="fc" id="L201">                    state.observed(),</span>
+<span class="fc" id="L202">                    state.holdout());</span>
+            }
+        };
+
+<span class="fc" id="L206">    private final CanonicalCodec&lt;FiniteDifferenceCandidate&gt; candidateCodec =</span>
+<span class="fc" id="L207">        new CanonicalCodec&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L210">                return &quot;finite-difference-candidate-codec/v1&quot;;</span>
+            }
+
+            @Override
+            public String canonicalForm(FiniteDifferenceCandidate value) {
+<span class="fc" id="L215">                return &quot;order=&quot; + value.order()</span>
+<span class="fc" id="L216">                    + &quot;\ninitialDifferences=&quot; + canonicalNumbers(value.initialDifferences())</span>
+<span class="fc" id="L217">                    + &quot;\nobserved=&quot; + canonicalNumbers(value.observed())</span>
+<span class="fc" id="L218">                    + &quot;\nholdout=&quot; + canonicalNumbers(value.holdout());</span>
+            }
+        };
+
+<span class="fc" id="L222">    private final CounterexampleGenerator&lt;FiniteDifferenceCandidate&gt; counterexampleGenerator =</span>
+<span class="fc" id="L223">        new CounterexampleGenerator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L226">                return &quot;finite-difference-prefix-counterexample-search/v1&quot;;</span>
+            }
+
+            @Override
+            public CounterexampleResult search(
+                FiniteDifferenceCandidate candidate,
+                int attemptBudget
+            ) {
+                List&lt;Long&gt; generated;
+                try {
+<span class="fc" id="L236">                    generated = generate(candidate.initialDifferences(),</span>
+<span class="fc" id="L237">                        candidate.observed().size());</span>
+<span class="nc" id="L238">                } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L239">                    return CounterexampleResult.unsupported(</span>
+                        &quot;integer overflow while replaying observed sequence&quot;);
+<span class="fc" id="L241">                }</span>
+<span class="fc" id="L242">                int attempts = Math.min(attemptBudget, candidate.observed().size());</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                for (int index = 0; index &lt; attempts; index++) {</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                    if (!generated.get(index).equals(candidate.observed().get(index))) {</span>
+<span class="nc" id="L245">                        return CounterexampleResult.found(</span>
+                            index + 1,
+                            &quot;observed index &quot; + index + &quot; expected &quot;
+<span class="nc" id="L248">                                + candidate.observed().get(index) + &quot; but generated &quot;</span>
+<span class="nc" id="L249">                                + generated.get(index),</span>
+<span class="nc" id="L250">                            Map.of(</span>
+<span class="nc" id="L251">                                &quot;index&quot;, Integer.toString(index),</span>
+<span class="nc" id="L252">                                &quot;expected&quot;, Long.toString(candidate.observed().get(index)),</span>
+<span class="nc" id="L253">                                &quot;generated&quot;, Long.toString(generated.get(index))));</span>
+                    }
+                }
+<span class="fc bfc" id="L256" title="All 2 branches covered.">                if (attempts &lt; candidate.observed().size()) {</span>
+<span class="fc" id="L257">                    return CounterexampleResult.inconclusive(</span>
+                        attempts,
+                        &quot;prefix audit budget did not cover every observed term&quot;,
+<span class="fc" id="L260">                        Map.of(</span>
+<span class="fc" id="L261">                            &quot;checkedTerms&quot;, Integer.toString(attempts),</span>
+<span class="fc" id="L262">                            &quot;requiredTerms&quot;, Integer.toString(candidate.observed().size())));</span>
+                }
+<span class="fc" id="L264">                return CounterexampleResult.noneFound(</span>
+                    attempts,
+<span class="fc" id="L266">                    Map.of(</span>
+<span class="fc" id="L267">                        &quot;checkedTerms&quot;, Integer.toString(attempts),</span>
+                        &quot;replay&quot;, &quot;exact-integer&quot;));
+            }
+        };
+
+<span class="fc" id="L272">    private final CandidateEvaluator&lt;FiniteDifferenceCandidate, FiniteDifferenceCertificate&gt;</span>
+<span class="fc" id="L273">        evaluator = new CandidateEvaluator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L276">                return &quot;finite-difference-holdout-evaluator/v1&quot;;</span>
+            }
+
+            @Override
+            public Evaluation&lt;FiniteDifferenceCertificate&gt; evaluate(
+                FiniteDifferenceCandidate candidate
+            ) {
+<span class="fc" id="L283">                int total = candidate.observed().size() + candidate.holdout().size();</span>
+                List&lt;Long&gt; generated;
+                try {
+<span class="fc" id="L286">                    generated = generate(candidate.initialDifferences(), total);</span>
+<span class="nc" id="L287">                } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L288">                    return Evaluation.unsupported(</span>
+                        &quot;integer overflow while generating holdout continuation&quot;,
+<span class="nc" id="L290">                        Map.of());</span>
+<span class="fc" id="L291">                }</span>
+<span class="fc" id="L292">                List&lt;Long&gt; predictedHoldout = generated.subList(</span>
+<span class="fc" id="L293">                    candidate.observed().size(), total);</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                if (!predictedHoldout.equals(candidate.holdout())) {</span>
+<span class="fc" id="L295">                    return Evaluation.refuted(</span>
+                        &quot;finite-difference recurrence failed the retained holdout&quot;,
+<span class="fc" id="L297">                        Map.of(</span>
+<span class="fc" id="L298">                            &quot;expectedHoldout&quot;, canonicalNumbers(candidate.holdout()),</span>
+<span class="fc" id="L299">                            &quot;predictedHoldout&quot;, canonicalNumbers(predictedHoldout)));</span>
+                }
+<span class="fc" id="L301">                FiniteDifferenceCertificate certificate =</span>
+                    new FiniteDifferenceCertificate(
+<span class="fc" id="L303">                        candidate.order(),</span>
+<span class="fc" id="L304">                        candidate.initialDifferences(),</span>
+                        generated,
+<span class="fc" id="L306">                        candidate.observed().size(),</span>
+<span class="fc" id="L307">                        candidate.holdout().size(),</span>
+                        &quot;FINITE_DIFFERENCE_VALIDATION_NOT_FORMAL_PROOF&quot;);
+<span class="fc" id="L309">                return Evaluation.confirmed(</span>
+                    certificate,
+                    &quot;constant finite difference predicts every retained holdout term&quot;,
+<span class="fc" id="L312">                    Map.of(</span>
+<span class="fc" id="L313">                        &quot;differenceOrder&quot;, Integer.toString(candidate.order()),</span>
+<span class="fc" id="L314">                        &quot;holdoutTerms&quot;, Integer.toString(candidate.holdout().size()),</span>
+<span class="fc" id="L315">                        &quot;predictedHoldout&quot;, canonicalNumbers(predictedHoldout)));</span>
+            }
+        };
+
+<span class="fc" id="L319">    private final CanonicalCodec&lt;FiniteDifferenceCertificate&gt; certificateCodec =</span>
+<span class="fc" id="L320">        new CanonicalCodec&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L323">                return &quot;finite-difference-certificate-codec/v1&quot;;</span>
+            }
+
+            @Override
+            public String canonicalForm(FiniteDifferenceCertificate value) {
+<span class="fc" id="L328">                return &quot;order=&quot; + value.order()</span>
+<span class="fc" id="L329">                    + &quot;\ninitialDifferences=&quot; + canonicalNumbers(value.initialDifferences())</span>
+<span class="fc" id="L330">                    + &quot;\ngeneratedTerms=&quot; + canonicalNumbers(value.generatedTerms())</span>
+<span class="fc" id="L331">                    + &quot;\nobservedCount=&quot; + value.observedCount()</span>
+<span class="fc" id="L332">                    + &quot;\nholdoutCount=&quot; + value.holdoutCount()</span>
+<span class="fc" id="L333">                    + &quot;\nstrength=&quot; + value.evidenceStrength();</span>
+            }
+        };
+
+<span class="fc" id="L337">    private final CertificateRenderer&lt;FiniteDifferenceCertificate&gt; certificateRenderer =</span>
+<span class="fc" id="L338">        new CertificateRenderer&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L341">                return &quot;finite-difference-certificate-renderer/v1&quot;;</span>
+            }
+
+            @Override
+            public CertificateRendering render(FiniteDifferenceCertificate certificate) {
+<span class="fc" id="L346">                String rendered = &quot;differenceOrder=&quot; + certificate.order()</span>
+                    + &quot;\ninitialDifferences=&quot;
+<span class="fc" id="L348">                    + canonicalNumbers(certificate.initialDifferences())</span>
+                    + &quot;\ngeneratedTerms=&quot;
+<span class="fc" id="L350">                    + canonicalNumbers(certificate.generatedTerms())</span>
+<span class="fc" id="L351">                    + &quot;\nobservedCount=&quot; + certificate.observedCount()</span>
+<span class="fc" id="L352">                    + &quot;\nholdoutCount=&quot; + certificate.holdoutCount()</span>
+<span class="fc" id="L353">                    + &quot;\nstrength=&quot; + certificate.evidenceStrength();</span>
+<span class="fc" id="L354">                return new CertificateRendering(</span>
+                    &quot;FINITE_DIFFERENCE_WITNESS&quot;,
+                    &quot;text/plain&quot;,
+                    rendered);
+            }
+        };
+
+<span class="fc" id="L361">    private final EvidenceAdapter&lt;SequenceState, FiniteDifferenceCandidate, FiniteDifferenceCertificate&gt;</span>
+<span class="fc" id="L362">        evidenceAdapter = new EvidenceAdapter&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L365">                return &quot;finite-difference-evidence-adapter/v1&quot;;</span>
+            }
+
+            @Override
+            public DomainPayload adapt(
+                Optional&lt;SequenceState&gt; initialState,
+                Optional&lt;FiniteDifferenceCandidate&gt; candidate,
+                Optional&lt;FiniteDifferenceCertificate&gt; certificate
+            ) {
+<span class="fc" id="L374">                LinkedHashMap&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L375">                values.put(&quot;observedTerms&quot;, initialState</span>
+<span class="fc" id="L376">                    .map(state -&gt; canonicalNumbers(state.observed()))</span>
+<span class="fc" id="L377">                    .orElse(&quot;NOT_AVAILABLE&quot;));</span>
+<span class="fc" id="L378">                values.put(&quot;holdoutTerms&quot;, initialState</span>
+<span class="fc" id="L379">                    .map(state -&gt; canonicalNumbers(state.holdout()))</span>
+<span class="fc" id="L380">                    .orElse(&quot;NOT_AVAILABLE&quot;));</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                values.put(&quot;candidateStatus&quot;, candidate.isPresent()</span>
+<span class="fc" id="L382">                    ? &quot;SELECTED&quot;</span>
+<span class="fc" id="L383">                    : &quot;NOT_SELECTED&quot;);</span>
+<span class="fc" id="L384">                values.put(&quot;differenceOrder&quot;, candidate</span>
+<span class="fc" id="L385">                    .map(value -&gt; Integer.toString(value.order()))</span>
+<span class="fc" id="L386">                    .orElse(&quot;NOT_EVALUATED&quot;));</span>
+<span class="fc" id="L387">                values.put(&quot;initialDifferences&quot;, candidate</span>
+<span class="fc" id="L388">                    .map(value -&gt; canonicalNumbers(value.initialDifferences()))</span>
+<span class="fc" id="L389">                    .orElse(&quot;NOT_EVALUATED&quot;));</span>
+<span class="fc" id="L390">                values.put(&quot;certificateStrength&quot;, certificate</span>
+<span class="fc" id="L391">                    .map(FiniteDifferenceCertificate::evidenceStrength)</span>
+<span class="fc" id="L392">                    .orElse(&quot;NOT_EVALUATED&quot;));</span>
+<span class="fc" id="L393">                values.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L394">                values.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L395">                return new DomainPayload(&quot;finite-difference-sequence-evidence/v1&quot;, values);</span>
+            }
+        };
+
+    @Override
+    public String domainId() {
+<span class="fc" id="L401">        return DOMAIN_ID;</span>
+    }
+
+    @Override
+    public String revision() {
+<span class="fc" id="L406">        return REVISION;</span>
+    }
+
+    @Override
+    public String stateType() {
+<span class="fc" id="L411">        return &quot;finite-difference-sequence-state/v1&quot;;</span>
+    }
+
+    @Override
+    public String candidateType() {
+<span class="fc" id="L416">        return &quot;finite-difference-recurrence-candidate/v1&quot;;</span>
+    }
+
+    @Override
+    public String certificateType() {
+<span class="fc" id="L421">        return &quot;finite-difference-certificate/v1&quot;;</span>
+    }
+
+    @Override
+    public StateGenerator&lt;SequenceState&gt; generator() {
+<span class="fc" id="L426">        return generator;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;SequenceState&gt; stateCodec() {
+<span class="fc" id="L431">        return stateCodec;</span>
+    }
+
+    @Override
+    public List&lt;Invariant&lt;SequenceState&gt;&gt; invariants() {
+<span class="fc" id="L436">        return invariants;</span>
+    }
+
+    @Override
+    public List&lt;TransitionOperator&lt;SequenceState&gt;&gt; operators() {
+<span class="fc" id="L441">        return operators;</span>
+    }
+
+    @Override
+    public Objective&lt;SequenceState&gt; objective() {
+<span class="fc" id="L446">        return objective;</span>
+    }
+
+    @Override
+    public CandidateExtractor&lt;SequenceState, FiniteDifferenceCandidate&gt; candidateExtractor() {
+<span class="fc" id="L451">        return candidateExtractor;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;FiniteDifferenceCandidate&gt; candidateCodec() {
+<span class="fc" id="L456">        return candidateCodec;</span>
+    }
+
+    @Override
+    public CounterexampleGenerator&lt;FiniteDifferenceCandidate&gt; counterexampleGenerator() {
+<span class="fc" id="L461">        return counterexampleGenerator;</span>
+    }
+
+    @Override
+    public CandidateEvaluator&lt;FiniteDifferenceCandidate, FiniteDifferenceCertificate&gt; evaluator() {
+<span class="fc" id="L466">        return evaluator;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;FiniteDifferenceCertificate&gt; certificateCodec() {
+<span class="fc" id="L471">        return certificateCodec;</span>
+    }
+
+    @Override
+    public CertificateRenderer&lt;FiniteDifferenceCertificate&gt; certificateRenderer() {
+<span class="fc" id="L476">        return certificateRenderer;</span>
+    }
+
+    @Override
+    public EvidenceAdapter&lt;SequenceState, FiniteDifferenceCandidate, FiniteDifferenceCertificate&gt;
+            evidenceAdapter() {
+<span class="fc" id="L482">        return evidenceAdapter;</span>
+    }
+
+    private static ParsedSequence parsePayload(String payload) {
+<span class="fc" id="L486">        LinkedHashMap&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        for (String part : payload.split(&quot;;&quot;)) {</span>
+<span class="fc" id="L488">            int separator = part.indexOf('=');</span>
+<span class="pc bpc" id="L489" title="2 of 4 branches missed.">            if (separator &lt; 1 || separator == part.length() - 1) {</span>
+<span class="nc" id="L490">                throw new IllegalArgumentException(</span>
+                    &quot;sequence payload entries must use key=value&quot;);
+            }
+<span class="fc" id="L493">            String key = part.substring(0, separator).trim();</span>
+<span class="fc" id="L494">            String value = part.substring(separator + 1).trim();</span>
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">            if (values.putIfAbsent(key, value) != null) {</span>
+<span class="nc" id="L496">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate sequence payload key: &quot; + key);
+            }
+        }
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        if (!values.keySet().equals(java.util.Set.of(&quot;observed&quot;, &quot;holdout&quot;))) {</span>
+<span class="nc" id="L501">            throw new IllegalArgumentException(</span>
+                &quot;sequence payload requires exactly observed and holdout&quot;);
+        }
+<span class="fc" id="L504">        List&lt;Long&gt; observed = parseNumbers(values.get(&quot;observed&quot;));</span>
+<span class="fc" id="L505">        List&lt;Long&gt; holdout = parseNumbers(values.get(&quot;holdout&quot;));</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">        if (observed.size() &lt; 3) {</span>
+<span class="nc" id="L507">            throw new IllegalArgumentException(</span>
+                &quot;at least three observed sequence terms are required&quot;);
+        }
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">        if (holdout.isEmpty()) {</span>
+<span class="nc" id="L511">            throw new IllegalArgumentException(</span>
+                &quot;at least one holdout sequence term is required&quot;);
+        }
+<span class="fc" id="L514">        return new ParsedSequence(observed, holdout);</span>
+    }
+
+    private static List&lt;Long&gt; parseNumbers(String value) {
+<span class="fc" id="L518">        List&lt;Long&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L519" title="All 2 branches covered.">        for (String token : value.split(&quot;,&quot;)) {</span>
+<span class="fc" id="L520">            String trimmed = token.trim();</span>
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">            if (trimmed.isEmpty()) {</span>
+<span class="nc" id="L522">                throw new IllegalArgumentException(&quot;empty sequence term&quot;);</span>
+            }
+<span class="fc" id="L524">            result.add(Long.parseLong(trimmed));</span>
+        }
+<span class="fc" id="L526">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;Long&gt; difference(List&lt;Long&gt; row) {
+<span class="fc" id="L530">        List&lt;Long&gt; result = new ArrayList&lt;&gt;(Math.max(0, row.size() - 1));</span>
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        for (int index = 0; index + 1 &lt; row.size(); index++) {</span>
+<span class="fc" id="L532">            result.add(Math.subtractExact(row.get(index + 1), row.get(index)));</span>
+        }
+<span class="fc" id="L534">        return List.copyOf(result);</span>
+    }
+
+    private static boolean isConstant(List&lt;Long&gt; row) {
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">        if (row.isEmpty()) {</span>
+<span class="nc" id="L539">            return false;</span>
+        }
+<span class="fc" id="L541">        long first = row.getFirst();</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">        return row.stream().allMatch(value -&gt; value == first);</span>
+    }
+
+    private static List&lt;Long&gt; generate(List&lt;Long&gt; initialDifferences, int count) {
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">        if (count &lt; 1) {</span>
+<span class="nc" id="L547">            return List.of();</span>
+        }
+<span class="fc" id="L549">        List&lt;Long&gt; levels = new ArrayList&lt;&gt;(initialDifferences);</span>
+<span class="fc" id="L550">        List&lt;Long&gt; generated = new ArrayList&lt;&gt;(count);</span>
+<span class="fc bfc" id="L551" title="All 2 branches covered.">        for (int index = 0; index &lt; count; index++) {</span>
+<span class="fc" id="L552">            generated.add(levels.getFirst());</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">            for (int level = 0; level + 1 &lt; levels.size(); level++) {</span>
+<span class="fc" id="L554">                levels.set(level, Math.addExact(levels.get(level), levels.get(level + 1)));</span>
+            }
+        }
+<span class="fc" id="L557">        return List.copyOf(generated);</span>
+    }
+
+    private static String canonicalNumbers(List&lt;Long&gt; values) {
+<span class="fc" id="L561">        return values.stream()</span>
+<span class="fc" id="L562">            .map(String::valueOf)</span>
+<span class="fc" id="L563">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    private record ParsedSequence(List&lt;Long&gt; observed, List&lt;Long&gt; holdout) {
+<span class="fc" id="L567">        private ParsedSequence {</span>
+<span class="fc" id="L568">            observed = List.copyOf(observed);</span>
+<span class="fc" id="L569">            holdout = List.copyOf(holdout);</span>
+<span class="fc" id="L570">        }</span>
+    }
+
+    public record SequenceState(
+        List&lt;Long&gt; observed,
+        List&lt;Long&gt; holdout,
+        List&lt;List&lt;Long&gt;&gt; rows
+    ) {
+<span class="fc" id="L578">        public SequenceState {</span>
+<span class="fc" id="L579">            observed = immutableNumbers(observed, &quot;observed&quot;);</span>
+<span class="fc" id="L580">            holdout = immutableNumbers(holdout, &quot;holdout&quot;);</span>
+<span class="fc" id="L581">            Objects.requireNonNull(rows, &quot;rows&quot;);</span>
+<span class="fc" id="L582">            rows = rows.stream()</span>
+<span class="fc" id="L583">                .map(row -&gt; immutableNumbers(row, &quot;difference row&quot;))</span>
+<span class="fc" id="L584">                .toList();</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">            if (rows.isEmpty()) {</span>
+<span class="nc" id="L586">                throw new IllegalArgumentException(&quot;rows must not be empty&quot;);</span>
+            }
+<span class="fc" id="L588">        }</span>
+    }
+
+    public record FiniteDifferenceCandidate(
+        int order,
+        List&lt;Long&gt; initialDifferences,
+        List&lt;Long&gt; observed,
+        List&lt;Long&gt; holdout
+    ) {
+<span class="fc" id="L597">        public FiniteDifferenceCandidate {</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">            if (order &lt; 1) {</span>
+<span class="nc" id="L599">                throw new IllegalArgumentException(&quot;difference order must be positive&quot;);</span>
+            }
+<span class="fc" id="L601">            initialDifferences = immutableNumbers(</span>
+                initialDifferences, &quot;initialDifferences&quot;);
+<span class="fc" id="L603">            observed = immutableNumbers(observed, &quot;observed&quot;);</span>
+<span class="fc" id="L604">            holdout = immutableNumbers(holdout, &quot;holdout&quot;);</span>
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">            if (initialDifferences.size() != order + 1) {</span>
+<span class="nc" id="L606">                throw new IllegalArgumentException(</span>
+                    &quot;initialDifferences must contain order+1 values&quot;);
+            }
+<span class="fc" id="L609">        }</span>
+    }
+
+    public record FiniteDifferenceCertificate(
+        int order,
+        List&lt;Long&gt; initialDifferences,
+        List&lt;Long&gt; generatedTerms,
+        int observedCount,
+        int holdoutCount,
+        String evidenceStrength
+    ) {
+<span class="fc" id="L620">        public FiniteDifferenceCertificate {</span>
+<span class="pc bpc" id="L621" title="3 of 6 branches missed.">            if (order &lt; 1 || observedCount &lt; 1 || holdoutCount &lt; 1) {</span>
+<span class="nc" id="L622">                throw new IllegalArgumentException(</span>
+                    &quot;certificate order and counts must be positive&quot;);
+            }
+<span class="fc" id="L625">            initialDifferences = immutableNumbers(</span>
+                initialDifferences, &quot;initialDifferences&quot;);
+<span class="fc" id="L627">            generatedTerms = immutableNumbers(</span>
+                generatedTerms, &quot;generatedTerms&quot;);
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            if (generatedTerms.size() != observedCount + holdoutCount) {</span>
+<span class="nc" id="L630">                throw new IllegalArgumentException(</span>
+                    &quot;certificate generated term count is inconsistent&quot;);
+            }
+<span class="fc" id="L633">            DomainCanonical.requireIdentifier(evidenceStrength, &quot;evidenceStrength&quot;);</span>
+<span class="fc" id="L634">        }</span>
+    }
+
+    private static List&lt;Long&gt; immutableNumbers(List&lt;Long&gt; values, String name) {
+<span class="fc" id="L638">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L640">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">        if (values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L643">            throw new IllegalArgumentException(name + &quot; must not contain null&quot;);</span>
+        }
+<span class="fc" id="L645">        return List.copyOf(values);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
