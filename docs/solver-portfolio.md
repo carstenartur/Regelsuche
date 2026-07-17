@@ -54,17 +54,25 @@ Under `INDEPENDENT_CONFIRMATION`, an early refutation does not stop the remainin
 
 Conflict blocks promotion automatically. The portfolio-compatible `SolverBackend` facade returns the exact selected formal execution to existing proof consumers. When no backend reaches the requested evidence level it returns a synthetic non-confirming execution and preserves the complete report separately through `lastRun()`.
 
-`PortfolioRun.write(...)` uses one authoritative evidence layout:
+`PortfolioRun.write(...)` uses one authoritative evidence layout for an exact request:
 
 ```text
 <run>/
+  obligation.json
+  request.json
   report.json
   executions/
-    000-backend-id.json
-    001-other-backend.json
+    001-backend-id/
+      translation.json
+      result.json
+      execution.json
+    002-other-backend/
+      translation.json
+      result.json
+      execution.json
 ```
 
-Every attempt with an `executionHash` must have exactly one retained execution file. Filtered, unavailable, cancelled-before-invocation and budget-skipped attempts remain in `report.json` and do not receive fabricated result artifacts. Rewriting a run clears only `executions/`, so shorter subsequent runs cannot retain stale backend results and sibling files such as `request.json` remain intact.
+Every attempt with an `executionHash` must have exactly one retained directory containing the hash-linked translation, result and execution contracts. Filtered, unavailable, cancelled-before-invocation and budget-skipped attempts remain in `report.json` and do not receive fabricated backend artifacts. Rewriting a run replaces the complete run directory, so stale requests, reports or backend results cannot survive.
 
 ## Z3 backend
 
@@ -89,4 +97,4 @@ Install Z3, then run:
   :regelsuche-solver-portfolio:writeSolverPortfolioExample
 ```
 
-The example is written below `regelsuche-solver-portfolio/build/reports/solver-portfolio` with separate `formal/` and `guidance/` runs and a shared `profiles/` directory. The `Solver Portfolio` workflow validates the report schema, checks every retained execution hash and executes the real multi-stage path from exact polynomial validation to a Z3 proof object.
+The example is written below `regelsuche-solver-portfolio/build/reports/solver-portfolio` with separate `formal/` and `guidance/` runs and a shared `profiles/` directory. The `Solver Portfolio` workflow validates the obligation, report, translation, result and execution schemas, verifies every hash link and executes the real multi-stage path from exact polynomial validation to a Z3 proof object.
