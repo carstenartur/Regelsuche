@@ -33,7 +33,13 @@ try (TrustedPluginRuntime runtime =
 Das Gate liest jedes JAR genau einmal. Geprüft und anschließend in ein privates
 Staging-Verzeichnis geschrieben werden dieselben Bytes. Dadurch entsteht kein
 Zeitfenster, in dem ein Artefakt nach der Prüfung gegen andere Bytes
- ausgetauscht werden kann.
+ausgetauscht werden kann.
+
+Die Methode `RegelsuchePlugin.signature()` ist nur ein nach der Instanziierung
+sichtbarer Metadatenhinweis. Sie ist keine Sicherheitsgrenze: Ein Plugin dürfte
+seinen Rückgabewert selbst wählen und der Code müsste bereits geladen werden,
+um ihn abzufragen. Autorisierung erfolgt deshalb ausschließlich über das
+Detached Manifest und den lokalen Trust Store.
 
 ## Policies
 
@@ -143,6 +149,11 @@ Für jedes gefundene JAR entsteht
 Listen `admittedArtifacts` und `blockedArtifacts`. Jede Verification muss genau
 in einer dieser Listen erscheinen.
 
+Die Felder `signatureVerified` und `trustedSource` im historischen
+`PluginRuntime`-Katalog bleiben aus Kompatibilitätsgründen bestehen. Für den
+Vorlade-Trust ist jedoch `TrustedPluginRuntime.gateResult()` die maßgebliche,
+auf Artefaktbytes bezogene Evidence.
+
 ## Fail-closed Verhalten
 
 Unter `REQUIRE_VERIFIED` werden insbesondere blockiert:
@@ -157,7 +168,7 @@ Unter `REQUIRE_VERIFIED` werden insbesondere blockiert:
 
 Ein fehlerhafter Trust Store verhindert den Aufbau von `TrustedPluginRuntime`.
 Er wird nicht stillschweigend durch eine leere oder permissive Konfiguration
-er ersetzt.
+ersetzt.
 
 ## Versionierte Schemas
 
