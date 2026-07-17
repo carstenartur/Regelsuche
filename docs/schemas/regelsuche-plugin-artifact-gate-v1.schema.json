@@ -95,6 +95,7 @@
         "status": {
           "enum": [
             "UNREADABLE",
+            "ARTIFACT_TOO_LARGE",
             "MISSING_SIGNATURE_MANIFEST",
             "MALFORMED_SIGNATURE_MANIFEST",
             "MANIFEST_ARTIFACT_MISMATCH",
@@ -161,6 +162,62 @@
                   "VERIFIED_RETIRED_KEY",
                   "VERIFIED_TRUSTED"
                 ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signatureVerified": {
+                "const": true
+              }
+            },
+            "required": [
+              "signatureVerified"
+            ]
+          },
+          "then": {
+            "properties": {
+              "signaturePresent": {
+                "const": true
+              },
+              "trusted": {
+                "const": true
+              },
+              "status": {
+                "enum": [
+                  "VERIFIED_RETIRED_KEY",
+                  "VERIFIED_TRUSTED"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "VERIFIED_RETIRED_KEY",
+                  "VERIFIED_TRUSTED"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "signaturePresent": {
+                "const": true
+              },
+              "signatureVerified": {
+                "const": true
+              },
+              "trusted": {
+                "const": true
               }
             }
           }
