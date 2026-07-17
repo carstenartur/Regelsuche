@@ -82,10 +82,11 @@ jobs:
             --quiet \
             jsonschema==4.25.1
           python3 - <<'PY'
+          from copy import deepcopy
           import hashlib
           import json
           from pathlib import Path
-          from jsonschema import FormatChecker
+          from jsonschema import FormatChecker, ValidationError
           from jsonschema.validators import validator_for
 
           def compact(value):
@@ -97,6 +98,13 @@ jobs:
 
           def sha256(value):
               return 'sha256:' + hashlib.sha256(value).hexdigest()
+
+          def require_rejection(validator, value, label):
+              try:
+                  validator.validate(value)
+              except ValidationError:
+                  return
+              raise AssertionError(f'{label} unexpectedly passed schema validation')
 
           schema_paths = {
               'index': Path(
@@ -121,6 +129,44 @@ jobs:
           validators['index'].validate(index)
           validators['resolution'].validate(resolved)
           validators['resolution'].validate(unresolved)
+
+          missing_dependencies = deepcopy(index)
+          del missing_dependencies['entries'][0]['dependencies']
+          require_rejection(
+              validators['index'],
+              missing_dependencies,
+              'entry without dependencies',
+          )
+
+          remote_file_uri = deepcopy(index)
+          remote_file_uri['entries'][0]['artifactUri'] = (
+              'file://remote.example.test/artifacts/not-local.jar'
+          )
+          require_rejection(
+              validators['index'],
+              remote_file_uri,
+              'remote-host file URI',
+          )
+
+          leading_zero_prerelease = deepcopy(index)
+          leading_zero_prerelease['entries'][0]['version'] = '1.0.0-alpha.01'
+          require_rejection(
+              validators['index'],
+              leading_zero_prerelease,
+              'numeric prerelease with leading zero',
+          )
+
+          unsigned_java_plan = deepcopy(resolved)
+          java_step = next(
+              item for item in unsigned_java_plan['plan']
+              if item['kind'] == 'JAVA_PLUGIN'
+          )
+          java_step['signatureManifestUri'] = ''
+          require_rejection(
+              validators['resolution'],
+              unsigned_java_plan,
+              'Java plan step without signature manifest',
+          )
 
           artifact_ids = set()
           coordinates = set()
