@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
@@ -48,7 +47,7 @@ public final class PluginArtifactGate {
             throw new IllegalStateException("Unable to create plugin staging directory", exception);
         }
 
-        List<Path> artifacts = listArtifacts(source);
+        List<Path> artifacts = listArtifactEntries(source);
         List<PluginArtifactVerification> verifications = new ArrayList<>();
         List<String> admitted = new ArrayList<>();
         List<String> blocked = new ArrayList<>();
@@ -77,14 +76,21 @@ public final class PluginArtifactGate {
         return GateResult.create(policy, trustStoreHash, verifications, admitted, blocked);
     }
 
-    private List<Path> listArtifacts(Path sourceDirectory) {
-        if (!Files.isDirectory(sourceDirectory, LinkOption.NOFOLLOW_LINKS)) {
+    /**
+     * Lists every direct entry whose name claims to be a JAR, including
+     * symlinks, directories and unreadable entries. The verifier classifies
+     * non-regular entries as {@code UNREADABLE}; they must not disappear from
+     * the admission ledger merely because they are unsafe to open.
+     */
+    private List<Path> listArtifactEntries(Path sourceDirectory) {
+        if (!Files.isDirectory(sourceDirectory)) {
             return List.of();
         }
         try (var stream = Files.list(sourceDirectory)) {
             return stream
-                .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
-                .filter(path -> path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".jar"))
+                .filter(path -> path.getFileName().toString()
+                    .toLowerCase(java.util.Locale.ROOT)
+                    .endsWith(".jar"))
                 .sorted(Comparator.comparing(path -> path.getFileName().toString()))
                 .toList();
         } catch (IOException exception) {
