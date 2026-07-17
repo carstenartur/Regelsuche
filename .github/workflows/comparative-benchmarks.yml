@@ -51,11 +51,13 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.1.0
 
-      - name: Install real Z3 and pinned SymPy
+      - name: Install pinned Z3 and SymPy
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends z3 python3-venv
+          sudo apt-get install -y --no-install-recommends \
+            z3=4.8.12-3.1build1 \
+            python3-venv
           python3 -m venv .venv
           .venv/bin/python -m pip install \
             --disable-pip-version-check \
