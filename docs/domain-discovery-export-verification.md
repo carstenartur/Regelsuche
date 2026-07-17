@@ -8,9 +8,10 @@ erweitern.
 ## Bedrohungsmodell
 
 Ein Exportverzeichnis kann unvollständig, veraltet, manipuliert oder während des
-Lesens verändert worden sein. Außerdem können symbolische Links oder unerwartete
-Dateien dazu führen, dass ein Consumer andere Bytes verarbeitet als diejenigen,
-die im Manifest beschrieben sind.
+Lesens verändert worden sein. Außerdem können symbolische Links in einer Datei,
+im Exportverzeichnis oder in einer übergeordneten Pfadkomponente dazu führen,
+dass ein Consumer andere Bytes verarbeitet als diejenigen, die im Manifest
+beschrieben sind.
 
 `DomainDiscoveryExportVerifier` behandelt deshalb keinen Pfad allein als
 vertrauenswürdigen Input. Ein erfolgreicher Aufruf liefert ausschließlich einen
@@ -22,7 +23,8 @@ Verify-then-read-Lücke.
 
 `requireVerified(exportDirectory)` verlangt:
 
-1. ein lokales Verzeichnis, das selbst kein symbolischer Link ist;
+1. einen absoluten lokalen Pfad, dessen gesamte Ancestry bis zum
+   Exportverzeichnis frei von symbolischen Links ist;
 2. genau `export-manifest.json` und die drei kanonischen Artefakte;
 3. keine unbekannten Dateien, Unterverzeichnisse oder symbolischen Links;
 4. positive, konfigurierbar begrenzte Dateigrößen;
@@ -37,8 +39,9 @@ Verify-then-read-Lücke.
     und Handoff-Bindungen.
 
 Ein fehlendes oder nachträglich verändertes Manifest, zusätzliche Dateien,
-Symlinks, Größenüberschreitungen, Hashabweichungen, Identitätssubstitutionen und
-strukturell unbekannte Felder werden abgewiesen.
+Symlinks in einer beliebigen Pfadkomponente, Größenüberschreitungen,
+Hashabweichungen, Identitätssubstitutionen und strukturell unbekannte Felder
+werden abgewiesen.
 
 Die Standardgrenzen betragen:
 
@@ -129,7 +132,7 @@ einen Finite-Difference-Sequence-Export. Negative Tests decken ab:
 - Byte-Manipulation;
 - fehlende oder zusätzliche Dateien;
 - Größenüberschreitungen;
-- symbolische Links;
+- symbolische Links in Artefakten und übergeordneten Pfadkomponenten;
 - Campaign-Substitution trotz konsistent aktualisierter Byte-Hashes;
 - doppelte JSON-Felder trotz konsistent aktualisiertem Manifest;
 - ungültige Grenzen und Null-Eingaben;
