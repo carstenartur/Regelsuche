@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -39,9 +38,7 @@ public record PluginArtifactVerification(
         if (!SCHEMA.equals(schema)) {
             throw new IllegalArgumentException("unsupported plugin artifact verification schema");
         }
-        if (artifactFileName == null || artifactFileName.isBlank()) {
-            throw new IllegalArgumentException("artifactFileName must not be blank");
-        }
+        artifactFileName = requireArtifactFileName(artifactFileName);
         Objects.requireNonNull(status, "status");
         artifactSha256 = artifactSha256 == null ? "" : artifactSha256;
         if (!artifactSha256.isEmpty()) {
@@ -50,13 +47,7 @@ public record PluginArtifactVerification(
         manifestFileName = manifestFileName == null ? "" : manifestFileName;
         publisherId = publisherId == null ? "" : publisherId;
         keyId = keyId == null ? "" : keyId;
-        warnings = warnings == null ? List.of() : warnings.stream()
-            .filter(Objects::nonNull)
-            .map(String::trim)
-            .filter(value -> !value.isBlank())
-            .distinct()
-            .sorted(Comparator.naturalOrder())
-            .toList();
+        warnings = normalizeWarnings(warnings);
         if (trusted && !signatureVerified) {
             throw new IllegalArgumentException("trusted verification must have a valid signature");
         }
@@ -97,19 +88,19 @@ public record PluginArtifactVerification(
         String keyId,
         List<String> warnings
     ) {
-        List<String> normalizedWarnings = warnings == null ? List.of() : warnings.stream()
-            .filter(Objects::nonNull)
-            .map(String::trim)
-            .filter(value -> !value.isBlank())
-            .distinct()
-            .sorted()
-            .toList();
+        String normalizedArtifactFileName = requireArtifactFileName(artifactFileName);
+        Objects.requireNonNull(status, "status");
+        List<String> normalizedWarnings = normalizeWarnings(warnings);
         String normalizedArtifactHash = artifactSha256 == null ? "" : artifactSha256;
+        if (!normalizedArtifactHash.isEmpty()) {
+            normalizedArtifactHash = PluginSignatureManifest.requireSha256(
+                normalizedArtifactHash, "artifactSha256");
+        }
         String normalizedManifest = manifestFileName == null ? "" : manifestFileName;
         String normalizedPublisher = publisherId == null ? "" : publisherId;
         String normalizedKey = keyId == null ? "" : keyId;
         String contentHash = hash(canonicalMaterial(
-            artifactFileName,
+            normalizedArtifactFileName,
             normalizedArtifactHash,
             normalizedManifest,
             status,
@@ -122,7 +113,7 @@ public record PluginArtifactVerification(
         ));
         return new PluginArtifactVerification(
             SCHEMA,
-            artifactFileName,
+            normalizedArtifactFileName,
             normalizedArtifactHash,
             normalizedManifest,
             status,
@@ -137,7 +128,7 @@ public record PluginArtifactVerification(
     }
 
     public boolean readable() {
-        return status != Status.UNREADABLE;
+        return status != Status.UNREADABLE && status != Status.ARTIFACT_TOO_LARGE;
     }
 
     public boolean permittedBy(PluginTrustPolicy policy) {
@@ -163,6 +154,23 @@ public record PluginArtifactVerification(
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Unable to serialize plugin artifact verification", exception);
         }
+    }
+
+    private static List<String> normalizeWarnings(List<String> values) {
+        return values == null ? List.of() : values.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
+            .filter(value -> !value.isBlank())
+            .distinct()
+            .sorted(Comparator.naturalOrder())
+            .toList();
+    }
+
+    private static String requireArtifactFileName(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("artifactFileName must not be blank");
+        }
+        return value;
     }
 
     private static byte[] canonicalMaterial(
@@ -222,6 +230,7 @@ public record PluginArtifactVerification(
 
     public enum Status {
         UNREADABLE,
+        ARTIFACT_TOO_LARGE,
         MISSING_SIGNATURE_MANIFEST,
         MALFORMED_SIGNATURE_MANIFEST,
         MANIFEST_ARTIFACT_MISMATCH,
