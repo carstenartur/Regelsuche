@@ -91,7 +91,7 @@ export REGELSUCHE_SYMPY_PYTHON=/path/to/python
 
 The default bundle is written below `regelsuche-benchmarks/build/reports/comparative-benchmarks`.
 
-The pinned runtime image contains Temurin 21.0.11+10, the Ubuntu Noble Z3 package and SymPy 1.14.0:
+The pinned runtime image contains Temurin 21.0.11+10, Z3 `4.8.12-3.1build1` and SymPy `1.14.0`:
 
 ```bash
 docker build \
