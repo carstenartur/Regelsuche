@@ -40,8 +40,8 @@ Eine gültige Indexsignatur ersetzt keine Signaturprüfung der heruntergeladenen
 Plugin-JARs. `networkAccessStatus=NOT_PERFORMED`,
 `installationStatus=NOT_PERFORMED` und `trustVerificationStatus=NOT_EVALUATED`
 im Resolution Receipt verhindern weiterhin, dass eine reine Katalogauflösung als
-Download, Installation oder Artefakt-Signaturprüfung dargestellt wird. Der
-Index-Trust-Entscheid ist eine getrennte Evidence.
+Download, Installation oder Artefakt-Signaturprüfung dargestellt wird. Die
+Index-Trust-Entscheidung ist eine getrennte Evidence.
 
 ## Index v1
 
