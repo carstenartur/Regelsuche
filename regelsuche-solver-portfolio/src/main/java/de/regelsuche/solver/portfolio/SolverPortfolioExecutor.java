@@ -300,6 +300,8 @@ public final class SolverPortfolioExecutor {
         }
         List<ObservedExecution> qualifying = allConfirmations.stream()
             .filter(item -> item.profile().canConfirm(request.objective()))
+            .filter(item -> confirmationCarriesRequiredEvidence(
+                request.objective(), item.execution()))
             .sorted(observedComparator())
             .toList();
         int requiredConfirmations = request.policy()
@@ -310,7 +312,9 @@ public final class SolverPortfolioExecutor {
         if (distinctConfirmations >= requiredConfirmations) {
             ObservedExecution selected = selectConfirmation(request, qualifying);
             boolean proofAuthorized = request.objective().proofObjective()
-                && selected.profile().canConfirm(request.objective());
+                && selected.profile().canConfirm(request.objective())
+                && confirmationCarriesRequiredEvidence(
+                    request.objective(), selected.execution());
             return new Aggregate(
                 PortfolioOutcome.CONFIRMED, selected, List.of(), proofAuthorized);
         }
@@ -341,6 +345,17 @@ public final class SolverPortfolioExecutor {
         }
         return new Aggregate(
             PortfolioOutcome.INCONCLUSIVE, null, List.of(), false);
+    }
+
+    private static boolean confirmationCarriesRequiredEvidence(
+        SolverObjective objective,
+        SolverExecution execution
+    ) {
+        if (!objective.proofObjective()) {
+            return true;
+        }
+        return execution.result().certificateHash()
+            .matches("sha256:[0-9a-f]{64}");
     }
 
     private static ObservedExecution selectConfirmation(
