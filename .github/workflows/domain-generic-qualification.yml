@@ -61,7 +61,7 @@ jobs:
             --console=plain 2>&1 \
             | tee build/reports/domain-generic-qualification-ci/gradle.log
 
-      - name: Require complete retained evidence
+      - name: Require complete retained evidence and documentation
         shell: bash
         run: |
           root=regelsuche-release/build/reports/domain-generic-qualification
@@ -76,6 +76,11 @@ jobs:
               test -s "$root/runs/run-${run}/verification-receipts/${domain}.json"
             done
           done
+          test -s docs/domain-generic-qualification.md
+          grep -q '## Trust Boundary und Beweiswert' \
+            docs/domain-generic-qualification.md
+          grep -q '## Consumer-Prüfverfahren' \
+            docs/domain-generic-qualification.md
 
       - name: Require byte-identical repeated campaign output
         shell: bash
@@ -144,18 +149,56 @@ jobs:
           validators['report'].validate(report)
           validators['run'].validate(run)
 
+          expected_claim = (
+              'reproducible generation, bounded search, counterexample search, '
+              'validation, certificate rendering and evidence across distinct '
+              'mathematical object types'
+          )
+          expected_checks = [
+              'AT_LEAST_TWO_DISTINCT_DOMAINS',
+              'BALANCED_RESOURCE_ACCOUNTING',
+              'CONFIRMED_CANDIDATES_WITH_CERTIFICATES',
+              'DISTINCT_MATHEMATICAL_STATE_TYPES',
+              'EXPRESSION_REWRITE_DOMAIN_RETAINED',
+              'EXTERNAL_NOVELTY_STATUS_NOT_EVALUATED',
+              'NON_EXPRESSION_DOMAIN_RETAINED',
+              'PROMOTION_STATUS_NOT_EVALUATED',
+              'PROOF_STATUS_NOT_EVALUATED',
+              'PUBLIC_EVIDENCE_STATUS_NOT_EVALUATED',
+              'REPRESENTATION_FREE_LIFECYCLE_HANDOFF',
+              'SHARED_RESOURCE_ACCOUNTING',
+              'THREE_CLEAN_MULTI_DOMAIN_RUNS',
+              'VERIFIED_EXPORT_SNAPSHOTS',
+          ]
+          expected_resources = [
+              'CANDIDATE_EVALUATIONS',
+              'CERTIFICATE_ATTEMPTS',
+              'COUNTEREXAMPLE_ATTEMPTS',
+              'EXPLORED_STATES',
+              'GENERATED_SUCCESSORS',
+          ]
+
           assert report['profile'] == 'DOMAIN_GENERIC_DISCOVERY'
+          assert report['claim'] == expected_claim
           assert report['status'] == 'READY'
           assert report['domainGenericClaimAuthorized'] is True
           assert report['autonomousCampaignClaimAuthorized'] is False
           assert report['cleanRunCount'] == 3
           assert report['cleanRunsIdentical'] is True
           assert report['blockers'] == []
+          assert [check['code'] for check in report['checks']] == expected_checks
           assert all(check['passed'] for check in report['checks'])
           assert [item['domainId'] for item in report['domains']] == [
               'expression-rewrite',
               'integer-sequence-finite-difference',
           ]
+          for domain in report['domains']:
+              assert domain['outcome'] == 'CONFIRMED'
+              assert domain['selectedCandidateHash'].startswith('sha256:')
+              assert domain['certificateHash'].startswith('sha256:')
+              assert domain['resourceNames'] == expected_resources
+              assert domain['resourcesBalanced'] is True
+              assert domain['representationFreeHandoff'] is True
           for status in (
               'proofStatus',
               'externalNoveltyStatus',
@@ -296,16 +339,49 @@ jobs:
           require_rejection(
               validators['report'], invalid_autonomy,
               'domain-generic report broadening AUTONOMOUS_CAMPAIGN')
+
           invalid_proof = copy.deepcopy(report)
           invalid_proof['proofStatus'] = 'CONFIRMED'
           require_rejection(
               validators['report'], invalid_proof,
               'domain-generic report inflating proof status')
+
           invalid_ready = copy.deepcopy(report)
           invalid_ready['domains'] = invalid_ready['domains'][:1]
           require_rejection(
               validators['report'], invalid_ready,
               'READY report with only one domain')
+
+          invalid_claim = copy.deepcopy(report)
+          invalid_claim['claim'] = 'generic mathematical discovery'
+          require_rejection(
+              validators['report'], invalid_claim,
+              'READY report with an alternative claim')
+
+          invalid_check = copy.deepcopy(report)
+          invalid_check['checks'][0]['passed'] = False
+          require_rejection(
+              validators['report'], invalid_check,
+              'READY report with a failed required check')
+
+          invalid_check_code = copy.deepcopy(report)
+          invalid_check_code['checks'][0]['code'] = 'ALTERNATIVE_REQUIREMENT'
+          require_rejection(
+              validators['report'], invalid_check_code,
+              'READY report with an alternative requirement set')
+
+          invalid_resources = copy.deepcopy(report)
+          invalid_resources['domains'][0]['resourceNames'] = \
+              invalid_resources['domains'][0]['resourceNames'][:-1]
+          require_rejection(
+              validators['report'], invalid_resources,
+              'READY report with incomplete resource roles')
+
+          invalid_outcome = copy.deepcopy(report)
+          invalid_outcome['domains'][1]['outcome'] = 'REFUTED'
+          require_rejection(
+              validators['report'], invalid_outcome,
+              'READY report with a refuted domain')
           PY
 
       - name: Upload qualification evidence and diagnostics
@@ -318,5 +394,6 @@ jobs:
             regelsuche-release/build/reports/tests/**
             regelsuche-release/build/test-results/**
             build/reports/domain-generic-qualification-ci/**
+            docs/domain-generic-qualification.md
             docs/schemas/regelsuche-domain-generic-*.schema.json
           if-no-files-found: warn
