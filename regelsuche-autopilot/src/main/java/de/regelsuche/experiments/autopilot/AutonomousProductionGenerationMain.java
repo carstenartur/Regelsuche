@@ -2,7 +2,7 @@ package de.regelsuche.experiments.autopilot;
 
 import java.nio.file.Path;
 
-/** Command-line entry point for the pinned target-free generation slice. */
+/** Command-line entry point for the pinned target-free generation export. */
 public final class AutonomousProductionGenerationMain {
     private AutonomousProductionGenerationMain() {
     }
@@ -17,7 +17,7 @@ public final class AutonomousProductionGenerationMain {
         AutonomousProductionGenerationRunner runner =
             new AutonomousProductionGenerationRunner();
         var run = runner.runPinned(parallelism);
-        runner.write(output, run);
+        new AutonomousProductionGenerationExport().write(output, run);
         System.out.println(run.contentHash());
     }
 }
