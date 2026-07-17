@@ -22,19 +22,32 @@ jobs:
           ref: issue-224-domain-generic-qualification
           fetch-depth: 0
 
-      - name: Decode and commit non-workflow qualification source
+      - name: Decode and authenticate source archive
         shell: bash
         run: |
           set -euo pipefail
           cat .github/domain-generic-patch/chunk-* \
             | base64 --decode > /tmp/domain-generic-changes.tar.gz
-          test "$(sha256sum /tmp/domain-generic-changes.tar.gz | cut -d' ' -f1)" = \
-            c029497c2618b337e9f0ae110f124f0b52f3ecaad9fa3d24df6625620b734875
+          actual="$(sha256sum /tmp/domain-generic-changes.tar.gz | cut -d' ' -f1)"
+          test "$actual" = c029497c2618b337e9f0ae110f124f0b52f3ecaad9fa3d24df6625620b734875
+          tar -tzf /tmp/domain-generic-changes.tar.gz \
+            > /tmp/domain-generic-files.txt
+          test "$(wc -l < /tmp/domain-generic-files.txt)" -eq 12
+
+      - name: Extract non-workflow qualification source
+        shell: bash
+        run: |
+          set -euo pipefail
           tar -xzf /tmp/domain-generic-changes.tar.gz
           rm -f .github/workflows/domain-generic-qualification.yml
+          test -s regleruche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java || \
+            test -s regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java
+          test -s regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java
 
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - name: Stage and validate non-workflow source
+        shell: bash
+        run: |
+          set -euo pipefail
           git add \
             docs/README.md \
             docs/domain-generic-qualification.md \
@@ -48,5 +61,16 @@ jobs:
             regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericQualificationMain.java \
             regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java
           git diff --cached --check
+          test -n "$(git diff --cached --name-only)"
+
+      - name: Commit non-workflow qualification source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'feat(release): qualify reproducible domain-generic discovery'
-          git push origin HEAD:issue-224-domain-generic-qualification
+
+      - name: Push non-workflow qualification source
+        shell: bash
+        run: git push origin HEAD:issue-224-domain-generic-qualification
