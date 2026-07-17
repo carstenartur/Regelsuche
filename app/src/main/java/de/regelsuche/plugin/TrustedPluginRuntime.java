@@ -2,6 +2,7 @@ package de.regelsuche.plugin;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -40,9 +41,9 @@ public final class TrustedPluginRuntime implements AutoCloseable {
     }
 
     /**
-     * Replaces the active runtime only after a new trust decision and staged
-     * runtime have been built successfully. A failed reload leaves the wrapper
-     * closed rather than exposing stale trust evidence for a closed runtime.
+     * Closes the active runtime before reevaluating trust. A failed reload
+     * leaves the wrapper closed rather than exposing stale trust evidence or
+     * continuing with a previously admitted code set.
      */
     public synchronized void reload() {
         closeCurrentRuntime();
@@ -50,11 +51,13 @@ public final class TrustedPluginRuntime implements AutoCloseable {
         gateResult = null;
 
         try {
+            requireStrictTrustStore();
             PluginTrustStore trustStore = PluginTrustStore.load(trustConfig.trustStorePath());
             stagingDirectory = Files.createTempDirectory("regelsuche-trusted-plugins-");
             PluginArtifactGate.GateResult nextGateResult = new PluginArtifactGate(
                 trustStore,
-                trustConfig.policy()
+                trustConfig.policy(),
+                trustConfig.maxArtifactBytes()
             ).materialize(sourceConfig.pluginsDirectory(), stagingDirectory);
             PluginRuntimeConfig stagedConfig = new PluginRuntimeConfig(
                 stagingDirectory,
@@ -116,6 +119,17 @@ public final class TrustedPluginRuntime implements AutoCloseable {
         closeCurrentRuntime();
         cleanupStagingDirectory();
         gateResult = null;
+    }
+
+    private void requireStrictTrustStore() {
+        if (trustConfig.policy() != PluginTrustPolicy.REQUIRE_VERIFIED) {
+            return;
+        }
+        Path path = trustConfig.trustStorePath();
+        if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IllegalStateException(
+                "REQUIRE_VERIFIED requires a regular trust store file: " + path);
+        }
     }
 
     private void closeCurrentRuntime() {
