@@ -44,9 +44,17 @@ jobs:
       - name: Verify signed, tampered, unsigned and revoked artifact contracts
         run: |
           ./gradlew :app:test \
-            --tests de.regelsuche.plugin.PluginArtifactTrustTest
+            --tests 'de.regelsuche.plugin.PluginArtifactTrust*' \
+            --rerun-tasks
 
-      - name: Validate versioned trust schemas
+      - name: Require retained canonical trust evidence
+        run: |
+          test -s app/build/reports/plugin-artifact-trust/gate-result.json
+          test -s app/build/reports/plugin-artifact-trust/verification.json
+          test -s app/build/reports/plugin-artifact-trust/trust-store.json
+          test -s app/build/reports/plugin-artifact-trust/signature-manifest.json
+
+      - name: Validate schemas, evidence and accounting
         shell: bash
         run: |
           python3 -m pip install \
@@ -58,23 +66,55 @@ jobs:
           from pathlib import Path
           from jsonschema.validators import validator_for
 
-          paths = [
+          schema_paths = [
               Path('docs/schemas/regelsuche-plugin-signature-v1.schema.json'),
               Path('docs/schemas/regelsuche-plugin-trust-store-v1.schema.json'),
               Path('docs/schemas/regelsuche-plugin-artifact-verification-v1.schema.json'),
+              Path('docs/schemas/regelsuche-plugin-artifact-gate-v1.schema.json'),
           ]
-          for path in paths:
+          schemas = {}
+          for path in schema_paths:
               schema = json.loads(path.read_text(encoding='utf-8'))
               validator_for(schema).check_schema(schema)
               assert schema.get('additionalProperties') is False
+              schemas[schema['$id']] = schema
+
+          report_dir = Path('app/build/reports/plugin-artifact-trust')
+          instances = {
+              'regelsuche.plugin-signature/v1': json.loads(
+                  (report_dir / 'signature-manifest.json').read_text(encoding='utf-8')),
+              'regelsuche.plugin-trust-store/v1': json.loads(
+                  (report_dir / 'trust-store.json').read_text(encoding='utf-8')),
+              'regelsuche.plugin-artifact-verification/v1': json.loads(
+                  (report_dir / 'verification.json').read_text(encoding='utf-8')),
+              'regelsuche.plugin-artifact-gate/v1': json.loads(
+                  (report_dir / 'gate-result.json').read_text(encoding='utf-8')),
+          }
+          for schema_id, instance in instances.items():
+              validator_for(schemas[schema_id])(schemas[schema_id]).validate(instance)
+
+          verification = instances['regelsuche.plugin-artifact-verification/v1']
+          assert verification['status'] == 'VERIFIED_TRUSTED'
+          assert verification['signatureVerified'] is True
+          assert verification['trusted'] is True
+
+          gate = instances['regelsuche.plugin-artifact-gate/v1']
+          assert gate['policy'] == 'REQUIRE_VERIFIED'
+          assert gate['admittedArtifacts'] == ['reference-plugin.jar']
+          assert gate['blockedArtifacts'] == []
+          accounted = sorted(gate['admittedArtifacts'] + gate['blockedArtifacts'])
+          expected = sorted(item['artifactFileName'] for item in gate['verifications'])
+          assert accounted == expected
+          assert gate['verifications'] == [verification]
           PY
 
-      - name: Upload trust test evidence and diagnostics
+      - name: Upload trust evidence and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: plugin-artifact-trust-evidence
           path: |
+            app/build/reports/plugin-artifact-trust/**
             app/build/reports/tests/**
             app/build/test-results/**
             docs/schemas/regelsuche-plugin-*.schema.json
