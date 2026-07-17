@@ -86,6 +86,7 @@ jobs:
           import hashlib
           import json
           from pathlib import Path
+          from urllib.parse import urlsplit
           from jsonschema import FormatChecker, ValidationError
           from jsonschema.validators import validator_for
 
@@ -105,6 +106,20 @@ jobs:
               except ValidationError:
                   return
               raise AssertionError(f'{label} unexpectedly passed schema validation')
+
+          def require_distribution_uri(value):
+              parsed = urlsplit(value)
+              assert parsed.fragment == ''
+              assert parsed.username is None
+              assert parsed.password is None
+              scheme = parsed.scheme.lower()
+              if scheme == 'https':
+                  assert parsed.hostname
+              elif scheme == 'file':
+                  assert parsed.netloc == ''
+                  assert parsed.path.startswith('/')
+              else:
+                  raise AssertionError(f'unsupported distribution URI scheme: {scheme}')
 
           schema_paths = {
               'index': Path(
@@ -181,10 +196,10 @@ jobs:
               coordinates.add(coordinate)
               assert entry['artifactSha256'] not in artifact_hashes
               artifact_hashes.add(entry['artifactSha256'])
-              assert entry['artifactUri'].startswith(('https://', 'file:/'))
-              assert entry['provenanceUri'].startswith(('https://', 'file:/'))
+              require_distribution_uri(entry['artifactUri'])
+              require_distribution_uri(entry['provenanceUri'])
               if entry['kind'] == 'JAVA_PLUGIN':
-                  assert entry['signatureManifestUri'].startswith(('https://', 'file:/'))
+                  require_distribution_uri(entry['signatureManifestUri'])
 
           index_payload = {k: v for k, v in index.items() if k != 'contentHash'}
           assert index['contentHash'] == sha256(compact(index_payload) + b'\n')
@@ -199,6 +214,11 @@ jobs:
               assert receipt['networkAccessStatus'] == 'NOT_PERFORMED'
               assert receipt['installationStatus'] == 'NOT_PERFORMED'
               assert receipt['trustVerificationStatus'] == 'NOT_EVALUATED'
+              for step in receipt['plan']:
+                  require_distribution_uri(step['artifactUri'])
+                  require_distribution_uri(step['provenanceUri'])
+                  if step['kind'] == 'JAVA_PLUGIN':
+                      require_distribution_uri(step['signatureManifestUri'])
 
           assert resolved['status'] == 'RESOLVED'
           assert resolved['blockers'] == []
