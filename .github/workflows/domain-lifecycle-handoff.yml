@@ -1,0 +1,168 @@
+name: Domain Lifecycle Handoff
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoff.java'
+      - 'regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoffTest.java'
+      - 'regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionDomainHandoffAdapter.java'
+      - 'regelsuche-autopilot/src/test/java/de/regelsuche/experiments/autopilot/AutonomousProductionDomainHandoffAdapterTest.java'
+      - 'regelsuche-autopilot/build.gradle'
+      - 'docs/domain-lifecycle-handoff.md'
+      - 'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'
+      - '.github/workflows/domain-lifecycle-handoff.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoff.java'
+      - 'regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoffTest.java'
+      - 'regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionDomainHandoffAdapter.java'
+      - 'regelsuche-autopilot/src/test/java/de/regelsuche/experiments/autopilot/AutonomousProductionDomainHandoffAdapterTest.java'
+      - 'regelsuche-autopilot/build.gradle'
+      - 'docs/domain-lifecycle-handoff.md'
+      - 'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'
+      - '.github/workflows/domain-lifecycle-handoff.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: domain-lifecycle-handoff-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  handoff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Verify generic and unchanged production handoffs
+        run: |
+          ./gradlew \
+            :regelsuche-discovery:test \
+            :regelsuche-autopilot:test \
+            --tests de.regelsuche.discovery.domain.DiscoveryLifecycleHandoffTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousProductionDomainHandoffAdapterTest \
+            --rerun-tasks
+
+      - name: Require retained handoff evidence
+        run: |
+          test -s regelsuche-discovery/build/reports/domain-lifecycle-handoff/expression-handoff.json
+          test -s regelsuche-discovery/build/reports/domain-lifecycle-handoff/sequence-handoff.json
+          test -s regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-handoff.json
+
+      - name: Require byte-identical repeated handoffs
+        shell: bash
+        run: |
+          mkdir -p /tmp/domain-lifecycle-handoff-first
+          cp regelsuche-discovery/build/reports/domain-lifecycle-handoff/*.json \
+            /tmp/domain-lifecycle-handoff-first/
+          cp regelsuche-autopilot/build/reports/domain-lifecycle-handoff/*.json \
+            /tmp/domain-lifecycle-handoff-first/
+          ./gradlew \
+            :regelsuche-discovery:test \
+            :regelsuche-autopilot:test \
+            --tests de.regelsuche.discovery.domain.DiscoveryLifecycleHandoffTest \
+            --tests de.regelsuche.experiments.autopilot.AutonomousProductionDomainHandoffAdapterTest \
+            --rerun-tasks
+          cmp /tmp/domain-lifecycle-handoff-first/expression-handoff.json \
+            regelsuche-discovery/build/reports/domain-lifecycle-handoff/expression-handoff.json
+          cmp /tmp/domain-lifecycle-handoff-first/sequence-handoff.json \
+            regelsuche-discovery/build/reports/domain-lifecycle-handoff/sequence-handoff.json
+          cmp /tmp/domain-lifecycle-handoff-first/production-generation-handoff.json \
+            regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-handoff.json
+
+      - name: Validate schema, balances and representation boundary
+        shell: bash
+        run: |
+          python3 -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            jsonschema==4.25.1
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema.validators import validator_for
+
+          schema_path = Path(
+              'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json')
+          schema = json.loads(schema_path.read_text(encoding='utf-8'))
+          validator_for(schema).check_schema(schema)
+          assert schema.get('additionalProperties') is False
+          validator = validator_for(schema)(schema)
+
+          files = [
+              Path('regelsuche-discovery/build/reports/domain-lifecycle-handoff/expression-handoff.json'),
+              Path('regelsuche-discovery/build/reports/domain-lifecycle-handoff/sequence-handoff.json'),
+              Path('regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-handoff.json'),
+          ]
+          reports = [json.loads(path.read_text(encoding='utf-8')) for path in files]
+          for report in reports:
+              validator.validate(report)
+              assert report['proofStatus'] == 'NOT_EVALUATED'
+              assert report['externalNoveltyStatus'] == 'NOT_EVALUATED'
+              assert report['promotionStatus'] == 'NOT_EVALUATED'
+              assert report['publicEvidenceStatus'] == 'NOT_EVALUATED'
+              for resource in report['resources']:
+                  assert resource['configured'] == (
+                      resource['executed']
+                      + resource['skipped']
+                      + resource['remaining'])
+
+          expression, sequence, production = reports
+          assert expression['sourceKind'] == 'DOMAIN_DISCOVERY_EVIDENCE'
+          assert sequence['sourceKind'] == 'DOMAIN_DISCOVERY_EVIDENCE'
+          assert expression['stage'] == sequence['stage'] == 'DISCOVERY_VALIDATION'
+          assert expression['disposition'] == sequence['disposition'] == 'CONFIRMED'
+          assert production['sourceKind'] == 'PRODUCTION_GENERATION_RUN'
+          assert production['stage'] == 'GENERATION'
+          assert production['disposition'] == 'COMPLETED'
+          assert production['selectedCandidateHash'] == ''
+          assert production['certificateHash'] == ''
+
+          forbidden_keys = {
+              'payload',
+              'expression',
+              'seedExpression',
+              'selectedExpression',
+              'states',
+              'path',
+              'sequenceTerms',
+          }
+          def keys(value):
+              if isinstance(value, dict):
+                  for key, nested in value.items():
+                      yield key
+                      yield from keys(nested)
+              elif isinstance(value, list):
+                  for nested in value:
+                      yield from keys(nested)
+          for report in reports:
+              assert forbidden_keys.isdisjoint(set(keys(report)))
+          PY
+
+      - name: Upload handoff evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: domain-lifecycle-handoff-evidence
+          path: |
+            regelsuche-discovery/build/reports/domain-lifecycle-handoff/**
+            regelsuche-autopilot/build/reports/domain-lifecycle-handoff/**
+            regelsuche-discovery/build/reports/tests/**
+            regelsuche-autopilot/build/reports/tests/**
+            regelsuche-discovery/build/test-results/**
+            regelsuche-autopilot/build/test-results/**
+            docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json
+          if-no-files-found: warn

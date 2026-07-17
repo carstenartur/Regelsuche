@@ -8,6 +8,7 @@
 - [Capability-aware Solver-Portfolio](solver-portfolio.md) — rollenbasierte Backend-Auswahl, Budgets, Timeouts, Cache, Konflikte und formale Z3-Bestätigung.
 - [Vergleichende Discovery-Benchmarks](discovery-benchmarks.md) — informationsgleiche, track-spezifische Baselines ohne universelles Leaderboard.
 - [Generische Discovery-Domänen](generic-discovery-domains.md) — domänenneutrale Generation, Suche, Validierung und Evidence mit Algebra- und Zahlenfolgen-Adapter.
+- [Domänenneutraler Lifecycle-Handoff](domain-lifecycle-handoff.md) — hashgebundene Übergabe aus generischer Discovery und unveränderter algebraischer Produktionsgeneration ohne Repräsentationsstrings.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
@@ -39,8 +40,10 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Capability-aware Solver-Portfolio](solver-portfolio.md)
 - [Vergleichende Discovery-Benchmarks](discovery-benchmarks.md)
 - [Generische Discovery-Domänen](generic-discovery-domains.md)
+- [Domänenneutraler Lifecycle-Handoff](domain-lifecycle-handoff.md)
 - [Discovery-Domain-Descriptor-Schema v1](schemas/regelsuche-discovery-domain-descriptor-v1.schema.json)
 - [Domain-Discovery-Evidence-Schema v1](schemas/regelsuche-domain-discovery-evidence-v1.schema.json)
+- [Discovery-Lifecycle-Handoff-Schema v1](schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json)
 - [Comparative-Benchmark-Schema v1](schemas/regelsuche-comparative-benchmark-v1.schema.json)
 - [Solver-Portfolio-Report-Schema v1](schemas/regelsuche-solver-portfolio-report-v1.schema.json)
 - [Solver-Obligation-Schema v1](schemas/regelsuche-solver-obligation-v1.schema.json)
