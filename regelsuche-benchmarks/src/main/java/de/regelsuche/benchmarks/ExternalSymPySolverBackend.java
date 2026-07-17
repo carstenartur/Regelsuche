@@ -73,9 +73,11 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
             List.of(RequestedEvidence.DECISION,
                 RequestedEvidence.SYMBOLIC_CERTIFICATE),
             true);
+        // The executable path is runtime placement/availability, not semantic
+        // backend configuration. Certificates must remain stable when the same
+        // SymPy revision and script run from a different absolute path.
         this.configurationHash = SolverIr.sha256(
-            "python=" + python
-                + "\ntimeoutMillis=" + Math.max(100L, timeout.toMillis())
+            "timeoutMillis=" + Math.max(100L, timeout.toMillis())
                 + "\nfragment=polynomial-equality/v1"
                 + "\nscript=" + SCRIPT);
     }
