@@ -66,11 +66,14 @@ jobs:
             regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericQualificationMain.java \
             regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java
 
-      - name: Validate staged qualification source
+      - name: Reject malformed staged patches
+        shell: bash
+        run: git diff --cached --check
+
+      - name: Require complete staged source set
         shell: bash
         run: |
-          set -euo pipefail
-          git diff --cached --check
+          git diff --cached --name-only
           test "$(git diff --cached --name-only | wc -l)" -eq 11
 
       - name: Commit non-workflow qualification source
