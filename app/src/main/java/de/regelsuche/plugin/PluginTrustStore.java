@@ -56,14 +56,31 @@ public record PluginTrustStore(
             .sorted(Comparator.comparing(ArtifactRevocation::artifactSha256))
             .toList();
 
-        Set<String> keyIdentities = new HashSet<>();
+        Map<String, PublisherKey> keysByIdentity = new LinkedHashMap<>();
         for (PublisherKey key : keys) {
-            String identity = key.publisherId() + "\u0000" + key.keyId();
-            if (!keyIdentities.add(identity)) {
+            String identity = keyIdentity(key.publisherId(), key.keyId());
+            if (keysByIdentity.putIfAbsent(identity, key) != null) {
                 throw new IllegalArgumentException("duplicate publisher/key identity: "
                     + key.publisherId() + "/" + key.keyId());
             }
         }
+        for (PublisherKey key : keys) {
+            if (key.successorKeyId().isEmpty()) {
+                continue;
+            }
+            PublisherKey successor = keysByIdentity.get(
+                keyIdentity(key.publisherId(), key.successorKeyId()));
+            if (successor == null) {
+                throw new IllegalArgumentException("missing successor key: "
+                    + key.publisherId() + "/" + key.successorKeyId());
+            }
+            if (successor.revoked()) {
+                throw new IllegalArgumentException("successor key is revoked: "
+                    + successor.publisherId() + "/" + successor.keyId());
+            }
+        }
+        validateAcyclicRotation(keysByIdentity);
+
         Set<String> revokedHashes = new HashSet<>();
         for (ArtifactRevocation revocation : revokedArtifacts) {
             if (!revokedHashes.add(revocation.artifactSha256())) {
@@ -181,6 +198,26 @@ public record PluginTrustStore(
         return values == null ? List.of() : List.copyOf(values);
     }
 
+    private static String keyIdentity(String publisherId, String keyId) {
+        return publisherId + "\u0000" + keyId;
+    }
+
+    private static void validateAcyclicRotation(Map<String, PublisherKey> keysByIdentity) {
+        for (PublisherKey start : keysByIdentity.values()) {
+            Set<String> visited = new HashSet<>();
+            PublisherKey current = start;
+            while (current != null && !current.successorKeyId().isEmpty()) {
+                String identity = keyIdentity(current.publisherId(), current.keyId());
+                if (!visited.add(identity)) {
+                    throw new IllegalArgumentException("cyclic publisher key rotation: "
+                        + current.publisherId() + "/" + current.keyId());
+                }
+                current = keysByIdentity.get(
+                    keyIdentity(current.publisherId(), current.successorKeyId()));
+            }
+        }
+    }
+
     public enum KeyStatus {
         ACTIVE,
         RETIRED,
@@ -211,6 +248,9 @@ public record PluginTrustStore(
                 successorKeyId = PluginSignatureManifest.requireIdentifier(successorKeyId, "successorKeyId");
                 if (successorKeyId.equals(keyId)) {
                     throw new IllegalArgumentException("successorKeyId must differ from keyId");
+                }
+                if (status != KeyStatus.RETIRED) {
+                    throw new IllegalArgumentException("only retired keys may declare a successor");
                 }
             }
         }
