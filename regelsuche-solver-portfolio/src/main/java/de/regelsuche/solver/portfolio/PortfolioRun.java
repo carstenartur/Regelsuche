@@ -44,6 +44,11 @@ public record PortfolioRun(
             throw new IllegalArgumentException(
                 "every traced execution must be retained by the portfolio run");
         }
+        boolean reportSelected = !report.selectedExecutionHash().isEmpty();
+        if (reportSelected != (selectedExecution != null)) {
+            throw new IllegalArgumentException(
+                "selected execution presence must match the portfolio report");
+        }
         if (selectedExecution != null
                 && !report.selectedExecutionHash().equals(selectedExecution.contentHash())) {
             throw new IllegalArgumentException(
@@ -52,37 +57,76 @@ public record PortfolioRun(
     }
 
     /**
-     * Writes one authoritative layout: `report.json` plus every concrete
-     * execution under `executions/`. Filtered and skipped attempts remain in
-     * the report and deliberately have no fabricated execution artifact.
+     * Writes one authoritative evidence layout for the exact request:
+     * obligation, request, report, and every concrete translation/result/execution.
+     * Filtered and skipped attempts remain in the report and deliberately have no
+     * fabricated backend artifact.
      */
-    public void write(Path outputDirectory) {
+    public void write(Path outputDirectory, PortfolioRequest request) {
         Objects.requireNonNull(outputDirectory, "outputDirectory");
+        Objects.requireNonNull(request, "request");
+        validateRequest(request);
         try {
-            Path executionsDirectory = outputDirectory.resolve("executions");
-            clearDirectory(executionsDirectory);
-            Files.createDirectories(executionsDirectory);
+            clearDirectory(outputDirectory);
+            Files.createDirectories(outputDirectory);
+            Files.writeString(
+                outputDirectory.resolve("obligation.json"),
+                request.obligation().toCanonicalJson(),
+                StandardCharsets.UTF_8);
+            Files.writeString(
+                outputDirectory.resolve("request.json"),
+                request.toCanonicalJson(),
+                StandardCharsets.UTF_8);
             Files.writeString(
                 outputDirectory.resolve("report.json"),
                 report.toCanonicalJson(),
                 StandardCharsets.UTF_8);
+
+            Path executionsDirectory = outputDirectory.resolve("executions");
+            Files.createDirectories(executionsDirectory);
             for (SolverExecution execution : executions) {
                 PortfolioAttempt attempt = report.attempts().stream()
                     .filter(item -> execution.contentHash().equals(item.executionHash()))
                     .findFirst()
                     .orElseThrow();
-                String filename = String.format(
-                    "%03d-%s.json",
+                Path attemptDirectory = executionsDirectory.resolve(String.format(
+                    "%03d-%s",
                     attempt.sequence(),
-                    safeFilename(attempt.backendId()));
+                    safeFilename(attempt.backendId())));
+                Files.createDirectories(attemptDirectory);
                 Files.writeString(
-                    executionsDirectory.resolve(filename),
+                    attemptDirectory.resolve("translation.json"),
+                    execution.translation().toCanonicalJson(),
+                    StandardCharsets.UTF_8);
+                Files.writeString(
+                    attemptDirectory.resolve("result.json"),
+                    execution.result().toCanonicalJson(),
+                    StandardCharsets.UTF_8);
+                Files.writeString(
+                    attemptDirectory.resolve("execution.json"),
                     execution.toCanonicalJson(),
                     StandardCharsets.UTF_8);
             }
         } catch (IOException exception) {
             throw new UncheckedIOException(
                 "Could not write solver portfolio evidence", exception);
+        }
+    }
+
+    private void validateRequest(PortfolioRequest request) {
+        if (!report.requestHash().equals(request.contentHash())) {
+            throw new IllegalArgumentException(
+                "portfolio request must match the report request hash");
+        }
+        if (!report.obligationHash().equals(request.obligation().contentHash())) {
+            throw new IllegalArgumentException(
+                "portfolio request obligation must match the report");
+        }
+        for (SolverExecution execution : executions) {
+            if (!execution.obligationHash().equals(request.obligation().contentHash())) {
+                throw new IllegalArgumentException(
+                    "portfolio execution belongs to another obligation");
+            }
         }
     }
 
