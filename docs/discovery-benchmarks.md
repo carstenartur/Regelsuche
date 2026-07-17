@@ -89,4 +89,21 @@ export REGELSUCHE_SYMPY_PYTHON=/path/to/python
   :regelsuche-benchmarks:writeComparativeBenchmark
 ```
 
-The default bundle is written below `regelsuche-benchmarks/build/reports/comparative-benchmarks`. CI pins SymPy `1.14.0`, installs system Z3, validates the Draft-2020-12 schema and compares two complete runs byte for byte.
+The default bundle is written below `regelsuche-benchmarks/build/reports/comparative-benchmarks`.
+
+The pinned runtime image contains Temurin 21.0.11+10, the Ubuntu Noble Z3 package and SymPy 1.14.0:
+
+```bash
+docker build \
+  -f Dockerfile.comparative-benchmarks \
+  -t regelsuche-comparative-benchmarks .
+
+mkdir -p build/comparative-benchmark-output
+chmod 0777 build/comparative-benchmark-output
+docker run --rm \
+  -v "$PWD/build/comparative-benchmark-output:/output" \
+  regelsuche-comparative-benchmarks \
+  /output
+```
+
+CI installs the same external tools, validates the Draft-2020-12 schema, compares two complete Gradle runs byte for byte and then requires the Docker bundle to be byte-identical to the Gradle bundle.
