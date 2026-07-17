@@ -77,6 +77,12 @@ public record PortfolioReport(
             throw new IllegalArgumentException(
                 "decisive portfolio outcome requires selected execution");
         }
+        if ((outcome == PortfolioOutcome.REFUTED
+                || outcome == PortfolioOutcome.CONFLICT)
+                && !promotionBlocked) {
+            throw new IllegalArgumentException(
+                "refutation and conflict must block automatic promotion");
+        }
         requireSha(contentHash, "contentHash");
         String expected = hash(
             requestHash, obligationHash, objective, policy, outcome, attempts,
@@ -100,7 +106,8 @@ public record PortfolioReport(
         int executedInvocations,
         boolean proofAuthorized
     ) {
-        boolean promotionBlocked = outcome == PortfolioOutcome.CONFLICT
+        boolean promotionBlocked = outcome == PortfolioOutcome.REFUTED
+            || outcome == PortfolioOutcome.CONFLICT
             || (request.objective().proofObjective() && !proofAuthorized);
         List<PortfolioAttempt> orderedAttempts = attempts == null ? List.of()
             : attempts.stream().sorted(Comparator.comparingInt(PortfolioAttempt::sequence)).toList();
