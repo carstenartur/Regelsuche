@@ -18,80 +18,64 @@ import de.regelsuche.solver.ir.SolverIr.Symbol;
 import de.regelsuche.solver.ir.SolverIr.Theory;
 import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverTranslation;
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 
 /**
- * External SymPy baseline for the explicitly shared polynomial-equality fragment.
+ * External SymPy baseline for the shared polynomial-equality fragment.
  *
- * <p>This adapter is validation-only. It never claims discovery or formal proof,
- * rejects assumptions rather than silently dropping them, and records the exact
- * SymPy version and symbolic normal-form payload in the certificate hash.</p>
+ * <p>The adapter is validation-only. It rejects assumptions and unsupported
+ * syntax instead of silently changing the problem and binds the deterministic
+ * normal-form payload to the exact SymPy revision.</p>
  */
 public final class ExternalSymPySolverBackend implements SolverBackend {
-    private static final String SCRIPT = """
-        import sys
-        import sympy
-        from sympy.parsing.sympy_parser import (
-            parse_expr,
-            standard_transformations,
-            convert_xor,
-        )
+    private static final String SCRIPT =
+        "import sys,sympy\n"
+            + "from sympy.parsing.sympy_parser import parse_expr,"
+            + "standard_transformations,convert_xor\n"
+            + "t=standard_transformations+(convert_xor,)\n"
+            + "a=parse_expr(sys.argv[1],transformations=t,evaluate=False)\n"
+            + "b=parse_expr(sys.argv[2],transformations=t,evaluate=False)\n"
+            + "d=sympy.simplify(sympy.expand(a-b))\n"
+            + "print('CONFIRMED' if d==0 else "
+            + "('REFUTED' if d.is_zero is False else 'UNKNOWN'))\n"
+            + "print(sympy.srepr(d))\n";
 
-        transformations = standard_transformations + (convert_xor,)
-        left = parse_expr(sys.argv[1], transformations=transformations, evaluate=False)
-        right = parse_expr(sys.argv[2], transformations=transformations, evaluate=False)
-        difference = sympy.expand(left - right)
-        simplified = sympy.simplify(difference)
-
-        if simplified == 0:
-            verdict = "CONFIRMED"
-        elif simplified.is_zero is False:
-            verdict = "REFUTED"
-        else:
-            verdict = "UNKNOWN"
-
-        print(verdict)
-        print(sympy.srepr(simplified))
-        """;
-
-    private final String pythonExecutable;
-    private final long timeoutMillis;
+    private final String python;
+    private final Duration timeout;
     private final BackendDescriptor descriptor;
     private final String configurationHash;
     private final CoreExpressionIrAdapter expressions = new CoreExpressionIrAdapter();
 
     public ExternalSymPySolverBackend(
         String backendVersion,
-        String pythonExecutable,
+        String python,
         Duration timeout
     ) {
         if (backendVersion == null || backendVersion.isBlank()) {
             throw new IllegalArgumentException("backendVersion must not be blank");
         }
-        if (pythonExecutable == null || pythonExecutable.isBlank()) {
-            throw new IllegalArgumentException("pythonExecutable must not be blank");
+        if (python == null || python.isBlank()) {
+            throw new IllegalArgumentException("python must not be blank");
         }
-        this.pythonExecutable = pythonExecutable;
-        this.timeoutMillis = Math.max(100L, Objects.requireNonNull(timeout).toMillis());
+        this.python = python;
+        this.timeout = Objects.requireNonNull(timeout, "timeout");
         this.descriptor = new BackendDescriptor(
             "sympy-cas-equality",
             backendVersion.trim(),
             List.of(Theory.REAL_ARITHMETIC),
             List.of(Relation.EQUALS),
-            List.of(RequestedEvidence.DECISION, RequestedEvidence.SYMBOLIC_CERTIFICATE),
+            List.of(RequestedEvidence.DECISION,
+                RequestedEvidence.SYMBOLIC_CERTIFICATE),
             true);
         this.configurationHash = SolverIr.sha256(
-            "python=" + pythonExecutable
-                + "\ntimeoutMillis=" + timeoutMillis
+            "python=" + python
+                + "\ntimeoutMillis=" + Math.max(100L, timeout.toMillis())
                 + "\nfragment=polynomial-equality/v1"
                 + "\nscript=" + SCRIPT);
     }
@@ -108,110 +92,97 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
     @Override
     public SolverExecution execute(Obligation obligation) {
         Objects.requireNonNull(obligation, "obligation");
-        Map<String, String> terms = termMapping(obligation);
-        List<String> issues = compatibilityIssues(obligation);
+        Map<String, String> terms = Map.of(
+            "goal.left", expressions.render(obligation.goal().left()),
+            "goal.right", expressions.render(obligation.goal().right()));
+        List<String> issues = issues(obligation);
         if (!issues.isEmpty()) {
             return rejected(obligation, terms, issues);
         }
 
         SolverTranslation translation = SolverTranslation.create(
-            obligation,
-            descriptor,
-            TranslationStatus.LOSSLESS,
-            List.of(),
-            terms);
-        ProcessOutput output = run(
-            List.of(
-                pythonExecutable,
-                "-c",
-                SCRIPT,
-                terms.get("goal.left"),
-                terms.get("goal.right")),
-            timeoutMillis);
-        SolverResult result;
-        if (!output.available()) {
-            result = result(
-                obligation,
-                ResultStatus.ERROR,
-                "SymPy Python process unavailable: " + normalize(output.stderr()),
-                "",
-                List.of("EXTERNAL_PROCESS_UNAVAILABLE"));
-        } else if (output.timedOut()) {
-            result = result(
-                obligation,
-                ResultStatus.TIMEOUT,
-                "SymPy equality validation timed out",
-                "",
-                List.of("EXTERNAL_PROCESS_TIMEOUT"));
-        } else if (output.exitCode() != 0) {
-            result = result(
-                obligation,
-                ResultStatus.ERROR,
-                "SymPy equality validation failed: "
-                    + normalize(output.stdout() + " " + output.stderr()),
-                "",
-                List.of("EXTERNAL_PROCESS_FAILED"));
-        } else {
-            List<String> lines = output.stdout().lines()
-                .map(String::trim)
-                .filter(line -> !line.isBlank())
-                .toList();
-            String verdict = lines.isEmpty() ? "" : lines.getFirst().toUpperCase(Locale.ROOT);
-            String normalForm = lines.size() <= 1
-                ? ""
-                : String.join("\n", lines.subList(1, lines.size()));
-            result = switch (verdict) {
-                case "CONFIRMED" -> result(
-                    obligation,
-                    ResultStatus.CONFIRMED,
-                    "SymPy reduced the polynomial difference to zero",
-                    certificate(verdict, normalForm),
-                    List.of("EXTERNAL_SYMPY", "POLYNOMIAL_DIFFERENCE_NORMAL_FORM"));
-                case "REFUTED" -> result(
-                    obligation,
-                    ResultStatus.REFUTED,
-                    "SymPy produced a non-zero polynomial difference normal form",
-                    certificate(verdict, normalForm),
-                    List.of("EXTERNAL_SYMPY", "POLYNOMIAL_DIFFERENCE_NORMAL_FORM"));
-                case "UNKNOWN" -> result(
-                    obligation,
-                    ResultStatus.UNKNOWN,
-                    "SymPy could not decide whether the polynomial difference is zero",
-                    "",
-                    List.of("EXTERNAL_SYMPY"));
-                default -> result(
-                    obligation,
-                    ResultStatus.ERROR,
-                    "Unrecognized SymPy output: " + normalize(output.stdout()),
-                    "",
-                    List.of("EXTERNAL_SYMPY", "UNRECOGNIZED_OUTPUT"));
-            };
-        }
+            obligation, descriptor, TranslationStatus.LOSSLESS,
+            List.of(), terms);
+        ExternalCommand.Output output = ExternalCommand.run(
+            List.of(python, "-c", SCRIPT,
+                terms.get("goal.left"), terms.get("goal.right")),
+            timeout);
+        SolverResult result = interpret(obligation, output);
         return SolverExecution.create(obligation, translation, result);
     }
 
-    private Map<String, String> termMapping(Obligation obligation) {
-        return Map.of(
-            "goal.left", expressions.render(obligation.goal().left()),
-            "goal.right", expressions.render(obligation.goal().right()));
+    private SolverResult interpret(
+        Obligation obligation,
+        ExternalCommand.Output output
+    ) {
+        if (!output.available()) {
+            return result(obligation, ResultStatus.ERROR,
+                "SymPy process unavailable: " + normalize(output.stderr()),
+                "", List.of("EXTERNAL_PROCESS_UNAVAILABLE"));
+        }
+        if (output.timedOut()) {
+            return result(obligation, ResultStatus.TIMEOUT,
+                "SymPy equality validation timed out",
+                "", List.of("EXTERNAL_PROCESS_TIMEOUT"));
+        }
+        if (output.exitCode() != 0) {
+            return result(obligation, ResultStatus.ERROR,
+                "SymPy equality validation failed: "
+                    + normalize(output.stdout() + " " + output.stderr()),
+                "", List.of("EXTERNAL_PROCESS_FAILED"));
+        }
+
+        List<String> lines = output.stdout().lines()
+            .map(String::trim)
+            .filter(line -> !line.isBlank())
+            .toList();
+        String verdict = lines.isEmpty()
+            ? ""
+            : lines.getFirst().toUpperCase(Locale.ROOT);
+        String normalForm = lines.size() <= 1
+            ? ""
+            : String.join("\n", lines.subList(1, lines.size()));
+        return switch (verdict) {
+            case "CONFIRMED" -> result(obligation, ResultStatus.CONFIRMED,
+                "SymPy reduced the polynomial difference to zero",
+                certificate(verdict, normalForm),
+                List.of("EXTERNAL_SYMPY",
+                    "POLYNOMIAL_DIFFERENCE_NORMAL_FORM"));
+            case "REFUTED" -> result(obligation, ResultStatus.REFUTED,
+                "SymPy produced a non-zero polynomial difference normal form",
+                certificate(verdict, normalForm),
+                List.of("EXTERNAL_SYMPY",
+                    "POLYNOMIAL_DIFFERENCE_NORMAL_FORM"));
+            case "UNKNOWN" -> result(obligation, ResultStatus.UNKNOWN,
+                "SymPy could not decide the polynomial difference",
+                "", List.of("EXTERNAL_SYMPY"));
+            default -> result(obligation, ResultStatus.ERROR,
+                "Unrecognized SymPy output: " + normalize(output.stdout()),
+                "", List.of("EXTERNAL_SYMPY", "UNRECOGNIZED_OUTPUT"));
+        };
     }
 
-    private List<String> compatibilityIssues(Obligation obligation) {
+    private List<String> issues(Obligation obligation) {
         List<String> issues = new ArrayList<>();
-        obligation.theories().stream()
-            .filter(theory -> !descriptor.supportedTheories().contains(theory))
-            .forEach(theory -> issues.add("UNSUPPORTED_THEORY=" + theory.name()));
-        if (!descriptor.supportedRelations().contains(obligation.goal().relation())) {
-            issues.add("UNSUPPORTED_RELATION:" + obligation.goal().relation().name());
+        if (!obligation.theories().stream()
+                .allMatch(descriptor.supportedTheories()::contains)) {
+            issues.add("UNSUPPORTED_THEORY");
         }
-        if (!descriptor.supportedEvidence().contains(obligation.requestedEvidence())) {
-            issues.add("UNSUPPORTED_EVIDENCE:" + obligation.requestedEvidence().name());
+        if (!descriptor.supportedRelations()
+                .contains(obligation.goal().relation())) {
+            issues.add("UNSUPPORTED_RELATION:"
+                + obligation.goal().relation().name());
+        }
+        if (!descriptor.supportedEvidence()
+                .contains(obligation.requestedEvidence())) {
+            issues.add("UNSUPPORTED_EVIDENCE:"
+                + obligation.requestedEvidence().name());
         }
         if (!obligation.assumptions().isEmpty()) {
             issues.add("ASSUMPTIONS_NOT_SUPPORTED");
         }
-        if (!isPolynomial(obligation.goal().left())
-                || !isPolynomial(obligation.goal().right())) {
+        if (!polynomial(obligation.goal().left())
+                || !polynomial(obligation.goal().right())) {
             issues.add("UNSUPPORTED_EXPRESSION_FRAGMENT:POLYNOMIAL_ONLY");
         }
         return issues.stream().distinct().sorted().toList();
@@ -223,21 +194,12 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
         List<String> issues
     ) {
         SolverTranslation translation = SolverTranslation.create(
-            obligation,
-            descriptor,
-            TranslationStatus.REJECTED,
-            issues,
-            terms);
+            obligation, descriptor, TranslationStatus.REJECTED, issues, terms);
         SolverResult result = SolverResult.create(
-            obligation,
-            descriptor,
-            ResultStatus.UNSUPPORTED,
-            TranslationStatus.REJECTED,
-            List.of(),
-            issues,
+            obligation, descriptor, ResultStatus.UNSUPPORTED,
+            TranslationStatus.REJECTED, List.of(), issues,
             "SymPy baseline rejected the obligation before execution",
-            Map.of(),
-            "");
+            Map.of(), "");
         return SolverExecution.create(obligation, translation, result);
     }
 
@@ -249,28 +211,20 @@ public final class ExternalSymPySolverBackend implements SolverBackend {
         List<String> capabilities
     ) {
         return SolverResult.create(
-            obligation,
-            descriptor,
-            status,
-            TranslationStatus.LOSSLESS,
-            capabilities,
-            List.of(),
-            message,
-            Map.of(),
-            certificateHash);
+            obligation, descriptor, status, TranslationStatus.LOSSLESS,
+            capabilities, List.of(), message, Map.of(), certificateHash);
     }
 
     private String certificate(String verdict, String normalForm) {
         return SolverIr.sha256(
-            "backend=" + descriptor.backendId() + '@' + descriptor.backendVersion()
-                + "\
-configuration=" + configurationHash
-                + "\
-verdict=" + verdict
+            "backend=" + descriptor.backendId() + '@'
+                + descriptor.backendVersion()
+                + "\nconfiguration=" + configurationHash
+                + "\nverdict=" + verdict
                 + "\nnormalForm=" + normalForm);
     }
 
-    private static boolean isPolynomial(Expression expression) {
+    private static boolean polynomial(Expression expression) {
         if (expression instanceof Literal || expression instanceof Symbol) {
             return true;
         }
@@ -280,9 +234,10 @@ verdict=" + verdict
         Binary binary = (Binary) expression;
         return switch (binary.operator()) {
             case ADD, SUBTRACT, MULTIPLY ->
-                isPolynomial(binary.left()) && isPolynomial(binary.right());
+                polynomial(binary.left()) && polynomial(binary.right());
             case DIVIDE -> false;
-            case POWER -> isPolynomial(binary.left()) && nonNegativeInteger(binary.right());
+            case POWER -> polynomial(binary.left())
+                && nonNegativeInteger(binary.right());
         };
     }
 
@@ -291,7 +246,8 @@ verdict=" + verdict
             return false;
         }
         try {
-            BigDecimal value = new BigDecimal(literal.value()).stripTrailingZeros();
+            BigDecimal value =
+                new BigDecimal(literal.value()).stripTrailingZeros();
             return value.signum() >= 0 && value.scale() <= 0;
         } catch (NumberFormatException exception) {
             return false;
@@ -300,100 +256,32 @@ verdict=" + verdict
 
     public static Detection detectSystemSymPy() {
         String python = System.getenv().getOrDefault(
-            "REGELSUCHE_SYMPY_PYTHON",
-            "python3");
-        ProcessOutput output = run(
-            List.of(
-                python,
-                "-c",
+            "REGELSUCHE_SYMPY_PYTHON", "python3");
+        ExternalCommand.Output output = ExternalCommand.run(
+            List.of(python, "-c",
                 "import sympy; print(sympy.__version__)"),
-            5_000L);
-        if (!output.available() || output.timedOut() || output.exitCode() != 0) {
+            Duration.ofSeconds(5));
+        if (!output.available() || output.timedOut()
+                || output.exitCode() != 0) {
             return new Detection(
                 new ExternalSymPySolverBackend(
-                    "unavailable",
-                    python,
-                    Duration.ofSeconds(20)),
+                    "unavailable", python, Duration.ofSeconds(20)),
                 false,
                 normalize(output.stdout() + " " + output.stderr()));
         }
         String version = normalize(output.stdout());
-        if (version.isBlank()) {
-            version = "system";
-        }
         return new Detection(
             new ExternalSymPySolverBackend(
-                version,
+                version.isBlank() ? "system" : version,
                 python,
                 Duration.ofSeconds(20)),
             true,
             version);
     }
 
-    private static ProcessOutput run(List<String> command, long timeoutMillis) {
-        Process process;
-        try {
-            process = new ProcessBuilder(command)
-                .redirectErrorStream(false)
-                .start();
-        } catch (IOException exception) {
-            return new ProcessOutput(
-                false,
-                false,
-                -1,
-                "",
-                exception.getMessage());
-        }
-        try {
-            process.getOutputStream().close();
-        } catch (IOException ignored) {
-            // The process does not use stdin.
-        }
-        boolean finished;
-        try {
-            finished = process.waitFor(timeoutMillis, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            process.destroyForcibly();
-            return new ProcessOutput(
-                true,
-                false,
-                -1,
-                "",
-                "Interrupted while waiting for SymPy");
-        }
-        if (!finished) {
-            process.destroyForcibly();
-            try {
-                process.waitFor(2, TimeUnit.SECONDS);
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
-            }
-            return new ProcessOutput(
-                true,
-                true,
-                -1,
-                read(process.getInputStream()),
-                read(process.getErrorStream()));
-        }
-        return new ProcessOutput(
-            true,
-            false,
-            process.exitValue(),
-            read(process.getInputStream()),
-            read(process.getErrorStream()));
-    }
-
-    private static String read(java.io.InputStream stream) {
-        try (stream) {
-            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException exception) {
-            return "";
-      }
-    }
-
     private static String normalize(String value) {
-        return value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        return value == null ? ""
+            : value.trim().replaceAll("\\s+", " ");
     }
 
     public record Detection(
@@ -404,19 +292,6 @@ verdict=" + verdict
         public Detection {
             Objects.requireNonNull(backend, "backend");
             detail = detail == null ? "" : detail;
-        }
-    }
-
-    private record ProcessOutput(
-        boolean available,
-        boolean timedOut,
-        int exitCode,
-        String stdout,
-        String stderr
-    ) {
-        private ProcessOutput {
-            stdout = stdout == null ? "" : stdout;
-            stderr = stderr == null ? "" : stderr;
         }
     }
 }
