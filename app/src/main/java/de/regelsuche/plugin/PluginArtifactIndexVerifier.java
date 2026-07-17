@@ -38,51 +38,105 @@ public final class PluginArtifactIndexVerifier {
             trustStore.toCanonicalJson().getBytes(StandardCharsets.UTF_8));
 
         if (!index.indexId().equals(signature.indexId())) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.INDEX_ID_MISMATCH, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.INDEX_ID_MISMATCH,
+                false,
+                false,
                 List.of("INDEX_ID_MISMATCH"));
         }
         if (!index.revision().equals(signature.revision())) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.REVISION_MISMATCH, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.REVISION_MISMATCH,
+                false,
+                false,
                 List.of("REVISION_MISMATCH"));
         }
         if (!index.contentHash().equals(signature.indexContentHash())) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.INDEX_HASH_MISMATCH, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.INDEX_HASH_MISMATCH,
+                false,
+                false,
                 List.of("INDEX_HASH_MISMATCH"));
         }
         if (!index.curatorId().equals(signature.curatorId())) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.CURATOR_MISMATCH, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.CURATOR_MISMATCH,
+                false,
+                false,
                 List.of("CURATOR_MISMATCH"));
         }
         if (!trustStore.hasPublisher(signature.curatorId())) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.UNKNOWN_CURATOR, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.UNKNOWN_CURATOR,
+                false,
+                false,
                 List.of("UNKNOWN_CURATOR"));
         }
         Optional<PublisherKey> keyLookup = trustStore.findKey(
             signature.curatorId(), signature.keyId());
         if (keyLookup.isEmpty()) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.UNKNOWN_KEY, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.UNKNOWN_KEY,
+                false,
+                false,
                 List.of("UNKNOWN_KEY"));
         }
         PublisherKey key = keyLookup.orElseThrow();
         if (key.revoked()) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.REVOKED_KEY, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.REVOKED_KEY,
+                false,
+                false,
                 List.of("REVOKED_KEY"));
         }
         if (!signature.algorithm().equals(key.algorithm())) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.KEY_ALGORITHM_MISMATCH, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.KEY_ALGORITHM_MISMATCH,
+                false,
+                false,
                 List.of("KEY_ALGORITHM_MISMATCH"));
         }
         if (!verifySignature(signature, key)) {
-            return result(index, signature, signatureHash, trustStoreHash,
-                Status.INVALID_SIGNATURE, false, false,
+            return result(
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.INVALID_SIGNATURE,
+                false,
+                false,
                 List.of("INVALID_SIGNATURE"));
         }
 
@@ -92,26 +146,36 @@ public final class PluginArtifactIndexVerifier {
         List<String> warnings = key.retired()
             ? List.of("RETIRED_CURATOR_KEY")
             : List.of();
-        return result(index, signature, signatureHash, trustStoreHash,
-            status, true, true, warnings);
+        return result(
+            index,
+            signature,
+            signatureHash,
+            trustStoreHash,
+            status,
+            true,
+            true,
+            warnings);
     }
 
     public VerifiedIndex requireTrusted(Path indexPath) {
-        Objects.requireNonNull(indexPath, "indexPath");
-        return requireTrusted(
-            indexPath,
-            PluginArtifactIndexSignature.sidecarFor(indexPath));
+        Path index = Objects.requireNonNull(indexPath, "indexPath");
+        return requireTrusted(index, PluginArtifactIndexSignature.sidecarFor(index));
     }
 
     public VerifiedIndex requireTrusted(Path indexPath, Path signaturePath) {
-        PluginArtifactIndex index = PluginArtifactIndex.load(indexPath);
+        Path indexFile = Objects.requireNonNull(indexPath, "indexPath");
+        Path signatureFile = Objects.requireNonNull(signaturePath, "signaturePath");
+        PluginArtifactIndex index = PluginArtifactIndex.load(indexFile);
         PluginArtifactIndexSignature signature =
-            PluginArtifactIndexSignature.read(signaturePath);
+            PluginArtifactIndexSignature.read(signatureFile);
         Verification verification = verify(index, signature);
         if (!verification.trusted()) {
             throw new SecurityException(
-                "plugin artifact index verification failed: "
-                    + verification.status());
+                "plugin artifact index verification failed: status="
+                    + verification.status()
+                    + ", indexPath=" + indexFile.toAbsolutePath().normalize()
+                    + ", signaturePath="
+                    + signatureFile.toAbsolutePath().normalize());
         }
         return new VerifiedIndex(index, verification);
     }
@@ -205,7 +269,8 @@ public final class PluginArtifactIndexVerifier {
             trustStoreContentHash = PluginSignatureManifest.requireSha256(
                 trustStoreContentHash, "trustStoreContentHash");
             Objects.requireNonNull(status, "status");
-            curatorId = PluginSignatureManifest.requireIdentifier(curatorId, "curatorId");
+            curatorId = PluginSignatureManifest.requireIdentifier(
+                curatorId, "curatorId");
             keyId = PluginSignatureManifest.requireIdentifier(keyId, "keyId");
             warnings = normalizeWarnings(warnings);
             boolean verifiedStatus = status == Status.VERIFIED_TRUSTED
@@ -336,7 +401,9 @@ public final class PluginArtifactIndexVerifier {
                     writeField(output, "signatureContentHash", signatureContentHash);
                     writeField(output, "trustStoreContentHash", trustStoreContentHash);
                     writeField(output, "status", status.name());
-                    writeField(output, "signatureVerified",
+                    writeField(
+                        output,
+                        "signatureVerified",
                         Boolean.toString(signatureVerified));
                     writeField(output, "trusted", Boolean.toString(trusted));
                     writeField(output, "curatorId", curatorId);
