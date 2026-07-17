@@ -1,0 +1,178 @@
+name: Generic Discovery Domains
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'regelsuche-discovery/**'
+      - 'docs/generic-discovery-domains.md'
+      - 'docs/schemas/regelsuche-discovery-domain-descriptor-v1.schema.json'
+      - 'docs/schemas/regelsuche-domain-discovery-evidence-v1.schema.json'
+      - '.github/workflows/generic-discovery-domains.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'regelsuche-discovery/**'
+      - 'docs/generic-discovery-domains.md'
+      - 'docs/schemas/regelsuche-discovery-domain-descriptor-v1.schema.json'
+      - 'docs/schemas/regelsuche-domain-discovery-evidence-v1.schema.json'
+      - '.github/workflows/generic-discovery-domains.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: generic-discovery-domains-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  domains:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.1.0
+
+      - name: Test generic contracts and both domain adapters
+        run: |
+          ./gradlew :regelsuche-discovery:test \
+            --tests 'de.regelsuche.discovery.domain.*'
+          cp -a \
+            regelsuche-discovery/build/reports/domain-discovery \
+            regelsuche-discovery/build/reports/domain-discovery-run-a
+
+      - name: Require byte-identical repeated evidence
+        run: |
+          ./gradlew :regelsuche-discovery:test \
+            --tests de.regelsuche.discovery.domain.DomainDiscoveryEvidenceTest \
+            --rerun-tasks
+          diff -ru \
+            regelsuche-discovery/build/reports/domain-discovery-run-a \
+            regelsuche-discovery/build/reports/domain-discovery
+
+      - name: Validate schemas, references and fail-closed semantics
+        shell: bash
+        run: |
+          python3 -m venv .venv-domain-discovery
+          .venv-domain-discovery/bin/python -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            jsonschema==4.25.1
+          .venv-domain-discovery/bin/python - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          from jsonschema.exceptions import ValidationError
+
+          schema_root = Path('docs/schemas')
+          descriptor_schema = json.loads((
+              schema_root / 'regelsuche-discovery-domain-descriptor-v1.schema.json'
+          ).read_text(encoding='utf-8'))
+          evidence_schema = json.loads((
+              schema_root / 'regelsuche-domain-discovery-evidence-v1.schema.json'
+          ).read_text(encoding='utf-8'))
+          Draft202012Validator.check_schema(descriptor_schema)
+          Draft202012Validator.check_schema(evidence_schema)
+          descriptor_validator = Draft202012Validator(descriptor_schema)
+          evidence_validator = Draft202012Validator(evidence_schema)
+
+          root = Path('regelsuche-discovery/build/reports/domain-discovery')
+          reports = {}
+          for name in ('expression', 'sequence'):
+              report = json.loads((root / name / 'report.json').read_text(
+                  encoding='utf-8'))
+              descriptor = json.loads((root / name / 'domain.json').read_text(
+                  encoding='utf-8'))
+              descriptor_validator.validate(descriptor)
+              evidence_validator.validate(report)
+              assert report['domain'] == descriptor
+              assert report['domain']['domainId'] == report['seed']['domainId']
+              assert report['outcome'] == 'CONFIRMED'
+              assert report['selectedCandidateHash'] is not None
+              assert report['certificate'] is not None
+              assert report['proofStatus'] == 'NOT_EVALUATED'
+              assert report['externalNoveltyStatus'] == 'NOT_EVALUATED'
+              assert report['promotionStatus'] == 'NOT_EVALUATED'
+              assert report['publicEvidenceStatus'] == 'NOT_EVALUATED'
+              assert report['summary']['exploredStates'] == len(report['states'])
+              assert report['summary']['generatedTransitions'] == len(
+                  report['transitions'])
+              assert report['summary']['candidateAttempts'] == len(
+                  report['candidateAttempts'])
+              assert len({state['stateHash'] for state in report['states']}) == \
+                  len(report['states'])
+              resources = {line['resource']: line for line in report['resources']}
+              assert set(resources) == {
+                  'EXPLORED_STATES',
+                  'GENERATED_SUCCESSORS',
+                  'CANDIDATE_EVALUATIONS',
+                  'COUNTEREXAMPLE_ATTEMPTS',
+                  'CERTIFICATE_ATTEMPTS',
+              }
+              for line in resources.values():
+                  assert line['configured'] == (
+                      line['executed'] + line['skipped'] + line['remaining']
+                  )
+              reports[name] = report
+
+          assert reports['expression']['domain']['domainId'] == 'expression-rewrite'
+          assert reports['expression']['certificate']['kind'] == \
+              'CANONICAL_EQUIVALENCE_TRACE'
+          expression_properties = {
+              item['key']: item['value']
+              for item in reports['expression']['domainEvidence']['properties']
+          }
+          assert expression_properties['formalProofStatus'] == 'NOT_EVALUATED'
+          assert int(expression_properties['ruleCount']) >= 1
+
+          assert reports['sequence']['domain']['domainId'] == \
+              'integer-sequence-finite-difference'
+          assert reports['sequence']['certificate']['kind'] == \
+              'FINITE_DIFFERENCE_WITNESS'
+          sequence_properties = {
+              item['key']: item['value']
+              for item in reports['sequence']['domainEvidence']['properties']
+          }
+          assert sequence_properties['differenceOrder'] == '2'
+          assert sequence_properties['holdoutTerms'] == '[25,36]'
+
+          invalid_proof = copy.deepcopy(reports['sequence'])
+          invalid_proof['proofStatus'] = 'CONFIRMED'
+          try:
+              evidence_validator.validate(invalid_proof)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError('schema accepted proof inflation')
+
+          invalid_descriptor = copy.deepcopy(reports['sequence']['domain'])
+          invalid_descriptor['deterministic'] = False
+          try:
+              descriptor_validator.validate(invalid_descriptor)
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError('schema accepted non-deterministic v1 domain')
+          PY
+
+      - name: Upload domain evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: generic-discovery-domain-evidence
+          path: |
+            regelsuche-discovery/build/reports/domain-discovery/**
+            regelsuche-discovery/build/reports/domain-discovery-run-a/**
+            regelsuche-discovery/build/reports/tests/**
+            regelsuche-discovery/build/test-results/**
+          if-no-files-found: warn
