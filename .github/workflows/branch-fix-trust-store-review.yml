@@ -1,0 +1,78 @@
+name: Apply Trust Store Review Fixes
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: issue-104-authenticated-trust-state
+          fetch-depth: 0
+
+      - name: Patch dedicated CI and parser documentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/plugin-trust-store-revision.yml')
+          text = workflow.read_text(encoding='utf-8')
+          needle = (
+              "      - 'app/src/test/java/de/regelsuche/plugin/"
+              "PluginTrustStoreRevisionTest.java'\n"
+          )
+          replacement = needle + (
+              "      - 'app/src/test/java/de/regelsuche/plugin/"
+              "PluginTrustStoreRevisionStrictJsonTest.java'\n"
+          )
+          if text.count(needle) != 2:
+              raise SystemExit('expected two trust revision test path filters')
+          text = text.replace(needle, replacement)
+          test_line = (
+              "            --tests de.regelsuche.plugin."
+              "PluginTrustStoreRevisionTest \\\n"
+          )
+          strict_line = (
+              "            --tests de.regelsuche.plugin."
+              "PluginTrustStoreRevisionStrictJsonTest \\\n"
+          )
+          if text.count(test_line) != 2:
+              raise SystemExit('expected two targeted trust revision test commands')
+          text = text.replace(test_line, test_line + strict_line)
+          workflow.write_text(text, encoding='utf-8')
+
+          documentation = Path('docs/plugin-artifact-trust.md')
+          text = documentation.read_text(encoding='utf-8')
+          old = (
+              'Die Java-Parser sind zusätzlich strikt gegenüber unbekannten JSON-Feldern,\n'
+              'doppelten Feldern und nachgestellten JSON-Werten.\n'
+          )
+          new = (
+              'Die Revision- und Checkpoint-Parser sind zusätzlich strikt gegenüber\n'
+              'unbekannten JSON-Feldern, doppelten Feldern und nachgestellten JSON-Werten.\n'
+              'Die älteren Trust-Store- und Artefaktmanifest-Parser behalten ihre jeweils\n'
+              'dokumentierten Verträge und werden hier nicht pauschal als gleich streng\n'
+              'klassifiziert.\n'
+          )
+          if old not in text:
+              raise SystemExit('parser strictness paragraph not found')
+          documentation.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+          rm -f .github/workflows/branch-fix-trust-store-review.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'fix(plugins): align trust revision CI and parser claims'
+          git push origin HEAD:issue-104-authenticated-trust-state
