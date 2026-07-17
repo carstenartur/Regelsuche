@@ -1,4 +1,4 @@
-name: Branch Source Snapshot
+name: Apply Domain Generic Qualification Source
 
 on:
   push:
@@ -10,20 +10,40 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  snapshot:
+  apply:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Upload repository source snapshot
-        uses: actions/upload-artifact@v7
         with:
-          name: issue-224-domain-generic-source
-          path: |
-            .
-            !.git/**
-            !**/build/**
-          include-hidden-files: true
-          if-no-files-found: error
+          ref: issue-224-domain-generic-qualification
+          fetch-depth: 0
+
+      - name: Decode, validate and commit qualification source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/domain-generic-patch/chunk-* \
+            | base64 --decode > /tmp/domain-generic-changes.tar.gz
+          tar -tzf /tmp/domain-generic-changes.tar.gz > /tmp/domain-generic-files.txt
+          grep -qx '.github/workflows/domain-generic-qualification.yml' \
+            /tmp/domain-generic-files.txt
+          grep -qx 'regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java' \
+            /tmp/domain-generic-files.txt
+          grep -qx 'regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java' \
+            /tmp/domain-generic-files.txt
+          tar -xzf /tmp/domain-generic-changes.tar.gz
+
+          rm -rf .github/domain-generic-patch
+          rm -f .github/workflows/branch-apply-domain-generic.yml
+          rm -f .github/workflows/branch-source-snapshot.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'feat(release): qualify reproducible domain-generic discovery'
+          git push origin HEAD:issue-224-domain-generic-qualification
