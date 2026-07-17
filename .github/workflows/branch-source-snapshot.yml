@@ -1,0 +1,26 @@
+name: Branch Source Snapshot
+
+on:
+  push:
+    branches: [ "issue-224-domain-generic-qualification" ]
+    paths:
+      - '.github/workflows/branch-source-snapshot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Upload repository source snapshot
+        uses: actions/upload-artifact@v7
+        with:
+          name: issue-224-domain-generic-source
+          path: |
+            .
+            !.git/**
+            !**/build/**
+          include-hidden-files: true
+          if-no-files-found: error
