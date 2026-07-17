@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginArtifactIndexVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginArtifactIndexVerifier.java</span></div><h1>PluginArtifactIndexVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.plugin.PluginTrustStore.PublisherKey;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.Signature;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Verifies immutable artifact-index revisions against trusted Ed25519 keys. */
+public final class PluginArtifactIndexVerifier {
+    private final PluginTrustStore trustStore;
+
+<span class="fc" id="L25">    public PluginArtifactIndexVerifier(PluginTrustStore trustStore) {</span>
+<span class="fc" id="L26">        this.trustStore = Objects.requireNonNull(trustStore, &quot;trustStore&quot;);</span>
+<span class="fc" id="L27">    }</span>
+
+    public Verification verify(
+        PluginArtifactIndex index,
+        PluginArtifactIndexSignature signature
+    ) {
+<span class="fc" id="L33">        Objects.requireNonNull(index, &quot;index&quot;);</span>
+<span class="fc" id="L34">        Objects.requireNonNull(signature, &quot;signature&quot;);</span>
+<span class="fc" id="L35">        String signatureHash = PluginArtifactVerifier.sha256(</span>
+<span class="fc" id="L36">            signature.toCanonicalJson().getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L37">        String trustStoreHash = PluginArtifactVerifier.sha256(</span>
+<span class="fc" id="L38">            trustStore.toCanonicalJson().getBytes(StandardCharsets.UTF_8));</span>
+
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (!index.indexId().equals(signature.indexId())) {</span>
+<span class="nc" id="L41">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.INDEX_ID_MISMATCH,
+                false,
+                false,
+<span class="nc" id="L49">                List.of(&quot;INDEX_ID_MISMATCH&quot;));</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!index.revision().equals(signature.revision())) {</span>
+<span class="fc" id="L52">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.REVISION_MISMATCH,
+                false,
+                false,
+<span class="fc" id="L60">                List.of(&quot;REVISION_MISMATCH&quot;));</span>
+        }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (!index.contentHash().equals(signature.indexContentHash())) {</span>
+<span class="nc" id="L63">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.INDEX_HASH_MISMATCH,
+                false,
+                false,
+<span class="nc" id="L71">                List.of(&quot;INDEX_HASH_MISMATCH&quot;));</span>
+        }
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (!index.curatorId().equals(signature.curatorId())) {</span>
+<span class="nc" id="L74">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.CURATOR_MISMATCH,
+                false,
+                false,
+<span class="nc" id="L82">                List.of(&quot;CURATOR_MISMATCH&quot;));</span>
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (!trustStore.hasPublisher(signature.curatorId())) {</span>
+<span class="fc" id="L85">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.UNKNOWN_CURATOR,
+                false,
+                false,
+<span class="fc" id="L93">                List.of(&quot;UNKNOWN_CURATOR&quot;));</span>
+        }
+<span class="fc" id="L95">        Optional&lt;PublisherKey&gt; keyLookup = trustStore.findKey(</span>
+<span class="fc" id="L96">            signature.curatorId(), signature.keyId());</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (keyLookup.isEmpty()) {</span>
+<span class="nc" id="L98">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.UNKNOWN_KEY,
+                false,
+                false,
+<span class="nc" id="L106">                List.of(&quot;UNKNOWN_KEY&quot;));</span>
+        }
+<span class="fc" id="L108">        PublisherKey key = keyLookup.orElseThrow();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (key.revoked()) {</span>
+<span class="fc" id="L110">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.REVOKED_KEY,
+                false,
+                false,
+<span class="fc" id="L118">                List.of(&quot;REVOKED_KEY&quot;));</span>
+        }
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (!signature.algorithm().equals(key.algorithm())) {</span>
+<span class="nc" id="L121">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.KEY_ALGORITHM_MISMATCH,
+                false,
+                false,
+<span class="nc" id="L129">                List.of(&quot;KEY_ALGORITHM_MISMATCH&quot;));</span>
+        }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (!verifySignature(signature, key)) {</span>
+<span class="fc" id="L132">            return result(</span>
+                index,
+                signature,
+                signatureHash,
+                trustStoreHash,
+                Status.INVALID_SIGNATURE,
+                false,
+                false,
+<span class="fc" id="L140">                List.of(&quot;INVALID_SIGNATURE&quot;));</span>
+        }
+
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        Status status = key.retired()</span>
+<span class="fc" id="L144">            ? Status.VERIFIED_RETIRED_KEY</span>
+<span class="fc" id="L145">            : Status.VERIFIED_TRUSTED;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        List&lt;String&gt; warnings = key.retired()</span>
+<span class="fc" id="L147">            ? List.of(&quot;RETIRED_CURATOR_KEY&quot;)</span>
+<span class="fc" id="L148">            : List.of();</span>
+<span class="fc" id="L149">        return result(</span>
+            index,
+            signature,
+            signatureHash,
+            trustStoreHash,
+            status,
+            true,
+            true,
+            warnings);
+    }
+
+    public VerifiedIndex requireTrusted(Path indexPath) {
+<span class="fc" id="L161">        Path index = Objects.requireNonNull(indexPath, &quot;indexPath&quot;);</span>
+<span class="nc" id="L162">        return requireTrusted(index, PluginArtifactIndexSignature.sidecarFor(index));</span>
+    }
+
+    public VerifiedIndex requireTrusted(Path indexPath, Path signaturePath) {
+<span class="fc" id="L166">        Path indexFile = Objects.requireNonNull(indexPath, &quot;indexPath&quot;);</span>
+<span class="fc" id="L167">        Path signatureFile = Objects.requireNonNull(signaturePath, &quot;signaturePath&quot;);</span>
+<span class="fc" id="L168">        PluginArtifactIndex index = PluginArtifactIndex.load(indexFile);</span>
+<span class="fc" id="L169">        PluginArtifactIndexSignature signature =</span>
+<span class="fc" id="L170">            PluginArtifactIndexSignature.read(signatureFile);</span>
+<span class="fc" id="L171">        Verification verification = verify(index, signature);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (!verification.trusted()) {</span>
+<span class="fc" id="L173">            throw new SecurityException(</span>
+                &quot;plugin artifact index verification failed: status=&quot;
+<span class="fc" id="L175">                    + verification.status()</span>
+<span class="fc" id="L176">                    + &quot;, indexPath=&quot; + indexFile.toAbsolutePath().normalize()</span>
+                    + &quot;, signaturePath=&quot;
+<span class="fc" id="L178">                    + signatureFile.toAbsolutePath().normalize());</span>
+        }
+<span class="fc" id="L180">        return new VerifiedIndex(index, verification);</span>
+    }
+
+    private Verification result(
+        PluginArtifactIndex index,
+        PluginArtifactIndexSignature signature,
+        String signatureHash,
+        String trustStoreHash,
+        Status status,
+        boolean signatureVerified,
+        boolean trusted,
+        List&lt;String&gt; warnings
+    ) {
+<span class="fc" id="L193">        return Verification.create(</span>
+<span class="fc" id="L194">            index.indexId(),</span>
+<span class="fc" id="L195">            index.revision(),</span>
+<span class="fc" id="L196">            index.contentHash(),</span>
+            signatureHash,
+            trustStoreHash,
+            status,
+            signatureVerified,
+            trusted,
+<span class="fc" id="L202">            signature.curatorId(),</span>
+<span class="fc" id="L203">            signature.keyId(),</span>
+            warnings);
+    }
+
+    private static boolean verifySignature(
+        PluginArtifactIndexSignature manifest,
+        PublisherKey key
+    ) {
+        try {
+<span class="fc" id="L212">            Signature verifier = Signature.getInstance(</span>
+                PluginArtifactIndexSignature.ALGORITHM);
+<span class="fc" id="L214">            verifier.initVerify(key.publicKey());</span>
+<span class="fc" id="L215">            verifier.update(manifest.signedPayload());</span>
+<span class="fc" id="L216">            return verifier.verify(</span>
+<span class="fc" id="L217">                Base64.getDecoder().decode(manifest.signatureBase64()));</span>
+<span class="nc" id="L218">        } catch (GeneralSecurityException | IllegalArgumentException exception) {</span>
+<span class="nc" id="L219">            return false;</span>
+        }
+    }
+
+<span class="fc" id="L223">    public enum Status {</span>
+<span class="fc" id="L224">        INDEX_ID_MISMATCH,</span>
+<span class="fc" id="L225">        REVISION_MISMATCH,</span>
+<span class="fc" id="L226">        INDEX_HASH_MISMATCH,</span>
+<span class="fc" id="L227">        CURATOR_MISMATCH,</span>
+<span class="fc" id="L228">        UNKNOWN_CURATOR,</span>
+<span class="fc" id="L229">        UNKNOWN_KEY,</span>
+<span class="fc" id="L230">        REVOKED_KEY,</span>
+<span class="fc" id="L231">        KEY_ALGORITHM_MISMATCH,</span>
+<span class="fc" id="L232">        INVALID_SIGNATURE,</span>
+<span class="fc" id="L233">        VERIFIED_RETIRED_KEY,</span>
+<span class="fc" id="L234">        VERIFIED_TRUSTED</span>
+    }
+
+    /** Immutable, replayable evidence for one index-signature decision. */
+    public record Verification(
+        String schema,
+        String indexId,
+        String revision,
+        String indexContentHash,
+        String signatureContentHash,
+        String trustStoreContentHash,
+        Status status,
+        boolean signatureVerified,
+        boolean trusted,
+        String curatorId,
+        String keyId,
+        List&lt;String&gt; warnings,
+        String contentHash
+    ) {
+        public static final String SCHEMA =
+            &quot;regelsuche.plugin-artifact-index-verification/v1&quot;;
+<span class="fc" id="L255">        private static final ObjectMapper JSON =</span>
+<span class="fc" id="L256">            new ObjectMapper().findAndRegisterModules();</span>
+
+<span class="fc" id="L258">        public Verification {</span>
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L260">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported plugin artifact index verification schema&quot;);
+            }
+<span class="fc" id="L263">            indexId = PluginSignatureManifest.requireIdentifier(indexId, &quot;indexId&quot;);</span>
+<span class="fc" id="L264">            revision = PluginSignatureManifest.requireIdentifier(revision, &quot;revision&quot;);</span>
+<span class="fc" id="L265">            indexContentHash = PluginSignatureManifest.requireSha256(</span>
+                indexContentHash, &quot;indexContentHash&quot;);
+<span class="fc" id="L267">            signatureContentHash = PluginSignatureManifest.requireSha256(</span>
+                signatureContentHash, &quot;signatureContentHash&quot;);
+<span class="fc" id="L269">            trustStoreContentHash = PluginSignatureManifest.requireSha256(</span>
+                trustStoreContentHash, &quot;trustStoreContentHash&quot;);
+<span class="fc" id="L271">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L272">            curatorId = PluginSignatureManifest.requireIdentifier(</span>
+                curatorId, &quot;curatorId&quot;);
+<span class="fc" id="L274">            keyId = PluginSignatureManifest.requireIdentifier(keyId, &quot;keyId&quot;);</span>
+<span class="fc" id="L275">            warnings = normalizeWarnings(warnings);</span>
+<span class="fc bfc" id="L276" title="All 4 branches covered.">            boolean verifiedStatus = status == Status.VERIFIED_TRUSTED</span>
+                || status == Status.VERIFIED_RETIRED_KEY;
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">            if (verifiedStatus != signatureVerified || verifiedStatus != trusted) {</span>
+<span class="nc" id="L279">                throw new IllegalArgumentException(</span>
+                    &quot;index verification status and trust flags disagree&quot;);
+            }
+<span class="fc" id="L282">            String expected = PluginArtifactVerifier.sha256(canonicalMaterial(</span>
+                indexId,
+                revision,
+                indexContentHash,
+                signatureContentHash,
+                trustStoreContentHash,
+                status,
+                signatureVerified,
+                trusted,
+                curatorId,
+                keyId,
+                warnings));
+<span class="fc bfc" id="L294" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L295">                throw new IllegalArgumentException(</span>
+                    &quot;plugin artifact index verification contentHash mismatch&quot;);
+            }
+<span class="fc" id="L298">        }</span>
+
+        private static Verification create(
+            String indexId,
+            String revision,
+            String indexContentHash,
+            String signatureContentHash,
+            String trustStoreContentHash,
+            Status status,
+            boolean signatureVerified,
+            boolean trusted,
+            String curatorId,
+            String keyId,
+            List&lt;String&gt; warnings
+        ) {
+<span class="fc" id="L313">            String normalizedIndex = PluginSignatureManifest.requireIdentifier(</span>
+                indexId, &quot;indexId&quot;);
+<span class="fc" id="L315">            String normalizedRevision = PluginSignatureManifest.requireIdentifier(</span>
+                revision, &quot;revision&quot;);
+<span class="fc" id="L317">            String normalizedIndexHash = PluginSignatureManifest.requireSha256(</span>
+                indexContentHash, &quot;indexContentHash&quot;);
+<span class="fc" id="L319">            String normalizedSignatureHash = PluginSignatureManifest.requireSha256(</span>
+                signatureContentHash, &quot;signatureContentHash&quot;);
+<span class="fc" id="L321">            String normalizedTrustStoreHash = PluginSignatureManifest.requireSha256(</span>
+                trustStoreContentHash, &quot;trustStoreContentHash&quot;);
+<span class="fc" id="L323">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L324">            String normalizedCurator = PluginSignatureManifest.requireIdentifier(</span>
+                curatorId, &quot;curatorId&quot;);
+<span class="fc" id="L326">            String normalizedKey = PluginSignatureManifest.requireIdentifier(</span>
+                keyId, &quot;keyId&quot;);
+<span class="fc" id="L328">            List&lt;String&gt; normalizedWarnings = normalizeWarnings(warnings);</span>
+<span class="fc" id="L329">            String hash = PluginArtifactVerifier.sha256(canonicalMaterial(</span>
+                normalizedIndex,
+                normalizedRevision,
+                normalizedIndexHash,
+                normalizedSignatureHash,
+                normalizedTrustStoreHash,
+                status,
+                signatureVerified,
+                trusted,
+                normalizedCurator,
+                normalizedKey,
+                normalizedWarnings));
+<span class="fc" id="L341">            return new Verification(</span>
+                SCHEMA,
+                normalizedIndex,
+                normalizedRevision,
+                normalizedIndexHash,
+                normalizedSignatureHash,
+                normalizedTrustStoreHash,
+                status,
+                signatureVerified,
+                trusted,
+                normalizedCurator,
+                normalizedKey,
+                normalizedWarnings,
+                hash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L358">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L359">            payload.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L360">            payload.put(&quot;indexId&quot;, indexId);</span>
+<span class="fc" id="L361">            payload.put(&quot;revision&quot;, revision);</span>
+<span class="fc" id="L362">            payload.put(&quot;indexContentHash&quot;, indexContentHash);</span>
+<span class="fc" id="L363">            payload.put(&quot;signatureContentHash&quot;, signatureContentHash);</span>
+<span class="fc" id="L364">            payload.put(&quot;trustStoreContentHash&quot;, trustStoreContentHash);</span>
+<span class="fc" id="L365">            payload.put(&quot;status&quot;, status.name());</span>
+<span class="fc" id="L366">            payload.put(&quot;signatureVerified&quot;, signatureVerified);</span>
+<span class="fc" id="L367">            payload.put(&quot;trusted&quot;, trusted);</span>
+<span class="fc" id="L368">            payload.put(&quot;curatorId&quot;, curatorId);</span>
+<span class="fc" id="L369">            payload.put(&quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L370">            payload.put(&quot;warnings&quot;, warnings);</span>
+<span class="fc" id="L371">            payload.put(&quot;contentHash&quot;, contentHash);</span>
+            try {
+<span class="fc" id="L373">                return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L374">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L375">                throw new IllegalStateException(</span>
+                    &quot;Unable to serialize plugin artifact index verification&quot;,
+                    exception);
+            }
+        }
+
+        private static byte[] canonicalMaterial(
+            String indexId,
+            String revision,
+            String indexContentHash,
+            String signatureContentHash,
+            String trustStoreContentHash,
+            Status status,
+            boolean signatureVerified,
+            boolean trusted,
+            String curatorId,
+            String keyId,
+            List&lt;String&gt; warnings
+        ) {
+            try {
+<span class="fc" id="L395">                ByteArrayOutputStream bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L396">                try (DataOutputStream output = new DataOutputStream(bytes)) {</span>
+<span class="fc" id="L397">                    writeField(output, &quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L398">                    writeField(output, &quot;indexId&quot;, indexId);</span>
+<span class="fc" id="L399">                    writeField(output, &quot;revision&quot;, revision);</span>
+<span class="fc" id="L400">                    writeField(output, &quot;indexContentHash&quot;, indexContentHash);</span>
+<span class="fc" id="L401">                    writeField(output, &quot;signatureContentHash&quot;, signatureContentHash);</span>
+<span class="fc" id="L402">                    writeField(output, &quot;trustStoreContentHash&quot;, trustStoreContentHash);</span>
+<span class="fc" id="L403">                    writeField(output, &quot;status&quot;, status.name());</span>
+<span class="fc" id="L404">                    writeField(</span>
+                        output,
+                        &quot;signatureVerified&quot;,
+<span class="fc" id="L407">                        Boolean.toString(signatureVerified));</span>
+<span class="fc" id="L408">                    writeField(output, &quot;trusted&quot;, Boolean.toString(trusted));</span>
+<span class="fc" id="L409">                    writeField(output, &quot;curatorId&quot;, curatorId);</span>
+<span class="fc" id="L410">                    writeField(output, &quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L411">                    output.writeInt(warnings.size());</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">                    for (String warning : warnings) {</span>
+<span class="fc" id="L413">                        writeField(output, &quot;warning&quot;, warning);</span>
+<span class="fc" id="L414">                    }</span>
+                }
+<span class="fc" id="L416">                return bytes.toByteArray();</span>
+<span class="nc" id="L417">            } catch (IOException exception) {</span>
+<span class="nc" id="L418">                throw new IllegalStateException(</span>
+                    &quot;Unable to encode plugin artifact index verification&quot;,
+                    exception);
+            }
+        }
+
+        private static List&lt;String&gt; normalizeWarnings(List&lt;String&gt; values) {
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            return values == null ? List.of() : values.stream()</span>
+<span class="fc" id="L426">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L427">                .map(String::trim)</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">                .filter(value -&gt; !value.isBlank())</span>
+<span class="fc" id="L429">                .distinct()</span>
+<span class="fc" id="L430">                .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L431">                .toList();</span>
+        }
+
+        private static void writeField(
+            DataOutputStream output,
+            String name,
+            String value
+        ) throws IOException {
+<span class="fc" id="L439">            writeBytes(output, name.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L440">            writeBytes(output, value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L441">        }</span>
+
+        private static void writeBytes(DataOutputStream output, byte[] value)
+                throws IOException {
+<span class="fc" id="L445">            output.writeInt(value.length);</span>
+<span class="fc" id="L446">            output.write(value);</span>
+<span class="fc" id="L447">        }</span>
+    }
+
+    /**
+     * Authority-bearing result that can only be created by this verifier after
+     * a successful trust decision.
+     */
+    public static final class VerifiedIndex {
+        private final PluginArtifactIndex index;
+        private final Verification verification;
+
+        private VerifiedIndex(
+            PluginArtifactIndex index,
+            Verification verification
+<span class="fc" id="L461">        ) {</span>
+<span class="fc" id="L462">            this.index = Objects.requireNonNull(index, &quot;index&quot;);</span>
+<span class="fc" id="L463">            this.verification = Objects.requireNonNull(</span>
+                verification, &quot;verification&quot;);
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">            if (!verification.trusted()</span>
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">                    || !index.indexId().equals(verification.indexId())</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                    || !index.revision().equals(verification.revision())</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">                    || !index.contentHash().equals(verification.indexContentHash())</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">                    || !index.curatorId().equals(verification.curatorId())) {</span>
+<span class="nc" id="L470">                throw new IllegalArgumentException(</span>
+                    &quot;verified index requires trusted matching verification evidence&quot;);
+            }
+<span class="fc" id="L473">        }</span>
+
+        public PluginArtifactIndex index() {
+<span class="fc" id="L476">            return index;</span>
+        }
+
+        public Verification verification() {
+<span class="fc" id="L480">            return verification;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

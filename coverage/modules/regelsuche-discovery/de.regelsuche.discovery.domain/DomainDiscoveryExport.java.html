@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainDiscoveryExport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DomainDiscoveryExport.java</span></div><h1>DomainDiscoveryExport.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Commits one generic domain-discovery run as a manifest-bound export.
+ *
+ * &lt;p&gt;The detailed domain evidence remains representation-specific. The stable
+ * downstream entry point is the representation-free lifecycle handoff, bound
+ * to the exact descriptor and evidence bytes by a manifest written last.&lt;/p&gt;
+ */
+<span class="fc" id="L27">public final class DomainDiscoveryExport {</span>
+    public static final String SCHEMA = &quot;regelsuche.domain-discovery-export/v1&quot;;
+    public static final String COMMIT_PROTOCOL = &quot;MANIFEST_LAST_ATOMIC_RENAME&quot;;
+    public static final String MANIFEST_FILE_NAME = &quot;export-manifest.json&quot;;
+
+    public DomainExportManifest write(
+        Path outputDirectory,
+        DomainDiscoveryEvidence evidence
+    ) {
+<span class="fc" id="L36">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L37">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L38">        DiscoveryLifecycleHandoff handoff = DiscoveryLifecycleHandoff.from(evidence);</span>
+<span class="fc" id="L39">        validateBinding(evidence, handoff);</span>
+
+<span class="fc" id="L41">        List&lt;Payload&gt; payloads = List.of(</span>
+<span class="fc" id="L42">            payload(</span>
+                ArtifactRole.DOMAIN_DESCRIPTOR,
+<span class="fc" id="L44">                evidence.descriptor().contentHash(),</span>
+<span class="fc" id="L45">                evidence.descriptor().toCanonicalJson()),</span>
+<span class="fc" id="L46">            payload(</span>
+                ArtifactRole.DISCOVERY_EVIDENCE,
+<span class="fc" id="L48">                evidence.contentHash(),</span>
+<span class="fc" id="L49">                evidence.toCanonicalJson()),</span>
+<span class="fc" id="L50">            payload(</span>
+                ArtifactRole.LIFECYCLE_HANDOFF,
+<span class="fc" id="L52">                handoff.contentHash(),</span>
+<span class="fc" id="L53">                handoff.toCanonicalJson()));</span>
+<span class="fc" id="L54">        DomainExportManifest manifest = DomainExportManifest.create(</span>
+<span class="fc" id="L55">            evidence.campaignId(),</span>
+<span class="fc" id="L56">            evidence.descriptor().domainId(),</span>
+<span class="fc" id="L57">            evidence.descriptor().revision(),</span>
+<span class="fc" id="L58">            evidence.descriptor().contentHash(),</span>
+<span class="fc" id="L59">            evidence.contentHash(),</span>
+<span class="fc" id="L60">            handoff.contentHash(),</span>
+<span class="fc" id="L61">            payloads.stream().map(Payload::artifact).toList());</span>
+
+<span class="fc" id="L63">        Path directory = outputDirectory.toAbsolutePath().normalize();</span>
+        try {
+<span class="fc" id="L65">            Files.createDirectories(directory);</span>
+<span class="fc" id="L66">            Files.deleteIfExists(directory.resolve(MANIFEST_FILE_NAME));</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (Payload payload : payloads.stream()</span>
+<span class="fc" id="L68">                    .sorted(Comparator.comparing(item -&gt; item.artifact().fileName()))</span>
+<span class="fc" id="L69">                    .toList()) {</span>
+<span class="fc" id="L70">                atomicWrite(</span>
+<span class="fc" id="L71">                    directory.resolve(payload.artifact().fileName()),</span>
+<span class="fc" id="L72">                    payload.content());</span>
+<span class="fc" id="L73">            }</span>
+<span class="fc" id="L74">            atomicWrite(</span>
+<span class="fc" id="L75">                directory.resolve(MANIFEST_FILE_NAME),</span>
+<span class="fc" id="L76">                manifest.toCanonicalJson());</span>
+<span class="fc" id="L77">            return manifest;</span>
+<span class="nc" id="L78">        } catch (IOException exception) {</span>
+<span class="nc" id="L79">            throw new UncheckedIOException(</span>
+                &quot;Could not commit generic domain discovery export&quot;, exception);
+        }
+    }
+
+    private static void validateBinding(
+        DomainDiscoveryEvidence evidence,
+        DiscoveryLifecycleHandoff handoff
+    ) {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (handoff.sourceKind()</span>
+                != DiscoveryLifecycleHandoff.SourceKind.DOMAIN_DISCOVERY_EVIDENCE
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                || handoff.stage()</span>
+                    != DiscoveryLifecycleHandoff.Stage.DISCOVERY_VALIDATION
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                || !evidence.campaignId().equals(handoff.campaignId())</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                || !evidence.descriptor().domainId().equals(handoff.domainId())</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                || !evidence.descriptor().revision().equals(handoff.domainRevision())</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                || !evidence.descriptor().contentHash().equals(</span>
+<span class="fc" id="L96">                    handoff.domainContractHash())</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                || !evidence.seed().contentHash().equals(handoff.inputHash())</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                || !evidence.contentHash().equals(handoff.sourceEvidenceHash())) {</span>
+<span class="nc" id="L99">            throw new IllegalStateException(</span>
+                &quot;lifecycle handoff must bind the exported domain evidence&quot;);
+        }
+<span class="fc" id="L102">    }</span>
+
+    private static Payload payload(
+        ArtifactRole role,
+        String sourceContentHash,
+        String content
+    ) {
+<span class="fc" id="L109">        Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L110">        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L111">        return new Payload(</span>
+            new ExportArtifact(
+<span class="fc" id="L113">                role.fileName(),</span>
+                role,
+                sourceContentHash,
+<span class="fc" id="L116">                DomainCanonical.sha256(content),</span>
+                bytes.length),
+            content);
+    }
+
+    private static void atomicWrite(Path target, String content) throws IOException {
+<span class="fc" id="L122">        Path directory = target.getParent();</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (directory == null) {</span>
+<span class="nc" id="L124">            throw new IOException(&quot;export target must have a parent directory&quot;);</span>
+        }
+<span class="fc" id="L126">        Path temporary = Files.createTempFile(</span>
+            directory,
+<span class="fc" id="L128">            &quot;.&quot; + target.getFileName() + &quot;.&quot;,</span>
+            &quot;.tmp&quot;);
+        try {
+<span class="fc" id="L131">            Files.writeString(</span>
+                temporary,
+                content,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+<span class="fc" id="L137">            try (FileChannel channel = FileChannel.open(</span>
+                    temporary, StandardOpenOption.WRITE)) {
+<span class="fc" id="L139">                channel.force(true);</span>
+            }
+<span class="fc" id="L141">            Files.move(</span>
+                temporary,
+                target,
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+<span class="fc" id="L147">            Files.deleteIfExists(temporary);</span>
+        }
+<span class="fc" id="L149">    }</span>
+
+    private static String manifestHash(
+        String campaignId,
+        String domainId,
+        String domainRevision,
+        String domainDescriptorHash,
+        String discoveryEvidenceHash,
+        String lifecycleHandoffHash,
+        List&lt;ExportArtifact&gt; artifacts,
+        String commitProtocol
+    ) {
+<span class="fc" id="L161">        return DomainCanonical.sha256(</span>
+            SCHEMA
+                + &quot;\ncampaignId=&quot; + campaignId
+                + &quot;\ndomainId=&quot; + domainId
+                + &quot;\ndomainRevision=&quot; + domainRevision
+                + &quot;\ndomainDescriptorHash=&quot; + domainDescriptorHash
+                + &quot;\ndiscoveryEvidenceHash=&quot; + discoveryEvidenceHash
+                + &quot;\nlifecycleHandoffHash=&quot; + lifecycleHandoffHash
+<span class="fc" id="L169">                + &quot;\nartifacts=&quot; + artifacts.stream()</span>
+<span class="fc" id="L170">                    .map(ExportArtifact::canonicalMaterial).toList()</span>
+                + &quot;\ncommitProtocol=&quot; + commitProtocol);
+    }
+
+    private static List&lt;ExportArtifact&gt; normalizeArtifacts(
+        List&lt;ExportArtifact&gt; values
+    ) {
+<span class="pc bpc" id="L177" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L178">            throw new IllegalArgumentException(&quot;domain export requires artifacts&quot;);</span>
+        }
+<span class="fc" id="L180">        List&lt;ExportArtifact&gt; normalized = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L181">        Set&lt;String&gt; fileNames = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L182">        EnumSet&lt;ArtifactRole&gt; roles = EnumSet.noneOf(ArtifactRole.class);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        for (ExportArtifact value : values) {</span>
+<span class="fc" id="L184">            ExportArtifact artifact = Objects.requireNonNull(</span>
+                value, &quot;export artifact&quot;);
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            if (!fileNames.add(artifact.fileName())) {</span>
+<span class="nc" id="L187">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L188">                    &quot;duplicate domain export file: &quot; + artifact.fileName());</span>
+            }
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (!roles.add(artifact.role())) {</span>
+<span class="nc" id="L191">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L192">                    &quot;duplicate domain export role: &quot; + artifact.role());</span>
+            }
+<span class="fc" id="L194">            normalized.add(artifact);</span>
+<span class="fc" id="L195">        }</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (!roles.equals(EnumSet.allOf(ArtifactRole.class))) {</span>
+<span class="fc" id="L197">            throw new IllegalArgumentException(</span>
+                &quot;domain export must contain every required artifact role&quot;);
+        }
+<span class="fc" id="L200">        normalized.sort(Comparator.comparing(ExportArtifact::fileName));</span>
+<span class="fc" id="L201">        return List.copyOf(normalized);</span>
+    }
+
+<span class="fc" id="L204">    public enum ArtifactRole {</span>
+<span class="fc" id="L205">        DOMAIN_DESCRIPTOR(&quot;domain.json&quot;),</span>
+<span class="fc" id="L206">        DISCOVERY_EVIDENCE(&quot;evidence.json&quot;),</span>
+<span class="fc" id="L207">        LIFECYCLE_HANDOFF(&quot;lifecycle-handoff.json&quot;);</span>
+
+        private final String fileName;
+
+<span class="fc" id="L211">        ArtifactRole(String fileName) {</span>
+<span class="fc" id="L212">            this.fileName = fileName;</span>
+<span class="fc" id="L213">        }</span>
+
+        public String fileName() {
+<span class="fc" id="L216">            return fileName;</span>
+        }
+    }
+
+    public record ExportArtifact(
+        String fileName,
+        ArtifactRole role,
+        String sourceContentHash,
+        String byteHash,
+        long byteLength
+    ) {
+<span class="fc" id="L227">        public ExportArtifact {</span>
+<span class="fc" id="L228">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (fileName == null</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                    || !role.fileName().equals(fileName)</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                    || fileName.contains(&quot;/&quot;)</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                    || fileName.contains(&quot;\\&quot;)</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                    || MANIFEST_FILE_NAME.equals(fileName)) {</span>
+<span class="fc" id="L234">                throw new IllegalArgumentException(</span>
+                    &quot;export file name must be the canonical role file name&quot;);
+            }
+<span class="fc" id="L237">            DomainCanonical.requireSha256(</span>
+                sourceContentHash, &quot;sourceContentHash&quot;);
+<span class="fc" id="L239">            DomainCanonical.requireSha256(byteHash, &quot;byteHash&quot;);</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (byteLength &lt;= 0L) {</span>
+<span class="nc" id="L241">                throw new IllegalArgumentException(</span>
+                    &quot;byteLength must be positive&quot;);
+            }
+<span class="fc" id="L244">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L247">            return fileName + '|' + role.name() + '|' + sourceContentHash</span>
+                + '|' + byteHash + '|' + byteLength;
+        }
+    }
+
+    public record DomainExportManifest(
+        String schema,
+        String campaignId,
+        String domainId,
+        String domainRevision,
+        String domainDescriptorHash,
+        String discoveryEvidenceHash,
+        String lifecycleHandoffHash,
+        List&lt;ExportArtifact&gt; artifacts,
+        String commitProtocol,
+        String contentHash
+    ) {
+<span class="fc" id="L264">        public DomainExportManifest {</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L266">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported generic domain export schema&quot;);
+            }
+<span class="fc" id="L269">            campaignId = DomainCanonical.requireIdentifier(</span>
+                campaignId, &quot;campaignId&quot;);
+<span class="fc" id="L271">            domainId = DomainCanonical.requireIdentifier(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L272">            domainRevision = DomainCanonical.requireIdentifier(</span>
+                domainRevision, &quot;domainRevision&quot;);
+<span class="fc" id="L274">            DomainCanonical.requireSha256(</span>
+                domainDescriptorHash, &quot;domainDescriptorHash&quot;);
+<span class="fc" id="L276">            DomainCanonical.requireSha256(</span>
+                discoveryEvidenceHash, &quot;discoveryEvidenceHash&quot;);
+<span class="fc" id="L278">            DomainCanonical.requireSha256(</span>
+                lifecycleHandoffHash, &quot;lifecycleHandoffHash&quot;);
+<span class="fc" id="L280">            artifacts = normalizeArtifacts(artifacts);</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">            if (!COMMIT_PROTOCOL.equals(commitProtocol)) {</span>
+<span class="nc" id="L282">                throw new IllegalArgumentException(</span>
+                    &quot;domain export must use the manifest-last commit protocol&quot;);
+            }
+<span class="fc" id="L285">            requireRoot(</span>
+                artifacts,
+                ArtifactRole.DOMAIN_DESCRIPTOR,
+                domainDescriptorHash);
+<span class="fc" id="L289">            requireRoot(</span>
+                artifacts,
+                ArtifactRole.DISCOVERY_EVIDENCE,
+                discoveryEvidenceHash);
+<span class="fc" id="L293">            requireRoot(</span>
+                artifacts,
+                ArtifactRole.LIFECYCLE_HANDOFF,
+                lifecycleHandoffHash);
+<span class="fc" id="L297">            DomainCanonical.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L298">            String expected = manifestHash(</span>
+                campaignId,
+                domainId,
+                domainRevision,
+                domainDescriptorHash,
+                discoveryEvidenceHash,
+                lifecycleHandoffHash,
+                artifacts,
+                commitProtocol);
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L308">                throw new IllegalArgumentException(</span>
+                    &quot;generic domain export contentHash mismatch&quot;);
+            }
+<span class="fc" id="L311">        }</span>
+
+        public static DomainExportManifest create(
+            String campaignId,
+            String domainId,
+            String domainRevision,
+            String domainDescriptorHash,
+            String discoveryEvidenceHash,
+            String lifecycleHandoffHash,
+            List&lt;ExportArtifact&gt; artifacts
+        ) {
+<span class="fc" id="L322">            String normalizedCampaign = DomainCanonical.requireIdentifier(</span>
+                campaignId, &quot;campaignId&quot;);
+<span class="fc" id="L324">            String normalizedDomain = DomainCanonical.requireIdentifier(</span>
+                domainId, &quot;domainId&quot;);
+<span class="fc" id="L326">            String normalizedRevision = DomainCanonical.requireIdentifier(</span>
+                domainRevision, &quot;domainRevision&quot;);
+<span class="fc" id="L328">            DomainCanonical.requireSha256(</span>
+                domainDescriptorHash, &quot;domainDescriptorHash&quot;);
+<span class="fc" id="L330">            DomainCanonical.requireSha256(</span>
+                discoveryEvidenceHash, &quot;discoveryEvidenceHash&quot;);
+<span class="fc" id="L332">            DomainCanonical.requireSha256(</span>
+                lifecycleHandoffHash, &quot;lifecycleHandoffHash&quot;);
+<span class="fc" id="L334">            List&lt;ExportArtifact&gt; normalizedArtifacts = normalizeArtifacts(artifacts);</span>
+<span class="fc" id="L335">            String hash = manifestHash(</span>
+                normalizedCampaign,
+                normalizedDomain,
+                normalizedRevision,
+                domainDescriptorHash,
+                discoveryEvidenceHash,
+                lifecycleHandoffHash,
+                normalizedArtifacts,
+                COMMIT_PROTOCOL);
+<span class="fc" id="L344">            return new DomainExportManifest(</span>
+                SCHEMA,
+                normalizedCampaign,
+                normalizedDomain,
+                normalizedRevision,
+                domainDescriptorHash,
+                discoveryEvidenceHash,
+                lifecycleHandoffHash,
+                normalizedArtifacts,
+                COMMIT_PROTOCOL,
+                hash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L358">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L359">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L360">                .property(&quot;campaignId&quot;, campaignId)</span>
+<span class="fc" id="L361">                .property(&quot;domainId&quot;, domainId)</span>
+<span class="fc" id="L362">                .property(&quot;domainRevision&quot;, domainRevision)</span>
+<span class="fc" id="L363">                .property(&quot;domainDescriptorHash&quot;, domainDescriptorHash)</span>
+<span class="fc" id="L364">                .property(&quot;discoveryEvidenceHash&quot;, discoveryEvidenceHash)</span>
+<span class="fc" id="L365">                .property(&quot;lifecycleHandoffHash&quot;, lifecycleHandoffHash)</span>
+<span class="fc" id="L366">                .array(&quot;artifacts&quot;, array -&gt; artifacts.forEach(artifact -&gt;</span>
+<span class="fc" id="L367">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L368">                        .property(&quot;fileName&quot;, artifact.fileName())</span>
+<span class="fc" id="L369">                        .property(&quot;role&quot;, artifact.role().name())</span>
+<span class="fc" id="L370">                        .property(&quot;sourceContentHash&quot;, artifact.sourceContentHash())</span>
+<span class="fc" id="L371">                        .property(&quot;byteHash&quot;, artifact.byteHash())</span>
+<span class="fc" id="L372">                        .property(&quot;byteLength&quot;, artifact.byteLength()))))</span>
+<span class="fc" id="L373">                .property(&quot;commitProtocol&quot;, commitProtocol)</span>
+<span class="fc" id="L374">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L375">                .endObject()</span>
+<span class="fc" id="L376">                .toString();</span>
+        }
+
+        private static void requireRoot(
+            List&lt;ExportArtifact&gt; artifacts,
+            ArtifactRole role,
+            String expectedHash
+        ) {
+<span class="fc" id="L384">            ExportArtifact artifact = artifacts.stream()</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">                .filter(item -&gt; item.role() == role)</span>
+<span class="fc" id="L386">                .findFirst()</span>
+<span class="fc" id="L387">                .orElseThrow();</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            if (!expectedHash.equals(artifact.sourceContentHash())) {</span>
+<span class="fc" id="L389">                throw new IllegalArgumentException(</span>
+                    &quot;manifest root hash must match retained &quot; + role);
+            }
+<span class="fc" id="L392">        }</span>
+    }
+
+    private record Payload(ExportArtifact artifact, String content) {
+<span class="fc" id="L396">        private Payload {</span>
+<span class="fc" id="L397">            Objects.requireNonNull(artifact, &quot;artifact&quot;);</span>
+<span class="fc" id="L398">            Objects.requireNonNull(content, &quot;content&quot;);</span>
+<span class="fc" id="L399">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
