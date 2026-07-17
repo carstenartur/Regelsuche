@@ -10,6 +10,8 @@ import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class DiscoveryLifecycleHandoffTest {
@@ -118,6 +120,56 @@ class DiscoveryLifecycleHandoffTest {
                 handoff.promotionStatus(),
                 handoff.publicEvidenceStatus(),
                 handoff.contentHash()));
+    }
+
+    @Test
+    void rejectsCompletedDiscoveryValidationHandoff() {
+        assertThrows(IllegalArgumentException.class, () ->
+            DiscoveryLifecycleHandoff.create(
+                "invalid-completed-discovery-handoff",
+                DiscoveryLifecycleHandoff.SourceKind.DOMAIN_DISCOVERY_EVIDENCE,
+                "invalid-completed-campaign",
+                "invalid-completed-domain",
+                "v1",
+                DomainCanonical.sha256("domain-contract"),
+                DomainCanonical.sha256("input"),
+                DomainCanonical.sha256("source-evidence"),
+                DiscoveryLifecycleHandoff.Stage.DISCOVERY_VALIDATION,
+                DiscoveryLifecycleHandoff.Disposition.COMPLETED,
+                "",
+                "",
+                List.of(new DiscoveryLifecycleHandoff.ResourceAccount(
+                    "STATES", 1, 1, 0, 0)),
+                Map.of(),
+                DiscoveryLifecycleHandoff.NOT_EVALUATED,
+                DiscoveryLifecycleHandoff.NOT_EVALUATED,
+                DiscoveryLifecycleHandoff.NOT_EVALUATED,
+                DiscoveryLifecycleHandoff.NOT_EVALUATED));
+    }
+
+    @Test
+    void rejectsWhitespaceOptionalHash() {
+        assertThrows(IllegalArgumentException.class, () ->
+            DiscoveryLifecycleHandoff.create(
+                "invalid-whitespace-hash-handoff",
+                DiscoveryLifecycleHandoff.SourceKind.DOMAIN_DISCOVERY_EVIDENCE,
+                "invalid-whitespace-campaign",
+                "invalid-whitespace-domain",
+                "v1",
+                DomainCanonical.sha256("domain-contract"),
+                DomainCanonical.sha256("input"),
+                DomainCanonical.sha256("source-evidence"),
+                DiscoveryLifecycleHandoff.Stage.DISCOVERY_VALIDATION,
+                DiscoveryLifecycleHandoff.Disposition.CONFIRMED,
+                " ",
+                DomainCanonical.sha256("certificate"),
+                List.of(new DiscoveryLifecycleHandoff.ResourceAccount(
+                    "STATES", 1, 1, 0, 0)),
+                Map.of(),
+                DiscoveryLifecycleHandoff.NOT_EVALUATED,
+                DiscoveryLifecycleHandoff.NOT_EVALUATED,
+                DiscoveryLifecycleHandoff.NOT_EVALUATED,
+                DiscoveryLifecycleHandoff.NOT_EVALUATED));
     }
 
     private static void write(Path path, String content) throws Exception {
