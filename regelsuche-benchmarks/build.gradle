@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'application'
     id 'jacoco'
 }
 
@@ -13,10 +14,33 @@ java {
     }
 }
 
+application {
+    mainClass = 'de.regelsuche.benchmarks.ComparativeBenchmarkMain'
+}
+
 dependencies {
+    api project(':regelsuche-solver-ir')
     implementation project(':regelsuche-search')
+    implementation project(':regelsuche-solver-portfolio')
+
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+def comparativeBenchmarkOutput = providers.gradleProperty(
+    'comparativeBenchmarkOutput'
+).orElse(
+    layout.buildDirectory.dir('reports/comparative-benchmarks')
+        .map { it.asFile.absolutePath }
+)
+
+tasks.register('writeComparativeBenchmark', JavaExec) {
+    group = 'verification'
+    description = 'Writes the canonical initial #235 comparative benchmark bundle.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.benchmarks.ComparativeBenchmarkMain'
+    args comparativeBenchmarkOutput.get()
 }
 
 tasks.named('test') {
