@@ -2,6 +2,7 @@ package de.regelsuche.benchmarks;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmarks.ComparativeBenchmark.CapabilityClaim;
@@ -50,6 +51,27 @@ class ComparativeBenchmarkBundleWriterTest {
     }
 
     @Test
+    void incompleteMatrixCannotReplacePreviouslyRetainedEvidence(
+        @TempDir Path directory
+    ) throws Exception {
+        ComparativeBenchmarkBundleWriter writer =
+            new ComparativeBenchmarkBundleWriter();
+        Report complete = singleResultReport();
+        writer.write(directory, complete);
+        Path sentinel = directory.resolve("retained-sentinel.txt");
+        Files.writeString(sentinel, "retained");
+
+        IllegalArgumentException failure = assertThrows(
+            IllegalArgumentException.class,
+            () -> writer.write(directory, incompleteResultReport()));
+
+        assertTrue(failure.getMessage().contains("result matrix is incomplete"));
+        assertEquals("retained", Files.readString(sentinel));
+        assertEquals(complete.toCanonicalJson(),
+            Files.readString(directory.resolve("report.json")));
+    }
+
+    @Test
     void replacesContentsWithoutDeletingNonRemovableOutputRoot(
         @TempDir Path parent
     ) throws Exception {
@@ -77,11 +99,7 @@ class ComparativeBenchmarkBundleWriterTest {
         var benchmarkCase = ComparativeBenchmarkCatalog.searchCases().getFirst();
         var parity = ComparativeBenchmarkCatalog.searchParity(
             List.of(benchmarkCase));
-        var system = new SearchSystem(
-            "best-first",
-            "test",
-            new BestFirstSearchStrategy(),
-            List.of());
+        var system = searchSystem();
         var configuration =
             ComparativeBenchmarkCatalog.searchConfiguration(system, parity);
         var result = new ComparativeBenchmarkExecutor().runSearch(
@@ -100,6 +118,39 @@ class ComparativeBenchmarkBundleWriterTest {
             List.of(benchmarkCase),
             List.of(result),
             List.of(claim),
+            List.of());
+    }
+
+    private static Report incompleteResultReport() {
+        var cases = ComparativeBenchmarkCatalog.searchCases().subList(0, 2);
+        var parity = ComparativeBenchmarkCatalog.searchParity(cases);
+        var system = searchSystem();
+        var configuration =
+            ComparativeBenchmarkCatalog.searchConfiguration(system, parity);
+        var onlyResult = new ComparativeBenchmarkExecutor().runSearch(
+            system, configuration, cases.getFirst());
+        var claim = CapabilityClaim.create(
+            "partial-search-result",
+            Track.TARGET_DIRECTED_SEARCH,
+            ClaimStatus.INSUFFICIENT_EVIDENCE,
+            "only one of two configured cases was executed",
+            List.of(onlyResult.contentHash()),
+            List.of("INCOMPLETE_MATRIX"));
+        return Report.create(
+            "bundle-writer-incomplete-test/v1",
+            List.of(parity),
+            List.of(configuration),
+            cases,
+            List.of(onlyResult),
+            List.of(claim),
+            List.of());
+    }
+
+    private static SearchSystem searchSystem() {
+        return new SearchSystem(
+            "best-first",
+            "test",
+            new BestFirstSearchStrategy(),
             List.of());
     }
 }
