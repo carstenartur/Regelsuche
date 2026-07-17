@@ -123,7 +123,22 @@
     },
     "semver": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+    },
+    "uri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^(?:[Hh][Tt][Tt][Pp][Ss]://|[Ff][Ii][Ll][Ee]:/(?:$|[^/].*|//.*))"
+    },
+    "uriOrEmpty": {
+      "oneOf": [
+        {
+          "const": ""
+        },
+        {
+          "$ref": "#/$defs/uri"
+        }
+      ]
     },
     "kind": {
       "enum": [
@@ -272,26 +287,13 @@
           "$ref": "#/$defs/sha256"
         },
         "artifactUri": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^(https://|file:/)"
+          "$ref": "#/$defs/uri"
         },
         "signatureManifestUri": {
-          "oneOf": [
-            {
-              "const": ""
-            },
-            {
-              "type": "string",
-              "format": "uri",
-              "pattern": "^(https://|file:/)"
-            }
-          ]
+          "$ref": "#/$defs/uriOrEmpty"
         },
         "provenanceUri": {
-          "type": "string",
-          "format": "uri",
-          "pattern": "^(https://|file:/)"
+          "$ref": "#/$defs/uri"
         },
         "publisherId": {
           "$ref": "#/$defs/identifier"
@@ -300,6 +302,27 @@
           "$ref": "#/$defs/sha256"
         }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "JAVA_PLUGIN"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "signatureManifestUri": {
+                "$ref": "#/$defs/uri"
+              }
+            }
+          }
+        }
+      ],
       "additionalProperties": false
     }
   }
