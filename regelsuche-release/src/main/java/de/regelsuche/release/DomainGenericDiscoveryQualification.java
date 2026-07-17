@@ -51,6 +51,7 @@ public final class DomainGenericDiscoveryQualification {
 
         List<DomainSummary> domains = exports.stream()
             .map(DomainGenericDiscoveryQualification::summarize)
+            .distinct()
             .sorted(Comparator.comparing(DomainSummary::domainId))
             .toList();
         List<RequirementCheck> checks = checks(

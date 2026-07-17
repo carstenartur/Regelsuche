@@ -87,6 +87,7 @@ class DomainGenericQualificationRunnerTest {
             .evaluate(List.of(expression, expression), 3, true);
 
         assertEquals(QualificationStatus.BLOCKED, blocked.status());
+        assertEquals(1, blocked.domains().size());
         assertFalse(blocked.domainGenericClaimAuthorized());
         assertTrue(blocked.blockers().contains(
             "AT_LEAST_TWO_DISTINCT_DOMAINS"));
