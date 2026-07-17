@@ -257,7 +257,9 @@ class PluginArtifactResolverTest {
         assertEquals(ResolutionStatus.RESOLVED, receipt.status());
         assertEquals(1, receipt.plan().size());
         assertEquals(List.of(
-            "optional-dependency-cycle:JAVA_PLUGIN/optional-cycle->"
+            "optional-dependency-rejected:optional-cycle-1.0.0->"
+                + "JAVA_PLUGIN/optional-cycle@=1.0.0:"
+                + "blockers=dependency-cycle:JAVA_PLUGIN/optional-cycle->"
                 + "JAVA_PLUGIN/optional-cycle"), receipt.warnings());
     }
 
