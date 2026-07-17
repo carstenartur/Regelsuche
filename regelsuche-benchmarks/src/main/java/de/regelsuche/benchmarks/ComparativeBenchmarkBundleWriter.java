@@ -19,7 +19,7 @@ public final class ComparativeBenchmarkBundleWriter {
         Objects.requireNonNull(outputDirectory, "outputDirectory");
         Objects.requireNonNull(report, "report");
         try {
-            clear(outputDirectory);
+            clearContents(outputDirectory);
             Files.createDirectories(outputDirectory);
             writeFile(
                 outputDirectory.resolve("report.json"),
@@ -90,12 +90,20 @@ public final class ComparativeBenchmarkBundleWriter {
         Files.writeString(path, content, StandardCharsets.UTF_8);
     }
 
-    private static void clear(Path directory) throws IOException {
+    /**
+     * Deletes every previous evidence entry while preserving the requested root.
+     * The root may be a Docker volume mount and therefore must never be removed.
+     */
+    private static void clearContents(Path directory) throws IOException {
         if (!Files.exists(directory)) {
             return;
         }
-        try (var paths = Files.walk(directory)) {
-            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+        Path normalizedRoot = directory.toAbsolutePath().normalize();
+        try (var paths = Files.walk(normalizedRoot)) {
+            for (Path path : paths
+                    .filter(item -> !item.equals(normalizedRoot))
+                    .sorted(Comparator.reverseOrder())
+                    .toList()) {
                 Files.delete(path);
             }
         }
