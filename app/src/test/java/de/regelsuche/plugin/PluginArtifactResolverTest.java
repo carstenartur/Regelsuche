@@ -177,6 +177,91 @@ class PluginArtifactResolverTest {
     }
 
     @Test
+    void blocksRequiredDependencyCycles() {
+        Entry left = PluginArtifactIndexFixtures.entry(
+            "cycle-left-1.0.0",
+            ArtifactKind.JAVA_PLUGIN,
+            "cycle-left",
+            "1.0.0",
+            "1",
+            "1.0.0",
+            "",
+            List.of(),
+            List.of(new Dependency(
+                ArtifactKind.JAVA_PLUGIN,
+                "cycle-right",
+                "=1.0.0",
+                false)));
+        Entry right = PluginArtifactIndexFixtures.entry(
+            "cycle-right-1.0.0",
+            ArtifactKind.JAVA_PLUGIN,
+            "cycle-right",
+            "1.0.0",
+            "1",
+            "1.0.0",
+            "",
+            List.of(),
+            List.of(new Dependency(
+                ArtifactKind.JAVA_PLUGIN,
+                "cycle-left",
+                "=1.0.0",
+                false)));
+        PluginArtifactIndex index = PluginArtifactIndex.create(
+            "cycle-index", "1.0.0", "curator", List.of(right, left));
+
+        ResolutionReceipt receipt = resolver.resolve(index,
+            ResolutionRequest.latestCompatible(
+                "resolve-required-cycle",
+                ArtifactKind.JAVA_PLUGIN,
+                "cycle-left",
+                "1.0.0",
+                "1",
+                List.of()));
+
+        assertEquals(ResolutionStatus.UNRESOLVED, receipt.status());
+        assertEquals(List.of(
+            "dependency-cycle:JAVA_PLUGIN/cycle-left->"
+                + "JAVA_PLUGIN/cycle-right->JAVA_PLUGIN/cycle-left"),
+            receipt.blockers());
+        assertTrue(receipt.plan().isEmpty());
+    }
+
+    @Test
+    void skipsOptionalSelfCycleAsVisibleWarning() {
+        Entry root = PluginArtifactIndexFixtures.entry(
+            "optional-cycle-1.0.0",
+            ArtifactKind.JAVA_PLUGIN,
+            "optional-cycle",
+            "1.0.0",
+            "1",
+            "1.0.0",
+            "",
+            List.of(),
+            List.of(new Dependency(
+                ArtifactKind.JAVA_PLUGIN,
+                "optional-cycle",
+                "=1.0.0",
+                true)));
+        PluginArtifactIndex index = PluginArtifactIndex.create(
+            "optional-cycle-index", "1.0.0", "curator", List.of(root));
+
+        ResolutionReceipt receipt = resolver.resolve(index,
+            ResolutionRequest.latestCompatible(
+                "resolve-optional-cycle",
+                ArtifactKind.JAVA_PLUGIN,
+                "optional-cycle",
+                "1.0.0",
+                "1",
+                List.of()));
+
+        assertEquals(ResolutionStatus.RESOLVED, receipt.status());
+        assertEquals(1, receipt.plan().size());
+        assertEquals(List.of(
+            "optional-dependency-cycle:JAVA_PLUGIN/optional-cycle->"
+                + "JAVA_PLUGIN/optional-cycle"), receipt.warnings());
+    }
+
+    @Test
     void receiptRejectsTamperingAndRequestRejectsAmbiguousSelectors() {
         PluginArtifactIndex index = PluginArtifactIndexFixtures.referenceIndex();
         ResolutionReceipt receipt = resolver.resolve(index,
