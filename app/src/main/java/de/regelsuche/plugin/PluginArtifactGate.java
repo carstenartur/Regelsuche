@@ -26,8 +26,20 @@ public final class PluginArtifactGate {
     private final String trustStoreHash;
 
     public PluginArtifactGate(PluginTrustStore trustStore, PluginTrustPolicy policy) {
+        this(
+            trustStore,
+            policy,
+            PluginArtifactTrustConfig.DEFAULT_MAX_ARTIFACT_BYTES
+        );
+    }
+
+    public PluginArtifactGate(
+        PluginTrustStore trustStore,
+        PluginTrustPolicy policy,
+        long maxArtifactBytes
+    ) {
         PluginTrustStore effectiveTrustStore = Objects.requireNonNull(trustStore, "trustStore");
-        this.verifier = new PluginArtifactVerifier(effectiveTrustStore);
+        this.verifier = new PluginArtifactVerifier(effectiveTrustStore, maxArtifactBytes);
         this.policy = policy == null ? PluginTrustPolicy.WARN : policy;
         this.trustStoreHash = PluginArtifactVerifier.sha256(
             effectiveTrustStore.toCanonicalJson().getBytes(StandardCharsets.UTF_8));
