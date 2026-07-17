@@ -1,0 +1,836 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginArtifactIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginArtifactIndex.java</span></div><h1>PluginArtifactIndex.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Immutable, content-addressed catalog of externally published extension
+ * artifacts. The index describes artifacts; it never downloads or installs
+ * them and cannot bypass the separate pre-classloading trust gate.
+ */
+public record PluginArtifactIndex(
+    String schema,
+    String indexId,
+    String revision,
+    String curatorId,
+    List&lt;Entry&gt; entries,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.plugin-artifact-index/v1&quot;;
+
+<span class="fc" id="L41">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L42">        .findAndRegisterModules()</span>
+<span class="fc" id="L43">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+<span class="fc" id="L45">    public PluginArtifactIndex {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;unsupported plugin artifact index schema&quot;);</span>
+        }
+<span class="fc" id="L49">        indexId = identifier(indexId, &quot;indexId&quot;);</span>
+<span class="fc" id="L50">        revision = identifier(revision, &quot;revision&quot;);</span>
+<span class="fc" id="L51">        curatorId = identifier(curatorId, &quot;curatorId&quot;);</span>
+<span class="fc" id="L52">        entries = normalizeEntries(entries);</span>
+<span class="fc" id="L53">        validateUniqueEntries(entries);</span>
+<span class="fc" id="L54">        validateRequiredDependencies(entries);</span>
+<span class="fc" id="L55">        contentHash = sha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L56">        String expected = hash(render(indexId, revision, curatorId, entries, false, &quot;&quot;));</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L58">            throw new IllegalArgumentException(&quot;plugin artifact index contentHash mismatch&quot;);</span>
+        }
+<span class="fc" id="L60">    }</span>
+
+    public static PluginArtifactIndex create(
+        String indexId,
+        String revision,
+        String curatorId,
+        List&lt;Entry&gt; entries
+    ) {
+<span class="fc" id="L68">        String normalizedIndex = identifier(indexId, &quot;indexId&quot;);</span>
+<span class="fc" id="L69">        String normalizedRevision = identifier(revision, &quot;revision&quot;);</span>
+<span class="fc" id="L70">        String normalizedCurator = identifier(curatorId, &quot;curatorId&quot;);</span>
+<span class="fc" id="L71">        List&lt;Entry&gt; normalizedEntries = normalizeEntries(entries);</span>
+<span class="fc" id="L72">        validateUniqueEntries(normalizedEntries);</span>
+<span class="fc" id="L73">        validateRequiredDependencies(normalizedEntries);</span>
+<span class="fc" id="L74">        String contentHash = hash(render(</span>
+            normalizedIndex,
+            normalizedRevision,
+            normalizedCurator,
+            normalizedEntries,
+            false,
+            &quot;&quot;));
+<span class="fc" id="L81">        return new PluginArtifactIndex(</span>
+            SCHEMA,
+            normalizedIndex,
+            normalizedRevision,
+            normalizedCurator,
+            normalizedEntries,
+            contentHash);
+    }
+
+    public static PluginArtifactIndex load(Path path) {
+<span class="fc" id="L91">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L93">            IndexDto dto = JSON.readValue(</span>
+<span class="fc" id="L94">                Files.readString(path, StandardCharsets.UTF_8), IndexDto.class);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (dto == null) {</span>
+<span class="nc" id="L96">                throw new IllegalArgumentException(&quot;plugin artifact index must not be empty&quot;);</span>
+            }
+<span class="fc" id="L98">            return new PluginArtifactIndex(</span>
+                dto.schema,
+                dto.indexId,
+                dto.revision,
+                dto.curatorId,
+<span class="fc" id="L103">                requiredList(dto.entries, &quot;entries&quot;).stream()</span>
+<span class="fc" id="L104">                    .map(PluginArtifactIndex::entry)</span>
+<span class="fc" id="L105">                    .toList(),</span>
+                dto.contentHash);
+<span class="fc" id="L107">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L108">            throw new IllegalArgumentException(&quot;Invalid plugin artifact index: &quot; + path, exception);</span>
+<span class="nc" id="L109">        } catch (IOException exception) {</span>
+<span class="nc" id="L110">            throw new IllegalArgumentException(&quot;Unable to read plugin artifact index: &quot; + path, exception);</span>
+        }
+    }
+
+    public Path write(Path path) {
+<span class="fc" id="L115">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L117">            Path parent = path.toAbsolutePath().normalize().getParent();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L119">                Files.createDirectories(parent);</span>
+            }
+<span class="fc" id="L121">            Files.writeString(path, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L122">            return path;</span>
+<span class="nc" id="L123">        } catch (IOException exception) {</span>
+<span class="nc" id="L124">            throw new IllegalStateException(&quot;Unable to write plugin artifact index&quot;, exception);</span>
+        }
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L129">        return render(indexId, revision, curatorId, entries, true, contentHash);</span>
+    }
+
+    public List&lt;Entry&gt; componentVersions(ArtifactKind kind, String componentId) {
+<span class="fc" id="L133">        Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L134">        String component = identifier(componentId, &quot;componentId&quot;);</span>
+<span class="fc" id="L135">        return entries.stream()</span>
+<span class="fc bfc" id="L136" title="All 4 branches covered.">            .filter(item -&gt; item.kind() == kind &amp;&amp; item.componentId().equals(component))</span>
+<span class="fc" id="L137">            .sorted(Comparator.comparing(Entry::version, PluginArtifactIndex::compareVersions)</span>
+<span class="fc" id="L138">                .reversed()</span>
+<span class="fc" id="L139">                .thenComparing(Entry::artifactId))</span>
+<span class="fc" id="L140">            .toList();</span>
+    }
+
+    static int compareVersions(String left, String right) {
+<span class="fc" id="L144">        return SemanticVersion.parse(left).compareTo(SemanticVersion.parse(right));</span>
+    }
+
+    static String requireVersion(String value, String field) {
+<span class="fc" id="L148">        return SemanticVersion.parse(value, field).source();</span>
+    }
+
+    private static Entry entry(EntryDto dto) {
+<span class="fc" id="L152">        Objects.requireNonNull(dto, &quot;artifact index entry&quot;);</span>
+<span class="fc" id="L153">        ArtifactKind kind = enumValue(ArtifactKind.class, dto.kind, &quot;artifact kind&quot;);</span>
+<span class="fc" id="L154">        String maximumCoreVersionExclusive = requiredValue(</span>
+            dto.maximumCoreVersionExclusive, &quot;maximumCoreVersionExclusive&quot;);
+<span class="fc" id="L156">        String signatureManifestUri = requiredValue(</span>
+            dto.signatureManifestUri, &quot;signatureManifestUri&quot;);
+<span class="fc" id="L158">        List&lt;String&gt; rawCapabilities = requiredList(dto.capabilities, &quot;capabilities&quot;);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (String capability : rawCapabilities) {</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">            if (capability == null) {</span>
+<span class="nc" id="L161">                throw new IllegalArgumentException(&quot;capabilities must not contain null&quot;);</span>
+            }
+<span class="fc" id="L163">            identifier(capability, &quot;capability&quot;);</span>
+<span class="fc" id="L164">        }</span>
+<span class="fc" id="L165">        List&lt;Dependency&gt; parsedDependencies = requiredList(</span>
+<span class="fc" id="L166">            dto.dependencies, &quot;dependencies&quot;).stream()</span>
+<span class="fc" id="L167">            .map(item -&gt; {</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                if (item == null) {</span>
+<span class="nc" id="L169">                    throw new IllegalArgumentException(</span>
+                        &quot;dependencies must not contain null&quot;);
+                }
+<span class="fc" id="L172">                return new Dependency(</span>
+<span class="fc" id="L173">                    enumValue(ArtifactKind.class, item.kind, &quot;dependency kind&quot;),</span>
+                    item.componentId,
+                    item.versionConstraint,
+<span class="fc" id="L176">                    requiredBoolean(item.optional, &quot;dependency optional&quot;));</span>
+            })
+<span class="fc" id="L178">            .toList();</span>
+<span class="fc" id="L179">        return new Entry(</span>
+            dto.artifactId,
+            kind,
+            dto.componentId,
+            dto.version,
+            dto.apiVersion,
+            dto.minimumCoreVersion,
+            maximumCoreVersionExclusive,
+            rawCapabilities,
+            parsedDependencies,
+            dto.artifactFileName,
+            dto.artifactSha256,
+            dto.artifactUri,
+            signatureManifestUri,
+            dto.provenanceUri,
+            dto.publisherId,
+            dto.identityHash);
+    }
+
+    private static String render(
+        String indexId,
+        String revision,
+        String curatorId,
+        List&lt;Entry&gt; entries,
+        boolean includeHash,
+        String contentHash
+    ) {
+<span class="fc" id="L206">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L207">        payload.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L208">        payload.put(&quot;indexId&quot;, indexId);</span>
+<span class="fc" id="L209">        payload.put(&quot;revision&quot;, revision);</span>
+<span class="fc" id="L210">        payload.put(&quot;curatorId&quot;, curatorId);</span>
+<span class="fc" id="L211">        payload.put(&quot;entries&quot;, entries.stream().map(Entry::payload).toList());</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (includeHash) {</span>
+<span class="fc" id="L213">            payload.put(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L215">        return json(payload) + &quot;\n&quot;;</span>
+    }
+
+    private static List&lt;Entry&gt; normalizeEntries(List&lt;Entry&gt; values) {
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L220">            throw new IllegalArgumentException(&quot;plugin artifact index requires an entry&quot;);</span>
+        }
+<span class="fc" id="L222">        return values.stream()</span>
+<span class="fc" id="L223">            .map(value -&gt; Objects.requireNonNull(value, &quot;artifact index entry&quot;))</span>
+<span class="fc" id="L224">            .sorted(Comparator</span>
+<span class="fc" id="L225">                .comparing((Entry item) -&gt; item.kind().name())</span>
+<span class="fc" id="L226">                .thenComparing(Entry::componentId)</span>
+<span class="fc" id="L227">                .thenComparing(Entry::version, PluginArtifactIndex::compareVersions)</span>
+<span class="fc" id="L228">                .thenComparing(Entry::artifactId))</span>
+<span class="fc" id="L229">            .toList();</span>
+    }
+
+    private static void validateUniqueEntries(List&lt;Entry&gt; entries) {
+<span class="fc" id="L233">        Set&lt;String&gt; artifactIds = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L234">        Set&lt;String&gt; coordinates = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L235">        Set&lt;String&gt; hashes = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (Entry item : entries) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (!artifactIds.add(item.artifactId())) {</span>
+<span class="nc" id="L238">                throw new IllegalArgumentException(&quot;duplicate artifact ID: &quot; + item.artifactId());</span>
+            }
+<span class="fc" id="L240">            String coordinate = item.kind() + &quot;\u0000&quot; + item.componentId()</span>
+<span class="fc" id="L241">                + &quot;\u0000&quot; + item.version();</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (!coordinates.add(coordinate)) {</span>
+<span class="fc" id="L243">                throw new IllegalArgumentException(</span>
+<span class="fc" id="L244">                    &quot;duplicate artifact coordinate: &quot; + item.kind() + &quot;/&quot;</span>
+<span class="fc" id="L245">                        + item.componentId() + &quot;/&quot; + item.version());</span>
+            }
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (!hashes.add(item.artifactSha256())) {</span>
+<span class="fc" id="L248">                throw new IllegalArgumentException(</span>
+                    &quot;artifact bytes are published under multiple identities: &quot;
+<span class="fc" id="L250">                        + item.artifactSha256());</span>
+            }
+<span class="fc" id="L252">        }</span>
+<span class="fc" id="L253">    }</span>
+
+    private static void validateRequiredDependencies(List&lt;Entry&gt; entries) {
+<span class="fc" id="L256">        Map&lt;String, Set&lt;String&gt;&gt; publishedVersions = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for (Entry item : entries) {</span>
+<span class="fc" id="L258">            publishedVersions.computeIfAbsent(</span>
+<span class="fc" id="L259">                dependencyKey(item.kind(), item.componentId()),</span>
+<span class="fc" id="L260">                ignored -&gt; new HashSet&lt;&gt;()).add(item.version());</span>
+<span class="fc" id="L261">        }</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        for (Entry item : entries) {</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            for (Dependency dependency : item.dependencies()) {</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">                if (dependency.optional()) {</span>
+<span class="fc" id="L265">                    continue;</span>
+                }
+<span class="fc" id="L267">                Set&lt;String&gt; versions = publishedVersions.get(</span>
+<span class="fc" id="L268">                    dependencyKey(dependency.kind(), dependency.componentId()));</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                boolean published = versions != null</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">                    &amp;&amp; (&quot;any&quot;.equals(dependency.versionConstraint())</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                        || versions.contains(dependency.versionConstraint().substring(1)));</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                if (!published) {</span>
+<span class="fc" id="L273">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L274">                        &quot;required dependency is not published: &quot; + dependency.kind()</span>
+<span class="fc" id="L275">                            + &quot;/&quot; + dependency.componentId() + &quot; &quot;</span>
+<span class="fc" id="L276">                            + dependency.versionConstraint());</span>
+                }
+<span class="fc" id="L278">            }</span>
+<span class="fc" id="L279">        }</span>
+<span class="fc" id="L280">    }</span>
+
+    private static String dependencyKey(ArtifactKind kind, String componentId) {
+<span class="fc" id="L283">        return kind + &quot;\u0000&quot; + componentId;</span>
+    }
+
+    private static String json(Object value) {
+        try {
+<span class="fc" id="L288">            return JSON.writeValueAsString(value);</span>
+<span class="nc" id="L289">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L290">            throw new IllegalStateException(&quot;Unable to serialize plugin artifact index&quot;, exception);</span>
+        }
+    }
+
+    private static String hash(String value) {
+<span class="fc" id="L295">        return PluginArtifactVerifier.sha256(value.getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    private static String identifier(String value, String field) {
+<span class="fc" id="L299">        return PluginSignatureManifest.requireIdentifier(value, field);</span>
+    }
+
+    private static String sha256(String value, String field) {
+<span class="fc" id="L303">        return PluginSignatureManifest.requireSha256(value, field);</span>
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; E enumValue(
+        Class&lt;E&gt; type,
+        String value,
+        String field
+    ) {
+        try {
+<span class="fc" id="L312">            return Enum.valueOf(type, value);</span>
+<span class="nc" id="L313">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L314">            throw new IllegalArgumentException(&quot;Unsupported &quot; + field + &quot;: &quot; + value, exception);</span>
+        }
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; list(List&lt;T&gt; values) {
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        return values == null ? List.of() : List.copyOf(values);</span>
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; requiredList(List&lt;T&gt; values, String field) {
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        if (values == null) {</span>
+<span class="fc" id="L324">            throw new IllegalArgumentException(field + &quot; must be present&quot;);</span>
+        }
+<span class="fc" id="L326">        return values;</span>
+    }
+
+    private static String requiredValue(String value, String field) {
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L331">            throw new IllegalArgumentException(field + &quot; must be present&quot;);</span>
+        }
+<span class="fc" id="L333">        return value;</span>
+    }
+
+    private static boolean requiredBoolean(Boolean value, String field) {
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L338">            throw new IllegalArgumentException(field + &quot; must be present&quot;);</span>
+        }
+<span class="fc" id="L340">        return value;</span>
+    }
+
+<span class="fc" id="L343">    public enum ArtifactKind {</span>
+<span class="fc" id="L344">        JAVA_PLUGIN,</span>
+<span class="fc" id="L345">        RULE_PACKAGE,</span>
+<span class="fc" id="L346">        KNOWLEDGE_PACK</span>
+    }
+
+    public record Entry(
+        String artifactId,
+        ArtifactKind kind,
+        String componentId,
+        String version,
+        String apiVersion,
+        String minimumCoreVersion,
+        String maximumCoreVersionExclusive,
+        List&lt;String&gt; capabilities,
+        List&lt;Dependency&gt; dependencies,
+        String artifactFileName,
+        String artifactSha256,
+        String artifactUri,
+        String signatureManifestUri,
+        String provenanceUri,
+        String publisherId,
+        String identityHash
+    ) {
+<span class="fc" id="L367">        public Entry {</span>
+<span class="fc" id="L368">            artifactId = identifier(artifactId, &quot;artifactId&quot;);</span>
+<span class="fc" id="L369">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L370">            componentId = identifier(componentId, &quot;componentId&quot;);</span>
+<span class="fc" id="L371">            version = requireVersion(version, &quot;version&quot;);</span>
+<span class="fc" id="L372">            apiVersion = identifier(apiVersion, &quot;apiVersion&quot;);</span>
+<span class="fc" id="L373">            minimumCoreVersion = requireVersion(minimumCoreVersion, &quot;minimumCoreVersion&quot;);</span>
+<span class="fc" id="L374">            maximumCoreVersionExclusive = optionalVersion(</span>
+                maximumCoreVersionExclusive, &quot;maximumCoreVersionExclusive&quot;);
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            if (!maximumCoreVersionExclusive.isEmpty()</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">                    &amp;&amp; compareVersions(minimumCoreVersion, maximumCoreVersionExclusive) &gt;= 0) {</span>
+<span class="nc" id="L378">                throw new IllegalArgumentException(</span>
+                    &quot;maximumCoreVersionExclusive must exceed minimumCoreVersion&quot;);
+            }
+<span class="fc" id="L381">            capabilities = PluginArtifactIndex.capabilities(capabilities);</span>
+<span class="fc" id="L382">            dependencies = PluginArtifactIndex.dependencies(dependencies);</span>
+<span class="fc" id="L383">            artifactFileName = fileName(artifactFileName, kind);</span>
+<span class="fc" id="L384">            artifactSha256 = sha256(artifactSha256, &quot;artifactSha256&quot;);</span>
+<span class="fc" id="L385">            artifactUri = uri(artifactUri, &quot;artifactUri&quot;, false);</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            signatureManifestUri = uri(</span>
+                signatureManifestUri, &quot;signatureManifestUri&quot;, kind != ArtifactKind.JAVA_PLUGIN);
+<span class="fc" id="L388">            provenanceUri = uri(provenanceUri, &quot;provenanceUri&quot;, false);</span>
+<span class="fc" id="L389">            publisherId = identifier(publisherId, &quot;publisherId&quot;);</span>
+<span class="fc" id="L390">            identityHash = sha256(identityHash, &quot;identityHash&quot;);</span>
+<span class="fc" id="L391">            String expected = identity(</span>
+                artifactId,
+                kind,
+                componentId,
+                version,
+                apiVersion,
+                minimumCoreVersion,
+                maximumCoreVersionExclusive,
+                capabilities,
+                dependencies,
+                artifactFileName,
+                artifactSha256,
+                artifactUri,
+                signatureManifestUri,
+                provenanceUri,
+                publisherId);
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            if (!expected.equals(identityHash)) {</span>
+<span class="nc" id="L408">                throw new IllegalArgumentException(&quot;artifact identityHash mismatch&quot;);</span>
+            }
+<span class="fc" id="L410">        }</span>
+
+        public static Entry create(
+            String artifactId,
+            ArtifactKind kind,
+            String componentId,
+            String version,
+            String apiVersion,
+            String minimumCoreVersion,
+            String maximumCoreVersionExclusive,
+            List&lt;String&gt; capabilities,
+            List&lt;Dependency&gt; dependencies,
+            String artifactFileName,
+            String artifactSha256,
+            String artifactUri,
+            String signatureManifestUri,
+            String provenanceUri,
+            String publisherId
+        ) {
+<span class="fc" id="L429">            String normalizedArtifactId = identifier(artifactId, &quot;artifactId&quot;);</span>
+<span class="fc" id="L430">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L431">            String normalizedComponent = identifier(componentId, &quot;componentId&quot;);</span>
+<span class="fc" id="L432">            String normalizedVersion = requireVersion(version, &quot;version&quot;);</span>
+<span class="fc" id="L433">            String normalizedApi = identifier(apiVersion, &quot;apiVersion&quot;);</span>
+<span class="fc" id="L434">            String normalizedMinimum = requireVersion(</span>
+                minimumCoreVersion, &quot;minimumCoreVersion&quot;);
+<span class="fc" id="L436">            String normalizedMaximum = optionalVersion(</span>
+                maximumCoreVersionExclusive, &quot;maximumCoreVersionExclusive&quot;);
+<span class="fc" id="L438">            List&lt;String&gt; normalizedCapabilities =</span>
+<span class="fc" id="L439">                PluginArtifactIndex.capabilities(capabilities);</span>
+<span class="fc" id="L440">            List&lt;Dependency&gt; normalizedDependencies =</span>
+<span class="fc" id="L441">                PluginArtifactIndex.dependencies(dependencies);</span>
+<span class="fc" id="L442">            String normalizedFileName = fileName(artifactFileName, kind);</span>
+<span class="fc" id="L443">            String normalizedHash = sha256(artifactSha256, &quot;artifactSha256&quot;);</span>
+<span class="fc" id="L444">            String normalizedArtifactUri = uri(artifactUri, &quot;artifactUri&quot;, false);</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            String normalizedSignatureUri = uri(</span>
+                signatureManifestUri, &quot;signatureManifestUri&quot;, kind != ArtifactKind.JAVA_PLUGIN);
+<span class="fc" id="L447">            String normalizedProvenance = uri(provenanceUri, &quot;provenanceUri&quot;, false);</span>
+<span class="fc" id="L448">            String normalizedPublisher = identifier(publisherId, &quot;publisherId&quot;);</span>
+<span class="fc" id="L449">            String identity = identity(</span>
+                normalizedArtifactId,
+                kind,
+                normalizedComponent,
+                normalizedVersion,
+                normalizedApi,
+                normalizedMinimum,
+                normalizedMaximum,
+                normalizedCapabilities,
+                normalizedDependencies,
+                normalizedFileName,
+                normalizedHash,
+                normalizedArtifactUri,
+                normalizedSignatureUri,
+                normalizedProvenance,
+                normalizedPublisher);
+<span class="fc" id="L465">            return new Entry(</span>
+                normalizedArtifactId,
+                kind,
+                normalizedComponent,
+                normalizedVersion,
+                normalizedApi,
+                normalizedMinimum,
+                normalizedMaximum,
+                normalizedCapabilities,
+                normalizedDependencies,
+                normalizedFileName,
+                normalizedHash,
+                normalizedArtifactUri,
+                normalizedSignatureUri,
+                normalizedProvenance,
+                normalizedPublisher,
+                identity);
+        }
+
+        public boolean supportsCore(String coreVersion) {
+<span class="fc" id="L485">            String core = requireVersion(coreVersion, &quot;coreVersion&quot;);</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">            return compareVersions(core, minimumCoreVersion) &gt;= 0</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">                &amp;&amp; (maximumCoreVersionExclusive.isEmpty()</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">                    || compareVersions(core, maximumCoreVersionExclusive) &lt; 0);</span>
+        }
+
+        Map&lt;String, Object&gt; payload() {
+<span class="fc" id="L492">            Map&lt;String, Object&gt; payload = basePayload(</span>
+                artifactId,
+                kind,
+                componentId,
+                version,
+                apiVersion,
+                minimumCoreVersion,
+                maximumCoreVersionExclusive,
+                capabilities,
+                dependencies,
+                artifactFileName,
+                artifactSha256,
+                artifactUri,
+                signatureManifestUri,
+                provenanceUri,
+                publisherId);
+<span class="fc" id="L508">            payload.put(&quot;identityHash&quot;, identityHash);</span>
+<span class="fc" id="L509">            return payload;</span>
+        }
+
+        private static String identity(
+            String artifactId,
+            ArtifactKind kind,
+            String componentId,
+            String version,
+            String apiVersion,
+            String minimumCoreVersion,
+            String maximumCoreVersionExclusive,
+            List&lt;String&gt; capabilities,
+            List&lt;Dependency&gt; dependencies,
+            String artifactFileName,
+            String artifactSha256,
+            String artifactUri,
+            String signatureManifestUri,
+            String provenanceUri,
+            String publisherId
+        ) {
+<span class="fc" id="L529">            return hash(json(basePayload(</span>
+                artifactId,
+                kind,
+                componentId,
+                version,
+                apiVersion,
+                minimumCoreVersion,
+                maximumCoreVersionExclusive,
+                capabilities,
+                dependencies,
+                artifactFileName,
+                artifactSha256,
+                artifactUri,
+                signatureManifestUri,
+                provenanceUri,
+                publisherId)));
+        }
+
+        private static Map&lt;String, Object&gt; basePayload(
+            String artifactId,
+            ArtifactKind kind,
+            String componentId,
+            String version,
+            String apiVersion,
+            String minimumCoreVersion,
+            String maximumCoreVersionExclusive,
+            List&lt;String&gt; capabilities,
+            List&lt;Dependency&gt; dependencies,
+            String artifactFileName,
+            String artifactSha256,
+            String artifactUri,
+            String signatureManifestUri,
+            String provenanceUri,
+            String publisherId
+        ) {
+<span class="fc" id="L564">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L565">            payload.put(&quot;artifactId&quot;, artifactId);</span>
+<span class="fc" id="L566">            payload.put(&quot;kind&quot;, kind.name());</span>
+<span class="fc" id="L567">            payload.put(&quot;componentId&quot;, componentId);</span>
+<span class="fc" id="L568">            payload.put(&quot;version&quot;, version);</span>
+<span class="fc" id="L569">            payload.put(&quot;apiVersion&quot;, apiVersion);</span>
+<span class="fc" id="L570">            payload.put(&quot;minimumCoreVersion&quot;, minimumCoreVersion);</span>
+<span class="fc" id="L571">            payload.put(&quot;maximumCoreVersionExclusive&quot;, maximumCoreVersionExclusive);</span>
+<span class="fc" id="L572">            payload.put(&quot;capabilities&quot;, capabilities);</span>
+<span class="fc" id="L573">            payload.put(&quot;dependencies&quot;, dependencies.stream().map(Dependency::payload).toList());</span>
+<span class="fc" id="L574">            payload.put(&quot;artifactFileName&quot;, artifactFileName);</span>
+<span class="fc" id="L575">            payload.put(&quot;artifactSha256&quot;, artifactSha256);</span>
+<span class="fc" id="L576">            payload.put(&quot;artifactUri&quot;, artifactUri);</span>
+<span class="fc" id="L577">            payload.put(&quot;signatureManifestUri&quot;, signatureManifestUri);</span>
+<span class="fc" id="L578">            payload.put(&quot;provenanceUri&quot;, provenanceUri);</span>
+<span class="fc" id="L579">            payload.put(&quot;publisherId&quot;, publisherId);</span>
+<span class="fc" id="L580">            return payload;</span>
+        }
+    }
+
+    public record Dependency(
+        ArtifactKind kind,
+        String componentId,
+        String versionConstraint,
+        boolean optional
+    ) {
+<span class="fc" id="L590">        public Dependency {</span>
+<span class="fc" id="L591">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L592">            componentId = identifier(componentId, &quot;dependency componentId&quot;);</span>
+<span class="fc" id="L593">            versionConstraint = constraint(versionConstraint);</span>
+<span class="fc" id="L594">        }</span>
+
+        public boolean matches(String version) {
+<span class="fc" id="L597">            String candidate = requireVersion(version, &quot;dependency version&quot;);</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">            return &quot;any&quot;.equals(versionConstraint)</span>
+<span class="fc bfc" id="L599" title="All 2 branches covered.">                || candidate.equals(versionConstraint.substring(1));</span>
+        }
+
+        Map&lt;String, Object&gt; payload() {
+<span class="fc" id="L603">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L604">            payload.put(&quot;kind&quot;, kind.name());</span>
+<span class="fc" id="L605">            payload.put(&quot;componentId&quot;, componentId);</span>
+<span class="fc" id="L606">            payload.put(&quot;versionConstraint&quot;, versionConstraint);</span>
+<span class="fc" id="L607">            payload.put(&quot;optional&quot;, optional);</span>
+<span class="fc" id="L608">            return payload;</span>
+        }
+    }
+
+    private static List&lt;String&gt; capabilities(List&lt;String&gt; values) {
+<span class="fc" id="L613">        return list(values).stream()</span>
+<span class="fc" id="L614">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L615">            .map(String::trim)</span>
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isBlank())</span>
+<span class="fc" id="L617">            .map(value -&gt; identifier(value.toLowerCase(Locale.ROOT), &quot;capability&quot;))</span>
+<span class="fc" id="L618">            .distinct()</span>
+<span class="fc" id="L619">            .sorted()</span>
+<span class="fc" id="L620">            .toList();</span>
+    }
+
+    private static List&lt;Dependency&gt; dependencies(List&lt;Dependency&gt; values) {
+<span class="fc" id="L624">        Set&lt;String&gt; identities = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L625">        List&lt;Dependency&gt; normalized = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L626" title="All 2 branches covered.">        for (Dependency item : list(values)) {</span>
+<span class="fc" id="L627">            Dependency dependency = Objects.requireNonNull(item, &quot;dependency&quot;);</span>
+<span class="fc" id="L628">            String identity = dependency.kind() + &quot;\u0000&quot; + dependency.componentId();</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            if (!identities.add(identity)) {</span>
+<span class="nc" id="L630">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L631">                    &quot;duplicate dependency: &quot; + dependency.kind() + &quot;/&quot;</span>
+<span class="nc" id="L632">                        + dependency.componentId());</span>
+            }
+<span class="fc" id="L634">            normalized.add(dependency);</span>
+<span class="fc" id="L635">        }</span>
+<span class="fc" id="L636">        normalized.sort(Comparator</span>
+<span class="fc" id="L637">            .comparing((Dependency item) -&gt; item.kind().name())</span>
+<span class="fc" id="L638">            .thenComparing(Dependency::componentId));</span>
+<span class="fc" id="L639">        return List.copyOf(normalized);</span>
+    }
+
+    private static String optionalVersion(String value, String field) {
+<span class="pc bpc" id="L643" title="1 of 4 branches missed.">        return value == null || value.isBlank() ? &quot;&quot; : requireVersion(value.trim(), field);</span>
+    }
+
+    private static String constraint(String value) {
+<span class="fc bfc" id="L647" title="All 2 branches covered.">        if (&quot;any&quot;.equals(value)) {</span>
+<span class="fc" id="L648">            return value;</span>
+        }
+<span class="pc bpc" id="L650" title="2 of 4 branches missed.">        if (value == null || !value.startsWith(&quot;=&quot;)) {</span>
+<span class="nc" id="L651">            throw new IllegalArgumentException(</span>
+                &quot;versionConstraint must be 'any' or '=x.y.z'&quot;);
+        }
+<span class="fc" id="L654">        return &quot;=&quot; + requireVersion(value.substring(1), &quot;dependency versionConstraint&quot;);</span>
+    }
+
+    private static String fileName(String value, ArtifactKind kind) {
+<span class="pc bpc" id="L658" title="2 of 4 branches missed.">        if (value == null || value.isBlank()</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">                || !Path.of(value).getFileName().toString().equals(value)</span>
+<span class="pc bpc" id="L660" title="2 of 4 branches missed.">                || value.contains(&quot;/&quot;) || value.contains(&quot;\\&quot;)) {</span>
+<span class="nc" id="L661">            throw new IllegalArgumentException(&quot;artifactFileName must be a simple file name&quot;);</span>
+        }
+<span class="fc" id="L663">        String lower = value.toLowerCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L664" title="All 3 branches covered.">        boolean supported = switch (kind) {</span>
+<span class="fc" id="L665">            case JAVA_PLUGIN -&gt; lower.endsWith(&quot;.jar&quot;);</span>
+<span class="pc bpc" id="L666" title="3 of 4 branches missed.">            case RULE_PACKAGE -&gt; lower.endsWith(&quot;.regelsuche&quot;) || lower.endsWith(&quot;.rules&quot;);</span>
+<span class="pc bpc" id="L667" title="3 of 4 branches missed.">            case KNOWLEDGE_PACK -&gt; lower.endsWith(&quot;.json&quot;) || lower.endsWith(&quot;.zip&quot;)</span>
+<span class="pc bnc" id="L668" title="All 4 branches missed.">                || lower.endsWith(&quot;.yaml&quot;) || lower.endsWith(&quot;.yml&quot;);</span>
+        };
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">        if (!supported) {</span>
+<span class="nc" id="L671">            throw new IllegalArgumentException(</span>
+                &quot;artifactFileName extension does not match &quot; + kind);
+        }
+<span class="fc" id="L674">        return value;</span>
+    }
+
+    private static String uri(String value, String field, boolean optional) {
+<span class="pc bpc" id="L678" title="2 of 6 branches missed.">        if ((value == null || value.isBlank()) &amp;&amp; optional) {</span>
+<span class="fc" id="L679">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L681" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L682">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+        }
+        try {
+<span class="fc" id="L685">            URI uri = new URI(value).normalize();</span>
+<span class="fc" id="L686">            String scheme = uri.getScheme();</span>
+<span class="fc bfc" id="L687" title="All 2 branches covered.">            boolean https = &quot;https&quot;.equalsIgnoreCase(scheme)</span>
+<span class="pc bpc" id="L688" title="2 of 4 branches missed.">                &amp;&amp; uri.getHost() != null &amp;&amp; !uri.getHost().isBlank();</span>
+<span class="fc bfc" id="L689" title="All 2 branches covered.">            boolean file = &quot;file&quot;.equalsIgnoreCase(scheme)</span>
+<span class="pc bpc" id="L690" title="2 of 4 branches missed.">                &amp;&amp; uri.getPath() != null &amp;&amp; uri.getPath().startsWith(&quot;/&quot;)</span>
+<span class="pc bpc" id="L691" title="2 of 4 branches missed.">                &amp;&amp; (uri.getHost() == null || uri.getHost().isBlank());</span>
+<span class="pc bpc" id="L692" title="3 of 8 branches missed.">            if ((!https &amp;&amp; !file) || uri.getFragment() != null || uri.getUserInfo() != null) {</span>
+<span class="fc" id="L693">                throw new IllegalArgumentException(</span>
+                    field + &quot; must be an absolute https or local file URI without user info or fragment&quot;);
+            }
+<span class="fc" id="L696">            return uri.toString();</span>
+<span class="nc" id="L697">        } catch (URISyntaxException exception) {</span>
+<span class="nc" id="L698">            throw new IllegalArgumentException(field + &quot; is not a valid URI&quot;, exception);</span>
+        }
+    }
+
+    /** SemVer 2.0 ordering; build metadata is ignored for precedence. */
+<span class="fc" id="L703">    private record SemanticVersion(</span>
+        String source,
+        BigInteger major,
+        BigInteger minor,
+        BigInteger patch,
+        List&lt;String&gt; prerelease
+    ) implements Comparable&lt;SemanticVersion&gt; {
+<span class="fc" id="L710">        private static final Pattern PATTERN = Pattern.compile(</span>
+            &quot;^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)&quot;
+                + &quot;(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?&quot;
+                + &quot;(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$&quot;
+        );
+
+        static SemanticVersion parse(String value) {
+<span class="fc" id="L717">            return parse(value, &quot;version&quot;);</span>
+        }
+
+        static SemanticVersion parse(String value, String field) {
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L722">                throw new IllegalArgumentException(field + &quot; must be semantic version x.y.z&quot;);</span>
+            }
+<span class="fc" id="L724">            Matcher matcher = PATTERN.matcher(value);</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">            if (!matcher.matches()) {</span>
+<span class="fc" id="L726">                throw new IllegalArgumentException(field + &quot; must be semantic version x.y.z&quot;);</span>
+            }
+<span class="fc bfc" id="L728" title="All 2 branches covered.">            List&lt;String&gt; prerelease = matcher.group(4) == null</span>
+<span class="fc" id="L729">                ? List.of()</span>
+<span class="fc" id="L730">                : List.of(matcher.group(4).split(&quot;\\.&quot;));</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">            for (String prereleaseIdentifier : prerelease) {</span>
+<span class="fc bfc" id="L732" title="All 2 branches covered.">                if (numeric(prereleaseIdentifier)</span>
+<span class="fc bfc" id="L733" title="All 2 branches covered.">                        &amp;&amp; prereleaseIdentifier.length() &gt; 1</span>
+<span class="fc bfc" id="L734" title="All 2 branches covered.">                        &amp;&amp; prereleaseIdentifier.startsWith(&quot;0&quot;)) {</span>
+<span class="fc" id="L735">                    throw new IllegalArgumentException(</span>
+                        field + &quot; has a numeric prerelease identifier with a leading zero&quot;);
+                }
+<span class="fc" id="L738">            }</span>
+<span class="fc" id="L739">            return new SemanticVersion(</span>
+                value,
+<span class="fc" id="L741">                new BigInteger(matcher.group(1)),</span>
+<span class="fc" id="L742">                new BigInteger(matcher.group(2)),</span>
+<span class="fc" id="L743">                new BigInteger(matcher.group(3)),</span>
+                prerelease);
+        }
+
+        @Override
+        public int compareTo(SemanticVersion other) {
+<span class="fc" id="L749">            int result = major.compareTo(other.major);</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">            if (result == 0) {</span>
+<span class="fc" id="L751">                result = minor.compareTo(other.minor);</span>
+            }
+<span class="fc bfc" id="L753" title="All 2 branches covered.">            if (result == 0) {</span>
+<span class="fc" id="L754">                result = patch.compareTo(other.patch);</span>
+            }
+<span class="fc bfc" id="L756" title="All 2 branches covered.">            if (result != 0) {</span>
+<span class="fc" id="L757">                return result;</span>
+            }
+<span class="fc bfc" id="L759" title="All 4 branches covered.">            if (prerelease.isEmpty() &amp;&amp; other.prerelease.isEmpty()) {</span>
+<span class="fc" id="L760">                return 0;</span>
+            }
+<span class="fc bfc" id="L762" title="All 2 branches covered.">            if (prerelease.isEmpty()) {</span>
+<span class="fc" id="L763">                return 1;</span>
+            }
+<span class="pc bpc" id="L765" title="1 of 2 branches missed.">            if (other.prerelease.isEmpty()) {</span>
+<span class="nc" id="L766">                return -1;</span>
+            }
+<span class="fc" id="L768">            int length = Math.min(prerelease.size(), other.prerelease.size());</span>
+<span class="pc bpc" id="L769" title="1 of 2 branches missed.">            for (int index = 0; index &lt; length; index++) {</span>
+<span class="fc" id="L770">                String left = prerelease.get(index);</span>
+<span class="fc" id="L771">                String right = other.prerelease.get(index);</span>
+<span class="fc" id="L772">                boolean leftNumeric = numeric(left);</span>
+<span class="fc" id="L773">                boolean rightNumeric = numeric(right);</span>
+<span class="pc bpc" id="L774" title="1 of 4 branches missed.">                if (leftNumeric &amp;&amp; rightNumeric) {</span>
+<span class="fc" id="L775">                    result = compareNumeric(left, right);</span>
+<span class="pc bpc" id="L776" title="1 of 2 branches missed.">                } else if (leftNumeric != rightNumeric) {</span>
+<span class="nc bnc" id="L777" title="All 2 branches missed.">                    result = leftNumeric ? -1 : 1;</span>
+                } else {
+<span class="fc" id="L779">                    result = left.compareTo(right);</span>
+                }
+<span class="fc bfc" id="L781" title="All 2 branches covered.">                if (result != 0) {</span>
+<span class="fc" id="L782">                    return result;</span>
+                }
+            }
+<span class="nc" id="L785">            return Integer.compare(prerelease.size(), other.prerelease.size());</span>
+        }
+
+        private static boolean numeric(String value) {
+<span class="fc" id="L789">            return value.chars().allMatch(Character::isDigit);</span>
+        }
+
+        private static int compareNumeric(String left, String right) {
+<span class="fc" id="L793">            int length = Integer.compare(left.length(), right.length());</span>
+<span class="pc bpc" id="L794" title="1 of 2 branches missed.">            return length == 0 ? left.compareTo(right) : length;</span>
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L799">    public static final class IndexDto {</span>
+        public String schema;
+        public String indexId;
+        public String revision;
+        public String curatorId;
+        public List&lt;EntryDto&gt; entries;
+        public String contentHash;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L809">    public static final class EntryDto {</span>
+        public String artifactId;
+        public String kind;
+        public String componentId;
+        public String version;
+        public String apiVersion;
+        public String minimumCoreVersion;
+        public String maximumCoreVersionExclusive;
+        public List&lt;String&gt; capabilities;
+        public List&lt;DependencyDto&gt; dependencies;
+        public String artifactFileName;
+        public String artifactSha256;
+        public String artifactUri;
+        public String signatureManifestUri;
+        public String provenanceUri;
+        public String publisherId;
+        public String identityHash;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L829">    public static final class DependencyDto {</span>
+        public String kind;
+        public String componentId;
+        public String versionConstraint;
+        public Boolean optional;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

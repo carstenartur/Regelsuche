@@ -41,15 +41,15 @@ final class DomainCanonical {
     }
 
     static String requireSha256(String value, String name) {
-<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L45">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="fc" id="L45">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
         }
 <span class="fc" id="L47">        return value;</span>
     }
 
     static Map&lt;String, String&gt; sortedMap(Map&lt;String, String&gt; values) {
-<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
-<span class="nc" id="L52">            return Map.of();</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="fc" id="L52">            return Map.of();</span>
         }
 <span class="fc" id="L54">        LinkedHashMap&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
 <span class="fc" id="L55">        values.entrySet().stream()</span>

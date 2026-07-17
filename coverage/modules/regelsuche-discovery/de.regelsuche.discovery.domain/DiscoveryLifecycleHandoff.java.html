@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DiscoveryLifecycleHandoff.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">DiscoveryLifecycleHandoff.java</span></div><h1>DiscoveryLifecycleHandoff.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Hash-only handoff from discovery execution into later lifecycle stages.
+ * Domain objects remain in their schema-specific source evidence and are bound
+ * through {@code sourceEvidenceHash} rather than copied into this contract.
+ */
+public record DiscoveryLifecycleHandoff(
+    String schema,
+    String handoffId,
+    SourceKind sourceKind,
+    String campaignId,
+    String domainId,
+    String domainRevision,
+    String domainContractHash,
+    String inputHash,
+    String sourceEvidenceHash,
+    Stage stage,
+    Disposition disposition,
+    String selectedCandidateHash,
+    String certificateHash,
+    List&lt;ResourceAccount&gt; resources,
+    Map&lt;String, String&gt; metadata,
+    String proofStatus,
+    String externalNoveltyStatus,
+    String promotionStatus,
+    String publicEvidenceStatus,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.discovery-lifecycle-handoff/v1&quot;;
+    public static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+
+<span class="fc" id="L43">    public DiscoveryLifecycleHandoff {</span>
+<span class="fc" id="L44">        requireSchema(schema);</span>
+<span class="fc" id="L45">        handoffId = DomainCanonical.requireIdentifier(handoffId, &quot;handoffId&quot;);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(sourceKind, &quot;sourceKind&quot;);</span>
+<span class="fc" id="L47">        campaignId = DomainCanonical.requireIdentifier(campaignId, &quot;campaignId&quot;);</span>
+<span class="fc" id="L48">        domainId = DomainCanonical.requireIdentifier(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L49">        domainRevision = DomainCanonical.requireIdentifier(</span>
+            domainRevision, &quot;domainRevision&quot;);
+<span class="fc" id="L51">        domainContractHash = DomainCanonical.requireSha256(</span>
+            domainContractHash, &quot;domainContractHash&quot;);
+<span class="fc" id="L53">        inputHash = DomainCanonical.requireSha256(inputHash, &quot;inputHash&quot;);</span>
+<span class="fc" id="L54">        sourceEvidenceHash = DomainCanonical.requireSha256(</span>
+            sourceEvidenceHash, &quot;sourceEvidenceHash&quot;);
+<span class="fc" id="L56">        Objects.requireNonNull(stage, &quot;stage&quot;);</span>
+<span class="fc" id="L57">        Objects.requireNonNull(disposition, &quot;disposition&quot;);</span>
+<span class="fc" id="L58">        selectedCandidateHash = optionalSha256(</span>
+            selectedCandidateHash, &quot;selectedCandidateHash&quot;);
+<span class="fc" id="L60">        certificateHash = optionalSha256(certificateHash, &quot;certificateHash&quot;);</span>
+<span class="fc" id="L61">        resources = normalizeResources(resources);</span>
+<span class="fc" id="L62">        metadata = DomainCanonical.sortedMap(metadata);</span>
+<span class="fc" id="L63">        requireNotEvaluated(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L64">        requireNotEvaluated(externalNoveltyStatus, &quot;externalNoveltyStatus&quot;);</span>
+<span class="fc" id="L65">        requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L66">        requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L67">        validateSemantics(</span>
+            sourceKind,
+            stage,
+            disposition,
+            selectedCandidateHash,
+            certificateHash,
+            resources);
+<span class="fc" id="L74">        contentHash = DomainCanonical.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L75">        String expected = contentHash(</span>
+            handoffId,
+            sourceKind,
+            campaignId,
+            domainId,
+            domainRevision,
+            domainContractHash,
+            inputHash,
+            sourceEvidenceHash,
+            stage,
+            disposition,
+            selectedCandidateHash,
+            certificateHash,
+            resources,
+            metadata,
+            proofStatus,
+            externalNoveltyStatus,
+            promotionStatus,
+            publicEvidenceStatus);
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L95">            throw new IllegalArgumentException(</span>
+                &quot;discovery lifecycle handoff contentHash mismatch&quot;);
+        }
+<span class="fc" id="L98">    }</span>
+
+    /** Creates a representation-free handoff from generic domain evidence. */
+    public static DiscoveryLifecycleHandoff from(DomainDiscoveryEvidence evidence) {
+<span class="fc" id="L102">        Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L103">        DiscoveryDomainDescriptor descriptor = evidence.descriptor();</span>
+<span class="fc" id="L104">        List&lt;ResourceAccount&gt; accounts = evidence.resources().stream()</span>
+<span class="fc" id="L105">            .map(line -&gt; new ResourceAccount(</span>
+<span class="fc" id="L106">                line.resource().name(),</span>
+<span class="fc" id="L107">                line.configured(),</span>
+<span class="fc" id="L108">                line.executed(),</span>
+<span class="fc" id="L109">                line.skipped(),</span>
+<span class="fc" id="L110">                line.remaining()))</span>
+<span class="fc" id="L111">            .toList();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        String retainedCertificate = evidence.certificate() == null</span>
+<span class="nc" id="L113">            ? &quot;&quot;</span>
+<span class="fc" id="L114">            : evidence.certificate().contentHash();</span>
+<span class="fc" id="L115">        String domainPayloadHash = DomainCanonical.sha256(</span>
+<span class="fc" id="L116">            DomainCanonical.canonicalMap(Map.of(</span>
+<span class="fc" id="L117">                &quot;type&quot;, evidence.domainEvidence().type(),</span>
+<span class="fc" id="L118">                &quot;properties&quot;, DomainCanonical.canonicalMap(</span>
+<span class="fc" id="L119">                    evidence.domainEvidence().properties()))));</span>
+<span class="fc" id="L120">        Map&lt;String, String&gt; metadata = Map.ofEntries(</span>
+<span class="fc" id="L121">            Map.entry(&quot;candidateAttemptCount&quot;,</span>
+<span class="fc" id="L122">                Integer.toString(evidence.candidateAttempts().size())),</span>
+<span class="fc" id="L123">            Map.entry(&quot;domainEvidenceHash&quot;, domainPayloadHash),</span>
+<span class="fc" id="L124">            Map.entry(&quot;domainEvidenceType&quot;, evidence.domainEvidence().type()),</span>
+<span class="fc" id="L125">            Map.entry(&quot;executionOutcome&quot;, evidence.outcome().name()),</span>
+<span class="fc" id="L126">            Map.entry(&quot;stateTraceCount&quot;, Integer.toString(evidence.states().size())),</span>
+<span class="fc" id="L127">            Map.entry(&quot;transitionTraceCount&quot;,</span>
+<span class="fc" id="L128">                Integer.toString(evidence.transitions().size())));</span>
+<span class="fc" id="L129">        return create(</span>
+<span class="fc" id="L130">            evidence.campaignId() + &quot;-lifecycle-handoff&quot;,</span>
+            SourceKind.DOMAIN_DISCOVERY_EVIDENCE,
+<span class="fc" id="L132">            evidence.campaignId(),</span>
+<span class="fc" id="L133">            descriptor.domainId(),</span>
+<span class="fc" id="L134">            descriptor.revision(),</span>
+<span class="fc" id="L135">            descriptor.contentHash(),</span>
+<span class="fc" id="L136">            evidence.seed().contentHash(),</span>
+<span class="fc" id="L137">            evidence.contentHash(),</span>
+            Stage.DISCOVERY_VALIDATION,
+<span class="fc" id="L139">            disposition(evidence.outcome()),</span>
+<span class="fc" id="L140">            evidence.selectedCandidateHash(),</span>
+            retainedCertificate,
+            accounts,
+            metadata,
+<span class="fc" id="L144">            evidence.proofStatus(),</span>
+<span class="fc" id="L145">            evidence.externalNoveltyStatus(),</span>
+<span class="fc" id="L146">            evidence.promotionStatus(),</span>
+<span class="fc" id="L147">            evidence.publicEvidenceStatus());</span>
+    }
+
+    /** Creates a handoff for an existing immutable execution contract. */
+    public static DiscoveryLifecycleHandoff create(
+        String handoffId,
+        SourceKind sourceKind,
+        String campaignId,
+        String domainId,
+        String domainRevision,
+        String domainContractHash,
+        String inputHash,
+        String sourceEvidenceHash,
+        Stage stage,
+        Disposition disposition,
+        String selectedCandidateHash,
+        String certificateHash,
+        List&lt;ResourceAccount&gt; resources,
+        Map&lt;String, String&gt; metadata,
+        String proofStatus,
+        String externalNoveltyStatus,
+        String promotionStatus,
+        String publicEvidenceStatus
+    ) {
+<span class="fc" id="L171">        String normalizedHandoffId = DomainCanonical.requireIdentifier(</span>
+            handoffId, &quot;handoffId&quot;);
+<span class="fc" id="L173">        Objects.requireNonNull(sourceKind, &quot;sourceKind&quot;);</span>
+<span class="fc" id="L174">        String normalizedCampaignId = DomainCanonical.requireIdentifier(</span>
+            campaignId, &quot;campaignId&quot;);
+<span class="fc" id="L176">        String normalizedDomainId = DomainCanonical.requireIdentifier(</span>
+            domainId, &quot;domainId&quot;);
+<span class="fc" id="L178">        String normalizedRevision = DomainCanonical.requireIdentifier(</span>
+            domainRevision, &quot;domainRevision&quot;);
+<span class="fc" id="L180">        String normalizedContractHash = DomainCanonical.requireSha256(</span>
+            domainContractHash, &quot;domainContractHash&quot;);
+<span class="fc" id="L182">        String normalizedInputHash = DomainCanonical.requireSha256(</span>
+            inputHash, &quot;inputHash&quot;);
+<span class="fc" id="L184">        String normalizedSourceHash = DomainCanonical.requireSha256(</span>
+            sourceEvidenceHash, &quot;sourceEvidenceHash&quot;);
+<span class="fc" id="L186">        Objects.requireNonNull(stage, &quot;stage&quot;);</span>
+<span class="fc" id="L187">        Objects.requireNonNull(disposition, &quot;disposition&quot;);</span>
+<span class="fc" id="L188">        String normalizedCandidateHash = optionalSha256(</span>
+            selectedCandidateHash, &quot;selectedCandidateHash&quot;);
+<span class="fc" id="L190">        String normalizedCertificateHash = optionalSha256(</span>
+            certificateHash, &quot;certificateHash&quot;);
+<span class="fc" id="L192">        List&lt;ResourceAccount&gt; normalizedResources = normalizeResources(resources);</span>
+<span class="fc" id="L193">        Map&lt;String, String&gt; normalizedMetadata = DomainCanonical.sortedMap(metadata);</span>
+<span class="fc" id="L194">        requireNotEvaluated(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L195">        requireNotEvaluated(externalNoveltyStatus, &quot;externalNoveltyStatus&quot;);</span>
+<span class="fc" id="L196">        requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L197">        requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L198">        validateSemantics(</span>
+            sourceKind,
+            stage,
+            disposition,
+            normalizedCandidateHash,
+            normalizedCertificateHash,
+            normalizedResources);
+<span class="fc" id="L205">        String hash = contentHash(</span>
+            normalizedHandoffId,
+            sourceKind,
+            normalizedCampaignId,
+            normalizedDomainId,
+            normalizedRevision,
+            normalizedContractHash,
+            normalizedInputHash,
+            normalizedSourceHash,
+            stage,
+            disposition,
+            normalizedCandidateHash,
+            normalizedCertificateHash,
+            normalizedResources,
+            normalizedMetadata,
+            proofStatus,
+            externalNoveltyStatus,
+            promotionStatus,
+            publicEvidenceStatus);
+<span class="fc" id="L224">        return new DiscoveryLifecycleHandoff(</span>
+            SCHEMA,
+            normalizedHandoffId,
+            sourceKind,
+            normalizedCampaignId,
+            normalizedDomainId,
+            normalizedRevision,
+            normalizedContractHash,
+            normalizedInputHash,
+            normalizedSourceHash,
+            stage,
+            disposition,
+            normalizedCandidateHash,
+            normalizedCertificateHash,
+            normalizedResources,
+            normalizedMetadata,
+            proofStatus,
+            externalNoveltyStatus,
+            promotionStatus,
+            publicEvidenceStatus,
+            hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L248">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L249">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L250">            .property(&quot;handoffId&quot;, handoffId)</span>
+<span class="fc" id="L251">            .property(&quot;sourceKind&quot;, sourceKind.name())</span>
+<span class="fc" id="L252">            .property(&quot;campaignId&quot;, campaignId)</span>
+<span class="fc" id="L253">            .property(&quot;domainId&quot;, domainId)</span>
+<span class="fc" id="L254">            .property(&quot;domainRevision&quot;, domainRevision)</span>
+<span class="fc" id="L255">            .property(&quot;domainContractHash&quot;, domainContractHash)</span>
+<span class="fc" id="L256">            .property(&quot;inputHash&quot;, inputHash)</span>
+<span class="fc" id="L257">            .property(&quot;sourceEvidenceHash&quot;, sourceEvidenceHash)</span>
+<span class="fc" id="L258">            .property(&quot;stage&quot;, stage.name())</span>
+<span class="fc" id="L259">            .property(&quot;disposition&quot;, disposition.name())</span>
+<span class="fc" id="L260">            .property(&quot;selectedCandidateHash&quot;, selectedCandidateHash)</span>
+<span class="fc" id="L261">            .property(&quot;certificateHash&quot;, certificateHash)</span>
+<span class="fc" id="L262">            .array(&quot;resources&quot;, array -&gt; resources.forEach(account -&gt;</span>
+<span class="fc" id="L263">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L264">                    .property(&quot;resource&quot;, account.resource())</span>
+<span class="fc" id="L265">                    .property(&quot;configured&quot;, account.configured())</span>
+<span class="fc" id="L266">                    .property(&quot;executed&quot;, account.executed())</span>
+<span class="fc" id="L267">                    .property(&quot;skipped&quot;, account.skipped())</span>
+<span class="fc" id="L268">                    .property(&quot;remaining&quot;, account.remaining()))))</span>
+<span class="fc" id="L269">            .array(&quot;metadata&quot;, array -&gt; metadata.forEach((key, value) -&gt;</span>
+<span class="fc" id="L270">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L271">                    .property(&quot;key&quot;, key)</span>
+<span class="fc" id="L272">                    .property(&quot;value&quot;, value))))</span>
+<span class="fc" id="L273">            .property(&quot;proofStatus&quot;, proofStatus)</span>
+<span class="fc" id="L274">            .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus)</span>
+<span class="fc" id="L275">            .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L276">            .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus)</span>
+<span class="fc" id="L277">            .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L278">        return json.endObject().toString();</span>
+    }
+
+    private static Disposition disposition(DomainDiscoveryEvidence.Outcome outcome) {
+<span class="pc bpc" id="L282" title="5 of 6 branches missed.">        return switch (outcome) {</span>
+<span class="fc" id="L283">            case CONFIRMED -&gt; Disposition.CONFIRMED;</span>
+<span class="nc" id="L284">            case REFUTED -&gt; Disposition.REFUTED;</span>
+<span class="nc" id="L285">            case INCONCLUSIVE -&gt; Disposition.INCOMPLETE;</span>
+<span class="nc" id="L286">            case UNSUPPORTED -&gt; Disposition.UNSUPPORTED;</span>
+<span class="nc" id="L287">            case BUDGET_EXHAUSTED -&gt; Disposition.BUDGET_EXHAUSTED;</span>
+<span class="nc" id="L288">            case INVALID_SEED -&gt; Disposition.INVALID_INPUT;</span>
+        };
+    }
+
+    private static String contentHash(
+        String handoffId,
+        SourceKind sourceKind,
+        String campaignId,
+        String domainId,
+        String domainRevision,
+        String domainContractHash,
+        String inputHash,
+        String sourceEvidenceHash,
+        Stage stage,
+        Disposition disposition,
+        String selectedCandidateHash,
+        String certificateHash,
+        List&lt;ResourceAccount&gt; resources,
+        Map&lt;String, String&gt; metadata,
+        String proofStatus,
+        String externalNoveltyStatus,
+        String promotionStatus,
+        String publicEvidenceStatus
+    ) {
+<span class="fc" id="L312">        Map&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L313">        values.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L314">        values.put(&quot;handoffId&quot;, handoffId);</span>
+<span class="fc" id="L315">        values.put(&quot;sourceKind&quot;, sourceKind.name());</span>
+<span class="fc" id="L316">        values.put(&quot;campaignId&quot;, campaignId);</span>
+<span class="fc" id="L317">        values.put(&quot;domainId&quot;, domainId);</span>
+<span class="fc" id="L318">        values.put(&quot;domainRevision&quot;, domainRevision);</span>
+<span class="fc" id="L319">        values.put(&quot;domainContractHash&quot;, domainContractHash);</span>
+<span class="fc" id="L320">        values.put(&quot;inputHash&quot;, inputHash);</span>
+<span class="fc" id="L321">        values.put(&quot;sourceEvidenceHash&quot;, sourceEvidenceHash);</span>
+<span class="fc" id="L322">        values.put(&quot;stage&quot;, stage.name());</span>
+<span class="fc" id="L323">        values.put(&quot;disposition&quot;, disposition.name());</span>
+<span class="fc" id="L324">        values.put(&quot;selectedCandidateHash&quot;, selectedCandidateHash);</span>
+<span class="fc" id="L325">        values.put(&quot;certificateHash&quot;, certificateHash);</span>
+<span class="fc" id="L326">        values.put(&quot;resources&quot;, DomainCanonical.canonicalList(resources.stream()</span>
+<span class="fc" id="L327">            .map(ResourceAccount::canonicalMaterial)</span>
+<span class="fc" id="L328">            .toList()));</span>
+<span class="fc" id="L329">        values.put(&quot;metadata&quot;, DomainCanonical.canonicalMap(metadata));</span>
+<span class="fc" id="L330">        values.put(&quot;proofStatus&quot;, proofStatus);</span>
+<span class="fc" id="L331">        values.put(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus);</span>
+<span class="fc" id="L332">        values.put(&quot;promotionStatus&quot;, promotionStatus);</span>
+<span class="fc" id="L333">        values.put(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus);</span>
+<span class="fc" id="L334">        return DomainCanonical.sha256(DomainCanonical.canonicalMap(values));</span>
+    }
+
+    private static List&lt;ResourceAccount&gt; normalizeResources(
+        List&lt;ResourceAccount&gt; values
+    ) {
+<span class="pc bpc" id="L340" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L341">            throw new IllegalArgumentException(</span>
+                &quot;lifecycle handoff requires resource accounting&quot;);
+        }
+<span class="fc" id="L344">        Set&lt;String&gt; names = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L345">        List&lt;ResourceAccount&gt; normalized = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (ResourceAccount value : values) {</span>
+<span class="fc" id="L347">            ResourceAccount account = Objects.requireNonNull(</span>
+                value, &quot;resource account&quot;);
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            if (!names.add(account.resource())) {</span>
+<span class="nc" id="L350">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L351">                    &quot;duplicate lifecycle resource: &quot; + account.resource());</span>
+            }
+<span class="fc" id="L353">            normalized.add(account);</span>
+<span class="fc" id="L354">        }</span>
+<span class="fc" id="L355">        normalized.sort(Comparator.comparing(ResourceAccount::resource));</span>
+<span class="fc" id="L356">        return List.copyOf(normalized);</span>
+    }
+
+    private static void validateSemantics(
+        SourceKind sourceKind,
+        Stage stage,
+        Disposition disposition,
+        String selectedCandidateHash,
+        String certificateHash,
+        List&lt;ResourceAccount&gt; resources
+    ) {
+<span class="fc" id="L367">        resources.forEach(ResourceAccount::validateBalance);</span>
+<span class="pc bpc" id="L368" title="2 of 4 branches missed.">        if (sourceKind == SourceKind.DOMAIN_DISCOVERY_EVIDENCE</span>
+                &amp;&amp; stage != Stage.DISCOVERY_VALIDATION) {
+<span class="nc" id="L370">            throw new IllegalArgumentException(</span>
+                &quot;generic domain evidence must use DISCOVERY_VALIDATION stage&quot;);
+        }
+<span class="pc bpc" id="L373" title="3 of 4 branches missed.">        if (sourceKind == SourceKind.PRODUCTION_GENERATION_RUN</span>
+                &amp;&amp; stage != Stage.GENERATION) {
+<span class="nc" id="L375">            throw new IllegalArgumentException(</span>
+                &quot;production generation evidence must use GENERATION stage&quot;);
+        }
+<span class="pc bpc" id="L378" title="1 of 4 branches missed.">        if (disposition == Disposition.COMPLETED &amp;&amp; stage != Stage.GENERATION) {</span>
+<span class="fc" id="L379">            throw new IllegalArgumentException(</span>
+                &quot;COMPLETED disposition is reserved for generation handoffs&quot;);
+        }
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (stage == Stage.GENERATION) {</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">            if (disposition != Disposition.COMPLETED</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                    || !selectedCandidateHash.isEmpty()</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">                    || !certificateHash.isEmpty()) {</span>
+<span class="nc" id="L386">                throw new IllegalArgumentException(</span>
+                    &quot;generation handoff cannot select or certify a candidate&quot;);
+            }
+<span class="nc" id="L389">            return;</span>
+        }
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        if (disposition == Disposition.CONFIRMED) {</span>
+<span class="pc bpc" id="L392" title="2 of 4 branches missed.">            if (selectedCandidateHash.isEmpty() || certificateHash.isEmpty()) {</span>
+<span class="nc" id="L393">                throw new IllegalArgumentException(</span>
+                    &quot;confirmed discovery handoff requires candidate and certificate hashes&quot;);
+            }
+<span class="nc bnc" id="L396" title="All 4 branches missed.">        } else if (!selectedCandidateHash.isEmpty() || !certificateHash.isEmpty()) {</span>
+<span class="nc" id="L397">            throw new IllegalArgumentException(</span>
+                &quot;non-confirmed discovery handoff cannot retain selected evidence&quot;);
+        }
+<span class="fc" id="L400">    }</span>
+
+    private static String optionalSha256(String value, String field) {
+<span class="pc bpc" id="L403" title="1 of 4 branches missed.">        if (value == null || value.isEmpty()) {</span>
+<span class="fc" id="L404">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L406">        return DomainCanonical.requireSha256(value, field);</span>
+    }
+
+    private static void requireSchema(String value) {
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        if (!SCHEMA.equals(value)) {</span>
+<span class="nc" id="L411">            throw new IllegalArgumentException(</span>
+                &quot;unsupported discovery lifecycle handoff schema&quot;);
+        }
+<span class="fc" id="L414">    }</span>
+
+    private static void requireNotEvaluated(String value, String field) {
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (!NOT_EVALUATED.equals(value)) {</span>
+<span class="nc" id="L418">            throw new IllegalArgumentException(field + &quot; must be NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L420">    }</span>
+
+<span class="fc" id="L422">    public enum SourceKind {</span>
+<span class="fc" id="L423">        DOMAIN_DISCOVERY_EVIDENCE,</span>
+<span class="fc" id="L424">        PRODUCTION_GENERATION_RUN</span>
+    }
+
+<span class="fc" id="L427">    public enum Stage {</span>
+<span class="fc" id="L428">        GENERATION,</span>
+<span class="fc" id="L429">        DISCOVERY_VALIDATION</span>
+    }
+
+<span class="fc" id="L432">    public enum Disposition {</span>
+<span class="fc" id="L433">        COMPLETED,</span>
+<span class="fc" id="L434">        CONFIRMED,</span>
+<span class="fc" id="L435">        REFUTED,</span>
+<span class="fc" id="L436">        INCOMPLETE,</span>
+<span class="fc" id="L437">        UNSUPPORTED,</span>
+<span class="fc" id="L438">        BUDGET_EXHAUSTED,</span>
+<span class="fc" id="L439">        INVALID_INPUT</span>
+    }
+
+    public record ResourceAccount(
+        String resource,
+        long configured,
+        long executed,
+        long skipped,
+        long remaining
+    ) {
+<span class="fc" id="L449">        public ResourceAccount {</span>
+<span class="fc" id="L450">            resource = DomainCanonical.requireIdentifier(resource, &quot;resource&quot;);</span>
+<span class="pc bpc" id="L451" title="4 of 8 branches missed.">            if (configured &lt; 0L</span>
+                    || executed &lt; 0L
+                    || skipped &lt; 0L
+                    || remaining &lt; 0L) {
+<span class="nc" id="L455">                throw new IllegalArgumentException(</span>
+                    &quot;resource counts must be non-negative&quot;);
+            }
+<span class="fc" id="L458">            validateBalance(configured, executed, skipped, remaining, resource);</span>
+<span class="fc" id="L459">        }</span>
+
+        public void validateBalance() {
+<span class="fc" id="L462">            validateBalance(configured, executed, skipped, remaining, resource);</span>
+<span class="fc" id="L463">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L466">            return DomainCanonical.canonicalMap(Map.of(</span>
+                &quot;resource&quot;, resource,
+<span class="fc" id="L468">                &quot;configured&quot;, Long.toString(configured),</span>
+<span class="fc" id="L469">                &quot;executed&quot;, Long.toString(executed),</span>
+<span class="fc" id="L470">                &quot;skipped&quot;, Long.toString(skipped),</span>
+<span class="fc" id="L471">                &quot;remaining&quot;, Long.toString(remaining)));</span>
+        }
+
+        private static void validateBalance(
+            long configured,
+            long executed,
+            long skipped,
+            long remaining,
+            String resource
+        ) {
+<span class="fc" id="L481">            long accounted = Math.addExact(</span>
+<span class="fc" id="L482">                Math.addExact(executed, skipped), remaining);</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            if (configured != accounted) {</span>
+<span class="nc" id="L484">                throw new IllegalArgumentException(</span>
+                    &quot;unbalanced lifecycle resource &quot; + resource);
+            }
+<span class="fc" id="L487">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

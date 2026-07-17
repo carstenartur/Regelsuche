@@ -2,7 +2,7 @@
 
 import java.nio.file.Path;
 
-/** Command-line entry point for the pinned target-free generation slice. */
+/** Command-line entry point for the pinned target-free generation export. */
 public final class AutonomousProductionGenerationMain {
     private AutonomousProductionGenerationMain() {
     }
@@ -17,7 +17,7 @@ public final class AutonomousProductionGenerationMain {
 <span class="nc" id="L17">        AutonomousProductionGenerationRunner runner =</span>
             new AutonomousProductionGenerationRunner();
 <span class="nc" id="L19">        var run = runner.runPinned(parallelism);</span>
-<span class="nc" id="L20">        runner.write(output, run);</span>
+<span class="nc" id="L20">        new AutonomousProductionGenerationExport().write(output, run);</span>
 <span class="nc" id="L21">        System.out.println(run.contentHash());</span>
 <span class="nc" id="L22">    }</span>
 }

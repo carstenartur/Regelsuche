@@ -1,0 +1,877 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginArtifactResolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginArtifactResolver.java</span></div><h1>PluginArtifactResolver.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.plugin.PluginArtifactIndex.ArtifactKind;
+import de.regelsuche.plugin.PluginArtifactIndex.Dependency;
+import de.regelsuche.plugin.PluginArtifactIndex.Entry;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+
+/**
+ * Deterministically resolves one immutable index coordinate and its dependency
+ * closure. Resolution performs no network access, installation or trust
+ * verification; those remain separate explicit stages.
+ */
+<span class="fc" id="L27">public final class PluginArtifactResolver {</span>
+    public static final String REQUEST_SCHEMA =
+        &quot;regelsuche.plugin-artifact-resolution-request/v1&quot;;
+    public static final String RECEIPT_SCHEMA =
+        &quot;regelsuche.plugin-artifact-resolution/v1&quot;;
+    public static final String NOT_PERFORMED = &quot;NOT_PERFORMED&quot;;
+    public static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+
+<span class="fc" id="L35">    private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();</span>
+<span class="fc" id="L36">    private static final Comparator&lt;Coordinate&gt; COORDINATE_ORDER = Comparator</span>
+<span class="fc" id="L37">        .comparing((Coordinate value) -&gt; value.kind().name())</span>
+<span class="fc" id="L38">        .thenComparing(Coordinate::componentId);</span>
+
+    public ResolutionReceipt resolve(
+        PluginArtifactIndex index,
+        ResolutionRequest request
+    ) {
+<span class="fc" id="L44">        Objects.requireNonNull(index, &quot;index&quot;);</span>
+<span class="fc" id="L45">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L46">        Context context = new Context(index, request);</span>
+<span class="fc" id="L47">        Entry root = selectRoot(context);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (root != null) {</span>
+<span class="fc" id="L49">            visit(root, context);</span>
+        }
+<span class="fc" id="L51">        List&lt;String&gt; blockers = normalizeMessages(context.blockers);</span>
+<span class="fc" id="L52">        List&lt;String&gt; warnings = normalizeMessages(context.warnings);</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">        boolean resolved = root != null &amp;&amp; blockers.isEmpty();</span>
+<span class="fc" id="L54">        return ResolutionReceipt.create(</span>
+<span class="fc" id="L55">            index.contentHash(),</span>
+            request,
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            resolved ? ResolutionStatus.RESOLVED : ResolutionStatus.UNRESOLVED,</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">            resolved ? root.identityHash() : &quot;&quot;,</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            resolved ? numbered(context.ordered) : List.of(),</span>
+            blockers,
+            warnings);
+    }
+
+    private static Entry selectRoot(Context context) {
+<span class="fc" id="L65">        ResolutionRequest request = context.request;</span>
+<span class="fc" id="L66">        List&lt;Entry&gt; versions = context.index.componentVersions(</span>
+<span class="fc" id="L67">            request.kind(), request.componentId());</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (versions.isEmpty()) {</span>
+<span class="fc" id="L69">            context.blockers.add(&quot;component-not-published:&quot;</span>
+<span class="fc" id="L70">                + coordinate(request.kind(), request.componentId()));</span>
+<span class="fc" id="L71">            return null;</span>
+        }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (request.selectionMode() == SelectionMode.EXACT) {</span>
+<span class="fc" id="L74">            versions = versions.stream()</span>
+<span class="fc" id="L75">                .filter(value -&gt; value.version().equals(request.requestedVersion()))</span>
+<span class="fc" id="L76">                .toList();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            if (versions.isEmpty()) {</span>
+<span class="nc" id="L78">                context.blockers.add(&quot;requested-version-not-published:&quot;</span>
+<span class="nc" id="L79">                    + request.requestedVersion());</span>
+<span class="nc" id="L80">                return null;</span>
+            }
+        }
+<span class="fc" id="L83">        versions = versions.stream()</span>
+<span class="fc" id="L84">            .filter(value -&gt; value.supportsCore(request.coreVersion()))</span>
+<span class="fc" id="L85">            .toList();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (versions.isEmpty()) {</span>
+<span class="fc" id="L87">            context.blockers.add(&quot;no-core-compatible-version:&quot; + request.coreVersion());</span>
+<span class="fc" id="L88">            return null;</span>
+        }
+<span class="fc" id="L90">        versions = versions.stream()</span>
+<span class="fc" id="L91">            .filter(value -&gt; value.apiVersion().equals(request.apiVersion()))</span>
+<span class="fc" id="L92">            .toList();</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (versions.isEmpty()) {</span>
+<span class="nc" id="L94">            context.blockers.add(&quot;no-api-compatible-version:&quot; + request.apiVersion());</span>
+<span class="nc" id="L95">            return null;</span>
+        }
+<span class="fc" id="L97">        versions = versions.stream()</span>
+<span class="fc" id="L98">            .filter(value -&gt; value.capabilities().containsAll(</span>
+<span class="fc" id="L99">                request.requiredCapabilities()))</span>
+<span class="fc" id="L100">            .toList();</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (versions.isEmpty()) {</span>
+<span class="fc" id="L102">            context.blockers.add(&quot;required-capabilities-unavailable:&quot;</span>
+<span class="fc" id="L103">                + String.join(&quot;,&quot;, request.requiredCapabilities()));</span>
+<span class="fc" id="L104">            return null;</span>
+        }
+<span class="fc" id="L106">        return versions.getFirst();</span>
+    }
+
+    private static void visit(Entry entry, Context context) {
+<span class="fc" id="L110">        Coordinate current = Coordinate.from(entry);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (context.visiting.contains(current)) {</span>
+<span class="fc" id="L112">            context.blockers.add(&quot;dependency-cycle:&quot;</span>
+<span class="fc" id="L113">                + cycle(context.stack, current));</span>
+<span class="fc" id="L114">            return;</span>
+        }
+<span class="fc" id="L116">        Entry existing = context.selected.get(current);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (!existing.version().equals(entry.version())) {</span>
+<span class="fc" id="L119">                context.blockers.add(&quot;dependency-version-conflict:&quot;</span>
+<span class="fc" id="L120">                    + current + &quot;:&quot; + existing.version() + &quot;&lt;&gt;&quot; + entry.version());</span>
+            }
+<span class="fc" id="L122">            return;</span>
+        }
+
+<span class="fc" id="L125">        context.selected.put(current, entry);</span>
+<span class="fc" id="L126">        context.visiting.add(current);</span>
+<span class="fc" id="L127">        context.stack.addLast(current);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (Dependency dependency : entry.dependencies()) {</span>
+<span class="fc" id="L129">            Entry candidate = selectDependency(dependency, entry, context);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (candidate == null) {</span>
+<span class="fc" id="L131">                continue;</span>
+            }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (dependency.optional()) {</span>
+<span class="fc" id="L134">                visitOptional(dependency, entry, candidate, context);</span>
+            } else {
+<span class="fc" id="L136">                visit(candidate, context);</span>
+            }
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        context.stack.removeLast();</span>
+<span class="fc" id="L140">        context.visiting.remove(current);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (context.ordered.stream().noneMatch(value -&gt;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                value.kind() == entry.kind()</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                    &amp;&amp; value.componentId().equals(entry.componentId()))) {</span>
+<span class="fc" id="L144">            context.ordered.add(entry);</span>
+        }
+<span class="fc" id="L146">    }</span>
+
+    /**
+     * Optional branches are transactional: if any required descendant of an
+     * optional dependency fails, every selection made by that branch is rolled
+     * back and the rejected branch is retained as one deterministic warning.
+     */
+    private static void visitOptional(
+        Dependency dependency,
+        Entry parent,
+        Entry candidate,
+        Context context
+    ) {
+<span class="fc" id="L159">        Snapshot before = context.snapshot();</span>
+<span class="fc" id="L160">        int blockerStart = context.blockers.size();</span>
+<span class="fc" id="L161">        int warningStart = context.warnings.size();</span>
+<span class="fc" id="L162">        visit(candidate, context);</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (context.blockers.size() == blockerStart) {</span>
+<span class="nc" id="L164">            return;</span>
+        }
+
+<span class="fc" id="L167">        List&lt;String&gt; branchBlockers = normalizeMessages(new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L168">            context.blockers.subList(blockerStart, context.blockers.size())));</span>
+<span class="fc" id="L169">        List&lt;String&gt; branchWarnings = normalizeMessages(new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L170">            context.warnings.subList(warningStart, context.warnings.size())));</span>
+<span class="fc" id="L171">        context.restore(before);</span>
+
+<span class="fc" id="L173">        StringBuilder warning = new StringBuilder(&quot;optional-dependency-rejected:&quot;)</span>
+<span class="fc" id="L174">            .append(parent.artifactId())</span>
+<span class="fc" id="L175">            .append(&quot;-&gt;&quot;)</span>
+<span class="fc" id="L176">            .append(coordinate(dependency.kind(), dependency.componentId()))</span>
+<span class="fc" id="L177">            .append(&quot;@&quot;)</span>
+<span class="fc" id="L178">            .append(dependency.versionConstraint())</span>
+<span class="fc" id="L179">            .append(&quot;:blockers=&quot;)</span>
+<span class="fc" id="L180">            .append(String.join(&quot;|&quot;, branchBlockers));</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (!branchWarnings.isEmpty()) {</span>
+<span class="nc" id="L182">            warning.append(&quot;:warnings=&quot;).append(String.join(&quot;|&quot;, branchWarnings));</span>
+        }
+<span class="fc" id="L184">        context.warnings.add(warning.toString());</span>
+<span class="fc" id="L185">    }</span>
+
+    private static Entry selectDependency(
+        Dependency dependency,
+        Entry parent,
+        Context context
+    ) {
+<span class="fc" id="L192">        List&lt;Entry&gt; candidates = context.index.componentVersions(</span>
+<span class="fc" id="L193">                dependency.kind(), dependency.componentId()).stream()</span>
+<span class="fc" id="L194">            .filter(value -&gt; dependency.matches(value.version()))</span>
+<span class="fc" id="L195">            .filter(value -&gt; value.supportsCore(context.request.coreVersion()))</span>
+<span class="fc" id="L196">            .filter(value -&gt; value.apiVersion().equals(context.request.apiVersion()))</span>
+<span class="fc" id="L197">            .toList();</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (!candidates.isEmpty()) {</span>
+<span class="fc" id="L199">            return candidates.getFirst();</span>
+        }
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        String diagnostic = (dependency.optional()</span>
+<span class="fc" id="L202">            ? &quot;optional-dependency-unavailable:&quot;</span>
+<span class="pc" id="L203">            : &quot;required-dependency-unavailable:&quot;)</span>
+<span class="fc" id="L204">            + parent.artifactId() + &quot;-&gt;&quot;</span>
+<span class="fc" id="L205">            + coordinate(dependency.kind(), dependency.componentId())</span>
+<span class="fc" id="L206">            + &quot;@&quot; + dependency.versionConstraint();</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (dependency.optional()) {</span>
+<span class="fc" id="L208">            context.warnings.add(diagnostic);</span>
+        } else {
+<span class="nc" id="L210">            context.blockers.add(diagnostic);</span>
+        }
+<span class="fc" id="L212">        return null;</span>
+    }
+
+    private static List&lt;ResolutionStep&gt; numbered(List&lt;Entry&gt; entries) {
+<span class="fc" id="L216">        List&lt;ResolutionStep&gt; steps = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int index = 0; index &lt; entries.size(); index++) {</span>
+<span class="fc" id="L218">            steps.add(ResolutionStep.from(index + 1, entries.get(index)));</span>
+        }
+<span class="fc" id="L220">        return List.copyOf(steps);</span>
+    }
+
+    private static String cycle(Deque&lt;Coordinate&gt; stack, Coordinate repeated) {
+<span class="fc" id="L224">        List&lt;Coordinate&gt; cycle = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L225">        boolean copy = false;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (Coordinate value : stack) {</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (value.equals(repeated)) {</span>
+<span class="fc" id="L228">                copy = true;</span>
+            }
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (copy) {</span>
+<span class="fc" id="L231">                cycle.add(value);</span>
+            }
+<span class="fc" id="L233">        }</span>
+<span class="fc" id="L234">        cycle.add(repeated);</span>
+<span class="fc" id="L235">        return cycle.stream()</span>
+<span class="fc" id="L236">            .map(Coordinate::toString)</span>
+<span class="fc" id="L237">            .collect(java.util.stream.Collectors.joining(&quot;-&gt;&quot;));</span>
+    }
+
+    private static String coordinate(ArtifactKind kind, String componentId) {
+<span class="fc" id="L241">        return kind.name() + &quot;/&quot; + componentId;</span>
+    }
+
+    private static List&lt;String&gt; normalizeIdentifiers(
+        List&lt;String&gt; values,
+        String field
+    ) {
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L249">            return List.of();</span>
+        }
+<span class="fc" id="L251">        return values.stream()</span>
+<span class="fc" id="L252">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L253">            .map(String::trim)</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isBlank())</span>
+<span class="fc" id="L255">            .map(value -&gt; PluginSignatureManifest.requireIdentifier(value, field))</span>
+<span class="fc" id="L256">            .distinct()</span>
+<span class="fc" id="L257">            .sorted()</span>
+<span class="fc" id="L258">            .toList();</span>
+    }
+
+    private static List&lt;String&gt; normalizeMessages(List&lt;String&gt; values) {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L263">            return List.of();</span>
+        }
+<span class="fc" id="L265">        return values.stream()</span>
+<span class="fc" id="L266">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L267">            .map(String::trim)</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isBlank())</span>
+<span class="fc" id="L269">            .distinct()</span>
+<span class="fc" id="L270">            .sorted()</span>
+<span class="fc" id="L271">            .toList();</span>
+    }
+
+    private static String optionalHash(String value, String field) {
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L276">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L278">        return PluginSignatureManifest.requireSha256(value, field);</span>
+    }
+
+    private static String hash(Object value) {
+        try {
+<span class="fc" id="L283">            return PluginArtifactVerifier.sha256(JSON.writeValueAsBytes(value));</span>
+<span class="nc" id="L284">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L285">            throw new IllegalStateException(&quot;Unable to hash artifact resolution&quot;, exception);</span>
+        }
+    }
+
+    private static String json(Object value) {
+        try {
+<span class="fc" id="L291">            return JSON.writeValueAsString(value) + &quot;\n&quot;;</span>
+<span class="nc" id="L292">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L293">            throw new IllegalStateException(</span>
+                &quot;Unable to serialize artifact resolution&quot;, exception);
+        }
+    }
+
+    private static String requireUri(String value, String field, boolean optional) {
+<span class="pc bpc" id="L299" title="2 of 6 branches missed.">        if ((value == null || value.isBlank()) &amp;&amp; optional) {</span>
+<span class="fc" id="L300">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L302" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L303">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+        }
+        try {
+<span class="fc" id="L306">            URI uri = new URI(value).normalize();</span>
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">            boolean https = &quot;https&quot;.equalsIgnoreCase(uri.getScheme())</span>
+<span class="pc bpc" id="L308" title="2 of 4 branches missed.">                &amp;&amp; uri.getHost() != null &amp;&amp; !uri.getHost().isBlank();</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">            boolean file = &quot;file&quot;.equalsIgnoreCase(uri.getScheme())</span>
+<span class="nc bnc" id="L310" title="All 4 branches missed.">                &amp;&amp; uri.getPath() != null &amp;&amp; uri.getPath().startsWith(&quot;/&quot;)</span>
+<span class="pc bnc" id="L311" title="All 4 branches missed.">                &amp;&amp; (uri.getHost() == null || uri.getHost().isBlank());</span>
+<span class="pc bpc" id="L312" title="3 of 4 branches missed.">            if ((!https &amp;&amp; !file)</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">                    || uri.getUserInfo() != null</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                    || uri.getFragment() != null) {</span>
+<span class="nc" id="L315">                throw new IllegalArgumentException(</span>
+                    field + &quot; must be an absolute https or local file URI&quot;);
+            }
+<span class="fc" id="L318">            return uri.toString();</span>
+<span class="nc" id="L319">        } catch (URISyntaxException exception) {</span>
+<span class="nc" id="L320">            throw new IllegalArgumentException(field + &quot; is not a valid URI&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L324">    public enum SelectionMode {</span>
+<span class="fc" id="L325">        EXACT,</span>
+<span class="fc" id="L326">        LATEST_COMPATIBLE</span>
+    }
+
+<span class="fc" id="L329">    public enum ResolutionStatus {</span>
+<span class="fc" id="L330">        RESOLVED,</span>
+<span class="fc" id="L331">        UNRESOLVED</span>
+    }
+
+    public record ResolutionRequest(
+        String schema,
+        String requestId,
+        ArtifactKind kind,
+        String componentId,
+        SelectionMode selectionMode,
+        String requestedVersion,
+        String coreVersion,
+        String apiVersion,
+        List&lt;String&gt; requiredCapabilities,
+        String contentHash
+    ) {
+<span class="fc" id="L346">        public ResolutionRequest {</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">            if (!REQUEST_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L348">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported artifact resolution request schema&quot;);
+            }
+<span class="fc" id="L351">            requestId = PluginSignatureManifest.requireIdentifier(</span>
+                requestId, &quot;requestId&quot;);
+<span class="fc" id="L353">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L354">            componentId = PluginSignatureManifest.requireIdentifier(</span>
+                componentId, &quot;componentId&quot;);
+<span class="fc" id="L356">            Objects.requireNonNull(selectionMode, &quot;selectionMode&quot;);</span>
+<span class="fc" id="L357">            requestedVersion = normalizeVersionSelection(</span>
+                selectionMode, requestedVersion);
+<span class="fc" id="L359">            coreVersion = PluginArtifactIndex.requireVersion(</span>
+                coreVersion, &quot;coreVersion&quot;);
+<span class="fc" id="L361">            apiVersion = PluginSignatureManifest.requireIdentifier(</span>
+                apiVersion, &quot;apiVersion&quot;);
+<span class="fc" id="L363">            requiredCapabilities = normalizeIdentifiers(</span>
+                requiredCapabilities, &quot;required capability&quot;);
+<span class="fc" id="L365">            contentHash = PluginSignatureManifest.requireSha256(</span>
+                contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L367">            String expected = hash(basePayload(</span>
+                requestId,
+                kind,
+                componentId,
+                selectionMode,
+                requestedVersion,
+                coreVersion,
+                apiVersion,
+                requiredCapabilities));
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L377">                throw new IllegalArgumentException(</span>
+                    &quot;artifact resolution request contentHash mismatch&quot;);
+            }
+<span class="fc" id="L380">        }</span>
+
+        public static ResolutionRequest latestCompatible(
+            String requestId,
+            ArtifactKind kind,
+            String componentId,
+            String coreVersion,
+            String apiVersion,
+            List&lt;String&gt; requiredCapabilities
+        ) {
+<span class="fc" id="L390">            return create(</span>
+                requestId,
+                kind,
+                componentId,
+                SelectionMode.LATEST_COMPATIBLE,
+                &quot;&quot;,
+                coreVersion,
+                apiVersion,
+                requiredCapabilities);
+        }
+
+        public static ResolutionRequest exact(
+            String requestId,
+            ArtifactKind kind,
+            String componentId,
+            String requestedVersion,
+            String coreVersion,
+            String apiVersion,
+            List&lt;String&gt; requiredCapabilities
+        ) {
+<span class="fc" id="L410">            return create(</span>
+                requestId,
+                kind,
+                componentId,
+                SelectionMode.EXACT,
+                requestedVersion,
+                coreVersion,
+                apiVersion,
+                requiredCapabilities);
+        }
+
+        private static ResolutionRequest create(
+            String requestId,
+            ArtifactKind kind,
+            String componentId,
+            SelectionMode selectionMode,
+            String requestedVersion,
+            String coreVersion,
+            String apiVersion,
+            List&lt;String&gt; requiredCapabilities
+        ) {
+<span class="fc" id="L431">            String normalizedRequestId = PluginSignatureManifest.requireIdentifier(</span>
+                requestId, &quot;requestId&quot;);
+<span class="fc" id="L433">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L434">            String normalizedComponentId = PluginSignatureManifest.requireIdentifier(</span>
+                componentId, &quot;componentId&quot;);
+<span class="fc" id="L436">            Objects.requireNonNull(selectionMode, &quot;selectionMode&quot;);</span>
+<span class="fc" id="L437">            String normalizedVersion = normalizeVersionSelection(</span>
+                selectionMode, requestedVersion);
+<span class="fc" id="L439">            String normalizedCoreVersion = PluginArtifactIndex.requireVersion(</span>
+                coreVersion, &quot;coreVersion&quot;);
+<span class="fc" id="L441">            String normalizedApiVersion = PluginSignatureManifest.requireIdentifier(</span>
+                apiVersion, &quot;apiVersion&quot;);
+<span class="fc" id="L443">            List&lt;String&gt; normalizedCapabilities = normalizeIdentifiers(</span>
+                requiredCapabilities, &quot;required capability&quot;);
+<span class="fc" id="L445">            String contentHash = hash(basePayload(</span>
+                normalizedRequestId,
+                kind,
+                normalizedComponentId,
+                selectionMode,
+                normalizedVersion,
+                normalizedCoreVersion,
+                normalizedApiVersion,
+                normalizedCapabilities));
+<span class="fc" id="L454">            return new ResolutionRequest(</span>
+                REQUEST_SCHEMA,
+                normalizedRequestId,
+                kind,
+                normalizedComponentId,
+                selectionMode,
+                normalizedVersion,
+                normalizedCoreVersion,
+                normalizedApiVersion,
+                normalizedCapabilities,
+                contentHash);
+        }
+
+        Map&lt;String, Object&gt; payload() {
+<span class="fc" id="L468">            Map&lt;String, Object&gt; payload = basePayload(</span>
+                requestId,
+                kind,
+                componentId,
+                selectionMode,
+                requestedVersion,
+                coreVersion,
+                apiVersion,
+                requiredCapabilities);
+<span class="fc" id="L477">            payload.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L478">            return payload;</span>
+        }
+
+        private static Map&lt;String, Object&gt; basePayload(
+            String requestId,
+            ArtifactKind kind,
+            String componentId,
+            SelectionMode selectionMode,
+            String requestedVersion,
+            String coreVersion,
+            String apiVersion,
+            List&lt;String&gt; requiredCapabilities
+        ) {
+<span class="fc" id="L491">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L492">            payload.put(&quot;schema&quot;, REQUEST_SCHEMA);</span>
+<span class="fc" id="L493">            payload.put(&quot;requestId&quot;, requestId);</span>
+<span class="fc" id="L494">            payload.put(&quot;kind&quot;, kind.name());</span>
+<span class="fc" id="L495">            payload.put(&quot;componentId&quot;, componentId);</span>
+<span class="fc" id="L496">            payload.put(&quot;selectionMode&quot;, selectionMode.name());</span>
+<span class="fc" id="L497">            payload.put(&quot;requestedVersion&quot;, requestedVersion);</span>
+<span class="fc" id="L498">            payload.put(&quot;coreVersion&quot;, coreVersion);</span>
+<span class="fc" id="L499">            payload.put(&quot;apiVersion&quot;, apiVersion);</span>
+<span class="fc" id="L500">            payload.put(&quot;requiredCapabilities&quot;, requiredCapabilities);</span>
+<span class="fc" id="L501">            return payload;</span>
+        }
+
+        private static String normalizeVersionSelection(
+            SelectionMode mode,
+            String version
+        ) {
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">            String normalized = version == null ? &quot;&quot; : version.trim();</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">            if (mode == SelectionMode.EXACT) {</span>
+<span class="fc" id="L510">                return PluginArtifactIndex.requireVersion(</span>
+                    normalized, &quot;requestedVersion&quot;);
+            }
+<span class="fc bfc" id="L513" title="All 2 branches covered.">            if (!normalized.isEmpty()) {</span>
+<span class="fc" id="L514">                throw new IllegalArgumentException(</span>
+                    &quot;LATEST_COMPATIBLE request must not provide requestedVersion&quot;);
+            }
+<span class="fc" id="L517">            return &quot;&quot;;</span>
+        }
+    }
+
+    public record ResolutionStep(
+        int order,
+        String artifactId,
+        ArtifactKind kind,
+        String componentId,
+        String version,
+        String artifactFileName,
+        String artifactSha256,
+        String artifactUri,
+        String signatureManifestUri,
+        String provenanceUri,
+        String publisherId,
+        String identityHash
+    ) {
+<span class="fc" id="L535">        public ResolutionStep {</span>
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">            if (order &lt; 1) {</span>
+<span class="nc" id="L537">                throw new IllegalArgumentException(</span>
+                    &quot;resolution order must be positive&quot;);
+            }
+<span class="fc" id="L540">            artifactId = PluginSignatureManifest.requireIdentifier(</span>
+                artifactId, &quot;artifactId&quot;);
+<span class="fc" id="L542">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L543">            componentId = PluginSignatureManifest.requireIdentifier(</span>
+                componentId, &quot;componentId&quot;);
+<span class="fc" id="L545">            version = PluginArtifactIndex.requireVersion(version, &quot;version&quot;);</span>
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">            if (artifactFileName == null</span>
+<span class="pc bpc" id="L547" title="1 of 2 branches missed.">                    || artifactFileName.isBlank()</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">                    || artifactFileName.contains(&quot;/&quot;)</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">                    || artifactFileName.contains(&quot;\\&quot;)) {</span>
+<span class="nc" id="L550">                throw new IllegalArgumentException(</span>
+                    &quot;artifactFileName must be a simple file name&quot;);
+            }
+<span class="fc" id="L553">            artifactSha256 = PluginSignatureManifest.requireSha256(</span>
+                artifactSha256, &quot;artifactSha256&quot;);
+<span class="fc" id="L555">            artifactUri = requireUri(artifactUri, &quot;artifactUri&quot;, false);</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">            signatureManifestUri = requireUri(</span>
+                signatureManifestUri,
+                &quot;signatureManifestUri&quot;,
+                kind != ArtifactKind.JAVA_PLUGIN);
+<span class="fc" id="L560">            provenanceUri = requireUri(provenanceUri, &quot;provenanceUri&quot;, false);</span>
+<span class="fc" id="L561">            publisherId = PluginSignatureManifest.requireIdentifier(</span>
+                publisherId, &quot;publisherId&quot;);
+<span class="fc" id="L563">            identityHash = PluginSignatureManifest.requireSha256(</span>
+                identityHash, &quot;identityHash&quot;);
+<span class="fc" id="L565">        }</span>
+
+        static ResolutionStep from(int order, Entry entry) {
+<span class="fc" id="L568">            return new ResolutionStep(</span>
+                order,
+<span class="fc" id="L570">                entry.artifactId(),</span>
+<span class="fc" id="L571">                entry.kind(),</span>
+<span class="fc" id="L572">                entry.componentId(),</span>
+<span class="fc" id="L573">                entry.version(),</span>
+<span class="fc" id="L574">                entry.artifactFileName(),</span>
+<span class="fc" id="L575">                entry.artifactSha256(),</span>
+<span class="fc" id="L576">                entry.artifactUri(),</span>
+<span class="fc" id="L577">                entry.signatureManifestUri(),</span>
+<span class="fc" id="L578">                entry.provenanceUri(),</span>
+<span class="fc" id="L579">                entry.publisherId(),</span>
+<span class="fc" id="L580">                entry.identityHash());</span>
+        }
+
+        Map&lt;String, Object&gt; payload() {
+<span class="fc" id="L584">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L585">            payload.put(&quot;order&quot;, order);</span>
+<span class="fc" id="L586">            payload.put(&quot;artifactId&quot;, artifactId);</span>
+<span class="fc" id="L587">            payload.put(&quot;kind&quot;, kind.name());</span>
+<span class="fc" id="L588">            payload.put(&quot;componentId&quot;, componentId);</span>
+<span class="fc" id="L589">            payload.put(&quot;version&quot;, version);</span>
+<span class="fc" id="L590">            payload.put(&quot;artifactFileName&quot;, artifactFileName);</span>
+<span class="fc" id="L591">            payload.put(&quot;artifactSha256&quot;, artifactSha256);</span>
+<span class="fc" id="L592">            payload.put(&quot;artifactUri&quot;, artifactUri);</span>
+<span class="fc" id="L593">            payload.put(&quot;signatureManifestUri&quot;, signatureManifestUri);</span>
+<span class="fc" id="L594">            payload.put(&quot;provenanceUri&quot;, provenanceUri);</span>
+<span class="fc" id="L595">            payload.put(&quot;publisherId&quot;, publisherId);</span>
+<span class="fc" id="L596">            payload.put(&quot;identityHash&quot;, identityHash);</span>
+<span class="fc" id="L597">            return payload;</span>
+        }
+    }
+
+    public record ResolutionReceipt(
+        String schema,
+        String indexContentHash,
+        ResolutionRequest request,
+        ResolutionStatus status,
+        String rootArtifactIdentityHash,
+        List&lt;ResolutionStep&gt; plan,
+        List&lt;String&gt; blockers,
+        List&lt;String&gt; warnings,
+        String networkAccessStatus,
+        String installationStatus,
+        String trustVerificationStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L615">        public ResolutionReceipt {</span>
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">            if (!RECEIPT_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L617">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported artifact resolution schema&quot;);
+            }
+<span class="fc" id="L620">            indexContentHash = PluginSignatureManifest.requireSha256(</span>
+                indexContentHash, &quot;indexContentHash&quot;);
+<span class="fc" id="L622">            Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L623">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L624">            rootArtifactIdentityHash = optionalHash(</span>
+                rootArtifactIdentityHash, &quot;rootArtifactIdentityHash&quot;);
+<span class="fc" id="L626">            plan = normalizePlan(plan);</span>
+<span class="fc" id="L627">            blockers = normalizeMessages(blockers);</span>
+<span class="fc" id="L628">            warnings = normalizeMessages(warnings);</span>
+<span class="fc" id="L629">            requireStatus(networkAccessStatus, NOT_PERFORMED, &quot;networkAccessStatus&quot;);</span>
+<span class="fc" id="L630">            requireStatus(installationStatus, NOT_PERFORMED, &quot;installationStatus&quot;);</span>
+<span class="fc" id="L631">            requireStatus(</span>
+                trustVerificationStatus,
+                NOT_EVALUATED,
+                &quot;trustVerificationStatus&quot;);
+<span class="fc" id="L635">            validateDisposition(status, rootArtifactIdentityHash, plan, blockers);</span>
+<span class="fc" id="L636">            contentHash = PluginSignatureManifest.requireSha256(</span>
+                contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L638">            String expected = hash(basePayload(</span>
+                indexContentHash,
+                request,
+                status,
+                rootArtifactIdentityHash,
+                plan,
+                blockers,
+                warnings));
+<span class="fc bfc" id="L646" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L647">                throw new IllegalArgumentException(</span>
+                    &quot;artifact resolution contentHash mismatch&quot;);
+            }
+<span class="fc" id="L650">        }</span>
+
+        static ResolutionReceipt create(
+            String indexContentHash,
+            ResolutionRequest request,
+            ResolutionStatus status,
+            String rootArtifactIdentityHash,
+            List&lt;ResolutionStep&gt; plan,
+            List&lt;String&gt; blockers,
+            List&lt;String&gt; warnings
+        ) {
+<span class="fc" id="L661">            String normalizedIndexHash = PluginSignatureManifest.requireSha256(</span>
+                indexContentHash, &quot;indexContentHash&quot;);
+<span class="fc" id="L663">            Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L664">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L665">            String normalizedRootHash = optionalHash(</span>
+                rootArtifactIdentityHash, &quot;rootArtifactIdentityHash&quot;);
+<span class="fc" id="L667">            List&lt;ResolutionStep&gt; normalizedPlan = normalizePlan(plan);</span>
+<span class="fc" id="L668">            List&lt;String&gt; normalizedBlockers = normalizeMessages(blockers);</span>
+<span class="fc" id="L669">            List&lt;String&gt; normalizedWarnings = normalizeMessages(warnings);</span>
+<span class="fc" id="L670">            validateDisposition(</span>
+                status,
+                normalizedRootHash,
+                normalizedPlan,
+                normalizedBlockers);
+<span class="fc" id="L675">            String contentHash = hash(basePayload(</span>
+                normalizedIndexHash,
+                request,
+                status,
+                normalizedRootHash,
+                normalizedPlan,
+                normalizedBlockers,
+                normalizedWarnings));
+<span class="fc" id="L683">            return new ResolutionReceipt(</span>
+                RECEIPT_SCHEMA,
+                normalizedIndexHash,
+                request,
+                status,
+                normalizedRootHash,
+                normalizedPlan,
+                normalizedBlockers,
+                normalizedWarnings,
+                NOT_PERFORMED,
+                NOT_PERFORMED,
+                NOT_EVALUATED,
+                contentHash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L699">            Map&lt;String, Object&gt; payload = basePayload(</span>
+                indexContentHash,
+                request,
+                status,
+                rootArtifactIdentityHash,
+                plan,
+                blockers,
+                warnings);
+<span class="fc" id="L707">            payload.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L708">            return json(payload);</span>
+        }
+
+        private static Map&lt;String, Object&gt; basePayload(
+            String indexContentHash,
+            ResolutionRequest request,
+            ResolutionStatus status,
+            String rootArtifactIdentityHash,
+            List&lt;ResolutionStep&gt; plan,
+            List&lt;String&gt; blockers,
+            List&lt;String&gt; warnings
+        ) {
+<span class="fc" id="L720">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L721">            payload.put(&quot;schema&quot;, RECEIPT_SCHEMA);</span>
+<span class="fc" id="L722">            payload.put(&quot;indexContentHash&quot;, indexContentHash);</span>
+<span class="fc" id="L723">            payload.put(&quot;request&quot;, request.payload());</span>
+<span class="fc" id="L724">            payload.put(&quot;status&quot;, status.name());</span>
+<span class="fc" id="L725">            payload.put(&quot;rootArtifactIdentityHash&quot;, rootArtifactIdentityHash);</span>
+<span class="fc" id="L726">            payload.put(&quot;plan&quot;, plan.stream()</span>
+<span class="fc" id="L727">                .map(ResolutionStep::payload)</span>
+<span class="fc" id="L728">                .toList());</span>
+<span class="fc" id="L729">            payload.put(&quot;blockers&quot;, blockers);</span>
+<span class="fc" id="L730">            payload.put(&quot;warnings&quot;, warnings);</span>
+<span class="fc" id="L731">            payload.put(&quot;networkAccessStatus&quot;, NOT_PERFORMED);</span>
+<span class="fc" id="L732">            payload.put(&quot;installationStatus&quot;, NOT_PERFORMED);</span>
+<span class="fc" id="L733">            payload.put(&quot;trustVerificationStatus&quot;, NOT_EVALUATED);</span>
+<span class="fc" id="L734">            return payload;</span>
+        }
+
+        private static List&lt;ResolutionStep&gt; normalizePlan(
+            List&lt;ResolutionStep&gt; values
+        ) {
+<span class="pc bpc" id="L740" title="1 of 2 branches missed.">            if (values == null) {</span>
+<span class="nc" id="L741">                return List.of();</span>
+            }
+<span class="fc" id="L743">            List&lt;ResolutionStep&gt; normalized = values.stream()</span>
+<span class="fc" id="L744">                .map(value -&gt; Objects.requireNonNull(value, &quot;resolution step&quot;))</span>
+<span class="fc" id="L745">                .sorted(Comparator.comparingInt(ResolutionStep::order))</span>
+<span class="fc" id="L746">                .toList();</span>
+<span class="fc" id="L747">            Set&lt;String&gt; coordinates = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L748" title="All 2 branches covered.">            for (int index = 0; index &lt; normalized.size(); index++) {</span>
+<span class="fc" id="L749">                ResolutionStep step = normalized.get(index);</span>
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">                if (step.order() != index + 1) {</span>
+<span class="nc" id="L751">                    throw new IllegalArgumentException(</span>
+                        &quot;resolution plan order must be contiguous&quot;);
+                }
+<span class="fc" id="L754">                String coordinate = coordinate(step.kind(), step.componentId());</span>
+<span class="pc bpc" id="L755" title="1 of 2 branches missed.">                if (!coordinates.add(coordinate)) {</span>
+<span class="nc" id="L756">                    throw new IllegalArgumentException(</span>
+                        &quot;resolution plan selects a component more than once: &quot;
+                            + coordinate);
+                }
+            }
+<span class="fc" id="L761">            return List.copyOf(normalized);</span>
+        }
+
+        private static void validateDisposition(
+            ResolutionStatus status,
+            String rootArtifactIdentityHash,
+            List&lt;ResolutionStep&gt; plan,
+            List&lt;String&gt; blockers
+        ) {
+<span class="fc bfc" id="L770" title="All 2 branches covered.">            if (status == ResolutionStatus.RESOLVED) {</span>
+<span class="pc bpc" id="L771" title="1 of 2 branches missed.">                if (rootArtifactIdentityHash.isEmpty()</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">                        || plan.isEmpty()</span>
+<span class="pc bpc" id="L773" title="1 of 2 branches missed.">                        || !blockers.isEmpty()) {</span>
+<span class="nc" id="L774">                    throw new IllegalArgumentException(</span>
+                        &quot;resolved receipt requires root, plan and no blockers&quot;);
+                }
+<span class="pc bpc" id="L777" title="1 of 2 branches missed.">                if (!plan.getLast().identityHash().equals(rootArtifactIdentityHash)) {</span>
+<span class="nc" id="L778">                    throw new IllegalArgumentException(</span>
+                        &quot;resolution plan must end with the requested root artifact&quot;);
+                }
+<span class="fc" id="L781">                return;</span>
+            }
+<span class="pc bpc" id="L783" title="1 of 2 branches missed.">            if (!rootArtifactIdentityHash.isEmpty()</span>
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">                    || !plan.isEmpty()</span>
+<span class="pc bpc" id="L785" title="1 of 2 branches missed.">                    || blockers.isEmpty()) {</span>
+<span class="nc" id="L786">                throw new IllegalArgumentException(</span>
+                    &quot;unresolved receipt requires blockers and no executable plan&quot;);
+            }
+<span class="fc" id="L789">        }</span>
+
+        private static void requireStatus(
+            String value,
+            String expected,
+            String field
+        ) {
+<span class="pc bpc" id="L796" title="1 of 2 branches missed.">            if (!expected.equals(value)) {</span>
+<span class="nc" id="L797">                throw new IllegalArgumentException(field + &quot; must be &quot; + expected);</span>
+            }
+<span class="fc" id="L799">        }</span>
+    }
+
+    private static final class Context {
+        private final PluginArtifactIndex index;
+        private final ResolutionRequest request;
+<span class="fc" id="L805">        private final TreeMap&lt;Coordinate, Entry&gt; selected =</span>
+            new TreeMap&lt;&gt;(COORDINATE_ORDER);
+<span class="fc" id="L807">        private final Set&lt;Coordinate&gt; visiting = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L808">        private final Deque&lt;Coordinate&gt; stack = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L809">        private final List&lt;Entry&gt; ordered = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L810">        private final List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L811">        private final List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+
+        private Context(
+            PluginArtifactIndex index,
+            ResolutionRequest request
+<span class="fc" id="L816">        ) {</span>
+<span class="fc" id="L817">            this.index = index;</span>
+<span class="fc" id="L818">            this.request = request;</span>
+<span class="fc" id="L819">        }</span>
+
+        private Snapshot snapshot() {
+<span class="fc" id="L822">            TreeMap&lt;Coordinate, Entry&gt; selectedCopy =</span>
+                new TreeMap&lt;&gt;(COORDINATE_ORDER);
+<span class="fc" id="L824">            selectedCopy.putAll(selected);</span>
+<span class="fc" id="L825">            return new Snapshot(</span>
+                selectedCopy,
+                new HashSet&lt;&gt;(visiting),
+                new ArrayDeque&lt;&gt;(stack),
+                new ArrayList&lt;&gt;(ordered),
+                new ArrayList&lt;&gt;(blockers),
+                new ArrayList&lt;&gt;(warnings));
+        }
+
+        private void restore(Snapshot snapshot) {
+<span class="fc" id="L835">            selected.clear();</span>
+<span class="fc" id="L836">            selected.putAll(snapshot.selected());</span>
+<span class="fc" id="L837">            visiting.clear();</span>
+<span class="fc" id="L838">            visiting.addAll(snapshot.visiting());</span>
+<span class="fc" id="L839">            stack.clear();</span>
+<span class="fc" id="L840">            stack.addAll(snapshot.stack());</span>
+<span class="fc" id="L841">            ordered.clear();</span>
+<span class="fc" id="L842">            ordered.addAll(snapshot.ordered());</span>
+<span class="fc" id="L843">            blockers.clear();</span>
+<span class="fc" id="L844">            blockers.addAll(snapshot.blockers());</span>
+<span class="fc" id="L845">            warnings.clear();</span>
+<span class="fc" id="L846">            warnings.addAll(snapshot.warnings());</span>
+<span class="fc" id="L847">        }</span>
+    }
+
+<span class="fc" id="L850">    private record Snapshot(</span>
+        TreeMap&lt;Coordinate, Entry&gt; selected,
+        Set&lt;Coordinate&gt; visiting,
+        Deque&lt;Coordinate&gt; stack,
+        List&lt;Entry&gt; ordered,
+        List&lt;String&gt; blockers,
+        List&lt;String&gt; warnings
+    ) {
+    }
+
+    private record Coordinate(ArtifactKind kind, String componentId) {
+<span class="fc" id="L861">        private Coordinate {</span>
+<span class="fc" id="L862">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L863">            componentId = PluginSignatureManifest.requireIdentifier(</span>
+                componentId, &quot;componentId&quot;);
+<span class="fc" id="L865">        }</span>
+
+        static Coordinate from(Entry entry) {
+<span class="fc" id="L868">            return new Coordinate(entry.kind(), entry.componentId());</span>
+        }
+
+        @Override
+        public String toString() {
+<span class="fc" id="L873">            return coordinate(kind, componentId);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
