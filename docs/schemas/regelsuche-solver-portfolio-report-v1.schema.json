@@ -118,6 +118,32 @@
   "allOf": [
     {
       "if": {
+        "properties": {
+          "outcome": { "enum": ["CONFIRMED", "REFUTED"] }
+        },
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "selectedExecutionHash": { "$ref": "#/$defs/sha256" },
+          "selectedBackendId": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "outcome": { "const": "REFUTED" } },
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "promotionBlocked": { "const": true },
+          "proofAuthorized": { "const": false }
+        }
+      }
+    },
+    {
+      "if": {
         "properties": { "outcome": { "const": "CONFLICT" } },
         "required": ["outcome"]
       },
@@ -125,6 +151,8 @@
         "properties": {
           "promotionBlocked": { "const": true },
           "proofAuthorized": { "const": false },
+          "selectedExecutionHash": { "const": "" },
+          "selectedBackendId": { "const": "" },
           "conflictExecutionHashes": { "minItems": 2 }
         }
       }
@@ -136,6 +164,9 @@
       },
       "then": {
         "properties": {
+          "objective": {
+            "enum": ["SYMBOLIC_CONFIRMATION", "FORMAL_PROOF"]
+          },
           "outcome": { "const": "CONFIRMED" },
           "selectedExecutionHash": { "$ref": "#/$defs/sha256" }
         }
