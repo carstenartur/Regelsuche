@@ -178,6 +178,25 @@
       "if": {
         "properties": {
           "disposition": {
+            "const": "COMPLETED"
+          }
+        },
+        "required": [
+          "disposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "GENERATION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
             "const": "CONFIRMED"
           }
         },
