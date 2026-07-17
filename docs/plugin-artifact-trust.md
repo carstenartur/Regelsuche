@@ -130,6 +130,21 @@ Schlüsselstatus:
 Ein Artefaktwiderruf gewinnt immer gegen eine ansonsten gültige Signatur. Ein
 unbekannter Publisher oder Key ist keine implizite Vertrauenskette.
 
+### Authentisierte Verteilung des Trust States
+
+Der lokale Trust Store darf nicht unbemerkt durch eine ältere oder fremde Datei
+ersetzt werden. Der ergänzende Vertrag
+[Authentisierte Plugin-Trust-State-Revisionen](plugin-trust-store-revisions.md)
+bindet deshalb jede kanonische Trust-Store-Version an eine Ed25519-signierte,
+monotone Hashkette und einen lokalen letzten Checkpoint.
+
+Die Authority-Keys stammen aus einem getrennten, lokal gepinnten Root-Trust-Store.
+Ein Key wird nicht dadurch zur Authority, dass er im neu verteilten Arbeits-Trust-
+Store enthalten ist. Replay-, Gap-, Fork- und Trust-Domain-Abweichungen werden
+fail-closed abgewiesen. Der lokale Checkpoint muss gegen Rollback geschützt
+persistiert werden; eine normale kopierbare Datei allein kann keinen vollständigen
+lokalen State-Rollback verhindern.
+
 ## Verification-Evidence
 
 Für jedes gefundene JAR entsteht
@@ -176,7 +191,11 @@ ersetzt.
 
 - `docs/schemas/regelsuche-plugin-signature-v1.schema.json`
 - `docs/schemas/regelsuche-plugin-trust-store-v1.schema.json`
+- `docs/schemas/regelsuche-plugin-trust-store-revision-v1.schema.json`
+- `docs/schemas/regelsuche-plugin-trust-store-chain-checkpoint-v1.schema.json`
+- `docs/schemas/regelsuche-plugin-trust-store-revision-verification-v1.schema.json`
 - `docs/schemas/regelsuche-plugin-artifact-verification-v1.schema.json`
 - `docs/schemas/regelsuche-plugin-artifact-gate-v1.schema.json`
 
-Die Java-Parser sind zusätzlich strikt gegenüber unbekannten JSON-Feldern.
+Die Java-Parser sind zusätzlich strikt gegenüber unbekannten JSON-Feldern,
+doppelten Feldern und nachgestellten JSON-Werten.
