@@ -295,25 +295,25 @@ public final class PluginRuntime implements AutoCloseable {
             List&lt;URL&gt; urls;
 <span class="fc" id="L296">            try (var stream = Files.list(config.pluginsDirectory())) {</span>
 <span class="fc" id="L297">                urls = stream</span>
-<span class="pc" id="L298">                    .filter(path -&gt; path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(&quot;.jar&quot;))</span>
+<span class="fc" id="L298">                    .filter(path -&gt; path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(&quot;.jar&quot;))</span>
 <span class="fc" id="L299">                    .sorted(Comparator.comparing(Path::toString))</span>
 <span class="fc" id="L300">                    .map(this::toUrl)</span>
 <span class="fc" id="L301">                    .toList();</span>
             }
-<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (urls.isEmpty()) {</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (urls.isEmpty()) {</span>
 <span class="fc" id="L304">                return;</span>
             }
-<span class="nc" id="L306">            externalPluginClassLoader = new URLClassLoader(urls.toArray(URL[]::new),</span>
-<span class="nc" id="L307">                Thread.currentThread().getContextClassLoader());</span>
-<span class="nc" id="L308">            loadPlugins(ServiceLoader.load(RegelsuchePlugin.class, externalPluginClassLoader),</span>
-<span class="nc" id="L309">                config.pluginsDirectory().toString(), discoveredPlugins, discoveredDiagnostics);</span>
+<span class="fc" id="L306">            externalPluginClassLoader = new URLClassLoader(urls.toArray(URL[]::new),</span>
+<span class="fc" id="L307">                Thread.currentThread().getContextClassLoader());</span>
+<span class="fc" id="L308">            loadPlugins(ServiceLoader.load(RegelsuchePlugin.class, externalPluginClassLoader),</span>
+<span class="fc" id="L309">                config.pluginsDirectory().toString(), discoveredPlugins, discoveredDiagnostics);</span>
 <span class="nc" id="L310">        } catch (IOException ex) {</span>
 <span class="nc" id="L311">            discoveredDiagnostics.add(new RuntimeDiagnostic(</span>
                 &quot;plugin-runtime&quot;,
 <span class="nc" id="L313">                &quot;Could not scan plugin directory &quot; + config.pluginsDirectory() + &quot;: &quot; + ex.getMessage()</span>
             ));
-<span class="nc" id="L315">        }</span>
-<span class="nc" id="L316">    }</span>
+<span class="fc" id="L315">        }</span>
+<span class="fc" id="L316">    }</span>
 
     private void loadPlugins(
         ServiceLoader&lt;RegelsuchePlugin&gt; loader,
@@ -486,7 +486,7 @@ public final class PluginRuntime implements AutoCloseable {
     }
 
     private boolean isTrustedSource(String source, boolean signatureVerified) {
-<span class="pc bpc" id="L489" title="3 of 4 branches missed.">        return &quot;classpath&quot;.equals(source) || signatureVerified;</span>
+<span class="pc bpc" id="L489" title="1 of 4 branches missed.">        return &quot;classpath&quot;.equals(source) || signatureVerified;</span>
     }
 
     private List&lt;String&gt; buildTrustWarnings(
@@ -496,23 +496,23 @@ public final class PluginRuntime implements AutoCloseable {
         String provenance,
         boolean trustedSource
     ) {
-<span class="pc bpc" id="L499" title="1 of 2 branches missed.">        if (&quot;classpath&quot;.equals(source)) {</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        if (&quot;classpath&quot;.equals(source)) {</span>
 <span class="fc" id="L500">            return List.of();</span>
         }
-<span class="nc" id="L502">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
-<span class="nc bnc" id="L503" title="All 2 branches missed.">        if (provenance.isBlank()) {</span>
+<span class="fc" id="L502">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">        if (provenance.isBlank()) {</span>
 <span class="nc" id="L504">            warnings.add(&quot;MISSING_PROVENANCE&quot;);</span>
         }
-<span class="nc bnc" id="L506" title="All 2 branches missed.">        if (!signaturePresent) {</span>
-<span class="nc" id="L507">            warnings.add(&quot;MISSING_SIGNATURE_METADATA&quot;);</span>
+<span class="pc bpc" id="L506" title="1 of 2 branches missed.">        if (!signaturePresent) {</span>
+<span class="fc" id="L507">            warnings.add(&quot;MISSING_SIGNATURE_METADATA&quot;);</span>
 <span class="nc bnc" id="L508" title="All 2 branches missed.">        } else if (!signatureVerified) {</span>
 <span class="nc" id="L509">            warnings.add(&quot;SIGNATURE_NOT_VERIFIED&quot;);</span>
         }
-<span class="nc" id="L511">        warnings.add(&quot;UNKNOWN_SOURCE&quot;);</span>
-<span class="nc bnc" id="L512" title="All 2 branches missed.">        if (!trustedSource) {</span>
-<span class="nc" id="L513">            warnings.add(&quot;UNTRUSTED_EXTERNAL_SOURCE&quot;);</span>
+<span class="fc" id="L511">        warnings.add(&quot;UNKNOWN_SOURCE&quot;);</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (!trustedSource) {</span>
+<span class="fc" id="L513">            warnings.add(&quot;UNTRUSTED_EXTERNAL_SOURCE&quot;);</span>
         }
-<span class="nc" id="L515">        return warnings.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L515">        return warnings.stream().distinct().sorted().toList();</span>
     }
 
     private void registerPlugin(RegelsuchePlugin plugin, String source, List&lt;RuntimeDiagnostic&gt; discoveredDiagnostics) {
@@ -769,7 +769,7 @@ public final class PluginRuntime implements AutoCloseable {
 
     private URL toUrl(Path path) {
         try {
-<span class="nc" id="L772">            return path.toUri().toURL();</span>
+<span class="fc" id="L772">            return path.toUri().toURL();</span>
 <span class="nc" id="L773">        } catch (IOException ex) {</span>
 <span class="nc" id="L774">            throw new IllegalArgumentException(&quot;Invalid plugin path: &quot; + path, ex);</span>
         }
@@ -793,13 +793,13 @@ public final class PluginRuntime implements AutoCloseable {
     }
 
     private void closeQuietly() {
-<span class="pc bpc" id="L796" title="1 of 2 branches missed.">        if (externalPluginClassLoader != null) {</span>
+<span class="fc bfc" id="L796" title="All 2 branches covered.">        if (externalPluginClassLoader != null) {</span>
             try {
-<span class="nc" id="L798">                externalPluginClassLoader.close();</span>
+<span class="fc" id="L798">                externalPluginClassLoader.close();</span>
 <span class="nc" id="L799">            } catch (IOException ignored) {</span>
                 // ignore close noise during reload
-<span class="nc" id="L801">            }</span>
-<span class="nc" id="L802">            externalPluginClassLoader = null;</span>
+<span class="fc" id="L801">            }</span>
+<span class="fc" id="L802">            externalPluginClassLoader = null;</span>
         }
 <span class="fc" id="L804">    }</span>
 

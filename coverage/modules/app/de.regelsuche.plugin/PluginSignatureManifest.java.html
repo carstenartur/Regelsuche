@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginSignatureManifest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginSignatureManifest.java</span></div><h1>PluginSignatureManifest.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/**
+ * Strict detached signature envelope for one external plugin JAR.
+ *
+ * &lt;p&gt;The Ed25519 signature covers an unambiguous, length-prefixed encoding of
+ * every identity field except the signature itself. The manifest is stored next
+ * to the artifact as {@code &lt;artifact&gt;.sig.json}.&lt;/p&gt;
+ */
+public record PluginSignatureManifest(
+    String schema,
+    String artifactFileName,
+    String artifactSha256,
+    String publisherId,
+    String keyId,
+    String algorithm,
+    String signatureBase64
+) {
+    public static final String SCHEMA = &quot;regelsuche.plugin-signature/v1&quot;;
+    public static final String ALGORITHM = &quot;Ed25519&quot;;
+
+<span class="fc" id="L38">    private static final Pattern SHA256 = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L39">    private static final Pattern IDENTIFIER = Pattern.compile(&quot;[A-Za-z0-9][A-Za-z0-9._:-]{0,127}&quot;);</span>
+<span class="fc" id="L40">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L41">        .findAndRegisterModules()</span>
+<span class="fc" id="L42">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+<span class="fc" id="L44">    public PluginSignatureManifest {</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;unsupported plugin signature schema&quot;);</span>
+        }
+<span class="fc" id="L48">        artifactFileName = requireFileName(artifactFileName);</span>
+<span class="fc" id="L49">        artifactSha256 = requireSha256(artifactSha256, &quot;artifactSha256&quot;);</span>
+<span class="fc" id="L50">        publisherId = requireIdentifier(publisherId, &quot;publisherId&quot;);</span>
+<span class="fc" id="L51">        keyId = requireIdentifier(keyId, &quot;keyId&quot;);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (!ALGORITHM.equals(algorithm)) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;unsupported plugin signature algorithm: &quot; + algorithm);</span>
+        }
+<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        if (signatureBase64 == null || signatureBase64.isBlank()) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;signatureBase64 must not be blank&quot;);</span>
+        }
+        byte[] signature;
+        try {
+<span class="fc" id="L60">            signature = Base64.getDecoder().decode(signatureBase64);</span>
+<span class="nc" id="L61">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;signatureBase64 is not valid base64&quot;, exception);</span>
+<span class="fc" id="L63">        }</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (signature.length != 64) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;Ed25519 signatures must contain exactly 64 bytes&quot;);</span>
+        }
+<span class="fc" id="L67">    }</span>
+
+    public static PluginSignatureManifest create(
+        String artifactFileName,
+        String artifactSha256,
+        String publisherId,
+        String keyId,
+        String signatureBase64
+    ) {
+<span class="fc" id="L76">        return new PluginSignatureManifest(</span>
+            SCHEMA,
+            artifactFileName,
+            artifactSha256,
+            publisherId,
+            keyId,
+            ALGORITHM,
+            signatureBase64
+        );
+    }
+
+    public byte[] signedPayload() {
+<span class="fc" id="L88">        return signedPayload(</span>
+            artifactFileName,
+            artifactSha256,
+            publisherId,
+            keyId,
+            algorithm
+        );
+    }
+
+    public static byte[] signedPayload(
+        String artifactFileName,
+        String artifactSha256,
+        String publisherId,
+        String keyId,
+        String algorithm
+    ) {
+<span class="fc" id="L104">        String normalizedArtifact = requireFileName(artifactFileName);</span>
+<span class="fc" id="L105">        String normalizedHash = requireSha256(artifactSha256, &quot;artifactSha256&quot;);</span>
+<span class="fc" id="L106">        String normalizedPublisher = requireIdentifier(publisherId, &quot;publisherId&quot;);</span>
+<span class="fc" id="L107">        String normalizedKey = requireIdentifier(keyId, &quot;keyId&quot;);</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (!ALGORITHM.equals(algorithm)) {</span>
+<span class="nc" id="L109">            throw new IllegalArgumentException(&quot;unsupported plugin signature algorithm: &quot; + algorithm);</span>
+        }
+        try {
+<span class="fc" id="L112">            ByteArrayOutputStream bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L113">            try (DataOutputStream output = new DataOutputStream(bytes)) {</span>
+<span class="fc" id="L114">                writeField(output, &quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L115">                writeField(output, &quot;artifactFileName&quot;, normalizedArtifact);</span>
+<span class="fc" id="L116">                writeField(output, &quot;artifactSha256&quot;, normalizedHash);</span>
+<span class="fc" id="L117">                writeField(output, &quot;publisherId&quot;, normalizedPublisher);</span>
+<span class="fc" id="L118">                writeField(output, &quot;keyId&quot;, normalizedKey);</span>
+<span class="fc" id="L119">                writeField(output, &quot;algorithm&quot;, algorithm);</span>
+            }
+<span class="fc" id="L121">            return bytes.toByteArray();</span>
+<span class="nc" id="L122">        } catch (IOException exception) {</span>
+<span class="nc" id="L123">            throw new IllegalStateException(&quot;Unable to encode plugin signature payload&quot;, exception);</span>
+        }
+    }
+
+    public static Path sidecarFor(Path artifact) {
+<span class="fc" id="L128">        Objects.requireNonNull(artifact, &quot;artifact&quot;);</span>
+<span class="fc" id="L129">        Path fileName = artifact.getFileName();</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (fileName == null) {</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(&quot;artifact must have a file name&quot;);</span>
+        }
+<span class="fc" id="L133">        return artifact.resolveSibling(fileName + &quot;.sig.json&quot;);</span>
+    }
+
+    public static PluginSignatureManifest read(Path path) {
+<span class="fc" id="L137">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L139">            ManifestDto dto = JSON.readValue(Files.readString(path, StandardCharsets.UTF_8), ManifestDto.class);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (dto == null) {</span>
+<span class="nc" id="L141">                throw new IllegalArgumentException(&quot;plugin signature manifest must not be empty&quot;);</span>
+            }
+<span class="fc" id="L143">            return new PluginSignatureManifest(</span>
+                dto.schema,
+                dto.artifactFileName,
+                dto.artifactSha256,
+                dto.publisherId,
+                dto.keyId,
+                dto.algorithm,
+                dto.signatureBase64
+            );
+<span class="fc" id="L152">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L153">            throw new IllegalArgumentException(&quot;Invalid plugin signature manifest: &quot; + path, exception);</span>
+<span class="nc" id="L154">        } catch (IOException exception) {</span>
+<span class="nc" id="L155">            throw new IllegalArgumentException(&quot;Unable to read plugin signature manifest: &quot; + path, exception);</span>
+        }
+    }
+
+    public Path write(Path path) {
+<span class="fc" id="L160">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L162">            Path parent = path.toAbsolutePath().normalize().getParent();</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L164">                Files.createDirectories(parent);</span>
+            }
+<span class="fc" id="L166">            Files.writeString(path, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L167">            return path;</span>
+<span class="nc" id="L168">        } catch (IOException exception) {</span>
+<span class="nc" id="L169">            throw new IllegalStateException(&quot;Unable to write plugin signature manifest&quot;, exception);</span>
+        }
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L174">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L175">        payload.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L176">        payload.put(&quot;artifactFileName&quot;, artifactFileName);</span>
+<span class="fc" id="L177">        payload.put(&quot;artifactSha256&quot;, artifactSha256);</span>
+<span class="fc" id="L178">        payload.put(&quot;publisherId&quot;, publisherId);</span>
+<span class="fc" id="L179">        payload.put(&quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L180">        payload.put(&quot;algorithm&quot;, algorithm);</span>
+<span class="fc" id="L181">        payload.put(&quot;signatureBase64&quot;, signatureBase64);</span>
+        try {
+<span class="fc" id="L183">            return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L184">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L185">            throw new IllegalStateException(&quot;Unable to serialize plugin signature manifest&quot;, exception);</span>
+        }
+    }
+
+    private static void writeField(DataOutputStream output, String name, String value) throws IOException {
+<span class="fc" id="L190">        writeBytes(output, name.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L191">        writeBytes(output, value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L192">    }</span>
+
+    private static void writeBytes(DataOutputStream output, byte[] value) throws IOException {
+<span class="fc" id="L195">        output.writeInt(value.length);</span>
+<span class="fc" id="L196">        output.write(value);</span>
+<span class="fc" id="L197">    }</span>
+
+    private static String requireFileName(String value) {
+<span class="pc bpc" id="L200" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L201">            throw new IllegalArgumentException(&quot;artifactFileName must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (!Path.of(value).getFileName().toString().equals(value)</span>
+<span class="pc bpc" id="L204" title="2 of 4 branches missed.">                || value.contains(&quot;/&quot;) || value.contains(&quot;\\&quot;)) {</span>
+<span class="nc" id="L205">            throw new IllegalArgumentException(&quot;artifactFileName must be a simple file name&quot;);</span>
+        }
+<span class="fc" id="L207">        return value;</span>
+    }
+
+    static String requireSha256(String value, String field) {
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
+<span class="nc" id="L212">            throw new IllegalArgumentException(field + &quot; must use sha256:&lt;64 lowercase hex characters&gt;&quot;);</span>
+        }
+<span class="fc" id="L214">        return value;</span>
+    }
+
+    static String requireIdentifier(String value, String field) {
+<span class="pc bpc" id="L218" title="2 of 4 branches missed.">        if (value == null || !IDENTIFIER.matcher(value).matches()) {</span>
+<span class="nc" id="L219">            throw new IllegalArgumentException(field + &quot; is not a valid identifier&quot;);</span>
+        }
+<span class="fc" id="L221">        return value;</span>
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L225">    public static final class ManifestDto {</span>
+        public String schema;
+        public String artifactFileName;
+        public String artifactSha256;
+        public String publisherId;
+        public String keyId;
+        public String algorithm;
+        public String signatureBase64;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginArtifactGate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginArtifactGate.java</span></div><h1>PluginArtifactGate.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Materializes only policy-admitted plugin bytes into a private staging
+ * directory. The staged bytes are the exact snapshot that was verified.
+ */
+public final class PluginArtifactGate {
+<span class="fc" id="L22">    private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();</span>
+
+    private final PluginArtifactVerifier verifier;
+    private final PluginTrustPolicy policy;
+    private final String trustStoreHash;
+
+    public PluginArtifactGate(PluginTrustStore trustStore, PluginTrustPolicy policy) {
+<span class="fc" id="L29">        this(</span>
+            trustStore,
+            policy,
+            PluginArtifactTrustConfig.DEFAULT_MAX_ARTIFACT_BYTES
+        );
+<span class="fc" id="L34">    }</span>
+
+    public PluginArtifactGate(
+        PluginTrustStore trustStore,
+        PluginTrustPolicy policy,
+        long maxArtifactBytes
+<span class="fc" id="L40">    ) {</span>
+<span class="fc" id="L41">        PluginTrustStore effectiveTrustStore = Objects.requireNonNull(trustStore, &quot;trustStore&quot;);</span>
+<span class="fc" id="L42">        this.verifier = new PluginArtifactVerifier(effectiveTrustStore, maxArtifactBytes);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        this.policy = policy == null ? PluginTrustPolicy.WARN : policy;</span>
+<span class="fc" id="L44">        this.trustStoreHash = PluginArtifactVerifier.sha256(</span>
+<span class="fc" id="L45">            effectiveTrustStore.toCanonicalJson().getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L46">    }</span>
+
+    public GateResult materialize(Path sourceDirectory, Path stagingDirectory) {
+<span class="fc" id="L49">        Objects.requireNonNull(sourceDirectory, &quot;sourceDirectory&quot;);</span>
+<span class="fc" id="L50">        Objects.requireNonNull(stagingDirectory, &quot;stagingDirectory&quot;);</span>
+<span class="fc" id="L51">        Path source = sourceDirectory.toAbsolutePath().normalize();</span>
+<span class="fc" id="L52">        Path staging = stagingDirectory.toAbsolutePath().normalize();</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (source.equals(staging)) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;source and staging directories must differ&quot;);</span>
+        }
+        try {
+<span class="fc" id="L57">            Files.createDirectories(staging);</span>
+<span class="nc" id="L58">        } catch (IOException exception) {</span>
+<span class="nc" id="L59">            throw new IllegalStateException(&quot;Unable to create plugin staging directory&quot;, exception);</span>
+<span class="fc" id="L60">        }</span>
+
+<span class="fc" id="L62">        List&lt;Path&gt; artifacts = listArtifactEntries(source);</span>
+<span class="fc" id="L63">        List&lt;PluginArtifactVerification&gt; verifications = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L64">        List&lt;String&gt; admitted = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L65">        List&lt;String&gt; blocked = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (Path artifact : artifacts) {</span>
+<span class="fc" id="L67">            PluginArtifactVerifier.ArtifactSnapshot snapshot = verifier.snapshot(artifact);</span>
+<span class="fc" id="L68">            PluginArtifactVerification verification = snapshot.verification();</span>
+<span class="fc" id="L69">            verifications.add(verification);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (verification.permittedBy(policy)) {</span>
+<span class="fc" id="L71">                Path target = staging.resolve(verification.artifactFileName());</span>
+                try {
+<span class="fc" id="L73">                    Files.write(</span>
+                        target,
+<span class="fc" id="L75">                        snapshot.artifactBytes(),</span>
+                        StandardOpenOption.CREATE_NEW,
+                        StandardOpenOption.WRITE
+                    );
+<span class="nc" id="L79">                } catch (IOException exception) {</span>
+<span class="nc" id="L80">                    throw new IllegalStateException(&quot;Unable to materialize verified plugin artifact &quot;</span>
+<span class="nc" id="L81">                        + verification.artifactFileName(), exception);</span>
+<span class="fc" id="L82">                }</span>
+<span class="fc" id="L83">                admitted.add(verification.artifactFileName());</span>
+<span class="fc" id="L84">            } else {</span>
+<span class="fc" id="L85">                blocked.add(verification.artifactFileName());</span>
+            }
+<span class="fc" id="L87">        }</span>
+<span class="fc" id="L88">        return GateResult.create(policy, trustStoreHash, verifications, admitted, blocked);</span>
+    }
+
+    /**
+     * Lists every direct entry whose name claims to be a JAR, including
+     * symlinks, directories and unreadable entries. The verifier classifies
+     * non-regular entries as {@code UNREADABLE}; they must not disappear from
+     * the admission ledger merely because they are unsafe to open.
+     */
+    private List&lt;Path&gt; listArtifactEntries(Path sourceDirectory) {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (!Files.isDirectory(sourceDirectory)) {</span>
+<span class="nc" id="L99">            return List.of();</span>
+        }
+<span class="fc" id="L101">        try (var stream = Files.list(sourceDirectory)) {</span>
+<span class="fc" id="L102">            return stream</span>
+<span class="fc" id="L103">                .filter(path -&gt; path.getFileName().toString()</span>
+<span class="fc" id="L104">                    .toLowerCase(java.util.Locale.ROOT)</span>
+<span class="fc" id="L105">                    .endsWith(&quot;.jar&quot;))</span>
+<span class="fc" id="L106">                .sorted(Comparator.comparing(path -&gt; path.getFileName().toString()))</span>
+<span class="fc" id="L107">                .toList();</span>
+<span class="nc" id="L108">        } catch (IOException exception) {</span>
+<span class="nc" id="L109">            throw new IllegalStateException(&quot;Unable to scan plugin directory &quot; + sourceDirectory, exception);</span>
+        }
+    }
+
+    public record GateResult(
+        String schema,
+        PluginTrustPolicy policy,
+        String trustStoreHash,
+        List&lt;PluginArtifactVerification&gt; verifications,
+        List&lt;String&gt; admittedArtifacts,
+        List&lt;String&gt; blockedArtifacts,
+        String contentHash
+    ) {
+        public static final String SCHEMA = &quot;regelsuche.plugin-artifact-gate/v1&quot;;
+
+<span class="fc" id="L124">        public GateResult {</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L126">                throw new IllegalArgumentException(&quot;unsupported plugin artifact gate schema&quot;);</span>
+            }
+<span class="fc" id="L128">            Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L129">            trustStoreHash = PluginSignatureManifest.requireSha256(</span>
+                trustStoreHash, &quot;trustStoreHash&quot;);
+<span class="fc" id="L131">            verifications = normalizeVerifications(verifications);</span>
+<span class="fc" id="L132">            admittedArtifacts = normalizeNames(admittedArtifacts);</span>
+<span class="fc" id="L133">            blockedArtifacts = normalizeNames(blockedArtifacts);</span>
+<span class="fc" id="L134">            validateAccounting(verifications, admittedArtifacts, blockedArtifacts);</span>
+<span class="fc" id="L135">            String expectedHash = contentHash(</span>
+                policy,
+                trustStoreHash,
+                verifications,
+                admittedArtifacts,
+                blockedArtifacts
+            );
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (!expectedHash.equals(contentHash)) {</span>
+<span class="nc" id="L143">                throw new IllegalArgumentException(&quot;plugin artifact gate contentHash mismatch&quot;);</span>
+            }
+<span class="fc" id="L145">        }</span>
+
+        public static GateResult create(
+            PluginTrustPolicy policy,
+            String trustStoreHash,
+            List&lt;PluginArtifactVerification&gt; verifications,
+            List&lt;String&gt; admittedArtifacts,
+            List&lt;String&gt; blockedArtifacts
+        ) {
+<span class="fc" id="L154">            Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L155">            String normalizedTrustStoreHash = PluginSignatureManifest.requireSha256(</span>
+                trustStoreHash, &quot;trustStoreHash&quot;);
+<span class="fc" id="L157">            List&lt;PluginArtifactVerification&gt; normalizedVerifications =</span>
+<span class="fc" id="L158">                normalizeVerifications(verifications);</span>
+<span class="fc" id="L159">            List&lt;String&gt; normalizedAdmitted = normalizeNames(admittedArtifacts);</span>
+<span class="fc" id="L160">            List&lt;String&gt; normalizedBlocked = normalizeNames(blockedArtifacts);</span>
+<span class="fc" id="L161">            validateAccounting(</span>
+                normalizedVerifications,
+                normalizedAdmitted,
+                normalizedBlocked
+            );
+<span class="fc" id="L166">            return new GateResult(</span>
+                SCHEMA,
+                policy,
+                normalizedTrustStoreHash,
+                normalizedVerifications,
+                normalizedAdmitted,
+                normalizedBlocked,
+<span class="fc" id="L173">                contentHash(</span>
+                    policy,
+                    normalizedTrustStoreHash,
+                    normalizedVerifications,
+                    normalizedAdmitted,
+                    normalizedBlocked
+                )
+            );
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L184">            Map&lt;String, Object&gt; payload = basePayload(</span>
+                policy,
+                trustStoreHash,
+                verifications,
+                admittedArtifacts,
+                blockedArtifacts
+            );
+<span class="fc" id="L191">            payload.put(&quot;contentHash&quot;, contentHash);</span>
+            try {
+<span class="fc" id="L193">                return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L194">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L195">                throw new IllegalStateException(&quot;Unable to serialize plugin artifact gate result&quot;, exception);</span>
+            }
+        }
+
+        private static String contentHash(
+            PluginTrustPolicy policy,
+            String trustStoreHash,
+            List&lt;PluginArtifactVerification&gt; verifications,
+            List&lt;String&gt; admittedArtifacts,
+            List&lt;String&gt; blockedArtifacts
+        ) {
+            try {
+<span class="fc" id="L207">                return PluginArtifactVerifier.sha256(JSON.writeValueAsBytes(basePayload(</span>
+                    policy,
+                    trustStoreHash,
+                    verifications,
+                    admittedArtifacts,
+                    blockedArtifacts
+                )));
+<span class="nc" id="L214">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L215">                throw new IllegalStateException(&quot;Unable to hash plugin artifact gate result&quot;, exception);</span>
+            }
+        }
+
+        private static Map&lt;String, Object&gt; basePayload(
+            PluginTrustPolicy policy,
+            String trustStoreHash,
+            List&lt;PluginArtifactVerification&gt; verifications,
+            List&lt;String&gt; admittedArtifacts,
+            List&lt;String&gt; blockedArtifacts
+        ) {
+<span class="fc" id="L226">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L227">            payload.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L228">            payload.put(&quot;policy&quot;, policy.name());</span>
+<span class="fc" id="L229">            payload.put(&quot;trustStoreHash&quot;, trustStoreHash);</span>
+<span class="fc" id="L230">            payload.put(&quot;verifications&quot;, verifications.stream()</span>
+<span class="fc" id="L231">                .map(GateResult::verificationPayload)</span>
+<span class="fc" id="L232">                .toList());</span>
+<span class="fc" id="L233">            payload.put(&quot;admittedArtifacts&quot;, admittedArtifacts);</span>
+<span class="fc" id="L234">            payload.put(&quot;blockedArtifacts&quot;, blockedArtifacts);</span>
+<span class="fc" id="L235">            return payload;</span>
+        }
+
+        private static Map&lt;String, Object&gt; verificationPayload(PluginArtifactVerification verification) {
+<span class="fc" id="L239">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L240">            payload.put(&quot;schema&quot;, verification.schema());</span>
+<span class="fc" id="L241">            payload.put(&quot;artifactFileName&quot;, verification.artifactFileName());</span>
+<span class="fc" id="L242">            payload.put(&quot;artifactSha256&quot;, verification.artifactSha256());</span>
+<span class="fc" id="L243">            payload.put(&quot;manifestFileName&quot;, verification.manifestFileName());</span>
+<span class="fc" id="L244">            payload.put(&quot;status&quot;, verification.status().name());</span>
+<span class="fc" id="L245">            payload.put(&quot;signaturePresent&quot;, verification.signaturePresent());</span>
+<span class="fc" id="L246">            payload.put(&quot;signatureVerified&quot;, verification.signatureVerified());</span>
+<span class="fc" id="L247">            payload.put(&quot;trusted&quot;, verification.trusted());</span>
+<span class="fc" id="L248">            payload.put(&quot;publisherId&quot;, verification.publisherId());</span>
+<span class="fc" id="L249">            payload.put(&quot;keyId&quot;, verification.keyId());</span>
+<span class="fc" id="L250">            payload.put(&quot;warnings&quot;, verification.warnings());</span>
+<span class="fc" id="L251">            payload.put(&quot;contentHash&quot;, verification.contentHash());</span>
+<span class="fc" id="L252">            return payload;</span>
+        }
+
+        private static List&lt;PluginArtifactVerification&gt; normalizeVerifications(
+            List&lt;PluginArtifactVerification&gt; values
+        ) {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            return values == null ? List.of() : values.stream()</span>
+<span class="fc" id="L259">                .map(value -&gt; Objects.requireNonNull(value, &quot;verification&quot;))</span>
+<span class="fc" id="L260">                .sorted(Comparator.comparing(PluginArtifactVerification::artifactFileName))</span>
+<span class="fc" id="L261">                .toList();</span>
+        }
+
+        private static void validateAccounting(
+            List&lt;PluginArtifactVerification&gt; verifications,
+            List&lt;String&gt; admittedArtifacts,
+            List&lt;String&gt; blockedArtifacts
+        ) {
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            if (admittedArtifacts.stream().anyMatch(blockedArtifacts::contains)) {</span>
+<span class="nc" id="L270">                throw new IllegalArgumentException(&quot;an artifact cannot be both admitted and blocked&quot;);</span>
+            }
+<span class="fc" id="L272">            List&lt;String&gt; accounted = new ArrayList&lt;&gt;(admittedArtifacts);</span>
+<span class="fc" id="L273">            accounted.addAll(blockedArtifacts);</span>
+<span class="fc" id="L274">            List&lt;String&gt; expected = verifications.stream()</span>
+<span class="fc" id="L275">                .map(PluginArtifactVerification::artifactFileName)</span>
+<span class="fc" id="L276">                .sorted()</span>
+<span class="fc" id="L277">                .toList();</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (!accounted.stream().sorted().toList().equals(expected)) {</span>
+<span class="nc" id="L279">                throw new IllegalArgumentException(&quot;gate result does not account for every verified artifact&quot;);</span>
+            }
+<span class="fc" id="L281">        }</span>
+
+        private static List&lt;String&gt; normalizeNames(List&lt;String&gt; values) {
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">            if (values == null) {</span>
+<span class="nc" id="L285">                return List.of();</span>
+            }
+<span class="fc" id="L287">            return values.stream()</span>
+<span class="fc" id="L288">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L289">                .map(String::trim)</span>
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                .filter(value -&gt; !value.isBlank())</span>
+<span class="fc" id="L291">                .distinct()</span>
+<span class="fc" id="L292">                .sorted()</span>
+<span class="fc" id="L293">                .toList();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

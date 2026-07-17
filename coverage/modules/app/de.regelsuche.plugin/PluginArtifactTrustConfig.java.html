@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginArtifactTrustConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginArtifactTrustConfig.java</span></div><h1>PluginArtifactTrustConfig.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import java.nio.file.Path;
+
+/** Configuration for the opt-in pre-classloading plugin trust gate. */
+public record PluginArtifactTrustConfig(
+    Path trustStorePath,
+    PluginTrustPolicy policy,
+    long maxArtifactBytes
+) {
+    public static final long DEFAULT_MAX_ARTIFACT_BYTES = 64L * 1024L * 1024L;
+
+    public PluginArtifactTrustConfig(Path trustStorePath, PluginTrustPolicy policy) {
+<span class="fc" id="L14">        this(trustStorePath, policy, DEFAULT_MAX_ARTIFACT_BYTES);</span>
+<span class="fc" id="L15">    }</span>
+
+<span class="fc" id="L17">    public PluginArtifactTrustConfig {</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        trustStorePath = trustStorePath == null</span>
+<span class="nc" id="L19">            ? Path.of(&quot;plugins&quot;, &quot;trust-store.json&quot;).toAbsolutePath().normalize()</span>
+<span class="fc" id="L20">            : trustStorePath.toAbsolutePath().normalize();</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        policy = policy == null ? PluginTrustPolicy.REQUIRE_VERIFIED : policy;</span>
+<span class="pc bpc" id="L22" title="2 of 4 branches missed.">        if (maxArtifactBytes &lt; 1 || maxArtifactBytes &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L23">            throw new IllegalArgumentException(</span>
+                &quot;maxArtifactBytes must be in [1,&quot; + Integer.MAX_VALUE + &quot;]&quot;);
+        }
+<span class="fc" id="L26">    }</span>
+
+    public static PluginArtifactTrustConfig defaults(Path pluginsDirectory) {
+<span class="nc bnc" id="L29" title="All 2 branches missed.">        Path directory = pluginsDirectory == null ? Path.of(&quot;plugins&quot;) : pluginsDirectory;</span>
+<span class="nc" id="L30">        return new PluginArtifactTrustConfig(</span>
+<span class="nc" id="L31">            directory.resolve(&quot;trust-store.json&quot;),</span>
+            PluginTrustPolicy.REQUIRE_VERIFIED,
+            DEFAULT_MAX_ARTIFACT_BYTES
+        );
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

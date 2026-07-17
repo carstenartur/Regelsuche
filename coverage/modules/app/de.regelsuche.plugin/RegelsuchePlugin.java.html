@@ -16,7 +16,7 @@ public interface RegelsuchePlugin {
     }
 
     default java.util.Set&lt;String&gt; capabilities() {
-<span class="nc" id="L19">        return java.util.Set.of();</span>
+<span class="fc" id="L19">        return java.util.Set.of();</span>
     }
 
     default java.util.List&lt;PluginDependency&gt; dependencies() {
@@ -27,41 +27,51 @@ public interface RegelsuchePlugin {
 <span class="nc" id="L27">        return &quot;&quot;;</span>
     }
 
+    /**
+     * Optional descriptive signature hint exposed after plugin instantiation.
+     *
+     * &lt;p&gt;This value is not an artifact-verification boundary: plugin code must
+     * already be loaded to invoke it, and the plugin controls the returned
+     * string. Secure external loading uses a detached
+     * {@link PluginSignatureManifest}, {@link PluginTrustStore} and
+     * {@link TrustedPluginRuntime} before any plugin bytecode enters a class
+     * loader.&lt;/p&gt;
+     */
     default String signature() {
-<span class="fc" id="L31">        return &quot;&quot;;</span>
+<span class="fc" id="L41">        return &quot;&quot;;</span>
     }
 
     default void registerRules(RuleRegistry registry) {
-<span class="fc" id="L35">    }</span>
+<span class="fc" id="L45">    }</span>
 
     default void registerTransformations(TransformationRegistry registry) {
-<span class="fc" id="L38">    }</span>
+<span class="fc" id="L48">    }</span>
 
     default void registerVisitors(AstVisitorRegistry registry) {
-<span class="fc" id="L41">    }</span>
+<span class="fc" id="L51">    }</span>
 
     default void registerMacros(MacroRegistry registry) {
-<span class="fc" id="L44">    }</span>
+<span class="fc" id="L54">    }</span>
 
     default void registerSearchStrategies(SearchStrategyRegistry registry) {
-<span class="fc" id="L47">    }</span>
+<span class="fc" id="L57">    }</span>
 
     default void registerHeuristics(HeuristicRegistry registry) {
-<span class="fc" id="L50">    }</span>
+<span class="fc" id="L60">    }</span>
 
     default void registerCostFunctions(CostFunctionRegistry registry) {
-<span class="fc" id="L53">    }</span>
+<span class="fc" id="L63">    }</span>
 
     default void registerRenderers(RendererRegistry registry) {
-<span class="fc" id="L56">    }</span>
+<span class="fc" id="L66">    }</span>
 
     default void registerExplanations(ExplanationRegistry registry) {
-<span class="fc" id="L59">    }</span>
+<span class="fc" id="L69">    }</span>
 
     default void registerParserExtensions(ParserExtensionRegistry registry) {
-<span class="fc" id="L62">    }</span>
+<span class="fc" id="L72">    }</span>
 
     default void registerExamples(ExampleRegistry registry) {
-<span class="fc" id="L65">    }</span>
+<span class="fc" id="L75">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

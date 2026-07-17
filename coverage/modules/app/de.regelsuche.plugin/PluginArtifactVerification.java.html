@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginArtifactVerification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginArtifactVerification.java</span></div><h1>PluginArtifactVerification.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/** Immutable, replayable result of verifying one external plugin artifact. */
+public record PluginArtifactVerification(
+    String schema,
+    String artifactFileName,
+    String artifactSha256,
+    String manifestFileName,
+    Status status,
+    boolean signaturePresent,
+    boolean signatureVerified,
+    boolean trusted,
+    String publisherId,
+    String keyId,
+    List&lt;String&gt; warnings,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.plugin-artifact-verification/v1&quot;;
+
+<span class="fc" id="L35">    private static final ObjectMapper JSON = new ObjectMapper().findAndRegisterModules();</span>
+
+<span class="fc" id="L37">    public PluginArtifactVerification {</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(&quot;unsupported plugin artifact verification schema&quot;);</span>
+        }
+<span class="fc" id="L41">        artifactFileName = requireArtifactFileName(artifactFileName);</span>
+<span class="fc" id="L42">        Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        artifactSha256 = artifactSha256 == null ? &quot;&quot; : artifactSha256;</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!artifactSha256.isEmpty()) {</span>
+<span class="fc" id="L45">            artifactSha256 = PluginSignatureManifest.requireSha256(artifactSha256, &quot;artifactSha256&quot;);</span>
+        }
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        manifestFileName = manifestFileName == null ? &quot;&quot; : manifestFileName;</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        publisherId = publisherId == null ? &quot;&quot; : publisherId;</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        keyId = keyId == null ? &quot;&quot; : keyId;</span>
+<span class="fc" id="L50">        warnings = normalizeWarnings(warnings);</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        if (trusted &amp;&amp; !signatureVerified) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(&quot;trusted verification must have a valid signature&quot;);</span>
+        }
+<span class="pc bpc" id="L54" title="1 of 4 branches missed.">        if (signatureVerified &amp;&amp; !signaturePresent) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;verified signature must be present&quot;);</span>
+        }
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        boolean verifiedStatus = status == Status.VERIFIED_TRUSTED</span>
+            || status == Status.VERIFIED_RETIRED_KEY;
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">        if (verifiedStatus != signatureVerified || verifiedStatus != trusted) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;verification status and trust flags disagree&quot;);</span>
+        }
+<span class="fc" id="L62">        String expectedHash = hash(canonicalMaterial(</span>
+            artifactFileName,
+            artifactSha256,
+            manifestFileName,
+            status,
+            signaturePresent,
+            signatureVerified,
+            trusted,
+            publisherId,
+            keyId,
+            warnings
+        ));
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (!expectedHash.equals(contentHash)) {</span>
+<span class="fc" id="L75">            throw new IllegalArgumentException(&quot;plugin artifact verification contentHash mismatch&quot;);</span>
+        }
+<span class="fc" id="L77">    }</span>
+
+    public static PluginArtifactVerification create(
+        String artifactFileName,
+        String artifactSha256,
+        String manifestFileName,
+        Status status,
+        boolean signaturePresent,
+        boolean signatureVerified,
+        boolean trusted,
+        String publisherId,
+        String keyId,
+        List&lt;String&gt; warnings
+    ) {
+<span class="fc" id="L91">        String normalizedArtifactFileName = requireArtifactFileName(artifactFileName);</span>
+<span class="fc" id="L92">        Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L93">        List&lt;String&gt; normalizedWarnings = normalizeWarnings(warnings);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        String normalizedArtifactHash = artifactSha256 == null ? &quot;&quot; : artifactSha256;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (!normalizedArtifactHash.isEmpty()) {</span>
+<span class="fc" id="L96">            normalizedArtifactHash = PluginSignatureManifest.requireSha256(</span>
+                normalizedArtifactHash, &quot;artifactSha256&quot;);
+        }
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        String normalizedManifest = manifestFileName == null ? &quot;&quot; : manifestFileName;</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        String normalizedPublisher = publisherId == null ? &quot;&quot; : publisherId;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        String normalizedKey = keyId == null ? &quot;&quot; : keyId;</span>
+<span class="fc" id="L102">        String contentHash = hash(canonicalMaterial(</span>
+            normalizedArtifactFileName,
+            normalizedArtifactHash,
+            normalizedManifest,
+            status,
+            signaturePresent,
+            signatureVerified,
+            trusted,
+            normalizedPublisher,
+            normalizedKey,
+            normalizedWarnings
+        ));
+<span class="fc" id="L114">        return new PluginArtifactVerification(</span>
+            SCHEMA,
+            normalizedArtifactFileName,
+            normalizedArtifactHash,
+            normalizedManifest,
+            status,
+            signaturePresent,
+            signatureVerified,
+            trusted,
+            normalizedPublisher,
+            normalizedKey,
+            normalizedWarnings,
+            contentHash
+        );
+    }
+
+    public boolean readable() {
+<span class="fc bfc" id="L131" title="All 4 branches covered.">        return status != Status.UNREADABLE &amp;&amp; status != Status.ARTIFACT_TOO_LARGE;</span>
+    }
+
+    public boolean permittedBy(PluginTrustPolicy policy) {
+<span class="fc" id="L135">        return Objects.requireNonNull(policy, &quot;policy&quot;).permits(this);</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L139">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L140">        payload.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L141">        payload.put(&quot;artifactFileName&quot;, artifactFileName);</span>
+<span class="fc" id="L142">        payload.put(&quot;artifactSha256&quot;, artifactSha256);</span>
+<span class="fc" id="L143">        payload.put(&quot;manifestFileName&quot;, manifestFileName);</span>
+<span class="fc" id="L144">        payload.put(&quot;status&quot;, status.name());</span>
+<span class="fc" id="L145">        payload.put(&quot;signaturePresent&quot;, signaturePresent);</span>
+<span class="fc" id="L146">        payload.put(&quot;signatureVerified&quot;, signatureVerified);</span>
+<span class="fc" id="L147">        payload.put(&quot;trusted&quot;, trusted);</span>
+<span class="fc" id="L148">        payload.put(&quot;publisherId&quot;, publisherId);</span>
+<span class="fc" id="L149">        payload.put(&quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L150">        payload.put(&quot;warnings&quot;, warnings);</span>
+<span class="fc" id="L151">        payload.put(&quot;contentHash&quot;, contentHash);</span>
+        try {
+<span class="fc" id="L153">            return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L154">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L155">            throw new IllegalStateException(&quot;Unable to serialize plugin artifact verification&quot;, exception);</span>
+        }
+    }
+
+    private static List&lt;String&gt; normalizeWarnings(List&lt;String&gt; values) {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        return values == null ? List.of() : values.stream()</span>
+<span class="fc" id="L161">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L162">            .map(String::trim)</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isBlank())</span>
+<span class="fc" id="L164">            .distinct()</span>
+<span class="fc" id="L165">            .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L166">            .toList();</span>
+    }
+
+    private static String requireArtifactFileName(String value) {
+<span class="pc bpc" id="L170" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L171">            throw new IllegalArgumentException(&quot;artifactFileName must not be blank&quot;);</span>
+        }
+<span class="fc" id="L173">        return value;</span>
+    }
+
+    private static byte[] canonicalMaterial(
+        String artifactFileName,
+        String artifactSha256,
+        String manifestFileName,
+        Status status,
+        boolean signaturePresent,
+        boolean signatureVerified,
+        boolean trusted,
+        String publisherId,
+        String keyId,
+        List&lt;String&gt; warnings
+    ) {
+        try {
+<span class="fc" id="L189">            ByteArrayOutputStream bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L190">            try (DataOutputStream output = new DataOutputStream(bytes)) {</span>
+<span class="fc" id="L191">                writeField(output, &quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L192">                writeField(output, &quot;artifactFileName&quot;, artifactFileName);</span>
+<span class="fc" id="L193">                writeField(output, &quot;artifactSha256&quot;, artifactSha256);</span>
+<span class="fc" id="L194">                writeField(output, &quot;manifestFileName&quot;, manifestFileName);</span>
+<span class="fc" id="L195">                writeField(output, &quot;status&quot;, status.name());</span>
+<span class="fc" id="L196">                writeField(output, &quot;signaturePresent&quot;, Boolean.toString(signaturePresent));</span>
+<span class="fc" id="L197">                writeField(output, &quot;signatureVerified&quot;, Boolean.toString(signatureVerified));</span>
+<span class="fc" id="L198">                writeField(output, &quot;trusted&quot;, Boolean.toString(trusted));</span>
+<span class="fc" id="L199">                writeField(output, &quot;publisherId&quot;, publisherId);</span>
+<span class="fc" id="L200">                writeField(output, &quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L201">                output.writeInt(warnings.size());</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">                for (String warning : warnings) {</span>
+<span class="fc" id="L203">                    writeField(output, &quot;warning&quot;, warning);</span>
+<span class="fc" id="L204">                }</span>
+            }
+<span class="fc" id="L206">            return bytes.toByteArray();</span>
+<span class="nc" id="L207">        } catch (IOException exception) {</span>
+<span class="nc" id="L208">            throw new IllegalStateException(&quot;Unable to encode plugin artifact verification&quot;, exception);</span>
+        }
+    }
+
+    private static void writeField(DataOutputStream output, String name, String value) throws IOException {
+<span class="fc" id="L213">        writeBytes(output, name.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L214">        writeBytes(output, value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L215">    }</span>
+
+    private static void writeBytes(DataOutputStream output, byte[] value) throws IOException {
+<span class="fc" id="L218">        output.writeInt(value.length);</span>
+<span class="fc" id="L219">        output.write(value);</span>
+<span class="fc" id="L220">    }</span>
+
+    private static String hash(byte[] bytes) {
+        try {
+<span class="fc" id="L224">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L225">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L226">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L227">            throw new IllegalStateException(&quot;SHA-256 is not available&quot;, exception);</span>
+        }
+    }
+
+<span class="fc" id="L231">    public enum Status {</span>
+<span class="fc" id="L232">        UNREADABLE,</span>
+<span class="fc" id="L233">        ARTIFACT_TOO_LARGE,</span>
+<span class="fc" id="L234">        MISSING_SIGNATURE_MANIFEST,</span>
+<span class="fc" id="L235">        MALFORMED_SIGNATURE_MANIFEST,</span>
+<span class="fc" id="L236">        MANIFEST_ARTIFACT_MISMATCH,</span>
+<span class="fc" id="L237">        ARTIFACT_HASH_MISMATCH,</span>
+<span class="fc" id="L238">        REVOKED_ARTIFACT,</span>
+<span class="fc" id="L239">        UNKNOWN_PUBLISHER,</span>
+<span class="fc" id="L240">        UNKNOWN_KEY,</span>
+<span class="fc" id="L241">        REVOKED_KEY,</span>
+<span class="fc" id="L242">        KEY_ALGORITHM_MISMATCH,</span>
+<span class="fc" id="L243">        INVALID_SIGNATURE,</span>
+<span class="fc" id="L244">        VERIFIED_RETIRED_KEY,</span>
+<span class="fc" id="L245">        VERIFIED_TRUSTED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

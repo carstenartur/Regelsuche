@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginTrustStore.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginTrustStore.java</span></div><h1>PluginTrustStore.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Versioned allowlist and revocation state for external plugin publishers.
+ *
+ * &lt;p&gt;Key rotation is represented by multiple keys for one publisher. A retired
+ * key remains valid for historical signatures and may name a successor;
+ * revoked keys never authorize code loading.&lt;/p&gt;
+ */
+public record PluginTrustStore(
+    String schema,
+    List&lt;PublisherKey&gt; keys,
+    List&lt;ArtifactRevocation&gt; revokedArtifacts
+) {
+    public static final String SCHEMA = &quot;regelsuche.plugin-trust-store/v1&quot;;
+
+<span class="fc" id="L40">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L41">        .findAndRegisterModules()</span>
+<span class="fc" id="L42">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+<span class="fc" id="L44">    public PluginTrustStore {</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;unsupported plugin trust-store schema&quot;);</span>
+        }
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        keys = keys == null ? List.of() : keys.stream()</span>
+<span class="fc" id="L49">            .map(key -&gt; Objects.requireNonNull(key, &quot;publisher key&quot;))</span>
+<span class="fc" id="L50">            .sorted(Comparator</span>
+<span class="fc" id="L51">                .comparing(PublisherKey::publisherId)</span>
+<span class="fc" id="L52">                .thenComparing(PublisherKey::keyId))</span>
+<span class="fc" id="L53">            .toList();</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        revokedArtifacts = revokedArtifacts == null ? List.of() : revokedArtifacts.stream()</span>
+<span class="fc" id="L55">            .map(revocation -&gt; Objects.requireNonNull(revocation, &quot;artifact revocation&quot;))</span>
+<span class="fc" id="L56">            .sorted(Comparator.comparing(ArtifactRevocation::artifactSha256))</span>
+<span class="fc" id="L57">            .toList();</span>
+
+<span class="fc" id="L59">        Map&lt;String, PublisherKey&gt; keysByIdentity = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (PublisherKey key : keys) {</span>
+<span class="fc" id="L61">            String identity = keyIdentity(key.publisherId(), key.keyId());</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            if (keysByIdentity.putIfAbsent(identity, key) != null) {</span>
+<span class="nc" id="L63">                throw new IllegalArgumentException(&quot;duplicate publisher/key identity: &quot;</span>
+<span class="nc" id="L64">                    + key.publisherId() + &quot;/&quot; + key.keyId());</span>
+            }
+<span class="fc" id="L66">        }</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (PublisherKey key : keys) {</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (key.successorKeyId().isEmpty()) {</span>
+<span class="fc" id="L69">                continue;</span>
+            }
+<span class="fc" id="L71">            PublisherKey successor = keysByIdentity.get(</span>
+<span class="fc" id="L72">                keyIdentity(key.publisherId(), key.successorKeyId()));</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (successor == null) {</span>
+<span class="fc" id="L74">                throw new IllegalArgumentException(&quot;missing successor key: &quot;</span>
+<span class="fc" id="L75">                    + key.publisherId() + &quot;/&quot; + key.successorKeyId());</span>
+            }
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            if (successor.revoked()) {</span>
+<span class="fc" id="L78">                throw new IllegalArgumentException(&quot;successor key is revoked: &quot;</span>
+<span class="fc" id="L79">                    + successor.publisherId() + &quot;/&quot; + successor.keyId());</span>
+            }
+<span class="fc" id="L81">        }</span>
+<span class="fc" id="L82">        validateAcyclicRotation(keysByIdentity);</span>
+
+<span class="fc" id="L84">        Set&lt;String&gt; revokedHashes = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (ArtifactRevocation revocation : revokedArtifacts) {</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (!revokedHashes.add(revocation.artifactSha256())) {</span>
+<span class="nc" id="L87">                throw new IllegalArgumentException(&quot;duplicate artifact revocation: &quot;</span>
+<span class="nc" id="L88">                    + revocation.artifactSha256());</span>
+            }
+<span class="fc" id="L90">        }</span>
+<span class="fc" id="L91">    }</span>
+
+    public static PluginTrustStore empty() {
+<span class="fc" id="L94">        return new PluginTrustStore(SCHEMA, List.of(), List.of());</span>
+    }
+
+    public static PluginTrustStore load(Path path) {
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        if (path == null || !Files.isRegularFile(path)) {</span>
+<span class="fc" id="L99">            return empty();</span>
+        }
+        try {
+<span class="fc" id="L102">            TrustStoreDto dto = JSON.readValue(Files.readString(path, StandardCharsets.UTF_8), TrustStoreDto.class);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            if (dto == null) {</span>
+<span class="nc" id="L104">                throw new IllegalArgumentException(&quot;plugin trust store must not be empty&quot;);</span>
+            }
+<span class="fc" id="L106">            List&lt;PublisherKey&gt; keys = list(dto.keys).stream()</span>
+<span class="fc" id="L107">                .map(PluginTrustStore::toPublisherKey)</span>
+<span class="fc" id="L108">                .toList();</span>
+<span class="fc" id="L109">            List&lt;ArtifactRevocation&gt; revocations = list(dto.revokedArtifacts).stream()</span>
+<span class="fc" id="L110">                .map(item -&gt; new ArtifactRevocation(item.artifactSha256, item.reason))</span>
+<span class="fc" id="L111">                .toList();</span>
+<span class="fc" id="L112">            return new PluginTrustStore(dto.schema, keys, revocations);</span>
+<span class="fc" id="L113">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L114">            throw new IllegalArgumentException(&quot;Invalid plugin trust store: &quot; + path, exception);</span>
+<span class="nc" id="L115">        } catch (IOException exception) {</span>
+<span class="nc" id="L116">            throw new IllegalArgumentException(&quot;Unable to read plugin trust store: &quot; + path, exception);</span>
+        }
+    }
+
+    public Optional&lt;PublisherKey&gt; findKey(String publisherId, String keyId) {
+<span class="fc" id="L121">        return keys.stream()</span>
+<span class="pc bpc" id="L122" title="2 of 4 branches missed.">            .filter(key -&gt; key.publisherId().equals(publisherId) &amp;&amp; key.keyId().equals(keyId))</span>
+<span class="fc" id="L123">            .findFirst();</span>
+    }
+
+    public boolean hasPublisher(String publisherId) {
+<span class="fc" id="L127">        return keys.stream().anyMatch(key -&gt; key.publisherId().equals(publisherId));</span>
+    }
+
+    public boolean isArtifactRevoked(String artifactSha256) {
+<span class="fc" id="L131">        return revokedArtifacts.stream()</span>
+<span class="fc" id="L132">            .anyMatch(revocation -&gt; revocation.artifactSha256().equals(artifactSha256));</span>
+    }
+
+    public Path write(Path path) {
+<span class="fc" id="L136">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L138">            Path parent = path.toAbsolutePath().normalize().getParent();</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L140">                Files.createDirectories(parent);</span>
+            }
+<span class="fc" id="L142">            Files.writeString(path, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L143">            return path;</span>
+<span class="nc" id="L144">        } catch (IOException exception) {</span>
+<span class="nc" id="L145">            throw new IllegalStateException(&quot;Unable to write plugin trust store&quot;, exception);</span>
+        }
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L150">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L151">        payload.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L152">        List&lt;Map&lt;String, Object&gt;&gt; keyPayloads = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (PublisherKey key : keys) {</span>
+<span class="fc" id="L154">            Map&lt;String, Object&gt; item = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L155">            item.put(&quot;publisherId&quot;, key.publisherId());</span>
+<span class="fc" id="L156">            item.put(&quot;keyId&quot;, key.keyId());</span>
+<span class="fc" id="L157">            item.put(&quot;algorithm&quot;, key.algorithm());</span>
+<span class="fc" id="L158">            item.put(&quot;publicKeyBase64&quot;, key.publicKeyBase64());</span>
+<span class="fc" id="L159">            item.put(&quot;status&quot;, key.status().name());</span>
+<span class="fc" id="L160">            item.put(&quot;successorKeyId&quot;, key.successorKeyId());</span>
+<span class="fc" id="L161">            keyPayloads.add(item);</span>
+<span class="fc" id="L162">        }</span>
+<span class="fc" id="L163">        payload.put(&quot;keys&quot;, keyPayloads);</span>
+<span class="fc" id="L164">        List&lt;Map&lt;String, Object&gt;&gt; revocationPayloads = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (ArtifactRevocation revocation : revokedArtifacts) {</span>
+<span class="fc" id="L166">            Map&lt;String, Object&gt; item = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L167">            item.put(&quot;artifactSha256&quot;, revocation.artifactSha256());</span>
+<span class="fc" id="L168">            item.put(&quot;reason&quot;, revocation.reason());</span>
+<span class="fc" id="L169">            revocationPayloads.add(item);</span>
+<span class="fc" id="L170">        }</span>
+<span class="fc" id="L171">        payload.put(&quot;revokedArtifacts&quot;, revocationPayloads);</span>
+        try {
+<span class="fc" id="L173">            return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L174">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L175">            throw new IllegalStateException(&quot;Unable to serialize plugin trust store&quot;, exception);</span>
+        }
+    }
+
+    private static PublisherKey toPublisherKey(PublisherKeyDto dto) {
+<span class="fc" id="L180">        Objects.requireNonNull(dto, &quot;publisher key&quot;);</span>
+        KeyStatus status;
+        try {
+<span class="fc" id="L183">            status = KeyStatus.valueOf(dto.status);</span>
+<span class="nc" id="L184">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L185">            throw new IllegalArgumentException(&quot;Unsupported publisher key status: &quot; + dto.status, exception);</span>
+<span class="fc" id="L186">        }</span>
+<span class="fc" id="L187">        return new PublisherKey(</span>
+            dto.publisherId,
+            dto.keyId,
+            dto.algorithm,
+            dto.publicKeyBase64,
+            status,
+            dto.successorKeyId
+        );
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; list(List&lt;T&gt; values) {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        return values == null ? List.of() : List.copyOf(values);</span>
+    }
+
+    private static String keyIdentity(String publisherId, String keyId) {
+<span class="fc" id="L202">        return publisherId + &quot;\u0000&quot; + keyId;</span>
+    }
+
+    private static void validateAcyclicRotation(Map&lt;String, PublisherKey&gt; keysByIdentity) {
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (PublisherKey start : keysByIdentity.values()) {</span>
+<span class="fc" id="L207">            Set&lt;String&gt; visited = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L208">            PublisherKey current = start;</span>
+<span class="pc bpc" id="L209" title="1 of 4 branches missed.">            while (current != null &amp;&amp; !current.successorKeyId().isEmpty()) {</span>
+<span class="fc" id="L210">                String identity = keyIdentity(current.publisherId(), current.keyId());</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                if (!visited.add(identity)) {</span>
+<span class="fc" id="L212">                    throw new IllegalArgumentException(&quot;cyclic publisher key rotation: &quot;</span>
+<span class="fc" id="L213">                        + current.publisherId() + &quot;/&quot; + current.keyId());</span>
+                }
+<span class="fc" id="L215">                current = keysByIdentity.get(</span>
+<span class="fc" id="L216">                    keyIdentity(current.publisherId(), current.successorKeyId()));</span>
+<span class="fc" id="L217">            }</span>
+<span class="fc" id="L218">        }</span>
+<span class="fc" id="L219">    }</span>
+
+<span class="fc" id="L221">    public enum KeyStatus {</span>
+<span class="fc" id="L222">        ACTIVE,</span>
+<span class="fc" id="L223">        RETIRED,</span>
+<span class="fc" id="L224">        REVOKED</span>
+    }
+
+    public record PublisherKey(
+        String publisherId,
+        String keyId,
+        String algorithm,
+        String publicKeyBase64,
+        KeyStatus status,
+        String successorKeyId
+    ) {
+<span class="fc" id="L235">        public PublisherKey {</span>
+<span class="fc" id="L236">            publisherId = PluginSignatureManifest.requireIdentifier(publisherId, &quot;publisherId&quot;);</span>
+<span class="fc" id="L237">            keyId = PluginSignatureManifest.requireIdentifier(keyId, &quot;keyId&quot;);</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">            if (!PluginSignatureManifest.ALGORITHM.equals(algorithm)) {</span>
+<span class="nc" id="L239">                throw new IllegalArgumentException(&quot;unsupported publisher key algorithm: &quot; + algorithm);</span>
+            }
+<span class="fc" id="L241">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">            if (publicKeyBase64 == null || publicKeyBase64.isBlank()) {</span>
+<span class="nc" id="L243">                throw new IllegalArgumentException(&quot;publicKeyBase64 must not be blank&quot;);</span>
+            }
+<span class="fc" id="L245">            decodePublicKey(publicKeyBase64);</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            successorKeyId = successorKeyId == null ? &quot;&quot; : successorKeyId.trim();</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (!successorKeyId.isEmpty()) {</span>
+<span class="fc" id="L248">                successorKeyId = PluginSignatureManifest.requireIdentifier(successorKeyId, &quot;successorKeyId&quot;);</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                if (successorKeyId.equals(keyId)) {</span>
+<span class="nc" id="L250">                    throw new IllegalArgumentException(&quot;successorKeyId must differ from keyId&quot;);</span>
+                }
+<span class="fc bfc" id="L252" title="All 2 branches covered.">                if (status != KeyStatus.RETIRED) {</span>
+<span class="fc" id="L253">                    throw new IllegalArgumentException(&quot;only retired keys may declare a successor&quot;);</span>
+                }
+            }
+<span class="fc" id="L256">        }</span>
+
+        public PublicKey publicKey() {
+<span class="fc" id="L259">            return decodePublicKey(publicKeyBase64);</span>
+        }
+
+        public boolean revoked() {
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            return status == KeyStatus.REVOKED;</span>
+        }
+
+        public boolean retired() {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            return status == KeyStatus.RETIRED;</span>
+        }
+    }
+
+    public record ArtifactRevocation(String artifactSha256, String reason) {
+<span class="fc" id="L272">        public ArtifactRevocation {</span>
+<span class="fc" id="L273">            artifactSha256 = PluginSignatureManifest.requireSha256(artifactSha256, &quot;artifactSha256&quot;);</span>
+<span class="pc bpc" id="L274" title="2 of 4 branches missed.">            if (reason == null || reason.isBlank()) {</span>
+<span class="nc" id="L275">                throw new IllegalArgumentException(&quot;artifact revocation reason must not be blank&quot;);</span>
+            }
+<span class="fc" id="L277">            reason = reason.trim();</span>
+<span class="fc" id="L278">        }</span>
+    }
+
+    private static PublicKey decodePublicKey(String encoded) {
+        try {
+<span class="fc" id="L283">            byte[] bytes = Base64.getDecoder().decode(encoded);</span>
+<span class="fc" id="L284">            return KeyFactory.getInstance(PluginSignatureManifest.ALGORITHM)</span>
+<span class="fc" id="L285">                .generatePublic(new X509EncodedKeySpec(bytes));</span>
+<span class="nc" id="L286">        } catch (IllegalArgumentException | GeneralSecurityException exception) {</span>
+<span class="nc" id="L287">            throw new IllegalArgumentException(&quot;publicKeyBase64 is not a valid Ed25519 X.509 key&quot;, exception);</span>
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L292">    public static final class TrustStoreDto {</span>
+        public String schema;
+        public List&lt;PublisherKeyDto&gt; keys;
+        public List&lt;ArtifactRevocationDto&gt; revokedArtifacts;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L299">    public static final class PublisherKeyDto {</span>
+        public String publisherId;
+        public String keyId;
+        public String algorithm;
+        public String publicKeyBase64;
+        public String status;
+        public String successorKeyId;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L309">    public static final class ArtifactRevocationDto {</span>
+        public String artifactSha256;
+        public String reason;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

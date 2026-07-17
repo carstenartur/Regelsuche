@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginArtifactVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginArtifactVerifier.java</span></div><h1>PluginArtifactVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import de.regelsuche.plugin.PluginArtifactVerification.Status;
+import de.regelsuche.plugin.PluginTrustStore.PublisherKey;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.channels.Channels;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.security.GeneralSecurityException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.Signature;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+/** Verifies detached Ed25519 signatures before plugin bytecode is loaded. */
+public final class PluginArtifactVerifier {
+    private static final int BUFFER_SIZE = 8192;
+
+    private final PluginTrustStore trustStore;
+    private final long maxArtifactBytes;
+
+    public PluginArtifactVerifier(PluginTrustStore trustStore) {
+<span class="fc" id="L32">        this(trustStore, PluginArtifactTrustConfig.DEFAULT_MAX_ARTIFACT_BYTES);</span>
+<span class="fc" id="L33">    }</span>
+
+<span class="fc" id="L35">    public PluginArtifactVerifier(PluginTrustStore trustStore, long maxArtifactBytes) {</span>
+<span class="fc" id="L36">        this.trustStore = Objects.requireNonNull(trustStore, &quot;trustStore&quot;);</span>
+<span class="pc bpc" id="L37" title="2 of 4 branches missed.">        if (maxArtifactBytes &lt; 1 || maxArtifactBytes &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(</span>
+                &quot;maxArtifactBytes must be in [1,&quot; + Integer.MAX_VALUE + &quot;]&quot;);
+        }
+<span class="fc" id="L41">        this.maxArtifactBytes = maxArtifactBytes;</span>
+<span class="fc" id="L42">    }</span>
+
+    public PluginArtifactVerification verify(Path artifact) {
+<span class="fc" id="L45">        return snapshot(artifact).verification();</span>
+    }
+
+    /**
+     * Reads the artifact once and returns the exact byte snapshot that was
+     * verified. Admission gates must materialize these bytes rather than copy
+     * the source path again, avoiding a verify-then-swap race. Both the
+     * pre-read size and the streamed byte count are bounded.
+     */
+    public ArtifactSnapshot snapshot(Path artifact) {
+<span class="fc" id="L55">        Objects.requireNonNull(artifact, &quot;artifact&quot;);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        String artifactFileName = artifact.getFileName() == null</span>
+<span class="nc" id="L57">            ? artifact.toString()</span>
+<span class="fc" id="L58">            : artifact.getFileName().toString();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (!Files.isRegularFile(artifact, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L60">            return rejectedSnapshot(</span>
+                artifactFileName,
+                Status.UNREADABLE,
+                &quot;ARTIFACT_NOT_A_REGULAR_FILE&quot;
+            );
+        }
+
+<span class="fc" id="L67">        ArtifactRead artifactRead = readBoundedArtifact(artifact);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (artifactRead.status() == ArtifactReadStatus.TOO_LARGE) {</span>
+<span class="fc" id="L69">            return rejectedSnapshot(</span>
+                artifactFileName,
+                Status.ARTIFACT_TOO_LARGE,
+                &quot;ARTIFACT_EXCEEDS_MAX_BYTES&quot;
+            );
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (artifactRead.status() == ArtifactReadStatus.UNREADABLE) {</span>
+<span class="nc" id="L76">            return rejectedSnapshot(</span>
+                artifactFileName,
+                Status.UNREADABLE,
+                &quot;ARTIFACT_UNREADABLE&quot;
+            );
+        }
+<span class="fc" id="L82">        byte[] artifactBytes = artifactRead.bytes();</span>
+
+<span class="fc" id="L84">        String artifactHash = sha256(artifactBytes);</span>
+<span class="fc" id="L85">        Path manifestPath = PluginSignatureManifest.sidecarFor(artifact);</span>
+<span class="fc" id="L86">        String manifestFileName = manifestPath.getFileName().toString();</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (!Files.isRegularFile(manifestPath, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="fc" id="L88">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                &quot;&quot;,
+                Status.MISSING_SIGNATURE_MANIFEST,
+                false,
+                false,
+                false,
+                &quot;&quot;,
+                &quot;&quot;,
+<span class="fc" id="L98">                List.of(&quot;MISSING_SIGNATURE_MANIFEST&quot;)</span>
+            ), artifactBytes);
+        }
+
+        final PluginSignatureManifest manifest;
+        try {
+<span class="fc" id="L104">            manifest = PluginSignatureManifest.read(manifestPath);</span>
+<span class="fc" id="L105">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L106">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.MALFORMED_SIGNATURE_MANIFEST,
+                true,
+                false,
+                false,
+                &quot;&quot;,
+                &quot;&quot;,
+<span class="fc" id="L116">                List.of(&quot;MALFORMED_SIGNATURE_MANIFEST&quot;)</span>
+            ), artifactBytes);
+<span class="fc" id="L118">        }</span>
+
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (!artifactFileName.equals(manifest.artifactFileName())) {</span>
+<span class="fc" id="L121">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.MANIFEST_ARTIFACT_MISMATCH,
+                true,
+                false,
+                false,
+<span class="fc" id="L129">                manifest.publisherId(),</span>
+<span class="fc" id="L130">                manifest.keyId(),</span>
+<span class="fc" id="L131">                List.of(&quot;MANIFEST_ARTIFACT_MISMATCH&quot;)</span>
+            ), artifactBytes);
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (!artifactHash.equals(manifest.artifactSha256())) {</span>
+<span class="fc" id="L135">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.ARTIFACT_HASH_MISMATCH,
+                true,
+                false,
+                false,
+<span class="fc" id="L143">                manifest.publisherId(),</span>
+<span class="fc" id="L144">                manifest.keyId(),</span>
+<span class="fc" id="L145">                List.of(&quot;ARTIFACT_HASH_MISMATCH&quot;)</span>
+            ), artifactBytes);
+        }
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (trustStore.isArtifactRevoked(artifactHash)) {</span>
+<span class="fc" id="L149">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.REVOKED_ARTIFACT,
+                true,
+                false,
+                false,
+<span class="fc" id="L157">                manifest.publisherId(),</span>
+<span class="fc" id="L158">                manifest.keyId(),</span>
+<span class="fc" id="L159">                List.of(&quot;REVOKED_ARTIFACT&quot;)</span>
+            ), artifactBytes);
+        }
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (!trustStore.hasPublisher(manifest.publisherId())) {</span>
+<span class="nc" id="L163">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.UNKNOWN_PUBLISHER,
+                true,
+                false,
+                false,
+<span class="nc" id="L171">                manifest.publisherId(),</span>
+<span class="nc" id="L172">                manifest.keyId(),</span>
+<span class="nc" id="L173">                List.of(&quot;UNKNOWN_PUBLISHER&quot;)</span>
+            ), artifactBytes);
+        }
+
+<span class="fc" id="L177">        Optional&lt;PublisherKey&gt; keyLookup = trustStore.findKey(manifest.publisherId(), manifest.keyId());</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (keyLookup.isEmpty()) {</span>
+<span class="nc" id="L179">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.UNKNOWN_KEY,
+                true,
+                false,
+                false,
+<span class="nc" id="L187">                manifest.publisherId(),</span>
+<span class="nc" id="L188">                manifest.keyId(),</span>
+<span class="nc" id="L189">                List.of(&quot;UNKNOWN_KEY&quot;)</span>
+            ), artifactBytes);
+        }
+<span class="fc" id="L192">        PublisherKey key = keyLookup.orElseThrow();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (key.revoked()) {</span>
+<span class="fc" id="L194">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.REVOKED_KEY,
+                true,
+                false,
+                false,
+<span class="fc" id="L202">                manifest.publisherId(),</span>
+<span class="fc" id="L203">                manifest.keyId(),</span>
+<span class="fc" id="L204">                List.of(&quot;REVOKED_KEY&quot;)</span>
+            ), artifactBytes);
+        }
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (!manifest.algorithm().equals(key.algorithm())) {</span>
+<span class="nc" id="L208">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.KEY_ALGORITHM_MISMATCH,
+                true,
+                false,
+                false,
+<span class="nc" id="L216">                manifest.publisherId(),</span>
+<span class="nc" id="L217">                manifest.keyId(),</span>
+<span class="nc" id="L218">                List.of(&quot;KEY_ALGORITHM_MISMATCH&quot;)</span>
+            ), artifactBytes);
+        }
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (!verifySignature(manifest, key)) {</span>
+<span class="fc" id="L222">            return new ArtifactSnapshot(result(</span>
+                artifactFileName,
+                artifactHash,
+                manifestFileName,
+                Status.INVALID_SIGNATURE,
+                true,
+                false,
+                false,
+<span class="fc" id="L230">                manifest.publisherId(),</span>
+<span class="fc" id="L231">                manifest.keyId(),</span>
+<span class="fc" id="L232">                List.of(&quot;INVALID_SIGNATURE&quot;)</span>
+            ), artifactBytes);
+        }
+
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        Status verifiedStatus = key.retired()</span>
+<span class="nc" id="L237">            ? Status.VERIFIED_RETIRED_KEY</span>
+<span class="fc" id="L238">            : Status.VERIFIED_TRUSTED;</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        List&lt;String&gt; warnings = key.retired()</span>
+<span class="nc" id="L240">            ? List.of(&quot;RETIRED_PUBLISHER_KEY&quot;)</span>
+<span class="fc" id="L241">            : List.of();</span>
+<span class="fc" id="L242">        return new ArtifactSnapshot(result(</span>
+            artifactFileName,
+            artifactHash,
+            manifestFileName,
+            verifiedStatus,
+            true,
+            true,
+            true,
+<span class="fc" id="L250">            manifest.publisherId(),</span>
+<span class="fc" id="L251">            manifest.keyId(),</span>
+            warnings
+        ), artifactBytes);
+    }
+
+    public static String sha256(byte[] bytes) {
+<span class="fc" id="L257">        Objects.requireNonNull(bytes, &quot;bytes&quot;);</span>
+        try {
+<span class="fc" id="L259">            return &quot;sha256:&quot; + HexFormat.of().formatHex(</span>
+<span class="fc" id="L260">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes));</span>
+<span class="nc" id="L261">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L262">            throw new IllegalStateException(&quot;SHA-256 is not available&quot;, exception);</span>
+        }
+    }
+
+    private ArtifactSnapshot rejectedSnapshot(
+        String artifactFileName,
+        Status status,
+        String warning
+    ) {
+<span class="fc" id="L271">        return new ArtifactSnapshot(result(</span>
+            artifactFileName,
+            &quot;&quot;,
+            &quot;&quot;,
+            status,
+            false,
+            false,
+            false,
+            &quot;&quot;,
+            &quot;&quot;,
+<span class="fc" id="L281">            List.of(warning)</span>
+        ), new byte[0]);
+    }
+
+    private ArtifactRead readBoundedArtifact(Path artifact) {
+        try {
+<span class="fc" id="L287">            long declaredSize = Files.size(artifact);</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            if (declaredSize &gt; maxArtifactBytes) {</span>
+<span class="fc" id="L289">                return new ArtifactRead(ArtifactReadStatus.TOO_LARGE, new byte[0]);</span>
+            }
+<span class="fc" id="L291">            int initialCapacity = (int) Math.min(declaredSize, BUFFER_SIZE);</span>
+<span class="fc" id="L292">            ByteArrayOutputStream output = new ByteArrayOutputStream(initialCapacity);</span>
+<span class="fc" id="L293">            try (SeekableByteChannel channel = Files.newByteChannel(</span>
+                    artifact,
+                    StandardOpenOption.READ,
+                    LinkOption.NOFOLLOW_LINKS);
+<span class="fc" id="L297">                 InputStream input = Channels.newInputStream(channel)) {</span>
+<span class="fc" id="L298">                byte[] buffer = new byte[BUFFER_SIZE];</span>
+<span class="fc" id="L299">                long total = 0;</span>
+                int read;
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                while ((read = input.read(buffer)) != -1) {</span>
+<span class="fc" id="L302">                    total += read;</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                    if (total &gt; maxArtifactBytes) {</span>
+<span class="nc" id="L304">                        return new ArtifactRead(</span>
+                            ArtifactReadStatus.TOO_LARGE,
+                            new byte[0]
+                        );
+                    }
+<span class="fc" id="L309">                    output.write(buffer, 0, read);</span>
+                }
+<span class="nc bnc" id="L311" title="All 4 branches missed.">            }</span>
+<span class="fc" id="L312">            return new ArtifactRead(ArtifactReadStatus.READ, output.toByteArray());</span>
+<span class="nc" id="L313">        } catch (IOException | SecurityException exception) {</span>
+<span class="nc" id="L314">            return new ArtifactRead(ArtifactReadStatus.UNREADABLE, new byte[0]);</span>
+        }
+    }
+
+    private boolean verifySignature(PluginSignatureManifest manifest, PublisherKey key) {
+        try {
+<span class="fc" id="L320">            Signature verifier = Signature.getInstance(PluginSignatureManifest.ALGORITHM);</span>
+<span class="fc" id="L321">            verifier.initVerify(key.publicKey());</span>
+<span class="fc" id="L322">            verifier.update(manifest.signedPayload());</span>
+<span class="fc" id="L323">            return verifier.verify(Base64.getDecoder().decode(manifest.signatureBase64()));</span>
+<span class="nc" id="L324">        } catch (GeneralSecurityException | IllegalArgumentException exception) {</span>
+<span class="nc" id="L325">            return false;</span>
+        }
+    }
+
+    private PluginArtifactVerification result(
+        String artifactFileName,
+        String artifactHash,
+        String manifestFileName,
+        Status status,
+        boolean signaturePresent,
+        boolean signatureVerified,
+        boolean trusted,
+        String publisherId,
+        String keyId,
+        List&lt;String&gt; warnings
+    ) {
+<span class="fc" id="L341">        return PluginArtifactVerification.create(</span>
+            artifactFileName,
+            artifactHash,
+            manifestFileName,
+            status,
+            signaturePresent,
+            signatureVerified,
+            trusted,
+            publisherId,
+            keyId,
+            warnings
+        );
+    }
+
+<span class="fc" id="L355">    private enum ArtifactReadStatus {</span>
+<span class="fc" id="L356">        READ,</span>
+<span class="fc" id="L357">        TOO_LARGE,</span>
+<span class="fc" id="L358">        UNREADABLE</span>
+    }
+
+    private record ArtifactRead(ArtifactReadStatus status, byte[] bytes) {
+<span class="fc" id="L362">        private ArtifactRead {</span>
+<span class="fc" id="L363">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            bytes = bytes == null ? new byte[0] : bytes.clone();</span>
+<span class="fc" id="L365">        }</span>
+
+        @Override
+        public byte[] bytes() {
+<span class="fc" id="L369">            return bytes.clone();</span>
+        }
+    }
+
+    public record ArtifactSnapshot(
+        PluginArtifactVerification verification,
+        byte[] artifactBytes
+    ) {
+<span class="fc" id="L377">        public ArtifactSnapshot {</span>
+<span class="fc" id="L378">            Objects.requireNonNull(verification, &quot;verification&quot;);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">            artifactBytes = artifactBytes == null ? new byte[0] : artifactBytes.clone();</span>
+<span class="fc" id="L380">        }</span>
+
+        @Override
+        public byte[] artifactBytes() {
+<span class="fc" id="L384">            return artifactBytes.clone();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
