@@ -40,6 +40,10 @@ public final class AutonomousProductionGenerationExport {
         Objects.requireNonNull(run, "run");
         DiscoveryLifecycleHandoff handoff =
             new AutonomousProductionDomainHandoffAdapter().adapt(run);
+        if (!run.contentHash().equals(handoff.sourceEvidenceHash())) {
+            throw new IllegalStateException(
+                "lifecycle handoff must bind the exported generation run");
+        }
         List<Payload> payloads = List.of(
             payload(
                 ArtifactRole.RESEARCH_BRIEF,
@@ -131,11 +135,11 @@ public final class AutonomousProductionGenerationExport {
                     temporary, StandardOpenOption.WRITE)) {
                 channel.force(true);
             }
-            Files.deleteIfExists(target);
             Files.move(
                 temporary,
                 target,
-                StandardCopyOption.ATOMIC_MOVE);
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
         } finally {
             Files.deleteIfExists(temporary);
         }
