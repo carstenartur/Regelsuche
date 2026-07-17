@@ -119,7 +119,7 @@ public record PluginTrustStore(
 
     public Optional&lt;PublisherKey&gt; findKey(String publisherId, String keyId) {
 <span class="fc" id="L121">        return keys.stream()</span>
-<span class="pc bpc" id="L122" title="2 of 4 branches missed.">            .filter(key -&gt; key.publisherId().equals(publisherId) &amp;&amp; key.keyId().equals(keyId))</span>
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">            .filter(key -&gt; key.publisherId().equals(publisherId) &amp;&amp; key.keyId().equals(keyId))</span>
 <span class="fc" id="L123">            .findFirst();</span>
     }
 

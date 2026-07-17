@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginTrustStoreRevision.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginTrustStoreRevision.java</span></div><h1>PluginTrustStoreRevision.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Signed, hash-chained distribution envelope for one plugin trust-store state.
+ *
+ * &lt;p&gt;The payload authenticates semantic trust state and its sequence position;
+ * it does not fetch the revision, install artifacts or decide which checkpoint
+ * a caller persists. Replay safety requires the verifier to receive the last
+ * locally accepted revision state.&lt;/p&gt;
+ */
+public record PluginTrustStoreRevision(
+    String schema,
+    String trustDomainId,
+    long sequence,
+    String previousRevisionHash,
+    String trustStoreContentHash,
+    String authorityId,
+    String keyId,
+    String algorithm,
+    String signatureBase64,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.plugin-trust-store-revision/v1&quot;;
+    public static final String ALGORITHM = PluginSignatureManifest.ALGORITHM;
+
+<span class="fc" id="L44">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L45">        JsonFactory.builder()</span>
+<span class="fc" id="L46">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L47">            .build())</span>
+<span class="fc" id="L48">        .findAndRegisterModules()</span>
+<span class="fc" id="L49">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L50">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+
+<span class="fc" id="L52">    public PluginTrustStoreRevision {</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(</span>
+                &quot;unsupported plugin trust-store revision schema&quot;);
+        }
+<span class="fc" id="L57">        trustDomainId = PluginSignatureManifest.requireIdentifier(</span>
+            trustDomainId, &quot;trustDomainId&quot;);
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (sequence &lt; 1L) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(&quot;sequence must be positive&quot;);</span>
+        }
+<span class="fc" id="L62">        previousRevisionHash = previousHash(previousRevisionHash, sequence);</span>
+<span class="fc" id="L63">        trustStoreContentHash = PluginSignatureManifest.requireSha256(</span>
+            trustStoreContentHash, &quot;trustStoreContentHash&quot;);
+<span class="fc" id="L65">        authorityId = PluginSignatureManifest.requireIdentifier(</span>
+            authorityId, &quot;authorityId&quot;);
+<span class="fc" id="L67">        keyId = PluginSignatureManifest.requireIdentifier(keyId, &quot;keyId&quot;);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (!ALGORITHM.equals(algorithm)) {</span>
+<span class="nc" id="L69">            throw new IllegalArgumentException(</span>
+                &quot;unsupported plugin trust-store revision algorithm: &quot; + algorithm);
+        }
+<span class="fc" id="L72">        signatureBase64 = canonicalSignature(signatureBase64);</span>
+<span class="fc" id="L73">        contentHash = PluginSignatureManifest.requireSha256(</span>
+            contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L75">        String expected = hash(render(</span>
+            trustDomainId,
+            sequence,
+            previousRevisionHash,
+            trustStoreContentHash,
+            authorityId,
+            keyId,
+            algorithm,
+            signatureBase64,
+            false,
+            &quot;&quot;));
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException(</span>
+                &quot;plugin trust-store revision contentHash mismatch&quot;);
+        }
+<span class="fc" id="L90">    }</span>
+
+    public static PluginTrustStoreRevision create(
+        String trustDomainId,
+        long sequence,
+        String previousRevisionHash,
+        String trustStoreContentHash,
+        String authorityId,
+        String keyId,
+        String signatureBase64
+    ) {
+<span class="fc" id="L101">        String normalizedDomain = PluginSignatureManifest.requireIdentifier(</span>
+            trustDomainId, &quot;trustDomainId&quot;);
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (sequence &lt; 1L) {</span>
+<span class="nc" id="L104">            throw new IllegalArgumentException(&quot;sequence must be positive&quot;);</span>
+        }
+<span class="fc" id="L106">        String normalizedPrevious = previousHash(previousRevisionHash, sequence);</span>
+<span class="fc" id="L107">        String normalizedStoreHash = PluginSignatureManifest.requireSha256(</span>
+            trustStoreContentHash, &quot;trustStoreContentHash&quot;);
+<span class="fc" id="L109">        String normalizedAuthority = PluginSignatureManifest.requireIdentifier(</span>
+            authorityId, &quot;authorityId&quot;);
+<span class="fc" id="L111">        String normalizedKey = PluginSignatureManifest.requireIdentifier(</span>
+            keyId, &quot;keyId&quot;);
+<span class="fc" id="L113">        String normalizedSignature = canonicalSignature(signatureBase64);</span>
+<span class="fc" id="L114">        String hash = hash(render(</span>
+            normalizedDomain,
+            sequence,
+            normalizedPrevious,
+            normalizedStoreHash,
+            normalizedAuthority,
+            normalizedKey,
+            ALGORITHM,
+            normalizedSignature,
+            false,
+            &quot;&quot;));
+<span class="fc" id="L125">        return new PluginTrustStoreRevision(</span>
+            SCHEMA,
+            normalizedDomain,
+            sequence,
+            normalizedPrevious,
+            normalizedStoreHash,
+            normalizedAuthority,
+            normalizedKey,
+            ALGORITHM,
+            normalizedSignature,
+            hash);
+    }
+
+    public byte[] signedPayload() {
+<span class="fc" id="L139">        return signedPayload(</span>
+            trustDomainId,
+            sequence,
+            previousRevisionHash,
+            trustStoreContentHash,
+            authorityId,
+            keyId,
+            algorithm);
+    }
+
+    public static byte[] signedPayload(
+        String trustDomainId,
+        long sequence,
+        String previousRevisionHash,
+        String trustStoreContentHash,
+        String authorityId,
+        String keyId,
+        String algorithm
+    ) {
+<span class="fc" id="L158">        String normalizedDomain = PluginSignatureManifest.requireIdentifier(</span>
+            trustDomainId, &quot;trustDomainId&quot;);
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (sequence &lt; 1L) {</span>
+<span class="nc" id="L161">            throw new IllegalArgumentException(&quot;sequence must be positive&quot;);</span>
+        }
+<span class="fc" id="L163">        String normalizedPrevious = previousHash(previousRevisionHash, sequence);</span>
+<span class="fc" id="L164">        String normalizedStoreHash = PluginSignatureManifest.requireSha256(</span>
+            trustStoreContentHash, &quot;trustStoreContentHash&quot;);
+<span class="fc" id="L166">        String normalizedAuthority = PluginSignatureManifest.requireIdentifier(</span>
+            authorityId, &quot;authorityId&quot;);
+<span class="fc" id="L168">        String normalizedKey = PluginSignatureManifest.requireIdentifier(</span>
+            keyId, &quot;keyId&quot;);
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (!ALGORITHM.equals(algorithm)) {</span>
+<span class="nc" id="L171">            throw new IllegalArgumentException(</span>
+                &quot;unsupported plugin trust-store revision algorithm: &quot; + algorithm);
+        }
+        try {
+<span class="fc" id="L175">            ByteArrayOutputStream bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L176">            try (DataOutputStream output = new DataOutputStream(bytes)) {</span>
+<span class="fc" id="L177">                writeField(output, &quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L178">                writeField(output, &quot;trustDomainId&quot;, normalizedDomain);</span>
+<span class="fc" id="L179">                writeField(output, &quot;sequence&quot;, Long.toString(sequence));</span>
+<span class="fc" id="L180">                writeField(output, &quot;previousRevisionHash&quot;, normalizedPrevious);</span>
+<span class="fc" id="L181">                writeField(output, &quot;trustStoreContentHash&quot;, normalizedStoreHash);</span>
+<span class="fc" id="L182">                writeField(output, &quot;authorityId&quot;, normalizedAuthority);</span>
+<span class="fc" id="L183">                writeField(output, &quot;keyId&quot;, normalizedKey);</span>
+<span class="fc" id="L184">                writeField(output, &quot;algorithm&quot;, algorithm);</span>
+            }
+<span class="fc" id="L186">            return bytes.toByteArray();</span>
+<span class="nc" id="L187">        } catch (IOException exception) {</span>
+<span class="nc" id="L188">            throw new IllegalStateException(</span>
+                &quot;Unable to encode plugin trust-store revision payload&quot;, exception);
+        }
+    }
+
+    public static Path sidecarFor(Path trustStorePath) {
+<span class="nc" id="L194">        Objects.requireNonNull(trustStorePath, &quot;trustStorePath&quot;);</span>
+<span class="nc" id="L195">        Path fileName = trustStorePath.getFileName();</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (fileName == null) {</span>
+<span class="nc" id="L197">            throw new IllegalArgumentException(</span>
+                &quot;trust-store path must have a file name&quot;);
+        }
+<span class="nc" id="L200">        return trustStorePath.resolveSibling(fileName + &quot;.revision.json&quot;);</span>
+    }
+
+    public static PluginTrustStoreRevision read(Path path) {
+<span class="fc" id="L204">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L206">            RevisionDto dto = JSON.readValue(</span>
+<span class="fc" id="L207">                Files.readString(path, StandardCharsets.UTF_8), RevisionDto.class);</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (dto == null) {</span>
+<span class="nc" id="L209">                throw new IllegalArgumentException(</span>
+                    &quot;plugin trust-store revision must not be empty&quot;);
+            }
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            if (dto.sequence == null) {</span>
+<span class="nc" id="L213">                throw new IllegalArgumentException(&quot;sequence must be present&quot;);</span>
+            }
+<span class="fc" id="L215">            return new PluginTrustStoreRevision(</span>
+                dto.schema,
+                dto.trustDomainId,
+<span class="fc" id="L218">                dto.sequence,</span>
+                dto.previousRevisionHash,
+                dto.trustStoreContentHash,
+                dto.authorityId,
+                dto.keyId,
+                dto.algorithm,
+                dto.signatureBase64,
+                dto.contentHash);
+<span class="fc" id="L226">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L227">            throw new IllegalArgumentException(</span>
+                &quot;Invalid plugin trust-store revision: &quot; + path, exception);
+<span class="nc" id="L229">        } catch (IOException exception) {</span>
+<span class="nc" id="L230">            throw new IllegalArgumentException(</span>
+                &quot;Unable to read plugin trust-store revision: &quot; + path, exception);
+        }
+    }
+
+    public Path write(Path path) {
+<span class="fc" id="L236">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L238">            Path parent = path.toAbsolutePath().normalize().getParent();</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L240">                Files.createDirectories(parent);</span>
+            }
+<span class="fc" id="L242">            Files.writeString(path, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L243">            return path;</span>
+<span class="nc" id="L244">        } catch (IOException exception) {</span>
+<span class="nc" id="L245">            throw new IllegalStateException(</span>
+                &quot;Unable to write plugin trust-store revision&quot;, exception);
+        }
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L251">        return render(</span>
+            trustDomainId,
+            sequence,
+            previousRevisionHash,
+            trustStoreContentHash,
+            authorityId,
+            keyId,
+            algorithm,
+            signatureBase64,
+            true,
+            contentHash);
+    }
+
+    private static String render(
+        String trustDomainId,
+        long sequence,
+        String previousRevisionHash,
+        String trustStoreContentHash,
+        String authorityId,
+        String keyId,
+        String algorithm,
+        String signatureBase64,
+        boolean includeHash,
+        String contentHash
+    ) {
+<span class="fc" id="L276">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L277">        payload.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L278">        payload.put(&quot;trustDomainId&quot;, trustDomainId);</span>
+<span class="fc" id="L279">        payload.put(&quot;sequence&quot;, sequence);</span>
+<span class="fc" id="L280">        payload.put(&quot;previousRevisionHash&quot;, previousRevisionHash);</span>
+<span class="fc" id="L281">        payload.put(&quot;trustStoreContentHash&quot;, trustStoreContentHash);</span>
+<span class="fc" id="L282">        payload.put(&quot;authorityId&quot;, authorityId);</span>
+<span class="fc" id="L283">        payload.put(&quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L284">        payload.put(&quot;algorithm&quot;, algorithm);</span>
+<span class="fc" id="L285">        payload.put(&quot;signatureBase64&quot;, signatureBase64);</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (includeHash) {</span>
+<span class="fc" id="L287">            payload.put(&quot;contentHash&quot;, contentHash);</span>
+        }
+        try {
+<span class="fc" id="L290">            return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L291">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L292">            throw new IllegalStateException(</span>
+                &quot;Unable to serialize plugin trust-store revision&quot;, exception);
+        }
+    }
+
+    private static String previousHash(String value, long sequence) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        String normalized = value == null ? &quot;&quot; : value;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (sequence == 1L) {</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (!normalized.isEmpty()) {</span>
+<span class="fc" id="L301">                throw new IllegalArgumentException(</span>
+                    &quot;genesis revision must not name a previous revision&quot;);
+            }
+<span class="fc" id="L304">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (normalized.isEmpty()) {</span>
+<span class="fc" id="L307">            throw new IllegalArgumentException(</span>
+                &quot;non-genesis revision requires previousRevisionHash&quot;);
+        }
+<span class="fc" id="L310">        return PluginSignatureManifest.requireSha256(</span>
+            normalized, &quot;previousRevisionHash&quot;);
+    }
+
+    private static String canonicalSignature(String value) {
+<span class="pc bpc" id="L315" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L316">            throw new IllegalArgumentException(&quot;signatureBase64 must not be blank&quot;);</span>
+        }
+        final byte[] decoded;
+        try {
+<span class="fc" id="L320">            decoded = Base64.getDecoder().decode(value);</span>
+<span class="nc" id="L321">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L322">            throw new IllegalArgumentException(</span>
+                &quot;signatureBase64 is not valid base64&quot;, exception);
+<span class="fc" id="L324">        }</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (decoded.length != 64) {</span>
+<span class="nc" id="L326">            throw new IllegalArgumentException(</span>
+                &quot;Ed25519 signatures must contain exactly 64 bytes&quot;);
+        }
+<span class="fc" id="L329">        String canonical = Base64.getEncoder().encodeToString(decoded);</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (!canonical.equals(value)) {</span>
+<span class="fc" id="L331">            throw new IllegalArgumentException(</span>
+                &quot;signatureBase64 must use canonical padded base64&quot;);
+        }
+<span class="fc" id="L334">        return canonical;</span>
+    }
+
+    private static String hash(String value) {
+<span class="fc" id="L338">        return PluginArtifactVerifier.sha256(value.getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+    private static void writeField(
+        DataOutputStream output,
+        String name,
+        String value
+    ) throws IOException {
+<span class="fc" id="L346">        writeBytes(output, name.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L347">        writeBytes(output, value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L348">    }</span>
+
+    private static void writeBytes(DataOutputStream output, byte[] value)
+            throws IOException {
+<span class="fc" id="L352">        output.writeInt(value.length);</span>
+<span class="fc" id="L353">        output.write(value);</span>
+<span class="fc" id="L354">    }</span>
+
+    @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L357">    public static final class RevisionDto {</span>
+        public String schema;
+        public String trustDomainId;
+        public Long sequence;
+        public String previousRevisionHash;
+        public String trustStoreContentHash;
+        public String authorityId;
+        public String keyId;
+        public String algorithm;
+        public String signatureBase64;
+        public String contentHash;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

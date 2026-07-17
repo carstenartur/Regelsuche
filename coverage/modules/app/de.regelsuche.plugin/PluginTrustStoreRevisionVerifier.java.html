@@ -1,0 +1,738 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginTrustStoreRevisionVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.plugin</a> &gt; <span class="el_source">PluginTrustStoreRevisionVerifier.java</span></div><h1>PluginTrustStoreRevisionVerifier.java</h1><pre class="source lang-java linenums">package de.regelsuche.plugin;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.plugin.PluginTrustStore.PublisherKey;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.GeneralSecurityException;
+import java.security.Signature;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Verifies signed trust-store revisions against a pinned local authority store
+ * and a locally persisted last-accepted checkpoint.
+ */
+public final class PluginTrustStoreRevisionVerifier {
+    private final PluginTrustStore rootTrustStore;
+
+<span class="fc" id="L33">    public PluginTrustStoreRevisionVerifier(PluginTrustStore rootTrustStore) {</span>
+<span class="fc" id="L34">        this.rootTrustStore = Objects.requireNonNull(</span>
+            rootTrustStore, &quot;rootTrustStore&quot;);
+<span class="fc" id="L36">    }</span>
+
+    public Verification verify(
+        PluginTrustStore trustStore,
+        PluginTrustStoreRevision revision,
+        ChainCheckpoint previous
+    ) {
+<span class="fc" id="L43">        Objects.requireNonNull(trustStore, &quot;trustStore&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(revision, &quot;revision&quot;);</span>
+<span class="fc" id="L45">        String storeHash = hash(trustStore.toCanonicalJson());</span>
+<span class="fc" id="L46">        String rootHash = hash(rootTrustStore.toCanonicalJson());</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        String checkpointHash = previous == null ? &quot;&quot; : previous.contentHash();</span>
+
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!storeHash.equals(revision.trustStoreContentHash())) {</span>
+<span class="fc" id="L50">            return result(</span>
+                revision,
+                rootHash,
+                checkpointHash,
+                Status.TRUST_STORE_HASH_MISMATCH,
+                false,
+                false,
+                false,
+<span class="fc" id="L58">                List.of(&quot;TRUST_STORE_HASH_MISMATCH&quot;));</span>
+        }
+
+<span class="fc" id="L61">        Status chainFailure = validateChain(revision, previous);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (chainFailure != null) {</span>
+<span class="fc" id="L63">            return result(</span>
+                revision,
+                rootHash,
+                checkpointHash,
+                chainFailure,
+                false,
+                false,
+                false,
+<span class="fc" id="L71">                List.of(chainFailure.name()));</span>
+        }
+
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (!rootTrustStore.hasPublisher(revision.authorityId())) {</span>
+<span class="fc" id="L75">            return result(</span>
+                revision,
+                rootHash,
+                checkpointHash,
+                Status.UNKNOWN_AUTHORITY,
+                false,
+                false,
+                false,
+<span class="fc" id="L83">                List.of(&quot;UNKNOWN_AUTHORITY&quot;));</span>
+        }
+<span class="fc" id="L85">        Optional&lt;PublisherKey&gt; keyLookup = rootTrustStore.findKey(</span>
+<span class="fc" id="L86">            revision.authorityId(), revision.keyId());</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (keyLookup.isEmpty()) {</span>
+<span class="fc" id="L88">            return result(</span>
+                revision,
+                rootHash,
+                checkpointHash,
+                Status.UNKNOWN_KEY,
+                false,
+                false,
+                false,
+<span class="fc" id="L96">                List.of(&quot;UNKNOWN_KEY&quot;));</span>
+        }
+<span class="fc" id="L98">        PublisherKey key = keyLookup.orElseThrow();</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (key.revoked()) {</span>
+<span class="fc" id="L100">            return result(</span>
+                revision,
+                rootHash,
+                checkpointHash,
+                Status.REVOKED_KEY,
+                false,
+                false,
+                false,
+<span class="fc" id="L108">                List.of(&quot;REVOKED_KEY&quot;));</span>
+        }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (!revision.algorithm().equals(key.algorithm())) {</span>
+<span class="nc" id="L111">            return result(</span>
+                revision,
+                rootHash,
+                checkpointHash,
+                Status.KEY_ALGORITHM_MISMATCH,
+                false,
+                false,
+                false,
+<span class="nc" id="L119">                List.of(&quot;KEY_ALGORITHM_MISMATCH&quot;));</span>
+        }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (!verifySignature(revision, key)) {</span>
+<span class="fc" id="L122">            return result(</span>
+                revision,
+                rootHash,
+                checkpointHash,
+                Status.INVALID_SIGNATURE,
+                false,
+                false,
+                false,
+<span class="fc" id="L130">                List.of(&quot;INVALID_SIGNATURE&quot;));</span>
+        }
+
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        Status status = key.retired()</span>
+<span class="fc" id="L134">            ? Status.VERIFIED_RETIRED_KEY</span>
+<span class="fc" id="L135">            : Status.VERIFIED_TRUSTED;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        List&lt;String&gt; warnings = key.retired()</span>
+<span class="fc" id="L137">            ? List.of(&quot;RETIRED_TRUST_AUTHORITY_KEY&quot;)</span>
+<span class="fc" id="L138">            : List.of();</span>
+<span class="fc" id="L139">        return result(</span>
+            revision,
+            rootHash,
+            checkpointHash,
+            status,
+            true,
+            true,
+            true,
+            warnings);
+    }
+
+    public VerifiedTrustStoreRevision requireTrusted(
+        PluginTrustStore trustStore,
+        PluginTrustStoreRevision revision,
+        ChainCheckpoint previous
+    ) {
+<span class="fc" id="L155">        Verification verification = verify(trustStore, revision, previous);</span>
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        if (!verification.trusted() || !verification.replaySafe()) {</span>
+<span class="fc" id="L157">            throw new SecurityException(</span>
+                &quot;plugin trust-store revision verification failed: status=&quot;
+<span class="fc" id="L159">                    + verification.status()</span>
+<span class="fc" id="L160">                    + &quot;, trustDomainId=&quot; + revision.trustDomainId()</span>
+<span class="fc" id="L161">                    + &quot;, sequence=&quot; + revision.sequence());</span>
+        }
+<span class="fc" id="L163">        ChainCheckpoint checkpoint = ChainCheckpoint.create(</span>
+<span class="fc" id="L164">            revision.trustDomainId(),</span>
+<span class="fc" id="L165">            revision.sequence(),</span>
+<span class="fc" id="L166">            revision.contentHash());</span>
+<span class="fc" id="L167">        return new VerifiedTrustStoreRevision(</span>
+            trustStore,
+            revision,
+            verification,
+            checkpoint);
+    }
+
+    private static Status validateChain(
+        PluginTrustStoreRevision revision,
+        ChainCheckpoint previous
+    ) {
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (previous == null) {</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            return revision.sequence() == 1L</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                    &amp;&amp; revision.previousRevisionHash().isEmpty()</span>
+<span class="fc" id="L181">                ? null</span>
+<span class="fc" id="L182">                : Status.GENESIS_REQUIRED;</span>
+        }
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (!previous.trustDomainId().equals(revision.trustDomainId())) {</span>
+<span class="fc" id="L185">            return Status.TRUST_DOMAIN_MISMATCH;</span>
+        }
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (revision.sequence() &lt;= previous.sequence()) {</span>
+<span class="fc" id="L188">            return Status.REPLAYED_REVISION;</span>
+        }
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (revision.sequence() != Math.addExact(previous.sequence(), 1L)) {</span>
+<span class="fc" id="L191">            return Status.SEQUENCE_GAP;</span>
+        }
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (!previous.revisionHash().equals(revision.previousRevisionHash())) {</span>
+<span class="fc" id="L194">            return Status.PREVIOUS_HASH_MISMATCH;</span>
+        }
+<span class="fc" id="L196">        return null;</span>
+    }
+
+    private Verification result(
+        PluginTrustStoreRevision revision,
+        String rootTrustStoreHash,
+        String previousCheckpointHash,
+        Status status,
+        boolean signatureVerified,
+        boolean trusted,
+        boolean replaySafe,
+        List&lt;String&gt; warnings
+    ) {
+<span class="fc" id="L209">        return Verification.create(</span>
+<span class="fc" id="L210">            revision.trustDomainId(),</span>
+<span class="fc" id="L211">            revision.sequence(),</span>
+<span class="fc" id="L212">            revision.contentHash(),</span>
+<span class="fc" id="L213">            revision.previousRevisionHash(),</span>
+<span class="fc" id="L214">            revision.trustStoreContentHash(),</span>
+            rootTrustStoreHash,
+            previousCheckpointHash,
+            status,
+            signatureVerified,
+            trusted,
+            replaySafe,
+<span class="fc" id="L221">            revision.authorityId(),</span>
+<span class="fc" id="L222">            revision.keyId(),</span>
+            warnings);
+    }
+
+    private static boolean verifySignature(
+        PluginTrustStoreRevision revision,
+        PublisherKey key
+    ) {
+        try {
+<span class="fc" id="L231">            Signature verifier = Signature.getInstance(</span>
+                PluginTrustStoreRevision.ALGORITHM);
+<span class="fc" id="L233">            verifier.initVerify(key.publicKey());</span>
+<span class="fc" id="L234">            verifier.update(revision.signedPayload());</span>
+<span class="fc" id="L235">            return verifier.verify(</span>
+<span class="fc" id="L236">                Base64.getDecoder().decode(revision.signatureBase64()));</span>
+<span class="nc" id="L237">        } catch (GeneralSecurityException | IllegalArgumentException exception) {</span>
+<span class="nc" id="L238">            return false;</span>
+        }
+    }
+
+    private static String hash(byte[] value) {
+<span class="fc" id="L243">        return PluginArtifactVerifier.sha256(value);</span>
+    }
+
+    private static String hash(String value) {
+<span class="fc" id="L247">        return PluginArtifactVerifier.sha256(value.getBytes(StandardCharsets.UTF_8));</span>
+    }
+
+<span class="fc" id="L250">    public enum Status {</span>
+<span class="fc" id="L251">        TRUST_STORE_HASH_MISMATCH,</span>
+<span class="fc" id="L252">        GENESIS_REQUIRED,</span>
+<span class="fc" id="L253">        TRUST_DOMAIN_MISMATCH,</span>
+<span class="fc" id="L254">        REPLAYED_REVISION,</span>
+<span class="fc" id="L255">        SEQUENCE_GAP,</span>
+<span class="fc" id="L256">        PREVIOUS_HASH_MISMATCH,</span>
+<span class="fc" id="L257">        UNKNOWN_AUTHORITY,</span>
+<span class="fc" id="L258">        UNKNOWN_KEY,</span>
+<span class="fc" id="L259">        REVOKED_KEY,</span>
+<span class="fc" id="L260">        KEY_ALGORITHM_MISMATCH,</span>
+<span class="fc" id="L261">        INVALID_SIGNATURE,</span>
+<span class="fc" id="L262">        VERIFIED_RETIRED_KEY,</span>
+<span class="fc" id="L263">        VERIFIED_TRUSTED</span>
+    }
+
+    /** Local last-accepted state used to reject replay, gaps and forks. */
+    public record ChainCheckpoint(
+        String schema,
+        String trustDomainId,
+        long sequence,
+        String revisionHash,
+        String contentHash
+    ) {
+        public static final String SCHEMA =
+            &quot;regelsuche.plugin-trust-store-chain-checkpoint/v1&quot;;
+<span class="fc" id="L276">        private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L277">            JsonFactory.builder()</span>
+<span class="fc" id="L278">                .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L279">                .build())</span>
+<span class="fc" id="L280">            .findAndRegisterModules()</span>
+<span class="fc" id="L281">            .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L282">            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+
+<span class="fc" id="L284">        public ChainCheckpoint {</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L286">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported plugin trust-store chain checkpoint schema&quot;);
+            }
+<span class="fc" id="L289">            trustDomainId = PluginSignatureManifest.requireIdentifier(</span>
+                trustDomainId, &quot;trustDomainId&quot;);
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            if (sequence &lt; 1L) {</span>
+<span class="nc" id="L292">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint sequence must be positive&quot;);
+            }
+<span class="fc" id="L295">            revisionHash = PluginSignatureManifest.requireSha256(</span>
+                revisionHash, &quot;revisionHash&quot;);
+<span class="fc" id="L297">            contentHash = PluginSignatureManifest.requireSha256(</span>
+                contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L299">            String expected = hash(render(</span>
+                trustDomainId,
+                sequence,
+                revisionHash,
+                false,
+                &quot;&quot;));
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L306">                throw new IllegalArgumentException(</span>
+                    &quot;plugin trust-store chain checkpoint contentHash mismatch&quot;);
+            }
+<span class="fc" id="L309">        }</span>
+
+        private static ChainCheckpoint create(
+            String trustDomainId,
+            long sequence,
+            String revisionHash
+        ) {
+<span class="fc" id="L316">            String normalizedDomain = PluginSignatureManifest.requireIdentifier(</span>
+                trustDomainId, &quot;trustDomainId&quot;);
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            if (sequence &lt; 1L) {</span>
+<span class="nc" id="L319">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint sequence must be positive&quot;);
+            }
+<span class="fc" id="L322">            String normalizedRevision = PluginSignatureManifest.requireSha256(</span>
+                revisionHash, &quot;revisionHash&quot;);
+<span class="fc" id="L324">            String hash = hash(render(</span>
+                normalizedDomain,
+                sequence,
+                normalizedRevision,
+                false,
+                &quot;&quot;));
+<span class="fc" id="L330">            return new ChainCheckpoint(</span>
+                SCHEMA,
+                normalizedDomain,
+                sequence,
+                normalizedRevision,
+                hash);
+        }
+
+        public static ChainCheckpoint read(Path path) {
+<span class="fc" id="L339">            Objects.requireNonNull(path, &quot;path&quot;);</span>
+            try {
+<span class="fc" id="L341">                CheckpointDto dto = JSON.readValue(</span>
+<span class="fc" id="L342">                    Files.readString(path, StandardCharsets.UTF_8),</span>
+                    CheckpointDto.class);
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                if (dto == null) {</span>
+<span class="nc" id="L345">                    throw new IllegalArgumentException(</span>
+                        &quot;plugin trust-store checkpoint must not be empty&quot;);
+                }
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">                if (dto.sequence == null) {</span>
+<span class="nc" id="L349">                    throw new IllegalArgumentException(</span>
+                        &quot;checkpoint sequence must be present&quot;);
+                }
+<span class="fc" id="L352">                return new ChainCheckpoint(</span>
+                    dto.schema,
+                    dto.trustDomainId,
+<span class="fc" id="L355">                    dto.sequence,</span>
+                    dto.revisionHash,
+                    dto.contentHash);
+<span class="fc" id="L358">            } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L359">                throw new IllegalArgumentException(</span>
+                    &quot;Invalid plugin trust-store checkpoint: &quot; + path, exception);
+<span class="nc" id="L361">            } catch (IOException exception) {</span>
+<span class="nc" id="L362">                throw new IllegalArgumentException(</span>
+                    &quot;Unable to read plugin trust-store checkpoint: &quot; + path,
+                    exception);
+            }
+        }
+
+        public Path write(Path path) {
+<span class="fc" id="L369">            Objects.requireNonNull(path, &quot;path&quot;);</span>
+            try {
+<span class="fc" id="L371">                Path parent = path.toAbsolutePath().normalize().getParent();</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L373">                    Files.createDirectories(parent);</span>
+                }
+<span class="fc" id="L375">                Files.writeString(path, toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L376">                return path;</span>
+<span class="nc" id="L377">            } catch (IOException exception) {</span>
+<span class="nc" id="L378">                throw new IllegalStateException(</span>
+                    &quot;Unable to write plugin trust-store checkpoint&quot;, exception);
+            }
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L384">            return render(</span>
+                trustDomainId,
+                sequence,
+                revisionHash,
+                true,
+                contentHash);
+        }
+
+        private static String render(
+            String trustDomainId,
+            long sequence,
+            String revisionHash,
+            boolean includeHash,
+            String contentHash
+        ) {
+<span class="fc" id="L399">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L400">            payload.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L401">            payload.put(&quot;trustDomainId&quot;, trustDomainId);</span>
+<span class="fc" id="L402">            payload.put(&quot;sequence&quot;, sequence);</span>
+<span class="fc" id="L403">            payload.put(&quot;revisionHash&quot;, revisionHash);</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            if (includeHash) {</span>
+<span class="fc" id="L405">                payload.put(&quot;contentHash&quot;, contentHash);</span>
+            }
+            try {
+<span class="fc" id="L408">                return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L409">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L410">                throw new IllegalStateException(</span>
+                    &quot;Unable to serialize plugin trust-store checkpoint&quot;, exception);
+            }
+        }
+
+        @JsonIgnoreProperties(ignoreUnknown = false)
+<span class="fc" id="L416">        public static final class CheckpointDto {</span>
+            public String schema;
+            public String trustDomainId;
+            public Long sequence;
+            public String revisionHash;
+            public String contentHash;
+        }
+    }
+
+    /** Immutable replayable evidence for one trust-store revision decision. */
+    public record Verification(
+        String schema,
+        String trustDomainId,
+        long sequence,
+        String revisionHash,
+        String previousRevisionHash,
+        String trustStoreContentHash,
+        String rootTrustStoreContentHash,
+        String previousCheckpointHash,
+        Status status,
+        boolean signatureVerified,
+        boolean trusted,
+        boolean replaySafe,
+        String authorityId,
+        String keyId,
+        List&lt;String&gt; warnings,
+        String contentHash
+    ) {
+        public static final String SCHEMA =
+            &quot;regelsuche.plugin-trust-store-revision-verification/v1&quot;;
+<span class="fc" id="L446">        private static final ObjectMapper JSON =</span>
+<span class="fc" id="L447">            new ObjectMapper().findAndRegisterModules();</span>
+
+<span class="fc" id="L449">        public Verification {</span>
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L451">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported trust-store revision verification schema&quot;);
+            }
+<span class="fc" id="L454">            trustDomainId = PluginSignatureManifest.requireIdentifier(</span>
+                trustDomainId, &quot;trustDomainId&quot;);
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            if (sequence &lt; 1L) {</span>
+<span class="nc" id="L457">                throw new IllegalArgumentException(</span>
+                    &quot;verification sequence must be positive&quot;);
+            }
+<span class="fc" id="L460">            revisionHash = PluginSignatureManifest.requireSha256(</span>
+                revisionHash, &quot;revisionHash&quot;);
+<span class="fc" id="L462">            previousRevisionHash = optionalSha256(</span>
+                previousRevisionHash, &quot;previousRevisionHash&quot;);
+<span class="fc" id="L464">            trustStoreContentHash = PluginSignatureManifest.requireSha256(</span>
+                trustStoreContentHash, &quot;trustStoreContentHash&quot;);
+<span class="fc" id="L466">            rootTrustStoreContentHash = PluginSignatureManifest.requireSha256(</span>
+                rootTrustStoreContentHash, &quot;rootTrustStoreContentHash&quot;);
+<span class="fc" id="L468">            previousCheckpointHash = optionalSha256(</span>
+                previousCheckpointHash, &quot;previousCheckpointHash&quot;);
+<span class="fc" id="L470">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L471">            authorityId = PluginSignatureManifest.requireIdentifier(</span>
+                authorityId, &quot;authorityId&quot;);
+<span class="fc" id="L473">            keyId = PluginSignatureManifest.requireIdentifier(keyId, &quot;keyId&quot;);</span>
+<span class="fc" id="L474">            warnings = normalizeWarnings(warnings);</span>
+<span class="fc bfc" id="L475" title="All 4 branches covered.">            boolean verified = status == Status.VERIFIED_TRUSTED</span>
+                || status == Status.VERIFIED_RETIRED_KEY;
+<span class="pc bpc" id="L477" title="3 of 6 branches missed.">            if (verified != signatureVerified</span>
+                    || verified != trusted
+                    || verified != replaySafe) {
+<span class="nc" id="L480">                throw new IllegalArgumentException(</span>
+                    &quot;trust-store revision status and trust flags disagree&quot;);
+            }
+<span class="fc" id="L483">            contentHash = PluginSignatureManifest.requireSha256(</span>
+                contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L485">            String expected = hash(canonicalMaterial(</span>
+                trustDomainId,
+                sequence,
+                revisionHash,
+                previousRevisionHash,
+                trustStoreContentHash,
+                rootTrustStoreContentHash,
+                previousCheckpointHash,
+                status,
+                signatureVerified,
+                trusted,
+                replaySafe,
+                authorityId,
+                keyId,
+                warnings));
+<span class="fc bfc" id="L500" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L501">                throw new IllegalArgumentException(</span>
+                    &quot;trust-store revision verification contentHash mismatch&quot;);
+            }
+<span class="fc" id="L504">        }</span>
+
+        private static Verification create(
+            String trustDomainId,
+            long sequence,
+            String revisionHash,
+            String previousRevisionHash,
+            String trustStoreContentHash,
+            String rootTrustStoreContentHash,
+            String previousCheckpointHash,
+            Status status,
+            boolean signatureVerified,
+            boolean trusted,
+            boolean replaySafe,
+            String authorityId,
+            String keyId,
+            List&lt;String&gt; warnings
+        ) {
+<span class="fc" id="L522">            String normalizedDomain = PluginSignatureManifest.requireIdentifier(</span>
+                trustDomainId, &quot;trustDomainId&quot;);
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">            if (sequence &lt; 1L) {</span>
+<span class="nc" id="L525">                throw new IllegalArgumentException(</span>
+                    &quot;verification sequence must be positive&quot;);
+            }
+<span class="fc" id="L528">            String normalizedRevision = PluginSignatureManifest.requireSha256(</span>
+                revisionHash, &quot;revisionHash&quot;);
+<span class="fc" id="L530">            String normalizedPrevious = optionalSha256(</span>
+                previousRevisionHash, &quot;previousRevisionHash&quot;);
+<span class="fc" id="L532">            String normalizedStore = PluginSignatureManifest.requireSha256(</span>
+                trustStoreContentHash, &quot;trustStoreContentHash&quot;);
+<span class="fc" id="L534">            String normalizedRoot = PluginSignatureManifest.requireSha256(</span>
+                rootTrustStoreContentHash, &quot;rootTrustStoreContentHash&quot;);
+<span class="fc" id="L536">            String normalizedCheckpoint = optionalSha256(</span>
+                previousCheckpointHash, &quot;previousCheckpointHash&quot;);
+<span class="fc" id="L538">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L539">            String normalizedAuthority = PluginSignatureManifest.requireIdentifier(</span>
+                authorityId, &quot;authorityId&quot;);
+<span class="fc" id="L541">            String normalizedKey = PluginSignatureManifest.requireIdentifier(</span>
+                keyId, &quot;keyId&quot;);
+<span class="fc" id="L543">            List&lt;String&gt; normalizedWarnings = normalizeWarnings(warnings);</span>
+<span class="fc" id="L544">            String hash = hash(canonicalMaterial(</span>
+                normalizedDomain,
+                sequence,
+                normalizedRevision,
+                normalizedPrevious,
+                normalizedStore,
+                normalizedRoot,
+                normalizedCheckpoint,
+                status,
+                signatureVerified,
+                trusted,
+                replaySafe,
+                normalizedAuthority,
+                normalizedKey,
+                normalizedWarnings));
+<span class="fc" id="L559">            return new Verification(</span>
+                SCHEMA,
+                normalizedDomain,
+                sequence,
+                normalizedRevision,
+                normalizedPrevious,
+                normalizedStore,
+                normalizedRoot,
+                normalizedCheckpoint,
+                status,
+                signatureVerified,
+                trusted,
+                replaySafe,
+                normalizedAuthority,
+                normalizedKey,
+                normalizedWarnings,
+                hash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L579">            Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L580">            payload.put(&quot;schema&quot;, schema);</span>
+<span class="fc" id="L581">            payload.put(&quot;trustDomainId&quot;, trustDomainId);</span>
+<span class="fc" id="L582">            payload.put(&quot;sequence&quot;, sequence);</span>
+<span class="fc" id="L583">            payload.put(&quot;revisionHash&quot;, revisionHash);</span>
+<span class="fc" id="L584">            payload.put(&quot;previousRevisionHash&quot;, previousRevisionHash);</span>
+<span class="fc" id="L585">            payload.put(&quot;trustStoreContentHash&quot;, trustStoreContentHash);</span>
+<span class="fc" id="L586">            payload.put(&quot;rootTrustStoreContentHash&quot;, rootTrustStoreContentHash);</span>
+<span class="fc" id="L587">            payload.put(&quot;previousCheckpointHash&quot;, previousCheckpointHash);</span>
+<span class="fc" id="L588">            payload.put(&quot;status&quot;, status.name());</span>
+<span class="fc" id="L589">            payload.put(&quot;signatureVerified&quot;, signatureVerified);</span>
+<span class="fc" id="L590">            payload.put(&quot;trusted&quot;, trusted);</span>
+<span class="fc" id="L591">            payload.put(&quot;replaySafe&quot;, replaySafe);</span>
+<span class="fc" id="L592">            payload.put(&quot;authorityId&quot;, authorityId);</span>
+<span class="fc" id="L593">            payload.put(&quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L594">            payload.put(&quot;warnings&quot;, warnings);</span>
+<span class="fc" id="L595">            payload.put(&quot;contentHash&quot;, contentHash);</span>
+            try {
+<span class="fc" id="L597">                return JSON.writeValueAsString(payload) + &quot;\n&quot;;</span>
+<span class="nc" id="L598">            } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L599">                throw new IllegalStateException(</span>
+                    &quot;Unable to serialize trust-store revision verification&quot;,
+                    exception);
+            }
+        }
+
+        private static byte[] canonicalMaterial(
+            String trustDomainId,
+            long sequence,
+            String revisionHash,
+            String previousRevisionHash,
+            String trustStoreContentHash,
+            String rootTrustStoreContentHash,
+            String previousCheckpointHash,
+            Status status,
+            boolean signatureVerified,
+            boolean trusted,
+            boolean replaySafe,
+            String authorityId,
+            String keyId,
+            List&lt;String&gt; warnings
+        ) {
+            try {
+<span class="fc" id="L622">                ByteArrayOutputStream bytes = new ByteArrayOutputStream();</span>
+<span class="fc" id="L623">                try (DataOutputStream output = new DataOutputStream(bytes)) {</span>
+<span class="fc" id="L624">                    writeField(output, &quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L625">                    writeField(output, &quot;trustDomainId&quot;, trustDomainId);</span>
+<span class="fc" id="L626">                    writeField(output, &quot;sequence&quot;, Long.toString(sequence));</span>
+<span class="fc" id="L627">                    writeField(output, &quot;revisionHash&quot;, revisionHash);</span>
+<span class="fc" id="L628">                    writeField(output, &quot;previousRevisionHash&quot;, previousRevisionHash);</span>
+<span class="fc" id="L629">                    writeField(output, &quot;trustStoreContentHash&quot;, trustStoreContentHash);</span>
+<span class="fc" id="L630">                    writeField(</span>
+                        output,
+                        &quot;rootTrustStoreContentHash&quot;,
+                        rootTrustStoreContentHash);
+<span class="fc" id="L634">                    writeField(</span>
+                        output,
+                        &quot;previousCheckpointHash&quot;,
+                        previousCheckpointHash);
+<span class="fc" id="L638">                    writeField(output, &quot;status&quot;, status.name());</span>
+<span class="fc" id="L639">                    writeField(</span>
+                        output,
+                        &quot;signatureVerified&quot;,
+<span class="fc" id="L642">                        Boolean.toString(signatureVerified));</span>
+<span class="fc" id="L643">                    writeField(output, &quot;trusted&quot;, Boolean.toString(trusted));</span>
+<span class="fc" id="L644">                    writeField(output, &quot;replaySafe&quot;, Boolean.toString(replaySafe));</span>
+<span class="fc" id="L645">                    writeField(output, &quot;authorityId&quot;, authorityId);</span>
+<span class="fc" id="L646">                    writeField(output, &quot;keyId&quot;, keyId);</span>
+<span class="fc" id="L647">                    output.writeInt(warnings.size());</span>
+<span class="fc bfc" id="L648" title="All 2 branches covered.">                    for (String warning : warnings) {</span>
+<span class="fc" id="L649">                        writeField(output, &quot;warning&quot;, warning);</span>
+<span class="fc" id="L650">                    }</span>
+                }
+<span class="fc" id="L652">                return bytes.toByteArray();</span>
+<span class="nc" id="L653">            } catch (IOException exception) {</span>
+<span class="nc" id="L654">                throw new IllegalStateException(</span>
+                    &quot;Unable to encode trust-store revision verification&quot;,
+                    exception);
+            }
+        }
+    }
+
+    /** Authority-bearing accepted revision and the next replay checkpoint. */
+    public static final class VerifiedTrustStoreRevision {
+        private final PluginTrustStore trustStore;
+        private final PluginTrustStoreRevision revision;
+        private final Verification verification;
+        private final ChainCheckpoint checkpoint;
+
+        private VerifiedTrustStoreRevision(
+            PluginTrustStore trustStore,
+            PluginTrustStoreRevision revision,
+            Verification verification,
+            ChainCheckpoint checkpoint
+<span class="fc" id="L673">        ) {</span>
+<span class="fc" id="L674">            this.trustStore = Objects.requireNonNull(trustStore, &quot;trustStore&quot;);</span>
+<span class="fc" id="L675">            this.revision = Objects.requireNonNull(revision, &quot;revision&quot;);</span>
+<span class="fc" id="L676">            this.verification = Objects.requireNonNull(</span>
+                verification, &quot;verification&quot;);
+<span class="fc" id="L678">            this.checkpoint = Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">            if (!verification.trusted()</span>
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">                    || !verification.replaySafe()</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">                    || !revision.contentHash().equals(checkpoint.revisionHash())</span>
+<span class="pc bpc" id="L682" title="1 of 2 branches missed.">                    || revision.sequence() != checkpoint.sequence()</span>
+<span class="pc bpc" id="L683" title="1 of 2 branches missed.">                    || !revision.trustDomainId().equals(checkpoint.trustDomainId())) {</span>
+<span class="nc" id="L684">                throw new IllegalArgumentException(</span>
+                    &quot;verified trust-store revision requires matching trusted state&quot;);
+            }
+<span class="fc" id="L687">        }</span>
+
+        public PluginTrustStore trustStore() {
+<span class="fc" id="L690">            return trustStore;</span>
+        }
+
+        public PluginTrustStoreRevision revision() {
+<span class="fc" id="L694">            return revision;</span>
+        }
+
+        public Verification verification() {
+<span class="fc" id="L698">            return verification;</span>
+        }
+
+        public ChainCheckpoint checkpoint() {
+<span class="fc" id="L702">            return checkpoint;</span>
+        }
+    }
+
+    private static String optionalSha256(String value, String field) {
+<span class="pc bpc" id="L707" title="1 of 4 branches missed.">        if (value == null || value.isEmpty()) {</span>
+<span class="fc" id="L708">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L710">        return PluginSignatureManifest.requireSha256(value, field);</span>
+    }
+
+    private static List&lt;String&gt; normalizeWarnings(List&lt;String&gt; values) {
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">        return values == null ? List.of() : values.stream()</span>
+<span class="fc" id="L715">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L716">            .map(String::trim)</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isBlank())</span>
+<span class="fc" id="L718">            .distinct()</span>
+<span class="fc" id="L719">            .sorted(Comparator.naturalOrder())</span>
+<span class="fc" id="L720">            .toList();</span>
+    }
+
+    private static void writeField(
+        DataOutputStream output,
+        String name,
+        String value
+    ) throws IOException {
+<span class="fc" id="L728">        writeBytes(output, name.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L729">        writeBytes(output, value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L730">    }</span>
+
+    private static void writeBytes(DataOutputStream output, byte[] value)
+            throws IOException {
+<span class="fc" id="L734">        output.writeInt(value.length);</span>
+<span class="fc" id="L735">        output.write(value);</span>
+<span class="fc" id="L736">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
