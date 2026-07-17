@@ -14,24 +14,21 @@ import java.util.Objects;
 /**
  * Transitional adapter from the unchanged algebraic production generator into
  * the domain-neutral lifecycle handoff contract.
- *
- * <p>The adapter consumes only immutable production evidence and publishes
- * hashes, counts and balanced resources. It does not expose expression strings
- * and it does not reinterpret generation as validation, proof, novelty,
- * promotion or public evidence.</p>
  */
 public final class AutonomousProductionDomainHandoffAdapter {
-    public static final String CONTRACT_ID =
+    private static final String CONTRACT_ID =
         "regelsuche.autonomous-production-domain-handoff-adapter/v1";
+    private static final String CONTRACT_MATERIAL = CONTRACT_ID
+        + "\nsource=" + AutonomousProductionGenerationRunner.GENERATION_RUN_SCHEMA
+        + "\nsearch=existing-target-free-best-first"
+        + "\ninput=production-seed-catalog-hash"
+        + "\noutput=discovery-lifecycle-handoff-v1"
+        + "\nrawDomainObjectsExcluded=true";
+
     public static final String DOMAIN_ID = "expression-rewrite";
     public static final String DOMAIN_REVISION = "production-v2";
-    public static final String DOMAIN_CONTRACT_HASH = AutonomousResearchBrief.hash(
-        CONTRACT_ID
-            + "\nsource=" + AutonomousProductionGenerationRunner.GENERATION_RUN_SCHEMA
-            + "\nsearch=existing-target-free-best-first"
-            + "\ninput=production-seed-catalog-hash"
-            + "\noutput=discovery-lifecycle-handoff-v1"
-            + "\nrawDomainObjectsExcluded=true");
+    public static final String DOMAIN_CONTRACT_HASH =
+        AutonomousResearchBrief.hash(CONTRACT_MATERIAL);
 
     public DiscoveryLifecycleHandoff adapt(GenerationRun run) {
         Objects.requireNonNull(run, "run");
@@ -39,8 +36,9 @@ public final class AutonomousProductionDomainHandoffAdapter {
             throw new IllegalArgumentException(
                 "production generation handoff must remain target-free and non-mathematical");
         }
-        if (!"NOT_EVALUATED".equals(run.promotionStatus())
-                || !"NOT_EVALUATED".equals(run.publicEvidenceStatus())) {
+        if (!DiscoveryLifecycleHandoff.NOT_EVALUATED.equals(run.promotionStatus())
+                || !DiscoveryLifecycleHandoff.NOT_EVALUATED.equals(
+                    run.publicEvidenceStatus())) {
             throw new IllegalArgumentException(
                 "production generation cannot perform promotion or public evidence");
         }
