@@ -5,22 +5,32 @@ on:
     branches: [ "main" ]
     paths:
       - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactIndex.java'
+      - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactIndexSignature.java'
+      - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactIndexVerifier.java'
       - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactResolver.java'
+      - 'app/src/main/java/de/regelsuche/plugin/PluginTrustStore.java'
       - 'app/src/test/java/de/regelsuche/plugin/PluginArtifactIndex*.java'
       - 'app/src/test/java/de/regelsuche/plugin/PluginArtifactResolverTest.java'
       - 'docs/plugin-artifact-index.md'
       - 'docs/schemas/regelsuche-plugin-artifact-index-v1.schema.json'
+      - 'docs/schemas/regelsuche-plugin-artifact-index-signature-v1.schema.json'
+      - 'docs/schemas/regelsuche-plugin-artifact-index-verification-v1.schema.json'
       - 'docs/schemas/regelsuche-plugin-artifact-resolution-v1.schema.json'
       - '.github/workflows/plugin-artifact-index.yml'
   pull_request:
     branches: [ "main" ]
     paths:
       - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactIndex.java'
+      - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactIndexSignature.java'
+      - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactIndexVerifier.java'
       - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactResolver.java'
+      - 'app/src/main/java/de/regelsuche/plugin/PluginTrustStore.java'
       - 'app/src/test/java/de/regelsuche/plugin/PluginArtifactIndex*.java'
       - 'app/src/test/java/de/regelsuche/plugin/PluginArtifactResolverTest.java'
       - 'docs/plugin-artifact-index.md'
       - 'docs/schemas/regelsuche-plugin-artifact-index-v1.schema.json'
+      - 'docs/schemas/regelsuche-plugin-artifact-index-signature-v1.schema.json'
+      - 'docs/schemas/regelsuche-plugin-artifact-index-verification-v1.schema.json'
       - 'docs/schemas/regelsuche-plugin-artifact-resolution-v1.schema.json'
       - '.github/workflows/plugin-artifact-index.yml'
   workflow_dispatch:
@@ -47,7 +57,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Verify immutable index and deterministic resolution contracts
+      - name: Verify immutable signed index and deterministic resolution contracts
         run: |
           ./gradlew :app:test \
             --tests 'de.regelsuche.plugin.PluginArtifactIndex*' \
@@ -56,9 +66,15 @@ jobs:
 
       - name: Require retained canonical evidence
         run: |
-          test -s app/build/reports/plugin-artifact-index/index.json
-          test -s app/build/reports/plugin-artifact-index/resolved.json
-          test -s app/build/reports/plugin-artifact-index/unresolved.json
+          for name in \
+            index \
+            index-signature \
+            index-verification \
+            index-trust-store \
+            resolved \
+            unresolved; do
+            test -s "app/build/reports/plugin-artifact-index/${name}.json"
+          done
 
       - name: Require byte-identical repeated evidence
         shell: bash
@@ -68,13 +84,20 @@ jobs:
             /tmp/plugin-artifact-index-first/
           ./gradlew :app:test \
             --tests de.regelsuche.plugin.PluginArtifactIndexEvidenceTest \
+            --tests de.regelsuche.plugin.PluginArtifactIndexSignatureTest \
             --rerun-tasks
-          for name in index resolved unresolved; do
+          for name in \
+            index \
+            index-signature \
+            index-verification \
+            index-trust-store \
+            resolved \
+            unresolved; do
             cmp "/tmp/plugin-artifact-index-first/${name}.json" \
               "app/build/reports/plugin-artifact-index/${name}.json"
           done
 
-      - name: Validate schemas, immutable identities and side-effect boundary
+      - name: Validate schemas, signatures, immutable identities and side-effect boundary
         shell: bash
         run: |
           python3 -m pip install \
@@ -83,9 +106,13 @@ jobs:
             jsonschema==4.25.1
           python3 - <<'PY'
           from copy import deepcopy
+          import base64
           import hashlib
           import json
           from pathlib import Path
+          import struct
+          import subprocess
+          import tempfile
           from urllib.parse import urlsplit
           from jsonschema import FormatChecker, ValidationError
           from jsonschema.validators import validator_for
@@ -99,6 +126,14 @@ jobs:
 
           def sha256(value):
               return 'sha256:' + hashlib.sha256(value).hexdigest()
+
+          def field(name, value):
+              name_bytes = name.encode('utf-8')
+              value_bytes = value.encode('utf-8')
+              return (
+                  struct.pack('>I', len(name_bytes)) + name_bytes
+                  + struct.pack('>I', len(value_bytes)) + value_bytes
+              )
 
           def require_rejection(validator, value, label):
               try:
@@ -124,6 +159,10 @@ jobs:
           schema_paths = {
               'index': Path(
                   'docs/schemas/regelsuche-plugin-artifact-index-v1.schema.json'),
+              'signature': Path(
+                  'docs/schemas/regelsuche-plugin-artifact-index-signature-v1.schema.json'),
+              'verification': Path(
+                  'docs/schemas/regelsuche-plugin-artifact-index-verification-v1.schema.json'),
               'resolution': Path(
                   'docs/schemas/regelsuche-plugin-artifact-resolution-v1.schema.json'),
           }
@@ -138,12 +177,29 @@ jobs:
               )
 
           report_dir = Path('app/build/reports/plugin-artifact-index')
-          index = json.loads((report_dir / 'index.json').read_text(encoding='utf-8'))
+          index_path = report_dir / 'index.json'
+          signature_path = report_dir / 'index-signature.json'
+          verification_path = report_dir / 'index-verification.json'
+          trust_store_path = report_dir / 'index-trust-store.json'
+          index = json.loads(index_path.read_text(encoding='utf-8'))
+          signature = json.loads(signature_path.read_text(encoding='utf-8'))
+          verification = json.loads(verification_path.read_text(encoding='utf-8'))
+          trust_store = json.loads(trust_store_path.read_text(encoding='utf-8'))
           resolved = json.loads((report_dir / 'resolved.json').read_text(encoding='utf-8'))
           unresolved = json.loads((report_dir / 'unresolved.json').read_text(encoding='utf-8'))
           validators['index'].validate(index)
+          validators['signature'].validate(signature)
+          validators['verification'].validate(verification)
           validators['resolution'].validate(resolved)
           validators['resolution'].validate(unresolved)
+
+          inconsistent_verification = deepcopy(verification)
+          inconsistent_verification['trusted'] = False
+          require_rejection(
+              validators['verification'],
+              inconsistent_verification,
+              'verified status without trusted flag',
+          )
 
           missing_dependencies = deepcopy(index)
           del missing_dependencies['entries'][0]['dependencies']
@@ -204,6 +260,82 @@ jobs:
           index_payload = {k: v for k, v in index.items() if k != 'contentHash'}
           assert index['contentHash'] == sha256(compact(index_payload) + b'\n')
 
+          assert signature['indexId'] == index['indexId']
+          assert signature['revision'] == index['revision']
+          assert signature['indexContentHash'] == index['contentHash']
+          assert signature['curatorId'] == index['curatorId']
+          assert signature['algorithm'] == 'Ed25519'
+          matching_keys = [
+              key for key in trust_store['keys']
+              if key['publisherId'] == signature['curatorId']
+              and key['keyId'] == signature['keyId']
+          ]
+          assert len(matching_keys) == 1
+          key = matching_keys[0]
+          assert key['algorithm'] == signature['algorithm']
+          assert key['status'] in {'ACTIVE', 'RETIRED'}
+
+          signed_payload = b''.join([
+              field('schema', signature['schema']),
+              field('indexId', signature['indexId']),
+              field('revision', signature['revision']),
+              field('indexContentHash', signature['indexContentHash']),
+              field('curatorId', signature['curatorId']),
+              field('keyId', signature['keyId']),
+              field('algorithm', signature['algorithm']),
+          ])
+          signature_bytes = base64.b64decode(
+              signature['signatureBase64'], validate=True)
+          assert len(signature_bytes) == 64
+          with tempfile.TemporaryDirectory() as temporary:
+              temporary = Path(temporary)
+              key_path = temporary / 'curator-key.der'
+              payload_path = temporary / 'payload.bin'
+              signature_bytes_path = temporary / 'signature.bin'
+              key_path.write_bytes(base64.b64decode(
+                  key['publicKeyBase64'], validate=True))
+              payload_path.write_bytes(signed_payload)
+              signature_bytes_path.write_bytes(signature_bytes)
+              subprocess.run([
+                  'openssl', 'pkeyutl',
+                  '-verify',
+                  '-pubin',
+                  '-inkey', str(key_path),
+                  '-keyform', 'DER',
+                  '-rawin',
+                  '-in', str(payload_path),
+                  '-sigfile', str(signature_bytes_path),
+              ], check=True, capture_output=True)
+
+          assert verification['indexId'] == index['indexId']
+          assert verification['revision'] == index['revision']
+          assert verification['indexContentHash'] == index['contentHash']
+          assert verification['signatureContentHash'] == sha256(
+              signature_path.read_bytes())
+          assert verification['trustStoreContentHash'] == sha256(
+              trust_store_path.read_bytes())
+          assert verification['status'] == 'VERIFIED_TRUSTED'
+          assert verification['signatureVerified'] is True
+          assert verification['trusted'] is True
+          assert verification['curatorId'] == signature['curatorId']
+          assert verification['keyId'] == signature['keyId']
+          verification_material = b''.join([
+              field('schema', verification['schema']),
+              field('indexId', verification['indexId']),
+              field('revision', verification['revision']),
+              field('indexContentHash', verification['indexContentHash']),
+              field('signatureContentHash', verification['signatureContentHash']),
+              field('trustStoreContentHash', verification['trustStoreContentHash']),
+              field('status', verification['status']),
+              field('signatureVerified', str(verification['signatureVerified']).lower()),
+              field('trusted', str(verification['trusted']).lower()),
+              field('curatorId', verification['curatorId']),
+              field('keyId', verification['keyId']),
+              struct.pack('>I', len(verification['warnings'])),
+              *[field('warning', warning) for warning in verification['warnings']],
+          ])
+          assert verification['contentHash'] == sha256(verification_material)
+
           for receipt in (resolved, unresolved):
               request = receipt['request']
               request_payload = {k: v for k, v in request.items() if k != 'contentHash'}
@@ -247,5 +379,7 @@ jobs:
             app/build/reports/tests/**
             app/build/test-results/**
             docs/schemas/regelsuche-plugin-artifact-index-v1.schema.json
+            docs/schemas/regelsuche-plugin-artifact-index-signature-v1.schema.json
+            docs/schemas/regelsuche-plugin-artifact-index-verification-v1.schema.json
             docs/schemas/regelsuche-plugin-artifact-resolution-v1.schema.json
           if-no-files-found: warn
