@@ -55,7 +55,7 @@ jobs:
           test -s app/build/reports/plugin-artifact-trust/trust-store.json
           test -s app/build/reports/plugin-artifact-trust/signature-manifest.json
 
-      - name: Validate schemas, evidence and accounting
+      - name: Validate schemas, hashes, evidence and accounting
         shell: bash
         run: |
           python3 -m pip install \
@@ -63,6 +63,7 @@ jobs:
             --quiet \
             jsonschema==4.25.1
           python3 - <<'PY'
+          import hashlib
           import json
           from pathlib import Path
           from jsonschema.validators import validator_for
@@ -107,6 +108,26 @@ jobs:
           expected = sorted(item['artifactFileName'] for item in gate['verifications'])
           assert accounted == expected
           assert gate['verifications'] == [verification]
+
+          trust_bytes = (report_dir / 'trust-store.json').read_bytes()
+          expected_trust_hash = 'sha256:' + hashlib.sha256(trust_bytes).hexdigest()
+          assert gate['trustStoreHash'] == expected_trust_hash
+
+          gate_payload = {
+              'schema': gate['schema'],
+              'policy': gate['policy'],
+              'trustStoreHash': gate['trustStoreHash'],
+              'verifications': gate['verifications'],
+              'admittedArtifacts': gate['admittedArtifacts'],
+              'blockedArtifacts': gate['blockedArtifacts'],
+          }
+          gate_bytes = json.dumps(
+              gate_payload,
+              ensure_ascii=False,
+              separators=(',', ':'),
+          ).encode('utf-8')
+          expected_gate_hash = 'sha256:' + hashlib.sha256(gate_bytes).hexdigest()
+          assert gate['contentHash'] == expected_gate_hash
           PY
 
       - name: Upload trust evidence and diagnostics
