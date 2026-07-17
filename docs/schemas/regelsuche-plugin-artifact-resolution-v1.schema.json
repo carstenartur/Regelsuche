@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-artifact-resolution/v1",
+  "title": "Regelsuche immutable artifact resolution receipt v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "indexContentHash",
+    "request",
+    "status",
+    "rootArtifactIdentityHash",
+    "plan",
+    "blockers",
+    "warnings",
+    "networkAccessStatus",
+    "installationStatus",
+    "trustVerificationStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-artifact-resolution/v1"
+    },
+    "indexContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "request": {
+      "$ref": "#/$defs/request"
+    },
+    "status": {
+      "enum": [
+        "RESOLVED",
+        "UNRESOLVED"
+      ]
+    },
+    "rootArtifactIdentityHash": {
+      "$ref": "#/$defs/optionalSha256"
+    },
+    "plan": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "blockers": {
+      "$ref": "#/$defs/messages"
+    },
+    "warnings": {
+      "$ref": "#/$defs/messages"
+    },
+    "networkAccessStatus": {
+      "const": "NOT_PERFORMED"
+    },
+    "installationStatus": {
+      "const": "NOT_PERFORMED"
+    },
+    "trustVerificationStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "RESOLVED"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "rootArtifactIdentityHash": {
+            "$ref": "#/$defs/sha256"
+          },
+          "plan": {
+            "minItems": 1
+          },
+          "blockers": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "rootArtifactIdentityHash": {
+            "const": ""
+          },
+          "plan": {
+            "maxItems": 0
+          },
+          "blockers": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "optionalSha256": {
+      "oneOf": [
+        {
+          "const": ""
+        },
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ]
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?(\\+[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "kind": {
+      "enum": [
+        "JAVA_PLUGIN",
+        "RULE_PACKAGE",
+        "KNOWLEDGE_PACK"
+      ]
+    },
+    "messages": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": [
+        "schema",
+        "requestId",
+        "kind",
+        "componentId",
+        "selectionMode",
+        "requestedVersion",
+        "coreVersion",
+        "apiVersion",
+        "requiredCapabilities",
+        "contentHash"
+      ],
+      "properties": {
+        "schema": {
+          "const": "regelsuche.plugin-artifact-resolution-request/v1"
+        },
+        "requestId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "componentId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "selectionMode": {
+          "enum": [
+            "EXACT",
+            "LATEST_COMPATIBLE"
+          ]
+        },
+        "requestedVersion": {
+          "oneOf": [
+            {
+              "const": ""
+            },
+            {
+              "$ref": "#/$defs/semver"
+            }
+          ]
+        },
+        "coreVersion": {
+          "$ref": "#/$defs/semver"
+        },
+        "apiVersion": {
+          "$ref": "#/$defs/identifier"
+        },
+        "requiredCapabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "selectionMode": {
+                "const": "EXACT"
+              }
+            },
+            "required": [
+              "selectionMode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "requestedVersion": {
+                "$ref": "#/$defs/semver"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "requestedVersion": {
+                "const": ""
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "step": {
+      "type": "object",
+      "required": [
+        "order",
+        "artifactId",
+        "kind",
+        "componentId",
+        "version",
+        "artifactFileName",
+        "artifactSha256",
+        "artifactUri",
+        "signatureManifestUri",
+        "provenanceUri",
+        "publisherId",
+        "identityHash"
+      ],
+      "properties": {
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "artifactId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "$ref": "#/$defs/kind"
+        },
+        "componentId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        },
+        "artifactFileName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/\\\\]+$"
+        },
+        "artifactSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifactUri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^(https://|file:/)"
+        },
+        "signatureManifestUri": {
+          "oneOf": [
+            {
+              "const": ""
+            },
+            {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^(https://|file:/)"
+            }
+          ]
+        },
+        "provenanceUri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^(https://|file:/)"
+        },
+        "publisherId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "identityHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
