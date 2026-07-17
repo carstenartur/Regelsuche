@@ -19,8 +19,8 @@ public final class TrustedPluginRuntime implements AutoCloseable {
     private final PluginRuntimeConfig sourceConfig;
     private final PluginArtifactTrustConfig trustConfig;
 
-    private PluginRuntime runtime;
-    private PluginArtifactGate.GateResult gateResult;
+    private volatile PluginRuntime runtime;
+    private volatile PluginArtifactGate.GateResult gateResult;
     private Path stagingDirectory;
 
     private TrustedPluginRuntime(
@@ -39,15 +39,23 @@ public final class TrustedPluginRuntime implements AutoCloseable {
         return new TrustedPluginRuntime(sourceConfig, trustConfig);
     }
 
+    /**
+     * Replaces the active runtime only after a new trust decision and staged
+     * runtime have been built successfully. A failed reload leaves the wrapper
+     * closed rather than exposing stale trust evidence for a closed runtime.
+     */
     public synchronized void reload() {
         closeCurrentRuntime();
         cleanupStagingDirectory();
+        gateResult = null;
 
-        PluginTrustStore trustStore = PluginTrustStore.load(trustConfig.trustStorePath());
         try {
+            PluginTrustStore trustStore = PluginTrustStore.load(trustConfig.trustStorePath());
             stagingDirectory = Files.createTempDirectory("regelsuche-trusted-plugins-");
-            gateResult = new PluginArtifactGate(trustStore, trustConfig.policy())
-                .materialize(sourceConfig.pluginsDirectory(), stagingDirectory);
+            PluginArtifactGate.GateResult nextGateResult = new PluginArtifactGate(
+                trustStore,
+                trustConfig.policy()
+            ).materialize(sourceConfig.pluginsDirectory(), stagingDirectory);
             PluginRuntimeConfig stagedConfig = new PluginRuntimeConfig(
                 stagingDirectory,
                 sourceConfig.rulesDirectory(),
@@ -56,26 +64,31 @@ public final class TrustedPluginRuntime implements AutoCloseable {
                 sourceConfig.disabledRuleIds(),
                 sourceConfig.activeProfile()
             );
-            runtime = new PluginRuntime(stagedConfig);
+            PluginRuntime nextRuntime = new PluginRuntime(stagedConfig);
+            gateResult = nextGateResult;
+            runtime = nextRuntime;
         } catch (RuntimeException | IOException exception) {
             closeCurrentRuntime();
             cleanupStagingDirectory();
+            gateResult = null;
             throw new IllegalStateException("Unable to initialize trusted plugin runtime", exception);
         }
     }
 
     public PluginRuntime runtime() {
-        if (runtime == null) {
+        PluginRuntime current = runtime;
+        if (current == null) {
             throw new IllegalStateException("trusted plugin runtime is closed");
         }
-        return runtime;
+        return current;
     }
 
     public PluginArtifactGate.GateResult gateResult() {
-        if (gateResult == null) {
+        PluginArtifactGate.GateResult current = gateResult;
+        if (current == null) {
             throw new IllegalStateException("trusted plugin runtime is closed");
         }
-        return gateResult;
+        return current;
     }
 
     public List<PluginRuntime.LoadedPlugin> loadedPlugins() {
@@ -106,9 +119,10 @@ public final class TrustedPluginRuntime implements AutoCloseable {
     }
 
     private void closeCurrentRuntime() {
-        if (runtime != null) {
-            runtime.close();
-            runtime = null;
+        PluginRuntime current = runtime;
+        runtime = null;
+        if (current != null) {
+            current.close();
         }
     }
 
