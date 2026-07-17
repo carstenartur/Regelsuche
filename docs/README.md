@@ -24,8 +24,12 @@
 - [Plugin-Artefakt-Index-Schema v1](schemas/regelsuche-plugin-artifact-index-v1.schema.json)
 - [Plugin-Artefakt-Auflösungs-Schema v1](schemas/regelsuche-plugin-artifact-resolution-v1.schema.json)
 - [Kryptografische Plugin-Artefaktprüfung](plugin-artifact-trust.md) — Detached Ed25519-Manifeste, Publisher-Trust-Store, Rotation, Widerruf und Vorlade-Policy.
+- [Authentisierte Plugin-Trust-State-Revisionen](plugin-trust-store-revisions.md) — signierte Hashkette, lokale Checkpoints sowie Replay-, Gap- und Fork-Schutz für Publisher-Keys und Widerrufe.
 - [Plugin-Signatur-Schema v1](schemas/regelsuche-plugin-signature-v1.schema.json)
 - [Plugin-Trust-Store-Schema v1](schemas/regelsuche-plugin-trust-store-v1.schema.json)
+- [Plugin-Trust-Store-Revision-Schema v1](schemas/regelsuche-plugin-trust-store-revision-v1.schema.json)
+- [Plugin-Trust-Store-Checkpoint-Schema v1](schemas/regelsuche-plugin-trust-store-chain-checkpoint-v1.schema.json)
+- [Plugin-Trust-Store-Revision-Verifikations-Schema v1](schemas/regelsuche-plugin-trust-store-revision-verification-v1.schema.json)
 - [Plugin-Artefakt-Verifikations-Schema v1](schemas/regelsuche-plugin-artifact-verification-v1.schema.json)
 - [Plugin-Artefakt-Gate-Schema v1](schemas/regelsuche-plugin-artifact-gate-v1.schema.json)
 - [Plugin-API](plugin-api.md) — Java-Vertrag, Registries, Paketierung und Starter-Template.
