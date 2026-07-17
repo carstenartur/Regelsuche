@@ -10,6 +10,7 @@ import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoveryBudget;
 import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
 import de.regelsuche.discovery.domain.DomainDiscoveryExport.ArtifactRole;
 import de.regelsuche.discovery.domain.DomainDiscoveryExport.DomainExportManifest;
+import de.regelsuche.discovery.domain.DomainDiscoveryExport.ExportArtifact;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -79,7 +80,7 @@ class DomainDiscoveryExportTest {
     }
 
     @Test
-    void manifestRejectsMissingRolesAndMismatchedRootHashes(
+    void manifestRejectsMissingRolesMismatchedRootsAndNullFileNames(
         @TempDir Path tempDir
     ) {
         DomainExportManifest valid = exporter.write(
@@ -108,6 +109,17 @@ class DomainDiscoveryExportTest {
                 valid.artifacts().stream()
                     .filter(item -> item.role() != ArtifactRole.LIFECYCLE_HANDOFF)
                     .toList()));
+        ExportArtifact descriptor = valid.artifacts().stream()
+            .filter(item -> item.role() == ArtifactRole.DOMAIN_DESCRIPTOR)
+            .findFirst()
+            .orElseThrow();
+        assertThrows(IllegalArgumentException.class, () ->
+            new ExportArtifact(
+                null,
+                descriptor.role(),
+                descriptor.sourceContentHash(),
+                descriptor.byteHash(),
+                descriptor.byteLength()));
     }
 
     private static void assertExport(
