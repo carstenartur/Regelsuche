@@ -18,6 +18,9 @@
 
 - [Erweiterungssystem](extension-system.md) — zentrale Architekturkarte und Auswahlhilfe für Java-Plugins, Regeldateien, Knowledge Packs, deklarative und gelernte Makros, Discovery-Operatoren und mathematische Capabilities.
 - [Plugins](plugins.md) — `ServiceLoader`, externe JARs, `PluginRuntime`, Reload, Katalog und Diagnosen.
+- [Unveränderlicher Plugin- und Paketindex](plugin-artifact-index.md) — content-addressed Versionen, Kompatibilität, Abhängigkeiten, Provenance und deterministische Auflösungsreceipts.
+- [Plugin-Artefakt-Index-Schema v1](schemas/regelsuche-plugin-artifact-index-v1.schema.json)
+- [Plugin-Artefakt-Auflösungs-Schema v1](schemas/regelsuche-plugin-artifact-resolution-v1.schema.json)
 - [Kryptografische Plugin-Artefaktprüfung](plugin-artifact-trust.md) — Detached Ed25519-Manifeste, Publisher-Trust-Store, Rotation, Widerruf und Vorlade-Policy.
 - [Plugin-Signatur-Schema v1](schemas/regelsuche-plugin-signature-v1.schema.json)
 - [Plugin-Trust-Store-Schema v1](schemas/regelsuche-plugin-trust-store-v1.schema.json)

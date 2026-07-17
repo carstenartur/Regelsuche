@@ -1,0 +1,251 @@
+name: Plugin Artifact Index
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactIndex.java'
+      - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactResolver.java'
+      - 'app/src/test/java/de/regelsuche/plugin/PluginArtifactIndex*.java'
+      - 'app/src/test/java/de/regelsuche/plugin/PluginArtifactResolverTest.java'
+      - 'docs/plugin-artifact-index.md'
+      - 'docs/schemas/regelsuche-plugin-artifact-index-v1.schema.json'
+      - 'docs/schemas/regelsuche-plugin-artifact-resolution-v1.schema.json'
+      - '.github/workflows/plugin-artifact-index.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactIndex.java'
+      - 'app/src/main/java/de/regelsuche/plugin/PluginArtifactResolver.java'
+      - 'app/src/test/java/de/regelsuche/plugin/PluginArtifactIndex*.java'
+      - 'app/src/test/java/de/regelsuche/plugin/PluginArtifactResolverTest.java'
+      - 'docs/plugin-artifact-index.md'
+      - 'docs/schemas/regelsuche-plugin-artifact-index-v1.schema.json'
+      - 'docs/schemas/regelsuche-plugin-artifact-resolution-v1.schema.json'
+      - '.github/workflows/plugin-artifact-index.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: plugin-artifact-index-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  index:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Verify immutable index and deterministic resolution contracts
+        run: |
+          ./gradlew :app:test \
+            --tests 'de.regelsuche.plugin.PluginArtifactIndex*' \
+            --tests de.regelsuche.plugin.PluginArtifactResolverTest \
+            --rerun-tasks
+
+      - name: Require retained canonical evidence
+        run: |
+          test -s app/build/reports/plugin-artifact-index/index.json
+          test -s app/build/reports/plugin-artifact-index/resolved.json
+          test -s app/build/reports/plugin-artifact-index/unresolved.json
+
+      - name: Require byte-identical repeated evidence
+        shell: bash
+        run: |
+          mkdir -p /tmp/plugin-artifact-index-first
+          cp app/build/reports/plugin-artifact-index/*.json \
+            /tmp/plugin-artifact-index-first/
+          ./gradlew :app:test \
+            --tests de.regelsuche.plugin.PluginArtifactIndexEvidenceTest \
+            --rerun-tasks
+          for name in index resolved unresolved; do
+            cmp "/tmp/plugin-artifact-index-first/${name}.json" \
+              "app/build/reports/plugin-artifact-index/${name}.json"
+          done
+
+      - name: Validate schemas, immutable identities and side-effect boundary
+        shell: bash
+        run: |
+          python3 -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            jsonschema==4.25.1
+          python3 - <<'PY'
+          from copy import deepcopy
+          import hashlib
+          import json
+          from pathlib import Path
+          from urllib.parse import urlsplit
+          from jsonschema import FormatChecker, ValidationError
+          from jsonschema.validators import validator_for
+
+          def compact(value):
+              return json.dumps(
+                  value,
+                  ensure_ascii=False,
+                  separators=(',', ':'),
+              ).encode('utf-8')
+
+          def sha256(value):
+              return 'sha256:' + hashlib.sha256(value).hexdigest()
+
+          def require_rejection(validator, value, label):
+              try:
+                  validator.validate(value)
+              except ValidationError:
+                  return
+              raise AssertionError(f'{label} unexpectedly passed schema validation')
+
+          def require_distribution_uri(value):
+              parsed = urlsplit(value)
+              assert parsed.fragment == ''
+              assert parsed.username is None
+              assert parsed.password is None
+              scheme = parsed.scheme.lower()
+              if scheme == 'https':
+                  assert parsed.hostname
+              elif scheme == 'file':
+                  assert parsed.netloc == ''
+                  assert parsed.path.startswith('/')
+              else:
+                  raise AssertionError(f'unsupported distribution URI scheme: {scheme}')
+
+          schema_paths = {
+              'index': Path(
+                  'docs/schemas/regelsuche-plugin-artifact-index-v1.schema.json'),
+              'resolution': Path(
+                  'docs/schemas/regelsuche-plugin-artifact-resolution-v1.schema.json'),
+          }
+          validators = {}
+          for name, path in schema_paths.items():
+              schema = json.loads(path.read_text(encoding='utf-8'))
+              validator_for(schema).check_schema(schema)
+              assert schema.get('additionalProperties') is False
+              validators[name] = validator_for(schema)(
+                  schema,
+                  format_checker=FormatChecker(),
+              )
+
+          report_dir = Path('app/build/reports/plugin-artifact-index')
+          index = json.loads((report_dir / 'index.json').read_text(encoding='utf-8'))
+          resolved = json.loads((report_dir / 'resolved.json').read_text(encoding='utf-8'))
+          unresolved = json.loads((report_dir / 'unresolved.json').read_text(encoding='utf-8'))
+          validators['index'].validate(index)
+          validators['resolution'].validate(resolved)
+          validators['resolution'].validate(unresolved)
+
+          missing_dependencies = deepcopy(index)
+          del missing_dependencies['entries'][0]['dependencies']
+          require_rejection(
+              validators['index'],
+              missing_dependencies,
+              'entry without dependencies',
+          )
+
+          remote_file_uri = deepcopy(index)
+          remote_file_uri['entries'][0]['artifactUri'] = (
+              'file://remote.example.test/artifacts/not-local.jar'
+          )
+          require_rejection(
+              validators['index'],
+              remote_file_uri,
+              'remote-host file URI',
+          )
+
+          leading_zero_prerelease = deepcopy(index)
+          leading_zero_prerelease['entries'][0]['version'] = '1.0.0-alpha.01'
+          require_rejection(
+              validators['index'],
+              leading_zero_prerelease,
+              'numeric prerelease with leading zero',
+          )
+
+          unsigned_java_plan = deepcopy(resolved)
+          java_step = next(
+              item for item in unsigned_java_plan['plan']
+              if item['kind'] == 'JAVA_PLUGIN'
+          )
+          java_step['signatureManifestUri'] = ''
+          require_rejection(
+              validators['resolution'],
+              unsigned_java_plan,
+              'Java plan step without signature manifest',
+          )
+
+          artifact_ids = set()
+          coordinates = set()
+          artifact_hashes = set()
+          for entry in index['entries']:
+              identity_payload = {k: v for k, v in entry.items() if k != 'identityHash'}
+              assert entry['identityHash'] == sha256(compact(identity_payload))
+              assert entry['artifactId'] not in artifact_ids
+              artifact_ids.add(entry['artifactId'])
+              coordinate = (entry['kind'], entry['componentId'], entry['version'])
+              assert coordinate not in coordinates
+              coordinates.add(coordinate)
+              assert entry['artifactSha256'] not in artifact_hashes
+              artifact_hashes.add(entry['artifactSha256'])
+              require_distribution_uri(entry['artifactUri'])
+              require_distribution_uri(entry['provenanceUri'])
+              if entry['kind'] == 'JAVA_PLUGIN':
+                  require_distribution_uri(entry['signatureManifestUri'])
+
+          index_payload = {k: v for k, v in index.items() if k != 'contentHash'}
+          assert index['contentHash'] == sha256(compact(index_payload) + b'\n')
+
+          for receipt in (resolved, unresolved):
+              request = receipt['request']
+              request_payload = {k: v for k, v in request.items() if k != 'contentHash'}
+              assert request['contentHash'] == sha256(compact(request_payload))
+              receipt_payload = {k: v for k, v in receipt.items() if k != 'contentHash'}
+              assert receipt['contentHash'] == sha256(compact(receipt_payload))
+              assert receipt['indexContentHash'] == index['contentHash']
+              assert receipt['networkAccessStatus'] == 'NOT_PERFORMED'
+              assert receipt['installationStatus'] == 'NOT_PERFORMED'
+              assert receipt['trustVerificationStatus'] == 'NOT_EVALUATED'
+              for step in receipt['plan']:
+                  require_distribution_uri(step['artifactUri'])
+                  require_distribution_uri(step['provenanceUri'])
+                  if step['kind'] == 'JAVA_PLUGIN':
+                      require_distribution_uri(step['signatureManifestUri'])
+
+          assert resolved['status'] == 'RESOLVED'
+          assert resolved['blockers'] == []
+          assert resolved['plan']
+          assert [item['order'] for item in resolved['plan']] == list(
+              range(1, len(resolved['plan']) + 1))
+          assert resolved['plan'][-1]['identityHash'] == \
+              resolved['rootArtifactIdentityHash']
+          assert len({
+              (item['kind'], item['componentId']) for item in resolved['plan']
+          }) == len(resolved['plan'])
+
+          assert unresolved['status'] == 'UNRESOLVED'
+          assert unresolved['rootArtifactIdentityHash'] == ''
+          assert unresolved['plan'] == []
+          assert unresolved['blockers']
+          PY
+
+      - name: Upload index evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plugin-artifact-index-evidence
+          path: |
+            app/build/reports/plugin-artifact-index/**
+            app/build/reports/tests/**
+            app/build/test-results/**
+            docs/schemas/regelsuche-plugin-artifact-index-v1.schema.json
+            docs/schemas/regelsuche-plugin-artifact-resolution-v1.schema.json
+          if-no-files-found: warn

@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-artifact-index/v1",
+  "title": "Regelsuche immutable extension artifact index v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "indexId",
+    "revision",
+    "curatorId",
+    "entries",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-artifact-index/v1"
+    },
+    "indexId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "revision": {
+      "$ref": "#/$defs/identifier"
+    },
+    "curatorId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+    },
+    "uri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^(?:[Hh][Tt][Tt][Pp][Ss]://[^/@?#]+(?:[/?][^#]*)?|[Ff][Ii][Ll][Ee]:/(?:[^/#][^#]*|//(?:[^/#][^#]*)?)?)$"
+    },
+    "uriOrEmpty": {
+      "oneOf": [
+        {
+          "const": ""
+        },
+        {
+          "$ref": "#/$defs/uri"
+        }
+      ]
+    },
+    "dependency": {
+      "type": "object",
+      "required": [
+        "kind",
+        "componentId",
+        "versionConstraint",
+        "optional"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "JAVA_PLUGIN",
+            "RULE_PACKAGE",
+            "KNOWLEDGE_PACK"
+          ]
+        },
+        "componentId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "versionConstraint": {
+          "oneOf": [
+            {
+              "const": "any"
+            },
+            {
+              "type": "string",
+              "pattern": "^=(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+            }
+          ]
+        },
+        "optional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "entry": {
+      "type": "object",
+      "required": [
+        "artifactId",
+        "kind",
+        "componentId",
+        "version",
+        "apiVersion",
+        "minimumCoreVersion",
+        "maximumCoreVersionExclusive",
+        "capabilities",
+        "dependencies",
+        "artifactFileName",
+        "artifactSha256",
+        "artifactUri",
+        "signatureManifestUri",
+        "provenanceUri",
+        "publisherId",
+        "identityHash"
+      ],
+      "properties": {
+        "artifactId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "kind": {
+          "enum": [
+            "JAVA_PLUGIN",
+            "RULE_PACKAGE",
+            "KNOWLEDGE_PACK"
+          ]
+        },
+        "componentId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/semver"
+        },
+        "apiVersion": {
+          "$ref": "#/$defs/identifier"
+        },
+        "minimumCoreVersion": {
+          "$ref": "#/$defs/semver"
+        },
+        "maximumCoreVersionExclusive": {
+          "oneOf": [
+            {
+              "const": ""
+            },
+            {
+              "$ref": "#/$defs/semver"
+            }
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dependency"
+          }
+        },
+        "artifactFileName": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^/\\\\]+$"
+        },
+        "artifactSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "artifactUri": {
+          "$ref": "#/$defs/uri"
+        },
+        "signatureManifestUri": {
+          "$ref": "#/$defs/uriOrEmpty"
+        },
+        "provenanceUri": {
+          "$ref": "#/$defs/uri"
+        },
+        "publisherId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "identityHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "JAVA_PLUGIN"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "artifactFileName": {
+                "pattern": "(?i)\\.jar$"
+              },
+              "signatureManifestUri": {
+                "$ref": "#/$defs/uri"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "RULE_PACKAGE"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "artifactFileName": {
+                "pattern": "(?i)\\.(regelsuche|rules)$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "KNOWLEDGE_PACK"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "artifactFileName": {
+                "pattern": "(?i)\\.(json|zip|yaml|yml)$"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}
