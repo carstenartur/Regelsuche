@@ -84,6 +84,15 @@ class DomainDiscoveryExportVerifierTest {
         assertThrows(ExportVerificationException.class, () ->
             verifier.requireVerified(symlinked));
 
+        Path realParent = tempDir.resolve("real-parent");
+        export(realParent.resolve("nested"), sequenceEvidence());
+        Path linkedParent = tempDir.resolve("linked-parent");
+        Files.createSymbolicLink(linkedParent, realParent);
+        ExportVerificationException ancestryFailure = assertThrows(
+            ExportVerificationException.class,
+            () -> verifier.requireVerified(linkedParent.resolve("nested")));
+        assertTrue(ancestryFailure.getMessage().contains("symbolic link"));
+
         Path substituted = tempDir.resolve("substituted");
         DomainExportManifest substitutedManifest = exporter.write(
             substituted, expressionEvidence());
