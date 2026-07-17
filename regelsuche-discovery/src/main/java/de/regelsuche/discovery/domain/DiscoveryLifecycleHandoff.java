@@ -12,11 +12,8 @@ import java.util.Set;
 
 /**
  * Hash-only handoff from discovery execution into later lifecycle stages.
- *
- * <p>The handoff deliberately excludes domain objects such as expression strings
- * or sequence terms. Downstream lifecycle, persistence and export code can bind
- * the exact domain contract, input, execution evidence and resource accounting
- * without acquiring a dependency on a particular mathematical representation.</p>
+ * Domain objects remain in their schema-specific source evidence and are bound
+ * through {@code sourceEvidenceHash} rather than copied into this contract.
  */
 public record DiscoveryLifecycleHandoff(
     String schema,
@@ -44,14 +41,13 @@ public record DiscoveryLifecycleHandoff(
     public static final String NOT_EVALUATED = "NOT_EVALUATED";
 
     public DiscoveryLifecycleHandoff {
-        if (!SCHEMA.equals(schema)) {
-            throw new IllegalArgumentException("unsupported discovery lifecycle handoff schema");
-        }
+        requireSchema(schema);
         handoffId = DomainCanonical.requireIdentifier(handoffId, "handoffId");
         Objects.requireNonNull(sourceKind, "sourceKind");
         campaignId = DomainCanonical.requireIdentifier(campaignId, "campaignId");
         domainId = DomainCanonical.requireIdentifier(domainId, "domainId");
-        domainRevision = DomainCanonical.requireIdentifier(domainRevision, "domainRevision");
+        domainRevision = DomainCanonical.requireIdentifier(
+            domainRevision, "domainRevision");
         domainContractHash = DomainCanonical.requireSha256(
             domainContractHash, "domainContractHash");
         inputHash = DomainCanonical.requireSha256(inputHash, "inputHash");
@@ -76,7 +72,7 @@ public record DiscoveryLifecycleHandoff(
             certificateHash,
             resources);
         contentHash = DomainCanonical.requireSha256(contentHash, "contentHash");
-        String expectedHash = hashMaterial(
+        String expected = contentHash(
             handoffId,
             sourceKind,
             campaignId,
@@ -95,12 +91,13 @@ public record DiscoveryLifecycleHandoff(
             externalNoveltyStatus,
             promotionStatus,
             publicEvidenceStatus);
-        if (!expectedHash.equals(contentHash)) {
-            throw new IllegalArgumentException("discovery lifecycle handoff contentHash mismatch");
+        if (!expected.equals(contentHash)) {
+            throw new IllegalArgumentException(
+                "discovery lifecycle handoff contentHash mismatch");
         }
     }
 
-    /** Creates a handoff from the canonical generic domain execution evidence. */
+    /** Creates a representation-free handoff from generic domain evidence. */
     public static DiscoveryLifecycleHandoff from(DomainDiscoveryEvidence evidence) {
         Objects.requireNonNull(evidence, "evidence");
         DiscoveryDomainDescriptor descriptor = evidence.descriptor();
@@ -112,7 +109,7 @@ public record DiscoveryLifecycleHandoff(
                 line.skipped(),
                 line.remaining()))
             .toList();
-        String certificateHash = evidence.certificate() == null
+        String retainedCertificate = evidence.certificate() == null
             ? ""
             : evidence.certificate().contentHash();
         String domainPayloadHash = DomainCanonical.sha256(
@@ -141,7 +138,7 @@ public record DiscoveryLifecycleHandoff(
             Stage.DISCOVERY_VALIDATION,
             disposition(evidence.outcome()),
             evidence.selectedCandidateHash(),
-            certificateHash,
+            retainedCertificate,
             accounts,
             metadata,
             evidence.proofStatus(),
@@ -150,11 +147,7 @@ public record DiscoveryLifecycleHandoff(
             evidence.publicEvidenceStatus());
     }
 
-    /**
-     * Creates a handoff for an existing execution contract. This factory is used
-     * by transitional adapters while the production campaign itself remains
-     * byte-for-byte unchanged.
-     */
+    /** Creates a handoff for an existing immutable execution contract. */
     public static DiscoveryLifecycleHandoff create(
         String handoffId,
         SourceKind sourceKind,
@@ -175,15 +168,19 @@ public record DiscoveryLifecycleHandoff(
         String promotionStatus,
         String publicEvidenceStatus
     ) {
-        String normalizedHandoffId = DomainCanonical.requireIdentifier(handoffId, "handoffId");
+        String normalizedHandoffId = DomainCanonical.requireIdentifier(
+            handoffId, "handoffId");
         Objects.requireNonNull(sourceKind, "sourceKind");
-        String normalizedCampaignId = DomainCanonical.requireIdentifier(campaignId, "campaignId");
-        String normalizedDomainId = DomainCanonical.requireIdentifier(domainId, "domainId");
-        String normalizedDomainRevision = DomainCanonical.requireIdentifier(
+        String normalizedCampaignId = DomainCanonical.requireIdentifier(
+            campaignId, "campaignId");
+        String normalizedDomainId = DomainCanonical.requireIdentifier(
+            domainId, "domainId");
+        String normalizedRevision = DomainCanonical.requireIdentifier(
             domainRevision, "domainRevision");
         String normalizedContractHash = DomainCanonical.requireSha256(
             domainContractHash, "domainContractHash");
-        String normalizedInputHash = DomainCanonical.requireSha256(inputHash, "inputHash");
+        String normalizedInputHash = DomainCanonical.requireSha256(
+            inputHash, "inputHash");
         String normalizedSourceHash = DomainCanonical.requireSha256(
             sourceEvidenceHash, "sourceEvidenceHash");
         Objects.requireNonNull(stage, "stage");
@@ -205,12 +202,12 @@ public record DiscoveryLifecycleHandoff(
             normalizedCandidateHash,
             normalizedCertificateHash,
             normalizedResources);
-        String contentHash = hashMaterial(
+        String hash = contentHash(
             normalizedHandoffId,
             sourceKind,
             normalizedCampaignId,
             normalizedDomainId,
-            normalizedDomainRevision,
+            normalizedRevision,
             normalizedContractHash,
             normalizedInputHash,
             normalizedSourceHash,
@@ -230,7 +227,7 @@ public record DiscoveryLifecycleHandoff(
             sourceKind,
             normalizedCampaignId,
             normalizedDomainId,
-            normalizedDomainRevision,
+            normalizedRevision,
             normalizedContractHash,
             normalizedInputHash,
             normalizedSourceHash,
@@ -244,7 +241,7 @@ public record DiscoveryLifecycleHandoff(
             externalNoveltyStatus,
             promotionStatus,
             publicEvidenceStatus,
-            contentHash);
+            hash);
     }
 
     public String toCanonicalJson() {
@@ -292,7 +289,7 @@ public record DiscoveryLifecycleHandoff(
         };
     }
 
-    private static String hashMaterial(
+    private static String contentHash(
         String handoffId,
         SourceKind sourceKind,
         String campaignId,
@@ -337,14 +334,18 @@ public record DiscoveryLifecycleHandoff(
         return DomainCanonical.sha256(DomainCanonical.canonicalMap(values));
     }
 
-    private static List<ResourceAccount> normalizeResources(List<ResourceAccount> values) {
+    private static List<ResourceAccount> normalizeResources(
+        List<ResourceAccount> values
+    ) {
         if (values == null || values.isEmpty()) {
-            throw new IllegalArgumentException("lifecycle handoff requires resource accounting");
+            throw new IllegalArgumentException(
+                "lifecycle handoff requires resource accounting");
         }
         Set<String> names = new HashSet<>();
         List<ResourceAccount> normalized = new ArrayList<>();
         for (ResourceAccount value : values) {
-            ResourceAccount account = Objects.requireNonNull(value, "resource account");
+            ResourceAccount account = Objects.requireNonNull(
+                value, "resource account");
             if (!names.add(account.resource())) {
                 throw new IllegalArgumentException(
                     "duplicate lifecycle resource: " + account.resource());
@@ -374,6 +375,10 @@ public record DiscoveryLifecycleHandoff(
             throw new IllegalArgumentException(
                 "production generation evidence must use GENERATION stage");
         }
+        if (disposition == Disposition.COMPLETED && stage != Stage.GENERATION) {
+            throw new IllegalArgumentException(
+                "COMPLETED disposition is reserved for generation handoffs");
+        }
         if (stage == Stage.GENERATION) {
             if (disposition != Disposition.COMPLETED
                     || !selectedCandidateHash.isEmpty()
@@ -395,10 +400,17 @@ public record DiscoveryLifecycleHandoff(
     }
 
     private static String optionalSha256(String value, String field) {
-        if (value == null || value.isBlank()) {
+        if (value == null || value.isEmpty()) {
             return "";
         }
         return DomainCanonical.requireSha256(value, field);
+    }
+
+    private static void requireSchema(String value) {
+        if (!SCHEMA.equals(value)) {
+            throw new IllegalArgumentException(
+                "unsupported discovery lifecycle handoff schema");
+        }
     }
 
     private static void requireNotEvaluated(String value, String field) {
@@ -436,8 +448,12 @@ public record DiscoveryLifecycleHandoff(
     ) {
         public ResourceAccount {
             resource = DomainCanonical.requireIdentifier(resource, "resource");
-            if (configured < 0L || executed < 0L || skipped < 0L || remaining < 0L) {
-                throw new IllegalArgumentException("resource counts must be non-negative");
+            if (configured < 0L
+                    || executed < 0L
+                    || skipped < 0L
+                    || remaining < 0L) {
+                throw new IllegalArgumentException(
+                    "resource counts must be non-negative");
             }
             validateBalance(configured, executed, skipped, remaining, resource);
         }
@@ -462,7 +478,8 @@ public record DiscoveryLifecycleHandoff(
             long remaining,
             String resource
         ) {
-            long accounted = Math.addExact(Math.addExact(executed, skipped), remaining);
+            long accounted = Math.addExact(
+                Math.addExact(executed, skipped), remaining);
             if (configured != accounted) {
                 throw new IllegalArgumentException(
                     "unbalanced lifecycle resource " + resource);
