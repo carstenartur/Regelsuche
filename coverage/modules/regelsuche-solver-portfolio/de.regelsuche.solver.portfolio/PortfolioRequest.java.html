@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PortfolioRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">PortfolioRequest.java</span></div><h1>PortfolioRequest.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import java.util.Objects;
+
+/** Hash-linked execution objective independent of concrete backend classes. */
+public record PortfolioRequest(
+    String schema,
+    Obligation obligation,
+    SolverObjective objective,
+    PortfolioPolicy policy,
+    PortfolioBudget budget,
+    String configurationId,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.solver-portfolio-request/v1&quot;;
+
+<span class="fc" id="L20">    public PortfolioRequest {</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L22">            throw new IllegalArgumentException(&quot;unsupported portfolio request schema&quot;);</span>
+        }
+<span class="fc" id="L24">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L25">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L26">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L27">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L28" title="2 of 4 branches missed.">        if (configurationId == null || configurationId.isBlank()) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(&quot;configurationId must not be blank&quot;);</span>
+        }
+<span class="fc" id="L31">        requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L32">        String expected = hash(</span>
+            obligation, objective, policy, budget, configurationId);
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(&quot;portfolio request hash does not match fields&quot;);</span>
+        }
+<span class="fc" id="L37">    }</span>
+
+    public static PortfolioRequest create(
+        Obligation obligation,
+        SolverObjective objective,
+        PortfolioPolicy policy,
+        PortfolioBudget budget,
+        String configurationId
+    ) {
+<span class="fc" id="L46">        return new PortfolioRequest(</span>
+            SCHEMA, obligation, objective, policy, budget, configurationId,
+<span class="fc" id="L48">            hash(obligation, objective, policy, budget, configurationId));</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L52">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L53">            .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L54">            .property(&quot;obligationHash&quot;, obligation.contentHash())</span>
+<span class="fc" id="L55">            .property(&quot;objective&quot;, objective.name())</span>
+<span class="fc" id="L56">            .property(&quot;policy&quot;, policy.name())</span>
+<span class="fc" id="L57">            .property(&quot;budgetHash&quot;, budget.configurationHash())</span>
+<span class="fc" id="L58">            .property(&quot;configurationId&quot;, configurationId)</span>
+<span class="fc" id="L59">            .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L60">            .endObject()</span>
+<span class="fc" id="L61">            .toString();</span>
+    }
+
+    private static String hash(
+        Obligation obligation,
+        SolverObjective objective,
+        PortfolioPolicy policy,
+        PortfolioBudget budget,
+        String configurationId
+    ) {
+<span class="fc" id="L71">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L72">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L73">        Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L74">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L75" title="2 of 4 branches missed.">        if (configurationId == null || configurationId.isBlank()) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;configurationId must not be blank&quot;);</span>
+        }
+<span class="fc" id="L78">        return SolverIr.sha256(</span>
+            SCHEMA
+<span class="fc" id="L80">                + &quot;\nobligation=&quot; + obligation.contentHash()</span>
+<span class="fc" id="L81">                + &quot;\nobjective=&quot; + objective.name()</span>
+<span class="fc" id="L82">                + &quot;\npolicy=&quot; + policy.name()</span>
+<span class="fc" id="L83">                + &quot;\nbudget=&quot; + budget.configurationHash()</span>
+                + &quot;\nconfiguration=&quot; + configurationId);
+    }
+
+    private static void requireSha(String value, String name) {
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L89">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L91">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

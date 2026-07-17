@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SmtLibRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">SmtLibRenderer.java</span></div><h1>SmtLibRenderer.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.SolverIr.Binary;
+import de.regelsuche.solver.ir.SolverIr.BinaryOperator;
+import de.regelsuche.solver.ir.SolverIr.Call;
+import de.regelsuche.solver.ir.SolverIr.Expression;
+import de.regelsuche.solver.ir.SolverIr.Literal;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Predicate;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.Sort;
+import de.regelsuche.solver.ir.SolverIr.Symbol;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Lossless SMT-LIB 2 rendering for the bounded arithmetic fragment declared by Z3. */
+<span class="fc" id="L22">final class SmtLibRenderer {</span>
+
+    Material render(Obligation obligation) {
+<span class="fc" id="L25">        List&lt;String&gt; issues = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L26">        addDivisionDomainIssues(obligation, issues);</span>
+<span class="fc" id="L27">        Map&lt;String, String&gt; mapping = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L28">        StringBuilder script = new StringBuilder(&quot;(set-logic ALL)\n&quot;);</span>
+<span class="fc" id="L29">        obligation.declarations().forEach(declaration -&gt; {</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">            if (declaration.sort() != Sort.REAL) {</span>
+<span class="nc" id="L31">                issues.add(&quot;UNSUPPORTED_SORT:&quot; + declaration.name()</span>
+<span class="nc" id="L32">                    + ':' + declaration.sort().name());</span>
+            } else {
+<span class="fc" id="L34">                script.append(&quot;(declare-const &quot;).append(declaration.name())</span>
+<span class="fc" id="L35">                    .append(&quot; Real)\n&quot;);</span>
+            }
+<span class="fc" id="L37">        });</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (Predicate assumption : obligation.assumptions()) {</span>
+<span class="fc" id="L39">            String rendered = relation(</span>
+<span class="fc" id="L40">                assumption.relation(), assumption.left(), assumption.right(), issues);</span>
+<span class="fc" id="L41">            mapping.put(&quot;assumption.&quot; + assumption.id(), rendered);</span>
+<span class="fc" id="L42">            script.append(&quot;(assert &quot;).append(rendered).append(&quot;)\n&quot;);</span>
+<span class="fc" id="L43">        }</span>
+<span class="fc" id="L44">        String left = expression(obligation.goal().left(), issues);</span>
+<span class="fc" id="L45">        String right = expression(obligation.goal().right(), issues);</span>
+<span class="fc" id="L46">        mapping.put(&quot;goal.left&quot;, left);</span>
+<span class="fc" id="L47">        mapping.put(&quot;goal.right&quot;, right);</span>
+<span class="fc" id="L48">        String goal = relation(obligation.goal().relation(),</span>
+<span class="fc" id="L49">            obligation.goal().left(), obligation.goal().right(), issues);</span>
+<span class="fc" id="L50">        mapping.put(&quot;goal&quot;, goal);</span>
+<span class="fc" id="L51">        script.append(&quot;(assert (not &quot;).append(goal).append(&quot;))\n&quot;);</span>
+<span class="fc" id="L52">        return new Material(</span>
+<span class="fc" id="L53">            script.toString(), Map.copyOf(mapping),</span>
+<span class="fc" id="L54">            issues.stream().distinct().sorted().toList());</span>
+    }
+
+    private static void addDivisionDomainIssues(
+        Obligation obligation,
+        List&lt;String&gt; issues
+    ) {
+<span class="fc" id="L61">        List&lt;Expression&gt; denominators = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L62">        collectDenominators(obligation.goal().left(), denominators);</span>
+<span class="fc" id="L63">        collectDenominators(obligation.goal().right(), denominators);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (Predicate assumption : obligation.assumptions()) {</span>
+<span class="fc" id="L65">            collectDenominators(assumption.left(), denominators);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (assumption.right() != null) {</span>
+<span class="fc" id="L67">                collectDenominators(assumption.right(), denominators);</span>
+            }
+<span class="fc" id="L69">        }</span>
+<span class="fc" id="L70">        Set&lt;String&gt; checked = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (Expression denominator : denominators) {</span>
+<span class="fc" id="L72">            String material = denominator.canonicalMaterial();</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (!checked.add(material)) {</span>
+<span class="fc" id="L74">                continue;</span>
+            }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (denominator instanceof Literal literal) {</span>
+                try {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                    if (new BigDecimal(literal.value()).signum() == 0) {</span>
+<span class="nc" id="L79">                        issues.add(&quot;DIVISION_BY_ZERO_LITERAL&quot;);</span>
+                    }
+<span class="nc" id="L81">                } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L82">                    issues.add(&quot;UNSUPPORTED_DIVISOR_LITERAL:&quot; + literal.value());</span>
+<span class="nc" id="L83">                }</span>
+<span class="nc" id="L84">                continue;</span>
+            }
+<span class="fc" id="L86">            boolean encoded = obligation.assumptions().stream()</span>
+<span class="fc" id="L87">                .anyMatch(assumption -&gt; excludesZero(assumption, denominator));</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (!encoded) {</span>
+<span class="fc" id="L89">                issues.add(&quot;DIVISION_DOMAIN_NOT_ENCODED:&quot; + material);</span>
+            }
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">    }</span>
+
+    private static void collectDenominators(
+        Expression expression,
+        List&lt;Expression&gt; denominators
+    ) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (expression instanceof Binary binary) {</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.DIVIDE) {</span>
+<span class="fc" id="L100">                denominators.add(binary.right());</span>
+            }
+<span class="fc" id="L102">            collectDenominators(binary.left(), denominators);</span>
+<span class="fc" id="L103">            collectDenominators(binary.right(), denominators);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        } else if (expression instanceof Call call) {</span>
+<span class="fc" id="L105">            call.arguments().forEach(argument -&gt;</span>
+<span class="fc" id="L106">                collectDenominators(argument, denominators));</span>
+        }
+<span class="fc" id="L108">    }</span>
+
+    private static boolean excludesZero(
+        Predicate assumption,
+        Expression denominator
+    ) {
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (assumption.right() == null) {</span>
+<span class="nc" id="L115">            return false;</span>
+        }
+<span class="fc" id="L117">        boolean denominatorOnLeft = same(assumption.left(), denominator);</span>
+<span class="fc" id="L118">        boolean denominatorOnRight = same(assumption.right(), denominator);</span>
+<span class="fc" id="L119">        boolean zeroOnLeft = zeroLiteral(assumption.left());</span>
+<span class="fc" id="L120">        boolean zeroOnRight = zeroLiteral(assumption.right());</span>
+<span class="pc bpc" id="L121" title="2 of 3 branches missed.">        return switch (assumption.relation()) {</span>
+<span class="pc bpc" id="L122" title="6 of 8 branches missed.">            case NOT_EQUALS -&gt; denominatorOnLeft &amp;&amp; zeroOnRight</span>
+                || denominatorOnRight &amp;&amp; zeroOnLeft;
+<span class="nc bnc" id="L124" title="All 8 branches missed.">            case GREATER_THAN, LESS_THAN -&gt; denominatorOnLeft &amp;&amp; zeroOnRight</span>
+                || denominatorOnRight &amp;&amp; zeroOnLeft;
+<span class="nc" id="L126">            case EQUALS, LESS_OR_EQUAL, GREATER_OR_EQUAL, IS_INTEGER -&gt; false;</span>
+        };
+    }
+
+    private static boolean same(Expression first, Expression second) {
+<span class="fc" id="L131">        return first.canonicalMaterial().equals(second.canonicalMaterial());</span>
+    }
+
+    private static boolean zeroLiteral(Expression expression) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (!(expression instanceof Literal literal)) {</span>
+<span class="fc" id="L136">            return false;</span>
+        }
+        try {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            return new BigDecimal(literal.value()).signum() == 0;</span>
+<span class="nc" id="L140">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L141">            return false;</span>
+        }
+    }
+
+    private static String relation(
+        Relation relation,
+        Expression left,
+        Expression right,
+        List&lt;String&gt; issues
+    ) {
+<span class="fc" id="L151">        String leftTerm = expression(left, issues);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        String rightTerm = right == null ? &quot;&quot; : expression(right, issues);</span>
+<span class="pc bpc" id="L153" title="5 of 7 branches missed.">        return switch (relation) {</span>
+<span class="fc" id="L154">            case EQUALS -&gt; &quot;(= &quot; + leftTerm + ' ' + rightTerm + ')';</span>
+<span class="fc" id="L155">            case NOT_EQUALS -&gt; &quot;(not (= &quot; + leftTerm + ' ' + rightTerm + &quot;))&quot;;</span>
+<span class="nc" id="L156">            case LESS_THAN -&gt; &quot;(&lt; &quot; + leftTerm + ' ' + rightTerm + ')';</span>
+<span class="nc" id="L157">            case LESS_OR_EQUAL -&gt; &quot;(&lt;= &quot; + leftTerm + ' ' + rightTerm + ')';</span>
+<span class="nc" id="L158">            case GREATER_THAN -&gt; &quot;(&gt; &quot; + leftTerm + ' ' + rightTerm + ')';</span>
+<span class="nc" id="L159">            case GREATER_OR_EQUAL -&gt; &quot;(&gt;= &quot; + leftTerm + ' ' + rightTerm + ')';</span>
+<span class="nc" id="L160">            case IS_INTEGER -&gt; &quot;(is_int &quot; + leftTerm + ')';</span>
+        };
+    }
+
+    private static String expression(Expression expression, List&lt;String&gt; issues) {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (expression instanceof Literal literal) {</span>
+<span class="fc" id="L166">            return literal.value();</span>
+        }
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        if (expression instanceof Symbol symbol) {</span>
+<span class="fc" id="L169">            return symbol.name();</span>
+        }
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (expression instanceof Call call) {</span>
+<span class="fc" id="L172">            issues.add(&quot;UNSUPPORTED_CALL:&quot; + call.function());</span>
+<span class="fc" id="L173">            return &quot;unsupported_call&quot;;</span>
+        }
+<span class="fc" id="L175">        Binary binary = (Binary) expression;</span>
+<span class="fc" id="L176">        String left = expression(binary.left(), issues);</span>
+<span class="fc" id="L177">        String right = expression(binary.right(), issues);</span>
+<span class="pc bpc" id="L178" title="3 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L179">            case ADD -&gt; &quot;(+ &quot; + left + ' ' + right + ')';</span>
+<span class="nc" id="L180">            case SUBTRACT -&gt; &quot;(- &quot; + left + ' ' + right + ')';</span>
+<span class="nc" id="L181">            case MULTIPLY -&gt; &quot;(* &quot; + left + ' ' + right + ')';</span>
+<span class="fc" id="L182">            case DIVIDE -&gt; &quot;(/ &quot; + left + ' ' + right + ')';</span>
+<span class="nc" id="L183">            case POWER -&gt; power(binary, left, right, issues);</span>
+        };
+    }
+
+    private static String power(
+        Binary binary,
+        String left,
+        String right,
+        List&lt;String&gt; issues
+    ) {
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (!(binary.right() instanceof Literal literal)) {</span>
+<span class="nc" id="L194">            issues.add(&quot;UNSUPPORTED_POWER_EXPONENT:NON_LITERAL&quot;);</span>
+<span class="nc" id="L195">            return &quot;(^ &quot; + left + ' ' + right + ')';</span>
+        }
+        try {
+<span class="nc" id="L198">            BigDecimal exponent = new BigDecimal(literal.value());</span>
+<span class="nc bnc" id="L199" title="All 4 branches missed.">            if (exponent.scale() &gt; 0 || exponent.signum() &lt; 0) {</span>
+<span class="nc" id="L200">                issues.add(&quot;UNSUPPORTED_POWER_EXPONENT:&quot; + literal.value());</span>
+            }
+<span class="nc" id="L202">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L203">            issues.add(&quot;UNSUPPORTED_POWER_EXPONENT:&quot; + literal.value());</span>
+<span class="nc" id="L204">        }</span>
+<span class="nc" id="L205">        return &quot;(^ &quot; + left + ' ' + right + ')';</span>
+    }
+
+<span class="fc" id="L208">    record Material(</span>
+        String scriptPrefix,
+        Map&lt;String, String&gt; termMapping,
+        List&lt;String&gt; issues
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

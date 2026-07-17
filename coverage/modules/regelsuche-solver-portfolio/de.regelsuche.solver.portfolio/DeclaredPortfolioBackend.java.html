@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeclaredPortfolioBackend.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">DeclaredPortfolioBackend.java</span></div><h1>DeclaredPortfolioBackend.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.SolverBackend;
+import de.regelsuche.solver.ir.SolverExecution;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import java.util.Objects;
+
+/** Adapter that attaches an explicit capability profile to an existing backend. */
+public record DeclaredPortfolioBackend(
+    SolverBackend backend,
+    BackendCapabilityProfile profile
+) implements PortfolioBackend {
+<span class="fc" id="L13">    public DeclaredPortfolioBackend {</span>
+<span class="fc" id="L14">        Objects.requireNonNull(backend, &quot;backend&quot;);</span>
+<span class="fc" id="L15">        Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        if (!backend.descriptor().backendId().equals(profile.backendId())</span>
+<span class="pc bpc" id="L17" title="1 of 2 branches missed.">                || !backend.descriptor().backendVersion().equals(profile.backendVersion())) {</span>
+<span class="nc" id="L18">            throw new IllegalArgumentException(</span>
+                &quot;profile must identify the wrapped backend revision&quot;);
+        }
+<span class="fc" id="L21">    }</span>
+
+    @Override
+    public SolverExecution execute(Obligation obligation) {
+<span class="fc" id="L25">        SolverExecution execution = backend.execute(obligation);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (execution == null) {</span>
+<span class="nc" id="L27">            throw new IllegalStateException(&quot;declared backend returned no execution&quot;);</span>
+        }
+<span class="fc" id="L29">        return execution;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

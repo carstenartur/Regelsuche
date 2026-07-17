@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PortfolioRun.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">PortfolioRun.java</span></div><h1>PortfolioRun.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.SolverExecution;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Runtime bundle retaining and canonically writing every backend execution. */
+public record PortfolioRun(
+    PortfolioReport report,
+    List&lt;SolverExecution&gt; executions,
+    SolverExecution selectedExecution
+) {
+<span class="fc" id="L21">    public PortfolioRun {</span>
+<span class="fc" id="L22">        Objects.requireNonNull(report, &quot;report&quot;);</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">        executions = executions == null ? List.of() : List.copyOf(executions);</span>
+<span class="fc" id="L24">        Set&lt;String&gt; executionHashes = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        for (SolverExecution execution : executions) {</span>
+<span class="fc" id="L26">            Objects.requireNonNull(execution, &quot;execution&quot;);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">            if (!executionHashes.add(execution.contentHash())) {</span>
+<span class="nc" id="L28">                throw new IllegalArgumentException(</span>
+                    &quot;portfolio executions must have unique content hashes&quot;);
+            }
+<span class="fc" id="L31">            boolean traced = report.attempts().stream().anyMatch(attempt -&gt;</span>
+<span class="fc" id="L32">                execution.contentHash().equals(attempt.executionHash()));</span>
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">            if (!traced) {</span>
+<span class="nc" id="L34">                throw new IllegalArgumentException(</span>
+                    &quot;every retained execution must appear in the portfolio trace&quot;);
+            }
+<span class="fc" id="L37">        }</span>
+<span class="fc" id="L38">        long tracedExecutions = report.attempts().stream()</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">            .filter(attempt -&gt; !attempt.executionHash().isEmpty())</span>
+<span class="fc" id="L40">            .map(PortfolioAttempt::executionHash)</span>
+<span class="fc" id="L41">            .distinct()</span>
+<span class="fc" id="L42">            .count();</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (tracedExecutions != executions.size()) {</span>
+<span class="nc" id="L44">            throw new IllegalArgumentException(</span>
+                &quot;every traced execution must be retained by the portfolio run&quot;);
+        }
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        boolean reportSelected = !report.selectedExecutionHash().isEmpty();</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (reportSelected != (selectedExecution != null)) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(</span>
+                &quot;selected execution presence must match the portfolio report&quot;);
+        }
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (selectedExecution != null</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                &amp;&amp; !report.selectedExecutionHash().equals(selectedExecution.contentHash())) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(</span>
+                &quot;selected execution must match portfolio report&quot;);
+        }
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Writes one authoritative evidence layout for the exact request:
+     * obligation, request, report, and every concrete translation/result/execution.
+     * Filtered and skipped attempts remain in the report and deliberately have no
+     * fabricated backend artifact.
+     */
+    public void write(Path outputDirectory, PortfolioRequest request) {
+<span class="fc" id="L66">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L67">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L68">        validateRequest(request);</span>
+        try {
+<span class="fc" id="L70">            clearDirectory(outputDirectory);</span>
+<span class="fc" id="L71">            Files.createDirectories(outputDirectory);</span>
+<span class="fc" id="L72">            Files.writeString(</span>
+<span class="fc" id="L73">                outputDirectory.resolve(&quot;obligation.json&quot;),</span>
+<span class="fc" id="L74">                request.obligation().toCanonicalJson(),</span>
+                StandardCharsets.UTF_8);
+<span class="fc" id="L76">            Files.writeString(</span>
+<span class="fc" id="L77">                outputDirectory.resolve(&quot;request.json&quot;),</span>
+<span class="fc" id="L78">                request.toCanonicalJson(),</span>
+                StandardCharsets.UTF_8);
+<span class="fc" id="L80">            Files.writeString(</span>
+<span class="fc" id="L81">                outputDirectory.resolve(&quot;report.json&quot;),</span>
+<span class="fc" id="L82">                report.toCanonicalJson(),</span>
+                StandardCharsets.UTF_8);
+
+<span class="fc" id="L85">            Path executionsDirectory = outputDirectory.resolve(&quot;executions&quot;);</span>
+<span class="fc" id="L86">            Files.createDirectories(executionsDirectory);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (SolverExecution execution : executions) {</span>
+<span class="fc" id="L88">                PortfolioAttempt attempt = report.attempts().stream()</span>
+<span class="fc" id="L89">                    .filter(item -&gt; execution.contentHash().equals(item.executionHash()))</span>
+<span class="fc" id="L90">                    .findFirst()</span>
+<span class="fc" id="L91">                    .orElseThrow();</span>
+<span class="fc" id="L92">                Path attemptDirectory = executionsDirectory.resolve(String.format(</span>
+                    &quot;%03d-%s&quot;,
+<span class="fc" id="L94">                    attempt.sequence(),</span>
+<span class="fc" id="L95">                    safeFilename(attempt.backendId())));</span>
+<span class="fc" id="L96">                Files.createDirectories(attemptDirectory);</span>
+<span class="fc" id="L97">                Files.writeString(</span>
+<span class="fc" id="L98">                    attemptDirectory.resolve(&quot;translation.json&quot;),</span>
+<span class="fc" id="L99">                    execution.translation().toCanonicalJson(),</span>
+                    StandardCharsets.UTF_8);
+<span class="fc" id="L101">                Files.writeString(</span>
+<span class="fc" id="L102">                    attemptDirectory.resolve(&quot;result.json&quot;),</span>
+<span class="fc" id="L103">                    execution.result().toCanonicalJson(),</span>
+                    StandardCharsets.UTF_8);
+<span class="fc" id="L105">                Files.writeString(</span>
+<span class="fc" id="L106">                    attemptDirectory.resolve(&quot;execution.json&quot;),</span>
+<span class="fc" id="L107">                    execution.toCanonicalJson(),</span>
+                    StandardCharsets.UTF_8);
+<span class="fc" id="L109">            }</span>
+<span class="nc" id="L110">        } catch (IOException exception) {</span>
+<span class="nc" id="L111">            throw new UncheckedIOException(</span>
+                &quot;Could not write solver portfolio evidence&quot;, exception);
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">    }</span>
+
+    private void validateRequest(PortfolioRequest request) {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (!report.requestHash().equals(request.contentHash())) {</span>
+<span class="fc" id="L118">            throw new IllegalArgumentException(</span>
+                &quot;portfolio request must match the report request hash&quot;);
+        }
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (!report.obligationHash().equals(request.obligation().contentHash())) {</span>
+<span class="nc" id="L122">            throw new IllegalArgumentException(</span>
+                &quot;portfolio request obligation must match the report&quot;);
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (SolverExecution execution : executions) {</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">            if (!execution.obligationHash().equals(request.obligation().contentHash())) {</span>
+<span class="nc" id="L127">                throw new IllegalArgumentException(</span>
+                    &quot;portfolio execution belongs to another obligation&quot;);
+            }
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">    }</span>
+
+    private static void clearDirectory(Path directory) throws IOException {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (!Files.exists(directory)) {</span>
+<span class="nc" id="L135">            return;</span>
+        }
+<span class="fc" id="L137">        try (var paths = Files.walk(directory)) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {</span>
+<span class="fc" id="L139">                Files.delete(path);</span>
+<span class="fc" id="L140">            }</span>
+        }
+<span class="fc" id="L142">    }</span>
+
+    private static String safeFilename(String value) {
+<span class="fc" id="L145">        return value.replaceAll(&quot;[^A-Za-z0-9._-]&quot;, &quot;_&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

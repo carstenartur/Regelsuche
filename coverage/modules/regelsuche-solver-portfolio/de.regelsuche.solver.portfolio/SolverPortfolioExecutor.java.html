@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolverPortfolioExecutor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">SolverPortfolioExecutor.java</span></div><h1>SolverPortfolioExecutor.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.SolverExecution;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/** Executes a deterministic plan with exact caching, budgets, cancellation and conflict aggregation. */
+public final class SolverPortfolioExecutor {
+    private static final long CANCELLATION_POLL_MILLIS = 20L;
+
+    private final List&lt;PortfolioBackend&gt; backends;
+    private final SolverPortfolioPlanner planner;
+    private final PortfolioExecutionCache cache;
+
+    public SolverPortfolioExecutor(List&lt;? extends PortfolioBackend&gt; backends) {
+<span class="fc" id="L29">        this(backends, new SolverPortfolioPlanner(), new InMemoryPortfolioExecutionCache());</span>
+<span class="fc" id="L30">    }</span>
+
+    public SolverPortfolioExecutor(
+        List&lt;? extends PortfolioBackend&gt; backends,
+        SolverPortfolioPlanner planner,
+        PortfolioExecutionCache cache
+<span class="fc" id="L36">    ) {</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        this.backends = backends == null ? List.of() : List.copyOf(backends);</span>
+<span class="fc" id="L38">        this.planner = Objects.requireNonNull(planner, &quot;planner&quot;);</span>
+<span class="fc" id="L39">        this.cache = Objects.requireNonNull(cache, &quot;cache&quot;);</span>
+<span class="fc" id="L40">    }</span>
+
+    public PortfolioRun execute(PortfolioRequest request) {
+<span class="fc" id="L43">        return execute(request, CancellationToken.none());</span>
+    }
+
+    public PortfolioRun execute(
+        PortfolioRequest request,
+        CancellationToken cancellationToken
+    ) {
+<span class="fc" id="L50">        Objects.requireNonNull(request, &quot;request&quot;);</span>
+<span class="fc" id="L51">        Objects.requireNonNull(cancellationToken, &quot;cancellationToken&quot;);</span>
+<span class="fc" id="L52">        SolverPortfolioPlanner.Plan plan = planner.plan(request, backends);</span>
+<span class="fc" id="L53">        List&lt;PortfolioAttempt&gt; attempts = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L54">        List&lt;ObservedExecution&gt; observed = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L55">        int sequence = 0;</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (SolverPortfolioPlanner.RejectedBackend rejected : plan.rejected()) {</span>
+<span class="fc" id="L57">            String configurationHash = attemptConfigurationHash(</span>
+<span class="fc" id="L58">                request, rejected.profile(), request.budget().defaultTimeoutMillis());</span>
+<span class="fc" id="L59">            attempts.add(PortfolioAttempt.create(</span>
+<span class="fc" id="L60">                sequence++, rejected.profile(), rejected.disposition(), &quot;NOT_RUN&quot;, &quot;&quot;,</span>
+<span class="fc" id="L61">                rejected.issues(), 0L, configurationHash));</span>
+<span class="fc" id="L62">        }</span>
+
+<span class="fc" id="L64">        long consumedCost = 0L;</span>
+<span class="fc" id="L65">        int executedInvocations = 0;</span>
+<span class="fc" id="L66">        boolean cancelled = false;</span>
+<span class="fc" id="L67">        boolean budgetExhausted = false;</span>
+<span class="fc" id="L68">        boolean timedOut = false;</span>
+<span class="fc" id="L69">        boolean failed = false;</span>
+
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (SolverPortfolioPlanner.PlannedBackend planned : plan.planned()) {</span>
+<span class="fc" id="L72">            PortfolioBackend backend = planned.backend();</span>
+<span class="fc" id="L73">            BackendCapabilityProfile profile = backend.profile();</span>
+<span class="fc" id="L74">            PortfolioBudget.BackendLimit limit = request.budget().limitFor(profile);</span>
+<span class="fc" id="L75">            String configurationHash = attemptConfigurationHash(</span>
+<span class="fc" id="L76">                request, profile, limit.timeoutMillis());</span>
+<span class="fc" id="L77">            String cacheKey = cacheKey(request, profile, configurationHash);</span>
+
+<span class="fc" id="L79">            Optional&lt;SolverExecution&gt; cached = cache.find(cacheKey)</span>
+<span class="fc" id="L80">                .filter(execution -&gt; cacheEntryMatches(request, profile, execution));</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (cached.isPresent()) {</span>
+<span class="fc" id="L82">                SolverExecution execution = cached.orElseThrow();</span>
+<span class="fc" id="L83">                attempts.add(PortfolioAttempt.create(</span>
+                    sequence++, profile, AttemptDisposition.CACHE_HIT,
+<span class="fc" id="L85">                    execution.result().status().name(), execution.contentHash(),</span>
+<span class="fc" id="L86">                    List.of(), 0L, configurationHash));</span>
+<span class="fc" id="L87">                observed.add(new ObservedExecution(profile, execution));</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (decisive(request, observed)) {</span>
+<span class="fc" id="L89">                    break;</span>
+                }
+                continue;
+            }
+
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            if (cancellationToken.isCancelled()) {</span>
+<span class="fc" id="L95">                attempts.add(PortfolioAttempt.create(</span>
+                    sequence++, profile, AttemptDisposition.CANCELLED, &quot;NOT_RUN&quot;, &quot;&quot;,
+<span class="fc" id="L97">                    List.of(&quot;CANCELLED_BEFORE_INVOCATION&quot;), 0L, configurationHash));</span>
+<span class="fc" id="L98">                cancelled = true;</span>
+<span class="fc" id="L99">                break;</span>
+            }
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (profile.availability() != BackendAvailability.AVAILABLE) {</span>
+<span class="nc" id="L102">                attempts.add(PortfolioAttempt.create(</span>
+                    sequence++, profile, AttemptDisposition.SKIPPED_UNAVAILABLE,
+<span class="nc" id="L104">                    &quot;NOT_RUN&quot;, &quot;&quot;, List.of(&quot;BACKEND_&quot; + profile.availability().name()),</span>
+                    0L, configurationHash));
+<span class="nc" id="L106">                continue;</span>
+            }
+<span class="fc" id="L108">            long cost = profile.estimatedCostUnits();</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (executedInvocations &gt;= request.budget().maxInvocations()</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                    || cost &gt; limit.maxCostUnits()</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                    || consumedCost + cost &gt; request.budget().totalCostUnits()) {</span>
+<span class="fc" id="L112">                attempts.add(PortfolioAttempt.create(</span>
+                    sequence++, profile, AttemptDisposition.SKIPPED_BUDGET, &quot;NOT_RUN&quot;, &quot;&quot;,
+<span class="fc" id="L114">                    List.of(&quot;PORTFOLIO_BUDGET_EXHAUSTED&quot;), 0L,</span>
+                    configurationHash));
+<span class="fc" id="L116">                budgetExhausted = true;</span>
+<span class="fc" id="L117">                continue;</span>
+            }
+
+<span class="fc" id="L120">            Invocation invocation = invoke(</span>
+<span class="fc" id="L121">                backend, request, limit.timeoutMillis(), cancellationToken);</span>
+<span class="fc" id="L122">            executedInvocations++;</span>
+<span class="fc" id="L123">            consumedCost += cost;</span>
+<span class="fc" id="L124">            attempts.add(PortfolioAttempt.create(</span>
+<span class="fc" id="L125">                sequence++, profile, invocation.disposition(),</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                invocation.execution() == null</span>
+<span class="fc" id="L127">                    ? &quot;NOT_RUN&quot; : invocation.execution().result().status().name(),</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                invocation.execution() == null</span>
+<span class="fc" id="L129">                    ? &quot;&quot; : invocation.execution().contentHash(),</span>
+<span class="fc" id="L130">                invocation.issues(), cost, configurationHash));</span>
+
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (invocation.disposition() == AttemptDisposition.CANCELLED) {</span>
+<span class="nc" id="L133">                cancelled = true;</span>
+<span class="nc" id="L134">                break;</span>
+            }
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (invocation.disposition() == AttemptDisposition.TIMED_OUT) {</span>
+<span class="fc" id="L137">                timedOut = true;</span>
+<span class="fc" id="L138">                continue;</span>
+            }
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">            if (invocation.disposition() == AttemptDisposition.FAILED) {</span>
+<span class="nc" id="L141">                failed = true;</span>
+<span class="nc" id="L142">                continue;</span>
+            }
+<span class="fc" id="L144">            SolverExecution execution = invocation.execution();</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (execution != null) {</span>
+<span class="fc" id="L146">                observed.add(new ObservedExecution(profile, execution));</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">                if (profile.deterministic() &amp;&amp; profile.reproducible()) {</span>
+<span class="fc" id="L148">                    cache.put(cacheKey, execution);</span>
+                }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                if (decisive(request, observed)) {</span>
+<span class="fc" id="L151">                    break;</span>
+                }
+            }
+<span class="fc" id="L154">        }</span>
+
+<span class="fc" id="L156">        Aggregate aggregate = aggregate(request, plan, observed, cancelled,</span>
+            budgetExhausted, timedOut, failed);
+<span class="fc" id="L158">        PortfolioReport report = PortfolioReport.create(</span>
+<span class="fc" id="L159">            request, aggregate.outcome(), attempts,</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            aggregate.selected() == null</span>
+<span class="fc" id="L161">                ? &quot;&quot; : aggregate.selected().execution().contentHash(),</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            aggregate.selected() == null</span>
+<span class="fc" id="L163">                ? &quot;&quot; : aggregate.selected().profile().backendId(),</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            aggregate.selected() == null</span>
+<span class="fc" id="L165">                ? List.of() : aggregate.selected().profile().roles(),</span>
+<span class="fc" id="L166">            aggregate.conflictHashes(), consumedCost, executedInvocations,</span>
+<span class="fc" id="L167">            aggregate.proofAuthorized());</span>
+<span class="fc" id="L168">        return new PortfolioRun(</span>
+            report,
+<span class="fc" id="L170">            observed.stream().map(ObservedExecution::execution).toList(),</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            aggregate.selected() == null ? null : aggregate.selected().execution());</span>
+    }
+
+    private static Invocation invoke(
+        PortfolioBackend backend,
+        PortfolioRequest request,
+        long timeoutMillis,
+        CancellationToken cancellationToken
+    ) {
+<span class="fc" id="L180">        ThreadFactory factory = runnable -&gt; {</span>
+<span class="fc" id="L181">            Thread thread = new Thread(</span>
+<span class="fc" id="L182">                runnable, &quot;solver-portfolio-&quot; + backend.profile().backendId());</span>
+<span class="fc" id="L183">            thread.setDaemon(true);</span>
+<span class="fc" id="L184">            return thread;</span>
+        };
+<span class="fc" id="L186">        ExecutorService executor = Executors.newSingleThreadExecutor(factory);</span>
+<span class="fc" id="L187">        Future&lt;SolverExecution&gt; future = executor.submit(</span>
+<span class="fc" id="L188">            () -&gt; backend.execute(request.obligation()));</span>
+<span class="fc" id="L189">        long deadline = System.nanoTime()</span>
+<span class="fc" id="L190">            + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);</span>
+        try {
+            while (true) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                if (cancellationToken.isCancelled()) {</span>
+<span class="nc" id="L194">                    future.cancel(true);</span>
+<span class="nc" id="L195">                    return new Invocation(</span>
+                        AttemptDisposition.CANCELLED, null,
+<span class="nc" id="L197">                        List.of(&quot;CANCELLED_DURING_INVOCATION&quot;));</span>
+                }
+<span class="fc" id="L199">                long remainingNanos = deadline - System.nanoTime();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                if (remainingNanos &lt;= 0L) {</span>
+<span class="fc" id="L201">                    future.cancel(true);</span>
+<span class="fc" id="L202">                    return new Invocation(</span>
+                        AttemptDisposition.TIMED_OUT, null,
+<span class="fc" id="L204">                        List.of(&quot;BACKEND_TIMEOUT:&quot; + timeoutMillis));</span>
+                }
+<span class="fc" id="L206">                long waitMillis = Math.max(1L, Math.min(</span>
+                    CANCELLATION_POLL_MILLIS,
+<span class="fc" id="L208">                    TimeUnit.NANOSECONDS.toMillis(remainingNanos)));</span>
+                try {
+<span class="fc" id="L210">                    SolverExecution execution = future.get(</span>
+                        waitMillis, TimeUnit.MILLISECONDS);
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                    if (execution == null) {</span>
+<span class="nc" id="L213">                        return new Invocation(</span>
+                            AttemptDisposition.FAILED, null,
+<span class="nc" id="L215">                            List.of(&quot;BACKEND_RETURNED_NULL&quot;));</span>
+                    }
+<span class="fc" id="L217">                    return new Invocation(</span>
+<span class="fc" id="L218">                        AttemptDisposition.EXECUTED, execution, List.of());</span>
+<span class="fc" id="L219">                } catch (TimeoutException ignored) {</span>
+                    // Poll cancellation until the hard deadline is reached.
+                }
+<span class="fc" id="L222">            }</span>
+<span class="nc" id="L223">        } catch (InterruptedException exception) {</span>
+<span class="nc" id="L224">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L225">            future.cancel(true);</span>
+<span class="nc" id="L226">            return new Invocation(</span>
+                AttemptDisposition.CANCELLED, null,
+<span class="nc" id="L228">                List.of(&quot;PORTFOLIO_THREAD_INTERRUPTED&quot;));</span>
+<span class="nc" id="L229">        } catch (ExecutionException exception) {</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">            Throwable cause = exception.getCause() == null</span>
+<span class="nc" id="L231">                ? exception : exception.getCause();</span>
+<span class="nc" id="L232">            return new Invocation(</span>
+                AttemptDisposition.FAILED, null,
+<span class="nc" id="L234">                List.of(cause.getClass().getSimpleName() + ':'</span>
+<span class="nc" id="L235">                    + String.valueOf(cause.getMessage())));</span>
+        } finally {
+<span class="fc" id="L237">            executor.shutdownNow();</span>
+        }
+    }
+
+    private static boolean decisive(
+        PortfolioRequest request,
+        List&lt;ObservedExecution&gt; observed
+    ) {
+<span class="fc" id="L245">        Aggregate aggregate = aggregate(</span>
+            request,
+            new SolverPortfolioPlanner.Plan(
+<span class="fc" id="L248">                List.of(), List.of(), SolverIr.sha256(&quot;intermediate-plan&quot;)),</span>
+            observed, false, false, false, false);
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (aggregate.outcome() == PortfolioOutcome.CONFLICT) {</span>
+<span class="fc" id="L251">            return true;</span>
+        }
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        if (request.policy() == PortfolioPolicy.INDEPENDENT_CONFIRMATION) {</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            return aggregate.outcome() == PortfolioOutcome.CONFIRMED;</span>
+        }
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        return aggregate.outcome() == PortfolioOutcome.REFUTED</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            || aggregate.outcome() == PortfolioOutcome.CONFIRMED;</span>
+    }
+
+    private static Aggregate aggregate(
+        PortfolioRequest request,
+        SolverPortfolioPlanner.Plan plan,
+        List&lt;ObservedExecution&gt; observed,
+        boolean cancelled,
+        boolean budgetExhausted,
+        boolean timedOut,
+        boolean failed
+    ) {
+<span class="fc" id="L269">        List&lt;ObservedExecution&gt; lossless = observed.stream()</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            .filter(item -&gt; item.execution().translation().status()</span>
+                == TranslationStatus.LOSSLESS)
+<span class="fc" id="L272">            .toList();</span>
+<span class="fc" id="L273">        List&lt;ObservedExecution&gt; allConfirmations = lossless.stream()</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            .filter(item -&gt; item.execution().result().status()</span>
+                == ResultStatus.CONFIRMED)
+<span class="fc" id="L276">            .toList();</span>
+<span class="fc" id="L277">        List&lt;ObservedExecution&gt; mathematicalConfirmations = allConfirmations.stream()</span>
+<span class="fc" id="L278">            .filter(item -&gt; item.profile().roles().stream()</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">                .anyMatch(role -&gt; role != BackendRole.SEARCH_GUIDANCE))</span>
+<span class="fc" id="L280">            .toList();</span>
+<span class="fc" id="L281">        List&lt;ObservedExecution&gt; refutations = lossless.stream()</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            .filter(item -&gt; item.execution().result().status()</span>
+                == ResultStatus.REFUTED)
+<span class="fc" id="L284">            .filter(item -&gt; item.profile().canRefute())</span>
+<span class="fc" id="L285">            .toList();</span>
+<span class="fc bfc" id="L286" title="All 4 branches covered.">        if (!mathematicalConfirmations.isEmpty() &amp;&amp; !refutations.isEmpty()) {</span>
+<span class="fc" id="L287">            List&lt;String&gt; conflicts = java.util.stream.Stream.concat(</span>
+<span class="fc" id="L288">                    mathematicalConfirmations.stream(), refutations.stream())</span>
+<span class="fc" id="L289">                .map(item -&gt; item.execution().contentHash())</span>
+<span class="fc" id="L290">                .distinct().sorted().toList();</span>
+<span class="fc" id="L291">            return new Aggregate(</span>
+                PortfolioOutcome.CONFLICT, null, conflicts, false);
+        }
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        if (!refutations.isEmpty()) {</span>
+<span class="fc" id="L295">            ObservedExecution selected = refutations.stream()</span>
+<span class="fc" id="L296">                .sorted(observedComparator())</span>
+<span class="fc" id="L297">                .findFirst().orElseThrow();</span>
+<span class="fc" id="L298">            return new Aggregate(</span>
+<span class="fc" id="L299">                PortfolioOutcome.REFUTED, selected, List.of(), false);</span>
+        }
+<span class="fc" id="L301">        List&lt;ObservedExecution&gt; qualifying = allConfirmations.stream()</span>
+<span class="fc" id="L302">            .filter(item -&gt; item.profile().canConfirm(request.objective()))</span>
+<span class="fc" id="L303">            .filter(item -&gt; confirmationCarriesRequiredEvidence(</span>
+<span class="fc" id="L304">                request.objective(), item.execution()))</span>
+<span class="fc" id="L305">            .sorted(observedComparator())</span>
+<span class="fc" id="L306">            .toList();</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        int requiredConfirmations = request.policy()</span>
+<span class="fc" id="L308">                == PortfolioPolicy.INDEPENDENT_CONFIRMATION ? 2 : 1;</span>
+<span class="fc" id="L309">        long distinctConfirmations = qualifying.stream()</span>
+<span class="fc" id="L310">            .map(item -&gt; item.profile().backendId())</span>
+<span class="fc" id="L311">            .distinct().count();</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (distinctConfirmations &gt;= requiredConfirmations) {</span>
+<span class="fc" id="L313">            ObservedExecution selected = selectConfirmation(request, qualifying);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            boolean proofAuthorized = request.objective().proofObjective()</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                &amp;&amp; selected.profile().canConfirm(request.objective())</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                &amp;&amp; confirmationCarriesRequiredEvidence(</span>
+<span class="fc" id="L317">                    request.objective(), selected.execution());</span>
+<span class="fc" id="L318">            return new Aggregate(</span>
+<span class="fc" id="L319">                PortfolioOutcome.CONFIRMED, selected, List.of(), proofAuthorized);</span>
+        }
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (cancelled) {</span>
+<span class="fc" id="L322">            return new Aggregate(</span>
+<span class="fc" id="L323">                PortfolioOutcome.CANCELLED, null, List.of(), false);</span>
+        }
+<span class="fc bfc" id="L325" title="All 4 branches covered.">        if (plan.planned().isEmpty() &amp;&amp; observed.isEmpty()) {</span>
+<span class="fc" id="L326">            return new Aggregate(</span>
+<span class="fc" id="L327">                PortfolioOutcome.UNSUPPORTED, null, List.of(), false);</span>
+        }
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (budgetExhausted) {</span>
+<span class="nc" id="L330">            return new Aggregate(</span>
+<span class="nc" id="L331">                PortfolioOutcome.BUDGET_EXHAUSTED, null, List.of(), false);</span>
+        }
+<span class="pc bpc" id="L333" title="3 of 4 branches missed.">        if (timedOut &amp;&amp; observed.isEmpty()) {</span>
+<span class="nc" id="L334">            return new Aggregate(</span>
+<span class="nc" id="L335">                PortfolioOutcome.TIMEOUT, null, List.of(), false);</span>
+        }
+<span class="pc bpc" id="L337" title="2 of 4 branches missed.">        if (!observed.isEmpty() &amp;&amp; observed.stream().allMatch(item -&gt;</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">                item.execution().result().status() == ResultStatus.UNSUPPORTED)) {</span>
+<span class="nc" id="L339">            return new Aggregate(</span>
+<span class="nc" id="L340">                PortfolioOutcome.UNSUPPORTED, null, List.of(), false);</span>
+        }
+<span class="pc bpc" id="L342" title="3 of 4 branches missed.">        if (failed &amp;&amp; observed.isEmpty()) {</span>
+<span class="nc" id="L343">            return new Aggregate(</span>
+<span class="nc" id="L344">                PortfolioOutcome.ERROR, null, List.of(), false);</span>
+        }
+<span class="fc" id="L346">        return new Aggregate(</span>
+<span class="fc" id="L347">            PortfolioOutcome.INCONCLUSIVE, null, List.of(), false);</span>
+    }
+
+    private static boolean confirmationCarriesRequiredEvidence(
+        SolverObjective objective,
+        SolverExecution execution
+    ) {
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (!objective.proofObjective()) {</span>
+<span class="fc" id="L355">            return true;</span>
+        }
+<span class="fc" id="L357">        return execution.result().certificateHash()</span>
+<span class="fc" id="L358">            .matches(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+    }
+
+    private static ObservedExecution selectConfirmation(
+        PortfolioRequest request,
+        List&lt;ObservedExecution&gt; qualifying
+    ) {
+<span class="pc bpc" id="L365" title="2 of 5 branches missed.">        BackendRole preferred = switch (request.objective()) {</span>
+<span class="fc" id="L366">            case FORMAL_PROOF -&gt; BackendRole.FORMAL_PROOF;</span>
+<span class="fc" id="L367">            case SYMBOLIC_CONFIRMATION -&gt; BackendRole.SYMBOLIC_CONFIRMATION;</span>
+<span class="fc" id="L368">            case VALIDATION -&gt; BackendRole.ORACLE_VALIDATION;</span>
+<span class="nc" id="L369">            case SEARCH_GUIDANCE -&gt; BackendRole.SEARCH_GUIDANCE;</span>
+<span class="pc" id="L370">            case COUNTEREXAMPLE_SEARCH -&gt; BackendRole.COUNTEREXAMPLE;</span>
+        };
+<span class="fc" id="L372">        return qualifying.stream()</span>
+<span class="fc" id="L373">            .filter(item -&gt; item.profile().roles().contains(preferred))</span>
+<span class="fc" id="L374">            .findFirst()</span>
+<span class="fc" id="L375">            .orElse(qualifying.getFirst());</span>
+    }
+
+    private static Comparator&lt;ObservedExecution&gt; observedComparator() {
+<span class="fc" id="L379">        return Comparator</span>
+<span class="fc" id="L380">            .comparingInt((ObservedExecution item) -&gt;</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">                item.profile().roles().contains(BackendRole.FORMAL_PROOF) ? 0</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">                    : item.profile().roles().contains(</span>
+<span class="nc" id="L383">                        BackendRole.SYMBOLIC_CONFIRMATION) ? 1</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                    : item.profile().roles().contains(</span>
+<span class="nc" id="L385">                        BackendRole.ORACLE_VALIDATION) ? 2</span>
+<span class="nc" id="L386">                    : 3)</span>
+<span class="pc" id="L387">            .thenComparing(item -&gt; item.profile().backendId());</span>
+    }
+
+    private static boolean cacheEntryMatches(
+        PortfolioRequest request,
+        BackendCapabilityProfile profile,
+        SolverExecution execution
+    ) {
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        return request.obligation().contentHash().equals(execution.obligationHash())</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">            &amp;&amp; profile.backendId().equals(execution.result().backendId())</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            &amp;&amp; profile.backendVersion().equals(execution.result().backendVersion());</span>
+    }
+
+    private static String attemptConfigurationHash(
+        PortfolioRequest request,
+        BackendCapabilityProfile profile,
+        long timeoutMillis
+    ) {
+<span class="fc" id="L405">        return SolverIr.sha256(</span>
+<span class="fc" id="L406">            &quot;requestConfiguration=&quot; + request.configurationId()</span>
+<span class="fc" id="L407">                + &quot;\nprofile=&quot; + profile.semanticHash()</span>
+                + &quot;\ntimeoutMillis=&quot; + timeoutMillis);
+    }
+
+    private static String cacheKey(
+        PortfolioRequest request,
+        BackendCapabilityProfile profile,
+        String attemptConfigurationHash
+    ) {
+<span class="fc" id="L416">        return SolverIr.sha256(</span>
+<span class="fc" id="L417">            &quot;obligation=&quot; + request.obligation().contentHash()</span>
+<span class="fc" id="L418">                + &quot;\nbackendProfile=&quot; + profile.semanticHash()</span>
+                + &quot;\nattemptConfiguration=&quot; + attemptConfigurationHash);
+    }
+
+<span class="fc" id="L422">    private record Invocation(</span>
+        AttemptDisposition disposition,
+        SolverExecution execution,
+        List&lt;String&gt; issues
+    ) {
+    }
+
+<span class="fc" id="L429">    private record ObservedExecution(</span>
+        BackendCapabilityProfile profile,
+        SolverExecution execution
+    ) {
+    }
+
+<span class="fc" id="L435">    private record Aggregate(</span>
+        PortfolioOutcome outcome,
+        ObservedExecution selected,
+        List&lt;String&gt; conflictHashes,
+        boolean proofAuthorized
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

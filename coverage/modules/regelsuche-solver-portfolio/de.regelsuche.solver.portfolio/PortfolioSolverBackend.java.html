@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PortfolioSolverBackend.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">PortfolioSolverBackend.java</span></div><h1>PortfolioSolverBackend.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.SolverBackend;
+import de.regelsuche.solver.ir.SolverExecution;
+import de.regelsuche.solver.ir.SolverIr.BackendDescriptor;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.ResultStatus;
+import de.regelsuche.solver.ir.SolverIr.SolverResult;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
+import de.regelsuche.solver.ir.SolverTranslation;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/** SolverBackend-compatible facade so existing proof gates consume only a selected execution. */
+public final class PortfolioSolverBackend implements SolverBackend {
+    private final SolverObjective objectiveOverride;
+    private final PortfolioPolicy policy;
+    private final PortfolioBudget budget;
+    private final String configurationId;
+    private final SolverPortfolioExecutor executor;
+<span class="fc" id="L27">    private final ThreadLocal&lt;PortfolioRun&gt; lastRun = new ThreadLocal&lt;&gt;();</span>
+    private final BackendDescriptor descriptor;
+
+    public PortfolioSolverBackend(
+        List&lt;? extends PortfolioBackend&gt; backends,
+        PortfolioPolicy policy,
+        PortfolioBudget budget,
+        String configurationId
+    ) {
+<span class="fc" id="L36">        this(backends, null, policy, budget, configurationId,</span>
+            new InMemoryPortfolioExecutionCache());
+<span class="fc" id="L38">    }</span>
+
+    /**
+     * Creates a facade for a caller that explicitly requires one objective,
+     * independent of the weaker evidence strength carried by an existing IR
+     * obligation. This lets a proof gate retain its canonical statement while
+     * requiring the portfolio to continue through formal confirmation.
+     */
+    public PortfolioSolverBackend(
+        List&lt;? extends PortfolioBackend&gt; backends,
+        SolverObjective objective,
+        PortfolioPolicy policy,
+        PortfolioBudget budget,
+        String configurationId
+    ) {
+<span class="fc" id="L53">        this(backends, Objects.requireNonNull(objective, &quot;objective&quot;), policy,</span>
+            budget, configurationId, new InMemoryPortfolioExecutionCache());
+<span class="fc" id="L55">    }</span>
+
+    public PortfolioSolverBackend(
+        List&lt;? extends PortfolioBackend&gt; backends,
+        PortfolioPolicy policy,
+        PortfolioBudget budget,
+        String configurationId,
+        PortfolioExecutionCache cache
+    ) {
+<span class="nc" id="L64">        this(backends, null, policy, budget, configurationId, cache);</span>
+<span class="nc" id="L65">    }</span>
+
+    public PortfolioSolverBackend(
+        List&lt;? extends PortfolioBackend&gt; backends,
+        SolverObjective objectiveOverride,
+        PortfolioPolicy policy,
+        PortfolioBudget budget,
+        String configurationId,
+        PortfolioExecutionCache cache
+<span class="fc" id="L74">    ) {</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        List&lt;PortfolioBackend&gt; copiedBackends = backends == null</span>
+<span class="pc" id="L76">            ? List.of() : List.copyOf(backends);</span>
+<span class="fc" id="L77">        this.objectiveOverride = objectiveOverride;</span>
+<span class="fc" id="L78">        this.policy = Objects.requireNonNull(policy, &quot;policy&quot;);</span>
+<span class="fc" id="L79">        this.budget = Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">        if (configurationId == null || configurationId.isBlank()) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;configurationId must not be blank&quot;);</span>
+        }
+<span class="fc" id="L83">        this.configurationId = configurationId;</span>
+<span class="fc" id="L84">        this.executor = new SolverPortfolioExecutor(</span>
+<span class="fc" id="L85">            copiedBackends, new SolverPortfolioPlanner(), Objects.requireNonNull(cache));</span>
+<span class="fc" id="L86">        this.descriptor = new BackendDescriptor(</span>
+            &quot;solver-portfolio&quot;,
+            &quot;1&quot;,
+<span class="fc" id="L89">            Arrays.asList(Theory.values()),</span>
+<span class="fc" id="L90">            Arrays.stream(Relation.values())</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                .filter(relation -&gt; relation != Relation.IS_INTEGER).toList(),</span>
+<span class="fc" id="L92">            Arrays.asList(RequestedEvidence.values()),</span>
+<span class="fc" id="L93">            copiedBackends.stream().allMatch(item -&gt; item.profile().deterministic()));</span>
+<span class="fc" id="L94">    }</span>
+
+    @Override
+    public BackendDescriptor descriptor() {
+<span class="nc" id="L98">        return descriptor;</span>
+    }
+
+    @Override
+    public SolverExecution execute(Obligation obligation) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        SolverObjective objective = objectiveOverride == null</span>
+<span class="fc" id="L104">            ? objective(obligation.requestedEvidence())</span>
+<span class="fc" id="L105">            : objectiveOverride;</span>
+<span class="fc" id="L106">        PortfolioRequest request = PortfolioRequest.create(</span>
+            obligation, objective, policy, budget, configurationId);
+<span class="fc" id="L108">        PortfolioRun run = executor.execute(request);</span>
+<span class="fc" id="L109">        lastRun.set(run);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (run.selectedExecution() != null) {</span>
+<span class="fc" id="L111">            return run.selectedExecution();</span>
+        }
+<span class="fc" id="L113">        return syntheticExecution(obligation, run.report());</span>
+    }
+
+    public Optional&lt;PortfolioRun&gt; lastRun() {
+<span class="fc" id="L117">        return Optional.ofNullable(lastRun.get());</span>
+    }
+
+    private SolverExecution syntheticExecution(
+        Obligation obligation,
+        PortfolioReport report
+    ) {
+<span class="fc" id="L124">        List&lt;String&gt; issues = report.attempts().stream()</span>
+<span class="fc" id="L125">            .flatMap(attempt -&gt; attempt.issues().stream())</span>
+<span class="fc" id="L126">            .distinct().sorted().toList();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        boolean rejected = report.outcome() == PortfolioOutcome.UNSUPPORTED;</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        TranslationStatus translationStatus = rejected</span>
+<span class="pc" id="L129">            ? TranslationStatus.REJECTED : TranslationStatus.LOSSLESS;</span>
+<span class="pc bpc" id="L130" title="3 of 4 branches missed.">        if (rejected &amp;&amp; issues.isEmpty()) {</span>
+<span class="nc" id="L131">            issues = List.of(&quot;NO_CAPABLE_PORTFOLIO_BACKEND&quot;);</span>
+        }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        Map&lt;String, String&gt; terms = rejected</span>
+<span class="nc" id="L134">            ? Map.of(&quot;portfolio.report&quot;, report.contentHash())</span>
+<span class="fc" id="L135">            : Map.of(</span>
+<span class="fc" id="L136">                &quot;goal.left&quot;, obligation.goal().left().canonicalMaterial(),</span>
+<span class="fc" id="L137">                &quot;goal.right&quot;, obligation.goal().right().canonicalMaterial(),</span>
+<span class="fc" id="L138">                &quot;portfolio.report&quot;, report.contentHash());</span>
+<span class="fc" id="L139">        SolverTranslation translation = SolverTranslation.create(</span>
+            obligation, descriptor, translationStatus, issues, terms);
+<span class="pc bpc" id="L141" title="5 of 6 branches missed.">        ResultStatus status = switch (report.outcome()) {</span>
+<span class="nc" id="L142">            case UNSUPPORTED -&gt; ResultStatus.UNSUPPORTED;</span>
+<span class="nc" id="L143">            case TIMEOUT -&gt; ResultStatus.TIMEOUT;</span>
+<span class="nc" id="L144">            case ERROR, CONFLICT -&gt; ResultStatus.ERROR;</span>
+<span class="nc" id="L145">            case CONFIRMED -&gt; ResultStatus.CONFIRMED;</span>
+<span class="nc" id="L146">            case REFUTED -&gt; ResultStatus.REFUTED;</span>
+<span class="fc" id="L147">            case INCONCLUSIVE, CANCELLED, BUDGET_EXHAUSTED -&gt; ResultStatus.UNKNOWN;</span>
+        };
+<span class="fc" id="L149">        SolverResult result = SolverResult.create(</span>
+            obligation,
+            descriptor,
+            status,
+            translationStatus,
+<span class="fc" id="L154">            List.of(&quot;CAPABILITY_AWARE_PORTFOLIO&quot;, report.outcome().name()),</span>
+            issues,
+<span class="fc" id="L156">            &quot;portfolioOutcome=&quot; + report.outcome().name()</span>
+<span class="fc" id="L157">                + &quot;; reportHash=&quot; + report.contentHash(),</span>
+<span class="fc" id="L158">            Map.of(),</span>
+            &quot;&quot;);
+<span class="fc" id="L160">        return SolverExecution.create(obligation, translation, result);</span>
+    }
+
+    private static SolverObjective objective(RequestedEvidence evidence) {
+<span class="pc bpc" id="L164" title="3 of 4 branches missed.">        return switch (evidence) {</span>
+<span class="nc" id="L165">            case DECISION -&gt; SolverObjective.VALIDATION;</span>
+<span class="nc" id="L166">            case COUNTEREXAMPLE -&gt; SolverObjective.COUNTEREXAMPLE_SEARCH;</span>
+<span class="nc" id="L167">            case SYMBOLIC_CERTIFICATE -&gt; SolverObjective.SYMBOLIC_CONFIRMATION;</span>
+<span class="fc" id="L168">            case FORMAL_PROOF -&gt; SolverObjective.FORMAL_PROOF;</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

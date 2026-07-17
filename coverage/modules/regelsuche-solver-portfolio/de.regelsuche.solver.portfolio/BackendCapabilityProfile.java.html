@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BackendCapabilityProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">BackendCapabilityProfile.java</span></div><h1>BackendCapabilityProfile.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.Binary;
+import de.regelsuche.solver.ir.SolverIr.BinaryOperator;
+import de.regelsuche.solver.ir.SolverIr.Call;
+import de.regelsuche.solver.ir.SolverIr.Expression;
+import de.regelsuche.solver.ir.SolverIr.Obligation;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.RequestedEvidence;
+import de.regelsuche.solver.ir.SolverIr.Sort;
+import de.regelsuche.solver.ir.SolverIr.Theory;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/** Machine-readable capabilities and non-semantic runtime availability. */
+public record BackendCapabilityProfile(
+    String backendId,
+    String backendVersion,
+    List&lt;String&gt; supportedSchemas,
+    List&lt;Theory&gt; supportedTheories,
+    List&lt;Relation&gt; supportedGoalRelations,
+    List&lt;Relation&gt; supportedAssumptionRelations,
+    List&lt;Sort&gt; supportedSorts,
+    List&lt;BinaryOperator&gt; supportedOperators,
+    boolean supportsCalls,
+    List&lt;RequestedEvidence&gt; supportedEvidence,
+    List&lt;BackendRole&gt; roles,
+    CostClass costClass,
+    long estimatedCostUnits,
+    boolean deterministic,
+    boolean reproducible,
+    BackendAvailability availability,
+    String configurationHash,
+    String semanticHash
+) {
+<span class="fc" id="L42">    public BackendCapabilityProfile {</span>
+<span class="fc" id="L43">        requireText(backendId, &quot;backendId&quot;);</span>
+<span class="fc" id="L44">        requireText(backendVersion, &quot;backendVersion&quot;);</span>
+<span class="fc" id="L45">        supportedSchemas = sortedStrings(supportedSchemas);</span>
+<span class="fc" id="L46">        supportedTheories = sortedEnums(supportedTheories);</span>
+<span class="fc" id="L47">        supportedGoalRelations = sortedEnums(supportedGoalRelations);</span>
+<span class="fc" id="L48">        supportedAssumptionRelations = sortedEnums(supportedAssumptionRelations);</span>
+<span class="fc" id="L49">        supportedSorts = sortedEnums(supportedSorts);</span>
+<span class="fc" id="L50">        supportedOperators = sortedEnums(supportedOperators);</span>
+<span class="fc" id="L51">        supportedEvidence = sortedEnums(supportedEvidence);</span>
+<span class="fc" id="L52">        roles = sortedEnums(roles);</span>
+<span class="fc" id="L53">        Objects.requireNonNull(costClass, &quot;costClass&quot;);</span>
+<span class="fc" id="L54">        Objects.requireNonNull(availability, &quot;availability&quot;);</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (roles.isEmpty()) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(&quot;backend roles must not be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (estimatedCostUnits &lt;= 0L) {</span>
+<span class="nc" id="L59">            throw new IllegalArgumentException(&quot;estimatedCostUnits must be positive&quot;);</span>
+        }
+<span class="fc" id="L61">        requireSha(configurationHash, &quot;configurationHash&quot;);</span>
+<span class="fc" id="L62">        requireSha(semanticHash, &quot;semanticHash&quot;);</span>
+<span class="fc" id="L63">        String expected = semanticHash(</span>
+            backendId, backendVersion, supportedSchemas, supportedTheories,
+            supportedGoalRelations, supportedAssumptionRelations, supportedSorts,
+            supportedOperators, supportsCalls, supportedEvidence, roles, costClass,
+            estimatedCostUnits, deterministic, reproducible, configurationHash);
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (!expected.equals(semanticHash)) {</span>
+<span class="nc" id="L69">            throw new IllegalArgumentException(&quot;capability semanticHash does not match fields&quot;);</span>
+        }
+<span class="fc" id="L71">    }</span>
+
+    public static BackendCapabilityProfile create(
+        String backendId,
+        String backendVersion,
+        List&lt;String&gt; supportedSchemas,
+        List&lt;Theory&gt; supportedTheories,
+        List&lt;Relation&gt; supportedGoalRelations,
+        List&lt;Relation&gt; supportedAssumptionRelations,
+        List&lt;Sort&gt; supportedSorts,
+        List&lt;BinaryOperator&gt; supportedOperators,
+        boolean supportsCalls,
+        List&lt;RequestedEvidence&gt; supportedEvidence,
+        List&lt;BackendRole&gt; roles,
+        CostClass costClass,
+        long estimatedCostUnits,
+        boolean deterministic,
+        boolean reproducible,
+        BackendAvailability availability,
+        String configurationHash
+    ) {
+<span class="fc" id="L92">        List&lt;String&gt; schemas = sortedStrings(supportedSchemas);</span>
+<span class="fc" id="L93">        List&lt;Theory&gt; theories = sortedEnums(supportedTheories);</span>
+<span class="fc" id="L94">        List&lt;Relation&gt; goals = sortedEnums(supportedGoalRelations);</span>
+<span class="fc" id="L95">        List&lt;Relation&gt; assumptions = sortedEnums(supportedAssumptionRelations);</span>
+<span class="fc" id="L96">        List&lt;Sort&gt; sorts = sortedEnums(supportedSorts);</span>
+<span class="fc" id="L97">        List&lt;BinaryOperator&gt; operators = sortedEnums(supportedOperators);</span>
+<span class="fc" id="L98">        List&lt;RequestedEvidence&gt; evidence = sortedEnums(supportedEvidence);</span>
+<span class="fc" id="L99">        List&lt;BackendRole&gt; orderedRoles = sortedEnums(roles);</span>
+<span class="fc" id="L100">        return new BackendCapabilityProfile(</span>
+            backendId, backendVersion, schemas, theories, goals, assumptions,
+            sorts, operators, supportsCalls, evidence, orderedRoles, costClass,
+            estimatedCostUnits, deterministic, reproducible, availability,
+            configurationHash,
+<span class="fc" id="L105">            semanticHash(backendId, backendVersion, schemas, theories, goals,</span>
+                assumptions, sorts, operators, supportsCalls, evidence,
+                orderedRoles, costClass, estimatedCostUnits, deterministic,
+                reproducible, configurationHash));
+    }
+
+    public BackendCapabilityProfile withAvailability(BackendAvailability next) {
+<span class="fc" id="L112">        return new BackendCapabilityProfile(</span>
+            backendId, backendVersion, supportedSchemas, supportedTheories,
+            supportedGoalRelations, supportedAssumptionRelations, supportedSorts,
+            supportedOperators, supportsCalls, supportedEvidence, roles, costClass,
+            estimatedCostUnits, deterministic, reproducible, next,
+            configurationHash, semanticHash);
+    }
+
+    public List&lt;String&gt; capabilityIssues(Obligation obligation) {
+<span class="fc" id="L121">        Objects.requireNonNull(obligation, &quot;obligation&quot;);</span>
+<span class="fc" id="L122">        List&lt;String&gt; issues = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (!supportedSchemas.contains(obligation.schema())) {</span>
+<span class="nc" id="L124">            issues.add(&quot;UNSUPPORTED_SCHEMA:&quot; + obligation.schema());</span>
+        }
+<span class="fc" id="L126">        obligation.theories().stream()</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            .filter(theory -&gt; !supportedTheories.contains(theory))</span>
+<span class="pc" id="L128">            .forEach(theory -&gt; issues.add(&quot;UNSUPPORTED_THEORY:&quot; + theory.name()));</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (!supportedGoalRelations.contains(obligation.goal().relation())) {</span>
+<span class="nc" id="L130">            issues.add(&quot;UNSUPPORTED_GOAL_RELATION:&quot; + obligation.goal().relation().name());</span>
+        }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (!supportedEvidence.contains(obligation.requestedEvidence())) {</span>
+<span class="nc" id="L133">            issues.add(&quot;UNSUPPORTED_EVIDENCE:&quot; + obligation.requestedEvidence().name());</span>
+        }
+<span class="fc" id="L135">        obligation.declarations().stream()</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            .filter(declaration -&gt; !supportedSorts.contains(declaration.sort()))</span>
+<span class="pc" id="L137">            .forEach(declaration -&gt; issues.add(</span>
+<span class="nc" id="L138">                &quot;UNSUPPORTED_SORT:&quot; + declaration.name() + ':' + declaration.sort().name()));</span>
+<span class="fc" id="L139">        obligation.assumptions().stream()</span>
+<span class="pc bnc" id="L140" title="All 2 branches missed.">            .filter(assumption -&gt; !supportedAssumptionRelations.contains(assumption.relation()))</span>
+<span class="pc" id="L141">            .forEach(assumption -&gt; issues.add(</span>
+<span class="nc" id="L142">                &quot;UNSUPPORTED_ASSUMPTION_RELATION:&quot; + assumption.relation().name()));</span>
+
+<span class="fc" id="L144">        Set&lt;BinaryOperator&gt; operators = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L145">        boolean[] calls = new boolean[] {false};</span>
+<span class="fc" id="L146">        inspect(obligation.goal().left(), operators, calls);</span>
+<span class="fc" id="L147">        inspect(obligation.goal().right(), operators, calls);</span>
+<span class="fc" id="L148">        obligation.assumptions().forEach(assumption -&gt; {</span>
+<span class="nc" id="L149">            inspect(assumption.left(), operators, calls);</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (assumption.right() != null) {</span>
+<span class="nc" id="L151">                inspect(assumption.right(), operators, calls);</span>
+            }
+<span class="nc" id="L153">        });</span>
+<span class="fc" id="L154">        operators.stream()</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            .filter(operator -&gt; !supportedOperators.contains(operator))</span>
+<span class="fc" id="L156">            .forEach(operator -&gt; issues.add(&quot;UNSUPPORTED_OPERATOR:&quot; + operator.name()));</span>
+<span class="pc bpc" id="L157" title="3 of 4 branches missed.">        if (calls[0] &amp;&amp; !supportsCalls) {</span>
+<span class="nc" id="L158">            issues.add(&quot;UNSUPPORTED_CALL_EXPRESSION&quot;);</span>
+        }
+<span class="fc" id="L160">        return issues.stream().distinct().sorted().toList();</span>
+    }
+
+    public boolean canContributeTo(SolverObjective objective) {
+<span class="fc" id="L164">        return roles.stream().anyMatch(role -&gt; role.contributesTo(objective));</span>
+    }
+
+    public boolean canConfirm(SolverObjective objective) {
+<span class="fc" id="L168">        return roles.stream().anyMatch(role -&gt; role.canConfirm(objective));</span>
+    }
+
+    public boolean canRefute() {
+<span class="fc" id="L172">        return roles.stream().anyMatch(BackendRole::canRefute);</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="nc" id="L176">        return new JsonWriter().beginObject()</span>
+<span class="nc" id="L177">            .property(&quot;backendId&quot;, backendId)</span>
+<span class="nc" id="L178">            .property(&quot;backendVersion&quot;, backendVersion)</span>
+<span class="nc" id="L179">            .stringArray(&quot;supportedSchemas&quot;, supportedSchemas)</span>
+<span class="nc" id="L180">            .stringArray(&quot;supportedTheories&quot;, names(supportedTheories))</span>
+<span class="nc" id="L181">            .stringArray(&quot;supportedGoalRelations&quot;, names(supportedGoalRelations))</span>
+<span class="nc" id="L182">            .stringArray(&quot;supportedAssumptionRelations&quot;, names(supportedAssumptionRelations))</span>
+<span class="nc" id="L183">            .stringArray(&quot;supportedSorts&quot;, names(supportedSorts))</span>
+<span class="nc" id="L184">            .stringArray(&quot;supportedOperators&quot;, names(supportedOperators))</span>
+<span class="nc" id="L185">            .property(&quot;supportsCalls&quot;, supportsCalls)</span>
+<span class="nc" id="L186">            .stringArray(&quot;supportedEvidence&quot;, names(supportedEvidence))</span>
+<span class="nc" id="L187">            .stringArray(&quot;roles&quot;, names(roles))</span>
+<span class="nc" id="L188">            .property(&quot;costClass&quot;, costClass.name())</span>
+<span class="nc" id="L189">            .property(&quot;estimatedCostUnits&quot;, estimatedCostUnits)</span>
+<span class="nc" id="L190">            .property(&quot;deterministic&quot;, deterministic)</span>
+<span class="nc" id="L191">            .property(&quot;reproducible&quot;, reproducible)</span>
+<span class="nc" id="L192">            .property(&quot;availability&quot;, availability.name())</span>
+<span class="nc" id="L193">            .property(&quot;configurationHash&quot;, configurationHash)</span>
+<span class="nc" id="L194">            .property(&quot;semanticHash&quot;, semanticHash)</span>
+<span class="nc" id="L195">            .endObject()</span>
+<span class="nc" id="L196">            .toString();</span>
+    }
+
+    private static void inspect(
+        Expression expression,
+        Set&lt;BinaryOperator&gt; operators,
+        boolean[] calls
+    ) {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (expression instanceof Binary binary) {</span>
+<span class="fc" id="L205">            operators.add(binary.operator());</span>
+<span class="fc" id="L206">            inspect(binary.left(), operators, calls);</span>
+<span class="fc" id="L207">            inspect(binary.right(), operators, calls);</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        } else if (expression instanceof Call call) {</span>
+<span class="nc" id="L209">            calls[0] = true;</span>
+<span class="nc" id="L210">            call.arguments().forEach(argument -&gt; inspect(argument, operators, calls));</span>
+        }
+<span class="fc" id="L212">    }</span>
+
+    private static String semanticHash(
+        String backendId,
+        String backendVersion,
+        List&lt;String&gt; schemas,
+        List&lt;Theory&gt; theories,
+        List&lt;Relation&gt; goals,
+        List&lt;Relation&gt; assumptions,
+        List&lt;Sort&gt; sorts,
+        List&lt;BinaryOperator&gt; operators,
+        boolean supportsCalls,
+        List&lt;RequestedEvidence&gt; evidence,
+        List&lt;BackendRole&gt; roles,
+        CostClass costClass,
+        long cost,
+        boolean deterministic,
+        boolean reproducible,
+        String configurationHash
+    ) {
+<span class="fc" id="L232">        return SolverIr.sha256(</span>
+            &quot;backend=&quot; + backendId + '@' + backendVersion
+                + &quot;\nschemas=&quot; + schemas
+                + &quot;\ntheories=&quot; + theories
+                + &quot;\ngoals=&quot; + goals
+                + &quot;\nassumptions=&quot; + assumptions
+                + &quot;\nsorts=&quot; + sorts
+                + &quot;\noperators=&quot; + operators
+                + &quot;\ncalls=&quot; + supportsCalls
+                + &quot;\nevidence=&quot; + evidence
+                + &quot;\nroles=&quot; + roles
+<span class="fc" id="L243">                + &quot;\ncost=&quot; + costClass.name() + ':' + cost</span>
+                + &quot;\ndeterministic=&quot; + deterministic
+                + &quot;\nreproducible=&quot; + reproducible
+                + &quot;\nconfiguration=&quot; + configurationHash);
+    }
+
+    private static List&lt;String&gt; sortedStrings(List&lt;String&gt; values) {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L251">            return List.of();</span>
+        }
+<span class="fc" id="L253">        return values.stream()</span>
+<span class="pc bpc" id="L254" title="2 of 4 branches missed.">            .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L255">            .map(String::trim)</span>
+<span class="fc" id="L256">            .distinct()</span>
+<span class="fc" id="L257">            .sorted()</span>
+<span class="fc" id="L258">            .toList();</span>
+    }
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; List&lt;E&gt; sortedEnums(List&lt;E&gt; values) {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L263">            return List.of();</span>
+        }
+<span class="fc" id="L265">        return values.stream()</span>
+<span class="fc" id="L266">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L267">            .distinct()</span>
+<span class="fc" id="L268">            .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L269">            .toList();</span>
+    }
+
+    private static List&lt;String&gt; names(List&lt;? extends Enum&lt;?&gt;&gt; values) {
+<span class="nc" id="L273">        return values.stream().map(Enum::name).toList();</span>
+    }
+
+    private static void requireText(String value, String name) {
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L278">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L280">    }</span>
+
+    private static void requireSha(String value, String name) {
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L284">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L286">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

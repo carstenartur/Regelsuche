@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BackendRole.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">BackendRole.java</span></div><h1>BackendRole.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+/** Semantic role of one backend result inside a portfolio. */
+<span class="fc" id="L4">public enum BackendRole {</span>
+<span class="fc" id="L5">    SEARCH_GUIDANCE,</span>
+<span class="fc" id="L6">    ORACLE_VALIDATION,</span>
+<span class="fc" id="L7">    COUNTEREXAMPLE,</span>
+<span class="fc" id="L8">    SYMBOLIC_CONFIRMATION,</span>
+<span class="fc" id="L9">    FORMAL_PROOF;</span>
+
+    public boolean contributesTo(SolverObjective objective) {
+<span class="pc bpc" id="L12" title="2 of 5 branches missed.">        return switch (objective) {</span>
+<span class="nc bnc" id="L13" title="All 2 branches missed.">            case SEARCH_GUIDANCE -&gt; this == SEARCH_GUIDANCE;</span>
+<span class="pc bpc" id="L14" title="1 of 2 branches missed.">            case VALIDATION -&gt; this != SEARCH_GUIDANCE;</span>
+<span class="nc bnc" id="L15" title="All 2 branches missed.">            case COUNTEREXAMPLE_SEARCH -&gt; this != SEARCH_GUIDANCE;</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">            case SYMBOLIC_CONFIRMATION -&gt; this != SEARCH_GUIDANCE;</span>
+<span class="fc" id="L17">            case FORMAL_PROOF -&gt; true;</span>
+        };
+    }
+
+    public boolean canConfirm(SolverObjective objective) {
+<span class="pc bpc" id="L22" title="2 of 5 branches missed.">        return switch (objective) {</span>
+<span class="nc bnc" id="L23" title="All 2 branches missed.">            case SEARCH_GUIDANCE -&gt; this == SEARCH_GUIDANCE;</span>
+<span class="pc bpc" id="L24" title="5 of 6 branches missed.">            case VALIDATION -&gt; this == ORACLE_VALIDATION</span>
+                || this == SYMBOLIC_CONFIRMATION
+                || this == FORMAL_PROOF;
+<span class="nc" id="L27">            case COUNTEREXAMPLE_SEARCH -&gt; false;</span>
+<span class="pc bpc" id="L28" title="1 of 4 branches missed.">            case SYMBOLIC_CONFIRMATION -&gt; this == SYMBOLIC_CONFIRMATION</span>
+                || this == FORMAL_PROOF;
+<span class="fc bfc" id="L30" title="All 2 branches covered.">            case FORMAL_PROOF -&gt; this == FORMAL_PROOF;</span>
+        };
+    }
+
+    public boolean canRefute() {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        return this != SEARCH_GUIDANCE;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

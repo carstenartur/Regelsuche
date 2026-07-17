@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StandardPortfolioBackends.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-solver-portfolio</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.solver.portfolio</a> &gt; <span class="el_source">StandardPortfolioBackends.java</span></div><h1>StandardPortfolioBackends.java</h1><pre class="source lang-java linenums">package de.regelsuche.solver.portfolio;
+
+import de.regelsuche.solver.ir.PolynomialNormalFormSolverBackend;
+import de.regelsuche.solver.ir.RegelsucheSearchBackend;
+import de.regelsuche.solver.ir.SolverIr;
+import de.regelsuche.solver.ir.SolverIr.BinaryOperator;
+import de.regelsuche.solver.ir.SolverIr.Relation;
+import de.regelsuche.solver.ir.SolverIr.Sort;
+import java.util.Arrays;
+import java.util.List;
+
+/** Explicit declarations for the initial three-role portfolio; selection remains capability-based. */
+public final class StandardPortfolioBackends {
+    private StandardPortfolioBackends() {
+    }
+
+    public static PortfolioBackend search() {
+<span class="nc" id="L18">        RegelsucheSearchBackend backend = new RegelsucheSearchBackend();</span>
+<span class="nc" id="L19">        return new DeclaredPortfolioBackend(</span>
+            backend,
+<span class="nc" id="L21">            BackendCapabilityProfile.create(</span>
+<span class="nc" id="L22">                backend.descriptor().backendId(), backend.descriptor().backendVersion(),</span>
+<span class="nc" id="L23">                List.of(SolverIr.OBLIGATION_SCHEMA),</span>
+<span class="nc" id="L24">                backend.descriptor().supportedTheories(),</span>
+<span class="nc" id="L25">                backend.descriptor().supportedRelations(),</span>
+<span class="nc" id="L26">                List.of(),</span>
+<span class="nc" id="L27">                List.of(Sort.REAL),</span>
+<span class="nc" id="L28">                Arrays.asList(BinaryOperator.values()),</span>
+                true,
+<span class="nc" id="L30">                backend.descriptor().supportedEvidence(),</span>
+<span class="nc" id="L31">                List.of(BackendRole.SEARCH_GUIDANCE),</span>
+                CostClass.LOW,
+                5L,
+                true,
+                true,
+                BackendAvailability.AVAILABLE,
+<span class="nc" id="L37">                SolverIr.sha256(&quot;regelsuche-search/default-heuristic/v1&quot;)));</span>
+    }
+
+    public static PortfolioBackend polynomialNormalForm() {
+<span class="fc" id="L41">        PolynomialNormalFormSolverBackend backend =</span>
+            new PolynomialNormalFormSolverBackend();
+<span class="fc" id="L43">        return new DeclaredPortfolioBackend(</span>
+            backend,
+<span class="fc" id="L45">            BackendCapabilityProfile.create(</span>
+<span class="fc" id="L46">                backend.descriptor().backendId(), backend.descriptor().backendVersion(),</span>
+<span class="fc" id="L47">                List.of(SolverIr.OBLIGATION_SCHEMA),</span>
+<span class="fc" id="L48">                backend.descriptor().supportedTheories(),</span>
+<span class="fc" id="L49">                backend.descriptor().supportedRelations(),</span>
+<span class="fc" id="L50">                List.of(),</span>
+<span class="fc" id="L51">                List.of(Sort.REAL),</span>
+<span class="fc" id="L52">                List.of(BinaryOperator.ADD, BinaryOperator.SUBTRACT,</span>
+                    BinaryOperator.MULTIPLY, BinaryOperator.POWER),
+                false,
+<span class="fc" id="L55">                backend.descriptor().supportedEvidence(),</span>
+<span class="fc" id="L56">                List.of(BackendRole.ORACLE_VALIDATION,</span>
+                    BackendRole.COUNTEREXAMPLE,
+                    BackendRole.SYMBOLIC_CONFIRMATION),
+                CostClass.MEDIUM,
+                20L,
+                true,
+                true,
+                BackendAvailability.AVAILABLE,
+<span class="fc" id="L64">                SolverIr.sha256(&quot;polynomial-normal-form/exact-rational/v1&quot;)));</span>
+    }
+
+    public static PortfolioBackend z3(
+        Z3SmtSolverBackend backend,
+        BackendAvailability availability
+    ) {
+<span class="nc" id="L71">        return new DeclaredPortfolioBackend(</span>
+            backend,
+<span class="nc" id="L73">            BackendCapabilityProfile.create(</span>
+<span class="nc" id="L74">                backend.descriptor().backendId(), backend.descriptor().backendVersion(),</span>
+<span class="nc" id="L75">                List.of(SolverIr.OBLIGATION_SCHEMA),</span>
+<span class="nc" id="L76">                backend.descriptor().supportedTheories(),</span>
+<span class="nc" id="L77">                backend.descriptor().supportedRelations(),</span>
+<span class="nc" id="L78">                Arrays.asList(Relation.values()),</span>
+<span class="nc" id="L79">                List.of(Sort.REAL),</span>
+<span class="nc" id="L80">                Arrays.asList(BinaryOperator.values()),</span>
+                false,
+<span class="nc" id="L82">                backend.descriptor().supportedEvidence(),</span>
+<span class="nc" id="L83">                List.of(BackendRole.ORACLE_VALIDATION,</span>
+                    BackendRole.COUNTEREXAMPLE,
+                    BackendRole.FORMAL_PROOF),
+                CostClass.HIGH,
+                100L,
+                true,
+                true,
+                availability,
+<span class="nc" id="L91">                backend.configurationHash()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
