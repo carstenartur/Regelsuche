@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.domain-generic-discovery-qualification/v1",
+  "title": "Regelsuche domain-generic discovery qualification v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "profile",
+    "claim",
+    "status",
+    "domainGenericClaimAuthorized",
+    "autonomousCampaignClaimAuthorized",
+    "cleanRunCount",
+    "cleanRunsIdentical",
+    "domains",
+    "checks",
+    "blockers",
+    "proofStatus",
+    "externalNoveltyStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.domain-generic-discovery-qualification/v1"
+    },
+    "profile": {
+      "const": "DOMAIN_GENERIC_DISCOVERY"
+    },
+    "claim": {
+      "$ref": "#/$defs/nonBlank"
+    },
+    "status": {
+      "enum": ["READY", "BLOCKED"]
+    },
+    "domainGenericClaimAuthorized": {
+      "type": "boolean"
+    },
+    "autonomousCampaignClaimAuthorized": {
+      "const": false
+    },
+    "cleanRunCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cleanRunsIdentical": {
+      "type": "boolean"
+    },
+    "domains": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/domain"
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "proofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "READY"
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "domainGenericClaimAuthorized": {
+            "const": true
+          },
+          "cleanRunCount": {
+            "minimum": 3
+          },
+          "cleanRunsIdentical": {
+            "const": true
+          },
+          "domains": {
+            "minItems": 2
+          },
+          "blockers": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "domainGenericClaimAuthorized": {
+            "const": false
+          },
+          "blockers": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sha256OrEmpty": {
+      "oneOf": [
+        {"const": ""},
+        {"$ref": "#/$defs/sha256"}
+      ]
+    },
+    "domain": {
+      "type": "object",
+      "required": [
+        "domainId",
+        "domainRevision",
+        "stateType",
+        "candidateType",
+        "certificateType",
+        "domainDescriptorHash",
+        "discoveryEvidenceHash",
+        "lifecycleHandoffHash",
+        "exportVerificationHash",
+        "identityBindingStatus",
+        "outcome",
+        "selectedCandidateHash",
+        "certificateHash",
+        "resourceNames",
+        "resourcesBalanced",
+        "representationFreeHandoff",
+        "proofStatus",
+        "externalNoveltyStatus",
+        "promotionStatus",
+        "publicEvidenceStatus"
+      ],
+      "properties": {
+        "domainId": {"$ref": "#/$defs/identifier"},
+        "domainRevision": {"$ref": "#/$defs/identifier"},
+        "stateType": {"$ref": "#/$defs/identifier"},
+        "candidateType": {"$ref": "#/$defs/identifier"},
+        "certificateType": {"$ref": "#/$defs/identifier"},
+        "domainDescriptorHash": {"$ref": "#/$defs/sha256"},
+        "discoveryEvidenceHash": {"$ref": "#/$defs/sha256"},
+        "lifecycleHandoffHash": {"$ref": "#/$defs/sha256"},
+        "exportVerificationHash": {"$ref": "#/$defs/sha256"},
+        "identityBindingStatus": {"const": "VERIFIED"},
+        "outcome": {
+          "enum": [
+            "CONFIRMED",
+            "REFUTED",
+            "INCONCLUSIVE",
+            "UNSUPPORTED",
+            "BUDGET_EXHAUSTED",
+            "INVALID_SEED"
+          ]
+        },
+        "selectedCandidateHash": {"$ref": "#/$defs/sha256OrEmpty"},
+        "certificateHash": {"$ref": "#/$defs/sha256OrEmpty"},
+        "resourceNames": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/identifier"}
+        },
+        "resourcesBalanced": {"type": "boolean"},
+        "representationFreeHandoff": {"type": "boolean"},
+        "proofStatus": {"const": "NOT_EVALUATED"},
+        "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+        "promotionStatus": {"const": "NOT_EVALUATED"},
+        "publicEvidenceStatus": {"const": "NOT_EVALUATED"}
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "type": "object",
+      "required": ["code", "passed", "actual", "required"],
+      "properties": {
+        "code": {"$ref": "#/$defs/identifier"},
+        "passed": {"type": "boolean"},
+        "actual": {"$ref": "#/$defs/nonBlank"},
+        "required": {"$ref": "#/$defs/nonBlank"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

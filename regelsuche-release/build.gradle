@@ -20,6 +20,7 @@ application {
 
 dependencies {
     api project(':regelsuche-autopilot')
+    api project(':regelsuche-discovery')
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.0'
 
     testImplementation libs.junit.jupiter
@@ -86,6 +87,16 @@ tasks.register('verifyAutonomousCampaignRelease', JavaExec) {
         .get().asFile.absolutePath,
         '--qualify-candidate',
         '--require-ready'
+}
+
+
+tasks.register('runDomainGenericQualification', JavaExec) {
+    group = 'verification'
+    description = 'Runs the separate fail-closed multi-domain discovery qualification.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.release.DomainGenericQualificationMain'
+    args layout.buildDirectory.dir('reports/domain-generic-qualification')
+        .get().asFile.absolutePath
 }
 
 tasks.named('test') {
