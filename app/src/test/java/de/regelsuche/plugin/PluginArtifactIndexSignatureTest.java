@@ -116,9 +116,21 @@ class PluginArtifactIndexSignatureTest {
             verifier.verify(index, wrongRevision).status());
 
         Path indexPath = index.write(tempDir.resolve("index.json"));
-        invalid.write(PluginArtifactIndexSignature.sidecarFor(indexPath));
-        assertThrows(SecurityException.class, () ->
+        Path signaturePath = PluginArtifactIndexSignature.sidecarFor(indexPath);
+        invalid.write(signaturePath);
+        SecurityException failure = assertThrows(SecurityException.class, () ->
             verifier.requireTrusted(indexPath));
+        assertTrue(failure.getMessage().contains("status=INVALID_SIGNATURE"));
+        assertTrue(failure.getMessage().contains(
+            indexPath.toAbsolutePath().normalize().toString()));
+        assertTrue(failure.getMessage().contains(
+            signaturePath.toAbsolutePath().normalize().toString()));
+        assertThrows(NullPointerException.class, () ->
+            verifier.requireTrusted(null));
+        assertThrows(NullPointerException.class, () ->
+            verifier.requireTrusted(null, signaturePath));
+        assertThrows(NullPointerException.class, () ->
+            verifier.requireTrusted(indexPath, null));
     }
 
     @Test
