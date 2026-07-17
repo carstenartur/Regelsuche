@@ -29,7 +29,8 @@ Verify-then-read-Lücke.
 5. Lesen über `NOFOLLOW_LINKS` in genau einen unveränderlichen Byte-Snapshot;
 6. exakte Byte-Länge und SHA-256 aus dem Manifest;
 7. ein identisches Manifest vor und nach dem Lesen aller Artefakte;
-8. striktes JSON einschließlich Duplicate-Field-Erkennung;
+8. striktes JSON einschließlich Duplicate-Field-Erkennung, unbekannter Felder und
+   nachgestellter Tokens;
 9. die exakten Top-Level-Verträge für Descriptor, Discovery Evidence und
    Lifecycle Handoff;
 10. vollständige Campaign-, Domain-, Revision-, Descriptor-, Seed-, Evidence-
@@ -93,6 +94,12 @@ Descriptor und eingebetteter Evidence-Descriptor müssen als JSON-Struktur exakt
 - `identityBindingStatus=VERIFIED`;
 - `mathematicalValidationStatus=NOT_EVALUATED`;
 - einen vollständigen Receipt-Hash.
+
+Der semantische Manifest-Hash prüft den normalisierten Vertragsinhalt. Zulässige
+JSON-Formatierungen mit anderer Whitespace- oder Property-Reihenfolge erhalten
+denselben semantischen Hash, bleiben aber durch `manifestByteHash` als exakt
+unterschiedliche Eingabebytes sichtbar. Duplicate Fields, unbekannte Felder und
+nachgestellte JSON-Werte werden unabhängig davon abgewiesen.
 
 Der Receipt enthält bewusst keinen lokalen Pfad. Er ist übertragbare Evidence
 für die geprüften Bytes und Identitäten, nicht für den Speicherort.
