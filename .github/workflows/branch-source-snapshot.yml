@@ -40,11 +40,10 @@ jobs:
           set -euo pipefail
           tar -xzf /tmp/domain-generic-changes.tar.gz
           rm -f .github/workflows/domain-generic-qualification.yml
-          test -s regleruche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java || \
-            test -s regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java
+          test -s regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java
           test -s regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java
 
-      - name: Stage and validate non-workflow source
+      - name: Stage qualification documentation and schemas
         shell: bash
         run: |
           set -euo pipefail
@@ -53,15 +52,26 @@ jobs:
             docs/domain-generic-qualification.md \
             docs/schemas/regelsuche-domain-generic-evidence-profile-catalog-v1.schema.json \
             docs/schemas/regelsuche-domain-generic-discovery-qualification-v1.schema.json \
-            docs/schemas/regelsuche-domain-generic-discovery-qualification-run-v1.schema.json \
+            docs/schemas/regelsuche-domain-generic-discovery-qualification-run-v1.schema.json
+
+      - name: Stage qualification Java source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add \
             regelsuche-release/build.gradle \
             regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericEvidenceProfile.java \
             regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java \
             regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericQualificationRunner.java \
             regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericQualificationMain.java \
             regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java
+
+      - name: Validate staged qualification source
+        shell: bash
+        run: |
+          set -euo pipefail
           git diff --cached --check
-          test -n "$(git diff --cached --name-only)"
+          test "$(git diff --cached --name-only | wc -l)" -eq 11
 
       - name: Commit non-workflow qualification source
         shell: bash
