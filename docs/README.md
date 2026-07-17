@@ -7,6 +7,7 @@
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md) — kanonische Problemverträge, strukturierte Annahmen, Backend-Capabilities und zwei unabhängige Adapter.
 - [Capability-aware Solver-Portfolio](solver-portfolio.md) — rollenbasierte Backend-Auswahl, Budgets, Timeouts, Cache, Konflikte und formale Z3-Bestätigung.
 - [Vergleichende Discovery-Benchmarks](discovery-benchmarks.md) — informationsgleiche, track-spezifische Baselines ohne universelles Leaderboard.
+- [Generische Discovery-Domänen](generic-discovery-domains.md) — domänenneutrale Generation, Suche, Validierung und Evidence mit Algebra- und Zahlenfolgen-Adapter.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
@@ -15,7 +16,11 @@
 ## Erweiterungen
 
 - [Erweiterungssystem](extension-system.md) — zentrale Architekturkarte und Auswahlhilfe für Java-Plugins, Regeldateien, Knowledge Packs, deklarative und gelernte Makros, Discovery-Operatoren und mathematische Capabilities.
-- [Plugins](plugins.md) — `ServiceLoader`, externe JARs, `PluginRuntime`, Reload, Katalog, Diagnosen und aktuelle Vertrauensgrenzen.
+- [Plugins](plugins.md) — `ServiceLoader`, externe JARs, `PluginRuntime`, Reload, Katalog und Diagnosen.
+- [Kryptografische Plugin-Artefaktprüfung](plugin-artifact-trust.md) — Detached Ed25519-Manifeste, Publisher-Trust-Store, Rotation, Widerruf und Vorlade-Policy.
+- [Plugin-Signatur-Schema v1](schemas/regelsuche-plugin-signature-v1.schema.json)
+- [Plugin-Trust-Store-Schema v1](schemas/regelsuche-plugin-trust-store-v1.schema.json)
+- [Plugin-Artefakt-Verifikations-Schema v1](schemas/regelsuche-plugin-artifact-verification-v1.schema.json)
 - [Plugin-API](plugin-api.md) — Java-Vertrag, Registries, Paketierung und Starter-Template.
 - [Regeldateien](rule-files.md) — `.regelsuche`-/`.rules`-DSL, Profile, Import/Export und Debugging.
 - [Makros](macros.md) — vom Autor deklarierte Makros als Suchkanten.
@@ -32,6 +37,9 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md)
 - [Capability-aware Solver-Portfolio](solver-portfolio.md)
 - [Vergleichende Discovery-Benchmarks](discovery-benchmarks.md)
+- [Generische Discovery-Domänen](generic-discovery-domains.md)
+- [Discovery-Domain-Descriptor-Schema v1](schemas/regelsuche-discovery-domain-descriptor-v1.schema.json)
+- [Domain-Discovery-Evidence-Schema v1](schemas/regelsuche-domain-discovery-evidence-v1.schema.json)
 - [Comparative-Benchmark-Schema v1](schemas/regelsuche-comparative-benchmark-v1.schema.json)
 - [Solver-Portfolio-Report-Schema v1](schemas/regelsuche-solver-portfolio-report-v1.schema.json)
 - [Solver-Obligation-Schema v1](schemas/regelsuche-solver-obligation-v1.schema.json)
