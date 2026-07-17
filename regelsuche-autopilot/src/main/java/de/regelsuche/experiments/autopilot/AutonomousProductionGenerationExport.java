@@ -131,11 +131,11 @@ public final class AutonomousProductionGenerationExport {
                     temporary, StandardOpenOption.WRITE)) {
                 channel.force(true);
             }
+            Files.deleteIfExists(target);
             Files.move(
                 temporary,
                 target,
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING);
+                StandardCopyOption.ATOMIC_MOVE);
         } finally {
             Files.deleteIfExists(temporary);
         }
