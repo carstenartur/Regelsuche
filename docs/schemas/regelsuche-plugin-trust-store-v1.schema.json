@@ -14,12 +14,14 @@
     },
     "keys": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/publisherKey"
       }
     },
     "revokedArtifacts": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
         "$ref": "#/$defs/artifactRevocation"
       }
@@ -78,6 +80,29 @@
           ]
         }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "successorKeyId": {
+                "not": {
+                  "const": ""
+                }
+              }
+            },
+            "required": [
+              "successorKeyId"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "RETIRED"
+              }
+            }
+          }
+        }
+      ],
       "additionalProperties": false
     },
     "artifactRevocation": {
