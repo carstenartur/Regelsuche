@@ -12,6 +12,42 @@ import org.junit.jupiter.api.io.TempDir;
 
 class TrustedPluginRuntimeReloadTest {
     @Test
+    void strictPolicyRequiresExistingRegularTrustStore(@TempDir Path tempDir)
+        throws Exception {
+        Path plugins = tempDir.resolve("plugins");
+        Path rules = tempDir.resolve("rules");
+        Files.createDirectories(plugins);
+        Files.createDirectories(rules);
+        Path missingTrustStore = tempDir.resolve("missing-trust-store.json");
+        PluginRuntimeConfig runtimeConfig = new PluginRuntimeConfig(
+            plugins,
+            rules,
+            false,
+            Set.of(),
+            Set.of()
+        );
+
+        assertThrows(IllegalStateException.class, () -> TrustedPluginRuntime.open(
+            runtimeConfig,
+            new PluginArtifactTrustConfig(
+                missingTrustStore,
+                PluginTrustPolicy.REQUIRE_VERIFIED
+            )
+        ));
+
+        try (TrustedPluginRuntime warningRuntime = TrustedPluginRuntime.open(
+            runtimeConfig,
+            new PluginArtifactTrustConfig(
+                missingTrustStore,
+                PluginTrustPolicy.WARN
+            )
+        )) {
+            assertDoesNotThrow(warningRuntime::runtime);
+            assertDoesNotThrow(warningRuntime::gateResult);
+        }
+    }
+
+    @Test
     void malformedReplacementTrustStoreClosesRuntimeAndClearsOldEvidence(
         @TempDir Path tempDir
     ) throws Exception {
