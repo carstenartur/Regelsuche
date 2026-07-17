@@ -253,8 +253,8 @@ public final class ExpressionRewriteDiscoveryDomain implements DiscoveryDomain<
                             "targetCanonical", targetCanonical));
                 }
                 ExpressionTraceCertificate certificate = new ExpressionTraceCertificate(
-                    canonicalizer.stableHash(candidate.sourceExpression()),
-                    canonicalizer.stableHash(candidate.targetExpression()),
+                    DomainCanonical.sha256(sourceCanonical),
+                    DomainCanonical.sha256(targetCanonical),
                     candidate.ruleIds(),
                     candidate.assumptions(),
                     "VALIDATION_EVIDENCE_NOT_FORMAL_PROOF");
