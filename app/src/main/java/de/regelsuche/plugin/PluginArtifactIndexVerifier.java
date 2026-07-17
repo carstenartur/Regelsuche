@@ -232,7 +232,7 @@ public final class PluginArtifactIndexVerifier {
             }
         }
 
-        public static Verification create(
+        private static Verification create(
             String indexId,
             String revision,
             String indexContentHash,
@@ -380,18 +380,37 @@ public final class PluginArtifactIndexVerifier {
         }
     }
 
-    public record VerifiedIndex(
-        PluginArtifactIndex index,
-        Verification verification
-    ) {
-        public VerifiedIndex {
-            Objects.requireNonNull(index, "index");
-            Objects.requireNonNull(verification, "verification");
+    /**
+     * Authority-bearing result that can only be created by this verifier after
+     * a successful trust decision.
+     */
+    public static final class VerifiedIndex {
+        private final PluginArtifactIndex index;
+        private final Verification verification;
+
+        private VerifiedIndex(
+            PluginArtifactIndex index,
+            Verification verification
+        ) {
+            this.index = Objects.requireNonNull(index, "index");
+            this.verification = Objects.requireNonNull(
+                verification, "verification");
             if (!verification.trusted()
-                    || !index.contentHash().equals(verification.indexContentHash())) {
+                    || !index.indexId().equals(verification.indexId())
+                    || !index.revision().equals(verification.revision())
+                    || !index.contentHash().equals(verification.indexContentHash())
+                    || !index.curatorId().equals(verification.curatorId())) {
                 throw new IllegalArgumentException(
                     "verified index requires trusted matching verification evidence");
             }
+        }
+
+        public PluginArtifactIndex index() {
+            return index;
+        }
+
+        public Verification verification() {
+            return verification;
         }
     }
 }
