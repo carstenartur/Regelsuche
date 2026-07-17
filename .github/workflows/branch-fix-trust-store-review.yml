@@ -27,17 +27,16 @@ jobs:
 
           workflow = Path('.github/workflows/plugin-trust-store-revision.yml')
           text = workflow.read_text(encoding='utf-8')
-          needle = (
+          path_line = (
               "      - 'app/src/test/java/de/regelsuche/plugin/"
               "PluginTrustStoreRevisionTest.java'\n"
           )
-          replacement = needle + (
+          strict_path = (
               "      - 'app/src/test/java/de/regelsuche/plugin/"
               "PluginTrustStoreRevisionStrictJsonTest.java'\n"
           )
-          if text.count(needle) != 2:
-              raise SystemExit('expected two trust revision test path filters')
-          text = text.replace(needle, replacement)
+          if strict_path not in text:
+              text = text.replace(path_line, path_line + strict_path)
           test_line = (
               "            --tests de.regelsuche.plugin."
               "PluginTrustStoreRevisionTest \\\n"
@@ -46,27 +45,30 @@ jobs:
               "            --tests de.regelsuche.plugin."
               "PluginTrustStoreRevisionStrictJsonTest \\\n"
           )
-          if text.count(test_line) != 2:
-              raise SystemExit('expected two targeted trust revision test commands')
-          text = text.replace(test_line, test_line + strict_line)
+          if strict_line not in text:
+              text = text.replace(test_line, test_line + strict_line)
+          if text.count(strict_path) != 2 or text.count(strict_line) != 2:
+              raise SystemExit('dedicated workflow was not patched completely')
           workflow.write_text(text, encoding='utf-8')
 
           documentation = Path('docs/plugin-artifact-trust.md')
           text = documentation.read_text(encoding='utf-8')
-          old = (
+          broad = (
               'Die Java-Parser sind zusätzlich strikt gegenüber unbekannten JSON-Feldern,\n'
               'doppelten Feldern und nachgestellten JSON-Werten.\n'
           )
-          new = (
+          precise = (
               'Die Revision- und Checkpoint-Parser sind zusätzlich strikt gegenüber\n'
               'unbekannten JSON-Feldern, doppelten Feldern und nachgestellten JSON-Werten.\n'
               'Die älteren Trust-Store- und Artefaktmanifest-Parser behalten ihre jeweils\n'
               'dokumentierten Verträge und werden hier nicht pauschal als gleich streng\n'
               'klassifiziert.\n'
           )
-          if old not in text:
-              raise SystemExit('parser strictness paragraph not found')
-          documentation.write_text(text.replace(old, new), encoding='utf-8')
+          if broad in text:
+              text = text.replace(broad, precise)
+          if precise not in text:
+              raise SystemExit('precise parser strictness paragraph is missing')
+          documentation.write_text(text, encoding='utf-8')
           PY
 
           rm -f .github/workflows/branch-fix-trust-store-review.yml
