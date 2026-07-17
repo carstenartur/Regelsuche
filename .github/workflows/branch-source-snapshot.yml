@@ -22,28 +22,31 @@ jobs:
           ref: issue-224-domain-generic-qualification
           fetch-depth: 0
 
-      - name: Decode, validate and commit qualification source
+      - name: Decode and commit non-workflow qualification source
         shell: bash
         run: |
           set -euo pipefail
           cat .github/domain-generic-patch/chunk-* \
             | base64 --decode > /tmp/domain-generic-changes.tar.gz
-          tar -tzf /tmp/domain-generic-changes.tar.gz > /tmp/domain-generic-files.txt
-          grep -qx '.github/workflows/domain-generic-qualification.yml' \
-            /tmp/domain-generic-files.txt
-          grep -qx 'regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java' \
-            /tmp/domain-generic-files.txt
-          grep -qx 'regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java' \
-            /tmp/domain-generic-files.txt
+          test "$(sha256sum /tmp/domain-generic-changes.tar.gz | cut -d' ' -f1)" = \
+            c029497c2618b337e9f0ae110f124f0b52f3ecaad9fa3d24df6625620b734875
           tar -xzf /tmp/domain-generic-changes.tar.gz
-
-          rm -rf .github/domain-generic-patch
-          rm -f .github/workflows/branch-apply-domain-generic.yml
-          rm -f .github/workflows/branch-source-snapshot.yml
+          rm -f .github/workflows/domain-generic-qualification.yml
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add \
+            docs/README.md \
+            docs/domain-generic-qualification.md \
+            docs/schemas/regelsuche-domain-generic-evidence-profile-catalog-v1.schema.json \
+            docs/schemas/regelsuche-domain-generic-discovery-qualification-v1.schema.json \
+            docs/schemas/regelsuche-domain-generic-discovery-qualification-run-v1.schema.json \
+            regelsuche-release/build.gradle \
+            regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericEvidenceProfile.java \
+            regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericDiscoveryQualification.java \
+            regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericQualificationRunner.java \
+            regelsuche-release/src/main/java/de/regelsuche/release/DomainGenericQualificationMain.java \
+            regelsuche-release/src/test/java/de/regelsuche/release/DomainGenericQualificationRunnerTest.java
           git diff --cached --check
           git commit -m 'feat(release): qualify reproducible domain-generic discovery'
           git push origin HEAD:issue-224-domain-generic-qualification
