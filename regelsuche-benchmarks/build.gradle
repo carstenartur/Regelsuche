@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'application'
     id 'jacoco'
 }
 
@@ -11,6 +12,10 @@ java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
+}
+
+application {
+    mainClass = 'de.regelsuche.benchmarks.ComparativeBenchmarkMain'
 }
 
 dependencies {
