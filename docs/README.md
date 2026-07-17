@@ -10,6 +10,7 @@
 - [Generische Discovery-Domänen](generic-discovery-domains.md) — domänenneutrale Generation, Suche, Validierung und Evidence mit Algebra- und Zahlenfolgen-Adapter.
 - [Domänenneutraler Lifecycle-Handoff](domain-lifecycle-handoff.md) — hashgebundene Übergabe aus generischer Discovery und unveränderter algebraischer Produktionsgeneration ohne Repräsentationsstrings.
 - [Generischer Domain-Discovery-Export](domain-discovery-export.md) — manifestgebundene Persistenz von Descriptor, vollständiger Domain Evidence und repräsentationsfreiem Lifecycle-Handoff.
+- [Verifikation generischer Domain-Discovery-Exporte](domain-discovery-export-verification.md) — bounded, symlink-sichere Byte-Snapshots und fail-closed Wurzelbindungen für persistierte Mehrdomänen-Evidence.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
@@ -23,8 +24,12 @@
 - [Plugin-Artefakt-Index-Schema v1](schemas/regelsuche-plugin-artifact-index-v1.schema.json)
 - [Plugin-Artefakt-Auflösungs-Schema v1](schemas/regelsuche-plugin-artifact-resolution-v1.schema.json)
 - [Kryptografische Plugin-Artefaktprüfung](plugin-artifact-trust.md) — Detached Ed25519-Manifeste, Publisher-Trust-Store, Rotation, Widerruf und Vorlade-Policy.
+- [Authentisierte Plugin-Trust-State-Revisionen](plugin-trust-store-revisions.md) — signierte Hashkette, lokale Checkpoints sowie Replay-, Gap- und Fork-Schutz für Publisher-Keys und Widerrufe.
 - [Plugin-Signatur-Schema v1](schemas/regelsuche-plugin-signature-v1.schema.json)
 - [Plugin-Trust-Store-Schema v1](schemas/regelsuche-plugin-trust-store-v1.schema.json)
+- [Plugin-Trust-Store-Revision-Schema v1](schemas/regelsuche-plugin-trust-store-revision-v1.schema.json)
+- [Plugin-Trust-Store-Checkpoint-Schema v1](schemas/regelsuche-plugin-trust-store-chain-checkpoint-v1.schema.json)
+- [Plugin-Trust-Store-Revision-Verifikations-Schema v1](schemas/regelsuche-plugin-trust-store-revision-verification-v1.schema.json)
 - [Plugin-Artefakt-Verifikations-Schema v1](schemas/regelsuche-plugin-artifact-verification-v1.schema.json)
 - [Plugin-Artefakt-Gate-Schema v1](schemas/regelsuche-plugin-artifact-gate-v1.schema.json)
 - [Plugin-API](plugin-api.md) — Java-Vertrag, Registries, Paketierung und Starter-Template.
@@ -46,10 +51,12 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Generische Discovery-Domänen](generic-discovery-domains.md)
 - [Domänenneutraler Lifecycle-Handoff](domain-lifecycle-handoff.md)
 - [Generischer Domain-Discovery-Export](domain-discovery-export.md)
+- [Verifikation generischer Domain-Discovery-Exporte](domain-discovery-export-verification.md)
 - [Discovery-Domain-Descriptor-Schema v1](schemas/regelsuche-discovery-domain-descriptor-v1.schema.json)
 - [Domain-Discovery-Evidence-Schema v1](schemas/regelsuche-domain-discovery-evidence-v1.schema.json)
 - [Discovery-Lifecycle-Handoff-Schema v1](schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json)
 - [Domain-Discovery-Export-Schema v1](schemas/regelsuche-domain-discovery-export-v1.schema.json)
+- [Domain-Discovery-Export-Verifikations-Schema v1](schemas/regelsuche-domain-discovery-export-verification-v1.schema.json)
 - [Comparative-Benchmark-Schema v1](schemas/regelsuche-comparative-benchmark-v1.schema.json)
 - [Solver-Portfolio-Report-Schema v1](schemas/regelsuche-solver-portfolio-report-v1.schema.json)
 - [Solver-Obligation-Schema v1](schemas/regelsuche-solver-obligation-v1.schema.json)
