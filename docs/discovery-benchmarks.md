@@ -63,6 +63,8 @@ configuredWork = executedWork + skippedWork + remainingWork
 completedMandatoryEvaluations <= mandatoryEvaluations
 ```
 
+Publication additionally requires the complete Cartesian matrix of every configuration and every case in the same track. If even one configured evaluation is missing, the writer rejects the run before deleting or replacing any previously retained evidence.
+
 Repeated runs with the fixed environment must produce byte-identical bundles. The dedicated workflow also checks that every standalone retained object is exactly the corresponding object embedded in `report.json`.
 
 ## Explicit coverage gaps
