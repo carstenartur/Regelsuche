@@ -34,13 +34,19 @@ class PluginArtifactIndexTest {
     }
 
     @Test
-    void semanticVersionOrderingSupportsZeroAndPrereleaseRules() {
+    void semanticVersionOrderingSupportsZeroPrereleaseAndUnboundedNumbers() {
         assertTrue(PluginArtifactIndex.compareVersions("0.9.0", "1.0.0") < 0);
         assertTrue(PluginArtifactIndex.compareVersions(
             "1.0.0-alpha.10", "1.0.0-alpha.2") > 0);
         assertTrue(PluginArtifactIndex.compareVersions("1.0.0", "1.0.0-rc.1") > 0);
         assertEquals(0, PluginArtifactIndex.compareVersions(
             "1.0.0+build.1", "1.0.0+build.2"));
+        assertTrue(PluginArtifactIndex.compareVersions(
+            "2147483648.0.0", "2147483647.999999999999999999999.0") > 0);
+        assertEquals(
+            "999999999999999999999999999999.0.0",
+            PluginArtifactIndex.requireVersion(
+                "999999999999999999999999999999.0.0", "version"));
         assertThrows(IllegalArgumentException.class, () ->
             PluginArtifactIndex.requireVersion("01.0.0", "version"));
         assertThrows(IllegalArgumentException.class, () ->
@@ -67,6 +73,32 @@ class PluginArtifactIndexTest {
             StandardCharsets.UTF_8);
         assertThrows(IllegalArgumentException.class, () ->
             PluginArtifactIndex.load(tampered));
+    }
+
+    @Test
+    void rejectsMissingRequiredFieldsEvenWhenDtoDefaultsWouldPreserveHashes(
+        @TempDir Path tempDir
+    ) throws Exception {
+        String json = PluginArtifactIndexFixtures.referenceIndex().toCanonicalJson();
+
+        String missingOptional = json.replaceFirst(
+            ",\"optional\":false", "");
+        assertNotEquals(json, missingOptional);
+        Path missingOptionalPath = tempDir.resolve("missing-optional.json");
+        Files.writeString(missingOptionalPath, missingOptional, StandardCharsets.UTF_8);
+        assertThrows(IllegalArgumentException.class, () ->
+            PluginArtifactIndex.load(missingOptionalPath));
+
+        String missingDependencies = json.replaceFirst(
+            ",\"dependencies\":\\[\\]", "");
+        assertNotEquals(json, missingDependencies);
+        Path missingDependenciesPath = tempDir.resolve("missing-dependencies.json");
+        Files.writeString(
+            missingDependenciesPath,
+            missingDependencies,
+            StandardCharsets.UTF_8);
+        assertThrows(IllegalArgumentException.class, () ->
+            PluginArtifactIndex.load(missingDependenciesPath));
     }
 
     @Test
@@ -154,6 +186,23 @@ class PluginArtifactIndexTest {
             "http://plugins.example.test/bad-uri.jar",
             "https://plugins.example.test/bad-uri.jar.sig.json",
             "https://plugins.example.test/source/bad-uri",
+            "org.regelsuche.community"));
+
+        assertThrows(IllegalArgumentException.class, () -> Entry.create(
+            "remote-file-uri-1.0.0",
+            ArtifactKind.JAVA_PLUGIN,
+            "remote-file-uri",
+            "1.0.0",
+            "1",
+            "1.0.0",
+            "",
+            List.of(),
+            List.of(),
+            "remote-file-uri.jar",
+            PluginArtifactIndexFixtures.hash("remote-file-uri"),
+            "file://remote.example.test/artifacts/remote-file-uri.jar",
+            "https://plugins.example.test/remote-file-uri.jar.sig.json",
+            "https://plugins.example.test/source/remote-file-uri",
             "org.regelsuche.community"));
     }
 
