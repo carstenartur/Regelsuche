@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-trust-store/v1",
+  "title": "Regelsuche plugin publisher trust store v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "keys",
+    "revokedArtifacts"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-trust-store/v1"
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/publisherKey"
+      }
+    },
+    "revokedArtifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactRevocation"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "publisherKey": {
+      "type": "object",
+      "required": [
+        "publisherId",
+        "keyId",
+        "algorithm",
+        "publicKeyBase64",
+        "status",
+        "successorKeyId"
+      ],
+      "properties": {
+        "publisherId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "keyId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "algorithm": {
+          "const": "Ed25519"
+        },
+        "publicKeyBase64": {
+          "type": "string",
+          "minLength": 1,
+          "contentEncoding": "base64"
+        },
+        "status": {
+          "enum": [
+            "ACTIVE",
+            "RETIRED",
+            "REVOKED"
+          ]
+        },
+        "successorKeyId": {
+          "oneOf": [
+            {
+              "const": ""
+            },
+            {
+              "$ref": "#/$defs/identifier"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifactRevocation": {
+      "type": "object",
+      "required": [
+        "artifactSha256",
+        "reason"
+      ],
+      "properties": {
+        "artifactSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
