@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-artifact-verification/v1",
+  "title": "Regelsuche plugin artifact verification v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "artifactFileName",
+    "artifactSha256",
+    "manifestFileName",
+    "status",
+    "signaturePresent",
+    "signatureVerified",
+    "trusted",
+    "publisherId",
+    "keyId",
+    "warnings",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-artifact-verification/v1"
+    },
+    "artifactFileName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifactSha256": {
+      "oneOf": [
+        {
+          "const": ""
+        },
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ]
+    },
+    "manifestFileName": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "UNREADABLE",
+        "ARTIFACT_TOO_LARGE",
+        "MISSING_SIGNATURE_MANIFEST",
+        "MALFORMED_SIGNATURE_MANIFEST",
+        "MANIFEST_ARTIFACT_MISMATCH",
+        "ARTIFACT_HASH_MISMATCH",
+        "REVOKED_ARTIFACT",
+        "UNKNOWN_PUBLISHER",
+        "UNKNOWN_KEY",
+        "REVOKED_KEY",
+        "KEY_ALGORITHM_MISMATCH",
+        "INVALID_SIGNATURE",
+        "VERIFIED_RETIRED_KEY",
+        "VERIFIED_TRUSTED"
+      ]
+    },
+    "signaturePresent": {
+      "type": "boolean"
+    },
+    "signatureVerified": {
+      "type": "boolean"
+    },
+    "trusted": {
+      "type": "boolean"
+    },
+    "publisherId": {
+      "type": "string"
+    },
+    "keyId": {
+      "type": "string"
+    },
+    "warnings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "trusted": {
+            "const": true
+          }
+        },
+        "required": [
+          "trusted"
+        ]
+      },
+      "then": {
+        "properties": {
+          "signaturePresent": {
+            "const": true
+          },
+          "signatureVerified": {
+            "const": true
+          },
+          "status": {
+            "enum": [
+              "VERIFIED_RETIRED_KEY",
+              "VERIFIED_TRUSTED"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "signatureVerified": {
+            "const": true
+          }
+        },
+        "required": [
+          "signatureVerified"
+        ]
+      },
+      "then": {
+        "properties": {
+          "signaturePresent": {
+            "const": true
+          },
+          "trusted": {
+            "const": true
+          },
+          "status": {
+            "enum": [
+              "VERIFIED_RETIRED_KEY",
+              "VERIFIED_TRUSTED"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "VERIFIED_RETIRED_KEY",
+              "VERIFIED_TRUSTED"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "signaturePresent": {
+            "const": true
+          },
+          "signatureVerified": {
+            "const": true
+          },
+          "trusted": {
+            "const": true
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

@@ -80,11 +80,15 @@ Beispielimplementierungen liegen unter `app/src/main/java/de/regelsuche/plugin/e
 
 ## Vertrauensmodell
 
-- Classpath-Plugins gelten als bekannte Quelle.
-- Für externe Quellen werden Signatur- und Provenance-Metadaten ausgewertet (`signature()`, `provenance()`), aber nicht kryptografisch verifiziert.
-- `signaturePresent` signalisiert nur vorhandene Signatur-Metadaten; `signatureVerified` bleibt ohne Verifizierer `false`.
-- Externe Plugins bleiben ohne Verifizierer/Allowlist untrusted (`trustedSource=false`).
-- Bei unbekannter oder untrusted externer Herkunft und fehlenden Metadaten erscheinen Warnungen (`MISSING_PROVENANCE`, `MISSING_SIGNATURE_METADATA`, `SIGNATURE_NOT_VERIFIED`, `UNKNOWN_SOURCE`, `UNTRUSTED_EXTERNAL_SOURCE`) im Katalog.
+- Classpath-Plugins gelten als bekannte, gemeinsam mit der Anwendung ausgelieferte Quelle.
+- `RegelsuchePlugin.signature()` und `provenance()` sind beschreibende Metadaten, die erst nach der Plugin-Instanziierung verfügbar sind. Sie dürfen deshalb keine Code-Ladeentscheidung autorisieren.
+- Für eine kryptografische Vorladeprüfung wird `TrustedPluginRuntime` verwendet. Es prüft ein Detached Ed25519-Manifest und einen lokalen Publisher-Trust-Store, bevor ein externes JAR einen ClassLoader erreicht.
+- `PluginTrustPolicy.WARN` erhält das historische permissive Verhalten und protokolliert jede Trust-Entscheidung. `PluginTrustPolicy.REQUIRE_VERIFIED` blockiert unsigned, manipulierte, unbekannte oder widerrufene Artefakte.
+- Das Gate materialisiert genau die zuvor gelesenen und verifizierten Bytes in ein privates Staging-Verzeichnis. So kann die Quelldatei nicht zwischen Prüfung und Classloading ausgetauscht werden.
+- Die maßgebliche Artefakt-Evidence steht über `TrustedPluginRuntime.gateResult()` bereit. Die bisherigen Katalogfelder bleiben für Kompatibilität und nachgelagerte Plugin-Metadaten erhalten.
+- Publisher-Key-Rotation, aktive/retired/revoked Keys sowie explizite Artefaktwiderrufe werden im versionierten Trust Store abgebildet.
+
+Das Manifestformat, die Trust-Store-Struktur, Policies und Fail-closed-Status sind in [Kryptografische Plugin-Artefaktprüfung](plugin-artifact-trust.md) dokumentiert.
 
 ## Community und Autoren-Onboarding
 

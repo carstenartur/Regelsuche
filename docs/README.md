@@ -16,7 +16,12 @@
 ## Erweiterungen
 
 - [Erweiterungssystem](extension-system.md) — zentrale Architekturkarte und Auswahlhilfe für Java-Plugins, Regeldateien, Knowledge Packs, deklarative und gelernte Makros, Discovery-Operatoren und mathematische Capabilities.
-- [Plugins](plugins.md) — `ServiceLoader`, externe JARs, `PluginRuntime`, Reload, Katalog, Diagnosen und aktuelle Vertrauensgrenzen.
+- [Plugins](plugins.md) — `ServiceLoader`, externe JARs, `PluginRuntime`, Reload, Katalog und Diagnosen.
+- [Kryptografische Plugin-Artefaktprüfung](plugin-artifact-trust.md) — Detached Ed25519-Manifeste, Publisher-Trust-Store, Rotation, Widerruf und Vorlade-Policy.
+- [Plugin-Signatur-Schema v1](schemas/regelsuche-plugin-signature-v1.schema.json)
+- [Plugin-Trust-Store-Schema v1](schemas/regelsuche-plugin-trust-store-v1.schema.json)
+- [Plugin-Artefakt-Verifikations-Schema v1](schemas/regelsuche-plugin-artifact-verification-v1.schema.json)
+- [Plugin-Artefakt-Gate-Schema v1](schemas/regelsuche-plugin-artifact-gate-v1.schema.json)
 - [Plugin-API](plugin-api.md) — Java-Vertrag, Registries, Paketierung und Starter-Template.
 - [Regeldateien](rule-files.md) — `.regelsuche`-/`.rules`-DSL, Profile, Import/Export und Debugging.
 - [Makros](macros.md) — vom Autor deklarierte Makros als Suchkanten.

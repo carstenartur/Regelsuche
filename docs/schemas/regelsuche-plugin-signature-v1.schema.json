@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-signature/v1",
+  "title": "Regelsuche detached plugin signature manifest v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "artifactFileName",
+    "artifactSha256",
+    "publisherId",
+    "keyId",
+    "algorithm",
+    "signatureBase64"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-signature/v1"
+    },
+    "artifactFileName": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/\\\\]+\\.jar$"
+    },
+    "artifactSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "publisherId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "keyId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "signatureBase64": {
+      "type": "string",
+      "minLength": 1,
+      "contentEncoding": "base64"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    }
+  }
+}

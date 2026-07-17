@@ -1,0 +1,183 @@
+name: Plugin Artifact Trust
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'app/src/main/java/de/regelsuche/plugin/**'
+      - 'app/src/test/java/de/regelsuche/plugin/**'
+      - 'docs/plugin-artifact-trust.md'
+      - 'docs/schemas/regelsuche-plugin-*.schema.json'
+      - '.github/workflows/plugin-artifact-trust.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'app/src/main/java/de/regelsuche/plugin/**'
+      - 'app/src/test/java/de/regelsuche/plugin/**'
+      - 'docs/plugin-artifact-trust.md'
+      - 'docs/schemas/regelsuche-plugin-*.schema.json'
+      - '.github/workflows/plugin-artifact-trust.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: plugin-artifact-trust-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  trust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Verify signed, tampered, unsigned, revoked, rotated and reload contracts
+        run: |
+          ./gradlew :app:test \
+            --tests 'de.regelsuche.plugin.PluginArtifactTrust*' \
+            --tests de.regelsuche.plugin.PluginTrustStoreRotationTest \
+            --tests de.regelsuche.plugin.TrustedPluginRuntimeReloadTest \
+            --rerun-tasks
+
+      - name: Require retained canonical trust evidence
+        run: |
+          test -s app/build/reports/plugin-artifact-trust/gate-result.json
+          test -s app/build/reports/plugin-artifact-trust/verification.json
+          test -s app/build/reports/plugin-artifact-trust/trust-store.json
+          test -s app/build/reports/plugin-artifact-trust/signature-manifest.json
+
+      - name: Validate schemas, hashes, evidence and accounting
+        shell: bash
+        run: |
+          python3 -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            jsonschema==4.25.1
+          python3 - <<'PY'
+          import copy
+          import hashlib
+          import json
+          from pathlib import Path
+          from jsonschema.exceptions import ValidationError
+          from jsonschema.validators import validator_for
+
+          schema_paths = [
+              Path('docs/schemas/regelsuche-plugin-signature-v1.schema.json'),
+              Path('docs/schemas/regelsuche-plugin-trust-store-v1.schema.json'),
+              Path('docs/schemas/regelsuche-plugin-artifact-verification-v1.schema.json'),
+              Path('docs/schemas/regelsuche-plugin-artifact-gate-v1.schema.json'),
+          ]
+          schemas = {}
+          validators = {}
+          for path in schema_paths:
+              schema = json.loads(path.read_text(encoding='utf-8'))
+              validator_for(schema).check_schema(schema)
+              assert schema.get('additionalProperties') is False
+              schemas[schema['$id']] = schema
+              validators[schema['$id']] = validator_for(schema)(schema)
+
+          report_dir = Path('app/build/reports/plugin-artifact-trust')
+          instances = {
+              'regelsuche.plugin-signature/v1': json.loads(
+                  (report_dir / 'signature-manifest.json').read_text(encoding='utf-8')),
+              'regelsuche.plugin-trust-store/v1': json.loads(
+                  (report_dir / 'trust-store.json').read_text(encoding='utf-8')),
+              'regelsuche.plugin-artifact-verification/v1': json.loads(
+                  (report_dir / 'verification.json').read_text(encoding='utf-8')),
+              'regelsuche.plugin-artifact-gate/v1': json.loads(
+                  (report_dir / 'gate-result.json').read_text(encoding='utf-8')),
+          }
+          for schema_id, instance in instances.items():
+              validators[schema_id].validate(instance)
+
+          verification = instances['regelsuche.plugin-artifact-verification/v1']
+          assert verification['status'] == 'VERIFIED_TRUSTED'
+          assert verification['signatureVerified'] is True
+          assert verification['trusted'] is True
+
+          gate = instances['regelsuche.plugin-artifact-gate/v1']
+          assert gate['policy'] == 'REQUIRE_VERIFIED'
+          assert gate['admittedArtifacts'] == ['reference-plugin.jar']
+          assert gate['blockedArtifacts'] == []
+          accounted = sorted(gate['admittedArtifacts'] + gate['blockedArtifacts'])
+          expected = sorted(item['artifactFileName'] for item in gate['verifications'])
+          assert accounted == expected
+          assert gate['verifications'] == [verification]
+
+          trust_bytes = (report_dir / 'trust-store.json').read_bytes()
+          expected_trust_hash = 'sha256:' + hashlib.sha256(trust_bytes).hexdigest()
+          assert gate['trustStoreHash'] == expected_trust_hash
+
+          gate_payload = {
+              'schema': gate['schema'],
+              'policy': gate['policy'],
+              'trustStoreHash': gate['trustStoreHash'],
+              'verifications': gate['verifications'],
+              'admittedArtifacts': gate['admittedArtifacts'],
+              'blockedArtifacts': gate['blockedArtifacts'],
+          }
+          gate_bytes = json.dumps(
+              gate_payload,
+              ensure_ascii=False,
+              separators=(',', ':'),
+          ).encode('utf-8')
+          expected_gate_hash = 'sha256:' + hashlib.sha256(gate_bytes).hexdigest()
+          assert gate['contentHash'] == expected_gate_hash
+
+          # Schema parity with the Java model: a verified signature cannot be
+          # represented as untrusted in either the standalone or embedded form.
+          invalid_verification = copy.deepcopy(verification)
+          invalid_verification['trusted'] = False
+          for schema_id, invalid_instance in (
+              ('regelsuche.plugin-artifact-verification/v1', invalid_verification),
+              ('regelsuche.plugin-artifact-gate/v1', {
+                  **gate,
+                  'verifications': [invalid_verification],
+              }),
+          ):
+              try:
+                  validators[schema_id].validate(invalid_instance)
+              except ValidationError:
+                  pass
+              else:
+                  raise AssertionError(
+                      f'{schema_id} accepted signatureVerified=true with trusted=false')
+
+          # Oversized artifacts are first-class blocked evidence, not omitted or
+          # collapsed into a generic unreadable status.
+          oversized = copy.deepcopy(verification)
+          oversized.update({
+              'artifactSha256': '',
+              'manifestFileName': '',
+              'status': 'ARTIFACT_TOO_LARGE',
+              'signaturePresent': False,
+              'signatureVerified': False,
+              'trusted': False,
+              'publisherId': '',
+              'keyId': '',
+              'warnings': ['ARTIFACT_EXCEEDS_MAX_BYTES'],
+          })
+          validators['regelsuche.plugin-artifact-verification/v1'].validate(oversized)
+          PY
+
+      - name: Upload trust evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plugin-artifact-trust-evidence
+          path: |
+            app/build/reports/plugin-artifact-trust/**
+            app/build/reports/tests/**
+            app/build/test-results/**
+            docs/schemas/regelsuche-plugin-*.schema.json
+          if-no-files-found: warn

@@ -43,19 +43,29 @@ app rules import examples/binomial-formulas.regelsuche --into rules/
 1. Implementiere `de.regelsuche.plugin.RegelsuchePlugin` (siehe [Plugin-API](plugin-api.md)).
 2. Registriere deine Klasse in `META-INF/services/de.regelsuche.plugin.RegelsuchePlugin`.
 3. Paketiere das Plugin als JAR und lege es in das Verzeichnis `plugins/`.
+4. Für verifizierte Installation: veröffentliche `<plugin>.jar.sig.json` und lasse den Publisher-Key im lokalen Trust Store zu.
 
 Details zu Metadaten, Abhängigkeiten, Vertrauensmodell und Regelpaketen stehen in
-[plugin-api.md](plugin-api.md) und [plugins.md](plugins.md).
+[plugin-api.md](plugin-api.md), [plugins.md](plugins.md) und
+[Kryptografische Plugin-Artefaktprüfung](plugin-artifact-trust.md).
 
 ## Community-Erweiterungen
 
-Externe Plugins tragen sich am besten mit folgenden Metadaten aus, damit sie
-im Katalog sichtbar und vertrauenswürdig erscheinen:
+Externe Plugins sollten folgende Laufzeitmetadaten bereitstellen, damit sie im
+lokalen Katalog nachvollziehbar erscheinen:
 
 - `id()` — eindeutiger Bezeichner (z. B. `mein-plugin`)
 - `version()` — semantische Versionsnummer (z. B. `1.0.0`)
 - `provenance()` — Release-URL oder Repository-Link
-- `signature()` — optionaler Sigstore-/Commit-Fingerabdruck
+- `signature()` — optionaler beschreibender Hinweis; **keine** Ladeautorisierung
 - `dependencies()` — Liste der Plugin-Abhängigkeiten
+
+Für kryptografisches Vertrauen sind stattdessen erforderlich:
+
+- unveränderlicher `sha256:`-Hash des veröffentlichten JARs;
+- Detached Ed25519-Manifest `regelsuche.plugin-signature/v1`;
+- Publisher- und Key-ID;
+- ein zugelassener, nicht widerrufener öffentlicher Schlüssel im Trust Store;
+- eine explizite lokale Policy (`WARN` oder `REQUIRE_VERIFIED`).
 
 Ein minimales Starter-Template findet sich am Ende von [plugin-api.md](plugin-api.md).

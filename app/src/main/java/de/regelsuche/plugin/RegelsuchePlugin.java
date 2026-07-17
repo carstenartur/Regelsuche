@@ -27,6 +27,16 @@ public interface RegelsuchePlugin {
         return "";
     }
 
+    /**
+     * Optional descriptive signature hint exposed after plugin instantiation.
+     *
+     * <p>This value is not an artifact-verification boundary: plugin code must
+     * already be loaded to invoke it, and the plugin controls the returned
+     * string. Secure external loading uses a detached
+     * {@link PluginSignatureManifest}, {@link PluginTrustStore} and
+     * {@link TrustedPluginRuntime} before any plugin bytecode enters a class
+     * loader.</p>
+     */
     default String signature() {
         return "";
     }
