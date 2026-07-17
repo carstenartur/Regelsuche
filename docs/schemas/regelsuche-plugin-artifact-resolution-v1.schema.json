@@ -128,7 +128,7 @@
     "uri": {
       "type": "string",
       "format": "uri",
-      "pattern": "^(?:[Hh][Tt][Tt][Pp][Ss]://|[Ff][Ii][Ll][Ee]:/(?:$|[^/].*|//.*))"
+      "pattern": "^(?:[Hh][Tt][Tt][Pp][Ss]://[^/@?#]+(?:[/?][^#]*)?|[Ff][Ii][Ll][Ee]:/(?:[^/#][^#]*|//(?:[^/#][^#]*)?)?)$"
     },
     "uriOrEmpty": {
       "oneOf": [
