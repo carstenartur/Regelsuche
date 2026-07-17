@@ -1,0 +1,64 @@
+plugins {
+    id 'java-library'
+    id 'jacoco'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    api project(':regelsuche-solver-ir')
+
+    testImplementation libs.junit.jupiter
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform {
+        excludeTags 'external-prover'
+    }
+    finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.register('z3IntegrationTest', Test) {
+    description = 'Runs the real external Z3 portfolio integration.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'external-prover'
+    }
+    shouldRunAfter tasks.named('test')
+}
+
+tasks.register('writeSolverPortfolioExample', JavaExec) {
+    group = 'verification'
+    description = 'Writes one deterministic capability-aware portfolio trace using system Z3.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.solver.portfolio.SolverPortfolioExampleMain'
+    args layout.buildDirectory.dir('reports/solver-portfolio').get().asFile.absolutePath
+}
+
+jacoco {
+    toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+    dependsOn tasks.named('test')
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport')
+}

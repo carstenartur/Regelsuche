@@ -5,6 +5,7 @@
 - [Aktueller Discovery-Stand](discovery-status.md) — gemessene Ergebnisse, wissenschaftliche Grenzen und nächste Arbeitsschritte.
 - [Release Readiness für Regelsuche 0.2](release-readiness.md) — getrennte Evidence Profiles, qualifizierter Autonomie-Claim sowie Gradle-/Docker-Reproduktion.
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md) — kanonische Problemverträge, strukturierte Annahmen, Backend-Capabilities und zwei unabhängige Adapter.
+- [Capability-aware Solver-Portfolio](solver-portfolio.md) — rollenbasierte Backend-Auswahl, Budgets, Timeouts, Cache, Konflikte und formale Z3-Bestätigung.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
@@ -28,6 +29,8 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Aktueller Open-Target-Discovery-Stand](discovery-status.md)
 - [Release Readiness und Kandidatenqualifikation](release-readiness.md)
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md)
+- [Capability-aware Solver-Portfolio](solver-portfolio.md)
+- [Solver-Portfolio-Report-Schema v1](schemas/regelsuche-solver-portfolio-report-v1.schema.json)
 - [Solver-Obligation-Schema v1](schemas/regelsuche-solver-obligation-v1.schema.json)
 - [Solver-Result-Schema v1](schemas/regelsuche-solver-result-v1.schema.json)
 - [Open-Target-Proof-Report-Schema v2](schemas/regelsuche-open-target-conjecture-proof-v2.schema.json)

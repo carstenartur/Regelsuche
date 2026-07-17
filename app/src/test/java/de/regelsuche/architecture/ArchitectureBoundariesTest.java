@@ -71,6 +71,8 @@ class ArchitectureBoundariesTest {
         expectedProjectDependencies.put("regelsuche-solver-ir", List.of(
             ":regelsuche-core", ":regelsuche-search", ":regelsuche-validation",
             ":regelsuche-math-algorithms"));
+        expectedProjectDependencies.put("regelsuche-solver-portfolio", List.of(
+            ":regelsuche-solver-ir"));
         expectedProjectDependencies.put("regelsuche-math-algorithms", List.of(":regelsuche-core", ":regelsuche-validation"));
         expectedProjectDependencies.put("regelsuche-math-jas", List.of(":regelsuche-validation"));
         expectedProjectDependencies.put("regelsuche-persistence", List.of(":regelsuche-core"));
@@ -86,7 +88,8 @@ class ArchitectureBoundariesTest {
             ":regelsuche-validation"));
         expectedProjectDependencies.put("app", List.of(":regelsuche-core", ":regelsuche-egraph", ":regelsuche-search",
             ":regelsuche-validation", ":regelsuche-math-algorithms", ":regelsuche-persistence", ":regelsuche-persistence-hibernate",
-            ":regelsuche-learning", ":regelsuche-experiments", ":regelsuche-cli", ":regelsuche-discovery"));
+            ":regelsuche-learning", ":regelsuche-experiments", ":regelsuche-cli", ":regelsuche-discovery",
+            ":regelsuche-solver-portfolio"));
         for (Map.Entry<String, List<String>> entry : expectedProjectDependencies.entrySet()) {
             String build = Files.readString(REPO_ROOT.resolve(entry.getKey()).resolve("build.gradle"));
             List<String> declared = projectDependencyTokens(build);

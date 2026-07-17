@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.solver-portfolio-report/v1",
+  "title": "Regelsuche solver portfolio execution report v1",
+  "type": "object",
+  "required": [
+    "schema", "requestHash", "obligationHash", "objective", "policy",
+    "outcome", "attempts", "selectedExecutionHash", "selectedBackendId",
+    "selectedRoles", "conflictExecutionHashes", "consumedCostUnits",
+    "executedInvocations", "proofAuthorized", "promotionBlocked",
+    "telemetryNotice", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.solver-portfolio-report/v1" },
+    "requestHash": { "$ref": "#/$defs/sha256" },
+    "obligationHash": { "$ref": "#/$defs/sha256" },
+    "objective": {
+      "enum": [
+        "SEARCH_GUIDANCE", "VALIDATION", "COUNTEREXAMPLE_SEARCH",
+        "SYMBOLIC_CONFIRMATION", "FORMAL_PROOF"
+      ]
+    },
+    "policy": {
+      "enum": [
+        "CAPABILITY_FIRST", "COUNTEREXAMPLE_FIRST",
+        "CHEAPEST_CONFIRMATION_FIRST", "INDEPENDENT_CONFIRMATION"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "CONFIRMED", "REFUTED", "CONFLICT", "INCONCLUSIVE",
+        "UNSUPPORTED", "TIMEOUT", "CANCELLED", "BUDGET_EXHAUSTED", "ERROR"
+      ]
+    },
+    "attempts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/attempt" }
+    },
+    "selectedExecutionHash": {
+      "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
+    },
+    "selectedBackendId": { "type": "string" },
+    "selectedRoles": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/role" }
+    },
+    "conflictExecutionHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sha256" }
+    },
+    "consumedCostUnits": { "type": "integer", "minimum": 0 },
+    "executedInvocations": { "type": "integer", "minimum": 0 },
+    "proofAuthorized": { "type": "boolean" },
+    "promotionBlocked": { "type": "boolean" },
+    "telemetryNotice": {
+      "const": "EXECUTION_TELEMETRY_NOT_MATHEMATICAL_EVIDENCE"
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "role": {
+      "enum": [
+        "SEARCH_GUIDANCE", "ORACLE_VALIDATION", "COUNTEREXAMPLE",
+        "SYMBOLIC_CONFIRMATION", "FORMAL_PROOF"
+      ]
+    },
+    "attempt": {
+      "type": "object",
+      "required": [
+        "sequence", "backendId", "backendVersion", "profileHash", "roles",
+        "disposition", "resultStatus", "executionHash", "issues",
+        "chargedCostUnits", "attemptConfigurationHash", "contentHash"
+      ],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 0 },
+        "backendId": { "type": "string", "minLength": 1 },
+        "backendVersion": { "type": "string", "minLength": 1 },
+        "profileHash": { "$ref": "#/$defs/sha256" },
+        "roles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/role" }
+        },
+        "disposition": {
+          "enum": [
+            "FILTERED_UNSUPPORTED", "FILTERED_IRRELEVANT", "CACHE_HIT",
+            "EXECUTED", "SKIPPED_UNAVAILABLE", "SKIPPED_BUDGET",
+            "TIMED_OUT", "CANCELLED", "FAILED"
+          ]
+        },
+        "resultStatus": {
+          "enum": [
+            "NOT_RUN", "CONFIRMED", "REFUTED", "UNKNOWN", "TIMEOUT",
+            "UNSUPPORTED", "ERROR"
+          ]
+        },
+        "executionHash": {
+          "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
+        },
+        "issues": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "chargedCostUnits": { "type": "integer", "minimum": 0 },
+        "attemptConfigurationHash": { "$ref": "#/$defs/sha256" },
+        "contentHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": { "enum": ["CONFIRMED", "REFUTED"] }
+        },
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "selectedExecutionHash": { "$ref": "#/$defs/sha256" },
+          "selectedBackendId": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "outcome": { "const": "REFUTED" } },
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "promotionBlocked": { "const": true },
+          "proofAuthorized": { "const": false }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "outcome": { "const": "CONFLICT" } },
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "promotionBlocked": { "const": true },
+          "proofAuthorized": { "const": false },
+          "selectedExecutionHash": { "const": "" },
+          "selectedBackendId": { "const": "" },
+          "conflictExecutionHashes": { "minItems": 2 }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "proofAuthorized": { "const": true } },
+        "required": ["proofAuthorized"]
+      },
+      "then": {
+        "properties": {
+          "objective": {
+            "enum": ["SYMBOLIC_CONFIRMATION", "FORMAL_PROOF"]
+          },
+          "outcome": { "const": "CONFIRMED" },
+          "selectedExecutionHash": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}
