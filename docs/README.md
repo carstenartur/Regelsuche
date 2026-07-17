@@ -10,8 +10,8 @@
 - [Generische Discovery-Domänen](generic-discovery-domains.md) — domänenneutrale Generation, Suche, Validierung und Evidence mit Algebra- und Zahlenfolgen-Adapter.
 - [Domänenneutraler Lifecycle-Handoff](domain-lifecycle-handoff.md) — hashgebundene Übergabe aus generischer Discovery und unveränderter algebraischer Produktionsgeneration ohne Repräsentationsstrings.
 - [Generischer Domain-Discovery-Export](domain-discovery-export.md) — manifestgebundene Persistenz von Descriptor, vollständiger Domain Evidence und repräsentationsfreiem Lifecycle-Handoff.
-- [Verifikation generischer Domain-Discovery-Exporte](domain-discovery-export-verification.md) — bounded, symlink-sichere Byte-Snapshots und fail-closed Wurzelbindungen für persistierte Mehrdomänen-Evidence.
-- [Qualification für domänengenerische Discovery](domain-generic-qualification.md) — separates fail-closed Profile für drei reproduzierbare Läufe über Algebra- und Zahlenfolgen-Domänen.
+- [Verifikation generischer Domain-Discovery-Exporte](domain-discovery-export-verification.md) — größenbegrenzte, symlink-sichere Byte-Snapshots und fehlersicher sperrende Wurzelbindungen für persistierte Mehrdomänen-Evidence.
+- [Qualification für domänengenerische Discovery](domain-generic-qualification.md) — versioniertes, fehlersicher sperrendes Evidence Profile für drei reproduzierbare Läufe über Algebra- und Zahlenfolgen-Domänen.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
@@ -25,8 +25,12 @@
 - [Plugin-Artefakt-Index-Schema v1](schemas/regelsuche-plugin-artifact-index-v1.schema.json)
 - [Plugin-Artefakt-Auflösungs-Schema v1](schemas/regelsuche-plugin-artifact-resolution-v1.schema.json)
 - [Kryptografische Plugin-Artefaktprüfung](plugin-artifact-trust.md) — Detached Ed25519-Manifeste, Publisher-Trust-Store, Rotation, Widerruf und Vorlade-Policy.
+- [Authentisierte Plugin-Trust-State-Revisionen](plugin-trust-store-revisions.md) — signierte Hashkette, lokale Checkpoints sowie Replay-, Gap- und Fork-Schutz für Publisher-Keys und Widerrufe.
 - [Plugin-Signatur-Schema v1](schemas/regelsuche-plugin-signature-v1.schema.json)
 - [Plugin-Trust-Store-Schema v1](schemas/regelsuche-plugin-trust-store-v1.schema.json)
+- [Plugin-Trust-Store-Revision-Schema v1](schemas/regelsuche-plugin-trust-store-revision-v1.schema.json)
+- [Plugin-Trust-Store-Checkpoint-Schema v1](schemas/regelsuche-plugin-trust-store-chain-checkpoint-v1.schema.json)
+- [Plugin-Trust-Store-Revision-Verifikations-Schema v1](schemas/regelsuche-plugin-trust-store-revision-verification-v1.schema.json)
 - [Plugin-Artefakt-Verifikations-Schema v1](schemas/regelsuche-plugin-artifact-verification-v1.schema.json)
 - [Plugin-Artefakt-Gate-Schema v1](schemas/regelsuche-plugin-artifact-gate-v1.schema.json)
 - [Plugin-API](plugin-api.md) — Java-Vertrag, Registries, Paketierung und Starter-Template.
