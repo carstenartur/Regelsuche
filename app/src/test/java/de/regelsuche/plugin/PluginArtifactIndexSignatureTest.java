@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.plugin.PluginArtifactIndexVerifier.Status;
 import de.regelsuche.plugin.PluginTrustStore.KeyStatus;
 import de.regelsuche.plugin.PluginTrustStore.PublisherKey;
+import java.lang.reflect.Modifier;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -57,6 +58,11 @@ class PluginArtifactIndexSignatureTest {
             verifier.requireTrusted(indexPath, signaturePath);
         assertEquals(index, verified.index());
         assertEquals(verification, verified.verification());
+
+        var constructors =
+            PluginArtifactIndexVerifier.VerifiedIndex.class.getDeclaredConstructors();
+        assertEquals(1, constructors.length);
+        assertTrue(Modifier.isPrivate(constructors[0].getModifiers()));
 
         Path evidence = Path.of("build", "reports", "plugin-artifact-index");
         Files.createDirectories(evidence);
@@ -152,6 +158,16 @@ class PluginArtifactIndexSignatureTest {
         assertThrows(IllegalArgumentException.class, () ->
             PluginArtifactIndexSignature.read(unknown));
 
+        String nonCanonical = nonCanonicalBase64(signature.signatureBase64());
+        assertThrows(IllegalArgumentException.class, () ->
+            PluginArtifactIndexSignature.create(
+                signature.indexId(),
+                signature.revision(),
+                signature.indexContentHash(),
+                signature.curatorId(),
+                signature.keyId(),
+                nonCanonical));
+
         var verification = new PluginArtifactIndexVerifier(
             trustStore(KeyStatus.ACTIVE)).verify(index, signature);
         assertThrows(IllegalArgumentException.class, () ->
@@ -204,6 +220,20 @@ class PluginArtifactIndexSignatureTest {
             curatorId,
             KEY_ID,
             Base64.getEncoder().encodeToString(signer.sign()));
+    }
+
+    private static String nonCanonicalBase64(String canonical) {
+        String alphabet =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        int position = canonical.length() - 3;
+        int current = alphabet.indexOf(canonical.charAt(position));
+        int replacement = (current & 0b110000) | 0b000001;
+        if (replacement == current) {
+            replacement = (current & 0b110000) | 0b000010;
+        }
+        return canonical.substring(0, position)
+            + alphabet.charAt(replacement)
+            + canonical.substring(position + 1);
     }
 
     private static PluginTrustStore trustStore(KeyStatus status) {
