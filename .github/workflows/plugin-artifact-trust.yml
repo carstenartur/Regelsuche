@@ -1,0 +1,81 @@
+name: Plugin Artifact Trust
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'app/src/main/java/de/regelsuche/plugin/**'
+      - 'app/src/test/java/de/regelsuche/plugin/**'
+      - 'docs/plugin-artifact-trust.md'
+      - 'docs/schemas/regelsuche-plugin-*.schema.json'
+      - '.github/workflows/plugin-artifact-trust.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'app/src/main/java/de/regelsuche/plugin/**'
+      - 'app/src/test/java/de/regelsuche/plugin/**'
+      - 'docs/plugin-artifact-trust.md'
+      - 'docs/schemas/regelsuche-plugin-*.schema.json'
+      - '.github/workflows/plugin-artifact-trust.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: plugin-artifact-trust-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  trust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Verify signed, tampered, unsigned and revoked artifact contracts
+        run: |
+          ./gradlew :app:test \
+            --tests de.regelsuche.plugin.PluginArtifactTrustTest
+
+      - name: Validate versioned trust schemas
+        shell: bash
+        run: |
+          python3 -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            jsonschema==4.25.1
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema.validators import validator_for
+
+          paths = [
+              Path('docs/schemas/regelsuche-plugin-signature-v1.schema.json'),
+              Path('docs/schemas/regelsuche-plugin-trust-store-v1.schema.json'),
+              Path('docs/schemas/regelsuche-plugin-artifact-verification-v1.schema.json'),
+          ]
+          for path in paths:
+              schema = json.loads(path.read_text(encoding='utf-8'))
+              validator_for(schema).check_schema(schema)
+              assert schema.get('additionalProperties') is False
+          PY
+
+      - name: Upload trust test evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plugin-artifact-trust-evidence
+          path: |
+            app/build/reports/tests/**
+            app/build/test-results/**
+            docs/schemas/regelsuche-plugin-*.schema.json
+          if-no-files-found: warn
