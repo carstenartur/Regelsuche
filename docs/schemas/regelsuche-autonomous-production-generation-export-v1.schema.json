@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-production-generation-export/v1",
+  "title": "Regelsuche autonomous production generation export manifest v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "exportId",
+    "generationRunHash",
+    "lifecycleHandoffHash",
+    "artifacts",
+    "commitProtocol",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.autonomous-production-generation-export/v1"
+    },
+    "exportId": {
+      "const": "autonomous-production-generation"
+    },
+    "generationRunHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "lifecycleHandoffHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "RESEARCH_BRIEF"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "SEED_CATALOG"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "OBSERVATION_BUNDLE"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "GENERATION_RECEIPT"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "DISCOVERY_REPORT"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "GENERATION_RUN"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "role": {
+                "const": "LIFECYCLE_HANDOFF"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "commitProtocol": {
+      "const": "MANIFEST_LAST_ATOMIC_RENAME"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "role": {
+      "enum": [
+        "RESEARCH_BRIEF",
+        "SEED_CATALOG",
+        "OBSERVATION_BUNDLE",
+        "GENERATION_RECEIPT",
+        "DISCOVERY_REPORT",
+        "GENERATION_RUN",
+        "LIFECYCLE_HANDOFF"
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "required": [
+        "fileName",
+        "role",
+        "sourceContentHash",
+        "byteHash",
+        "byteLength"
+      ],
+      "properties": {
+        "fileName": {
+          "enum": [
+            "brief-v2.json",
+            "seeds.json",
+            "observations.json",
+            "generation-receipt.json",
+            "discovery-report.json",
+            "generation-run.json",
+            "lifecycle-handoff.json"
+          ]
+        },
+        "role": {
+          "$ref": "#/$defs/role"
+        },
+        "sourceContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "RESEARCH_BRIEF"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "brief-v2.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "SEED_CATALOG"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "seeds.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "OBSERVATION_BUNDLE"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "observations.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "GENERATION_RECEIPT"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "generation-receipt.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "DISCOVERY_REPORT"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "discovery-report.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "GENERATION_RUN"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "generation-run.json"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "LIFECYCLE_HANDOFF"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "fileName": {
+                "const": "lifecycle-handoff.json"
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

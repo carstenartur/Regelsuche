@@ -7,10 +7,13 @@ on:
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoff.java'
       - 'regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoffTest.java'
       - 'regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionDomainHandoffAdapter.java'
+      - 'regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionGenerationExport.java'
+      - 'regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionGenerationMain.java'
       - 'regelsuche-autopilot/src/test/java/de/regelsuche/experiments/autopilot/AutonomousProductionDomainHandoffAdapterTest.java'
       - 'regelsuche-autopilot/build.gradle'
       - 'docs/domain-lifecycle-handoff.md'
       - 'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'
+      - 'docs/schemas/regelsuche-autonomous-production-generation-export-v1.schema.json'
       - '.github/workflows/domain-lifecycle-handoff.yml'
   pull_request:
     branches: [ "main" ]
@@ -18,10 +21,13 @@ on:
       - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoff.java'
       - 'regelsuche-discovery/src/test/java/de/regelsuche/discovery/domain/DiscoveryLifecycleHandoffTest.java'
       - 'regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionDomainHandoffAdapter.java'
+      - 'regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionGenerationExport.java'
+      - 'regelsuche-autopilot/src/main/java/de/regelsuche/experiments/autopilot/AutonomousProductionGenerationMain.java'
       - 'regelsuche-autopilot/src/test/java/de/regelsuche/experiments/autopilot/AutonomousProductionDomainHandoffAdapterTest.java'
       - 'regelsuche-autopilot/build.gradle'
       - 'docs/domain-lifecycle-handoff.md'
       - 'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'
+      - 'docs/schemas/regelsuche-autonomous-production-generation-export-v1.schema.json'
       - '.github/workflows/domain-lifecycle-handoff.yml'
   workflow_dispatch:
 
@@ -47,7 +53,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Verify generic and unchanged production handoffs
+      - name: Verify generic and committed production handoffs
         run: |
           ./gradlew \
             :regelsuche-discovery:test \
@@ -56,34 +62,58 @@ jobs:
             --tests de.regelsuche.experiments.autopilot.AutonomousProductionDomainHandoffAdapterTest \
             --rerun-tasks
 
-      - name: Require retained handoff evidence
+      - name: Require retained handoff and export evidence
         run: |
           test -s regelsuche-discovery/build/reports/domain-lifecycle-handoff/expression-handoff.json
           test -s regelsuche-discovery/build/reports/domain-lifecycle-handoff/sequence-handoff.json
           test -s regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-handoff.json
+          export_dir=regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-export
+          test -s "$export_dir/export-manifest.json"
+          for name in \
+            brief-v2.json \
+            seeds.json \
+            observations.json \
+            generation-receipt.json \
+            discovery-report.json \
+            generation-run.json \
+            lifecycle-handoff.json; do
+            test -s "$export_dir/$name"
+          done
 
-      - name: Require byte-identical repeated handoffs
+      - name: Require byte-identical repeated handoffs and export
         shell: bash
         run: |
-          mkdir -p /tmp/domain-lifecycle-handoff-first
-          cp regelsuche-discovery/build/reports/domain-lifecycle-handoff/*.json \
-            /tmp/domain-lifecycle-handoff-first/
-          cp regelsuche-autopilot/build/reports/domain-lifecycle-handoff/*.json \
-            /tmp/domain-lifecycle-handoff-first/
+          first=/tmp/domain-lifecycle-handoff-first
+          export_dir=regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-export
+          mkdir -p "$first/production-generation-export"
+          cp regelsuche-discovery/build/reports/domain-lifecycle-handoff/*.json "$first/"
+          cp regelsuche-autopilot/build/reports/domain-lifecycle-handoff/*.json "$first/"
+          cp "$export_dir"/*.json "$first/production-generation-export/"
           ./gradlew \
             :regelsuche-discovery:test \
             :regelsuche-autopilot:test \
             --tests de.regelsuche.discovery.domain.DiscoveryLifecycleHandoffTest \
             --tests de.regelsuche.experiments.autopilot.AutonomousProductionDomainHandoffAdapterTest \
             --rerun-tasks
-          cmp /tmp/domain-lifecycle-handoff-first/expression-handoff.json \
+          cmp "$first/expression-handoff.json" \
             regelsuche-discovery/build/reports/domain-lifecycle-handoff/expression-handoff.json
-          cmp /tmp/domain-lifecycle-handoff-first/sequence-handoff.json \
+          cmp "$first/sequence-handoff.json" \
             regelsuche-discovery/build/reports/domain-lifecycle-handoff/sequence-handoff.json
-          cmp /tmp/domain-lifecycle-handoff-first/production-generation-handoff.json \
+          cmp "$first/production-generation-handoff.json" \
             regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-handoff.json
+          for name in \
+            export-manifest.json \
+            brief-v2.json \
+            seeds.json \
+            observations.json \
+            generation-receipt.json \
+            discovery-report.json \
+            generation-run.json \
+            lifecycle-handoff.json; do
+            cmp "$first/production-generation-export/$name" "$export_dir/$name"
+          done
 
-      - name: Validate schema, balances and representation boundary
+      - name: Validate schemas, balances, byte bindings and representation boundary
         shell: bash
         run: |
           python3 -m pip install \
@@ -91,25 +121,37 @@ jobs:
             --quiet \
             jsonschema==4.25.1
           python3 - <<'PY'
+          import hashlib
           import json
           from pathlib import Path
           from jsonschema.validators import validator_for
 
-          schema_path = Path(
-              'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json')
-          schema = json.loads(schema_path.read_text(encoding='utf-8'))
-          validator_for(schema).check_schema(schema)
-          assert schema.get('additionalProperties') is False
-          validator = validator_for(schema)(schema)
+          def load_validator(path):
+              schema = json.loads(path.read_text(encoding='utf-8'))
+              validator_for(schema).check_schema(schema)
+              assert schema.get('additionalProperties') is False
+              return validator_for(schema)(schema)
 
-          files = [
+          def sha256(data):
+              return 'sha256:' + hashlib.sha256(data).hexdigest()
+
+          handoff_validator = load_validator(Path(
+              'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'))
+          export_validator = load_validator(Path(
+              'docs/schemas/regelsuche-autonomous-production-generation-export-v1.schema.json'))
+
+          export_dir = Path(
+              'regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-export')
+          handoff_files = [
               Path('regelsuche-discovery/build/reports/domain-lifecycle-handoff/expression-handoff.json'),
               Path('regelsuche-discovery/build/reports/domain-lifecycle-handoff/sequence-handoff.json'),
               Path('regelsuche-autopilot/build/reports/domain-lifecycle-handoff/production-generation-handoff.json'),
+              export_dir / 'lifecycle-handoff.json',
           ]
-          reports = [json.loads(path.read_text(encoding='utf-8')) for path in files]
+          reports = [json.loads(path.read_text(encoding='utf-8'))
+                     for path in handoff_files]
           for report in reports:
-              validator.validate(report)
+              handoff_validator.validate(report)
               assert report['proofStatus'] == 'NOT_EVALUATED'
               assert report['externalNoveltyStatus'] == 'NOT_EVALUATED'
               assert report['promotionStatus'] == 'NOT_EVALUATED'
@@ -120,16 +162,63 @@ jobs:
                       + resource['skipped']
                       + resource['remaining'])
 
-          expression, sequence, production = reports
+          expression, sequence, production, exported = reports
           assert expression['sourceKind'] == 'DOMAIN_DISCOVERY_EVIDENCE'
           assert sequence['sourceKind'] == 'DOMAIN_DISCOVERY_EVIDENCE'
           assert expression['stage'] == sequence['stage'] == 'DISCOVERY_VALIDATION'
           assert expression['disposition'] == sequence['disposition'] == 'CONFIRMED'
-          assert production['sourceKind'] == 'PRODUCTION_GENERATION_RUN'
-          assert production['stage'] == 'GENERATION'
-          assert production['disposition'] == 'COMPLETED'
-          assert production['selectedCandidateHash'] == ''
-          assert production['certificateHash'] == ''
+          for report in (production, exported):
+              assert report['sourceKind'] == 'PRODUCTION_GENERATION_RUN'
+              assert report['stage'] == 'GENERATION'
+              assert report['disposition'] == 'COMPLETED'
+              assert report['selectedCandidateHash'] == ''
+              assert report['certificateHash'] == ''
+          assert production == exported
+
+          manifest_path = export_dir / 'export-manifest.json'
+          manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          export_validator.validate(manifest)
+          assert manifest['commitProtocol'] == 'MANIFEST_LAST_ATOMIC_RENAME'
+          assert len(manifest['artifacts']) == 7
+          assert not list(export_dir.glob('*.tmp'))
+
+          by_role = {}
+          materials = []
+          for artifact in manifest['artifacts']:
+              assert artifact['role'] not in by_role
+              by_role[artifact['role']] = artifact
+              path = export_dir / artifact['fileName']
+              assert path.parent == export_dir
+              data = path.read_bytes()
+              assert len(data) == artifact['byteLength']
+              assert sha256(data) == artifact['byteHash']
+              materials.append(
+                  artifact['fileName'] + '|'
+                  + artifact['role'] + '|'
+                  + artifact['sourceContentHash'] + '|'
+                  + artifact['byteHash'] + '|'
+                  + str(artifact['byteLength']))
+
+          generation_run = json.loads(
+              (export_dir / 'generation-run.json').read_text(encoding='utf-8'))
+          lifecycle_handoff = json.loads(
+              (export_dir / 'lifecycle-handoff.json').read_text(encoding='utf-8'))
+          assert generation_run['contentHash'] == manifest['generationRunHash']
+          assert lifecycle_handoff['contentHash'] == manifest['lifecycleHandoffHash']
+          assert lifecycle_handoff['sourceEvidenceHash'] == manifest['generationRunHash']
+          assert by_role['GENERATION_RUN']['sourceContentHash'] == \
+              manifest['generationRunHash']
+          assert by_role['LIFECYCLE_HANDOFF']['sourceContentHash'] == \
+              manifest['lifecycleHandoffHash']
+
+          manifest_material = (
+              manifest['schema']
+              + '\nexportId=' + manifest['exportId']
+              + '\ngenerationRunHash=' + manifest['generationRunHash']
+              + '\nlifecycleHandoffHash=' + manifest['lifecycleHandoffHash']
+              + '\nartifacts=[' + ', '.join(materials) + ']'
+              + '\ncommitProtocol=' + manifest['commitProtocol'])
+          assert sha256(manifest_material.encode('utf-8')) == manifest['contentHash']
 
           forbidden_keys = {
               'payload',
@@ -150,6 +239,7 @@ jobs:
                       yield from keys(nested)
           for report in reports:
               assert forbidden_keys.isdisjoint(set(keys(report)))
+          assert forbidden_keys.isdisjoint(set(keys(manifest)))
           PY
 
       - name: Upload handoff evidence and diagnostics
@@ -165,4 +255,5 @@ jobs:
             regelsuche-discovery/build/test-results/**
             regelsuche-autopilot/build/test-results/**
             docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json
+            docs/schemas/regelsuche-autonomous-production-generation-export-v1.schema.json
           if-no-files-found: warn
