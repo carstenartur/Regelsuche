@@ -53,6 +53,7 @@ jobs:
         run: |
           python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
           python3 - <<'PY'
+          import copy
           import json
           from pathlib import Path
           from jsonschema import Draft202012Validator
@@ -80,6 +81,8 @@ jobs:
           ):
               Draft202012Validator.check_schema(schema)
 
+          report_validator = Draft202012Validator(report_schema)
+
           def load(path):
               return json.loads(path.read_text())
 
@@ -89,7 +92,7 @@ jobs:
               request = load(run_root / 'request.json')
               report = load(run_root / 'report.json')
               Draft202012Validator(obligation_schema).validate(obligation)
-              Draft202012Validator(report_schema).validate(report)
+              report_validator.validate(report)
 
               assert request['obligationHash'] == obligation['contentHash']
               assert report['obligationHash'] == obligation['contentHash']
@@ -153,6 +156,25 @@ jobs:
           assert manifest['allFormalExecutionsRetained'] is True
           assert manifest['formalProofAuthorized'] is True
           assert manifest['searchGuidanceExecuted'] is True
+
+          # Fail-closed schema checks: changing only the semantic decision fields
+          # must be rejected even though every hash still has the right shape.
+          invalid_refutation = copy.deepcopy(formal)
+          invalid_refutation['outcome'] = 'REFUTED'
+          invalid_refutation['proofAuthorized'] = False
+          invalid_refutation['promotionBlocked'] = False
+          assert list(report_validator.iter_errors(invalid_refutation))
+
+          invalid_conflict = copy.deepcopy(formal)
+          invalid_conflict['outcome'] = 'CONFLICT'
+          invalid_conflict['proofAuthorized'] = False
+          invalid_conflict['promotionBlocked'] = True
+          invalid_conflict['conflictExecutionHashes'] = [
+              attempt['executionHash'] for attempt in formal['attempts']
+              if attempt['executionHash']
+          ]
+          assert list(report_validator.iter_errors(invalid_conflict))
+
           print('solver-portfolio-contract=valid')
           PY
 
