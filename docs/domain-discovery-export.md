@@ -57,7 +57,8 @@ Das Manifest `regelsuche.domain-discovery-export/v1` bindet zusätzlich:
 Die drei Rollen `DOMAIN_DESCRIPTOR`, `DISCOVERY_EVIDENCE` und
 `LIFECYCLE_HANDOFF` müssen jeweils genau einmal vorhanden sein. Teilmanifeste,
 doppelte Rollen, alternative Dateinamen oder nicht passende Root-Hashes werden
-abgelehnt.
+abgelehnt. Die Artefaktliste wird unabhängig von der Eingabereihenfolge
+kanonisch nach Dateiname sortiert; diese Reihenfolge ist Teil des Manifest-Hashes.
 
 ## Fail-closed Commit-Protokoll
 
