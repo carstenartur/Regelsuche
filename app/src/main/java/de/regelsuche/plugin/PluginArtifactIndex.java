@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -99,7 +100,9 @@ public record PluginArtifactIndex(
                 dto.indexId,
                 dto.revision,
                 dto.curatorId,
-                list(dto.entries).stream().map(PluginArtifactIndex::entry).toList(),
+                requiredList(dto.entries, "entries").stream()
+                    .map(PluginArtifactIndex::entry)
+                    .toList(),
                 dto.contentHash);
         } catch (JsonProcessingException exception) {
             throw new IllegalArgumentException("Invalid plugin artifact index: " + path, exception);
@@ -148,14 +151,30 @@ public record PluginArtifactIndex(
     private static Entry entry(EntryDto dto) {
         Objects.requireNonNull(dto, "artifact index entry");
         ArtifactKind kind = enumValue(ArtifactKind.class, dto.kind, "artifact kind");
-        List<Dependency> parsedDependencies = list(dto.dependencies).stream()
-            .map(item -> new Dependency(
-                item.kind == null || item.kind.isBlank()
-                    ? kind
-                    : enumValue(ArtifactKind.class, item.kind, "dependency kind"),
-                item.componentId,
-                item.versionConstraint,
-                item.optional))
+        String maximumCoreVersionExclusive = requiredValue(
+            dto.maximumCoreVersionExclusive, "maximumCoreVersionExclusive");
+        String signatureManifestUri = requiredValue(
+            dto.signatureManifestUri, "signatureManifestUri");
+        List<String> rawCapabilities = requiredList(dto.capabilities, "capabilities");
+        for (String capability : rawCapabilities) {
+            if (capability == null) {
+                throw new IllegalArgumentException("capabilities must not contain null");
+            }
+            identifier(capability, "capability");
+        }
+        List<Dependency> parsedDependencies = requiredList(
+            dto.dependencies, "dependencies").stream()
+            .map(item -> {
+                if (item == null) {
+                    throw new IllegalArgumentException(
+                        "dependencies must not contain null");
+                }
+                return new Dependency(
+                    enumValue(ArtifactKind.class, item.kind, "dependency kind"),
+                    item.componentId,
+                    item.versionConstraint,
+                    requiredBoolean(item.optional, "dependency optional"));
+            })
             .toList();
         return new Entry(
             dto.artifactId,
@@ -164,13 +183,13 @@ public record PluginArtifactIndex(
             dto.version,
             dto.apiVersion,
             dto.minimumCoreVersion,
-            dto.maximumCoreVersionExclusive,
-            list(dto.capabilities),
+            maximumCoreVersionExclusive,
+            rawCapabilities,
             parsedDependencies,
             dto.artifactFileName,
             dto.artifactSha256,
             dto.artifactUri,
-            dto.signatureManifestUri,
+            signatureManifestUri,
             dto.provenanceUri,
             dto.publisherId,
             dto.identityHash);
@@ -287,6 +306,27 @@ public record PluginArtifactIndex(
 
     private static <T> List<T> list(List<T> values) {
         return values == null ? List.of() : List.copyOf(values);
+    }
+
+    private static <T> List<T> requiredList(List<T> values, String field) {
+        if (values == null) {
+            throw new IllegalArgumentException(field + " must be present");
+        }
+        return values;
+    }
+
+    private static String requiredValue(String value, String field) {
+        if (value == null) {
+            throw new IllegalArgumentException(field + " must be present");
+        }
+        return value;
+    }
+
+    private static boolean requiredBoolean(Boolean value, String field) {
+        if (value == null) {
+            throw new IllegalArgumentException(field + " must be present");
+        }
+        return value;
     }
 
     public enum ArtifactKind {
@@ -636,10 +676,11 @@ public record PluginArtifactIndex(
             boolean https = "https".equalsIgnoreCase(scheme)
                 && uri.getHost() != null && !uri.getHost().isBlank();
             boolean file = "file".equalsIgnoreCase(scheme)
-                && uri.getPath() != null && uri.getPath().startsWith("/");
+                && uri.getPath() != null && uri.getPath().startsWith("/")
+                && (uri.getHost() == null || uri.getHost().isBlank());
             if ((!https && !file) || uri.getFragment() != null || uri.getUserInfo() != null) {
                 throw new IllegalArgumentException(
-                    field + " must be an absolute https or file URI without user info or fragment");
+                    field + " must be an absolute https or local file URI without user info or fragment");
             }
             return uri.toString();
         } catch (URISyntaxException exception) {
@@ -650,9 +691,9 @@ public record PluginArtifactIndex(
     /** SemVer 2.0 ordering; build metadata is ignored for precedence. */
     private record SemanticVersion(
         String source,
-        int major,
-        int minor,
-        int patch,
+        BigInteger major,
+        BigInteger minor,
+        BigInteger patch,
         List<String> prerelease
     ) implements Comparable<SemanticVersion> {
         private static final Pattern PATTERN = Pattern.compile(
@@ -686,20 +727,20 @@ public record PluginArtifactIndex(
             }
             return new SemanticVersion(
                 value,
-                Integer.parseInt(matcher.group(1)),
-                Integer.parseInt(matcher.group(2)),
-                Integer.parseInt(matcher.group(3)),
+                new BigInteger(matcher.group(1)),
+                new BigInteger(matcher.group(2)),
+                new BigInteger(matcher.group(3)),
                 prerelease);
         }
 
         @Override
         public int compareTo(SemanticVersion other) {
-            int result = Integer.compare(major, other.major);
+            int result = major.compareTo(other.major);
             if (result == 0) {
-                result = Integer.compare(minor, other.minor);
+                result = minor.compareTo(other.minor);
             }
             if (result == 0) {
-                result = Integer.compare(patch, other.patch);
+                result = patch.compareTo(other.patch);
             }
             if (result != 0) {
                 return result;
@@ -778,6 +819,6 @@ public record PluginArtifactIndex(
         public String kind;
         public String componentId;
         public String versionConstraint;
-        public boolean optional;
+        public Boolean optional;
     }
 }
