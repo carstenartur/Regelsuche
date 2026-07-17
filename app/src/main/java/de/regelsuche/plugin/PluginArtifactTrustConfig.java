@@ -9,16 +9,16 @@ public record PluginArtifactTrustConfig(
 ) {
     public PluginArtifactTrustConfig {
         trustStorePath = trustStorePath == null
-            ? Path.of("plugins", "trust-store.json")
+            ? Path.of("plugins", "trust-store.json").toAbsolutePath().normalize()
             : trustStorePath.toAbsolutePath().normalize();
-        policy = policy == null ? PluginTrustPolicy.WARN : policy;
+        policy = policy == null ? PluginTrustPolicy.REQUIRE_VERIFIED : policy;
     }
 
     public static PluginArtifactTrustConfig defaults(Path pluginsDirectory) {
         Path directory = pluginsDirectory == null ? Path.of("plugins") : pluginsDirectory;
         return new PluginArtifactTrustConfig(
             directory.resolve("trust-store.json"),
-            PluginTrustPolicy.WARN
+            PluginTrustPolicy.REQUIRE_VERIFIED
         );
     }
 }
