@@ -1,6 +1,7 @@
 package de.regelsuche.benchmarks;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.solver.ir.SolverIr;
@@ -16,6 +17,20 @@ import org.junit.jupiter.api.Test;
 class ExternalSymPySolverBackendTest {
     private final SolverObligationFactory obligations =
         new SolverObligationFactory();
+
+    @Test
+    void semanticConfigurationDoesNotDependOnAbsoluteExecutablePath() {
+        var first = new ExternalSymPySolverBackend(
+            "1.14.0", "/workspace/.venv/bin/python", Duration.ofSeconds(20));
+        var second = new ExternalSymPySolverBackend(
+            "1.14.0", "/opt/regelsuche-sympy/bin/python", Duration.ofSeconds(20));
+        var differentTimeout = new ExternalSymPySolverBackend(
+            "1.14.0", "/opt/regelsuche-sympy/bin/python", Duration.ofSeconds(21));
+
+        assertEquals(first.configurationHash(), second.configurationHash());
+        assertNotEquals(first.configurationHash(),
+            differentTimeout.configurationHash());
+    }
 
     @Test
     void unsupportedFragmentIsRejectedBeforeMissingProcessMatters() {
