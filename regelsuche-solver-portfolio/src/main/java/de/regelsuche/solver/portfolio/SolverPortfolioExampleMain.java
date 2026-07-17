@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.List;
 
 /** Writes a real three-role portfolio example; system Z3 is required. */
@@ -20,6 +21,7 @@ public final class SolverPortfolioExampleMain {
         Path output = args.length == 0
             ? Path.of("build", "reports", "solver-portfolio")
             : Path.of(args[0]);
+        clearDirectory(output);
         Files.createDirectories(output);
         Z3SmtSolverBackend.Detection detection =
             Z3SmtSolverBackend.detectSystemZ3();
@@ -94,6 +96,17 @@ public final class SolverPortfolioExampleMain {
             .property("guidanceReportHash", guidanceRun.report().contentHash())
             .endObject().toString();
         write(output.resolve("manifest.json"), manifest);
+    }
+
+    private static void clearDirectory(Path directory) throws IOException {
+        if (!Files.exists(directory)) {
+            return;
+        }
+        try (var paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.delete(path);
+            }
+        }
     }
 
     private static void write(Path path, String content) throws IOException {
