@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-artifact-index-signature/v1",
+  "title": "Regelsuche signed plugin artifact index revision v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "indexId",
+    "revision",
+    "indexContentHash",
+    "curatorId",
+    "keyId",
+    "algorithm",
+    "signatureBase64"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-artifact-index-signature/v1"
+    },
+    "indexId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "revision": {
+      "$ref": "#/$defs/identifier"
+    },
+    "indexContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "curatorId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "keyId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "signatureBase64": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{86}==$"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
