@@ -1,0 +1,322 @@
+name: Domain Generic Qualification
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'regelsuche-release/build.gradle'
+      - 'regelsuche-release/src/main/java/de/regelsuche/release/DomainGeneric*.java'
+      - 'regelsuche-release/src/test/java/de/regelsuche/release/DomainGeneric*.java'
+      - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/**'
+      - 'docs/domain-generic-qualification.md'
+      - 'docs/README.md'
+      - 'docs/schemas/regelsuche-domain-generic-*.schema.json'
+      - '.github/workflows/domain-generic-qualification.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'regelsuche-release/build.gradle'
+      - 'regelsuche-release/src/main/java/de/regelsuche/release/DomainGeneric*.java'
+      - 'regelsuche-release/src/test/java/de/regelsuche/release/DomainGeneric*.java'
+      - 'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/**'
+      - 'docs/domain-generic-qualification.md'
+      - 'docs/README.md'
+      - 'docs/schemas/regelsuche-domain-generic-*.schema.json'
+      - '.github/workflows/domain-generic-qualification.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: domain-generic-qualification-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Test and execute the separate qualification profile
+        shell: bash
+        run: |
+          mkdir -p build/reports/domain-generic-qualification-ci
+          set -o pipefail
+          ./gradlew \
+            :regelsuche-release:test \
+            --tests de.regelsuche.release.DomainGenericQualificationRunnerTest \
+            :regelsuche-release:runDomainGenericQualification \
+            --rerun-tasks \
+            --console=plain 2>&1 \
+            | tee build/reports/domain-generic-qualification-ci/gradle.log
+
+      - name: Require complete retained evidence
+        shell: bash
+        run: |
+          root=regelsuche-release/build/reports/domain-generic-qualification
+          for name in profile-catalog qualification-report qualification-run; do
+            test -s "$root/${name}.json"
+          done
+          for run in 1 2 3; do
+            for domain in expression sequence; do
+              for name in domain evidence lifecycle-handoff export-manifest; do
+                test -s "$root/runs/run-${run}/${domain}/${name}.json"
+              done
+              test -s "$root/runs/run-${run}/verification-receipts/${domain}.json"
+            done
+          done
+
+      - name: Require byte-identical repeated campaign output
+        shell: bash
+        run: |
+          cp -a \
+            regelsuche-release/build/reports/domain-generic-qualification \
+            /tmp/domain-generic-qualification-first
+          ./gradlew :regelsuche-release:runDomainGenericQualification --rerun-tasks
+          diff -ru \
+            /tmp/domain-generic-qualification-first \
+            regelsuche-release/build/reports/domain-generic-qualification
+
+      - name: Validate schemas, identities, clean runs and claim boundaries
+        shell: bash
+        run: |
+          python3 -m venv .venv-domain-generic-qualification
+          .venv-domain-generic-qualification/bin/python -m pip install \
+            --disable-pip-version-check \
+            --quiet \
+            jsonschema==4.25.1
+          .venv-domain-generic-qualification/bin/python - <<'PY'
+          import copy
+          import hashlib
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          from jsonschema.exceptions import ValidationError
+
+          def sha256(value):
+              return 'sha256:' + hashlib.sha256(value).hexdigest()
+
+          def java_bool(value):
+              return 'true' if value else 'false'
+
+          def java_list(values):
+              return '[' + ', '.join(values) + ']'
+
+          def require_rejection(validator, value, label):
+              try:
+                  validator.validate(value)
+              except ValidationError:
+                  return
+              raise AssertionError(f'{label} unexpectedly passed schema validation')
+
+          schema_root = Path('docs/schemas')
+          schema_files = {
+              'catalog': 'regelsuche-domain-generic-evidence-profile-catalog-v1.schema.json',
+              'report': 'regelsuche-domain-generic-discovery-qualification-v1.schema.json',
+              'run': 'regelsuche-domain-generic-discovery-qualification-run-v1.schema.json',
+          }
+          validators = {}
+          for name, file_name in schema_files.items():
+              schema = json.loads((schema_root / file_name).read_text(encoding='utf-8'))
+              Draft202012Validator.check_schema(schema)
+              assert schema.get('additionalProperties') is False
+              validators[name] = Draft202012Validator(schema)
+
+          root = Path('regelsuche-release/build/reports/domain-generic-qualification')
+          catalog_path = root / 'profile-catalog.json'
+          report_path = root / 'qualification-report.json'
+          run_path = root / 'qualification-run.json'
+          catalog = json.loads(catalog_path.read_text(encoding='utf-8'))
+          report = json.loads(report_path.read_text(encoding='utf-8'))
+          run = json.loads(run_path.read_text(encoding='utf-8'))
+          validators['catalog'].validate(catalog)
+          validators['report'].validate(report)
+          validators['run'].validate(run)
+
+          assert report['profile'] == 'DOMAIN_GENERIC_DISCOVERY'
+          assert report['status'] == 'READY'
+          assert report['domainGenericClaimAuthorized'] is True
+          assert report['autonomousCampaignClaimAuthorized'] is False
+          assert report['cleanRunCount'] == 3
+          assert report['cleanRunsIdentical'] is True
+          assert report['blockers'] == []
+          assert all(check['passed'] for check in report['checks'])
+          assert [item['domainId'] for item in report['domains']] == [
+              'expression-rewrite',
+              'integer-sequence-finite-difference',
+          ]
+          for status in (
+              'proofStatus',
+              'externalNoveltyStatus',
+              'promotionStatus',
+              'publicEvidenceStatus',
+          ):
+              assert report[status] == 'NOT_EVALUATED'
+              assert run[status] == 'NOT_EVALUATED'
+          assert run['domainGenericQualificationStatus'] == 'READY'
+          assert run['domainGenericClaimAuthorized'] is True
+          assert run['autonomousCampaignClaimAuthorized'] is False
+
+          first_bytes = {}
+          fingerprints = []
+          for clean_run in (1, 2, 3):
+              material = []
+              for directory_name, expected_domain in (
+                  ('expression', 'expression-rewrite'),
+                  ('sequence', 'integer-sequence-finite-difference'),
+              ):
+                  directory = root / 'runs' / f'run-{clean_run}' / directory_name
+                  manifest_path = directory / 'export-manifest.json'
+                  receipt_path = (
+                      root / 'runs' / f'run-{clean_run}'
+                      / 'verification-receipts' / f'{directory_name}.json')
+                  manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+                  receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+                  assert manifest['domainId'] == expected_domain
+                  assert receipt['domainId'] == expected_domain
+                  assert receipt['manifestContentHash'] == manifest['contentHash']
+                  assert receipt['identityBindingStatus'] == 'VERIFIED'
+                  assert receipt['mathematicalValidationStatus'] == 'NOT_EVALUATED'
+                  material.append(
+                      expected_domain + '|'
+                      + manifest['contentHash'] + '|'
+                      + receipt['contentHash'])
+                  for file_name in (
+                      'domain.json',
+                      'evidence.json',
+                      'lifecycle-handoff.json',
+                      'export-manifest.json',
+                  ):
+                      key = (directory_name, file_name)
+                      retained = (directory / file_name).read_bytes()
+                      if clean_run == 1:
+                          first_bytes[key] = retained
+                      else:
+                          assert retained == first_bytes[key]
+                  key = (directory_name, 'verification.json')
+                  retained = receipt_path.read_bytes()
+                  if clean_run == 1:
+                      first_bytes[key] = retained
+                  else:
+                      assert retained == first_bytes[key]
+              fingerprint_material = (
+                  'regelsuche.domain-generic-clean-run/v1\nexports='
+                  + java_list(sorted(material))
+              ).encode('utf-8')
+              fingerprints.append(sha256(fingerprint_material))
+
+          assert fingerprints == run['cleanRunFingerprints']
+          assert len(set(fingerprints)) == 1
+
+          domain_material = []
+          for domain in report['domains']:
+              domain_material.append('|'.join([
+                  domain['domainId'],
+                  domain['domainRevision'],
+                  domain['stateType'],
+                  domain['candidateType'],
+                  domain['certificateType'],
+                  domain['domainDescriptorHash'],
+                  domain['discoveryEvidenceHash'],
+                  domain['lifecycleHandoffHash'],
+                  domain['exportVerificationHash'],
+                  domain['identityBindingStatus'],
+                  domain['outcome'],
+                  domain['selectedCandidateHash'],
+                  domain['certificateHash'],
+                  java_list(domain['resourceNames']),
+                  java_bool(domain['resourcesBalanced']),
+                  java_bool(domain['representationFreeHandoff']),
+                  domain['proofStatus'],
+                  domain['externalNoveltyStatus'],
+                  domain['promotionStatus'],
+                  domain['publicEvidenceStatus'],
+              ]))
+          check_material = [
+              check['code']
+              + '|passed=' + java_bool(check['passed'])
+              + '|actual=' + check['actual']
+              + '|required=' + check['required']
+              for check in report['checks']
+          ]
+          report_material = (
+              'regelsuche.domain-generic-discovery-qualification/v1'
+              + '\nprofile=' + report['profile']
+              + '\nstatus=' + report['status']
+              + '\ndomainGenericClaimAuthorized='
+                  + java_bool(report['domainGenericClaimAuthorized'])
+              + '\nautonomousCampaignClaimAuthorized='
+                  + java_bool(report['autonomousCampaignClaimAuthorized'])
+              + '\ncleanRunCount=' + str(report['cleanRunCount'])
+              + '\ncleanRunsIdentical=' + java_bool(report['cleanRunsIdentical'])
+              + '\ndomains=' + java_list(domain_material)
+              + '\nchecks=' + java_list(check_material)
+              + '\nblockers=' + java_list(report['blockers'])
+              + '\nproofStatus=' + report['proofStatus']
+              + '\nexternalNoveltyStatus=' + report['externalNoveltyStatus']
+              + '\npromotionStatus=' + report['promotionStatus']
+              + '\npublicEvidenceStatus=' + report['publicEvidenceStatus']
+          ).encode('utf-8')
+          assert report['contentHash'] == sha256(report_material)
+
+          assert run['profileCatalogHash'] == sha256(catalog_path.read_bytes())
+          assert run['qualificationReportHash'] == report['contentHash']
+          run_material = (
+              'regelsuche.domain-generic-discovery-qualification-run/v1'
+              + '\nprofileCatalogHash=' + run['profileCatalogHash']
+              + '\nqualificationReportHash=' + run['qualificationReportHash']
+              + '\ncleanRunFingerprints=' + java_list(run['cleanRunFingerprints'])
+              + '\ncleanRunsIdentical=' + java_bool(run['cleanRunsIdentical'])
+              + '\ndomainGenericQualificationStatus='
+                  + run['domainGenericQualificationStatus']
+              + '\ndomainGenericClaimAuthorized='
+                  + java_bool(run['domainGenericClaimAuthorized'])
+              + '\nautonomousCampaignClaimAuthorized='
+                  + java_bool(run['autonomousCampaignClaimAuthorized'])
+              + '\nproofStatus=' + run['proofStatus']
+              + '\nexternalNoveltyStatus=' + run['externalNoveltyStatus']
+              + '\npromotionStatus=' + run['promotionStatus']
+              + '\npublicEvidenceStatus=' + run['publicEvidenceStatus']
+          ).encode('utf-8')
+          assert run['contentHash'] == sha256(run_material)
+
+          invalid_autonomy = copy.deepcopy(report)
+          invalid_autonomy['autonomousCampaignClaimAuthorized'] = True
+          require_rejection(
+              validators['report'], invalid_autonomy,
+              'domain-generic report broadening AUTONOMOUS_CAMPAIGN')
+          invalid_proof = copy.deepcopy(report)
+          invalid_proof['proofStatus'] = 'CONFIRMED'
+          require_rejection(
+              validators['report'], invalid_proof,
+              'domain-generic report inflating proof status')
+          invalid_ready = copy.deepcopy(report)
+          invalid_ready['domains'] = invalid_ready['domains'][:1]
+          require_rejection(
+              validators['report'], invalid_ready,
+              'READY report with only one domain')
+          PY
+
+      - name: Upload qualification evidence and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: domain-generic-qualification-evidence
+          path: |
+            regelsuche-release/build/reports/domain-generic-qualification/**
+            regelsuche-release/build/reports/tests/**
+            regelsuche-release/build/test-results/**
+            build/reports/domain-generic-qualification-ci/**
+            docs/schemas/regelsuche-domain-generic-*.schema.json
+          if-no-files-found: warn
