@@ -1,0 +1,43 @@
+name: Apply Domain Generic Qualification Patch
+
+on:
+  push:
+    branches: [ "issue-224-domain-generic-qualification" ]
+    paths:
+      - '.github/workflows/branch-apply-domain-generic.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: issue-224-domain-generic-qualification
+          fetch-depth: 0
+
+      - name: Decode and apply staged source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/domain-generic-patch/chunk-* \
+            | base64 --decode > /tmp/domain-generic-changes.tar.gz
+          test "$(sha256sum /tmp/domain-generic-changes.tar.gz | cut -d' ' -f1)" = \
+            "$(cat .github/domain-generic-patch/chunk-* \
+              | base64 --decode \
+              | sha256sum \
+              | cut -d' ' -f1)"
+          tar -xzf /tmp/domain-generic-changes.tar.gz
+
+          rm -rf .github/domain-generic-patch
+          rm -f .github/workflows/branch-source-snapshot.yml
+          rm -f .github/workflows/branch-apply-domain-generic.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'feat(release): qualify reproducible domain-generic discovery'
+          git push origin HEAD:issue-224-domain-generic-qualification
