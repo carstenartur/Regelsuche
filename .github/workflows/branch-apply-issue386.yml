@@ -61,8 +61,7 @@ jobs:
         run: |
           set -o pipefail
           tar -xzf /tmp/issue386-implementation.tar.gz -C .
-          mv .github/autonomous-discovery-walkthrough.yml.pending \
-            .github/workflows/autonomous-discovery-walkthrough.yml
+          rm -f .github/autonomous-discovery-walkthrough.yml.pending
           bash -x .github/issue-386-apply.sh 2>&1 | tee /tmp/issue386-bootstrap.log
 
       - name: Upload walkthrough bootstrap diagnostics
