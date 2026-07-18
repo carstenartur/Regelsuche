@@ -91,9 +91,23 @@ def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
         "EVALUATOR_BACKED_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"
     ):
         raise ValueError("challenge claim policy is not conservative")
+    require_text(source.get("portfolioId"), "portfolioId")
     selection = source.get("selectionPolicy")
     if not isinstance(selection, dict):
         raise ValueError("selectionPolicy must be an object")
+    for flag in (
+        "requireIndependentEvaluator",
+        "requireFrozenSplitUnit",
+        "requireInformationParityBaselines",
+    ):
+        if selection.get(flag) is not True:
+            raise ValueError(f"selectionPolicy.{flag} must remain true")
+    minimum_assessed = selection.get("minimumAssessedClasses")
+    minimum_selected = selection.get("minimumSelectedClasses")
+    if not isinstance(minimum_assessed, int) or minimum_assessed < 5:
+        raise ValueError("minimumAssessedClasses must be at least 5")
+    if not isinstance(minimum_selected, int) or minimum_selected < 2:
+        raise ValueError("minimumSelectedClasses must be at least 2")
     if selection.get("externalSearchVisibility") != "POST_FORMATION_ONLY":
         raise ValueError("external search must remain post-formation")
     if selection.get("pilotEvidenceStatus") != "DEVELOPMENT_ONLY":
@@ -101,7 +115,7 @@ def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
     challenges = source.get("challenges")
     if not isinstance(challenges, list):
         raise ValueError("challenges must be an array")
-    if len(challenges) < int(selection.get("minimumAssessedClasses", 5)):
+    if len(challenges) < minimum_assessed:
         raise ValueError("insufficient assessed challenge classes")
 
     ids: set[str] = set()
@@ -128,7 +142,7 @@ def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
             raise ValueError(f"unsupported decision for {challenge_id}")
         if challenge["complexityTier"] not in VALID_COMPLEXITY:
             raise ValueError(
-                f"selected challenge is not beyond elementary tier: {challenge_id}"
+                f"unsupported complexity tier for {challenge_id}"
             )
         require_text_list(
             challenge["formationInformation"], "formationInformation"
@@ -191,7 +205,7 @@ def validate_source(source: dict[str, Any]) -> list[dict[str, Any]]:
             )
         if challenge["decision"] == "SELECTED_FOR_PREREGISTRATION":
             selected += 1
-    if selected < int(selection.get("minimumSelectedClasses", 2)):
+    if selected < minimum_selected:
         raise ValueError("insufficient selected challenge classes")
     return sorted(challenges, key=lambda item: item["challengeId"])
 
