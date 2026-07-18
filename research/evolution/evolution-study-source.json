@@ -1,0 +1,98 @@
+{
+  "schema": "regelsuche.evolution-study-source/v1",
+  "studyId": "regelsuche-evolution-population-study-2026-07/v1",
+  "executionStatus": "NOT_STARTED",
+  "finalTestAccess": "NOT_ACCESSED",
+  "publicationAuthorized": false,
+  "claimPolicy": "EVOLUTION_FITNESS_IS_NOT_PROOF_NOVELTY_PROMOTION_OR_PUBLIC_EVIDENCE",
+  "benchmarkSource": {
+    "path": "research/benchmarks/candidate-independent/benchmark-source.json",
+    "schema": "regelsuche.candidate-independent-benchmark-source/v1",
+    "benchmarkId": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1",
+    "canonicalSourceHash": "sha256:b1b37434b731d915a6ea206a22b9a3d7d36a0214f519e9cfa83c24bd0a8f8bca"
+  },
+  "formationBoundary": {
+    "allowedSplits": ["TRAIN"],
+    "prohibitedFields": ["target", "expectedAnswer", "hiddenReference", "testLabel", "postHocFamilyAnnotation", "finalTestOutcome"]
+  },
+  "populationPolicy": {
+    "randomSeed": 22020260718,
+    "populationSize": 12,
+    "generationBudget": 5,
+    "eliteCount": 2,
+    "maxOffspringPerLineage": 3,
+    "maxEvaluatedGenomes": 60,
+    "minDistinctAlphaStructures": 6,
+    "duplicatePolicy": "EXACT_AND_ALPHA_STRUCTURAL_UNIQUE",
+    "replacementPolicy": "ELITES_THEN_DETERMINISTIC_FITNESS_ORDER",
+    "terminalOutcomes": ["COMPLETED", "EXTINCT", "STAGNATED", "BUDGET_EXHAUSTED", "INCOMPLETE"]
+  },
+  "fitnessModel": {
+    "hardBlockers": ["SAFETY", "LEAKAGE", "CORRECTNESS", "EVIDENCE_INCOMPLETE", "UNBOUNDED", "CYCLIC", "DUPLICATE"],
+    "components": [
+      {"name": "newlySolvedTrainCases", "direction": "MAXIMIZE", "split": "TRAIN"},
+      {"name": "exploredStateReduction", "direction": "MAXIMIZE", "split": "TRAIN"},
+      {"name": "pathLengthReduction", "direction": "MAXIMIZE", "split": "TRAIN"},
+      {"name": "structuralSupportDiversity", "direction": "MAXIMIZE", "split": "TRAIN"},
+      {"name": "projectInternalNovelty", "direction": "MAXIMIZE", "split": "TRAIN"},
+      {"name": "assumptionComplexity", "direction": "MINIMIZE", "split": "TRAIN"},
+      {"name": "candidateComplexity", "direction": "MINIMIZE", "split": "TRAIN"},
+      {"name": "counterexampleRisk", "direction": "MINIMIZE", "split": "TRAIN"}
+    ],
+    "scalarSelectionProfile": {
+      "profileId": "regelsuche.evolution-fitness-profile/v1",
+      "frozenBeforeValidation": true,
+      "weights": {
+        "newlySolvedTrainCases": 8,
+        "exploredStateReduction": 3,
+        "pathLengthReduction": 2,
+        "structuralSupportDiversity": 5,
+        "projectInternalNovelty": 2,
+        "assumptionComplexity": -2,
+        "candidateComplexity": -1,
+        "counterexampleRisk": -8
+      }
+    }
+  },
+  "validationSelection": {
+    "split": "VALIDATION",
+    "selects": ["populationPolicy", "scalarSelectionProfile"],
+    "finalTestVisible": false,
+    "selectionStatus": "NOT_STARTED"
+  },
+  "finalTestPolicy": {
+    "split": "TEST",
+    "oneTimeEvaluation": true,
+    "rerunPolicy": "NEW_STUDY_ID_REQUIRED",
+    "status": "NOT_ACCESSED",
+    "terminalOutcomes": ["ACCEPTED", "REJECTED", "DISPROVED", "NO_RESULT", "TIMEOUT", "UNSUPPORTED", "INCOMPLETE"]
+  },
+  "diversityAblation": {
+    "profiles": ["FULL_DIVERSITY", "NO_DIVERSITY"],
+    "identicalBudgets": true,
+    "selectionSplit": "VALIDATION",
+    "finalTestUsedForSelection": false,
+    "status": "NOT_STARTED"
+  },
+  "splitManifest": [
+    {"caseId":"case-01","challengeId":"rational-assumption-rewrites","familyId":"rational-assumption-rewrites/train-linear-denominator","structuralSignature":"train-linear-denominator","exactFingerprint":"sha256:d11d815252dd0c29f308edd9f40c8c0174d4a4e5521a0f397b2c7015fbec92c5","alphaStructuralFingerprint":"sha256:da5d0ae0dc70c4b0534c2cccec25ce42891ea28f7689760638a8cb7426a00bcf","split":"TRAIN","formationVisible":true},
+    {"caseId":"case-02","challengeId":"rational-assumption-rewrites","familyId":"rational-assumption-rewrites/train-affine-shift","structuralSignature":"train-affine-shift","exactFingerprint":"sha256:8116b2fdd40545c2efddd9117feb6673688bb72c7f669ddfd87bd20b6caebc2c","alphaStructuralFingerprint":"sha256:b17acb4b6c5a10755faa241db9f49a9e1d411011fe7d57ae1f20bbff61a76cdd","split":"TRAIN","formationVisible":true},
+    {"caseId":"case-03","challengeId":"rational-assumption-rewrites","familyId":"rational-assumption-rewrites/validation-quadratic-denominator","structuralSignature":"validation-quadratic-denominator","exactFingerprint":"sha256:2276b3d8dea6556acc32469d01ec26d2b37cd875a84a7592e493c22ae7cb7828","alphaStructuralFingerprint":"sha256:b3c952f718fb275e57dcd194a1a196a6c67a8704b1d10f490d315d199c23110d","split":"VALIDATION","formationVisible":false},
+    {"caseId":"case-04","challengeId":"rational-assumption-rewrites","familyId":"rational-assumption-rewrites/validation-partial-fraction","structuralSignature":"validation-partial-fraction","exactFingerprint":"sha256:53f1a5c93277c822b5472a0c8c5bc209d024735a9fff4770b9b89c708d164856","alphaStructuralFingerprint":"sha256:52a50e3d8bfc60a0026fe6e7f12ec90de6c621dda74ab3e0b243600e85c17c92","split":"VALIDATION","formationVisible":false},
+    {"caseId":"case-05","challengeId":"rational-assumption-rewrites","familyId":"rational-assumption-rewrites/test-nested-denominator","structuralSignature":"test-nested-denominator","exactFingerprint":"sha256:78dc55e4119ab06cc25611b00f78910e094c0f13b0f9fd4fe857d9edcc85ac9c","alphaStructuralFingerprint":"sha256:0267ced537df8e4dea64d937ad0921c32317c0d39ddf8df972dbdf562b5919df","split":"TEST","formationVisible":false},
+    {"caseId":"case-06","challengeId":"rational-assumption-rewrites","familyId":"rational-assumption-rewrites/test-parameterized-pole","structuralSignature":"test-parameterized-pole","exactFingerprint":"sha256:748fcbc1771d819bc9c7bc48b3c700db63541497dd2ffc706824703673eb956c","alphaStructuralFingerprint":"sha256:73ab588335237d547c9f1ef928f1c0ea11a73e2cfcec97803822a11fbb752490","split":"TEST","formationVisible":false},
+    {"caseId":"case-07","challengeId":"finite-difference-recurrences","familyId":"finite-difference-recurrences/train-polynomial-difference","structuralSignature":"train-polynomial-difference","exactFingerprint":"sha256:be160b79db1a7b8c1aa381e1d97a747fa5bb30233391b99cce4bf323af495873","alphaStructuralFingerprint":"sha256:a907c4bec81ccd95b07da1b55aaa9f48b67dae50601654bfb09e0df5f9f848f0","split":"TRAIN","formationVisible":true},
+    {"caseId":"case-08","challengeId":"finite-difference-recurrences","familyId":"finite-difference-recurrences/train-first-order-recurrence","structuralSignature":"train-first-order-recurrence","exactFingerprint":"sha256:5892ff15ef5ec35eb88e79741682872034307866665787856a506db26009a461","alphaStructuralFingerprint":"sha256:727a1453f57835cd747478860c101283d3dac3f5444287df0ce6fbb4527816b0","split":"TRAIN","formationVisible":true},
+    {"caseId":"case-09","challengeId":"finite-difference-recurrences","familyId":"finite-difference-recurrences/validation-alternating-difference","structuralSignature":"validation-alternating-difference","exactFingerprint":"sha256:ad7830c42ff8613f4f46afc2504100fea54db223185a4d386ef6f70728f093d4","alphaStructuralFingerprint":"sha256:852e4409e3a45c4d7469f2fd5810306e249a6b0d87169567f4b7727800653815","split":"VALIDATION","formationVisible":false},
+    {"caseId":"case-10","challengeId":"finite-difference-recurrences","familyId":"finite-difference-recurrences/validation-second-order-recurrence","structuralSignature":"validation-second-order-recurrence","exactFingerprint":"sha256:59899818724eb0d8a0f85e5941e1d4fe778e28cebc1c15f326c9b4bed53441b5","alphaStructuralFingerprint":"sha256:9180d3f953cfb944b17d44f57b67d3357ef77ddc42da8448f08d05687e53fa40","split":"VALIDATION","formationVisible":false},
+    {"caseId":"case-11","challengeId":"finite-difference-recurrences","familyId":"finite-difference-recurrences/test-mixed-degree-difference","structuralSignature":"test-mixed-degree-difference","exactFingerprint":"sha256:7ea151f19fafbfe00c0a3c09c9da6b10a8a51902e9ba6bb494bcf2f39de3f4d6","alphaStructuralFingerprint":"sha256:255a939959bb3e57294ff3347a9c1cba8a652167bd295a7c4d16c7f93d748876","split":"TEST","formationVisible":false},
+    {"caseId":"case-12","challengeId":"finite-difference-recurrences","familyId":"finite-difference-recurrences/test-nonhomogeneous-recurrence","structuralSignature":"test-nonhomogeneous-recurrence","exactFingerprint":"sha256:aab8240ccf185c68f71e8de44fb89da1b5b46101c7f83fb9964bf851ea10b425","alphaStructuralFingerprint":"sha256:11f0d34a75fc4257961c178fdacbbdcb4911b1029904924e5c8f3a1b8a57b7ab","split":"TEST","formationVisible":false},
+    {"caseId":"case-13","challengeId":"reusable-search-macros","familyId":"reusable-search-macros/train-factor-expand","structuralSignature":"train-factor-expand","exactFingerprint":"sha256:7cf6fdbfecd9e40079f24e0a3ed1622dc018e63e8c58520d1f97a875f307ebef","alphaStructuralFingerprint":"sha256:9eedc1276b5ac7df9f696a160d44b49758b31d72fb9985a6e05b2f15d880857a","split":"TRAIN","formationVisible":true},
+    {"caseId":"case-14","challengeId":"reusable-search-macros","familyId":"reusable-search-macros/train-normalize-cancel","structuralSignature":"train-normalize-cancel","exactFingerprint":"sha256:953d1762fb858d24b464f3141c30957a77a7bed9a7bbe8b5b1cbc51128988acb","alphaStructuralFingerprint":"sha256:da6ad402e077f35af019bfca237ba93dd611019d18cb8237ac0a39fb019d92bc","split":"TRAIN","formationVisible":true},
+    {"caseId":"case-15","challengeId":"reusable-search-macros","familyId":"reusable-search-macros/validation-distribute-collect","structuralSignature":"validation-distribute-collect","exactFingerprint":"sha256:f7cfb2c8a9fda8dba59a415442b1b152c6fa54c581e34572d0222ee21b6fecb7","alphaStructuralFingerprint":"sha256:f7f976ea27de5b017de8ba68bcef7343c4bb1306a7f0516856cdc3fb29e79e66","split":"VALIDATION","formationVisible":false},
+    {"caseId":"case-16","challengeId":"reusable-search-macros","familyId":"reusable-search-macros/validation-substitute-simplify","structuralSignature":"validation-substitute-simplify","exactFingerprint":"sha256:761b608415eb17292c9f3f6a647f1b7ccac152cfc7a37dbb9afe80fdb1653e1f","alphaStructuralFingerprint":"sha256:55afa77447cbfb77d26eb0000c05e3a7f87f7662bed1f4fcf3753d1521984f51","split":"VALIDATION","formationVisible":false},
+    {"caseId":"case-17","challengeId":"reusable-search-macros","familyId":"reusable-search-macros/test-cross-family-compose","structuralSignature":"test-cross-family-compose","exactFingerprint":"sha256:b926a89c8d2d635ec5138d9bfe7044669e814bd75c7abfd498911f76aec8da84","alphaStructuralFingerprint":"sha256:f6c875239acdbea50bfdd19c2e035e318255057153e49fa8a0636a6ddfa996bd","split":"TEST","formationVisible":false},
+    {"caseId":"case-18","challengeId":"reusable-search-macros","familyId":"reusable-search-macros/test-guarded-reuse","structuralSignature":"test-guarded-reuse","exactFingerprint":"sha256:4b286af172b592e2ab5eeea25722dadfedd30fbc53195e06ca38b66bd2824618","alphaStructuralFingerprint":"sha256:626b2f6760787d33f615ec372f95a98902e6c7188c4274662f0874c97796ebf2","split":"TEST","formationVisible":false}
+  ],
+  "contentHash": "sha256:1cf044f1bf4d9df8f157fb402a428365477da11e57d39d9ca22b62bf7815da2b"
+}
