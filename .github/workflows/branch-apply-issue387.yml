@@ -1,0 +1,134 @@
+name: Apply Independent Reproduction Artifact
+
+on:
+  push:
+    branches: [ "issue-387-reproduction-artifact" ]
+    paths:
+      - '.github/workflows/branch-apply-issue387.yml'
+      - '.github/issue-387-patch/**'
+  workflow_dispatch:
+
+concurrency:
+  group: apply-independent-reproduction-${{ github.repository }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: issue-387-reproduction-artifact
+          fetch-depth: 0
+
+      - name: Decode and authenticate implementation archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/issue-387-patch/chunk-* | base64 --decode > /tmp/issue387-implementation.tar.gz
+          actual="$(sha256sum /tmp/issue387-implementation.tar.gz | cut -d' ' -f1)"
+          test "$actual" = 3274e46efd2cc076fbf4cad867e4945dfe263c9669cc16a4948187045454acd8
+          tar -tzf /tmp/issue387-implementation.tar.gz > /tmp/issue387-files.txt
+          grep -qx './scripts/build-independent-reproduction-artifact.py' /tmp/issue387-files.txt
+          grep -qx './scripts/verify-independent-reproduction.py' /tmp/issue387-files.txt
+          grep -qx './reproduction/reproduce.sh' /tmp/issue387-files.txt
+          grep -qx './reproduction/Dockerfile.reproduction' /tmp/issue387-files.txt
+          grep -qx './docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json' /tmp/issue387-files.txt
+          grep -qx './docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json' /tmp/issue387-files.txt
+          grep -qx './.github/issue-387-apply.py' /tmp/issue387-files.txt
+
+      - name: Install and patch the reproduction foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/issue387-stage
+          mkdir -p /tmp/issue387-stage
+          tar -xzf /tmp/issue387-implementation.tar.gz -C /tmp/issue387-stage
+
+          install -Dm755 \
+            /tmp/issue387-stage/scripts/build-independent-reproduction-artifact.py \
+            scripts/build-independent-reproduction-artifact.py
+          install -Dm755 \
+            /tmp/issue387-stage/scripts/verify-independent-reproduction.py \
+            scripts/verify-independent-reproduction.py
+          install -Dm755 \
+            /tmp/issue387-stage/reproduction/reproduce.sh \
+            reproduction/reproduce.sh
+          install -Dm644 \
+            /tmp/issue387-stage/reproduction/Dockerfile.reproduction \
+            reproduction/Dockerfile.reproduction
+          install -Dm644 \
+            /tmp/issue387-stage/reproduction/README.md \
+            reproduction/README.md
+          install -Dm644 \
+            /tmp/issue387-stage/docs/independent-reproduction.md \
+            docs/independent-reproduction.md
+          install -Dm644 \
+            /tmp/issue387-stage/docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json \
+            docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json
+          install -Dm644 \
+            /tmp/issue387-stage/docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json \
+            docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json
+
+          python3 /tmp/issue387-stage/.github/issue-387-apply.py
+          git diff --check
+
+      - name: Validate launcher, Python and Draft 2020-12 schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n reproduction/reproduce.sh
+          python3 -m py_compile \
+            scripts/build-independent-reproduction-artifact.py \
+            scripts/verify-independent-reproduction.py
+          python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          for path in (
+              Path('docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json'),
+              Path('docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json'),
+          ):
+              schema = json.loads(path.read_text(encoding='utf-8'))
+              Draft202012Validator.check_schema(schema)
+          PY
+          grep -qx \
+            'distributionSha256Sum=bafc141b619ad6350fd975fc903156dd5c151998cc8b058e8c1044ab5f7b031f' \
+            gradle/wrapper/gradle-wrapper.properties
+          grep -Fq '`NOT_COLLECTED`' docs/independent-reproduction.md
+
+      - name: Commit permanent implementation files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            README.md \
+            docs/README.md \
+            docs/independent-reproduction.md \
+            docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json \
+            docs/schemas/regelsuche-independent-reproduction-receipt-v1.schema.json \
+            gradle/wrapper/gradle-wrapper.properties \
+            reproduction \
+            scripts/build-independent-reproduction-artifact.py \
+            scripts/verify-independent-reproduction.py
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat: add independent reproduction artifact foundation'
+          git push origin HEAD:issue-387-reproduction-artifact
+
+      - name: Upload bootstrap diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: independent-reproduction-bootstrap
+          path: |
+            /tmp/issue387-files.txt
+          if-no-files-found: warn
