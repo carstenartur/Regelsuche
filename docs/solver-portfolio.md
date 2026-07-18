@@ -88,13 +88,22 @@ Every attempt with an `executionHash` must have exactly one retained directory c
 
 ## Reproduction
 
-Install Z3, then run the normal JUnit task and generate the reference trace:
+Install Z3 and run the complete repository-owned verification command:
 
 ```bash
-./gradlew \
-  :regelsuche-solver-portfolio:test \
-  :regelsuche-solver-portfolio:writeSolverPortfolioExample
+bash scripts/run-solver-portfolio-verification.sh
 ```
+
+The runner:
+
+- executes the normal solver-portfolio JUnit task, including the real Z3 case;
+- writes the canonical formal and guidance traces;
+- executes the proof-consumer integration test;
+- creates a build-local Python environment with `jsonschema==4.25.1` when necessary;
+- validates obligation, report, translation, result and execution schemas;
+- independently checks all retained hash links and selected executions;
+- confirms the exact polynomial-to-Z3 formal path and search-guidance path;
+- checks negative schema mutations for invalid refutation and conflict states.
 
 To select only the real external-prover integration through JUnit tags:
 
@@ -103,4 +112,4 @@ To select only the real external-prover integration through JUnit tags:
   -PincludeTestTags=external-prover
 ```
 
-The example is written below `regelsuche-solver-portfolio/build/reports/solver-portfolio` with separate `formal/` and `guidance/` runs and a shared `profiles/` directory. The `Solver Portfolio` workflow validates the obligation, report, translation, result and execution schemas, verifies every hash link and executes the real multi-stage path from exact polynomial validation to a Z3 proof object.
+The example is written below `regelsuche-solver-portfolio/build/reports/solver-portfolio` with separate `formal/` and `guidance/` runs and a shared `profiles/` directory. GitHub Actions only installs Z3 and calls the same runner; it contains no portfolio assertions or expected outcomes.
