@@ -160,6 +160,27 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
    starten — enthält Markdown/LaTeX/JSON/Mermaid/GraphML und das aktuelle
    Rule-Inventory.
 
+
+## Autonomous Discovery Result Card
+
+Der qualifizierte autonome Produktionslauf lässt sich ohne UI und ohne externe
+Dienste als hashgebundene Result Card reproduzieren:
+
+```bash
+./gradlew :regelsuche-release:runAutonomousDiscoveryWalkthrough
+```
+
+Der Befehl erzeugt JSON, Markdown, vier evidence-abgeleitete SVGs und das
+vollständige Rohartefakt-Bundle. Jede angezeigte Zahl verweist auf ihr
+Autoritätsartefakt und dessen Hash. Kandidatenbildung ohne Target-/Antwortzugriff,
+Qualification und paired held-out reuse werden sichtbar; externe mathematische
+Neuheit, Promotion und Public Evidence bleiben ausdrücklich getrennt und
+`NOT_EVALUATED`.
+
+![Generated autonomous discovery evidence sequence](docs/generated/autonomous-discovery-walkthrough/sequence.svg)
+
+[Walkthrough, Container-Befehl und unabhängiger Verifier](docs/autonomous-discovery-walkthrough.md)
+
 ## Scientific Discovery Walkthrough
 
 Für reproduzierbare Discovery-Läufe ohne UI:

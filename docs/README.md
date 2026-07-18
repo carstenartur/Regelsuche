@@ -18,6 +18,7 @@
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
 - [Demo Gallery](demo-gallery.md) — reproduzierbare UI- und Replay-Beispiele.
+- [Autonomous Discovery Result Card](autonomous-discovery-walkthrough.md) — Ein-Kommando-Walkthrough mit hashgebundener JSON-/Markdown-Karte und generierten Evidence-SVGs.
 
 ## Erweiterungen
 
@@ -46,6 +47,7 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 ## Discovery und wissenschaftliche Evidenz
 
 - [Discovery Evidence v1](discovery-evidence-v1.md)
+- [Autonomous-Discovery-Result-Card-Schema v1](schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json)
 - [Aktueller Open-Target-Discovery-Stand](discovery-status.md)
 - [Release Readiness und Kandidatenqualifikation](release-readiness.md)
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md)
