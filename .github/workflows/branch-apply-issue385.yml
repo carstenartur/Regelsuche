@@ -49,21 +49,23 @@ jobs:
           grep -qx '.github/workflows/capability-status.yml' /tmp/issue385-files.txt
           grep -qx '.github/issue-385-apply.sh' /tmp/issue385-files.txt
 
-      - name: Retain bootstrap-start evidence
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s\n' "$GITHUB_SHA" > .github/issue-385-patch/bootstrap-started
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/issue-385-patch/bootstrap-started
-          git commit -m 'chore(ci): mark capability bootstrap [skip ci]'
-          git push origin HEAD:issue-385-capability-status
-
       - name: Apply and verify capability-status slice
         shell: bash
         run: |
-          set -euo pipefail
+          set -o pipefail
           tar -xzf /tmp/issue385-static.tar.gz
           chmod +x .github/issue-385-apply.sh
-          .github/issue-385-apply.sh
+          bash -x .github/issue-385-apply.sh 2>&1 | tee /tmp/issue385-bootstrap.log
+
+      - name: Upload capability bootstrap diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: capability-status-bootstrap-diagnostics
+          path: |
+            /tmp/issue385-bootstrap.log
+            /tmp/issue385-files.txt
+            regelsuche-release/build/reports/release-readiness-qualified/**
+            regelsuche-release/build/reports/domain-generic-qualification/**
+            docs/generated/capability-status.*
+          if-no-files-found: warn
