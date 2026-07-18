@@ -368,8 +368,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L368">                ? profile.defaultGoal()</span>
 <span class="fc" id="L369">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L370">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="nc" id="L372">            return;</span>
+<span class="fc" id="L371">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="fc" id="L372">            return;</span>
 <span class="fc" id="L373">        }</span>
 <span class="fc" id="L374">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),
@@ -1393,13 +1393,13 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1393">            return;</span>
         }
 <span class="fc bfc" id="L1395" title="All 2 branches covered.">        if (!&quot;GET&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="fc" id="L1396">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
-<span class="fc" id="L1397">            return;</span>
+<span class="nc" id="L1396">            sendStatus(exchange, 405, &quot;method not allowed&quot;);</span>
+<span class="nc" id="L1397">            return;</span>
         }
 <span class="fc" id="L1399">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1400" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="nc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
-<span class="nc" id="L1402">            return;</span>
+<span class="fc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
+<span class="fc" id="L1402">            return;</span>
         }
 <span class="fc" id="L1404">        String selectedPathKey = queryParam(exchange, &quot;selectedPathKey&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1405">        de.regelsuche.ide.RuleInspectionDto dto =</span>
@@ -1420,8 +1420,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1420">        String matchId = stringValue(body, &quot;matchId&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1421">        int matchIndex = intValue(body, &quot;matchIndex&quot;, -1);</span>
 <span class="pc bpc" id="L1422" title="4 of 8 branches missed.">        if (expression.isBlank() || pathKey.isBlank() || (matchId.isBlank() &amp;&amp; matchIndex &lt; 0)) {</span>
-<span class="nc" id="L1423">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
-<span class="nc" id="L1424">            return;</span>
+<span class="fc" id="L1423">            sendStatus(exchange, 400, &quot;expression, pathKey and matchId (or legacy matchIndex) are required&quot;);</span>
+<span class="fc" id="L1424">            return;</span>
         }
 
 <span class="fc" id="L1427">        de.regelsuche.ide.RuleInspectionService service = new de.regelsuche.ide.RuleInspectionService();</span>
@@ -1799,8 +1799,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1799">            default          -&gt; null;</span>
         };
 <span class="fc bfc" id="L1801" title="All 2 branches covered.">        if (body == null) {</span>
-<span class="fc" id="L1802">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
-<span class="fc" id="L1803">            return;</span>
+<span class="nc" id="L1802">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="nc" id="L1803">            return;</span>
         }
 <span class="fc" id="L1805">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
 <span class="fc" id="L1806">    }</span>
