@@ -1,0 +1,720 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutonomousDiscoveryResultCard.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">AutonomousDiscoveryResultCard.java</span></div><h1>AutonomousDiscoveryResultCard.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.experiments.autopilot.AutonomousProductionCampaignRunner.CampaignRun;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.release.ProductionCandidateUtilityEvaluator.UtilityCase;
+import de.regelsuche.release.ProductionCandidateUtilityEvaluator.UtilityReport;
+import de.regelsuche.release.ReleaseReadinessRunner.ReleaseRun;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Canonical, claim-bounded presentation of a qualified autonomous discovery run. */
+public final class AutonomousDiscoveryResultCard {
+    public static final String SCHEMA =
+        &quot;regelsuche.autonomous-discovery-result-card/v1&quot;;
+    public static final String CLAIM_BANNER = &quot;NO EXTERNAL NOVELTY CLAIM&quot;;
+<span class="fc" id="L31">    private static final ObjectMapper MAPPER = new ObjectMapper();</span>
+
+    private final ObjectNode document;
+    private final String canonicalJson;
+    private final String markdown;
+    private final List&lt;ArtifactBinding&gt; artifacts;
+
+    private AutonomousDiscoveryResultCard(
+        ObjectNode document,
+        String canonicalJson,
+        String markdown,
+        List&lt;ArtifactBinding&gt; artifacts
+<span class="fc" id="L43">    ) {</span>
+<span class="fc" id="L44">        this.document = document;</span>
+<span class="fc" id="L45">        this.canonicalJson = canonicalJson;</span>
+<span class="fc" id="L46">        this.markdown = markdown;</span>
+<span class="fc" id="L47">        this.artifacts = artifacts;</span>
+<span class="fc" id="L48">    }</span>
+
+    public static AutonomousDiscoveryResultCard create(
+        String repositoryRevision,
+        ReleaseRun run,
+        Path outputDirectory
+    ) {
+<span class="fc" id="L55">        Objects.requireNonNull(run, &quot;run&quot;);</span>
+<span class="fc" id="L56">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L57">        requireRevision(repositoryRevision);</span>
+<span class="fc" id="L58">        requireQualifiedClaim(run);</span>
+
+<span class="fc" id="L60">        CampaignRun campaign = run.retainedCampaign();</span>
+<span class="fc" id="L61">        var lifecycle = campaign.lifecycle();</span>
+<span class="fc" id="L62">        var generation = lifecycle.mining().generation();</span>
+<span class="fc" id="L63">        var qualificationRun = Objects.requireNonNull(</span>
+<span class="fc" id="L64">            run.qualificationRun(), &quot;qualificationRun&quot;);</span>
+<span class="fc" id="L65">        var qualification = Objects.requireNonNull(</span>
+<span class="fc" id="L66">            run.qualificationEvidence(), &quot;qualificationEvidence&quot;);</span>
+<span class="fc" id="L67">        UtilityReport utility = qualificationRun.utility();</span>
+
+<span class="fc" id="L69">        List&lt;ArtifactBinding&gt; bindings = List.of(</span>
+<span class="fc" id="L70">            bind(outputDirectory, &quot;campaignManifest&quot;,</span>
+                &quot;evidence/campaign/production-campaign-manifest.json&quot;,
+<span class="fc" id="L72">                campaign.contentHash()),</span>
+<span class="fc" id="L73">            bind(outputDirectory, &quot;candidateLineage&quot;,</span>
+                &quot;evidence/campaign/full-lineage-v2.json&quot;,
+<span class="fc" id="L75">                lifecycle.mining().fullBatch().lineage().contentHash()),</span>
+<span class="fc" id="L76">            bind(outputDirectory, &quot;counterexampleReport&quot;,</span>
+                &quot;evidence/campaign/counterexample-report.json&quot;,
+<span class="fc" id="L78">                lifecycle.counterexampleHash()),</span>
+<span class="fc" id="L79">            bind(outputDirectory, &quot;fullMiningEvidence&quot;,</span>
+                &quot;evidence/campaign/full-mining-evidence.json&quot;,
+<span class="fc" id="L81">                lifecycle.mining().fullBatch().evidence().contentHash()),</span>
+<span class="fc" id="L82">            bind(outputDirectory, &quot;observationBundle&quot;,</span>
+                &quot;evidence/campaign/observations.json&quot;,
+<span class="fc" id="L84">                generation.observationBundle().contentHash()),</span>
+<span class="fc" id="L85">            bind(outputDirectory, &quot;pairedUtility&quot;,</span>
+                &quot;evidence/qualification/qualification-utility.json&quot;,
+<span class="fc" id="L87">                utility.contentHash()),</span>
+<span class="fc" id="L88">            bind(outputDirectory, &quot;projectNoveltyReport&quot;,</span>
+                &quot;evidence/campaign/project-novelty-report.json&quot;,
+<span class="fc" id="L90">                lifecycle.noveltyHash()),</span>
+<span class="fc" id="L91">            bind(outputDirectory, &quot;proofReport&quot;,</span>
+                &quot;evidence/campaign/proof-report.json&quot;,
+<span class="fc" id="L93">                lifecycle.proof().evidenceHash()),</span>
+<span class="fc" id="L94">            bind(outputDirectory, &quot;qualificationEvaluation&quot;,</span>
+                &quot;evidence/qualification/qualification-evaluation.json&quot;,
+<span class="fc" id="L96">                qualificationRun.evaluationHash()),</span>
+<span class="fc" id="L97">            bind(outputDirectory, &quot;qualificationEvidence&quot;,</span>
+                &quot;evidence/qualification/candidate-qualification-evidence.json&quot;,
+<span class="fc" id="L99">                qualification.contentHash()),</span>
+<span class="fc" id="L100">            bind(outputDirectory, &quot;releaseEvidence&quot;,</span>
+                &quot;evidence/evidence-summary.json&quot;,
+<span class="fc" id="L102">                run.evidence().evidenceHash()),</span>
+<span class="fc" id="L103">            bind(outputDirectory, &quot;releaseReadinessMatrix&quot;,</span>
+                &quot;evidence/release-readiness-report.json&quot;,
+<span class="fc" id="L105">                run.matrix().contentHash()),</span>
+<span class="fc" id="L106">            bind(outputDirectory, &quot;releaseReadinessRun&quot;,</span>
+                &quot;evidence/release-readiness-run.json&quot;,
+<span class="fc" id="L108">                run.contentHash()),</span>
+<span class="fc" id="L109">            bind(outputDirectory, &quot;researchBrief&quot;,</span>
+                &quot;evidence/campaign/brief-v2.json&quot;,
+<span class="fc" id="L111">                generation.brief().contentHash()),</span>
+<span class="fc" id="L112">            bind(outputDirectory, &quot;validationReport&quot;,</span>
+                &quot;evidence/campaign/validation-report.json&quot;,
+<span class="fc" id="L114">                lifecycle.validationHash())</span>
+<span class="fc" id="L115">        ).stream().sorted(Comparator.comparing(ArtifactBinding::role)).toList();</span>
+
+<span class="fc" id="L117">        PairedSummary pairedSummary = PairedSummary.from(utility.cases());</span>
+<span class="fc" id="L118">        UtilityCase representative = utility.cases().stream()</span>
+<span class="fc" id="L119">            .filter(UtilityCase::materialGain)</span>
+<span class="fc" id="L120">            .findFirst()</span>
+<span class="fc" id="L121">            .orElse(utility.cases().getFirst());</span>
+
+<span class="fc" id="L123">        ObjectNode root = MAPPER.createObjectNode();</span>
+<span class="fc" id="L124">        root.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L125">        root.put(&quot;repositoryRevision&quot;, repositoryRevision);</span>
+<span class="fc" id="L126">        root.put(&quot;runIdentity&quot;, run.contentHash());</span>
+<span class="fc" id="L127">        root.put(&quot;claimBanner&quot;, CLAIM_BANNER);</span>
+
+<span class="fc" id="L129">        ObjectNode brief = root.putObject(&quot;researchBrief&quot;);</span>
+<span class="fc" id="L130">        brief.put(&quot;briefHash&quot;, generation.brief().contentHash());</span>
+<span class="fc" id="L131">        brief.put(&quot;inventoryHash&quot;, generation.brief().inventoryHash());</span>
+<span class="fc" id="L132">        brief.put(&quot;modelHash&quot;, generation.brief().modelHash());</span>
+<span class="fc" id="L133">        brief.put(&quot;targetOrExpectedAnswerAccess&quot;, &quot;ABSENT&quot;);</span>
+<span class="fc" id="L134">        brief.put(&quot;targetProvided&quot;, false);</span>
+<span class="fc" id="L135">        brief.put(&quot;seedFamilyCount&quot;, campaign.seedFamilyCount());</span>
+<span class="fc" id="L136">        brief.put(&quot;observationCount&quot;, campaign.observationCount());</span>
+<span class="fc" id="L137">        brief.put(&quot;sourceArtifact&quot;, &quot;researchBrief&quot;);</span>
+<span class="fc" id="L138">        brief.put(&quot;countSourceArtifact&quot;, &quot;campaignManifest&quot;);</span>
+
+<span class="fc" id="L140">        ObjectNode candidate = root.putObject(&quot;candidate&quot;);</span>
+<span class="fc" id="L141">        candidate.put(&quot;conjectureId&quot;, qualification.conjectureId());</span>
+<span class="fc" id="L142">        candidate.put(&quot;candidateBranchId&quot;, qualification.candidateBranchId());</span>
+<span class="fc" id="L143">        candidate.put(&quot;leftPattern&quot;, qualification.leftPattern());</span>
+<span class="fc" id="L144">        candidate.put(&quot;rightPattern&quot;, qualification.rightPattern());</span>
+<span class="fc" id="L145">        addStrings(candidate, &quot;parameterRelations&quot;,</span>
+<span class="fc" id="L146">            qualification.parameterRelations());</span>
+<span class="fc" id="L147">        addStrings(candidate, &quot;assumptions&quot;, qualification.assumptions());</span>
+<span class="fc" id="L148">        candidate.put(&quot;lineageRoot&quot;, qualification.lineageHash());</span>
+<span class="fc" id="L149">        candidate.put(&quot;miningEvidenceHash&quot;, qualification.miningEvidenceHash());</span>
+<span class="fc" id="L150">        candidate.put(&quot;supportingObservationCount&quot;,</span>
+<span class="fc" id="L151">            qualification.supportingObservationIds().size());</span>
+<span class="fc" id="L152">        addStrings(candidate, &quot;supportingObservationIds&quot;,</span>
+<span class="fc" id="L153">            qualification.supportingObservationIds());</span>
+<span class="fc" id="L154">        addStrings(candidate, &quot;sourceObservationBranchHashes&quot;,</span>
+<span class="fc" id="L155">            qualification.sourceObservationBranchHashes());</span>
+<span class="fc" id="L156">        candidate.put(&quot;sourceArtifact&quot;, &quot;qualificationEvidence&quot;);</span>
+<span class="fc" id="L157">        candidate.put(&quot;lineageSourceArtifact&quot;, &quot;candidateLineage&quot;);</span>
+
+<span class="fc" id="L159">        ObjectNode lifecycleNode = root.putObject(&quot;lifecycle&quot;);</span>
+<span class="fc" id="L160">        lifecycleNode.put(&quot;validationStatus&quot;,</span>
+<span class="fc" id="L161">            lifecycle.evaluation().status().name());</span>
+<span class="fc" id="L162">        lifecycleNode.put(&quot;counterexampleStatus&quot;,</span>
+<span class="fc" id="L163">            lifecycle.evaluation().counterexample().status());</span>
+<span class="fc" id="L164">        lifecycleNode.put(&quot;counterexampleStrategyCount&quot;,</span>
+<span class="fc" id="L165">            lifecycle.evaluation().counterexample().attemptedSources().stream()</span>
+<span class="fc" id="L166">                .distinct().count());</span>
+<span class="fc" id="L167">        lifecycleNode.put(&quot;projectNoveltyStatus&quot;,</span>
+<span class="fc" id="L168">            lifecycle.novelty().status().name());</span>
+<span class="fc" id="L169">        lifecycleNode.put(&quot;externalNoveltyStatus&quot;,</span>
+<span class="fc" id="L170">            lifecycle.novelty().externalNoveltyStatus());</span>
+<span class="fc" id="L171">        lifecycleNode.put(&quot;proofEvidenceStatus&quot;,</span>
+<span class="fc" id="L172">            lifecycle.proof().proofStatus().name());</span>
+<span class="fc" id="L173">        lifecycleNode.put(&quot;proofBackendStatus&quot;,</span>
+<span class="fc" id="L174">            lifecycle.proof().result().status().name());</span>
+<span class="fc" id="L175">        lifecycleNode.put(&quot;proofTranslationStatus&quot;,</span>
+<span class="fc" id="L176">            lifecycle.proof().result().translationStatus().name());</span>
+<span class="fc" id="L177">        lifecycleNode.put(&quot;formalProofStatus&quot;,</span>
+<span class="fc" id="L178">            lifecycle.proof().formalProofStatus());</span>
+<span class="fc" id="L179">        lifecycleNode.put(&quot;lifecycleOutcome&quot;,</span>
+<span class="fc" id="L180">            lifecycle.lifecycleDecision().outcome().name());</span>
+<span class="fc" id="L181">        lifecycleNode.put(&quot;validationSourceArtifact&quot;, &quot;validationReport&quot;);</span>
+<span class="fc" id="L182">        lifecycleNode.put(&quot;counterexampleSourceArtifact&quot;,</span>
+            &quot;counterexampleReport&quot;);
+<span class="fc" id="L184">        lifecycleNode.put(&quot;noveltySourceArtifact&quot;, &quot;projectNoveltyReport&quot;);</span>
+<span class="fc" id="L185">        lifecycleNode.put(&quot;proofSourceArtifact&quot;, &quot;proofReport&quot;);</span>
+
+<span class="fc" id="L187">        ObjectNode qualificationNode = root.putObject(&quot;qualification&quot;);</span>
+<span class="fc" id="L188">        qualificationNode.put(&quot;qualified&quot;, qualification.qualified());</span>
+<span class="fc" id="L189">        qualificationNode.put(&quot;heldOutFamilyOrClusterCount&quot;,</span>
+<span class="fc" id="L190">            qualification.heldOutFamilyOrClusterCount());</span>
+<span class="fc" id="L191">        qualificationNode.put(&quot;configuredPositiveHoldouts&quot;,</span>
+<span class="fc" id="L192">            qualification.configuredPositiveHoldouts());</span>
+<span class="fc" id="L193">        qualificationNode.put(&quot;executedPositiveHoldouts&quot;,</span>
+<span class="fc" id="L194">            qualification.executedPositiveHoldouts());</span>
+<span class="fc" id="L195">        qualificationNode.put(&quot;configuredNegativeHoldouts&quot;,</span>
+<span class="fc" id="L196">            qualification.configuredNegativeHoldouts());</span>
+<span class="fc" id="L197">        qualificationNode.put(&quot;executedNegativeHoldouts&quot;,</span>
+<span class="fc" id="L198">            qualification.executedNegativeHoldouts());</span>
+<span class="fc" id="L199">        qualificationNode.put(&quot;mandatorySkippedWorkCount&quot;,</span>
+<span class="fc" id="L200">            qualification.mandatorySkippedWorkCount());</span>
+<span class="fc" id="L201">        qualificationNode.put(&quot;refutingHoldouts&quot;,</span>
+<span class="fc" id="L202">            qualification.refutingHoldouts());</span>
+<span class="fc" id="L203">        qualificationNode.put(&quot;counterexamplesFound&quot;,</span>
+<span class="fc" id="L204">            qualification.counterexamplesFound());</span>
+<span class="fc" id="L205">        qualificationNode.put(&quot;correctnessRegressionCount&quot;,</span>
+<span class="fc" id="L206">            qualification.correctnessRegressionCount());</span>
+<span class="fc" id="L207">        qualificationNode.put(&quot;failureCount&quot;, Math.addExact(</span>
+<span class="fc" id="L208">            Math.addExact(qualification.mandatorySkippedWorkCount(),</span>
+<span class="fc" id="L209">                qualification.refutingHoldouts()),</span>
+<span class="fc" id="L210">            Math.addExact(qualification.counterexamplesFound(),</span>
+<span class="fc" id="L211">                qualification.correctnessRegressionCount())));</span>
+<span class="fc" id="L212">        qualificationNode.put(&quot;evaluationStatus&quot;,</span>
+<span class="fc" id="L213">            qualificationRun.evaluation().status().name());</span>
+<span class="fc" id="L214">        qualificationNode.put(&quot;counterexampleStatus&quot;,</span>
+<span class="fc" id="L215">            qualificationRun.evaluation().counterexample().status());</span>
+<span class="fc" id="L216">        qualificationNode.put(&quot;sourceArtifact&quot;, &quot;qualificationEvidence&quot;);</span>
+<span class="fc" id="L217">        qualificationNode.put(&quot;evaluationSourceArtifact&quot;,</span>
+            &quot;qualificationEvaluation&quot;);
+
+<span class="fc" id="L220">        ObjectNode paired = root.putObject(&quot;pairedUtility&quot;);</span>
+<span class="fc" id="L221">        paired.put(&quot;suiteRevision&quot;, utility.suiteRevision());</span>
+<span class="fc" id="L222">        paired.put(&quot;pairedUtilityEvaluated&quot;, utility.pairedUtilityEvaluated());</span>
+<span class="fc" id="L223">        paired.put(&quot;beneficial&quot;, utility.beneficial());</span>
+<span class="fc" id="L224">        paired.put(&quot;gainPermille&quot;, utility.gainPermille());</span>
+<span class="fc" id="L225">        paired.put(&quot;representativeCaseId&quot;, representative.id());</span>
+<span class="fc" id="L226">        paired.set(&quot;summary&quot;, pairedSummary.toJson());</span>
+<span class="fc" id="L227">        ArrayNode cases = paired.putArray(&quot;cases&quot;);</span>
+<span class="fc" id="L228">        utility.cases().forEach(item -&gt; cases.add(utilityCase(item)));</span>
+<span class="fc" id="L229">        paired.put(&quot;sourceArtifact&quot;, &quot;pairedUtility&quot;);</span>
+
+<span class="fc" id="L231">        ObjectNode reproducibility = root.putObject(&quot;reproducibility&quot;);</span>
+<span class="fc" id="L232">        reproducibility.put(&quot;cleanRunCount&quot;, run.evidence().cleanRunCount());</span>
+<span class="fc" id="L233">        reproducibility.put(&quot;cleanRunsIdentical&quot;,</span>
+<span class="fc" id="L234">            run.evidence().cleanRunsIdentical());</span>
+<span class="fc" id="L235">        reproducibility.put(&quot;cleanRunStatus&quot;,</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">            run.evidence().cleanRunsIdentical()</span>
+<span class="pc" id="L237">                ? &quot;VERIFIED_IDENTICAL&quot; : &quot;FAILED&quot;);</span>
+<span class="fc" id="L238">        addStrings(reproducibility, &quot;cleanRunManifestHashes&quot;,</span>
+<span class="fc" id="L239">            run.evidence().cleanRunManifestHashes());</span>
+<span class="fc" id="L240">        reproducibility.put(&quot;containerParityStatus&quot;, &quot;ENFORCED_BY_CI&quot;);</span>
+<span class="fc" id="L241">        reproducibility.put(&quot;containerParityComparison&quot;, &quot;BYTE_FOR_BYTE&quot;);</span>
+<span class="fc" id="L242">        reproducibility.put(&quot;containerParityWorkflow&quot;,</span>
+            &quot;.github/workflows/autonomous-discovery-walkthrough.yml&quot;);
+<span class="fc" id="L244">        reproducibility.put(&quot;sourceArtifact&quot;, &quot;releaseEvidence&quot;);</span>
+
+<span class="fc" id="L246">        ObjectNode boundaries = root.putObject(&quot;claimBoundaries&quot;);</span>
+<span class="fc" id="L247">        boundaries.put(&quot;autonomyClaimAuthorized&quot;,</span>
+<span class="fc" id="L248">            run.matrix().autonomyClaimAuthorized());</span>
+<span class="fc" id="L249">        boundaries.put(&quot;externalNoveltyStatus&quot;,</span>
+<span class="fc" id="L250">            lifecycle.novelty().externalNoveltyStatus());</span>
+<span class="fc" id="L251">        boundaries.put(&quot;externalNoveltyClaimAuthorized&quot;, false);</span>
+<span class="fc" id="L252">        boundaries.put(&quot;promotionStatus&quot;, campaign.promotionStatus());</span>
+<span class="fc" id="L253">        boundaries.put(&quot;publicEvidenceStatus&quot;, campaign.publicEvidenceStatus());</span>
+<span class="fc" id="L254">        boundaries.put(&quot;releaseSourceArtifact&quot;, &quot;releaseReadinessRun&quot;);</span>
+<span class="fc" id="L255">        boundaries.put(&quot;noveltySourceArtifact&quot;, &quot;projectNoveltyReport&quot;);</span>
+
+<span class="fc" id="L257">        ArrayNode artifactArray = root.putArray(&quot;artifacts&quot;);</span>
+<span class="fc" id="L258">        bindings.forEach(binding -&gt; artifactArray.add(binding.toJson()));</span>
+
+<span class="fc" id="L260">        String material = canonical(root);</span>
+<span class="fc" id="L261">        String contentHash = AutonomousResearchBriefV2.hash(material);</span>
+<span class="fc" id="L262">        root.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L263">        String json = canonical(root) + &quot;\n&quot;;</span>
+<span class="fc" id="L264">        String markdown = markdown(root, bindings, representative);</span>
+<span class="fc" id="L265">        return new AutonomousDiscoveryResultCard(</span>
+            root, json, markdown, bindings);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L270">        return canonicalJson;</span>
+    }
+
+    public String toMarkdown() {
+<span class="fc" id="L274">        return markdown;</span>
+    }
+
+    public String contentHash() {
+<span class="fc" id="L278">        return document.path(&quot;contentHash&quot;).asText();</span>
+    }
+
+    public List&lt;ArtifactBinding&gt; artifacts() {
+<span class="nc" id="L282">        return artifacts;</span>
+    }
+
+    ObjectNode document() {
+<span class="fc" id="L286">        return document.deepCopy();</span>
+    }
+
+    private static void requireQualifiedClaim(ReleaseRun run) {
+<span class="fc" id="L290">        var campaign = run.retainedCampaign();</span>
+<span class="fc" id="L291">        var lifecycle = campaign.lifecycle();</span>
+<span class="fc" id="L292">        var qualification = run.qualificationEvidence();</span>
+<span class="pc bpc" id="L293" title="2 of 4 branches missed.">        if (!run.autonomousCampaignReady()</span>
+                || qualification == null
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                || !qualification.qualified()</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                || !run.evidence().targetFree()</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">                || campaign.targetProvided()</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                || lifecycle.targetProvided()</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">                || qualification.correctnessRegressionCount() != 0</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(</span>
+<span class="fc" id="L301">                    lifecycle.novelty().externalNoveltyStatus())</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(campaign.promotionStatus())</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(campaign.publicEvidenceStatus())) {</span>
+<span class="nc" id="L304">            throw new IllegalStateException(</span>
+                &quot;qualified autonomous discovery evidence is missing or overclaims its scope&quot;);
+        }
+<span class="fc" id="L307">    }</span>
+
+    private static void requireRevision(String value) {
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">        if (value == null || !value.matches(&quot;[0-9a-f]{40}&quot;)) {</span>
+<span class="fc" id="L311">            throw new IllegalArgumentException(</span>
+                &quot;repositoryRevision must be a 40-character lowercase Git commit&quot;);
+        }
+<span class="fc" id="L314">    }</span>
+
+    private static ArtifactBinding bind(
+        Path outputDirectory,
+        String role,
+        String relativePath,
+        String semanticHash
+    ) {
+<span class="fc" id="L322">        Path root = outputDirectory.toAbsolutePath().normalize();</span>
+<span class="fc" id="L323">        Path file = root.resolve(relativePath).normalize();</span>
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">        if (!file.startsWith(root) || !Files.isRegularFile(file)) {</span>
+<span class="nc" id="L325">            throw new IllegalStateException(</span>
+                &quot;required walkthrough artifact is missing: &quot; + relativePath);
+        }
+<span class="fc" id="L328">        requireSha256(semanticHash, &quot;semanticHash&quot;);</span>
+<span class="fc" id="L329">        return new ArtifactBinding(</span>
+<span class="fc" id="L330">            role, relativePath, semanticHash, fileHash(file));</span>
+    }
+
+    private static String fileHash(Path path) {
+        try {
+<span class="fc" id="L335">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L336">            try (var input = Files.newInputStream(path)) {</span>
+<span class="fc" id="L337">                byte[] buffer = new byte[8192];</span>
+                int read;
+<span class="fc bfc" id="L339" title="All 2 branches covered.">                while ((read = input.read(buffer)) &gt;= 0) {</span>
+<span class="fc" id="L340">                    digest.update(buffer, 0, read);</span>
+                }
+            }
+<span class="fc" id="L343">            return &quot;sha256:&quot; + HexFormat.of().formatHex(digest.digest());</span>
+<span class="nc" id="L344">        } catch (IOException exception) {</span>
+<span class="nc" id="L345">            throw new UncheckedIOException(</span>
+                &quot;Could not hash walkthrough artifact &quot; + path, exception);
+<span class="nc" id="L347">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L348">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static ObjectNode utilityCase(UtilityCase item) {
+<span class="fc" id="L353">        ObjectNode object = MAPPER.createObjectNode();</span>
+<span class="fc" id="L354">        object.put(&quot;id&quot;, item.id());</span>
+<span class="fc" id="L355">        object.put(&quot;baselineStatus&quot;, item.baselineStatus());</span>
+<span class="fc" id="L356">        object.put(&quot;candidateStatus&quot;, item.candidateStatus());</span>
+<span class="fc" id="L357">        object.put(&quot;baselineReached&quot;, item.baselineReached());</span>
+<span class="fc" id="L358">        object.put(&quot;candidateReached&quot;, item.candidateReached());</span>
+<span class="fc" id="L359">        object.put(&quot;baselinePathLength&quot;, item.baselinePathLength());</span>
+<span class="fc" id="L360">        object.put(&quot;candidatePathLength&quot;, item.candidatePathLength());</span>
+<span class="fc" id="L361">        object.put(&quot;baselineExploredStates&quot;, item.baselineExploredStates());</span>
+<span class="fc" id="L362">        object.put(&quot;candidateExploredStates&quot;, item.candidateExploredStates());</span>
+<span class="fc" id="L363">        object.put(&quot;materialGain&quot;, item.materialGain());</span>
+<span class="fc" id="L364">        object.put(&quot;regression&quot;, item.regression());</span>
+<span class="fc" id="L365">        return object;</span>
+    }
+
+    private static void addStrings(
+        ObjectNode object,
+        String field,
+        List&lt;String&gt; values
+    ) {
+<span class="fc" id="L373">        ArrayNode array = object.putArray(field);</span>
+<span class="fc" id="L374">        values.forEach(array::add);</span>
+<span class="fc" id="L375">    }</span>
+
+    private static String canonical(JsonNode value) {
+        try {
+<span class="fc" id="L379">            return MAPPER.writeValueAsString(sorted(value));</span>
+<span class="nc" id="L380">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L381">            throw new IllegalStateException(</span>
+                &quot;Could not render canonical result card&quot;, exception);
+        }
+    }
+
+    private static JsonNode sorted(JsonNode value) {
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (value.isObject()) {</span>
+<span class="fc" id="L388">            ObjectNode result = MAPPER.createObjectNode();</span>
+<span class="fc" id="L389">            TreeMap&lt;String, JsonNode&gt; fields = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L390">            value.fields().forEachRemaining(entry -&gt;</span>
+<span class="fc" id="L391">                fields.put(entry.getKey(), entry.getValue()));</span>
+<span class="fc" id="L392">            fields.forEach((name, child) -&gt; result.set(name, sorted(child)));</span>
+<span class="fc" id="L393">            return result;</span>
+        }
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (value.isArray()) {</span>
+<span class="fc" id="L396">            ArrayNode result = MAPPER.createArrayNode();</span>
+<span class="fc" id="L397">            value.forEach(child -&gt; result.add(sorted(child)));</span>
+<span class="fc" id="L398">            return result;</span>
+        }
+<span class="fc" id="L400">        return value.deepCopy();</span>
+    }
+
+    private static String markdown(
+        ObjectNode root,
+        List&lt;ArtifactBinding&gt; artifacts,
+        UtilityCase representative
+    ) {
+<span class="fc" id="L408">        StringBuilder text = new StringBuilder();</span>
+<span class="fc" id="L409">        text.append(&quot;# Autonomous Discovery Result Card\n\n&quot;)</span>
+<span class="fc" id="L410">            .append(&quot;&gt; **&quot;).append(CLAIM_BANNER).append(&quot;**  \n&quot;)</span>
+<span class="fc" id="L411">            .append(&quot;&gt; The retained candidate is qualified for the project's &quot;)</span>
+<span class="fc" id="L412">            .append(&quot;autonomous-campaign profile. External mathematical novelty, &quot;)</span>
+<span class="fc" id="L413">            .append(&quot;promotion and Public Evidence remain separate and unevaluated.\n\n&quot;)</span>
+<span class="fc" id="L414">            .append(&quot;- Repository revision: `&quot;)</span>
+<span class="fc" id="L415">            .append(root.path(&quot;repositoryRevision&quot;).asText()).append(&quot;`\n&quot;)</span>
+<span class="fc" id="L416">            .append(&quot;- Release run: `&quot;)</span>
+<span class="fc" id="L417">            .append(root.path(&quot;runIdentity&quot;).asText()).append(&quot;`\n&quot;)</span>
+<span class="fc" id="L418">            .append(&quot;- Result-card identity: `&quot;)</span>
+<span class="fc" id="L419">            .append(root.path(&quot;contentHash&quot;).asText()).append(&quot;`\n\n&quot;)</span>
+<span class="fc" id="L420">            .append(&quot;## Evidence sequence\n\n&quot;)</span>
+<span class="fc" id="L421">            .append(&quot;```text\n&quot;)</span>
+<span class="fc" id="L422">            .append(&quot;Research Brief\n&quot;)</span>
+<span class="fc" id="L423">            .append(&quot;  -&gt; Seed families\n&quot;)</span>
+<span class="fc" id="L424">            .append(&quot;  -&gt; Untargeted observations\n&quot;)</span>
+<span class="fc" id="L425">            .append(&quot;  -&gt; Aggregate candidate formation\n&quot;)</span>
+<span class="fc" id="L426">            .append(&quot;  -&gt; Validation and counterexample search\n&quot;)</span>
+<span class="fc" id="L427">            .append(&quot;  -&gt; Project novelty and proof evidence\n&quot;)</span>
+<span class="fc" id="L428">            .append(&quot;  -&gt; Qualification\n&quot;)</span>
+<span class="fc" id="L429">            .append(&quot;  -&gt; Paired held-out reuse\n&quot;)</span>
+<span class="fc" id="L430">            .append(&quot;```\n\n&quot;)</span>
+<span class="fc" id="L431">            .append(&quot;![Generated evidence sequence](figures/sequence.svg)\n\n&quot;)</span>
+<span class="fc" id="L432">            .append(&quot;## Headline evidence\n\n&quot;)</span>
+<span class="fc" id="L433">            .append(&quot;| Metric | Value | Authority |\n&quot;)</span>
+<span class="fc" id="L434">            .append(&quot;|---|---:|---|\n&quot;);</span>
+
+<span class="fc" id="L436">        ObjectNode brief = (ObjectNode) root.path(&quot;researchBrief&quot;);</span>
+<span class="fc" id="L437">        ObjectNode candidate = (ObjectNode) root.path(&quot;candidate&quot;);</span>
+<span class="fc" id="L438">        ObjectNode lifecycle = (ObjectNode) root.path(&quot;lifecycle&quot;);</span>
+<span class="fc" id="L439">        ObjectNode qualification = (ObjectNode) root.path(&quot;qualification&quot;);</span>
+<span class="fc" id="L440">        ObjectNode paired = (ObjectNode) root.path(&quot;pairedUtility&quot;);</span>
+<span class="fc" id="L441">        ObjectNode summary = (ObjectNode) paired.path(&quot;summary&quot;);</span>
+<span class="fc" id="L442">        ObjectNode reproducibility = (ObjectNode) root.path(&quot;reproducibility&quot;);</span>
+<span class="fc" id="L443">        ObjectNode boundaries = (ObjectNode) root.path(&quot;claimBoundaries&quot;);</span>
+
+<span class="fc" id="L445">        row(text, &quot;Target/expected-answer access&quot;,</span>
+<span class="fc" id="L446">            brief.path(&quot;targetOrExpectedAnswerAccess&quot;).asText(),</span>
+<span class="fc" id="L447">            authority(artifacts, &quot;campaignManifest&quot;));</span>
+<span class="fc" id="L448">        row(text, &quot;Seed families&quot;, brief.path(&quot;seedFamilyCount&quot;).asText(),</span>
+<span class="fc" id="L449">            authority(artifacts, &quot;campaignManifest&quot;));</span>
+<span class="fc" id="L450">        row(text, &quot;Untargeted observations&quot;,</span>
+<span class="fc" id="L451">            brief.path(&quot;observationCount&quot;).asText(),</span>
+<span class="fc" id="L452">            authority(artifacts, &quot;campaignManifest&quot;));</span>
+<span class="fc" id="L453">        row(text, &quot;Supporting observations&quot;,</span>
+<span class="fc" id="L454">            candidate.path(&quot;supportingObservationCount&quot;).asText(),</span>
+<span class="fc" id="L455">            authority(artifacts, &quot;qualificationEvidence&quot;));</span>
+<span class="fc" id="L456">        row(text, &quot;Production validation&quot;,</span>
+<span class="fc" id="L457">            lifecycle.path(&quot;validationStatus&quot;).asText(),</span>
+<span class="fc" id="L458">            authority(artifacts, &quot;validationReport&quot;));</span>
+<span class="fc" id="L459">        row(text, &quot;Counterexample search&quot;,</span>
+<span class="fc" id="L460">            lifecycle.path(&quot;counterexampleStatus&quot;).asText(),</span>
+<span class="fc" id="L461">            authority(artifacts, &quot;counterexampleReport&quot;));</span>
+<span class="fc" id="L462">        row(text, &quot;Project novelty&quot;,</span>
+<span class="fc" id="L463">            lifecycle.path(&quot;projectNoveltyStatus&quot;).asText(),</span>
+<span class="fc" id="L464">            authority(artifacts, &quot;projectNoveltyReport&quot;));</span>
+<span class="fc" id="L465">        row(text, &quot;Proof evidence&quot;,</span>
+<span class="fc" id="L466">            lifecycle.path(&quot;proofEvidenceStatus&quot;).asText(),</span>
+<span class="fc" id="L467">            authority(artifacts, &quot;proofReport&quot;));</span>
+<span class="fc" id="L468">        row(text, &quot;Formal proof&quot;,</span>
+<span class="fc" id="L469">            lifecycle.path(&quot;formalProofStatus&quot;).asText(),</span>
+<span class="fc" id="L470">            authority(artifacts, &quot;proofReport&quot;));</span>
+<span class="fc" id="L471">        row(text, &quot;Qualified positive holdouts&quot;,</span>
+<span class="fc" id="L472">            qualification.path(&quot;executedPositiveHoldouts&quot;).asText()</span>
+<span class="fc" id="L473">                + &quot;/&quot; + qualification.path(&quot;configuredPositiveHoldouts&quot;).asText(),</span>
+<span class="fc" id="L474">            authority(artifacts, &quot;qualificationEvidence&quot;));</span>
+<span class="fc" id="L475">        row(text, &quot;Qualified negative holdouts&quot;,</span>
+<span class="fc" id="L476">            qualification.path(&quot;executedNegativeHoldouts&quot;).asText()</span>
+<span class="fc" id="L477">                + &quot;/&quot; + qualification.path(&quot;configuredNegativeHoldouts&quot;).asText(),</span>
+<span class="fc" id="L478">            authority(artifacts, &quot;qualificationEvidence&quot;));</span>
+<span class="fc" id="L479">        row(text, &quot;Qualification failures&quot;,</span>
+<span class="fc" id="L480">            qualification.path(&quot;failureCount&quot;).asText(),</span>
+<span class="fc" id="L481">            authority(artifacts, &quot;qualificationEvidence&quot;));</span>
+<span class="fc" id="L482">        row(text, &quot;Baseline reachability&quot;,</span>
+<span class="fc" id="L483">            summary.path(&quot;baselineReachedCount&quot;).asText()</span>
+<span class="fc" id="L484">                + &quot;/&quot; + summary.path(&quot;caseCount&quot;).asText(),</span>
+<span class="fc" id="L485">            authority(artifacts, &quot;pairedUtility&quot;));</span>
+<span class="fc" id="L486">        row(text, &quot;Candidate-enabled reachability&quot;,</span>
+<span class="fc" id="L487">            summary.path(&quot;candidateReachedCount&quot;).asText()</span>
+<span class="fc" id="L488">                + &quot;/&quot; + summary.path(&quot;caseCount&quot;).asText(),</span>
+<span class="fc" id="L489">            authority(artifacts, &quot;pairedUtility&quot;));</span>
+<span class="fc" id="L490">        row(text, &quot;Paired path-length delta&quot;,</span>
+<span class="fc" id="L491">            summary.path(&quot;pairedPathLengthDeltaForBothReached&quot;).asText(),</span>
+<span class="fc" id="L492">            authority(artifacts, &quot;pairedUtility&quot;));</span>
+<span class="fc" id="L493">        row(text, &quot;Explored-state delta&quot;,</span>
+<span class="fc" id="L494">            summary.path(&quot;exploredStatesDelta&quot;).asText(),</span>
+<span class="fc" id="L495">            authority(artifacts, &quot;pairedUtility&quot;));</span>
+<span class="fc" id="L496">        row(text, &quot;Unsupported candidate cases&quot;,</span>
+<span class="fc" id="L497">            summary.path(&quot;unsupportedCandidateCaseCount&quot;).asText(),</span>
+<span class="fc" id="L498">            authority(artifacts, &quot;pairedUtility&quot;));</span>
+<span class="fc" id="L499">        row(text, &quot;Correctness regressions&quot;,</span>
+<span class="fc" id="L500">            qualification.path(&quot;correctnessRegressionCount&quot;).asText(),</span>
+<span class="fc" id="L501">            authority(artifacts, &quot;qualificationEvidence&quot;));</span>
+<span class="fc" id="L502">        row(text, &quot;Clean runs&quot;,</span>
+<span class="fc" id="L503">            reproducibility.path(&quot;cleanRunCount&quot;).asText()</span>
+<span class="fc" id="L504">                + &quot; / &quot; + reproducibility.path(&quot;cleanRunStatus&quot;).asText(),</span>
+<span class="fc" id="L505">            authority(artifacts, &quot;releaseEvidence&quot;));</span>
+<span class="fc" id="L506">        row(text, &quot;Container parity&quot;,</span>
+<span class="fc" id="L507">            reproducibility.path(&quot;containerParityStatus&quot;).asText()</span>
+                + &quot; / &quot;
+<span class="fc" id="L509">                + reproducibility.path(&quot;containerParityComparison&quot;).asText(),</span>
+            &quot;`.github/workflows/autonomous-discovery-walkthrough.yml`&quot;);
+<span class="fc" id="L511">        row(text, &quot;External novelty&quot;,</span>
+<span class="fc" id="L512">            boundaries.path(&quot;externalNoveltyStatus&quot;).asText(),</span>
+<span class="fc" id="L513">            authority(artifacts, &quot;projectNoveltyReport&quot;));</span>
+<span class="fc" id="L514">        row(text, &quot;Promotion&quot;,</span>
+<span class="fc" id="L515">            boundaries.path(&quot;promotionStatus&quot;).asText(),</span>
+<span class="fc" id="L516">            authority(artifacts, &quot;campaignManifest&quot;));</span>
+<span class="fc" id="L517">        row(text, &quot;Public Evidence&quot;,</span>
+<span class="fc" id="L518">            boundaries.path(&quot;publicEvidenceStatus&quot;).asText(),</span>
+<span class="fc" id="L519">            authority(artifacts, &quot;campaignManifest&quot;));</span>
+
+<span class="fc" id="L521">        text.append(&quot;\n## Retained candidate\n\n&quot;)</span>
+<span class="fc" id="L522">            .append(&quot;```text\n&quot;)</span>
+<span class="fc" id="L523">            .append(candidate.path(&quot;leftPattern&quot;).asText())</span>
+<span class="fc" id="L524">            .append(&quot;\n  -&gt; &quot;)</span>
+<span class="fc" id="L525">            .append(candidate.path(&quot;rightPattern&quot;).asText())</span>
+<span class="fc" id="L526">            .append(&quot;\n```\n\n&quot;)</span>
+<span class="fc" id="L527">            .append(&quot;- Candidate: `&quot;)</span>
+<span class="fc" id="L528">            .append(candidate.path(&quot;conjectureId&quot;).asText()).append(&quot;`\n&quot;)</span>
+<span class="fc" id="L529">            .append(&quot;- Lineage root: `&quot;)</span>
+<span class="fc" id="L530">            .append(candidate.path(&quot;lineageRoot&quot;).asText()).append(&quot;`\n&quot;)</span>
+<span class="fc" id="L531">            .append(&quot;- Assumptions: &quot;)</span>
+<span class="fc" id="L532">            .append(renderList(candidate.path(&quot;assumptions&quot;))).append(&quot;\n&quot;)</span>
+<span class="fc" id="L533">            .append(&quot;- Parameter relations: &quot;)</span>
+<span class="fc" id="L534">            .append(renderList(candidate.path(&quot;parameterRelations&quot;)))</span>
+<span class="fc" id="L535">            .append(&quot;\n\n&quot;)</span>
+<span class="fc" id="L536">            .append(&quot;![Generated candidate lineage](figures/candidate-lineage.svg)\n\n&quot;)</span>
+<span class="fc" id="L537">            .append(&quot;## Paired held-out utility\n\n&quot;)</span>
+<span class="fc" id="L538">            .append(&quot;Every number in the following table is derived from &quot;)</span>
+<span class="fc" id="L539">            .append(authority(artifacts, &quot;pairedUtility&quot;)).append(&quot;.\n\n&quot;)</span>
+<span class="fc" id="L540">            .append(&quot;| Case | Baseline status | Candidate status | &quot;)</span>
+<span class="fc" id="L541">            .append(&quot;Reached B/C | Path length B/C | States B/C | Gain | Regression |\n&quot;)</span>
+<span class="fc" id="L542">            .append(&quot;|---|---|---|---:|---:|---:|---:|---:|\n&quot;);</span>
+<span class="fc" id="L543">        root.path(&quot;pairedUtility&quot;).path(&quot;cases&quot;).forEach(item -&gt; text</span>
+<span class="fc" id="L544">            .append('|').append(escape(item.path(&quot;id&quot;).asText()))</span>
+<span class="fc" id="L545">            .append('|').append(escape(item.path(&quot;baselineStatus&quot;).asText()))</span>
+<span class="fc" id="L546">            .append('|').append(escape(item.path(&quot;candidateStatus&quot;).asText()))</span>
+<span class="fc" id="L547">            .append('|').append(item.path(&quot;baselineReached&quot;).asBoolean())</span>
+<span class="fc" id="L548">            .append('/').append(item.path(&quot;candidateReached&quot;).asBoolean())</span>
+<span class="fc" id="L549">            .append('|').append(item.path(&quot;baselinePathLength&quot;).asInt())</span>
+<span class="fc" id="L550">            .append('/').append(item.path(&quot;candidatePathLength&quot;).asInt())</span>
+<span class="fc" id="L551">            .append('|').append(item.path(&quot;baselineExploredStates&quot;).asLong())</span>
+<span class="fc" id="L552">            .append('/').append(item.path(&quot;candidateExploredStates&quot;).asLong())</span>
+<span class="fc" id="L553">            .append('|').append(item.path(&quot;materialGain&quot;).asBoolean())</span>
+<span class="fc" id="L554">            .append('|').append(item.path(&quot;regression&quot;).asBoolean())</span>
+<span class="fc" id="L555">            .append(&quot;|\n&quot;));</span>
+<span class="fc" id="L556">        text.append(&quot;\nRepresentative case: `&quot;)</span>
+<span class="fc" id="L557">            .append(representative.id()).append(&quot;`.\n\n&quot;)</span>
+<span class="fc" id="L558">            .append(&quot;![Generated paired utility](figures/paired-utility.svg)\n\n&quot;)</span>
+<span class="fc" id="L559">            .append(&quot;![Generated representative search comparison]&quot;)</span>
+<span class="fc" id="L560">            .append(&quot;(figures/representative-search.svg)\n\n&quot;)</span>
+<span class="fc" id="L561">            .append(&quot;## Authoritative artifacts\n\n&quot;)</span>
+<span class="fc" id="L562">            .append(&quot;| Role | Relative path | Semantic hash | File SHA-256 |\n&quot;)</span>
+<span class="fc" id="L563">            .append(&quot;|---|---|---|---|\n&quot;);</span>
+<span class="fc" id="L564">        artifacts.forEach(item -&gt; text</span>
+<span class="fc" id="L565">            .append('|').append(item.role())</span>
+<span class="fc" id="L566">            .append(&quot;|[&quot;).append(item.relativePath()).append(&quot;](&quot;)</span>
+<span class="fc" id="L567">            .append(item.relativePath()).append(&quot;)&quot;)</span>
+<span class="fc" id="L568">            .append(&quot;|`&quot;).append(item.semanticHash()).append(&quot;`&quot;)</span>
+<span class="fc" id="L569">            .append(&quot;|`&quot;).append(item.fileSha256()).append(&quot;`|\n&quot;));</span>
+<span class="fc" id="L570">        text.append(&quot;\nThe JSON card is canonical and hash-bound. The Markdown and &quot;)</span>
+<span class="fc" id="L571">            .append(&quot;figures are generated from the same verified in-memory run; &quot;)</span>
+<span class="fc" id="L572">            .append(&quot;none authorizes an external novelty claim.\n&quot;);</span>
+<span class="fc" id="L573">        return text.toString();</span>
+    }
+
+    private static String renderList(JsonNode values) {
+<span class="fc" id="L577">        List&lt;String&gt; rendered = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L578">        values.forEach(value -&gt; rendered.add('`' + value.asText() + '`'));</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">        return rendered.isEmpty() ? &quot;_none_&quot; : String.join(&quot;, &quot;, rendered);</span>
+    }
+
+    private static void row(
+        StringBuilder text,
+        String metric,
+        String value,
+        String authority
+    ) {
+<span class="fc" id="L588">        text.append('|').append(escape(metric))</span>
+<span class="fc" id="L589">            .append('|').append(escape(value))</span>
+<span class="fc" id="L590">            .append('|').append(authority).append(&quot;|\n&quot;);</span>
+<span class="fc" id="L591">    }</span>
+
+    private static String authority(
+        List&lt;ArtifactBinding&gt; artifacts,
+        String role
+    ) {
+<span class="fc" id="L597">        ArtifactBinding artifact = artifacts.stream()</span>
+<span class="fc" id="L598">            .filter(item -&gt; item.role().equals(role))</span>
+<span class="fc" id="L599">            .findFirst()</span>
+<span class="pc" id="L600">            .orElseThrow(() -&gt; new IllegalStateException(</span>
+                &quot;missing authority &quot; + role));
+<span class="fc" id="L602">        return &quot;[&quot; + artifact.relativePath() + &quot;](&quot; + artifact.relativePath()</span>
+<span class="fc" id="L603">            + &quot;) · `&quot; + artifact.semanticHash() + '`';</span>
+    }
+
+    private static String escape(String value) {
+<span class="fc" id="L607">        return value.replace(&quot;|&quot;, &quot;\\|&quot;).replace(&quot;\n&quot;, &quot; &quot;);</span>
+    }
+
+    private static void requireSha256(String value, String name) {
+<span class="pc bpc" id="L611" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L612">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L614">    }</span>
+
+    public record ArtifactBinding(
+        String role,
+        String relativePath,
+        String semanticHash,
+        String fileSha256
+    ) {
+<span class="fc" id="L622">        public ArtifactBinding {</span>
+<span class="pc bpc" id="L623" title="2 of 4 branches missed.">            if (role == null || !role.matches(&quot;[a-z][A-Za-z0-9]+&quot;)) {</span>
+<span class="nc" id="L624">                throw new IllegalArgumentException(&quot;invalid artifact role&quot;);</span>
+            }
+<span class="pc bpc" id="L626" title="2 of 4 branches missed.">            if (relativePath == null || relativePath.isBlank()</span>
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">                    || relativePath.startsWith(&quot;/&quot;)</span>
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">                    || relativePath.contains(&quot;..&quot;)) {</span>
+<span class="nc" id="L629">                throw new IllegalArgumentException(&quot;invalid relative artifact path&quot;);</span>
+            }
+<span class="fc" id="L631">            requireSha256(semanticHash, &quot;semanticHash&quot;);</span>
+<span class="fc" id="L632">            requireSha256(fileSha256, &quot;fileSha256&quot;);</span>
+<span class="fc" id="L633">        }</span>
+
+        ObjectNode toJson() {
+<span class="fc" id="L636">            ObjectNode object = MAPPER.createObjectNode();</span>
+<span class="fc" id="L637">            object.put(&quot;role&quot;, role);</span>
+<span class="fc" id="L638">            object.put(&quot;relativePath&quot;, relativePath);</span>
+<span class="fc" id="L639">            object.put(&quot;semanticHash&quot;, semanticHash);</span>
+<span class="fc" id="L640">            object.put(&quot;fileSha256&quot;, fileSha256);</span>
+<span class="fc" id="L641">            return object;</span>
+        }
+    }
+
+<span class="fc" id="L645">    private record PairedSummary(</span>
+        int caseCount,
+        int baselineReachedCount,
+        int candidateReachedCount,
+        int bothReachedCount,
+        int baselinePathLengthTotalForReachedCases,
+        int candidatePathLengthTotalForReachedCases,
+        int pairedPathLengthDeltaForBothReached,
+        long baselineExploredStatesTotal,
+        long candidateExploredStatesTotal,
+        long exploredStatesDelta,
+        int materialGainCount,
+        int correctnessRegressionCount,
+        int unsupportedCandidateCaseCount
+    ) {
+        static PairedSummary from(List&lt;UtilityCase&gt; cases) {
+<span class="fc" id="L661">            int baselineReached = (int) cases.stream()</span>
+<span class="fc" id="L662">                .filter(UtilityCase::baselineReached).count();</span>
+<span class="fc" id="L663">            int candidateReached = (int) cases.stream()</span>
+<span class="fc" id="L664">                .filter(UtilityCase::candidateReached).count();</span>
+<span class="fc" id="L665">            int bothReached = (int) cases.stream()</span>
+<span class="pc bpc" id="L666" title="3 of 4 branches missed.">                .filter(item -&gt; item.baselineReached() &amp;&amp; item.candidateReached())</span>
+<span class="fc" id="L667">                .count();</span>
+<span class="fc" id="L668">            int baselinePath = cases.stream()</span>
+<span class="fc" id="L669">                .filter(UtilityCase::baselineReached)</span>
+<span class="fc" id="L670">                .mapToInt(UtilityCase::baselinePathLength).sum();</span>
+<span class="fc" id="L671">            int candidatePath = cases.stream()</span>
+<span class="fc" id="L672">                .filter(UtilityCase::candidateReached)</span>
+<span class="fc" id="L673">                .mapToInt(UtilityCase::candidatePathLength).sum();</span>
+<span class="fc" id="L674">            int pairedDelta = cases.stream()</span>
+<span class="pc bpc" id="L675" title="3 of 4 branches missed.">                .filter(item -&gt; item.baselineReached() &amp;&amp; item.candidateReached())</span>
+<span class="pc" id="L676">                .mapToInt(item -&gt; item.candidatePathLength()</span>
+<span class="pc" id="L677">                    - item.baselinePathLength()).sum();</span>
+<span class="fc" id="L678">            long baselineStates = cases.stream()</span>
+<span class="fc" id="L679">                .mapToLong(UtilityCase::baselineExploredStates).sum();</span>
+<span class="fc" id="L680">            long candidateStates = cases.stream()</span>
+<span class="fc" id="L681">                .mapToLong(UtilityCase::candidateExploredStates).sum();</span>
+<span class="fc" id="L682">            int gains = (int) cases.stream()</span>
+<span class="fc" id="L683">                .filter(UtilityCase::materialGain).count();</span>
+<span class="fc" id="L684">            int regressions = (int) cases.stream()</span>
+<span class="fc" id="L685">                .filter(UtilityCase::regression).count();</span>
+<span class="fc" id="L686">            return new PairedSummary(</span>
+<span class="fc" id="L687">                cases.size(), baselineReached, candidateReached, bothReached,</span>
+                baselinePath, candidatePath, pairedDelta,
+                baselineStates, candidateStates,
+<span class="fc" id="L690">                Math.subtractExact(candidateStates, baselineStates),</span>
+<span class="fc" id="L691">                gains, regressions, cases.size() - candidateReached);</span>
+        }
+
+        ObjectNode toJson() {
+<span class="fc" id="L695">            ObjectNode object = MAPPER.createObjectNode();</span>
+<span class="fc" id="L696">            object.put(&quot;caseCount&quot;, caseCount);</span>
+<span class="fc" id="L697">            object.put(&quot;baselineReachedCount&quot;, baselineReachedCount);</span>
+<span class="fc" id="L698">            object.put(&quot;candidateReachedCount&quot;, candidateReachedCount);</span>
+<span class="fc" id="L699">            object.put(&quot;bothReachedCount&quot;, bothReachedCount);</span>
+<span class="fc" id="L700">            object.put(&quot;baselinePathLengthTotalForReachedCases&quot;,</span>
+                baselinePathLengthTotalForReachedCases);
+<span class="fc" id="L702">            object.put(&quot;candidatePathLengthTotalForReachedCases&quot;,</span>
+                candidatePathLengthTotalForReachedCases);
+<span class="fc" id="L704">            object.put(&quot;pairedPathLengthDeltaForBothReached&quot;,</span>
+                pairedPathLengthDeltaForBothReached);
+<span class="fc" id="L706">            object.put(&quot;baselineExploredStatesTotal&quot;,</span>
+                baselineExploredStatesTotal);
+<span class="fc" id="L708">            object.put(&quot;candidateExploredStatesTotal&quot;,</span>
+                candidateExploredStatesTotal);
+<span class="fc" id="L710">            object.put(&quot;exploredStatesDelta&quot;, exploredStatesDelta);</span>
+<span class="fc" id="L711">            object.put(&quot;materialGainCount&quot;, materialGainCount);</span>
+<span class="fc" id="L712">            object.put(&quot;correctnessRegressionCount&quot;,</span>
+                correctnessRegressionCount);
+<span class="fc" id="L714">            object.put(&quot;unsupportedCandidateCaseCount&quot;,</span>
+                unsupportedCandidateCaseCount);
+<span class="fc" id="L716">            return object;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

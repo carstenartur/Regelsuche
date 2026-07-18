@@ -28,7 +28,7 @@ import java.util.Objects;
     }
 
     public ReleaseRun runQualified(Path hiddenRuleReport) {
-<span class="nc" id="L31">        return run(hiddenRuleReport, true);</span>
+<span class="fc" id="L31">        return run(hiddenRuleReport, true);</span>
     }
 
     private ReleaseRun run(Path hiddenRuleReport, boolean qualifyCandidate) {
@@ -49,30 +49,30 @@ import java.util.Objects;
 
 <span class="fc" id="L50">        AutonomousCandidateQualificationRunner.QualificationRun qualificationRun = null;</span>
 <span class="fc" id="L51">        AutonomousCandidateQualificationEvidence qualificationEvidence = null;</span>
-<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (qualifyCandidate) {</span>
-<span class="nc" id="L53">            AutonomousCandidateQualificationRunner qualificationRunner =</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (qualifyCandidate) {</span>
+<span class="fc" id="L53">            AutonomousCandidateQualificationRunner qualificationRunner =</span>
                 new AutonomousCandidateQualificationRunner();
-<span class="nc" id="L55">            List&lt;AutonomousCandidateQualificationRunner.QualificationRun&gt; runs =</span>
-<span class="nc" id="L56">                campaigns.stream().map(qualificationRunner::run).toList();</span>
-<span class="nc" id="L57">            if (runs.stream().map(run -&gt; run.evidence().contentHash())</span>
-<span class="nc bnc" id="L58" title="All 2 branches missed.">                    .distinct().count() != 1L</span>
-<span class="nc" id="L59">                    || runs.stream().map(</span>
+<span class="fc" id="L55">            List&lt;AutonomousCandidateQualificationRunner.QualificationRun&gt; runs =</span>
+<span class="fc" id="L56">                campaigns.stream().map(qualificationRunner::run).toList();</span>
+<span class="fc" id="L57">            if (runs.stream().map(run -&gt; run.evidence().contentHash())</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                    .distinct().count() != 1L</span>
+<span class="fc" id="L59">                    || runs.stream().map(</span>
                         AutonomousCandidateQualificationRunner.QualificationRun::contentHash)
-<span class="nc bnc" id="L61" title="All 2 branches missed.">                        .distinct().count() != 1L) {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                        .distinct().count() != 1L) {</span>
 <span class="nc" id="L62">                throw new IllegalStateException(</span>
                     &quot;candidate qualification is not reproducible across clean campaign runs&quot;);
             }
-<span class="nc" id="L65">            qualificationRun = runs.getFirst();</span>
-<span class="nc" id="L66">            qualificationEvidence = qualificationRun.evidence();</span>
+<span class="fc" id="L65">            qualificationRun = runs.getFirst();</span>
+<span class="fc" id="L66">            qualificationEvidence = qualificationRun.evidence();</span>
         }
 <span class="fc" id="L68">        ReleaseReadinessMatrix.MatrixReport matrix =</span>
 <span class="fc" id="L69">            new ReleaseQualificationMatrixAdapter().apply(</span>
                 baseMatrix, evidence, qualificationEvidence);
 <span class="fc" id="L71">        String profileCatalog = ReleaseEvidenceProfile.catalogJson();</span>
 <span class="fc" id="L72">        String profileCatalogHash = AutonomousResearchBriefV2.hash(profileCatalog);</span>
-<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        String qualificationHash = qualificationEvidence == null</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        String qualificationHash = qualificationEvidence == null</span>
 <span class="fc" id="L74">            ? NO_QUALIFICATION_EVIDENCE_HASH</span>
-<span class="pc" id="L75">            : qualificationEvidence.contentHash();</span>
+<span class="fc" id="L75">            : qualificationEvidence.contentHash();</span>
 <span class="fc" id="L76">        String contentHash = runHash(</span>
             profileCatalogHash,
 <span class="fc" id="L78">            evidence.evidenceHash(),</span>
@@ -112,12 +112,12 @@ import java.util.Objects;
 <span class="nc" id="L112">                write(hiddenOutput, run.hiddenRuleEvidence().toCanonicalJson());</span>
             }
 <span class="fc" id="L114">            Path qualificationDirectory = outputDirectory.resolve(&quot;qualification&quot;);</span>
-<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (run.qualificationRun() == null) {</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (run.qualificationRun() == null) {</span>
 <span class="fc" id="L116">                deleteQualificationOutputs(qualificationDirectory);</span>
             } else {
-<span class="nc" id="L118">                new AutonomousCandidateQualificationRunner().write(</span>
+<span class="fc" id="L118">                new AutonomousCandidateQualificationRunner().write(</span>
                     qualificationDirectory,
-<span class="nc" id="L120">                    run.qualificationRun());</span>
+<span class="fc" id="L120">                    run.qualificationRun());</span>
             }
 <span class="fc" id="L122">            write(outputDirectory.resolve(&quot;release-readiness-report.json&quot;),</span>
 <span class="fc" id="L123">                run.matrix().toCanonicalJson());</span>
@@ -193,18 +193,18 @@ import java.util.Objects;
 <span class="pc bpc" id="L193" title="1 of 2 branches missed.">            String expectedHiddenHash = hiddenRuleEvidence == null</span>
 <span class="fc" id="L194">                ? ReleaseReadinessMatrix.NO_HIDDEN_RULE_EVIDENCE_HASH</span>
 <span class="pc" id="L195">                : hiddenRuleEvidence.evidenceHash();</span>
-<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            String expectedQualificationHash = qualificationEvidence == null</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            String expectedQualificationHash = qualificationEvidence == null</span>
 <span class="fc" id="L197">                ? NO_QUALIFICATION_EVIDENCE_HASH</span>
-<span class="pc" id="L198">                : qualificationEvidence.contentHash();</span>
-<span class="pc bpc" id="L199" title="4 of 8 branches missed.">            if ((qualificationRun == null) != (qualificationEvidence == null)</span>
+<span class="fc" id="L198">                : qualificationEvidence.contentHash();</span>
+<span class="pc bpc" id="L199" title="1 of 8 branches missed.">            if ((qualificationRun == null) != (qualificationEvidence == null)</span>
                     || qualificationRun != null
-<span class="nc" id="L201">                        &amp;&amp; !qualificationRun.evidence().contentHash()</span>
-<span class="pc bnc" id="L202" title="All 2 branches missed.">                            .equals(qualificationEvidence.contentHash())</span>
+<span class="fc" id="L201">                        &amp;&amp; !qualificationRun.evidence().contentHash()</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">                            .equals(qualificationEvidence.contentHash())</span>
 <span class="fc" id="L203">                    || !retainedCampaign.contentHash()</span>
-<span class="pc bpc" id="L204" title="2 of 4 branches missed.">                        .equals(evidence.campaignManifestHash())</span>
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">                        .equals(evidence.campaignManifestHash())</span>
                     || qualificationEvidence != null
-<span class="pc bnc" id="L206" title="All 2 branches missed.">                        &amp;&amp; !retainedCampaign.contentHash().equals(</span>
-<span class="nc" id="L207">                            qualificationEvidence.campaignManifestHash())</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                        &amp;&amp; !retainedCampaign.contentHash().equals(</span>
+<span class="fc" id="L207">                            qualificationEvidence.campaignManifestHash())</span>
 <span class="pc bpc" id="L208" title="1 of 2 branches missed.">                    || !evidence.evidenceHash().equals(matrix.evidenceHash())</span>
 <span class="pc bpc" id="L209" title="1 of 2 branches missed.">                    || !expectedHiddenHash.equals(matrix.hiddenRuleEvidenceHash())</span>
 <span class="fc" id="L210">                    || !AutonomousResearchBriefV2.hash(profileCatalogJson)</span>
@@ -230,9 +230,9 @@ import java.util.Objects;
         }
 
         public String toCanonicalJson() {
-<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            String qualificationHash = qualificationEvidence == null</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            String qualificationHash = qualificationEvidence == null</span>
 <span class="fc" id="L234">                ? NO_QUALIFICATION_EVIDENCE_HASH</span>
-<span class="pc" id="L235">                : qualificationEvidence.contentHash();</span>
+<span class="fc" id="L235">                : qualificationEvidence.contentHash();</span>
 <span class="fc" id="L236">            return new JsonWriter().beginObject()</span>
 <span class="fc" id="L237">                .property(&quot;schema&quot;, schema)</span>
 <span class="fc" id="L238">                .property(&quot;campaignManifestHash&quot;,</span>
@@ -244,7 +244,7 @@ import java.util.Objects;
 <span class="fc" id="L244">                .property(&quot;hiddenRuleEvidenceHash&quot;,</span>
 <span class="fc" id="L245">                    matrix.hiddenRuleEvidenceHash())</span>
 <span class="fc" id="L246">                .property(&quot;qualificationEvidenceStatus&quot;,</span>
-<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                    qualificationEvidence == null ? &quot;NOT_PROVIDED&quot; : &quot;BOUND&quot;)</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                    qualificationEvidence == null ? &quot;NOT_PROVIDED&quot; : &quot;BOUND&quot;)</span>
 <span class="fc" id="L248">                .property(&quot;qualificationEvidenceHash&quot;, qualificationHash)</span>
 <span class="fc" id="L249">                .property(&quot;matrixHash&quot;, matrix.contentHash())</span>
 <span class="fc" id="L250">                .property(&quot;autonomousCampaignStatus&quot;,</span>
