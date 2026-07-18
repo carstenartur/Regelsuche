@@ -36,7 +36,7 @@ class ProofDockerImageIntegrationTest {
     static final GenericContainer<?> PROOF_IMAGE = new GenericContainer<>(
         new ImageFromDockerfile()
             .withFileFromPath(".", PROJECT_ROOT)
-            .withDockerfilePath("Dockerfile.proof")
+            .withDockerfilePath("./Dockerfile.proof")
     )
         .withExposedPorts(8080)
         .waitingFor(Wait.forHttp("/api/proof/jobs").forStatusCode(200))
