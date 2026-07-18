@@ -3,185 +3,54 @@ name: Solver Portfolio
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'regelsuche-solver-ir/**'
+      - 'regelsuche-solver-portfolio/**'
+      - 'app/src/test/java/de/regelsuche/proof/OpenTargetProofPortfolioIntegrationTest.java'
+      - 'docs/schemas/regelsuche-solver-*.schema.json'
+      - 'scripts/verify-solver-portfolio.py'
+      - '.github/workflows/solver-portfolio.yml'
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'regelsuche-solver-ir/**'
+      - 'regelsuche-solver-portfolio/**'
+      - 'app/src/test/java/de/regelsuche/proof/OpenTargetProofPortfolioIntegrationTest.java'
+      - 'docs/schemas/regelsuche-solver-*.schema.json'
+      - 'scripts/verify-solver-portfolio.py'
+      - '.github/workflows/solver-portfolio.yml'
   workflow_dispatch:
 
 concurrency:
   group: solver-portfolio-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   portfolio:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     steps:
       - uses: actions/checkout@v7
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
-          distribution: 'temurin'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
-
-      - name: Install real Z3 backend
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@v6.1.0
+      - name: Install the real Z3 backend and verifier dependency
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends z3
-          z3 -version
-
-      - name: Test portfolio, proof consumer and real reference trace
-        shell: bash
-        run: |
-          set -e -o pipefail
-          ./gradlew \
-            :regelsuche-solver-portfolio:test \
-            :regelsuche-solver-portfolio:writeSolverPortfolioExample \
-            2>&1 | tee solver-portfolio-gradle.log
-          ./gradlew \
-            :app:test \
-            --tests de.regelsuche.proof.OpenTargetProofPortfolioIntegrationTest \
-            2>&1 | tee -a solver-portfolio-gradle.log
-
-      - name: Validate canonical portfolio evidence
-        run: |
           python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
-          python3 - <<'PY'
-          import copy
-          import json
-          from pathlib import Path
-          from jsonschema import Draft202012Validator
-
-          root = Path('regelsuche-solver-portfolio/build/reports/solver-portfolio')
-          schemas = Path('docs/schemas')
-
-          report_schema = json.loads((schemas /
-              'regelsuche-solver-portfolio-report-v1.schema.json').read_text())
-          obligation_schema = json.loads((schemas /
-              'regelsuche-solver-obligation-v1.schema.json').read_text())
-          translation_schema = json.loads((schemas /
-              'regelsuche-solver-translation-v1.schema.json').read_text())
-          result_schema = json.loads((schemas /
-              'regelsuche-solver-result-v1.schema.json').read_text())
-          execution_schema = json.loads((schemas /
-              'regelsuche-solver-execution-v1.schema.json').read_text())
-
-          for schema in (
-              report_schema,
-              obligation_schema,
-              translation_schema,
-              result_schema,
-              execution_schema,
-          ):
-              Draft202012Validator.check_schema(schema)
-
-          report_validator = Draft202012Validator(report_schema)
-
-          def load(path):
-              return json.loads(path.read_text())
-
-          def validate_run(name):
-              run_root = root / name
-              obligation = load(run_root / 'obligation.json')
-              request = load(run_root / 'request.json')
-              report = load(run_root / 'report.json')
-              Draft202012Validator(obligation_schema).validate(obligation)
-              report_validator.validate(report)
-
-              assert request['obligationHash'] == obligation['contentHash']
-              assert report['obligationHash'] == obligation['contentHash']
-              assert report['requestHash'] == request['contentHash']
-
-              traced_hashes = {
-                  attempt['executionHash'] for attempt in report['attempts']
-                  if attempt['executionHash']
-              }
-              retained_hashes = set()
-              execution_directories = sorted(
-                  path for path in (run_root / 'executions').iterdir()
-                  if path.is_dir()
-              )
-              for attempt_root in execution_directories:
-                  translation = load(attempt_root / 'translation.json')
-                  result = load(attempt_root / 'result.json')
-                  execution = load(attempt_root / 'execution.json')
-                  Draft202012Validator(translation_schema).validate(translation)
-                  Draft202012Validator(result_schema).validate(result)
-                  Draft202012Validator(execution_schema).validate(execution)
-
-                  assert translation['obligationHash'] == obligation['contentHash']
-                  assert result['obligationHash'] == obligation['contentHash']
-                  assert execution['obligationHash'] == obligation['contentHash']
-                  assert execution['translationHash'] == translation['contentHash']
-                  assert execution['resultHash'] == result['contentHash']
-                  assert execution['backendId'] == translation['backendId']
-                  assert execution['backendId'] == result['backendId']
-                  assert execution['backendVersion'] == translation['backendVersion']
-                  assert execution['backendVersion'] == result['backendVersion']
-                  assert execution['translationStatus'] == translation['status']
-                  assert execution['translationStatus'] == result['translationStatus']
-                  assert execution['resultStatus'] == result['status']
-                  retained_hashes.add(execution['contentHash'])
-
-              assert retained_hashes == traced_hashes
-              assert len(execution_directories) == len(retained_hashes)
-              selected = report['selectedExecutionHash']
-              if selected:
-                  assert selected in retained_hashes
-              return report
-
-          formal = validate_run('formal')
-          guidance = validate_run('guidance')
-          manifest = load(root / 'manifest.json')
-
-          assert formal['outcome'] == 'CONFIRMED'
-          assert formal['proofAuthorized'] is True
-          assert formal['selectedBackendId'] == 'z3-smt-proof'
-          executed = [a['backendId'] for a in formal['attempts']
-                      if a['disposition'] == 'EXECUTED']
-          assert 'polynomial-normal-form' in executed
-          assert 'z3-smt-proof' in executed
-          assert guidance['outcome'] == 'CONFIRMED'
-          assert guidance['selectedBackendId'] == 'regelsuche-search'
-          assert formal['telemetryNotice'] == \
-              'EXECUTION_TELEMETRY_NOT_MATHEMATICAL_EVIDENCE'
-          assert manifest['allThreeRolesConfigured'] is True
-          assert manifest['formalMultiStage'] is True
-          assert manifest['allFormalExecutionsRetained'] is True
-          assert manifest['formalProofAuthorized'] is True
-          assert manifest['searchGuidanceExecuted'] is True
-
-          invalid_refutation = copy.deepcopy(formal)
-          invalid_refutation['outcome'] = 'REFUTED'
-          invalid_refutation['proofAuthorized'] = False
-          invalid_refutation['promotionBlocked'] = False
-          assert list(report_validator.iter_errors(invalid_refutation))
-
-          invalid_conflict = copy.deepcopy(formal)
-          invalid_conflict['outcome'] = 'CONFLICT'
-          invalid_conflict['proofAuthorized'] = False
-          invalid_conflict['promotionBlocked'] = True
-          invalid_conflict['conflictExecutionHashes'] = [
-              attempt['executionHash'] for attempt in formal['attempts']
-              if attempt['executionHash']
-          ]
-          assert list(report_validator.iter_errors(invalid_conflict))
-
-          print('solver-portfolio-contract=valid')
-          PY
-
+      - name: Run the repository-owned solver portfolio verification
+        run: ./gradlew :regelsuche-solver-portfolio:verifySolverPortfolioEvidence --console=plain
       - name: Upload portfolio trace and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: solver-portfolio-trace
           path: |
-            solver-portfolio-gradle.log
             regelsuche-solver-portfolio/build/reports/solver-portfolio/**
             regelsuche-solver-portfolio/build/reports/tests/**
             regelsuche-solver-portfolio/build/test-results/**
