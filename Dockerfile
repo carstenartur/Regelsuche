@@ -25,10 +25,7 @@ COPY regelsuche-cli/build.gradle ./regelsuche-cli/build.gradle
 COPY regelsuche-discovery/build.gradle ./regelsuche-discovery/build.gradle
 COPY regelsuche-benchmarks/build.gradle ./regelsuche-benchmarks/build.gradle
 
-# Pre-warm the Gradle distribution and dependency cache. The build itself
-# fails (no sources yet), but the wrapper, distribution and dependencies are
-# downloaded, so the actual build below runs faster on rebuilds when only
-# sources change.
+# Pre-warm the Gradle distribution and dependency cache.
 RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon --version
 
@@ -55,7 +52,19 @@ COPY regelsuche-benchmarks ./regelsuche-benchmarks
 RUN ./gradlew --no-daemon :app:installDist -x test
 
 
-# ---------- Stage 2: Runtime ----------
+# ---------- Optional qualified autonomous-discovery walkthrough ----------
+# Build explicitly with `docker build --target walkthrough ...`. This stage is
+# deliberately not last: an ordinary `docker build .` must produce the normal
+# Web Workbench runtime image documented by the README and Dockerfile comments.
+FROM build AS walkthrough
+ARG REGELSUCHE_REPOSITORY_REVISION
+ENV REGELSUCHE_REPOSITORY_REVISION=${REGELSUCHE_REPOSITORY_REVISION}
+RUN mkdir -p /out
+VOLUME ["/out"]
+ENTRYPOINT ["./gradlew", "--no-daemon", ":regelsuche-release:runAutonomousDiscoveryWalkthrough", "-PwalkthroughOutput=/out"]
+
+
+# ---------- Default Web Workbench runtime ----------
 FROM eclipse-temurin:21-jre AS runtime
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -84,11 +93,3 @@ VOLUME ["/opt/regelsuche/data"]
 # arguments to `docker run` if you need basic-auth, TLS or a different port.
 ENTRYPOINT ["./bin/app"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8080"]
-
-# ---------- Qualified autonomous-discovery walkthrough ----------
-FROM build AS walkthrough
-ARG REGELSUCHE_REPOSITORY_REVISION
-ENV REGELSUCHE_REPOSITORY_REVISION=${REGELSUCHE_REPOSITORY_REVISION}
-RUN mkdir -p /out
-VOLUME ["/out"]
-ENTRYPOINT ["./gradlew", "--no-daemon", ":regelsuche-release:runAutonomousDiscoveryWalkthrough", "-PwalkthroughOutput=/out"]
