@@ -21,10 +21,6 @@ on:
       - '.github/workflows/benchmark.yml'
   workflow_dispatch:
 
-concurrency:
-  group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
@@ -57,6 +53,9 @@ jobs:
     name: Publish benchmark history and reports
     needs: verify
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
+      cancel-in-progress: false
     permissions:
       actions: read
       contents: write
