@@ -26,6 +26,12 @@ allprojects {
     }
 }
 
+project(':app') {
+    tasks.matching { it.name == 'dockerE2eTest' }.configureEach {
+        dependsOn tasks.named('installPlaywrightBrowsers')
+    }
+}
+
 tasks.register('allTests') {
     group = 'verification'
     description = 'Runs every Gradle Test task in the repository, including browser, Docker/Testcontainers and external-tool integration tests.'
