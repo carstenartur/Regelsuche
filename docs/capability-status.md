@@ -54,38 +54,36 @@ werden. Insbesondere bleiben folgende Achsen getrennt:
   — struktureller Vertrag.
 
 README und `docs/discovery-status.md` enthalten nur einen vom selben Generator
-verwalteten Kurzblock. Manuelle Änderungen innerhalb der Marker werden von CI
-abgewiesen.
+verwalteten Kurzblock. Manuelle Änderungen innerhalb der Marker werden von der
+repositoryeigenen Verifikation abgewiesen.
 
-## Lokale Reproduktion
+## Lokale Reproduktion und Verifikation
 
-Zuerst werden die autoritativen Evidence-Artefakte erzeugt:
-
-```bash
-./gradlew \
-  :regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence \
-  :regelsuche-release:runDomainGenericQualification
-```
-
-Danach kann die Statusmatrix überprüft werden:
+Der vollständige Vertrag läuft aus einem normalen Checkout mit einem Befehl:
 
 ```bash
-python3 scripts/generate-capability-status.py \
-  --repository-root . \
-  --release-report regelsuche-release/build/reports/release-readiness-qualified/release-readiness-report.json \
-  --release-run regelsuche-release/build/reports/release-readiness-qualified/release-readiness-run.json \
-  --domain-report regelsuche-release/build/reports/domain-generic-qualification/qualification-report.json \
-  --domain-run regelsuche-release/build/reports/domain-generic-qualification/qualification-run.json \
-  --repository-revision WORKTREE \
-  --json-output docs/generated/capability-status.json \
-  --markdown-output docs/generated/capability-status.md \
-  --check \
-  --check-docs
+bash scripts/run-capability-status-verification.sh
 ```
 
-Zum bewussten Aktualisieren der generierten Dateien werden `--check` und
-`--check-docs` entfernt und `--rewrite-docs` ergänzt. Die resultierenden Änderungen
-müssen gemeinsam mit den Evidence-Änderungen reviewt werden.
+Der Runner:
+
+1. erzeugt die autoritative qualifizierte Release- und domänengenerische Evidence neu;
+2. lässt `generate-capability-status.py` JSON, Markdown und die verwalteten
+   Dokumentationsblöcke gegen den Checkout prüfen;
+3. verwendet ein Build-lokales Python-Venv mit `jsonschema==4.25.1`;
+4. validiert das Statusdokument gegen sein Draft-2020-12-Schema;
+5. berechnet den kanonischen `contentHash` unabhängig neu;
+6. verlangt den exakten, eindeutig sortierten Satz von 13 Capabilities und deren
+   zulässige Status-, Evidence- und Blockerbeziehungen.
+
+Die Logs liegen unter `build/logs/capability-status-*.log`. GitHub Actions ruft nur
+diesen Befehl auf und veröffentlicht die bereits lokal erzeugten Reports.
+
+Zum bewussten Aktualisieren der generierten Dateien werden die Evidence-Artefakte
+zunächst wie im Runner erzeugt. Anschließend wird `generate-capability-status.py` ohne
+`--check` und `--check-docs`, aber mit `--rewrite-docs` aufgerufen. Die resultierenden
+Änderungen an JSON, Markdown, README und Discovery-Status müssen gemeinsam mit den
+Evidence-Änderungen reviewt werden.
 
 ## Sicherheits- und Trust-Grenze
 
