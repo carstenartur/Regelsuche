@@ -38,12 +38,12 @@ jobs:
     - name: Install Playwright host dependencies
       run: ./gradlew :app:installPlaywrightHostDependencies --console=plain
 
-    - name: Build and run every Gradle Test task
+    - name: Build and run the complete Gradle test lifecycle
       shell: bash
       run: |
         mkdir -p build/reports/ci
         set -o pipefail
-        ./gradlew allTests build --console=plain 2>&1 | tee build/reports/ci/gradle-build.log
+        ./gradlew test build --console=plain 2>&1 | tee build/reports/ci/gradle-build.log
 
     - name: Upload Gradle diagnostics
       if: always()
