@@ -88,13 +88,19 @@ Every attempt with an `executionHash` must have exactly one retained directory c
 
 ## Reproduction
 
-Install Z3, then run:
+Install Z3, then run the normal JUnit task and generate the reference trace:
 
 ```bash
 ./gradlew \
   :regelsuche-solver-portfolio:test \
-  :regelsuche-solver-portfolio:z3IntegrationTest \
   :regelsuche-solver-portfolio:writeSolverPortfolioExample
+```
+
+To select only the real external-prover integration through JUnit tags:
+
+```bash
+./gradlew :regelsuche-solver-portfolio:test \
+  -PincludeTestTags=external-prover
 ```
 
 The example is written below `regelsuche-solver-portfolio/build/reports/solver-portfolio` with separate `formal/` and `guidance/` runs and a shared `profiles/` directory. The `Solver Portfolio` workflow validates the obligation, report, translation, result and execution schemas, verifies every hash link and executes the real multi-stage path from exact polynomial validation to a Z3 proof object.
