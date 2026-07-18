@@ -6,11 +6,6 @@ on:
     paths:
       - '.github/workflows/branch-apply-issue385.yml'
       - '.github/issue-385-patch/**'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - '.github/workflows/branch-apply-issue385.yml'
-      - '.github/issue-385-patch/**'
   workflow_dispatch:
 
 permissions:
@@ -36,22 +31,24 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Decode implementation archive
+      - name: Decode and authenticate implementation archive
         shell: bash
         run: |
           set -euo pipefail
           cat .github/issue-385-patch/chunk-* | base64 --decode > /tmp/issue385-static.tar.gz
-          tar -tzf /tmp/issue385-static.tar.gz
-          tar -xzf /tmp/issue385-static.tar.gz
-          test -s scripts/generate-capability-status.py
-          test -s docs/capability-status.md
-          test -s docs/schemas/regelsuche-capability-status-v1.schema.json
-          test -s .github/workflows/capability-status.yml
-          test -s .github/issue-385-apply.sh
+          actual="$(sha256sum /tmp/issue385-static.tar.gz | cut -d' ' -f1)"
+          test "$actual" = 4df6ae7792ea05d1d3bcb35c514b8d0e71beac0acc66a093eb017e6e38796f39
+          tar -tzf /tmp/issue385-static.tar.gz > /tmp/issue385-files.txt
+          grep -qx 'scripts/generate-capability-status.py' /tmp/issue385-files.txt
+          grep -qx 'docs/capability-status.md' /tmp/issue385-files.txt
+          grep -qx 'docs/schemas/regelsuche-capability-status-v1.schema.json' /tmp/issue385-files.txt
+          grep -qx '.github/workflows/capability-status.yml' /tmp/issue385-files.txt
+          grep -qx '.github/issue-385-apply.sh' /tmp/issue385-files.txt
 
       - name: Apply and verify capability-status slice
         shell: bash
         run: |
           set -euo pipefail
+          tar -xzf /tmp/issue385-static.tar.gz
           chmod +x .github/issue-385-apply.sh
           .github/issue-385-apply.sh
