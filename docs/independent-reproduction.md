@@ -47,6 +47,14 @@ bundle archives. The archive itself always uses the fixed top-level directory
 
 ## Execute on separate infrastructure
 
+The host requires Bash, Python 3.11 or newer, `jsonschema==4.25.1` and Docker
+24 or newer. Install the pinned validator before verifying or executing the
+bundle:
+
+```bash
+python3 -m pip install jsonschema==4.25.1
+```
+
 Extract the archive without modifying it and run:
 
 ```bash
