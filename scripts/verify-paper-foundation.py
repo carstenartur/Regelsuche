@@ -36,6 +36,19 @@ def load_unique(path: Path) -> Any:
         return json.load(handle, object_pairs_hook=pairs)
 
 
+def resolve_paper_source(root: Path, value: str) -> Path:
+    relative = Path(value)
+    if relative.is_absolute() or not relative.parts:
+        raise SystemExit(f"paper source path is not relative: {value}")
+    if relative.parts[0] != "paper" or ".." in relative.parts:
+        raise SystemExit(f"paper source escapes paper/: {value}")
+    paper_root = (root / "paper").resolve()
+    resolved = (root / relative).resolve()
+    if resolved.parent != paper_root and paper_root not in resolved.parents:
+        raise SystemExit(f"paper source escapes paper/: {value}")
+    return resolved
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
@@ -57,13 +70,22 @@ def main() -> None:
     Draft202012Validator.check_schema(schema)
     Draft202012Validator(schema).validate(manifest)
 
+    evidence_issues = [item["issue"] for item in manifest["requiredEvidence"]]
+    if len(set(evidence_issues)) != len(evidence_issues):
+        raise SystemExit("requiredEvidence contains duplicate issue ids")
+
+    listed_paths: set[str] = set()
     for item in manifest["files"]:
-        path = root / item["path"]
+        value = item["path"]
+        if value in listed_paths:
+            raise SystemExit(f"paper source path appears more than once: {value}")
+        listed_paths.add(value)
+        path = resolve_paper_source(root, value)
         if not path.is_file():
-            raise SystemExit(f"missing paper source: {item['path']}")
+            raise SystemExit(f"missing paper source: {value}")
         actual = sha256_bytes(path.read_bytes())
         if actual != item["sha256"]:
-            raise SystemExit(f"paper source hash mismatch: {item['path']}")
+            raise SystemExit(f"paper source hash mismatch: {value}")
 
     without_hash = dict(manifest)
     without_hash.pop("contentHash")
@@ -71,9 +93,15 @@ def main() -> None:
     if expected != manifest["contentHash"]:
         raise SystemExit("paper artifact manifest contentHash mismatch")
 
-    claims = (root / manifest["claimRegistry"]).read_text(encoding="utf-8")
-    limitations = (root / manifest["limitations"]).read_text(encoding="utf-8")
-    manuscript = (root / manifest["manuscript"]).read_text(encoding="utf-8")
+    claims = resolve_paper_source(root, manifest["claimRegistry"]).read_text(
+        encoding="utf-8"
+    )
+    limitations = resolve_paper_source(root, manifest["limitations"]).read_text(
+        encoding="utf-8"
+    )
+    manuscript = resolve_paper_source(root, manifest["manuscript"]).read_text(
+        encoding="utf-8"
+    )
 
     required_tokens = [
         "PENDING_383",
@@ -100,9 +128,7 @@ def main() -> None:
         "schema": "regelsuche.paper-foundation-verification/v1",
         "manifestHash": manifest["contentHash"],
         "status": manifest["status"],
-        "requiredEvidenceIssues": sorted(
-            item["issue"] for item in manifest["requiredEvidence"]
-        ),
+        "requiredEvidenceIssues": sorted(evidence_issues),
         "centralClaimsPending": True,
         "externalNoveltyAuthorized": False,
     }
