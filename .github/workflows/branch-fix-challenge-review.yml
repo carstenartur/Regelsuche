@@ -5,6 +5,10 @@ on:
     branches: [ "issue-390-challenge-portfolio" ]
     paths:
       - '.github/workflows/branch-fix-challenge-review.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/branch-fix-challenge-review.yml'
   workflow_dispatch:
 
 permissions:
@@ -12,7 +16,6 @@ permissions:
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -122,21 +125,20 @@ jobs:
           from pathlib import Path
           from jsonschema import Draft202012Validator
 
-          schemas = [
-              Path('docs/schemas/regelsuche-discovery-challenge-plan-source-v1.schema.json'),
-              Path('docs/schemas/regelsuche-discovery-challenge-artifact-v1.schema.json'),
-          ]
-          loaded = []
-          for path in schemas:
-              schema = json.loads(path.read_text(encoding='utf-8'))
-              Draft202012Validator.check_schema(schema)
-              loaded.append(schema)
-          source = json.loads(
-              Path('research/challenges/challenge-plan-source.json').read_text(encoding='utf-8')
-          )
-          Draft202012Validator(loaded[0]).validate(source)
+          source_schema = json.loads(Path(
+              'docs/schemas/regelsuche-discovery-challenge-plan-source-v1.schema.json'
+          ).read_text(encoding='utf-8'))
+          artifact_schema = json.loads(Path(
+              'docs/schemas/regelsuche-discovery-challenge-artifact-v1.schema.json'
+          ).read_text(encoding='utf-8'))
+          Draft202012Validator.check_schema(source_schema)
+          Draft202012Validator.check_schema(artifact_schema)
+          source = json.loads(Path(
+              'research/challenges/challenge-plan-source.json'
+          ).read_text(encoding='utf-8'))
+          Draft202012Validator(source_schema).validate(source)
           for path in sorted(Path('research/challenges/generated').glob('*.json')):
-              Draft202012Validator(loaded[1]).validate(
+              Draft202012Validator(artifact_schema).validate(
                   json.loads(path.read_text(encoding='utf-8'))
               )
           PY
