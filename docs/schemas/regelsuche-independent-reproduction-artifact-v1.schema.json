@@ -1,0 +1,356 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.independent-reproduction-artifact/v1",
+  "title": "Regelsuche independent reproduction artifact manifest v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "artifactId",
+    "artifactStatus",
+    "claimPolicy",
+    "source",
+    "declaredEnvironment",
+    "backendIdentities",
+    "inputIdentities",
+    "expectedEvidence",
+    "portabilityPolicy",
+    "commands",
+    "schemas",
+    "metadata",
+    "files",
+    "externalAttestationStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.independent-reproduction-artifact/v1"},
+    "artifactId": {"$ref": "#/$defs/identifier"},
+    "artifactStatus": {
+      "enum": [
+        "DEVELOPMENT_READY_FOR_INDEPENDENT_EXECUTION",
+        "FROZEN_PUBLIC_RELEASE"
+      ]
+    },
+    "claimPolicy": {"const": "REPRODUCTION_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"},
+    "source": {
+      "type": "object",
+      "required": [
+        "repository",
+        "revision",
+        "releaseTag",
+        "releaseTagStatus",
+        "archivePath",
+        "archiveSha256"
+      ],
+      "properties": {
+        "repository": {"const": "carstenartur/Regelsuche"},
+        "revision": {"$ref": "#/$defs/revision"},
+        "releaseTag": {"$ref": "#/$defs/releaseTag"},
+        "releaseTagStatus": {
+          "enum": ["DEVELOPMENT_REVISION", "PUBLISHED"]
+        },
+        "archivePath": {"const": "source/regelsuche-source.tar.gz"},
+        "archiveSha256": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "declaredEnvironment": {
+      "type": "object",
+      "required": [
+        "javaImage",
+        "javaImageIndexDigest",
+        "gradleDistribution",
+        "gradleDistributionUrl",
+        "gradleDistributionSha256",
+        "operatingSystem",
+        "architecture",
+        "containerDefinitionPath",
+        "containerDefinitionSha256",
+        "containerTarget",
+        "runtimeUser",
+        "evaluatedRunNetworkPolicy",
+        "buildNetworkPolicy",
+        "containerImagePolicy",
+        "launcherRequirements"
+      ],
+      "properties": {
+        "javaImage": {
+          "const": "eclipse-temurin:21.0.11_10-jdk-noble@sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080"
+        },
+        "javaImageIndexDigest": {
+          "const": "sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080"
+        },
+        "gradleDistribution": {"const": "gradle-9.5.1-bin.zip"},
+        "gradleDistributionUrl": {
+          "const": "https://services.gradle.org/distributions/gradle-9.5.1-bin.zip"
+        },
+        "gradleDistributionSha256": {
+          "const": "bafc141b619ad6350fd975fc903156dd5c151998cc8b058e8c1044ab5f7b031f"
+        },
+        "operatingSystem": {"const": "ubuntu-24.04-noble-container"},
+        "architecture": {"enum": ["linux/amd64", "linux/arm64"]},
+        "containerDefinitionPath": {"const": "environment/Dockerfile.reproduction"},
+        "containerDefinitionSha256": {"$ref": "#/$defs/sha256"},
+        "containerTarget": {"const": "independent-reproduction"},
+        "runtimeUser": {"const": "reproducer:10001"},
+        "evaluatedRunNetworkPolicy": {"const": "DISABLED"},
+        "buildNetworkPolicy": {"const": "DEPENDENCY_RESOLUTION_ONLY"},
+        "containerImagePolicy": {"const": "BUILD_FROM_DIGEST_PINNED_DEFINITION"},
+        "launcherRequirements": {
+          "type": "object",
+          "required": ["python", "docker", "shell"],
+          "properties": {
+            "python": {"const": ">=3.11"},
+            "docker": {"const": ">=24"},
+            "shell": {"const": "bash"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "backendIdentities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {"$ref": "#/$defs/backendIdentity"}
+    },
+    "inputIdentities": {
+      "type": "object",
+      "required": [
+        "resultCardHash",
+        "runIdentity",
+        "researchBriefHash",
+        "inventoryHash",
+        "modelHash",
+        "candidateLineageHash",
+        "qualificationSuiteRevision",
+        "qualificationSuiteHash",
+        "qualificationSplitHash"
+      ],
+      "properties": {
+        "resultCardHash": {"$ref": "#/$defs/sha256"},
+        "runIdentity": {"$ref": "#/$defs/sha256"},
+        "researchBriefHash": {"$ref": "#/$defs/sha256"},
+        "inventoryHash": {"$ref": "#/$defs/sha256"},
+        "modelHash": {"$ref": "#/$defs/sha256"},
+        "candidateLineageHash": {"$ref": "#/$defs/sha256"},
+        "qualificationSuiteRevision": {"$ref": "#/$defs/nonBlank"},
+        "qualificationSuiteHash": {"$ref": "#/$defs/sha256"},
+        "qualificationSplitHash": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "expectedEvidence": {
+      "type": "object",
+      "required": [
+        "semanticRoots",
+        "requiredStatuses",
+        "claimBanner",
+        "exactByteRoot"
+      ],
+      "properties": {
+        "semanticRoots": {
+          "type": "object",
+          "minProperties": 10,
+          "additionalProperties": {"$ref": "#/$defs/sha256"}
+        },
+        "requiredStatuses": {
+          "type": "object",
+          "required": [
+            "autonomyClaimAuthorized",
+            "qualificationQualified",
+            "targetAccess",
+            "externalNoveltyStatus",
+            "promotionStatus",
+            "publicEvidenceStatus",
+            "correctnessRegressionCount"
+          ],
+          "properties": {
+            "autonomyClaimAuthorized": {"const": true},
+            "qualificationQualified": {"const": true},
+            "targetAccess": {"const": "ABSENT"},
+            "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+            "promotionStatus": {"const": "NOT_EVALUATED"},
+            "publicEvidenceStatus": {"const": "NOT_EVALUATED"},
+            "correctnessRegressionCount": {"const": 0}
+          },
+          "additionalProperties": false
+        },
+        "claimBanner": {"const": "NO EXTERNAL NOVELTY CLAIM"},
+        "exactByteRoot": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    },
+    "portabilityPolicy": {
+      "type": "object",
+      "required": [
+        "levels",
+        "exactBytePaths",
+        "semanticOnlyMetadata",
+        "unexpectedArtifactDisposition",
+        "correctionDisposition"
+      ],
+      "properties": {
+        "levels": {
+          "const": [
+            "EXACT_BYTE_REPRODUCED",
+            "SEMANTICALLY_REPRODUCED",
+            "NOT_REPRODUCED"
+          ]
+        },
+        "exactBytePaths": {
+          "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/expectedPath"}
+        },
+        "semanticOnlyMetadata": {
+          "const": [
+            "receipt.executionStartedAt",
+            "receipt.executionFinishedAt",
+            "receipt.environmentDiagnostics",
+            "receipt.containerImageId"
+          ]
+        },
+        "unexpectedArtifactDisposition": {"const": "RETAIN_AND_REPORT"},
+        "correctionDisposition": {"const": "NEW_IMMUTABLE_ARTIFACT_IDENTITY"}
+      },
+      "additionalProperties": false
+    },
+    "commands": {
+      "type": "object",
+      "required": ["verifyArtifact", "reproduce", "verifyReceipt"],
+      "properties": {
+        "verifyArtifact": {
+          "const": "python3 scripts/verify-independent-reproduction.py verify-artifact --root ."
+        },
+        "reproduce": {
+          "const": "./reproduce.sh --output /path/to/output --environment-id anonymous-independent-run"
+        },
+        "verifyReceipt": {
+          "const": "python3 scripts/verify-independent-reproduction.py verify-receipt --root . --receipt /path/to/receipt.json"
+        }
+      },
+      "additionalProperties": false
+    },
+    "schemas": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/fileReference"}
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["license", "citation", "codemeta", "instructions"],
+      "properties": {
+        "license": {"$ref": "#/$defs/fileReference"},
+        "citation": {"$ref": "#/$defs/fileReference"},
+        "codemeta": {"$ref": "#/$defs/fileReference"},
+        "instructions": {"$ref": "#/$defs/fileReference"}
+      },
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "array",
+      "minItems": 20,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/fileReference"}
+    },
+    "externalAttestationStatus": {"const": "NOT_COLLECTED"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "releaseTagStatus": {"const": "PUBLISHED"}
+            },
+            "required": ["releaseTagStatus"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "artifactStatus": {"const": "FROZEN_PUBLIC_RELEASE"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "properties": {
+              "releaseTagStatus": {"const": "DEVELOPMENT_REVISION"}
+            },
+            "required": ["releaseTagStatus"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "artifactStatus": {"const": "DEVELOPMENT_READY_FOR_INDEPENDENT_EXECUTION"}
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{1,191}$"
+    },
+    "releaseTag": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,190}$"
+    },
+    "nonBlank": {"type": "string", "minLength": 1},
+    "bundlePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+    },
+    "expectedPath": {
+      "type": "string",
+      "pattern": "^expected/(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+    },
+    "fileReference": {
+      "type": "object",
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": {"$ref": "#/$defs/bundlePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "backendIdentity": {
+      "type": "object",
+      "required": [
+        "backendId",
+        "backendVersion",
+        "status",
+        "translationStatus",
+        "resultHash",
+        "invocationHash"
+      ],
+      "properties": {
+        "backendId": {"$ref": "#/$defs/nonBlank"},
+        "backendVersion": {"$ref": "#/$defs/nonBlank"},
+        "status": {"const": "CONFIRMED"},
+        "translationStatus": {"const": "LOSSLESS"},
+        "resultHash": {"$ref": "#/$defs/sha256"},
+        "invocationHash": {"$ref": "#/$defs/sha256"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

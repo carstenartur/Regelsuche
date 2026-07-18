@@ -1,0 +1,24 @@
+FROM eclipse-temurin:21.0.11_10-jdk-noble@sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080 AS build
+WORKDIR /workspace
+
+COPY source/regelsuche-source.tar.gz /tmp/regelsuche-source.tar.gz
+RUN tar -xzf /tmp/regelsuche-source.tar.gz --strip-components=1 \
+    && rm /tmp/regelsuche-source.tar.gz \
+    && chmod +x ./gradlew \
+    && ./gradlew --no-daemon :regelsuche-release:classes --console=plain
+
+FROM build AS independent-reproduction
+ARG REGELSUCHE_REPOSITORY_REVISION
+ENV REGELSUCHE_REPOSITORY_REVISION=${REGELSUCHE_REPOSITORY_REVISION} \
+    GRADLE_USER_HOME=/home/reproducer/.gradle \
+    HOME=/home/reproducer
+
+RUN useradd --create-home --uid 10001 reproducer \
+    && mkdir -p /out \
+    && cp -a /root/.gradle /home/reproducer/.gradle \
+    && find /home/reproducer/.gradle -type f -name '*.lock' -delete \
+    && chown -R reproducer:reproducer /workspace /out /home/reproducer
+
+USER reproducer
+VOLUME ["/out"]
+ENTRYPOINT ["./gradlew", "--no-daemon", "--offline", ":regelsuche-release:runAutonomousDiscoveryWalkthrough", "-PwalkthroughOutput=/out", "--rerun-tasks", "--console=plain"]

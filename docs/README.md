@@ -19,6 +19,7 @@
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
 - [Demo Gallery](demo-gallery.md) — reproduzierbare UI- und Replay-Beispiele.
 - [Autonomous Discovery Result Card](autonomous-discovery-walkthrough.md) — Ein-Kommando-Walkthrough mit hashgebundener JSON-/Markdown-Karte und generierten Evidence-SVGs.
+- [Unabhängiges Reproduktionsartefakt](independent-reproduction.md) — deterministisches Quell-/Container-Bundle, exakte und semantische Vergleiche sowie kanonische Reproduction Receipts.
 
 ## Erweiterungen
 
@@ -48,6 +49,8 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 
 - [Discovery Evidence v1](discovery-evidence-v1.md)
 - [Autonomous-Discovery-Result-Card-Schema v1](schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json)
+- [Independent-Reproduction-Artifact-Schema v1](schemas/regelsuche-independent-reproduction-artifact-v1.schema.json)
+- [Independent-Reproduction-Receipt-Schema v1](schemas/regelsuche-independent-reproduction-receipt-v1.schema.json)
 - [Aktueller Open-Target-Discovery-Stand](discovery-status.md)
 - [Release Readiness und Kandidatenqualifikation](release-readiness.md)
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md)
