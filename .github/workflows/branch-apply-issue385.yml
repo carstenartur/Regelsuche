@@ -8,6 +8,10 @@ on:
       - '.github/issue-385-patch/**'
   workflow_dispatch:
 
+concurrency:
+  group: apply-capability-status-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -44,6 +48,17 @@ jobs:
           grep -qx 'docs/schemas/regelsuche-capability-status-v1.schema.json' /tmp/issue385-files.txt
           grep -qx '.github/workflows/capability-status.yml' /tmp/issue385-files.txt
           grep -qx '.github/issue-385-apply.sh' /tmp/issue385-files.txt
+
+      - name: Retain bootstrap-start evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > .github/issue-385-patch/bootstrap-started
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/issue-385-patch/bootstrap-started
+          git commit -m 'chore(ci): mark capability bootstrap [skip ci]'
+          git push origin HEAD:issue-385-capability-status
 
       - name: Apply and verify capability-status slice
         shell: bash
