@@ -31,12 +31,12 @@ jobs:
         run: python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
 
       - name: Verify paper foundation
-        run: ./paper/reproduce-paper.sh
+        run: bash paper/reproduce-paper.sh
 
       - name: Require deterministic generated summaries
         run: |
           cp -a paper/generated /tmp/paper-generated-first
-          ./paper/reproduce-paper.sh
+          bash paper/reproduce-paper.sh
           diff -ru /tmp/paper-generated-first paper/generated
 
       - name: Reject premature empirical claims
