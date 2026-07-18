@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.paper-artifact-manifest/v1",
+  "title": "Regelsuche paper artifact manifest v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "paperIssue",
+    "primaryResearchQuestion",
+    "manuscript",
+    "claimRegistry",
+    "limitations",
+    "artifactAppendix",
+    "requiredEvidence",
+    "files",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.paper-artifact-manifest/v1"},
+    "status": {"const": "FOUNDATION"},
+    "paperIssue": {"const": 388},
+    "primaryResearchQuestion": {"type": "string", "minLength": 1},
+    "manuscript": {"const": "paper/manuscript.md"},
+    "claimRegistry": {"const": "paper/claims-and-evidence.md"},
+    "limitations": {"const": "paper/limitations.md"},
+    "artifactAppendix": {"const": "paper/artifact-appendix.md"},
+    "requiredEvidence": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["issue", "purpose", "status"],
+        "properties": {
+          "issue": {"type": "integer", "minimum": 1},
+          "purpose": {"type": "string", "minLength": 1},
+          "status": {"enum": ["PENDING", "OPTIONAL"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "pattern": "^paper/[A-Za-z0-9._/-]+$"},
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "contentHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}
