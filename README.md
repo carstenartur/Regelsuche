@@ -17,6 +17,7 @@
 **Navigation:** [Demo Gallery](docs/demo-gallery.md) ·
 [Discovery Engine](docs/discovery-engine.md) ·
 [Discovery Evidence v1](docs/discovery-evidence-v1.md) ·
+[Capability status](docs/generated/capability-status.md) ·
 [Macro Rules](docs/macro-rules.md) ·
 [Erweiterungssystem](docs/extension-system.md)
 
@@ -57,9 +58,30 @@ This is what makes systematic search possible even inside very large or infinite
 
 Regelsuche can also expand its own stock of transformations. If the system repeatedly discovers that a sequence of smaller transformations leads to useful simplifications, that sequence can become a higher-level transformation strategy.
 
-The nested sequence of recognized and applied transformations forms a proof of the complete transformation.
+The nested sequence of recognized and applied transformations is a reproducible derivation trace. It is reported as a formal proof only when an independent prover returns the required proof evidence.
 
 The long-term vision is that mathematical discovery becomes less dependent on isolated intuition and more the result of systematic exploration: the system searches the game tree of possible transformations, identifies useful paths, reuses successful strategies, and turns repeated discoveries into new rules.
+
+<!-- capability-status:start -->
+## Verifizierter Capability- und Claim-Status
+
+Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Verträgen erzeugt. Die vollständige Matrix mit Evidence-Roots steht in [`capability-status.md`](docs/generated/capability-status.md).
+
+| Capability | Status |
+|---|---|
+| `AUTONOMOUS_CAMPAIGN` | `QUALIFIED` |
+| `DOMAIN_GENERIC_DISCOVERY` | `QUALIFIED` |
+| `EXTERNAL_NOVELTY_REVIEW` | `BLOCKED` |
+| `FORMAL_PROOF_OF_RETAINED_CANDIDATE` | `NOT_EVALUATED` |
+| `PLUGIN_ARTIFACT_TRUST` | `IMPLEMENTED` |
+| `PLUGIN_INDEX_AUTHENTICATION` | `IMPLEMENTED` |
+| `PLUGIN_TRUST_STATE_REVISIONS` | `IMPLEMENTED` |
+| `PROMOTION` | `NOT_EVALUATED` |
+| `PUBLIC_EVIDENCE` | `NOT_EVALUATED` |
+| `PUBLIC_PLUGIN_DISTRIBUTION` | `BLOCKED` |
+
+`QUALIFIED` autorisiert nur den jeweils benannten Claim. Externe mathematische Neuheit, formaler Beweis, Promotion und Public Evidence werden nicht aus einem anderen erfolgreichen Profil abgeleitet.
+<!-- capability-status:end -->
 
 ## Discovery evidence
 
@@ -198,8 +220,10 @@ Regelsuche kann auf mehreren Ebenen erweitert werden:
 
 Diese Wege haben unterschiedliche Vertrauens- und Qualitätsgrenzen. Insbesondere
 ist nicht jede interne Discovery- oder Solver-Registry automatisch ein externer
-Plugin-JAR-Endpunkt, und vorhandene Signaturmetadaten werden derzeit noch nicht
-kryptografisch verifiziert.
+Plugin-JAR-Endpunkt. Lokale Plugin-Artefakte, unveränderliche Indexrevisionen
+und Trust-State-Revisionen können kryptografisch geprüft werden. Ein gehosteter
+Katalog sowie Download, Installation, Update, Entfernung und Rollback bleiben
+davon getrennte, noch nicht qualifizierte Capabilities.
 
 👉 **[Erweiterungssystem und Auswahlhilfe](docs/extension-system.md)** ·
 [Plugins](docs/plugins.md) ·

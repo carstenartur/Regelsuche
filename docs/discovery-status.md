@@ -1,8 +1,29 @@
 # Aktueller Discovery-Stand
 
-Stand: 16. Juli 2026
+Stand: 18. Juli 2026
 
 Diese Seite fasst den gemessenen Forschungsstand von Regelsuche zusammen. Sie trennt technische Suchverbesserungen, Rediscovery, projektinterne Open-Target-Hypothesen, den internen Autonomie-Claim und mögliche externe mathematische Neuheit.
+
+<!-- capability-status:start -->
+## Maschinengebundener Capability-Status
+
+Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Verträgen erzeugt. Die vollständige Matrix mit Evidence-Roots steht in [`capability-status.md`](generated/capability-status.md).
+
+| Capability | Status |
+|---|---|
+| `AUTONOMOUS_CAMPAIGN` | `QUALIFIED` |
+| `DOMAIN_GENERIC_DISCOVERY` | `QUALIFIED` |
+| `EXTERNAL_NOVELTY_REVIEW` | `BLOCKED` |
+| `FORMAL_PROOF_OF_RETAINED_CANDIDATE` | `NOT_EVALUATED` |
+| `PLUGIN_ARTIFACT_TRUST` | `IMPLEMENTED` |
+| `PLUGIN_INDEX_AUTHENTICATION` | `IMPLEMENTED` |
+| `PLUGIN_TRUST_STATE_REVISIONS` | `IMPLEMENTED` |
+| `PROMOTION` | `NOT_EVALUATED` |
+| `PUBLIC_EVIDENCE` | `NOT_EVALUATED` |
+| `PUBLIC_PLUGIN_DISTRIBUTION` | `BLOCKED` |
+
+`QUALIFIED` autorisiert nur den jeweils benannten Claim. Externe mathematische Neuheit, formaler Beweis, Promotion und Public Evidence werden nicht aus einem anderen erfolgreichen Profil abgeleitet.
+<!-- capability-status:end -->
 
 ## Kurzfassung
 
@@ -35,6 +56,7 @@ Das maschinengeprüfte Profil `AUTONOMOUS_CAMPAIGN` ist damit für den algebrais
 | Production Campaign (#348) | Zwei Seed-Familien, 12 Observations, Aggregate Mining, exakte Lineage, Zero-output-Reject, Validation, Counterexample Search, Projekt-Novelty, Proof, Lifecycle, Feedback und vollständiges Manifest | Die gesamte targetfreie Discovery-Kette läuft unattended und reproduzierbar | Keine externe mathematische Novelty |
 | Releasequalifikation (#359) | 12 positive und 12 negative Fälle vollständig ausgeführt; ein vollständig zurückgehaltener Strukturcluster; keine Split-Kollision, kein mandatory skip, keine Refutation, kein surviving counterexample; positive Paired Utility ohne Regression | Derselbe retained Produktionskandidat erfüllt die drei zusätzlichen Release-Achsen | Die Mindestgröße 12/12 ist kein universeller Wahrheitsmaßstab |
 | Release-Gate (#226) | `SEARCH_REPRODUCIBILITY`, `HIDDEN_RULE_REDISCOVERY`, `OPEN_TARGET_DISCOVERY` und `AUTONOMOUS_CAMPAIGN` sind `READY`; `EXTERNAL_NOVELTY_REVIEW` bleibt `BLOCKED` | Der interne algebraische Autonomie-Claim ist maschinenautorisiert | Keine Public-Evidence- oder weltweite Neuheitsbehauptung |
+| Domain-generic Qualification (#381) | Expression-Rewrite und endliche Differenzen durchlaufen drei identische, manifestgebundene Mehrdomänen-Läufe | Ein separates Profile qualifiziert Generation, Suche, Validierung und Evidence über verschiedene mathematische Objekttypen | Keine Erweiterung von `AUTONOMOUS_CAMPAIGN`, keine externe Novelty und kein formaler Beweis |
 
 ## Retained Produktionskandidat
 
@@ -112,16 +134,17 @@ Die vollständigen Artefakte, JSON-Schemas und Docker-Schritte sind in [Release 
 
 ## Nächste Forschungs- und Architekturarbeit
 
-Nach Abschluss von #359 und #226 sind die nächsten sinnvollen Arbeitsblöcke voneinander unabhängig:
+Das Discovery-Epic #102 ist für den internen algebraischen 0.2-Claim abgeschlossen. Die nächsten Arbeiten sind getrennte Folgeprogramme:
 
-1. **#235 – Vergleichsbenchmarks:** faire Baselines pro Capability und Informationsregime, statt eines irreführenden Gesamt-Leaderboards.
-2. **#233/#234 – Solver-neutrale IR und Portfolio:** versionierte Obligations, Capability Matching, Backend-Auswahl und getrennte Such-/Validation-/Proof-Ergebnisse.
-3. **#224 – Domain-generische Discovery:** Expression Rewrites als erste Implementierung einer allgemeinen `DiscoveryDomain` und anschließend eine zweite Objektklasse.
-4. **#220 – Evolutionäre Operatorsuche:** erst mit strikt getrennten Generation-, Validation- und finalen TEST-Splits.
-5. **#332 – unabhängige Interestingness-Evaluation:** blinde Expert Reviews realer Kandidaten ohne Rückkopplung in Formation oder Calibration/TEST-Leakage.
-6. **#104 – öffentliches Plugin-Ökosystem:** veröffentlichter Index, Distribution, Kompatibilitätsmatrix und Supply-Chain-Policy.
-
-Das übergeordnete Epic #102 bleibt offen, weil autonome mathematische Discovery ein fortlaufendes Forschungsprogramm und kein einzelner Infrastruktur-PR ist.
+1. **#385 – Claim-/Dokumentations-Synchronisation:** öffentliche Statusaussagen ausschließlich aus autoritativer Evidence erzeugen und widersprüchliche Formulierungen in CI blockieren.
+2. **#390 und #383 – Challenge-Portfolio und candidate-unabhängiger Benchmark:** Problemklassen, Splits, Budgets und Auswertung vor den betrachteten Campaigns einfrieren.
+3. **#235 – Vergleichsbaselines und Ablationen:** informationsparitäre Open-Target-, Transfer- und Controller-Vergleiche ohne universelles Leaderboard.
+4. **#384 – End-to-End-Kosten und Amortisation:** Discovery- und Qualification-Kosten gegen den Nutzen auf einem vorab eingefrorenen Aufgabenstrom bilanzieren.
+5. **#386 und #387 – Walkthrough und unabhängige Reproduktion:** Evidence-basierte Result Card sowie ein extern ausführbares, unveränderliches Reproduktionsartefakt.
+6. **#388 – Methodenpaper:** Claims, Tabellen und Abbildungen aus den kanonischen Benchmark- und Reproduktionsartefakten erzeugen.
+7. **#332/#389 und #391 – externe Bewertung:** reale blinde Interessantheitsreviews beziehungsweise eine getrennte externe mathematische Novelty-Prüfung durchführen.
+8. **#224 und #104 – produktive Integration:** Domain-neutrale Downstream-Flächen und ein reales öffentliches Plugin-Distributionssystem fertigstellen.
+9. **#220 – evolutionäre Suche:** Populationen, Nested Splits und finalen TEST als eigenständigen späteren Forschungsstrang implementieren.
 
 ## Verbindliche wissenschaftliche Grenzen
 

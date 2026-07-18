@@ -1,0 +1,204 @@
+{
+  "schema": "regelsuche.capability-status/v1",
+  "policy": "EVIDENCE_DERIVED_FAIL_CLOSED",
+  "repositoryRevision": "WORKTREE",
+  "sourceEvidence": {
+    "releaseReadinessReportHash": "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+    "releaseReadinessRunHash": "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364",
+    "domainGenericQualificationReportHash": "sha256:40fa29310c8f457ca46cb00da4c94f723d8bb5f57cc53064a1abbf93a826f5aa",
+    "domainGenericQualificationRunHash": "sha256:7ed14645710b106744376191f8a6426a6ed53bcb813f68a92c92810d799f3282"
+  },
+  "capabilities": [
+    {
+      "capability": "AUTONOMOUS_CAMPAIGN",
+      "status": "QUALIFIED",
+      "claim": "autonomous generation, validation and retention of mathematical conjectures",
+      "evidenceRoots": [
+        "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+        "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364"
+      ],
+      "blockers": [],
+      "notes": [
+        "Status is derived from regelsuche.release-readiness-matrix/v1."
+      ]
+    },
+    {
+      "capability": "DOMAIN_GENERIC_DISCOVERY",
+      "status": "QUALIFIED",
+      "claim": "reproducible generation, bounded search, counterexample search, validation, certificate rendering and evidence across distinct mathematical object types",
+      "evidenceRoots": [
+        "sha256:40fa29310c8f457ca46cb00da4c94f723d8bb5f57cc53064a1abbf93a826f5aa",
+        "sha256:7ed14645710b106744376191f8a6426a6ed53bcb813f68a92c92810d799f3282"
+      ],
+      "blockers": [],
+      "notes": [
+        "This separate profile does not broaden AUTONOMOUS_CAMPAIGN.",
+        "Formal proof, external novelty, promotion and public evidence remain NOT_EVALUATED."
+      ]
+    },
+    {
+      "capability": "EXTERNAL_NOVELTY_REVIEW",
+      "status": "BLOCKED",
+      "claim": "externally reviewed mathematical novelty",
+      "evidenceRoots": [
+        "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+        "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364"
+      ],
+      "blockers": [
+        "EXTERNAL_NOVELTY_REVIEWED",
+        "PUBLIC_EVIDENCE_REVIEWED"
+      ],
+      "notes": [
+        "Status is derived from regelsuche.release-readiness-matrix/v1."
+      ]
+    },
+    {
+      "capability": "FORMAL_PROOF_OF_RETAINED_CANDIDATE",
+      "status": "NOT_EVALUATED",
+      "claim": "A formal theorem-prover proof of the retained production candidate.",
+      "evidenceRoots": [
+        "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+        "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364"
+      ],
+      "blockers": [
+        "FORMAL_PROOF_NOT_RETAINED"
+      ],
+      "notes": [
+        "The qualified release retains symbolic verification; that must not be relabeled as formal proof."
+      ]
+    },
+    {
+      "capability": "HIDDEN_RULE_REDISCOVERY",
+      "status": "QUALIFIED",
+      "claim": "rediscovery of withheld known rules without target leakage",
+      "evidenceRoots": [
+        "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+        "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364"
+      ],
+      "blockers": [],
+      "notes": [
+        "Status is derived from regelsuche.release-readiness-matrix/v1."
+      ]
+    },
+    {
+      "capability": "OPEN_TARGET_DISCOVERY",
+      "status": "QUALIFIED",
+      "claim": "formation and validation of an open-target conjecture",
+      "evidenceRoots": [
+        "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+        "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364"
+      ],
+      "blockers": [],
+      "notes": [
+        "Status is derived from regelsuche.release-readiness-matrix/v1."
+      ]
+    },
+    {
+      "capability": "PLUGIN_ARTIFACT_TRUST",
+      "status": "IMPLEMENTED",
+      "claim": "Local detached-signature verification, publisher trust policy and verified-byte staging are implemented.",
+      "evidenceRoots": [
+        "sha256:46a5f9fce2dd01cb99288bb1e31b6c88ac8b9ac0a22ad750f79dd1dc0b9fadb6",
+        "sha256:513128693b36a71172b3608752989478cd2465a8479ef0f0ced5a2f0cd5685e6",
+        "sha256:94b7240608ad8655b62496d13b97c5ff0547023a94993c307ae47e6f52df1655",
+        "sha256:fd1bffe151c49a44bdf1c847dbf9c30057a0e42007fff52f6d54755983fa533e"
+      ],
+      "blockers": [],
+      "notes": [
+        "IMPLEMENTED is a source-contract claim, not a public distribution or installation qualification.",
+        "Required source, schema and dedicated workflow files are hash-bound by this status artifact."
+      ]
+    },
+    {
+      "capability": "PLUGIN_INDEX_AUTHENTICATION",
+      "status": "IMPLEMENTED",
+      "claim": "Immutable local index revisions can be authenticated through curator Ed25519 signatures.",
+      "evidenceRoots": [
+        "sha256:26822da5c0044cbf731de66549ab8c4c9883b48bd3a8828044fc55aa271abbbf",
+        "sha256:43b662afcffd02579d360858a4e9285ae97ed4d187cda9cc1996985ddf41aa57",
+        "sha256:4809f379e96e6477ff45553b6e724ffae251859858a4f8d2decd134059b40e9f",
+        "sha256:4fca027b52f3b67458417052e4fcc08d5d9f475ad86617bf64227bc63749704f"
+      ],
+      "blockers": [],
+      "notes": [
+        "IMPLEMENTED is a source-contract claim, not a public distribution or installation qualification.",
+        "Required source, schema and dedicated workflow files are hash-bound by this status artifact."
+      ]
+    },
+    {
+      "capability": "PLUGIN_TRUST_STATE_REVISIONS",
+      "status": "IMPLEMENTED",
+      "claim": "Hash-chained trust-state revisions implement pinned-authority, replay, gap and fork checks.",
+      "evidenceRoots": [
+        "sha256:02b81e9218b8c5492dbdd1510af0eff0a3807ddc469f6548fbf693aab1abfbeb",
+        "sha256:3e3ddb897f0302afd49814cffa1fc05b429451c6cb30c25c0a5ce3847687537e",
+        "sha256:c5642239068b97d83026b1136442e57d88bec0210b4c5929e3b017c940dd0d5a",
+        "sha256:ee533fe4fef94e9c4f5ec33f7d1c16401b2c637428ff254487225801e9db9849",
+        "sha256:f383b2d8d5bd0440bce62f3d364dd31a24c64234a3ea9a2a8652e0179bf07971"
+      ],
+      "blockers": [],
+      "notes": [
+        "IMPLEMENTED is a source-contract claim, not a public distribution or installation qualification.",
+        "Required source, schema and dedicated workflow files are hash-bound by this status artifact."
+      ]
+    },
+    {
+      "capability": "PROMOTION",
+      "status": "NOT_EVALUATED",
+      "claim": "Promotion of the retained production candidate into active reusable knowledge.",
+      "evidenceRoots": [
+        "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+        "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364"
+      ],
+      "blockers": [
+        "PROMOTION_GATE_NOT_EXECUTED"
+      ],
+      "notes": [
+        "Release qualification does not itself activate or promote the candidate."
+      ]
+    },
+    {
+      "capability": "PUBLIC_EVIDENCE",
+      "status": "NOT_EVALUATED",
+      "claim": "Publication-authorized public evidence for the retained production candidate.",
+      "evidenceRoots": [
+        "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+        "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364"
+      ],
+      "blockers": [
+        "PUBLIC_EVIDENCE_GATE_NOT_EXECUTED"
+      ],
+      "notes": [
+        "A qualified internal autonomy claim is not a public novelty claim."
+      ]
+    },
+    {
+      "capability": "PUBLIC_PLUGIN_DISTRIBUTION",
+      "status": "BLOCKED",
+      "claim": "Hosted discovery, authenticated transport, download, installation, update, removal and rollback of published extensions.",
+      "evidenceRoots": [],
+      "blockers": [
+        "DOWNLOAD_INSTALL_UPDATE_REMOVE_ROLLBACK_NOT_BOUND",
+        "HOSTED_OR_FEDERATED_INDEX_NOT_BOUND",
+        "PUBLIC_PUBLISHING_AND_INCIDENT_PROCESS_NOT_BOUND"
+      ],
+      "notes": [
+        "Local cryptographic verification is implemented, but the end-to-end public ecosystem tracked in issue #104 is incomplete."
+      ]
+    },
+    {
+      "capability": "SEARCH_REPRODUCIBILITY",
+      "status": "QUALIFIED",
+      "claim": "reproducible target-free search under pinned inputs",
+      "evidenceRoots": [
+        "sha256:19315d071fbb20a64619bb63034f9928dd22e5ee138994fd71c010ab542a3e0c",
+        "sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364"
+      ],
+      "blockers": [],
+      "notes": [
+        "Status is derived from regelsuche.release-readiness-matrix/v1."
+      ]
+    }
+  ],
+  "contentHash": "sha256:66052c479ea87469c470543daf31de2e93242b9e2469ab21533985905916d9ed"
+}
