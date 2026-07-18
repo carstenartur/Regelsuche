@@ -39,25 +39,25 @@ jobs:
     - name: Install Playwright host dependencies
       run: ./gradlew :app:installPlaywrightHostDependencies --console=plain
 
-    - name: Build and run the complete Gradle test lifecycle
+    - name: Run the complete Gradle test lifecycle
       shell: bash
       run: |
         mkdir -p build/reports/ci
         set -o pipefail
-        ./gradlew test build --console=plain 2>&1 | tee build/reports/ci/gradle-build.log
+        ./gradlew test --console=plain 2>&1 | tee build/reports/ci/gradle-test.log
 
     - name: Upload Gradle diagnostics
       if: always()
       uses: actions/upload-artifact@v7
       with:
-        name: gradle-build-diagnostics
+        name: gradle-test-diagnostics
         path: |
-          build/reports/ci/gradle-build.log
+          build/reports/ci/gradle-test.log
           **/build/reports/tests/**
           **/build/test-results/**
         if-no-files-found: warn
 
-    - name: Require hidden-rule pilot evidence after a successful build
+    - name: Require hidden-rule pilot evidence after a successful test run
       if: success()
       shell: bash
       run: |
@@ -72,7 +72,7 @@ jobs:
         path: app/build/reports/hidden-rule-pilot/**
         if-no-files-found: warn
 
-    - name: Require held-out policy evidence after a successful build
+    - name: Require held-out policy evidence after a successful test run
       if: success()
       shell: bash
       run: |
@@ -87,7 +87,7 @@ jobs:
         path: app/build/reports/held-out-policy/**
         if-no-files-found: warn
 
-    - name: Require held-out descriptor-policy evidence after a successful build
+    - name: Require held-out descriptor-policy evidence after a successful test run
       if: success()
       shell: bash
       run: |
@@ -102,7 +102,7 @@ jobs:
         path: app/build/reports/held-out-descriptor-policy/**
         if-no-files-found: warn
 
-    - name: Require open-target conjecture evidence after a successful build
+    - name: Require open-target conjecture evidence after a successful test run
       if: success()
       shell: bash
       run: test -s regelsuche-learning/build/reports/open-target-conjecture-mining/report.json
@@ -115,7 +115,7 @@ jobs:
         path: regelsuche-learning/build/reports/open-target-conjecture-mining/**
         if-no-files-found: warn
 
-    - name: Require cross-family bridge transfer evidence after a successful build
+    - name: Require cross-family bridge transfer evidence after a successful test run
       if: success()
       shell: bash
       run: |
@@ -130,7 +130,7 @@ jobs:
         path: regelsuche-learning/build/reports/cross-family-bridge-transfer/**
         if-no-files-found: warn
 
-    - name: Require cross-family bridge qualification evidence after a successful build
+    - name: Require cross-family bridge qualification evidence after a successful test run
       if: success()
       shell: bash
       run: |
