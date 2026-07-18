@@ -57,23 +57,52 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
     verify-artifact --root "${ROOT}"
 fi
 
-OUTPUT="$(python3 - "${OUTPUT}" <<'PY'
+OUTPUT="$(python3 - "${ROOT}" "${OUTPUT}" <<'PY'
 from pathlib import Path
+import shutil
 import sys
-print(Path(sys.argv[1]).expanduser().resolve())
+
+root = Path(sys.argv[1]).resolve()
+raw_output = Path(sys.argv[2]).expanduser()
+if raw_output.exists() and raw_output.is_symlink():
+    raise SystemExit("output directory must not be a symbolic link")
+out = raw_output.resolve()
+home = Path.home().resolve()
+filesystem_root = Path(out.anchor)
+if (
+    out == filesystem_root
+    or out == home
+    or out == root
+    or root in out.parents
+    or out in root.parents
+):
+    raise SystemExit(
+        "output directory must be separate from filesystem root, home and artifact root"
+    )
+marker = out / ".regelsuche-independent-reproduction-output"
+if out.exists():
+    if not out.is_dir():
+        raise SystemExit("output path must be a directory")
+    entries = list(out.iterdir())
+    if entries and not marker.is_file():
+        raise SystemExit(
+            "refusing to replace a non-empty output directory without the reproduction marker"
+        )
+    for child in entries:
+        if child.is_symlink() or child.is_file():
+            child.unlink()
+        else:
+            shutil.rmtree(child)
+else:
+    out.mkdir(parents=True)
+marker.write_text(
+    "regelsuche.independent-reproduction-output/v1\n",
+    encoding="utf-8",
+)
+print(out)
 PY
 )"
 
-python3 - "${ROOT}" "${OUTPUT}" <<'PY'
-from pathlib import Path
-import sys
-root = Path(sys.argv[1]).resolve()
-out = Path(sys.argv[2]).resolve()
-if out == root or root in out.parents:
-    raise SystemExit("output directory must be outside the immutable artifact root")
-PY
-
-rm -rf "${OUTPUT}"
 mkdir -p "${OUTPUT}/observed" "${OUTPUT}/logs"
 chmod 0777 "${OUTPUT}/observed"
 STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
