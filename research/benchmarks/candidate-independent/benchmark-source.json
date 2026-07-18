@@ -1,0 +1,40 @@
+{
+  "benchmarkId": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1",
+  "budgets": {
+    "campaignsPerChallenge": 4,
+    "maxCandidateEvaluations": 600,
+    "maxProofAttempts": 100,
+    "maxStatesPerCampaign": 3000
+  },
+  "cases": [
+    {"caseId":"case-01","challengeId":"rational-assumption-rewrites","structuralCluster":"train-linear-denominator","split":"TRAIN","formationVisible":true,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-02","challengeId":"rational-assumption-rewrites","structuralCluster":"train-affine-shift","split":"TRAIN","formationVisible":true,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-03","challengeId":"rational-assumption-rewrites","structuralCluster":"validation-quadratic-denominator","split":"VALIDATION","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-04","challengeId":"rational-assumption-rewrites","structuralCluster":"validation-partial-fraction","split":"VALIDATION","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-05","challengeId":"rational-assumption-rewrites","structuralCluster":"test-nested-denominator","split":"TEST","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-06","challengeId":"rational-assumption-rewrites","structuralCluster":"test-parameterized-pole","split":"TEST","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-07","challengeId":"finite-difference-recurrences","structuralCluster":"train-polynomial-difference","split":"TRAIN","formationVisible":true,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-08","challengeId":"finite-difference-recurrences","structuralCluster":"train-first-order-recurrence","split":"TRAIN","formationVisible":true,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-09","challengeId":"finite-difference-recurrences","structuralCluster":"validation-alternating-difference","split":"VALIDATION","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-10","challengeId":"finite-difference-recurrences","structuralCluster":"validation-second-order-recurrence","split":"VALIDATION","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-11","challengeId":"finite-difference-recurrences","structuralCluster":"test-mixed-degree-difference","split":"TEST","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-12","challengeId":"finite-difference-recurrences","structuralCluster":"test-nonhomogeneous-recurrence","split":"TEST","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-13","challengeId":"reusable-search-macros","structuralCluster":"train-factor-expand","split":"TRAIN","formationVisible":true,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-14","challengeId":"reusable-search-macros","structuralCluster":"train-normalize-cancel","split":"TRAIN","formationVisible":true,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-15","challengeId":"reusable-search-macros","structuralCluster":"validation-distribute-collect","split":"VALIDATION","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-16","challengeId":"reusable-search-macros","structuralCluster":"validation-substitute-simplify","split":"VALIDATION","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-17","challengeId":"reusable-search-macros","structuralCluster":"test-cross-family-compose","split":"TEST","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]},
+    {"caseId":"case-18","challengeId":"reusable-search-macros","structuralCluster":"test-guarded-reuse","split":"TEST","formationVisible":false,"expectedAnswerVisible":false,"targetVisibleDuringFormation":false,"outcomePolicy":["ACCEPTED","REJECTED","DISPROVED","NO_RESULT","TIMEOUT","UNSUPPORTED","INCOMPLETE"]}
+  ],
+  "claimPolicy": "BENCHMARK_SUCCESS_DOES_NOT_IMPLY_EXTERNAL_MATHEMATICAL_NOVELTY",
+  "executionStatus": "NOT_STARTED",
+  "formationVisibility": {
+    "allowedSplits": ["TRAIN"],
+    "prohibitedFields": ["target","expectedAnswer","hiddenReference","testLabel","postHocFamilyAnnotation"]
+  },
+  "metrics": ["configuredCampaigns","executedCampaigns","zeroOutputCampaigns","acceptedCandidates","rejectedCandidates","disprovedCandidates","heldOutReachability","exploredStateDelta","correctnessRegressions","resourceUsage","structuralSupportDiversity"],
+  "portfolioContentHash": "sha256:b1b8caa2eacab13ad859506ce1a6c409a97262cf868c9ed6a5f5ad89b1ccb2e9",
+  "portfolioId": "regelsuche-evaluator-backed-challenges-2026-07/v1",
+  "publicationAuthorized": false,
+  "schema": "regelsuche.candidate-independent-benchmark-source/v1"
+}
