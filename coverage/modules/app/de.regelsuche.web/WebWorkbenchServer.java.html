@@ -1398,8 +1398,8 @@ public class WebWorkbenchServer {
         }
 <span class="fc" id="L1399">        String expression = queryParam(exchange, &quot;expression&quot;, &quot;&quot;);</span>
 <span class="fc bfc" id="L1400" title="All 2 branches covered.">        if (expression.isBlank()) {</span>
-<span class="nc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
-<span class="nc" id="L1402">            return;</span>
+<span class="fc" id="L1401">            sendStatus(exchange, 400, &quot;expression query parameter is required&quot;);</span>
+<span class="fc" id="L1402">            return;</span>
         }
 <span class="fc" id="L1404">        String selectedPathKey = queryParam(exchange, &quot;selectedPathKey&quot;, &quot;&quot;);</span>
 <span class="fc" id="L1405">        de.regelsuche.ide.RuleInspectionDto dto =</span>

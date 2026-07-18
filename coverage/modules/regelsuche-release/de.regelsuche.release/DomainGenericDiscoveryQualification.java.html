@@ -1,0 +1,663 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainGenericDiscoveryQualification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">DomainGenericDiscoveryQualification.java</span></div><h1>DomainGenericDiscoveryQualification.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.discovery.domain.DomainDiscoveryExport.ArtifactRole;
+import de.regelsuche.discovery.domain.DomainDiscoveryExportVerifier.VerifiedDomainExport;
+import de.regelsuche.experiments.autopilot.AutonomousResearchBriefV2;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/** Fail-closed qualification of a reproducible multi-domain discovery run. */
+<span class="fc" id="L19">public final class DomainGenericDiscoveryQualification {</span>
+    public static final String SCHEMA =
+        &quot;regelsuche.domain-generic-discovery-qualification/v1&quot;;
+    public static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+<span class="fc" id="L23">    private static final ObjectMapper JSON = new ObjectMapper();</span>
+<span class="fc" id="L24">    private static final Set&lt;String&gt; EXPECTED_RESOURCES = Set.of(</span>
+        &quot;EXPLORED_STATES&quot;,
+        &quot;GENERATED_SUCCESSORS&quot;,
+        &quot;CANDIDATE_EVALUATIONS&quot;,
+        &quot;COUNTEREXAMPLE_ATTEMPTS&quot;,
+        &quot;CERTIFICATE_ATTEMPTS&quot;);
+<span class="fc" id="L30">    private static final Set&lt;String&gt; FORBIDDEN_HANDOFF_FIELDS = Set.of(</span>
+        &quot;payload&quot;,
+        &quot;canonicalState&quot;,
+        &quot;seedExpression&quot;,
+        &quot;selectedExpression&quot;,
+        &quot;sequenceTerms&quot;,
+        &quot;states&quot;,
+        &quot;path&quot;);
+
+    public QualificationReport evaluate(
+        List&lt;VerifiedDomainExport&gt; exports,
+        int cleanRunCount,
+        boolean cleanRunsIdentical
+    ) {
+<span class="fc" id="L44">        Objects.requireNonNull(exports, &quot;exports&quot;);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (exports.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;exports must not contain null&quot;);</span>
+        }
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (cleanRunCount &lt; 0) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;cleanRunCount must be non-negative&quot;);</span>
+        }
+
+<span class="fc" id="L52">        List&lt;DomainSummary&gt; domains = exports.stream()</span>
+<span class="fc" id="L53">            .map(DomainGenericDiscoveryQualification::summarize)</span>
+<span class="fc" id="L54">            .distinct()</span>
+<span class="fc" id="L55">            .sorted(Comparator.comparing(DomainSummary::domainId))</span>
+<span class="fc" id="L56">            .toList();</span>
+<span class="fc" id="L57">        List&lt;RequirementCheck&gt; checks = checks(</span>
+            domains,
+            cleanRunCount,
+            cleanRunsIdentical);
+<span class="fc" id="L61">        QualificationStatus status = checks.stream()</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            .allMatch(RequirementCheck::passed)</span>
+<span class="fc" id="L63">                ? QualificationStatus.READY</span>
+<span class="fc" id="L64">                : QualificationStatus.BLOCKED;</span>
+<span class="fc" id="L65">        List&lt;String&gt; blockers = checks.stream()</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            .filter(check -&gt; !check.passed())</span>
+<span class="fc" id="L67">            .map(RequirementCheck::code)</span>
+<span class="fc" id="L68">            .sorted()</span>
+<span class="fc" id="L69">            .toList();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        boolean claimAuthorized = status == QualificationStatus.READY</span>
+            &amp;&amp; DomainGenericEvidenceProfile.DOMAIN_GENERIC_DISCOVERY
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                .authorizesDomainGenericClaim();</span>
+<span class="fc" id="L73">        return QualificationReport.create(</span>
+            DomainGenericEvidenceProfile.DOMAIN_GENERIC_DISCOVERY,
+            status,
+            claimAuthorized,
+            false,
+            cleanRunCount,
+            cleanRunsIdentical,
+            domains,
+            checks,
+            blockers,
+            NOT_EVALUATED,
+            NOT_EVALUATED,
+            NOT_EVALUATED,
+            NOT_EVALUATED);
+    }
+
+    private static List&lt;RequirementCheck&gt; checks(
+        List&lt;DomainSummary&gt; domains,
+        int cleanRunCount,
+        boolean cleanRunsIdentical
+    ) {
+<span class="fc" id="L94">        Set&lt;String&gt; domainIds = domains.stream()</span>
+<span class="fc" id="L95">            .map(DomainSummary::domainId)</span>
+<span class="fc" id="L96">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="fc" id="L97">        Set&lt;String&gt; stateTypes = domains.stream()</span>
+<span class="fc" id="L98">            .map(DomainSummary::stateType)</span>
+<span class="fc" id="L99">            .collect(java.util.stream.Collectors.toCollection(TreeSet::new));</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        boolean resourcesShared = !domains.isEmpty()</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            &amp;&amp; domains.stream().allMatch(domain -&gt;</span>
+<span class="fc" id="L102">                domain.resourceNames().equals(domains.getFirst().resourceNames()))</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            &amp;&amp; domains.getFirst().resourceNames().equals(</span>
+<span class="fc" id="L104">                EXPECTED_RESOURCES.stream().sorted().toList());</span>
+<span class="fc" id="L105">        return List.of(</span>
+<span class="fc" id="L106">            check(&quot;VERIFIED_EXPORT_SNAPSHOTS&quot;,</span>
+<span class="pc bpc" id="L107" title="2 of 4 branches missed.">                domains.size() &gt; 0 &amp;&amp; domains.stream().allMatch(</span>
+<span class="fc" id="L108">                    domain -&gt; &quot;VERIFIED&quot;.equals(domain.identityBindingStatus())),</span>
+<span class="fc" id="L109">                domains.stream().map(DomainSummary::identityBindingStatus).toList(),</span>
+                &quot;all VERIFIED&quot;),
+<span class="fc" id="L111">            check(&quot;AT_LEAST_TWO_DISTINCT_DOMAINS&quot;,</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                domainIds.size() &gt;= 2,</span>
+                domainIds,
+                &quot;&gt;=2 distinct domain IDs&quot;),
+<span class="fc" id="L115">            check(&quot;DISTINCT_MATHEMATICAL_STATE_TYPES&quot;,</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                stateTypes.size() &gt;= 2,</span>
+                stateTypes,
+                &quot;&gt;=2 distinct state types&quot;),
+<span class="fc" id="L119">            check(&quot;EXPRESSION_REWRITE_DOMAIN_RETAINED&quot;,</span>
+<span class="fc" id="L120">                domainIds.contains(&quot;expression-rewrite&quot;),</span>
+                domainIds,
+                &quot;expression-rewrite&quot;),
+<span class="fc" id="L123">            check(&quot;NON_EXPRESSION_DOMAIN_RETAINED&quot;,</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                domainIds.stream().anyMatch(id -&gt; !&quot;expression-rewrite&quot;.equals(id)),</span>
+                domainIds,
+                &quot;&gt;=1 non-expression domain&quot;),
+<span class="fc" id="L127">            check(&quot;CONFIRMED_CANDIDATES_WITH_CERTIFICATES&quot;,</span>
+<span class="pc bpc" id="L128" title="1 of 4 branches missed.">                domains.size() &gt; 0 &amp;&amp; domains.stream().allMatch(</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                    domain -&gt; &quot;CONFIRMED&quot;.equals(domain.outcome())</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                        &amp;&amp; !domain.selectedCandidateHash().isEmpty()</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                        &amp;&amp; !domain.certificateHash().isEmpty()),</span>
+<span class="fc" id="L132">                domains.stream().map(domain -&gt; domain.domainId() + ':'</span>
+<span class="fc" id="L133">                    + domain.outcome() + ':'</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                    + !domain.selectedCandidateHash().isEmpty() + ':'</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                    + !domain.certificateHash().isEmpty()).toList(),</span>
+                &quot;every domain CONFIRMED with selected candidate and certificate&quot;),
+<span class="fc" id="L137">            check(&quot;SHARED_RESOURCE_ACCOUNTING&quot;,</span>
+                resourcesShared,
+<span class="fc" id="L139">                domains.stream().map(DomainSummary::resourceNames).toList(),</span>
+<span class="fc" id="L140">                EXPECTED_RESOURCES.stream().sorted().toList()),</span>
+<span class="fc" id="L141">            check(&quot;BALANCED_RESOURCE_ACCOUNTING&quot;,</span>
+<span class="pc bpc" id="L142" title="2 of 4 branches missed.">                domains.size() &gt; 0 &amp;&amp; domains.stream().allMatch(</span>
+                    DomainSummary::resourcesBalanced),
+<span class="fc" id="L144">                domains.stream().map(domain -&gt; domain.domainId() + ':'</span>
+<span class="fc" id="L145">                    + domain.resourcesBalanced()).toList(),</span>
+                &quot;all configured=executed+skipped+remaining&quot;),
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">            check(&quot;REPRESENTATION_FREE_LIFECYCLE_HANDOFF&quot;,</span>
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">                domains.size() &gt; 0 &amp;&amp; domains.stream().allMatch(</span>
+                    DomainSummary::representationFreeHandoff),
+<span class="fc" id="L150">                domains.stream().map(domain -&gt; domain.domainId() + ':'</span>
+<span class="fc" id="L151">                    + domain.representationFreeHandoff()).toList(),</span>
+<span class="fc" id="L152">                true),</span>
+<span class="fc" id="L153">            check(&quot;THREE_CLEAN_MULTI_DOMAIN_RUNS&quot;,</span>
+                cleanRunCount &gt;= 3 &amp;&amp; cleanRunsIdentical,
+                cleanRunCount + &quot; runs; identical=&quot; + cleanRunsIdentical,
+                &quot;&gt;=3 byte-identical runs&quot;),
+<span class="fc" id="L157">            check(&quot;PROOF_STATUS_NOT_EVALUATED&quot;,</span>
+<span class="fc" id="L158">                allStatus(domains, DomainSummary::proofStatus),</span>
+<span class="fc" id="L159">                statuses(domains, DomainSummary::proofStatus),</span>
+                NOT_EVALUATED),
+<span class="fc" id="L161">            check(&quot;EXTERNAL_NOVELTY_STATUS_NOT_EVALUATED&quot;,</span>
+<span class="fc" id="L162">                allStatus(domains, DomainSummary::externalNoveltyStatus),</span>
+<span class="fc" id="L163">                statuses(domains, DomainSummary::externalNoveltyStatus),</span>
+                NOT_EVALUATED),
+<span class="fc" id="L165">            check(&quot;PROMOTION_STATUS_NOT_EVALUATED&quot;,</span>
+<span class="fc" id="L166">                allStatus(domains, DomainSummary::promotionStatus),</span>
+<span class="fc" id="L167">                statuses(domains, DomainSummary::promotionStatus),</span>
+                NOT_EVALUATED),
+<span class="fc" id="L169">            check(&quot;PUBLIC_EVIDENCE_STATUS_NOT_EVALUATED&quot;,</span>
+<span class="fc" id="L170">                allStatus(domains, DomainSummary::publicEvidenceStatus),</span>
+<span class="fc" id="L171">                statuses(domains, DomainSummary::publicEvidenceStatus),</span>
+                NOT_EVALUATED));
+    }
+
+    private static boolean allStatus(
+        List&lt;DomainSummary&gt; domains,
+        java.util.function.Function&lt;DomainSummary, String&gt; getter
+    ) {
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        return !domains.isEmpty()</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            &amp;&amp; domains.stream().map(getter).allMatch(NOT_EVALUATED::equals);</span>
+    }
+
+    private static List&lt;String&gt; statuses(
+        List&lt;DomainSummary&gt; domains,
+        java.util.function.Function&lt;DomainSummary, String&gt; getter
+    ) {
+<span class="fc" id="L187">        return domains.stream()</span>
+<span class="fc" id="L188">            .map(domain -&gt; domain.domainId() + ':' + getter.apply(domain))</span>
+<span class="fc" id="L189">            .toList();</span>
+    }
+
+    private static DomainSummary summarize(VerifiedDomainExport export) {
+        try {
+<span class="fc" id="L194">            JsonNode descriptor = JSON.readTree(export.artifactBytes(</span>
+                ArtifactRole.DOMAIN_DESCRIPTOR));
+<span class="fc" id="L196">            JsonNode evidence = JSON.readTree(export.artifactBytes(</span>
+                ArtifactRole.DISCOVERY_EVIDENCE));
+<span class="fc" id="L198">            JsonNode handoff = JSON.readTree(export.artifactBytes(</span>
+                ArtifactRole.LIFECYCLE_HANDOFF));
+<span class="fc" id="L200">            String domainId = text(descriptor, &quot;domainId&quot;);</span>
+<span class="fc" id="L201">            String selectedCandidateHash = optionalText(</span>
+                evidence, &quot;selectedCandidateHash&quot;);
+<span class="fc" id="L203">            JsonNode certificate = evidence.get(&quot;certificate&quot;);</span>
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">            String certificateHash = certificate == null || certificate.isNull()</span>
+<span class="fc" id="L205">                ? &quot;&quot;</span>
+<span class="fc" id="L206">                : text(certificate, &quot;contentHash&quot;);</span>
+<span class="fc" id="L207">            List&lt;String&gt; resources = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L208">            boolean balanced = true;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            for (JsonNode resource : evidence.withArray(&quot;resources&quot;)) {</span>
+<span class="fc" id="L210">                resources.add(text(resource, &quot;resource&quot;));</span>
+<span class="fc" id="L211">                long configured = integer(resource, &quot;configured&quot;);</span>
+<span class="fc" id="L212">                long executed = integer(resource, &quot;executed&quot;);</span>
+<span class="fc" id="L213">                long skipped = integer(resource, &quot;skipped&quot;);</span>
+<span class="fc" id="L214">                long remaining = integer(resource, &quot;remaining&quot;);</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                balanced &amp;= configured == executed + skipped + remaining;</span>
+<span class="fc" id="L216">            }</span>
+<span class="fc" id="L217">            resources.sort(String::compareTo);</span>
+<span class="fc" id="L218">            Set&lt;String&gt; nestedHandoffFields = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L219">            collectFieldNames(handoff, nestedHandoffFields);</span>
+<span class="fc" id="L220">            boolean representationFree = FORBIDDEN_HANDOFF_FIELDS.stream()</span>
+<span class="fc" id="L221">                .noneMatch(nestedHandoffFields::contains);</span>
+<span class="fc" id="L222">            requireSameStatus(evidence, handoff, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L223">            requireSameStatus(evidence, handoff, &quot;externalNoveltyStatus&quot;);</span>
+<span class="fc" id="L224">            requireSameStatus(evidence, handoff, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L225">            requireSameStatus(evidence, handoff, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L226">            return new DomainSummary(</span>
+                domainId,
+<span class="fc" id="L228">                text(descriptor, &quot;revision&quot;),</span>
+<span class="fc" id="L229">                text(descriptor, &quot;stateType&quot;),</span>
+<span class="fc" id="L230">                text(descriptor, &quot;candidateType&quot;),</span>
+<span class="fc" id="L231">                text(descriptor, &quot;certificateType&quot;),</span>
+<span class="fc" id="L232">                text(descriptor, &quot;contentHash&quot;),</span>
+<span class="fc" id="L233">                text(evidence, &quot;contentHash&quot;),</span>
+<span class="fc" id="L234">                text(handoff, &quot;contentHash&quot;),</span>
+<span class="fc" id="L235">                export.verification().contentHash(),</span>
+<span class="fc" id="L236">                export.verification().identityBindingStatus(),</span>
+<span class="fc" id="L237">                text(evidence, &quot;outcome&quot;),</span>
+                selectedCandidateHash,
+                certificateHash,
+<span class="fc" id="L240">                List.copyOf(resources),</span>
+                balanced,
+                representationFree,
+<span class="fc" id="L243">                text(evidence, &quot;proofStatus&quot;),</span>
+<span class="fc" id="L244">                text(evidence, &quot;externalNoveltyStatus&quot;),</span>
+<span class="fc" id="L245">                text(evidence, &quot;promotionStatus&quot;),</span>
+<span class="fc" id="L246">                text(evidence, &quot;publicEvidenceStatus&quot;));</span>
+<span class="nc" id="L247">        } catch (IOException exception) {</span>
+<span class="nc" id="L248">            throw new IllegalArgumentException(</span>
+                &quot;verified domain export snapshot is not readable JSON&quot;, exception);
+        }
+    }
+
+    private static void requireSameStatus(
+        JsonNode evidence,
+        JsonNode handoff,
+        String field
+    ) {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (!text(evidence, field).equals(text(handoff, field))) {</span>
+<span class="nc" id="L259">            throw new IllegalArgumentException(</span>
+                &quot;evidence and handoff status mismatch: &quot; + field);
+        }
+<span class="fc" id="L262">    }</span>
+
+    private static void collectFieldNames(JsonNode node, Set&lt;String&gt; target) {
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (node.isObject()) {</span>
+<span class="fc" id="L266">            node.fields().forEachRemaining(entry -&gt; {</span>
+<span class="fc" id="L267">                target.add(entry.getKey());</span>
+<span class="fc" id="L268">                collectFieldNames(entry.getValue(), target);</span>
+<span class="fc" id="L269">            });</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        } else if (node.isArray()) {</span>
+<span class="fc" id="L271">            node.forEach(item -&gt; collectFieldNames(item, target));</span>
+        }
+<span class="fc" id="L273">    }</span>
+
+    private static String text(JsonNode node, String field) {
+<span class="fc" id="L276">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">        if (value == null || !value.isTextual()) {</span>
+<span class="nc" id="L278">            throw new IllegalArgumentException(field + &quot; must be text&quot;);</span>
+        }
+<span class="fc" id="L280">        return value.textValue();</span>
+    }
+
+    private static String optionalText(JsonNode node, String field) {
+<span class="fc" id="L284">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L285" title="1 of 4 branches missed.">        if (value == null || value.isNull()) {</span>
+<span class="fc" id="L286">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (!value.isTextual()) {</span>
+<span class="nc" id="L289">            throw new IllegalArgumentException(field + &quot; must be text or null&quot;);</span>
+        }
+<span class="fc" id="L291">        return value.textValue();</span>
+    }
+
+    private static long integer(JsonNode node, String field) {
+<span class="fc" id="L295">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L296" title="2 of 4 branches missed.">        if (value == null || !value.canConvertToLong()) {</span>
+<span class="nc" id="L297">            throw new IllegalArgumentException(field + &quot; must be an integer&quot;);</span>
+        }
+<span class="fc" id="L299">        return value.longValue();</span>
+    }
+
+    private static RequirementCheck check(
+        String code,
+        boolean passed,
+        Object actual,
+        Object required
+    ) {
+<span class="fc" id="L308">        return new RequirementCheck(</span>
+            code,
+            passed,
+<span class="fc" id="L311">            String.valueOf(actual),</span>
+<span class="fc" id="L312">            String.valueOf(required));</span>
+    }
+
+<span class="fc" id="L315">    public enum QualificationStatus {</span>
+<span class="fc" id="L316">        READY,</span>
+<span class="fc" id="L317">        BLOCKED</span>
+    }
+
+    public record RequirementCheck(
+        String code,
+        boolean passed,
+        String actual,
+        String required
+    ) {
+<span class="fc" id="L326">        public RequirementCheck {</span>
+<span class="fc" id="L327">            requireText(code, &quot;code&quot;);</span>
+<span class="fc" id="L328">            requireText(actual, &quot;actual&quot;);</span>
+<span class="fc" id="L329">            requireText(required, &quot;required&quot;);</span>
+<span class="fc" id="L330">        }</span>
+
+        private String canonicalMaterial() {
+<span class="fc" id="L333">            return code + &quot;|passed=&quot; + passed</span>
+                + &quot;|actual=&quot; + actual
+                + &quot;|required=&quot; + required;
+        }
+    }
+
+    public record DomainSummary(
+        String domainId,
+        String domainRevision,
+        String stateType,
+        String candidateType,
+        String certificateType,
+        String domainDescriptorHash,
+        String discoveryEvidenceHash,
+        String lifecycleHandoffHash,
+        String exportVerificationHash,
+        String identityBindingStatus,
+        String outcome,
+        String selectedCandidateHash,
+        String certificateHash,
+        List&lt;String&gt; resourceNames,
+        boolean resourcesBalanced,
+        boolean representationFreeHandoff,
+        String proofStatus,
+        String externalNoveltyStatus,
+        String promotionStatus,
+        String publicEvidenceStatus
+    ) {
+<span class="fc" id="L361">        public DomainSummary {</span>
+<span class="fc" id="L362">            domainId = requireIdentifier(domainId, &quot;domainId&quot;);</span>
+<span class="fc" id="L363">            domainRevision = requireIdentifier(domainRevision, &quot;domainRevision&quot;);</span>
+<span class="fc" id="L364">            stateType = requireIdentifier(stateType, &quot;stateType&quot;);</span>
+<span class="fc" id="L365">            candidateType = requireIdentifier(candidateType, &quot;candidateType&quot;);</span>
+<span class="fc" id="L366">            certificateType = requireIdentifier(certificateType, &quot;certificateType&quot;);</span>
+<span class="fc" id="L367">            requireSha256(domainDescriptorHash, &quot;domainDescriptorHash&quot;);</span>
+<span class="fc" id="L368">            requireSha256(discoveryEvidenceHash, &quot;discoveryEvidenceHash&quot;);</span>
+<span class="fc" id="L369">            requireSha256(lifecycleHandoffHash, &quot;lifecycleHandoffHash&quot;);</span>
+<span class="fc" id="L370">            requireSha256(exportVerificationHash, &quot;exportVerificationHash&quot;);</span>
+<span class="fc" id="L371">            requireText(identityBindingStatus, &quot;identityBindingStatus&quot;);</span>
+<span class="fc" id="L372">            requireText(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L373">            selectedCandidateHash = optionalSha256(</span>
+                selectedCandidateHash, &quot;selectedCandidateHash&quot;);
+<span class="fc" id="L375">            certificateHash = optionalSha256(certificateHash, &quot;certificateHash&quot;);</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            resourceNames = resourceNames == null ? List.of() : resourceNames.stream()</span>
+<span class="fc" id="L377">                .map(name -&gt; requireIdentifier(name, &quot;resourceName&quot;))</span>
+<span class="fc" id="L378">                .distinct()</span>
+<span class="fc" id="L379">                .sorted()</span>
+<span class="fc" id="L380">                .toList();</span>
+<span class="fc" id="L381">            requireText(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L382">            requireText(externalNoveltyStatus, &quot;externalNoveltyStatus&quot;);</span>
+<span class="fc" id="L383">            requireText(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L384">            requireText(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L385">        }</span>
+
+        private String canonicalMaterial() {
+<span class="fc" id="L388">            return domainId + '|' + domainRevision + '|' + stateType + '|'</span>
+                + candidateType + '|' + certificateType + '|'
+                + domainDescriptorHash + '|' + discoveryEvidenceHash + '|'
+                + lifecycleHandoffHash + '|' + exportVerificationHash + '|'
+                + identityBindingStatus + '|' + outcome + '|'
+                + selectedCandidateHash + '|' + certificateHash + '|'
+                + resourceNames + '|' + resourcesBalanced + '|'
+                + representationFreeHandoff + '|' + proofStatus + '|'
+                + externalNoveltyStatus + '|' + promotionStatus + '|'
+                + publicEvidenceStatus;
+        }
+    }
+
+    public record QualificationReport(
+        String schema,
+        DomainGenericEvidenceProfile profile,
+        QualificationStatus status,
+        boolean domainGenericClaimAuthorized,
+        boolean autonomousCampaignClaimAuthorized,
+        int cleanRunCount,
+        boolean cleanRunsIdentical,
+        List&lt;DomainSummary&gt; domains,
+        List&lt;RequirementCheck&gt; checks,
+        List&lt;String&gt; blockers,
+        String proofStatus,
+        String externalNoveltyStatus,
+        String promotionStatus,
+        String publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L418">        public QualificationReport {</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L420">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported domain-generic qualification schema&quot;);
+            }
+<span class="fc" id="L423">            Objects.requireNonNull(profile, &quot;profile&quot;);</span>
+<span class="fc" id="L424">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            if (cleanRunCount &lt; 0) {</span>
+<span class="nc" id="L426">                throw new IllegalArgumentException(</span>
+                    &quot;cleanRunCount must be non-negative&quot;);
+            }
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            domains = domains == null ? List.of() : domains.stream()</span>
+<span class="fc" id="L430">                .map(domain -&gt; Objects.requireNonNull(domain, &quot;domain&quot;))</span>
+<span class="fc" id="L431">                .sorted(Comparator.comparing(DomainSummary::domainId))</span>
+<span class="fc" id="L432">                .toList();</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            checks = checks == null ? List.of() : checks.stream()</span>
+<span class="fc" id="L434">                .map(check -&gt; Objects.requireNonNull(check, &quot;check&quot;))</span>
+<span class="fc" id="L435">                .sorted(Comparator.comparing(RequirementCheck::code))</span>
+<span class="fc" id="L436">                .toList();</span>
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">            blockers = blockers == null ? List.of() : blockers.stream()</span>
+<span class="fc" id="L438">                .map(blocker -&gt; requireIdentifier(blocker, &quot;blocker&quot;))</span>
+<span class="fc" id="L439">                .distinct()</span>
+<span class="fc" id="L440">                .sorted()</span>
+<span class="fc" id="L441">                .toList();</span>
+<span class="fc" id="L442">            requireText(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L443">            requireText(externalNoveltyStatus, &quot;externalNoveltyStatus&quot;);</span>
+<span class="fc" id="L444">            requireText(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L445">            requireText(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">            boolean ready = status == QualificationStatus.READY;</span>
+<span class="pc bpc" id="L447" title="2 of 4 branches missed.">            if (domainGenericClaimAuthorized != ready</span>
+                    || autonomousCampaignClaimAuthorized
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">                    || ready != blockers.isEmpty()</span>
+<span class="pc bpc" id="L450" title="1 of 2 branches missed.">                    || ready != checks.stream().allMatch(RequirementCheck::passed)</span>
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">                    || !NOT_EVALUATED.equals(proofStatus)</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">                    || !NOT_EVALUATED.equals(externalNoveltyStatus)</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">                    || !NOT_EVALUATED.equals(promotionStatus)</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">                    || !NOT_EVALUATED.equals(publicEvidenceStatus)) {</span>
+<span class="nc" id="L455">                throw new IllegalArgumentException(</span>
+                    &quot;domain-generic qualification flags or scientific boundaries disagree&quot;);
+            }
+<span class="fc" id="L458">            requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L459">            String expected = hash(</span>
+                profile,
+                status,
+                domainGenericClaimAuthorized,
+                autonomousCampaignClaimAuthorized,
+                cleanRunCount,
+                cleanRunsIdentical,
+                domains,
+                checks,
+                blockers,
+                proofStatus,
+                externalNoveltyStatus,
+                promotionStatus,
+                publicEvidenceStatus);
+<span class="fc bfc" id="L473" title="All 2 branches covered.">            if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L474">                throw new IllegalArgumentException(</span>
+                    &quot;domain-generic qualification contentHash mismatch&quot;);
+            }
+<span class="fc" id="L477">        }</span>
+
+        private static QualificationReport create(
+            DomainGenericEvidenceProfile profile,
+            QualificationStatus status,
+            boolean domainGenericClaimAuthorized,
+            boolean autonomousCampaignClaimAuthorized,
+            int cleanRunCount,
+            boolean cleanRunsIdentical,
+            List&lt;DomainSummary&gt; domains,
+            List&lt;RequirementCheck&gt; checks,
+            List&lt;String&gt; blockers,
+            String proofStatus,
+            String externalNoveltyStatus,
+            String promotionStatus,
+            String publicEvidenceStatus
+        ) {
+<span class="fc" id="L494">            List&lt;DomainSummary&gt; orderedDomains = domains.stream()</span>
+<span class="fc" id="L495">                .sorted(Comparator.comparing(DomainSummary::domainId))</span>
+<span class="fc" id="L496">                .toList();</span>
+<span class="fc" id="L497">            List&lt;RequirementCheck&gt; orderedChecks = checks.stream()</span>
+<span class="fc" id="L498">                .sorted(Comparator.comparing(RequirementCheck::code))</span>
+<span class="fc" id="L499">                .toList();</span>
+<span class="fc" id="L500">            List&lt;String&gt; orderedBlockers = blockers.stream().distinct().sorted().toList();</span>
+<span class="fc" id="L501">            String contentHash = hash(</span>
+                profile,
+                status,
+                domainGenericClaimAuthorized,
+                autonomousCampaignClaimAuthorized,
+                cleanRunCount,
+                cleanRunsIdentical,
+                orderedDomains,
+                orderedChecks,
+                orderedBlockers,
+                proofStatus,
+                externalNoveltyStatus,
+                promotionStatus,
+                publicEvidenceStatus);
+<span class="fc" id="L515">            return new QualificationReport(</span>
+                SCHEMA,
+                profile,
+                status,
+                domainGenericClaimAuthorized,
+                autonomousCampaignClaimAuthorized,
+                cleanRunCount,
+                cleanRunsIdentical,
+                orderedDomains,
+                orderedChecks,
+                orderedBlockers,
+                proofStatus,
+                externalNoveltyStatus,
+                promotionStatus,
+                publicEvidenceStatus,
+                contentHash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L534">            return render(true);</span>
+        }
+
+        private String render(boolean includeHash) {
+<span class="fc" id="L538">            JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L539">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L540">                .property(&quot;profile&quot;, profile.name())</span>
+<span class="fc" id="L541">                .property(&quot;claim&quot;, profile.claim())</span>
+<span class="fc" id="L542">                .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L543">                .property(&quot;domainGenericClaimAuthorized&quot;,</span>
+                    domainGenericClaimAuthorized)
+<span class="fc" id="L545">                .property(&quot;autonomousCampaignClaimAuthorized&quot;,</span>
+                    autonomousCampaignClaimAuthorized)
+<span class="fc" id="L547">                .property(&quot;cleanRunCount&quot;, cleanRunCount)</span>
+<span class="fc" id="L548">                .property(&quot;cleanRunsIdentical&quot;, cleanRunsIdentical)</span>
+<span class="fc" id="L549">                .array(&quot;domains&quot;, array -&gt; domains.forEach(domain -&gt;</span>
+<span class="fc" id="L550">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L551">                        .property(&quot;domainId&quot;, domain.domainId())</span>
+<span class="fc" id="L552">                        .property(&quot;domainRevision&quot;, domain.domainRevision())</span>
+<span class="fc" id="L553">                        .property(&quot;stateType&quot;, domain.stateType())</span>
+<span class="fc" id="L554">                        .property(&quot;candidateType&quot;, domain.candidateType())</span>
+<span class="fc" id="L555">                        .property(&quot;certificateType&quot;, domain.certificateType())</span>
+<span class="fc" id="L556">                        .property(&quot;domainDescriptorHash&quot;,</span>
+<span class="fc" id="L557">                            domain.domainDescriptorHash())</span>
+<span class="fc" id="L558">                        .property(&quot;discoveryEvidenceHash&quot;,</span>
+<span class="fc" id="L559">                            domain.discoveryEvidenceHash())</span>
+<span class="fc" id="L560">                        .property(&quot;lifecycleHandoffHash&quot;,</span>
+<span class="fc" id="L561">                            domain.lifecycleHandoffHash())</span>
+<span class="fc" id="L562">                        .property(&quot;exportVerificationHash&quot;,</span>
+<span class="fc" id="L563">                            domain.exportVerificationHash())</span>
+<span class="fc" id="L564">                        .property(&quot;identityBindingStatus&quot;,</span>
+<span class="fc" id="L565">                            domain.identityBindingStatus())</span>
+<span class="fc" id="L566">                        .property(&quot;outcome&quot;, domain.outcome())</span>
+<span class="fc" id="L567">                        .property(&quot;selectedCandidateHash&quot;,</span>
+<span class="fc" id="L568">                            domain.selectedCandidateHash())</span>
+<span class="fc" id="L569">                        .property(&quot;certificateHash&quot;, domain.certificateHash())</span>
+<span class="fc" id="L570">                        .stringArray(&quot;resourceNames&quot;, domain.resourceNames())</span>
+<span class="fc" id="L571">                        .property(&quot;resourcesBalanced&quot;, domain.resourcesBalanced())</span>
+<span class="fc" id="L572">                        .property(&quot;representationFreeHandoff&quot;,</span>
+<span class="fc" id="L573">                            domain.representationFreeHandoff())</span>
+<span class="fc" id="L574">                        .property(&quot;proofStatus&quot;, domain.proofStatus())</span>
+<span class="fc" id="L575">                        .property(&quot;externalNoveltyStatus&quot;,</span>
+<span class="fc" id="L576">                            domain.externalNoveltyStatus())</span>
+<span class="fc" id="L577">                        .property(&quot;promotionStatus&quot;, domain.promotionStatus())</span>
+<span class="fc" id="L578">                        .property(&quot;publicEvidenceStatus&quot;,</span>
+<span class="fc" id="L579">                            domain.publicEvidenceStatus()))))</span>
+<span class="fc" id="L580">                .array(&quot;checks&quot;, array -&gt; checks.forEach(check -&gt;</span>
+<span class="fc" id="L581">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L582">                        .property(&quot;code&quot;, check.code())</span>
+<span class="fc" id="L583">                        .property(&quot;passed&quot;, check.passed())</span>
+<span class="fc" id="L584">                        .property(&quot;actual&quot;, check.actual())</span>
+<span class="fc" id="L585">                        .property(&quot;required&quot;, check.required()))))</span>
+<span class="fc" id="L586">                .stringArray(&quot;blockers&quot;, blockers)</span>
+<span class="fc" id="L587">                .property(&quot;proofStatus&quot;, proofStatus)</span>
+<span class="fc" id="L588">                .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus)</span>
+<span class="fc" id="L589">                .property(&quot;promotionStatus&quot;, promotionStatus)</span>
+<span class="fc" id="L590">                .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus);</span>
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">            if (includeHash) {</span>
+<span class="fc" id="L592">                json.property(&quot;contentHash&quot;, contentHash);</span>
+            }
+<span class="fc" id="L594">            return json.endObject().toString();</span>
+        }
+
+        private static String hash(
+            DomainGenericEvidenceProfile profile,
+            QualificationStatus status,
+            boolean domainGenericClaimAuthorized,
+            boolean autonomousCampaignClaimAuthorized,
+            int cleanRunCount,
+            boolean cleanRunsIdentical,
+            List&lt;DomainSummary&gt; domains,
+            List&lt;RequirementCheck&gt; checks,
+            List&lt;String&gt; blockers,
+            String proofStatus,
+            String externalNoveltyStatus,
+            String promotionStatus,
+            String publicEvidenceStatus
+        ) {
+<span class="fc" id="L612">            return AutonomousResearchBriefV2.hash(</span>
+                SCHEMA
+<span class="fc" id="L614">                    + &quot;\nprofile=&quot; + profile.name()</span>
+<span class="fc" id="L615">                    + &quot;\nstatus=&quot; + status.name()</span>
+                    + &quot;\ndomainGenericClaimAuthorized=&quot;
+                        + domainGenericClaimAuthorized
+                    + &quot;\nautonomousCampaignClaimAuthorized=&quot;
+                        + autonomousCampaignClaimAuthorized
+                    + &quot;\ncleanRunCount=&quot; + cleanRunCount
+                    + &quot;\ncleanRunsIdentical=&quot; + cleanRunsIdentical
+<span class="fc" id="L622">                    + &quot;\ndomains=&quot; + domains.stream()</span>
+<span class="fc" id="L623">                        .map(DomainSummary::canonicalMaterial).toList()</span>
+<span class="fc" id="L624">                    + &quot;\nchecks=&quot; + checks.stream()</span>
+<span class="fc" id="L625">                        .map(RequirementCheck::canonicalMaterial).toList()</span>
+                    + &quot;\nblockers=&quot; + blockers
+                    + &quot;\nproofStatus=&quot; + proofStatus
+                    + &quot;\nexternalNoveltyStatus=&quot; + externalNoveltyStatus
+                    + &quot;\npromotionStatus=&quot; + promotionStatus
+                    + &quot;\npublicEvidenceStatus=&quot; + publicEvidenceStatus);
+        }
+    }
+
+    private static String requireText(String value, String field) {
+<span class="pc bpc" id="L635" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L636">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L638">        return value;</span>
+    }
+
+    private static String requireIdentifier(String value, String field) {
+<span class="fc" id="L642">        requireText(value, field);</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">        if (!value.matches(&quot;[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}&quot;)) {</span>
+<span class="nc" id="L644">            throw new IllegalArgumentException(field + &quot; is not an identifier&quot;);</span>
+        }
+<span class="fc" id="L646">        return value;</span>
+    }
+
+    private static String requireSha256(String value, String field) {
+<span class="pc bpc" id="L650" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L651">            throw new IllegalArgumentException(field + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L653">        return value;</span>
+    }
+
+    private static String optionalSha256(String value, String field) {
+<span class="pc bpc" id="L657" title="1 of 4 branches missed.">        if (value == null || value.isEmpty()) {</span>
+<span class="fc" id="L658">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L660">        return requireSha256(value, field);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

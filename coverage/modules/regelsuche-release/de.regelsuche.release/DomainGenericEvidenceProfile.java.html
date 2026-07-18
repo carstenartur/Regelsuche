@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DomainGenericEvidenceProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">DomainGenericEvidenceProfile.java</span></div><h1>DomainGenericEvidenceProfile.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.List;
+
+/** Separate evidence profile for the stronger domain-generic discovery claim. */
+<span class="fc" id="L7">public enum DomainGenericEvidenceProfile {</span>
+<span class="fc" id="L8">    DOMAIN_GENERIC_DISCOVERY(</span>
+        &quot;reproducible generation, bounded search, counterexample search, &quot;
+            + &quot;validation, certificate rendering and evidence across distinct &quot;
+            + &quot;mathematical object types&quot;,
+        true,
+        false,
+<span class="fc" id="L14">        List.of(</span>
+            &quot;VERIFIED_EXPORT_SNAPSHOTS&quot;,
+            &quot;AT_LEAST_TWO_DISTINCT_DOMAINS&quot;,
+            &quot;DISTINCT_MATHEMATICAL_STATE_TYPES&quot;,
+            &quot;EXPRESSION_REWRITE_DOMAIN_RETAINED&quot;,
+            &quot;NON_EXPRESSION_DOMAIN_RETAINED&quot;,
+            &quot;CONFIRMED_CANDIDATES_WITH_CERTIFICATES&quot;,
+            &quot;SHARED_RESOURCE_ACCOUNTING&quot;,
+            &quot;BALANCED_RESOURCE_ACCOUNTING&quot;,
+            &quot;REPRESENTATION_FREE_LIFECYCLE_HANDOFF&quot;,
+            &quot;THREE_CLEAN_MULTI_DOMAIN_RUNS&quot;,
+            &quot;PROOF_STATUS_NOT_EVALUATED&quot;,
+            &quot;EXTERNAL_NOVELTY_STATUS_NOT_EVALUATED&quot;,
+            &quot;PROMOTION_STATUS_NOT_EVALUATED&quot;,
+            &quot;PUBLIC_EVIDENCE_STATUS_NOT_EVALUATED&quot;));
+
+    public static final String CATALOG_SCHEMA =
+        &quot;regelsuche.domain-generic-evidence-profile-catalog/v1&quot;;
+
+    private final String claim;
+    private final boolean authorizesDomainGenericClaim;
+    private final boolean authorizesAutonomousCampaignClaim;
+    private final List&lt;String&gt; requirements;
+
+    DomainGenericEvidenceProfile(
+        String claim,
+        boolean authorizesDomainGenericClaim,
+        boolean authorizesAutonomousCampaignClaim,
+        List&lt;String&gt; requirements
+<span class="fc" id="L43">    ) {</span>
+<span class="fc" id="L44">        this.claim = claim;</span>
+<span class="fc" id="L45">        this.authorizesDomainGenericClaim = authorizesDomainGenericClaim;</span>
+<span class="fc" id="L46">        this.authorizesAutonomousCampaignClaim = authorizesAutonomousCampaignClaim;</span>
+<span class="fc" id="L47">        this.requirements = List.copyOf(requirements);</span>
+<span class="fc" id="L48">    }</span>
+
+    public String claim() {
+<span class="fc" id="L51">        return claim;</span>
+    }
+
+    public boolean authorizesDomainGenericClaim() {
+<span class="fc" id="L55">        return authorizesDomainGenericClaim;</span>
+    }
+
+    public boolean authorizesAutonomousCampaignClaim() {
+<span class="fc" id="L59">        return authorizesAutonomousCampaignClaim;</span>
+    }
+
+    public List&lt;String&gt; requirements() {
+<span class="fc" id="L63">        return requirements;</span>
+    }
+
+    public static String catalogJson() {
+<span class="fc" id="L67">        return new JsonWriter().beginObject()</span>
+<span class="fc" id="L68">            .property(&quot;schema&quot;, CATALOG_SCHEMA)</span>
+<span class="fc" id="L69">            .array(&quot;profiles&quot;, array -&gt; {</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                for (DomainGenericEvidenceProfile profile : values()) {</span>
+<span class="fc" id="L71">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L72">                        .property(&quot;profile&quot;, profile.name())</span>
+<span class="fc" id="L73">                        .property(&quot;claim&quot;, profile.claim())</span>
+<span class="fc" id="L74">                        .property(&quot;authorizesDomainGenericClaim&quot;,</span>
+<span class="fc" id="L75">                            profile.authorizesDomainGenericClaim())</span>
+<span class="fc" id="L76">                        .property(&quot;authorizesAutonomousCampaignClaim&quot;,</span>
+<span class="fc" id="L77">                            profile.authorizesAutonomousCampaignClaim())</span>
+<span class="fc" id="L78">                        .stringArray(&quot;requirements&quot;, profile.requirements()));</span>
+                }
+<span class="fc" id="L80">            })</span>
+<span class="fc" id="L81">            .property(&quot;existingAutonomousCampaignProfileUnaffected&quot;, true)</span>
+<span class="fc" id="L82">            .endObject()</span>
+<span class="fc" id="L83">            .toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
