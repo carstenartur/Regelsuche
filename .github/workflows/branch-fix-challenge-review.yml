@@ -5,10 +5,6 @@ on:
     branches: [ "issue-390-challenge-portfolio" ]
     paths:
       - '.github/workflows/branch-fix-challenge-review.yml'
-  pull_request:
-    branches: [ "main" ]
-    paths:
-      - '.github/workflows/branch-fix-challenge-review.yml'
   workflow_dispatch:
 
 permissions:
@@ -35,83 +31,80 @@ jobs:
           path = Path('scripts/generate-discovery-challenge-portfolio.py')
           text = path.read_text(encoding='utf-8')
 
-          old = '''    selection = source.get("selectionPolicy")
-              if not isinstance(selection, dict):
-                  raise ValueError("selectionPolicy must be an object")
-              if selection.get("externalSearchVisibility") != "POST_FORMATION_ONLY":
-                  raise ValueError("external search must remain post-formation")
-              if selection.get("pilotEvidenceStatus") != "DEVELOPMENT_ONLY":
-                  raise ValueError("pilot evidence must remain development-only")
-              challenges = source.get("challenges")
-              if not isinstance(challenges, list):
-                  raise ValueError("challenges must be an array")
-              if len(challenges) < int(selection.get("minimumAssessedClasses", 5)):
-                  raise ValueError("insufficient assessed challenge classes")
-          '''
-          old = '\n'.join(line[4:] if line.startswith('    ') else line
-                          for line in old.splitlines()) + '\n'
-          new = '''    require_text(source.get("portfolioId"), "portfolioId")
-              selection = source.get("selectionPolicy")
-              if not isinstance(selection, dict):
-                  raise ValueError("selectionPolicy must be an object")
-              for flag in (
-                  "requireIndependentEvaluator",
-                  "requireFrozenSplitUnit",
-                  "requireInformationParityBaselines",
-              ):
-                  if selection.get(flag) is not True:
-                      raise ValueError(f"selectionPolicy.{flag} must remain true")
-              minimum_assessed = selection.get("minimumAssessedClasses")
-              minimum_selected = selection.get("minimumSelectedClasses")
-              if not isinstance(minimum_assessed, int) or minimum_assessed < 5:
-                  raise ValueError("minimumAssessedClasses must be at least 5")
-              if not isinstance(minimum_selected, int) or minimum_selected < 2:
-                  raise ValueError("minimumSelectedClasses must be at least 2")
-              if selection.get("externalSearchVisibility") != "POST_FORMATION_ONLY":
-                  raise ValueError("external search must remain post-formation")
-              if selection.get("pilotEvidenceStatus") != "DEVELOPMENT_ONLY":
-                  raise ValueError("pilot evidence must remain development-only")
-              challenges = source.get("challenges")
-              if not isinstance(challenges, list):
-                  raise ValueError("challenges must be an array")
-              if len(challenges) < minimum_assessed:
-                  raise ValueError("insufficient assessed challenge classes")
-          '''
-          new = '\n'.join(line[4:] if line.startswith('    ') else line
-                          for line in new.splitlines()) + '\n'
-          if text.count(old) != 1:
-              raise SystemExit('selection-policy validation marker not found exactly once')
-          text = text.replace(old, new)
+          replacements = [
+              (
+                  '''    selection = source.get("selectionPolicy")
+    if not isinstance(selection, dict):
+        raise ValueError("selectionPolicy must be an object")
+    if selection.get("externalSearchVisibility") != "POST_FORMATION_ONLY":
+        raise ValueError("external search must remain post-formation")
+    if selection.get("pilotEvidenceStatus") != "DEVELOPMENT_ONLY":
+        raise ValueError("pilot evidence must remain development-only")
+    challenges = source.get("challenges")
+    if not isinstance(challenges, list):
+        raise ValueError("challenges must be an array")
+    if len(challenges) < int(selection.get("minimumAssessedClasses", 5)):
+        raise ValueError("insufficient assessed challenge classes")
+''',
+                  '''    require_text(source.get("portfolioId"), "portfolioId")
+    selection = source.get("selectionPolicy")
+    if not isinstance(selection, dict):
+        raise ValueError("selectionPolicy must be an object")
+    for flag in (
+        "requireIndependentEvaluator",
+        "requireFrozenSplitUnit",
+        "requireInformationParityBaselines",
+    ):
+        if selection.get(flag) is not True:
+            raise ValueError(f"selectionPolicy.{flag} must remain true")
+    minimum_assessed = selection.get("minimumAssessedClasses")
+    minimum_selected = selection.get("minimumSelectedClasses")
+    if not isinstance(minimum_assessed, int) or minimum_assessed < 5:
+        raise ValueError("minimumAssessedClasses must be at least 5")
+    if not isinstance(minimum_selected, int) or minimum_selected < 2:
+        raise ValueError("minimumSelectedClasses must be at least 2")
+    if selection.get("externalSearchVisibility") != "POST_FORMATION_ONLY":
+        raise ValueError("external search must remain post-formation")
+    if selection.get("pilotEvidenceStatus") != "DEVELOPMENT_ONLY":
+        raise ValueError("pilot evidence must remain development-only")
+    challenges = source.get("challenges")
+    if not isinstance(challenges, list):
+        raise ValueError("challenges must be an array")
+    if len(challenges) < minimum_assessed:
+        raise ValueError("insufficient assessed challenge classes")
+''',
+                  'selection-policy validation marker',
+              ),
+              (
+                  '''        if challenge["complexityTier"] not in VALID_COMPLEXITY:
+            raise ValueError(
+                f"selected challenge is not beyond elementary tier: {challenge_id}"
+            )
+''',
+                  '''        if challenge["complexityTier"] not in VALID_COMPLEXITY:
+            raise ValueError(
+                f"unsupported complexity tier for {challenge_id}"
+            )
+''',
+                  'complexity error marker',
+              ),
+              (
+                  '''    if selected < int(selection.get("minimumSelectedClasses", 2)):
+        raise ValueError("insufficient selected challenge classes")
+''',
+                  '''    if selected < minimum_selected:
+        raise ValueError("insufficient selected challenge classes")
+''',
+                  'selected-count marker',
+              ),
+          ]
 
-          old = '''            raise ValueError(
-                      f"selected challenge is not beyond elementary tier: {challenge_id}"
-                  )
-          '''
-          old = '\n'.join(line[4:] if line.startswith('    ') else line
-                          for line in old.splitlines()) + '\n'
-          new = '''            raise ValueError(
-                      f"unsupported complexity tier for {challenge_id}"
-                  )
-          '''
-          new = '\n'.join(line[4:] if line.startswith('    ') else line
-                          for line in new.splitlines()) + '\n'
-          if text.count(old) != 1:
-              raise SystemExit('complexity error marker not found exactly once')
-          text = text.replace(old, new)
+          for old, new, marker in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f'{marker} not found exactly once')
+              text = text.replace(old, new)
 
-          old = '''    if selected < int(selection.get("minimumSelectedClasses", 2)):
-                  raise ValueError("insufficient selected challenge classes")
-          '''
-          old = '\n'.join(line[4:] if line.startswith('    ') else line
-                          for line in old.splitlines()) + '\n'
-          new = '''    if selected < minimum_selected:
-                  raise ValueError("insufficient selected challenge classes")
-          '''
-          new = '\n'.join(line[4:] if line.startswith('    ') else line
-                          for line in new.splitlines()) + '\n'
-          if text.count(old) != 1:
-              raise SystemExit('selected-count marker not found exactly once')
-          path.write_text(text.replace(old, new), encoding='utf-8')
+          path.write_text(text, encoding='utf-8')
           PY
 
       - name: Verify generator and schemas
