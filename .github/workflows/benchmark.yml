@@ -54,7 +54,7 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     concurrency:
-      group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
+      group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('pages-publish-{0}-main', github.repository) || format('benchmark-report-{0}-{1}', github.repository, github.run_id) }}
       cancel-in-progress: false
     permissions:
       actions: read
