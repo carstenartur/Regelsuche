@@ -1799,8 +1799,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L1799">            default          -&gt; null;</span>
         };
 <span class="fc bfc" id="L1801" title="All 2 branches covered.">        if (body == null) {</span>
-<span class="nc" id="L1802">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
-<span class="nc" id="L1803">            return;</span>
+<span class="fc" id="L1802">            sendStatus(exchange, 404, &quot;unknown export kind: &quot; + kind);</span>
+<span class="fc" id="L1803">            return;</span>
         }
 <span class="fc" id="L1805">        send(exchange, 200, &quot;text/markdown; charset=utf-8&quot;, body);</span>
 <span class="fc" id="L1806">    }</span>
