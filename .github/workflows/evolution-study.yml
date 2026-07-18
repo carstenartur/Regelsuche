@@ -1,0 +1,40 @@
+name: Evolution Study Contract
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'research/evolution/**'
+      - 'research/benchmarks/candidate-independent/**'
+      - 'scripts/verify-evolution-study.py'
+      - 'docs/evolutionary-search.md'
+      - 'docs/schemas/regelsuche-evolution-study-source-v1.schema.json'
+      - 'regelsuche-learning/build.gradle'
+      - '.github/workflows/evolution-study.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'research/evolution/**'
+      - 'research/benchmarks/candidate-independent/**'
+      - 'scripts/verify-evolution-study.py'
+      - 'docs/evolutionary-search.md'
+      - 'docs/schemas/regelsuche-evolution-study-source-v1.schema.json'
+      - 'regelsuche-learning/build.gradle'
+      - '.github/workflows/evolution-study.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6.1.0
+      - name: Verify the checkout-local frozen study contract
+        run: ./gradlew :regelsuche-learning:verifyEvolutionStudy --console=plain
