@@ -52,3 +52,33 @@ if (aiKnowledgeEnabled) {
         }
     }
 }
+
+// Stable, checkout-local verification entry points. GitHub Actions may invoke
+// these tasks, but it must not own their assertions or infrastructure lifecycle.
+tasks.register('integrationTest') {
+    group = 'verification'
+    description = 'Runs Docker-backed integration tests through Testcontainers.'
+    dependsOn ':app:dockerE2eTest'
+}
+
+tasks.register('browserE2eTest') {
+    group = 'verification'
+    description = 'Runs the browser end-to-end suite from a plain checkout.'
+    dependsOn ':app:e2eTest'
+}
+
+def verificationTestTask = tasks.register('verificationTest') {
+    group = 'verification'
+    description = 'Runs all JVM tests plus the Testcontainers integration suite.'
+    dependsOn tasks.named('integrationTest')
+}
+
+gradle.projectsEvaluated {
+    verificationTestTask.configure {
+        dependsOn subprojects.findAll { project ->
+            project.tasks.findByName('test') != null
+        }.collect { project ->
+            project.tasks.named('test')
+        }
+    }
+}
