@@ -7,6 +7,8 @@ on:
       - 'app/src/jmh/**'
       - 'app/src/main/**'
       - 'app/build.gradle'
+      - 'scripts/run-jmh-benchmark-verification.sh'
+      - 'scripts/verify-jmh-benchmark.py'
       - '.github/workflows/benchmark.yml'
   pull_request:
     branches: [ main ]
@@ -14,22 +16,20 @@ on:
       - 'app/src/jmh/**'
       - 'app/src/main/**'
       - 'app/build.gradle'
+      - 'scripts/run-jmh-benchmark-verification.sh'
+      - 'scripts/verify-jmh-benchmark.py'
       - '.github/workflows/benchmark.yml'
   workflow_dispatch:
 
-concurrency:
-  group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
-  cancel-in-progress: false
-
 permissions:
-  contents: write       # auto-push benchmark history to gh-pages
-  deployments: write    # create deployment status for benchmark-action
-  pull-requests: write  # post benchmark alert comments on PRs
+  contents: read
 
 jobs:
-  benchmark:
-    name: JMH micro-benchmarks
+  verify:
+    name: JMH micro-benchmark verification
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v5
@@ -37,22 +37,37 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6.1.0
+      - name: Run repository-owned JMH verification
+        run: bash scripts/run-jmh-benchmark-verification.sh
+      - name: Upload verified JMH result and local badge
+        uses: actions/upload-artifact@v7
+        with:
+          name: jmh-verification
+          path: |
+            app/build/reports/jmh/**
+            public/dev/bench/badge.json
+            build/logs/jmh-benchmark*.log
+          if-no-files-found: error
 
-      - name: Run JMH benchmarks
-        run: ./gradlew --no-configuration-cache :app:jmh
-
-      - name: Locate JMH JSON result
-        id: locate
-        run: |
-          path="app/build/reports/jmh/result.json"
-          if [ ! -f "$path" ]; then
-            # Fallback for jmh-gradle-plugin layouts that write into results/jmh
-            path=$(find app/build -name 'result.json' -path '*jmh*' | head -n1)
-          fi
-          echo "Benchmark result file: $path"
-          test -f "$path"
-          echo "path=$path" >> "$GITHUB_OUTPUT"
-
+  publish:
+    name: Publish benchmark history and reports
+    needs: verify
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('pages-publish-{0}-main', github.repository) || format('benchmark-report-{0}-{1}', github.repository, github.run_id) }}
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: write
+      deployments: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download verified JMH result
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: jmh-verification
+          path: .
       - name: Ensure gh-pages branch exists
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
@@ -80,13 +95,12 @@ jobs:
           git -c user.name='github-actions[bot]' -c user.email='github-actions[bot]@users.noreply.github.com' commit -m 'Initialize gh-pages'
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin gh-pages
-
       - name: Store benchmark history and charts
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: JMH Benchmarks
           tool: 'jmh'
-          output-file-path: ${{ steps.locate.outputs.path }}
+          output-file-path: app/build/reports/jmh/result.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           benchmark-data-dir-path: dev/bench
           auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -94,46 +108,8 @@ jobs:
           comment-on-alert: true
           fail-on-alert: false
           alert-comment-cc-users: '@carstenartur'
-
-      - name: Generate performance badge JSON
-        if: always()
-        run: |
-          python3 - <<'EOF'
-          import json
-          from pathlib import Path
-
-          result_path = Path('${{ steps.locate.outputs.path }}')
-          target = Path('public/dev/bench')
-          target.mkdir(parents=True, exist_ok=True)
-
-          try:
-              results = json.loads(result_path.read_text(encoding='utf-8'))
-              if not isinstance(results, list):
-                  results = []
-          except Exception as exc:
-              print(f"Could not read JMH result JSON {result_path}: {exc}")
-              results = []
-
-          benchmark_count = len(results)
-          if benchmark_count:
-              badge = {
-                  "schemaVersion": 1,
-                  "label": "performance",
-                  "message": f"{benchmark_count} benchmarks",
-                  "color": "blue",
-              }
-          else:
-              badge = {
-                  "schemaVersion": 1,
-                  "label": "performance",
-                  "message": "no data",
-                  "color": "lightgrey",
-              }
-          (target / 'badge.json').write_text(json.dumps(badge, separators=(',', ':')) + '\n', encoding='utf-8')
-          EOF
-
       - name: Deploy performance badge to GitHub Pages
-        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -143,17 +119,7 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           commit_message: 'Update benchmark badge (${{ github.sha }})'
-
-      - name: Upload raw JMH artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: jmh-results
-          path: |
-            ${{ steps.locate.outputs.path }}
-            app/build/reports/jmh/**
-
-      - name: Report deployed URL
+      - name: Report benchmark dashboard
         if: always()
         run: |
           {
