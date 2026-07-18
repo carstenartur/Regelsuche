@@ -3,6 +3,8 @@ package de.regelsuche.dockere2e;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -10,10 +12,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
@@ -25,8 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @Testcontainers(disabledWithoutDocker = true)
 class ProofDockerImageIntegrationTest {
-    private static final Logger LOG =
-        LoggerFactory.getLogger(ProofDockerImageIntegrationTest.class);
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final Path PROJECT_ROOT = Path.of(System.getProperty(
         "regelsuche.projectRoot",
@@ -45,7 +43,7 @@ class ProofDockerImageIntegrationTest {
             .withDockerfilePath("./Dockerfile.proof")
     )
         .withEnv("REGELSUCHE_PERSISTENCE_MODE", "IN_MEMORY")
-        .withLogConsumer(new Slf4jLogConsumer(LOG))
+        .withLogConsumer(frame -> System.err.print(frame.getUtf8String()))
         .withExposedPorts(8080)
         .waitingFor(Wait.forHttp("/api/proof/jobs").forStatusCode(200))
         .withStartupTimeout(Duration.ofMinutes(15));
@@ -80,14 +78,22 @@ class ProofDockerImageIntegrationTest {
             () -> "proof submission returned " + submitted.statusCode()
                 + ": " + submitted.body()
         );
-        assertTrue(submitted.body().contains("\"jobId\""), submitted::body);
+
+        JsonNode submittedDocument = JSON.readTree(submitted.body());
+        String jobId = submittedDocument.path("jobId").asText();
+        assertTrue(!jobId.isBlank(), submitted::body);
 
         HttpResponse<String> listed = send(HttpRequest.newBuilder()
             .uri(uri("/api/proof/jobs"))
             .GET()
             .build());
         assertEquals(200, listed.statusCode());
-        assertTrue(listed.body().contains("\"jobId\""), listed::body);
+
+        JsonNode listedDocument = JSON.readTree(listed.body());
+        boolean listedJobFound = listedDocument.path("jobs").findValuesAsText("id")
+            .contains(jobId);
+        assertTrue(listedJobFound,
+            () -> "submitted job " + jobId + " missing from list: " + listed.body());
     }
 
     private static void assertSuccessfulVersionCommand(
