@@ -28,7 +28,7 @@ The configured strategies are deterministic BestFirst, the project’s AStar var
 Three backends receive the same two real-polynomial equality statements with no assumptions and the same requested symbolic-certificate strength:
 
 1. Regelsuche’s exact rational polynomial normal form;
-2. external SymPy CAS, pinned in CI;
+2. external SymPy CAS, pinned in the verification environment;
 3. external Z3, with proof-object retrieval on confirmed equalities.
 
 Validation is not discovery. A backend that only checks equality is not scored as a failed conjecture generator. Likewise, a successful search path is not proof. Only the Z3 result may report `FORMAL_CERTIFICATE_RETAINED`; internal normal-form and SymPy certificates remain validation evidence.
@@ -65,7 +65,7 @@ completedMandatoryEvaluations <= mandatoryEvaluations
 
 Publication additionally requires the complete Cartesian matrix of every configuration and every case in the same track. If even one configured evaluation is missing, the writer rejects the run before deleting or replacing any previously retained evidence.
 
-Repeated runs with the fixed environment must produce byte-identical bundles. The dedicated workflow also checks that every standalone retained object is exactly the corresponding object embedded in `report.json`.
+Repeated runs with the fixed environment must produce byte-identical bundles. The verifier also checks that every standalone retained object is exactly the corresponding object embedded in `report.json`.
 
 ## Explicit coverage gaps
 
@@ -80,32 +80,32 @@ Unmeasured tracks are not omitted. The report currently retains machine-readable
 
 A gap can disappear only when its required raw evidence is executed and retained under the corresponding information-parity manifest.
 
-## Reproduction
+## Reproduction and verification
 
-With Z3 and a Python environment containing SymPy available:
-
-```bash
-export REGELSUCHE_SYMPY_PYTHON=/path/to/python
-./gradlew \
-  :regelsuche-benchmarks:test \
-  :regelsuche-benchmarks:writeComparativeBenchmark
-```
-
-The default bundle is written below `regelsuche-benchmarks/build/reports/comparative-benchmarks`.
-
-The pinned runtime image contains Temurin 21.0.11+10, Z3 `4.8.12-3.1build1` and SymPy `1.14.0`:
+The complete benchmark contract runs from a normal checkout with:
 
 ```bash
-docker build \
-  -f Dockerfile.comparative-benchmarks \
-  -t regelsuche-comparative-benchmarks .
-
-mkdir -p build/comparative-benchmark-output
-chmod 0777 build/comparative-benchmark-output
-docker run --rm \
-  -v "$PWD/build/comparative-benchmark-output:/output" \
-  regelsuche-comparative-benchmarks \
-  /output
+bash scripts/run-comparative-benchmarks-verification.sh
 ```
 
-CI installs the same external tools, validates the Draft-2020-12 schema, compares two complete Gradle runs byte for byte and then requires the Docker bundle to be byte-identical to the Gradle bundle.
+Required host tools are a reachable Docker daemon, Python `venv` support and Z3 4.8.12. The runner creates a build-local environment with SymPy 1.14.0 and `jsonschema` 4.25.1 and then:
+
+1. runs the benchmark JUnit suite;
+2. writes two independent Gradle evidence bundles;
+3. validates both bundles against the Draft-2020-12 schema and all parity, resource, reference, outcome and negative-schema invariants;
+4. requires the two Gradle bundles to be byte-identical;
+5. builds the pinned `Dockerfile.comparative-benchmarks` image;
+6. generates and validates a third bundle in that image;
+7. requires the Docker and Gradle bundles to be byte-identical.
+
+The three retained roots and all diagnostics are written below:
+
+```text
+build/reports/comparative-ci/
+  run-a/
+  run-b/
+  run-docker/
+  *.log
+```
+
+The `Comparative Benchmarks` GitHub workflow only installs the declared host toolchain, invokes the same runner and publishes these files. It contains no benchmark assertions, expected score policy, schema mutations or Docker lifecycle semantics.
