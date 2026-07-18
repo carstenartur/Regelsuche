@@ -1,4 +1,4 @@
-name: Apply Independent Reproduction Review Fixes
+name: Apply Independent Reproduction Script Fixes
 
 on:
   push:
@@ -29,54 +29,43 @@ jobs:
           ref: issue-387-reproduction-artifact
           fetch-depth: 0
 
-      - name: Apply and validate review fixes
+      - name: Apply and validate script fixes
         shell: bash
         run: |
           set -euo pipefail
-          test -f .github/issue-398-review-fixes/review.patch
-
-          git show caea7b67654bdbde29d40975c8b0c9ac4d0dabf9:.github/workflows/independent-reproduction-artifact.yml \
-            > .github/workflows/independent-reproduction-artifact.yml
-          git apply --check .github/issue-398-review-fixes/review.patch
-          git apply .github/issue-398-review-fixes/review.patch
+          PATCH=.github/issue-398-review-fixes/review.patch
+          test -f "$PATCH"
+          git apply --check \
+            --include='scripts/build-independent-reproduction-artifact.py' \
+            --include='scripts/verify-independent-reproduction.py' \
+            "$PATCH"
+          git apply \
+            --include='scripts/build-independent-reproduction-artifact.py' \
+            --include='scripts/verify-independent-reproduction.py' \
+            "$PATCH"
           rm -rf .github/issue-398-review-fixes
 
-          bash -n reproduction/reproduce.sh
           python3 - <<'PY'
-          import json
           from pathlib import Path
-          from jsonschema import Draft202012Validator
-
           for name in (
               'scripts/build-independent-reproduction-artifact.py',
               'scripts/verify-independent-reproduction.py',
           ):
               compile(Path(name).read_text(encoding='utf-8'), name, 'exec')
-          schema = json.loads(Path(
-              'docs/schemas/regelsuche-independent-reproduction-artifact-v1.schema.json'
-          ).read_text(encoding='utf-8'))
-          Draft202012Validator.check_schema(schema)
-          assert schema['properties']['declaredEnvironment']['properties'][
-              'launcherRequirements'
-          ]['properties']['jsonschema']['const'] == '4.25.1'
           PY
-
           grep -q 'repository checkout does not match' \
             scripts/build-independent-reproduction-artifact.py
           grep -q 'expected_directories' \
             scripts/verify-independent-reproduction.py
-          grep -q 'unexpected-empty-directory' \
-            .github/workflows/independent-reproduction-artifact.yml
           git diff --check
-          git status --short
 
-      - name: Commit permanent review fixes
+      - name: Commit permanent script fixes
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add scripts .github/issue-398-review-fixes
           test -n "$(git diff --cached --name-only)"
-          git commit --no-verify -m 'Address independent reproduction review findings'
+          git commit --no-verify -m 'Address independent reproduction script review findings'
           git push origin HEAD:refs/heads/issue-387-reproduction-artifact
