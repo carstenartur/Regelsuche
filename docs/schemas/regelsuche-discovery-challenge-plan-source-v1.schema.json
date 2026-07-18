@@ -50,6 +50,18 @@
       "uniqueItems": true,
       "items": {"$ref": "#/$defs/nonBlank"}
     },
+    "textArray2": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
+    "textArray3": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
     "budget": {
       "type": "object",
       "required": [
@@ -114,8 +126,8 @@
         "independentEvaluator": {"$ref": "#/$defs/evaluator"},
         "certificateRoute": {"$ref": "#/$defs/nonBlank"},
         "splitUnit": {"$ref": "#/$defs/nonBlank"},
-        "leakageControls": {"$ref": "#/$defs/textArray"},
-        "baselineProfiles": {"$ref": "#/$defs/textArray"},
+        "leakageControls": {"$ref": "#/$defs/textArray3"},
+        "baselineProfiles": {"$ref": "#/$defs/textArray2"},
         "multipleSolutionPolicy": {"$ref": "#/$defs/nonBlank"},
         "nullResultPolicy": {"$ref": "#/$defs/nonBlank"},
         "budget": {"$ref": "#/$defs/budget"},
