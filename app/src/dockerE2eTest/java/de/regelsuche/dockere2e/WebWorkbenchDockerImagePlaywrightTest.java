@@ -1,27 +1,24 @@
 package de.regelsuche.dockere2e;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.ElementHandle;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-
-import java.nio.file.Path;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Playwright-based Docker-image tests that verify KaTeX actually renders
@@ -38,23 +35,18 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @Testcontainers(disabledWithoutDocker = true)
 class WebWorkbenchDockerImagePlaywrightTest {
 
-    private static final org.slf4j.Logger LOG =
-        org.slf4j.LoggerFactory.getLogger(WebWorkbenchDockerImagePlaywrightTest.class);
-
-    private static final String PROJECT_ROOT =
-        System.getProperty("regelsuche.projectRoot",
-            Path.of("").toAbsolutePath().toString());
-
     @Container
     @SuppressWarnings("resource")
     static final GenericContainer<?> CONTAINER =
-        new GenericContainer<>(
-            new ImageFromDockerfile()
-                .withFileFromPath(".", Path.of(PROJECT_ROOT)))
+        new GenericContainer<>(RegelsucheDockerImages.APPLICATION)
+            // Browser rendering is independent of durable persistence and proof
+            // workers; those have dedicated Testcontainers coverage.
             .withEnv("REGELSUCHE_PERSISTENCE_MODE", "IN_MEMORY")
-            .withLogConsumer(new Slf4jLogConsumer(LOG))
+            .withEnv("REGELSUCHE_PROOF_ENABLED", "false")
+            .withLogConsumer(frame -> System.err.print(frame.getUtf8String()))
             .withExposedPorts(8080)
-            .waitingFor(Wait.forHttp("/").forStatusCode(200));
+            .waitingFor(Wait.forHttp("/").forStatusCode(200))
+            .withStartupTimeout(Duration.ofMinutes(10));
 
     private static Playwright playwright;
     private static Browser browser;
@@ -73,8 +65,12 @@ class WebWorkbenchDockerImagePlaywrightTest {
 
     @AfterAll
     static void stopPlaywright() {
-        if (browser != null) browser.close();
-        if (playwright != null) playwright.close();
+        if (browser != null) {
+            browser.close();
+        }
+        if (playwright != null) {
+            playwright.close();
+        }
     }
 
     private String baseUrl() {
@@ -86,26 +82,21 @@ class WebWorkbenchDockerImagePlaywrightTest {
         assumeTrue(browser != null, "Browser not initialized – skipping");
 
         try (Page page = browser.newPage()) {
-            page.navigate(baseUrl() + "/");
+            page.navigate(baseUrl() + "/",
+                new Page.NavigateOptions().setTimeout(30_000));
             page.waitForLoadState();
 
-            // Click the binomial demo button
             page.waitForSelector("button.demo-button[data-demo='binomial']",
-                new Page.WaitForSelectorOptions().setState(WaitForSelectorState.VISIBLE));
+                new Page.WaitForSelectorOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(30_000));
             page.click("button.demo-button[data-demo='binomial']");
 
-            // Wait for the deterministic completion event: runDemo() sets
-            // #demoStatus to class "status ok" only after the /api/demo POST
-            // resolves and renderDemoSummary has populated #demoSummary (which
-            // also triggers window.renderMath → KaTeX). This is a true DOM
-            // mutation event, not polling; the timeout is just a safety bound.
             page.waitForSelector("#demoStatus.ok",
                 new Page.WaitForSelectorOptions()
                     .setState(WaitForSelectorState.ATTACHED)
                     .setTimeout(60_000));
 
-            // Wait for KaTeX to insert at least one rendered node (mutation
-            // event on the .katex selector, fired as soon as auto-render runs).
             page.waitForSelector(".katex",
                 new Page.WaitForSelectorOptions()
                     .setState(WaitForSelectorState.ATTACHED)
@@ -113,10 +104,9 @@ class WebWorkbenchDockerImagePlaywrightTest {
 
             List<ElementHandle> katexElements = page.querySelectorAll(".katex");
             assertTrue(katexElements.size() > 0,
-                "Expected at least one .katex element rendered by KaTeX, found none. " +
-                "This indicates KaTeX did not load or run.");
+                "Expected at least one .katex element rendered by KaTeX, found none. "
+                    + "This indicates KaTeX did not load or run.");
 
-            // Verify no math-fallback elements in the replay/demo summary
             List<ElementHandle> fallbackElements = page.querySelectorAll(".math-fallback");
             assertFalse(fallbackElements.stream()
                 .anyMatch(el -> {
@@ -135,7 +125,6 @@ class WebWorkbenchDockerImagePlaywrightTest {
         assumeTrue(browser != null, "Browser not initialized – skipping");
 
         try (Page page = browser.newPage()) {
-            // Collect console errors
             var errors = new java.util.ArrayList<String>();
             page.onConsoleMessage(msg -> {
                 if ("error".equals(msg.type())) {
@@ -143,10 +132,10 @@ class WebWorkbenchDockerImagePlaywrightTest {
                 }
             });
 
-            page.navigate(baseUrl() + "/");
+            page.navigate(baseUrl() + "/",
+                new Page.NavigateOptions().setTimeout(30_000));
             page.waitForLoadState();
 
-            // Filter out benign errors (e.g. favicon 404 which is expected)
             List<String> significantErrors = errors.stream()
                 .filter(e -> !e.contains("favicon.ico"))
                 .toList();

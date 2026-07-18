@@ -8,11 +8,12 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.containers.wait.strategy.Wait;
 
 @Testcontainers(disabledWithoutDocker = true)
 class PostgresDiscoveryPersistenceTest {
@@ -22,7 +23,12 @@ class PostgresDiscoveryPersistenceTest {
         .withEnv("POSTGRES_USER", "regelsuche")
         .withEnv("POSTGRES_PASSWORD", "regelsuche-demo")
         .withExposedPorts(5432)
-        .waitingFor(Wait.forListeningPort());
+        // The PostgreSQL image opens port 5432 while its temporary bootstrap
+        // server is still shutting down. Wait for both readiness messages so
+        // the second one denotes the final server, not merely an open socket.
+        .waitingFor(Wait.forLogMessage(
+            ".*database system is ready to accept connections.*\\s", 2))
+        .withStartupTimeout(Duration.ofMinutes(2));
 
     @Test
     void migrationsCreateSearchableDiscoverySchema() throws Exception {

@@ -41,7 +41,6 @@ jobs:
           set -e -o pipefail
           ./gradlew \
             :regelsuche-solver-portfolio:test \
-            :regelsuche-solver-portfolio:z3IntegrationTest \
             :regelsuche-solver-portfolio:writeSolverPortfolioExample \
             2>&1 | tee solver-portfolio-gradle.log
           ./gradlew \
@@ -157,8 +156,6 @@ jobs:
           assert manifest['formalProofAuthorized'] is True
           assert manifest['searchGuidanceExecuted'] is True
 
-          # Fail-closed schema checks: changing only the semantic decision fields
-          # must be rejected even though every hash still has the right shape.
           invalid_refutation = copy.deepcopy(formal)
           invalid_refutation['outcome'] = 'REFUTED'
           invalid_refutation['proofAuthorized'] = False

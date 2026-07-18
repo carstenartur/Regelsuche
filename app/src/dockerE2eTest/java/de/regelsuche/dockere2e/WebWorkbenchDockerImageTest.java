@@ -1,21 +1,18 @@
 package de.regelsuche.dockere2e;
 
-import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.images.builder.ImageFromDockerfile;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import java.time.Duration;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Docker-image-based integration tests that verify the real container correctly
@@ -30,27 +27,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers(disabledWithoutDocker = true)
 class WebWorkbenchDockerImageTest {
 
-    private static final org.slf4j.Logger LOG =
-        org.slf4j.LoggerFactory.getLogger(WebWorkbenchDockerImageTest.class);
-
-    private static final String PROJECT_ROOT =
-        System.getProperty("regelsuche.projectRoot",
-            Path.of("").toAbsolutePath().toString());
+    private static final HttpClient HTTP = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(10))
+        .build();
 
     @Container
     @SuppressWarnings("resource")
     static final GenericContainer<?> CONTAINER =
-        new GenericContainer<>(
-            new ImageFromDockerfile()
-                .withFileFromPath(".", Path.of(PROJECT_ROOT)))
+        new GenericContainer<>(RegelsucheDockerImages.APPLICATION)
+            // This class verifies the HTTP/static-asset surface. Durable graph
+            // state and the external proof scheduler have their own dedicated
+            // Testcontainers suites and must not affect this fixture's startup.
             .withEnv("REGELSUCHE_PERSISTENCE_MODE", "IN_MEMORY")
-            .withLogConsumer(new Slf4jLogConsumer(LOG))
+            .withEnv("REGELSUCHE_PROOF_ENABLED", "false")
+            .withLogConsumer(frame -> System.err.print(frame.getUtf8String()))
             .withExposedPorts(8080)
-            .waitingFor(Wait.forHttp("/").forStatusCode(200));
-
-    private HttpClient client() {
-        return HttpClient.newHttpClient();
-    }
+            .waitingFor(Wait.forHttp("/").forStatusCode(200))
+            .withStartupTimeout(Duration.ofMinutes(10));
 
     private String baseUrl() {
         return "http://" + CONTAINER.getHost() + ":" + CONTAINER.getMappedPort(8080);
@@ -59,15 +52,17 @@ class WebWorkbenchDockerImageTest {
     private HttpResponse<String> get(String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl() + path))
+            .timeout(Duration.ofSeconds(30))
             .build();
-        return client().send(request, HttpResponse.BodyHandlers.ofString());
+        return HTTP.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<byte[]> getBytes(String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl() + path))
+            .timeout(Duration.ofSeconds(30))
             .build();
-        return client().send(request, HttpResponse.BodyHandlers.ofByteArray());
+        return HTTP.send(request, HttpResponse.BodyHandlers.ofByteArray());
     }
 
     @Test
@@ -130,7 +125,6 @@ class WebWorkbenchDockerImageTest {
 
     @Test
     void pathTraversalIsRejected() throws Exception {
-        // URL-encoded path traversal attempt
         HttpResponse<String> resp = get("/vendor/..%2F..%2F..%2F..%2Fetc%2Fpasswd");
         assertTrue(resp.statusCode() >= 400,
             "Path traversal should be rejected with 4xx, got " + resp.statusCode());
@@ -138,7 +132,6 @@ class WebWorkbenchDockerImageTest {
 
     @Test
     void rawPathTraversalIsRejected() throws Exception {
-        // Raw dots in path
         HttpResponse<String> resp = get("/vendor/../../../../etc/passwd");
         assertTrue(resp.statusCode() >= 400,
             "Path traversal should be rejected with 4xx, got " + resp.statusCode());

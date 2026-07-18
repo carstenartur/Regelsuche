@@ -21,21 +21,8 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform {
-        excludeTags 'external-prover'
-    }
+    useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
-}
-
-tasks.register('z3IntegrationTest', Test) {
-    description = 'Runs the real external Z3 portfolio integration.'
-    group = 'verification'
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-    useJUnitPlatform {
-        includeTags 'external-prover'
-    }
-    shouldRunAfter tasks.named('test')
 }
 
 tasks.register('writeSolverPortfolioExample', JavaExec) {

@@ -1,5 +1,53 @@
 def aiKnowledgeEnabled = System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
 
+def configuredIncludeTags = providers.gradleProperty('includeTestTags').orNull
+def configuredExcludeTags = providers.gradleProperty('excludeTestTags').orNull
+
+def parseTestTags = { String raw ->
+    raw == null ? [] : raw.split(',')
+        .collect { it.trim() }
+        .findAll { !it.isEmpty() }
+        .unique()
+}
+
+def includedTestTags = parseTestTags(configuredIncludeTags)
+def excludedTestTags = parseTestTags(configuredExcludeTags)
+
+allprojects {
+    tasks.withType(org.gradle.api.tasks.testing.Test).configureEach {
+        useJUnitPlatform {
+            if (!includedTestTags.isEmpty()) {
+                includeTags(*includedTestTags)
+            }
+            if (!excludedTestTags.isEmpty()) {
+                excludeTags(*excludedTestTags)
+            }
+        }
+    }
+}
+
+project(':app') {
+    tasks.matching { it.name == 'dockerE2eTest' }.configureEach {
+        dependsOn tasks.named('installPlaywrightBrowsers')
+    }
+}
+
+def repositoryTestTasks = subprojects.collect { candidateProject ->
+    candidateProject.tasks.withType(org.gradle.api.tasks.testing.Test)
+}
+
+def repositoryTest = tasks.register('test') {
+    group = 'verification'
+    description = 'Runs every Gradle Test task in the repository, including browser, Docker/Testcontainers and external-tool integration tests.'
+    dependsOn repositoryTestTasks
+}
+
+tasks.register('allTests') {
+    group = 'verification'
+    description = 'Explicit alias for the complete repository test run.'
+    dependsOn repositoryTest
+}
+
 buildscript {
     repositories {
         if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
