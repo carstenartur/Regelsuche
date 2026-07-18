@@ -1,27 +1,24 @@
 package de.regelsuche.dockere2e;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.ElementHandle;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.WaitForSelectorState;
+import java.time.Duration;
+import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-
-import java.nio.file.Path;
-import java.time.Duration;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Playwright-based Docker-image tests that verify KaTeX actually renders
@@ -38,16 +35,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 @Testcontainers(disabledWithoutDocker = true)
 class WebWorkbenchDockerImagePlaywrightTest {
 
-    private static final String PROJECT_ROOT =
-        System.getProperty("regelsuche.projectRoot",
-            Path.of("").toAbsolutePath().toString());
-
     @Container
     @SuppressWarnings("resource")
     static final GenericContainer<?> CONTAINER =
-        new GenericContainer<>(
-            new ImageFromDockerfile()
-                .withFileFromPath(".", Path.of(PROJECT_ROOT)))
+        new GenericContainer<>(RegelsucheDockerImages.APPLICATION)
             // Browser rendering is independent of durable persistence and proof
             // workers; those have dedicated Testcontainers coverage.
             .withEnv("REGELSUCHE_PERSISTENCE_MODE", "IN_MEMORY")
@@ -74,8 +65,12 @@ class WebWorkbenchDockerImagePlaywrightTest {
 
     @AfterAll
     static void stopPlaywright() {
-        if (browser != null) browser.close();
-        if (playwright != null) playwright.close();
+        if (browser != null) {
+            browser.close();
+        }
+        if (playwright != null) {
+            playwright.close();
+        }
     }
 
     private String baseUrl() {
@@ -87,11 +82,14 @@ class WebWorkbenchDockerImagePlaywrightTest {
         assumeTrue(browser != null, "Browser not initialized – skipping");
 
         try (Page page = browser.newPage()) {
-            page.navigate(baseUrl() + "/");
+            page.navigate(baseUrl() + "/",
+                new Page.NavigateOptions().setTimeout(30_000));
             page.waitForLoadState();
 
             page.waitForSelector("button.demo-button[data-demo='binomial']",
-                new Page.WaitForSelectorOptions().setState(WaitForSelectorState.VISIBLE));
+                new Page.WaitForSelectorOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(30_000));
             page.click("button.demo-button[data-demo='binomial']");
 
             page.waitForSelector("#demoStatus.ok",
@@ -134,7 +132,8 @@ class WebWorkbenchDockerImagePlaywrightTest {
                 }
             });
 
-            page.navigate(baseUrl() + "/");
+            page.navigate(baseUrl() + "/",
+                new Page.NavigateOptions().setTimeout(30_000));
             page.waitForLoadState();
 
             List<String> significantErrors = errors.stream()
