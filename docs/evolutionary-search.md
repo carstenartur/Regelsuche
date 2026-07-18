@@ -1,11 +1,13 @@
-# Evolutionary search genome foundation
+# Evolutionary search genome and study foundation
 
-Issue #220 is intentionally split into reviewable stages. This foundation stage
+Issue #220 is intentionally split into reviewable stages. The genome foundation
 makes evolved operator programs and search-policy candidates explicit,
-replayable, executable and reject-by-default. It does **not** claim that an
-evolution campaign has already produced a validated mathematical discovery.
+replayable, executable and reject-by-default. The study-contract stage freezes
+nested splits, population policy, fitness components and FINAL TEST rules before
+population execution. Neither stage claims that an evolution campaign has
+already produced a validated mathematical discovery.
 
-## Versioned contracts
+## Versioned genome contracts
 
 The implementation lives in `regelsuche-learning` under
 `de.regelsuche.evolution`.
@@ -22,7 +24,7 @@ The implementation lives in `regelsuche-learning` under
 - `DeterministicGenomeMutator` enumerates bounded mutations from a pinned seed
   and retains every accepted or rejected attempt in a canonical lineage batch.
 
-The retained schemas are:
+The retained genome schemas are:
 
 - `docs/schemas/regelsuche-evolution-genome-v1.schema.json`
 - `docs/schemas/regelsuche-evolution-preflight-v1.schema.json`
@@ -50,9 +52,11 @@ Genome formation is restricted to a `TrainingScope` whose only legal split is
 partition and feature schema. The v1 genome has no fields for hidden targets,
 TEST labels, expected answers or post-hoc discovery outcomes.
 
-This type-level boundary is necessary but not sufficient for the complete
-issue. The campaign runner still has to prove that its input adapters only
-supply TRAIN material and that VALIDATION/TEST evaluators remain separate.
+The frozen study source strengthens that boundary by binding all 18 cases from
+the candidate-independent benchmark and independently computing exact and
+alpha-structural fingerprints. Every family, signature and fingerprint must be
+unique across TRAIN, VALIDATION and FINAL TEST. A collision fails verification
+instead of being silently removed.
 
 ## Hard preflight blockers
 
@@ -92,6 +96,55 @@ key and rotated by a deterministic 64-bit seed mixer. `MutationLimits` bounds
 both evaluated proposals and accepted children. Accepted children must be
 structurally unique and pass the normal preflight gate.
 
+## Frozen population study
+
+The authoritative Phase-1 source is:
+
+```text
+research/evolution/evolution-study-source.json
+```
+
+Its Draft 2020-12 schema is:
+
+```text
+docs/schemas/regelsuche-evolution-study-source-v1.schema.json
+```
+
+Verify the study from a plain checkout with:
+
+```bash
+python3 scripts/verify-evolution-study.py
+```
+
+The study freezes before execution:
+
+- the exact candidate-independent benchmark identity and canonical source hash;
+- six TRAIN, six VALIDATION and six FINAL TEST cases;
+- exact and alpha-structural split fingerprints;
+- one pinned population seed, population size and generation budget;
+- elite, offspring, replacement and duplicate-suppression policies;
+- a minimum alpha-structural diversity requirement;
+- named hard blockers that are never converted to scalar penalties;
+- eight separately retained TRAIN-only fitness components;
+- a versioned scalar selection profile whose weight signs are checked against
+  component direction;
+- VALIDATION-only population and hyperparameter selection;
+- a full-diversity versus no-diversity ablation under identical budgets;
+- one-time FINAL TEST access with a new study identity required for reruns;
+- complete terminal-outcome policies for populations and FINAL TEST cases.
+
+The current source deliberately remains:
+
+```text
+executionStatus: NOT_STARTED
+finalTestAccess: NOT_ACCESSED
+publicationAuthorized: false
+```
+
+Changing the benchmark, split cases, fingerprints, population policy, fitness
+profile or FINAL TEST rule invalidates the source hash and requires a new study
+identity before execution.
+
 ## Replay and execution
 
 ```java
@@ -106,20 +159,22 @@ EvolutionGenomeCompiler.CompiledProgram program =
 ```
 
 The compiler exposes ordinary `RewriteRule` objects and instantiates symbolic
-assumption templates from concrete pattern bindings. Search integration must
+assumption templates from concrete pattern bindings. Population execution must
 still enforce the compiled program's recorded budgets and route every retained
 candidate through the existing semantic validation, counterexample, proof,
 novelty and promotion gates.
 
 ## Remaining stages for issue #220
 
-The foundation does not close #220. Follow-up slices still need to add:
+The frozen study source completes the contract portion of Phase 1 but does not
+close #220. Follow-up slices still need to add:
 
-1. deterministic populations and islands with structural-diversity metrics;
-2. a TRAIN-only fitness evaluator with explicit component and penalty records;
-3. frozen family and structural-signature TRAIN/VALIDATION/TEST splits;
-4. campaign checkpoints, resume/replay and resource-budget accounting;
-5. promotion adapters that can only invoke existing validation, proof, novelty
+1. deterministic population/island orchestration using the frozen policy;
+2. a TRAIN-only fitness evaluator that writes every raw component and blocker;
+3. canonical generation reports with structural-diversity and lineage data;
+4. complete checkpoints, strict resume and uninterrupted/resumed equivalence;
+5. VALIDATION-only selection and an immutable selection receipt;
+6. one-time FINAL TEST evaluation with every terminal outcome retained;
+7. promotion adapters that can only invoke existing validation, proof, novelty
    and release gates;
-6. bounded benchmark campaigns comparing evolved candidates with non-evolved
-   baselines and publishing negative as well as positive results.
+8. information-parity baselines, diversity ablation and pinned reproduction.
