@@ -134,12 +134,13 @@ tasks.register('verifyStaticReferencePage', Exec) {
 
 tasks.register('generateCiPages', Exec) {
     group = 'reporting'
-    description = 'Renders coverage and test badge pages from local Gradle reports.'
+    description = 'Renders coverage and test badge pages from the current local Gradle reports.'
     workingDir rootDir
     commandLine pythonExecutable, 'scripts/generate-ci-pages.py'
     inputs.file('scripts/generate-ci-pages.py')
     outputs.dir('public/coverage')
     outputs.dir('public/tests')
+    outputs.upToDateWhen { false }
 }
 
 tasks.register('verifyCandidateIndependentBenchmark', Exec) {
