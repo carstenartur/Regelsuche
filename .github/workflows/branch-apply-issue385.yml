@@ -6,10 +6,15 @@ on:
     paths:
       - '.github/workflows/branch-apply-issue385.yml'
       - '.github/issue-385-patch/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/branch-apply-issue385.yml'
+      - '.github/issue-385-patch/**'
   workflow_dispatch:
 
 concurrency:
-  group: apply-capability-status-${{ github.repository }}-${{ github.ref }}
+  group: apply-capability-status-${{ github.repository }}-issue-385
   cancel-in-progress: true
 
 permissions:
