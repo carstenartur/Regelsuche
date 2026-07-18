@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.discovery-challenge-artifact/v1",
+  "title": "Regelsuche discovery challenge generated artifacts v1",
+  "oneOf": [
+    {"$ref": "#/$defs/landscape"},
+    {"$ref": "#/$defs/feasibility"},
+    {"$ref": "#/$defs/splitPolicy"},
+    {"$ref": "#/$defs/baselinePlan"},
+    {"$ref": "#/$defs/runBudget"},
+    {"$ref": "#/$defs/portfolio"}
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{1,191}$"
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base": {
+      "type": "object",
+      "required": ["schema", "portfolioId", "sourceHash", "contentHash"],
+      "properties": {
+        "schema": {"$ref": "#/$defs/identifier"},
+        "portfolioId": {"$ref": "#/$defs/identifier"},
+        "sourceHash": {"$ref": "#/$defs/sha256"},
+        "contentHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "landscape": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "claimPolicy",
+            "assessedChallengeCount",
+            "selectedChallengeCount",
+            "deferredChallengeCount",
+            "challenges"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-landscape/v1"},
+            "claimPolicy": {"const": "EVALUATOR_BACKED_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"},
+            "assessedChallengeCount": {"type": "integer", "minimum": 5},
+            "selectedChallengeCount": {"type": "integer", "minimum": 2},
+            "deferredChallengeCount": {"type": "integer", "minimum": 0},
+            "challenges": {"type": "array", "minItems": 5, "uniqueItems": true}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "feasibility": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "evaluations",
+            "pilotEvidenceStatus",
+            "evaluatedCampaignStatus",
+            "externalNoveltyStatus"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-feasibility/v1"},
+            "evaluations": {"type": "array", "minItems": 5, "uniqueItems": true},
+            "pilotEvidenceStatus": {"const": "DEVELOPMENT_ONLY"},
+            "evaluatedCampaignStatus": {"const": "NOT_STARTED"},
+            "externalNoveltyStatus": {"const": "NOT_EVALUATED"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "splitPolicy": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "externalSearchVisibility",
+            "challengePolicies",
+            "crossSplitCollisionDisposition",
+            "correctedSplitDisposition"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-split-policy/v1"},
+            "externalSearchVisibility": {"const": "POST_FORMATION_ONLY"},
+            "challengePolicies": {"type": "array", "minItems": 5, "uniqueItems": true},
+            "crossSplitCollisionDisposition": {"const": "BLOCK_PUBLICATION"},
+            "correctedSplitDisposition": {"const": "NEW_PORTFOLIO_IDENTITY"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "baselinePlan": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["universalScorePolicy", "challengeBaselines"],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-baseline-plan/v1"},
+            "universalScorePolicy": {"const": "NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY"},
+            "challengeBaselines": {"type": "array", "minItems": 5, "uniqueItems": true}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "runBudget": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "challengeBudgets",
+            "overspendDisposition",
+            "missingMandatoryEvaluationDisposition"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-run-budget/v1"},
+            "challengeBudgets": {"type": "array", "minItems": 5, "uniqueItems": true},
+            "overspendDisposition": {"const": "INVALID_RUN"},
+            "missingMandatoryEvaluationDisposition": {"const": "INVALID_RUN"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "portfolio": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "claimPolicy",
+            "selectedChallengeIds",
+            "deferredChallengeIds",
+            "landscapeHash",
+            "feasibilityHash",
+            "splitPolicyHash",
+            "baselinePlanHash",
+            "runBudgetHash",
+            "pilotEvidenceStatus",
+            "evaluatedCampaignStatus",
+            "externalNoveltyStatus",
+            "consumptionTarget"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-portfolio/v1"},
+            "claimPolicy": {"const": "EVALUATOR_BACKED_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"},
+            "selectedChallengeIds": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/identifier"}
+            },
+            "deferredChallengeIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/identifier"}
+            },
+            "landscapeHash": {"$ref": "#/$defs/sha256"},
+            "feasibilityHash": {"$ref": "#/$defs/sha256"},
+            "splitPolicyHash": {"$ref": "#/$defs/sha256"},
+            "baselinePlanHash": {"$ref": "#/$defs/sha256"},
+            "runBudgetHash": {"$ref": "#/$defs/sha256"},
+            "pilotEvidenceStatus": {"const": "DEVELOPMENT_ONLY"},
+            "evaluatedCampaignStatus": {"const": "NOT_STARTED"},
+            "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+            "consumptionTarget": {"const": "issue-383-candidate-independent-benchmark"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
