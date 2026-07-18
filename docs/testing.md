@@ -1,16 +1,16 @@
 # Testing
 
-Regelsuche besitzt einen repositoryweiten, von GitHub unabhängigen Testvertrag. Aus einem normalen Checkout startet ein einziger Gradle-Aufruf sämtliche als `Test` modellierten Testschichten:
+Regelsuche besitzt einen repositoryweiten, von GitHub unabhängigen Testvertrag. Aus einem normalen Checkout startet der übliche Gradle-Testaufruf sämtliche als `Test` modellierten Testschichten:
 
 ```bash
-./gradlew allTests
+./gradlew test
 ```
 
-Der Root-Task sammelt die `Test`-Tasks aller Module dynamisch ein. Damit umfasst derselbe Gradle-Lauf:
+Der Root-Task aggregiert die `Test`-Tasks aller Module. `./gradlew allTests` bleibt als expliziter Alias für denselben vollständigen Lauf verfügbar.
 
 | Schicht | Enthaltener Task | Inhalt |
 | --- | --- | --- |
-| Modul- und Komponententests | alle `test`-Tasks | JUnit-5-Tests aller Java-Module |
+| Modul- und Komponententests | alle Modul-`test`-Tasks | JUnit-5-Tests aller Java-Module |
 | Browser-Integration | `:app:e2eTest` | Playwright gegen eine echte lokale `WebWorkbenchServer`-Instanz |
 | Container-Integration | `:app:dockerE2eTest` | reale Anwendungs-, PostgreSQL- und Proof-Images über Testcontainers |
 | Externer Solver | `:regelsuche-solver-portfolio:test` | echter Z3-Lauf, sofern Z3 auf dem Rechner verfügbar ist |
@@ -33,13 +33,13 @@ Tags können repositoryweit für jeden Gradle-`Test`-Task gefiltert werden:
 
 ```bash
 # Nur Tests mit dem angegebenen JUnit-Tag
-./gradlew allTests -PincludeTestTags=external-prover
+./gradlew test -PincludeTestTags=external-prover
 
 # Alles außer bestimmten JUnit-Tags
-./gradlew allTests -PexcludeTestTags=external-prover
+./gradlew test -PexcludeTestTags=external-prover
 
 # Mehrere Tags, kommasepariert
-./gradlew allTests -PexcludeTestTags=external-prover,slow
+./gradlew test -PexcludeTestTags=external-prover,slow
 ```
 
 Für einzelne Klassen und Methoden bleibt der normale Gradle/JUnit-Filter verfügbar:
@@ -57,12 +57,13 @@ Für einzelne Klassen und Methoden bleibt der normale Gradle/JUnit-Filter verfü
 Für schnelle Entwicklungszyklen können die Schichten weiterhin separat ausgeführt werden:
 
 ```bash
-./gradlew test
+./gradlew :app:test
 ./gradlew :app:e2eTest
 ./gradlew :app:dockerE2eTest
+./gradlew :regelsuche-solver-portfolio:test
 ```
 
-`./gradlew test` wählt die normalen `test`-Tasks der Module aus. Der vollständige, verbindliche lokale Einstiegspunkt ist dagegen `./gradlew allTests`, weil nur dieser auch die zusätzlich benannten Browser- und Container-`Test`-Tasks umfasst.
+Der unqualifizierte Root-Aufruf `./gradlew test` ist dagegen der vollständige verbindliche Testlauf. Er umfasst ausdrücklich auch die zusätzlich benannten Browser- und Container-`Test`-Tasks.
 
 ## Browser-Integration
 
@@ -97,4 +98,4 @@ Screenshots und Videos sind ein zusätzlicher Ausgabemodus derselben Browser-Tes
 ./gradlew :app:e2eTest -Pregelsuche.recordDocs=true
 ```
 
-Das Ändern von Dokumentationsartefakten ist bewusst nicht Teil von `allTests`, damit ein normaler Verifikationslauf den Checkout nicht verändert.
+Das Ändern von Dokumentationsartefakten ist bewusst nicht Teil von `test`, damit ein normaler Verifikationslauf den Checkout nicht verändert.
