@@ -38,15 +38,9 @@ The complete verification entry point is repository-owned and works from a plain
 ./gradlew verifyCandidateIndependentBenchmark
 ```
 
-The normal verification lifecycle also includes it:
-
-```bash
-./gradlew check
-```
-
 The verifier rejects duplicate JSON keys, unknown top-level fields, portfolio substitution, split-count drift, TEST or expected-answer exposure, incomplete terminal-outcome accounting and structural-cluster coverage drift.
 
-GitHub Actions may call the Gradle task and upload diagnostics, but it does not contain the benchmark rules or pass/fail logic.
+GitHub Actions calls this Gradle task, but it does not contain the benchmark rules or pass/fail logic. A later consolidation can attach the task to a repository-wide verification lifecycle once that lifecycle has one unambiguous root aggregate task.
 
 ## Follow-up phases
 
