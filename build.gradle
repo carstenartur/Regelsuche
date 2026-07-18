@@ -1,5 +1,7 @@
 def aiKnowledgeEnabled = System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
 
+def pythonExecutable = providers.gradleProperty('pythonExecutable').getOrElse('python3')
+
 buildscript {
     repositories {
         if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
@@ -55,6 +57,36 @@ if (aiKnowledgeEnabled) {
 
 // Stable, checkout-local verification entry points. GitHub Actions may invoke
 // these tasks, but it must not own their assertions or infrastructure lifecycle.
+tasks.register('docsLint', Exec) {
+    group = 'verification'
+    description = 'Checks Markdown display-math layout using a checked-in verifier.'
+    workingDir rootProject.projectDir
+    commandLine pythonExecutable, 'scripts/check-docs-math.py'
+}
+
+tasks.register('verifyDiscoveryGallery', Exec) {
+    group = 'verification'
+    description = 'Regenerates and verifies the committed discovery gallery.'
+    dependsOn ':app:generateDiscoveryGallery'
+    workingDir rootProject.projectDir
+    commandLine pythonExecutable, 'scripts/verify-generated-discovery-gallery.py'
+}
+
+tasks.register('verifyStaticReferencePage', Exec) {
+    group = 'verification'
+    description = 'Generates and verifies the static reference page contract.'
+    dependsOn ':app:generateStaticReferencePage'
+    workingDir rootProject.projectDir
+    commandLine pythonExecutable, 'scripts/verify-static-reference-page.py'
+}
+
+tasks.register('generateCiPages', Exec) {
+    group = 'reporting'
+    description = 'Renders coverage and test badge pages from local Gradle reports.'
+    workingDir rootProject.projectDir
+    commandLine pythonExecutable, 'scripts/generate-ci-pages.py'
+}
+
 tasks.register('integrationTest') {
     group = 'verification'
     description = 'Runs Docker-backed integration tests through Testcontainers.'
@@ -70,6 +102,7 @@ tasks.register('browserE2eTest') {
 def verificationTestTask = tasks.register('verificationTest') {
     group = 'verification'
     description = 'Runs all JVM tests plus the Testcontainers integration suite.'
+    dependsOn tasks.named('docsLint')
     dependsOn tasks.named('integrationTest')
 }
 
