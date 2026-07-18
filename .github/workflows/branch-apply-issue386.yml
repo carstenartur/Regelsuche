@@ -1,0 +1,79 @@
+name: Apply Autonomous Discovery Walkthrough Source
+
+on:
+  push:
+    branches: [ "issue-386-autonomous-walkthrough" ]
+    paths:
+      - '.github/workflows/branch-apply-issue386.yml'
+      - '.github/issue-386-patch/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/branch-apply-issue386.yml'
+      - '.github/issue-386-patch/**'
+  workflow_dispatch:
+
+concurrency:
+  group: apply-autonomous-walkthrough-${{ github.repository }}-issue-386
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: issue-386-autonomous-walkthrough
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Decode and authenticate walkthrough archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/issue-386-patch/chunk-* | base64 --decode > /tmp/issue386-static.tar.gz
+          actual="$(sha256sum /tmp/issue386-static.tar.gz | cut -d' ' -f1)"
+          test "$actual" = 436fb3dace41ddb2b2644701ef3ba395e3b867fdc47bd36d090261aaf1af7c76
+          tar -tzf /tmp/issue386-static.tar.gz > /tmp/issue386-files.txt
+          test "$(wc -l < /tmp/issue386-files.txt)" -eq 9
+          grep -qx 'scripts/generate-autonomous-discovery-result-card.py' /tmp/issue386-files.txt
+          grep -qx 'scripts/run-autonomous-discovery-walkthrough-container.sh' /tmp/issue386-files.txt
+          grep -qx 'docs/autonomous-discovery-walkthrough.md' /tmp/issue386-files.txt
+          grep -qx 'docs/generated/autonomous-discovery/result-card.json' /tmp/issue386-files.txt
+          grep -qx 'docs/generated/autonomous-discovery/result-card.md' /tmp/issue386-files.txt
+          grep -qx 'docs/generated/autonomous-discovery/result-card.svg' /tmp/issue386-files.txt
+          grep -qx 'docs/schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json' /tmp/issue386-files.txt
+          grep -qx '.github/workflows/autonomous-discovery-walkthrough.yml' /tmp/issue386-files.txt
+          grep -qx '.github/issue-386-apply.sh' /tmp/issue386-files.txt
+
+      - name: Retain bootstrap-start evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > .github/issue-386-patch/bootstrap-started
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/issue-386-patch/bootstrap-started
+          git commit -m 'chore(ci): mark walkthrough bootstrap [skip ci]'
+          git push origin HEAD:issue-386-autonomous-walkthrough
+
+      - name: Apply and verify walkthrough slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -xzf /tmp/issue386-static.tar.gz
+          chmod +x .github/issue-386-apply.sh
+          .github/issue-386-apply.sh
