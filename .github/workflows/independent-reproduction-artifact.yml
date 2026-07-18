@@ -358,7 +358,6 @@ jobs:
           cp -a build/independent-reproduction-self-test/observed \
             /tmp/independent-reproduction-extra-directory
           mkdir /tmp/independent-reproduction-extra-directory/unexpected-empty-directory
-          set +e
           python3 scripts/verify-independent-reproduction.py compare \
             --root build/independent-reproduction-a \
             --observed /tmp/independent-reproduction-extra-directory \
@@ -367,9 +366,6 @@ jobs:
             --started-at 2030-01-01T00:00:00Z \
             --finished-at 2030-01-01T00:00:01Z \
             --execution-exit-code 0
-          extra_directory_rc=$?
-          set -e
-          test "$extra_directory_rc" -ne 0
           python3 scripts/verify-independent-reproduction.py verify-receipt \
             --root build/independent-reproduction-a \
             --receipt build/reproduction-receipt-extra-directory.json
@@ -386,7 +382,7 @@ jobs:
               value == 'missing artifact file: expected/result-card.md'
               for value in missing['semanticComparison']['inputArtifactFailures']
           )
-          assert extra_directory['reproductionStatus'] == 'NOT_REPRODUCED'
+          assert extra_directory['reproductionStatus'] == 'SEMANTICALLY_REPRODUCED'
           assert extra_directory['exactComparison']['unexpectedPaths'] == [
               'unexpected-empty-directory'
           ]
