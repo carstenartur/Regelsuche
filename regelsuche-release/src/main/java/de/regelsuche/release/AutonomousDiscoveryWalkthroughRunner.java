@@ -315,13 +315,14 @@ public final class AutonomousDiscoveryWalkthroughRunner {
             return;
         }
         try (var paths = Files.walk(outputDirectory)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
-                try {
-                    Files.delete(path);
-                } catch (IOException exception) {
-                    throw new UncheckedIOException(exception);
-                }
-            });
+            paths.filter(path -> !path.equals(outputDirectory))
+                .sorted(Comparator.reverseOrder()).forEach(path -> {
+                    try {
+                        Files.delete(path);
+                    } catch (IOException exception) {
+                        throw new UncheckedIOException(exception);
+                    }
+                });
         } catch (IOException exception) {
             throw new UncheckedIOException(
                 "Could not reset walkthrough output", exception);
