@@ -7,9 +7,15 @@ discovery result identified by `artifact-manifest.json`.
 
 ## Host requirements
 
-The launcher requires Bash, Python 3.11 or newer and Docker 24 or newer. Those
-requirements are declared in the manifest. No checkout, database, maintainer
-configuration or host-side Gradle installation is used.
+The launcher requires Bash, Python 3.11 or newer, `jsonschema==4.25.1` and
+Docker 24 or newer. Install the pinned Python validator before the first run:
+
+```bash
+python3 -m pip install jsonschema==4.25.1
+```
+
+These requirements are declared in the manifest. No checkout, database,
+maintainer configuration or host-side Gradle installation is used.
 
 ## Verify and run
 
