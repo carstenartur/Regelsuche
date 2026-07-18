@@ -11,77 +11,17 @@ on:
 
 concurrency:
   group: pages-publish-${{ github.repository }}-${{ github.ref_name }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  docs-lint:
-    name: Docs markdown lint (display math indentation)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Fail on indented $$ display math in docs/
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          import sys
-
-          print("Rule: GitHub's MathJax-Renderer rendert `$$ … $$` nicht, wenn der Block in einer Liste eingerückt ist. Ziehe den Block auf Top-Level oder ersetze ihn durch Inline-Math `$…$`.")
-
-          # Self-check of the lint logic: fenced-code content must be ignored.
-          sample = [
-              "```md",
-              "  $$",
-              "x^2",
-              "  $$",
-              "```",
-              "",
-              "  $$",
-              "x^2",
-              "  $$",
-          ]
-          in_fence = False
-          sample_hits = []
-          for idx, line in enumerate(sample, start=1):
-              if re.match(r"^\s*```", line):
-                  in_fence = not in_fence
-                  continue
-              if not in_fence and re.match(r"^[ \t]+\$\$", line):
-                  sample_hits.append(idx)
-          if sample_hits != [7, 9]:
-              print("Internal lint self-check failed:", sample_hits)
-              sys.exit(2)
-
-          failures = []
-          for md in sorted(Path("docs").rglob("*.md")):
-              in_fence = False
-              for lineno, line in enumerate(md.read_text(encoding="utf-8").splitlines(), start=1):
-                  if re.match(r"^\s*```", line):
-                      in_fence = not in_fence
-                      continue
-                  if in_fence:
-                      continue
-                  if re.match(r"^[ \t]+\$\$", line):
-                      failures.append(f"{md}:{lineno}: indented display math `$$`")
-
-          if failures:
-              print("\nFound indented display-math blocks:")
-              for item in failures:
-                  print(item)
-              sys.exit(1)
-
-          print("OK: no indented display-math blocks in docs/**/*.md")
-          PY
-
   unit-test:
-    name: Unit & integration tests
+    name: Unit tests and checkout-local verification
     runs-on: ubuntu-latest
-    needs: docs-lint
     permissions:
-      contents: write   # required to publish reports to gh-pages
+      contents: write
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v5
@@ -89,183 +29,23 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6.1.0
-      - name: Build, test, coverage
+      - name: Verify thin-workflow architecture
+        run: ./gradlew verifyWorkflowSemantics --console=plain
+      - name: Lint documentation
+        run: python3 scripts/check-docs-math.py
+      - name: Build, test and generate coverage
         run: ./gradlew build jacocoTestReport
-      - name: Verify discovery gallery reproducibility
+      - name: Verify generated discovery gallery
         run: |
           env -u GITHUB_SHA ./gradlew :app:generateDiscoveryGallery
-          git diff --exit-code -- docs/generated/discovery docs/demo-gallery.md README.md
-          if git status --porcelain -- docs/generated/discovery docs/demo-gallery.md README.md | grep -q .; then echo "Untracked generated files detected"; exit 1; fi
-      - name: Generate static reference page and validate
+          python3 scripts/verify-generated-discovery-gallery.py
+      - name: Verify static reference page
         run: |
           ./gradlew :app:generateStaticReferencePage
-          PAGE_DIR=app/build/reports/static-reference-page
-          # Check index.html exists
-          test -f "$PAGE_DIR/index.html" || { echo "index.html missing"; exit 1; }
-          # Check all expected sub-pages exist
-          test -f "$PAGE_DIR/timeline.html" || { echo "timeline.html missing"; exit 1; }
-          test -f "$PAGE_DIR/observatory.html" || { echo "observatory.html missing"; exit 1; }
-          test -f "$PAGE_DIR/timeline.md" || { echo "timeline.md missing"; exit 1; }
-          test -f "$PAGE_DIR/version.txt" || { echo "version.txt missing"; exit 1; }
-          # Check mode label is present (must be unambiguous)
-          grep -q "LIVE EXECUTION\|REPLAYED FROM CANONICAL\|PRE-GENERATED REFERENCE" "$PAGE_DIR/index.html" \
-            || { echo "index.html missing result-mode label"; exit 1; }
-          # Check reproduce section with exact Gradle and Docker commands
-          grep -q "runReferenceCampaign" "$PAGE_DIR/index.html" \
-            || { echo "index.html missing runReferenceCampaign command"; exit 1; }
-          grep -q "generateStaticReferencePage" "$PAGE_DIR/index.html" \
-            || { echo "index.html missing generateStaticReferencePage command"; exit 1; }
-          grep -q "Dockerfile.proof" "$PAGE_DIR/index.html" \
-            || { echo "index.html missing Dockerfile.proof reference"; exit 1; }
-          echo "Static reference page validation passed."
-      - name: Generate Pages reports and badge JSON
+          python3 scripts/verify-static-reference-page.py
+      - name: Render local coverage and test pages
         if: always()
-        run: |
-          python3 - <<'EOF'
-          import html
-          import json
-          import shutil
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-
-          GREEN, YELLOW = 80, 60
-
-          def colour(pct):
-              if pct >= GREEN:
-                  return 'brightgreen'
-              if pct >= YELLOW:
-                  return 'yellow'
-              return 'red'
-
-          def write_json(path, payload):
-              path.parent.mkdir(parents=True, exist_ok=True)
-              path.write_text(json.dumps(payload, separators=(',', ':')) + '\n', encoding='utf-8')
-
-          def escape(value):
-              return html.escape(str(value), quote=True)
-
-          public = Path('public')
-          coverage_dir = public / 'coverage'
-          tests_dir = public / 'tests'
-          coverage_dir.mkdir(parents=True, exist_ok=True)
-          tests_dir.mkdir(parents=True, exist_ok=True)
-
-          # ── Coverage badge and report index (JaCoCo INSTRUCTION counters) ──
-          covered = missed = 0
-          coverage_reports = []
-          for jacoco_file in sorted(Path('.').glob('**/build/reports/jacoco/**/jacocoTestReport.xml')):
-              try:
-                  root = ET.parse(jacoco_file).getroot()
-              except ET.ParseError as exc:
-                  print(f"Skipping malformed JaCoCo XML {jacoco_file}: {exc}")
-                  continue
-              file_covered = file_missed = 0
-              for counter in root.iter('counter'):
-                  if counter.get('type') == 'INSTRUCTION':
-                      c = int(counter.get('covered', 0))
-                      m = int(counter.get('missed', 0))
-                      covered += c
-                      missed += m
-                      file_covered += c
-                      file_missed += m
-              total = file_covered + file_missed
-              pct = round(file_covered / total * 100) if total else 0
-              module = jacoco_file.parts[0] if jacoco_file.parts[0] != 'build' else 'root'
-              html_source = jacoco_file.parent / 'html'
-              if html_source.is_dir():
-                  target = coverage_dir / 'modules' / module
-                  shutil.copytree(html_source, target, dirs_exist_ok=True)
-                  coverage_reports.append((module, pct, f"modules/{module}/index.html"))
-
-          total = covered + missed
-          pct = round(covered / total * 100) if total else 0
-          write_json(coverage_dir / 'badge.json', {
-              "schemaVersion": 1,
-              "label": "coverage",
-              "message": f"{pct}%",
-              "color": colour(pct),
-          })
-
-          coverage_rows = '\n'.join(
-              f'<tr><td><a href="{escape(link)}">{escape(module)}</a></td><td>{module_pct}%</td></tr>'
-              for module, module_pct, link in coverage_reports
-          ) or '<tr><td colspan="2">No JaCoCo HTML reports were generated.</td></tr>'
-          (coverage_dir / 'index.html').write_text(f'''<!doctype html>
-          <html lang="en"><head><meta charset="utf-8"><title>Regelsuche Coverage</title>
-          <style>body{{font-family:system-ui,sans-serif;margin:2rem;max-width:960px}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ddd;padding:.5rem;text-align:left}}th{{background:#f6f8fa}}</style>
-          </head><body><h1>Regelsuche Coverage</h1>
-          <p>Total instruction coverage: <strong>{pct}%</strong></p>
-          <table><thead><tr><th>Module</th><th>Instruction coverage</th></tr></thead><tbody>{coverage_rows}</tbody></table>
-          </body></html>\n''', encoding='utf-8')
-
-          # ── Tests badge and report index (Gradle/JUnit XML) ────────────────
-          tests = failures = errors = skipped = 0
-          suites = []
-          for path in sorted(Path('.').glob('**/build/test-results/*/TEST-*.xml')):
-              try:
-                  root = ET.parse(path).getroot()
-              except ET.ParseError as exc:
-                  print(f"Skipping malformed JUnit XML {path}: {exc}")
-                  continue
-              suite_tests = int(root.get('tests', 0))
-              suite_failures = int(root.get('failures', 0))
-              suite_errors = int(root.get('errors', 0))
-              suite_skipped = int(root.get('skipped', 0))
-              tests += suite_tests
-              failures += suite_failures
-              errors += suite_errors
-              skipped += suite_skipped
-              parts = path.parts
-              module = parts[0] if parts[0] != 'build' else 'root'
-              task = parts[parts.index('test-results') + 1]
-              suites.append((module, task, root.get('name', path.stem), suite_tests, suite_failures + suite_errors, suite_skipped))
-
-          failed = failures + errors
-          passed = tests - failed - skipped
-          if failed:
-              msg, colr = f"{failed}/{tests} failed", 'red'
-          else:
-              msg, colr = f"{passed} passed", 'brightgreen'
-          write_json(tests_dir / 'badge.json', {
-              "schemaVersion": 1,
-              "label": "tests",
-              "message": msg,
-              "color": colr,
-          })
-
-          test_reports = []
-          for report_dir in sorted(Path('.').glob('**/build/reports/tests/*')):
-              if not report_dir.is_dir() or not (report_dir / 'index.html').is_file():
-                  continue
-              parts = report_dir.parts
-              module = parts[0] if parts[0] != 'build' else 'root'
-              task = parts[parts.index('tests') + 1]
-              target_name = f'{module}-{task}'
-              target = tests_dir / 'reports' / target_name
-              shutil.copytree(report_dir, target, dirs_exist_ok=True)
-              test_reports.append((module, task, f'reports/{target_name}/index.html'))
-
-          report_links = {(module, task): link for module, task, link in test_reports}
-          suite_row_items = []
-          for module, task, name, suite_tests, suite_failed, suite_skipped in suites:
-              link = report_links.get((module, task))
-              report_link = f'<a href="{escape(link)}">HTML</a>' if link else ''
-              suite_row_items.append(
-                  f'<tr><td>{escape(module)}</td><td>{escape(task)}</td><td>{escape(name)}</td>'
-                  f'<td>{suite_tests}</td><td>{suite_failed}</td><td>{suite_skipped}</td>'
-                  f'<td>{report_link}</td></tr>'
-              )
-          suite_rows = '\n'.join(suite_row_items) or '<tr><td colspan="7">No JUnit XML reports were generated.</td></tr>'
-          (tests_dir / 'index.html').write_text(f'''<!doctype html>
-          <html lang="en"><head><meta charset="utf-8"><title>Regelsuche Tests</title>
-          <style>body{{font-family:system-ui,sans-serif;margin:2rem;max-width:1200px}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ddd;padding:.5rem;text-align:left}}th{{background:#f6f8fa}}</style>
-          </head><body><h1>Regelsuche Tests</h1>
-          <p><strong>{passed}</strong> passed, <strong>{failed}</strong> failed, <strong>{skipped}</strong> skipped, <strong>{tests}</strong> total.</p>
-          <table><thead><tr><th>Module</th><th>Task</th><th>Suite</th><th>Tests</th><th>Failed</th><th>Skipped</th><th>Report</th></tr></thead><tbody>{suite_rows}</tbody></table>
-          </body></html>\n''', encoding='utf-8')
-
-          print(f"Coverage: {pct}%   Tests: {tests} ({failed} failed, {skipped} skipped)")
-          EOF
+        run: python3 scripts/generate-ci-pages.py
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
@@ -287,7 +67,6 @@ jobs:
             echo "gh-pages branch already exists."
             exit 0
           fi
-
           tmp_dir="$(mktemp -d)"
           trap 'rm -rf "$tmp_dir"' EXIT
           git init "$tmp_dir"
@@ -302,10 +81,12 @@ jobs:
           printf '{"schemaVersion":1,"label":"performance","message":"pending","color":"lightgrey"}\n' > dev/bench/badge.json
           printf '<!doctype html><title>Benchmarks pending</title><h1>Benchmarks pending</h1>\n' > dev/bench/index.html
           git add .
-          git -c user.name='github-actions[bot]' -c user.email='github-actions[bot]@users.noreply.github.com' commit -m 'Initialize gh-pages'
+          git -c user.name='github-actions[bot]' \
+            -c user.email='github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Initialize gh-pages'
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin gh-pages
-      - name: Deploy coverage badge & report to GitHub Pages
+      - name: Deploy coverage badge and report to GitHub Pages
         if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -332,31 +113,23 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-v1
-      - name: Install Playwright host dependencies
-        run: ./gradlew installPlaywrightHostDependencies
-      - name: Install Playwright browsers
-        run: ./gradlew installPlaywrightBrowsers
-      - name: Run browser E2E flows
-        run: ./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true
-      - name: Upload E2E reports
+      - name: Install Playwright host dependencies and Chromium
+        run: ./gradlew :app:installPlaywrightHostDependencies :app:installPlaywrightBrowsers
+      - name: Run checkout-local browser suite
+        run: ./gradlew :app:e2eTest -Pregelsuche.skipPlaywrightInstall=true
+      - name: Upload browser reports and evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: e2e-test-reports
+          name: browser-e2e-reports
           path: |
             app/build/reports/tests/e2eTest/**
             app/build/test-results/e2eTest/**
-      - name: Upload replay/report artifacts from E2E
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: browser-e2e-replay-report-artifacts
-          path: |
             app/build/reports/e2eTest/**
             app/build/discovery-artifacts/**
 
   docs-assets:
-    name: Refresh docs/assets screenshots & videos
+    name: Refresh docs screenshots and videos
     runs-on: ubuntu-latest
     needs: browser-e2e
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -375,18 +148,15 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-v1
-      - name: Install Playwright host dependencies
-        run: ./gradlew installPlaywrightHostDependencies
-      - name: Install Playwright browsers
-        run: ./gradlew installPlaywrightBrowsers
+      - name: Install Playwright host dependencies and Chromium
+        run: ./gradlew :app:installPlaywrightHostDependencies :app:installPlaywrightBrowsers
       - name: Record screenshots and videos
-        run: ./gradlew test e2eTest -Pregelsuche.recordDocs=true -Pregelsuche.skipPlaywrightInstall=true
+        run: ./gradlew :app:test :app:e2eTest -Pregelsuche.recordDocs=true -Pregelsuche.skipPlaywrightInstall=true
       - name: Detect screenshot changes
         id: screenshot_changes
         run: |
           changed_files="$(git status --porcelain docs/assets/screenshots/ | awk '{print $2}')"
           if [ -z "$changed_files" ]; then
-            echo "No screenshot changes detected."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -396,8 +166,6 @@ jobs:
             printf '%s\n' "$changed_files"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
-      # Variant 1 (recommended): raise/update a PR from a dedicated refresh branch.
-      # Variant 2 fallback would be direct push with strict concurrency+rebase retry loop.
       - name: Create or update screenshot refresh PR
         id: screenshot_pr
         if: steps.screenshot_changes.outputs.changed == 'true'
@@ -414,26 +182,22 @@ jobs:
 
             Updated files:
             ${{ steps.screenshot_changes.outputs.files }}
-          add-paths: |
-            docs/assets/screenshots/**
-      - name: Enable auto-merge (if repository policy allows it)
+          add-paths: docs/assets/screenshots/**
+      - name: Enable auto-merge when repository policy allows it
         if: steps.screenshot_changes.outputs.changed == 'true' && steps.screenshot_pr.outputs.pull-request-number != ''
         continue-on-error: true
         uses: peter-evans/enable-pull-request-automerge@v3
         with:
           pull-request-number: ${{ steps.screenshot_pr.outputs.pull-request-number }}
           merge-method: squash
-      - name: Upload screenshots artifact
-        if: steps.screenshot_changes.outputs.changed == 'true'
+      - name: Upload generated documentation media
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: docs-screenshots
-          path: docs/assets/screenshots/**
-      - name: Upload videos
-        uses: actions/upload-artifact@v7
-        with:
-          name: docs-videos
-          path: docs/assets/videos/**
+          name: docs-media
+          path: |
+            docs/assets/screenshots/**
+            docs/assets/videos/**
 
   benchmark-report:
     name: Benchmark quality report
@@ -446,55 +210,18 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v6.1.0
-      - name: Run benchmark + render report
-        run: ./gradlew benchmarkReport
-      - name: Upload benchmark report (Markdown)
+      - name: Generate benchmark report locally
+        run: ./gradlew :app:benchmarkReport
+      - name: Upload benchmark report
         uses: actions/upload-artifact@v7
         with:
           name: benchmark-report
-          path: docs/benchmark-report.md
-      - name: Upload benchmark summary (JSON)
-        uses: actions/upload-artifact@v7
-        with:
-          name: benchmark-summary
-          path: docs/assets/benchmark-summary.json
+          path: |
+            docs/benchmark-report.md
+            docs/assets/benchmark-summary.json
 
-
-  proof-image:
-    name: Build Dockerfile.proof & verify provers
-    runs-on: ubuntu-latest
-    needs: unit-test
-    steps:
-      - uses: actions/checkout@v7
-      - name: Build proof image (Z3 + cvc5; Lean opt-in)
-        run: docker build -f Dockerfile.proof -t regelsuche-proof:ci .
-      - name: Verify Z3 is present inside the image
-        run: docker run --rm --entrypoint z3 regelsuche-proof:ci --version
-      - name: Verify cvc5 is present inside the image
-        run: docker run --rm --entrypoint cvc5 regelsuche-proof:ci --version
-      - name: Smoke-check the proof workbench REST surface
-        run: |
-          docker run -d --rm --name regelsuche-proof-smoke \
-            -p 18080:8080 regelsuche-proof:ci
-          # Wait for the workbench to come up
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:18080/api/proof/jobs >/dev/null; then
-              echo "Workbench responded after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-          # Submit a tiny job and poll until it is listed.
-          curl -sf -X POST http://127.0.0.1:18080/api/proof/jobs \
-            -H 'Content-Type: application/json' \
-            -d '{"leftPattern":"a+0","rightPattern":"a","priority":0}' \
-            | tee /tmp/submit.json
-          curl -sf http://127.0.0.1:18080/api/proof/jobs | tee /tmp/list.json
-          grep '"jobId"' /tmp/submit.json
-          docker stop regelsuche-proof-smoke
-
-  docker-image-e2e:
-    name: Docker-image integration tests (Testcontainers + Playwright)
+  integration-test:
+    name: Infrastructure integration tests (Testcontainers)
     runs-on: ubuntu-latest
     needs: unit-test
     steps:
@@ -509,23 +236,16 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-v1
-      - name: Install Playwright host dependencies
-        run: ./gradlew installPlaywrightHostDependencies
-      - name: Install Playwright browsers
-        run: ./gradlew installPlaywrightBrowsers
-      - name: Run Docker-image E2E tests
-        run: ./gradlew dockerE2eTest
-      - name: Upload Docker E2E reports
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: docker-e2e-test-reports
-          path: |
-            app/build/reports/tests/dockerE2eTest/**
-            app/build/test-results/dockerE2eTest/**
-      - name: Upload scientific discovery artifacts
+      - name: Install Playwright host dependencies and Chromium
+        run: ./gradlew :app:installPlaywrightHostDependencies :app:installPlaywrightBrowsers
+      - name: Run checkout-local Testcontainers suite
+        run: ./gradlew :app:dockerE2eTest -Pregelsuche.skipPlaywrightInstall=true
+      - name: Upload integration reports and scientific artifacts
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: scientific-discovery-artifacts
-          path: app/build/discovery-artifacts/**
+          name: integration-test-reports
+          path: |
+            app/build/reports/tests/dockerE2eTest/**
+            app/build/test-results/dockerE2eTest/**
+            app/build/discovery-artifacts/**
