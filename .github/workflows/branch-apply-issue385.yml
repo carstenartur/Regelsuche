@@ -54,13 +54,55 @@ jobs:
           grep -qx '.github/workflows/capability-status.yml' /tmp/issue385-files.txt
           grep -qx '.github/issue-385-apply.sh' /tmp/issue385-files.txt
 
+      - name: Produce authoritative evidence before adding generated-doc links
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew \
+            :regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence \
+            :regelsuche-release:runDomainGenericQualification \
+            --rerun-tasks \
+            --console=plain 2>&1 \
+            | tee /tmp/issue385-evidence.log
+
       - name: Apply and verify capability-status slice
         shell: bash
         run: |
           set -o pipefail
-          tar -xzf /tmp/issue385-static.tar.gz
-          chmod +x .github/issue-385-apply.sh
-          bash -x .github/issue-385-apply.sh 2>&1 | tee /tmp/issue385-bootstrap.log
+          rm -rf /tmp/issue385-stage
+          mkdir -p /tmp/issue385-stage
+          tar -xzf /tmp/issue385-static.tar.gz -C /tmp/issue385-stage
+
+          install -Dm755 \
+            /tmp/issue385-stage/scripts/generate-capability-status.py \
+            scripts/generate-capability-status.py
+          install -Dm644 \
+            /tmp/issue385-stage/docs/capability-status.md \
+            docs/capability-status.md
+          install -Dm644 \
+            /tmp/issue385-stage/docs/schemas/regelsuche-capability-status-v1.schema.json \
+            docs/schemas/regelsuche-capability-status-v1.schema.json
+          install -Dm644 \
+            /tmp/issue385-stage/.github/workflows/capability-status.yml \
+            .github/workflows/capability-status.yml
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('/tmp/issue385-stage/.github/issue-385-apply.sh')
+          text = source.read_text(encoding='utf-8')
+          start = text.find('\n./gradlew \\\n')
+          end = text.find('\nCOMMON_ARGS=(', start)
+          if start < 0 or end < 0:
+              raise SystemExit('staged apply script Gradle block not found')
+          patched = text[:start] + '\n' + text[end:]
+          target = Path('/tmp/issue385-apply-with-evidence.sh')
+          target.write_text(patched, encoding='utf-8')
+          target.chmod(0o755)
+          PY
+
+          bash -x /tmp/issue385-apply-with-evidence.sh 2>&1 \
+            | tee /tmp/issue385-bootstrap.log
 
       - name: Upload capability bootstrap diagnostics
         if: always()
@@ -69,6 +111,7 @@ jobs:
           name: capability-status-bootstrap-diagnostics
           path: |
             /tmp/issue385-bootstrap.log
+            /tmp/issue385-evidence.log
             /tmp/issue385-files.txt
             regelsuche-release/build/reports/release-readiness-qualified/**
             regelsuche-release/build/reports/domain-generic-qualification/**
