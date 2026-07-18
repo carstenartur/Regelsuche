@@ -9,12 +9,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Path;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -26,27 +24,19 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class ProofDockerImageIntegrationTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    private static final Path PROJECT_ROOT = Path.of(System.getProperty(
-        "regelsuche.projectRoot",
-        Path.of("").toAbsolutePath().toString()
-    )).toAbsolutePath().normalize();
-
     private static final HttpClient HTTP = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
         .build();
 
     @Container
     @SuppressWarnings("resource")
-    static final GenericContainer<?> PROOF_IMAGE = new GenericContainer<>(
-        new ImageFromDockerfile()
-            .withFileFromPath(".", PROJECT_ROOT)
-            .withDockerfilePath("./Dockerfile.proof")
-    )
-        .withEnv("REGELSUCHE_PERSISTENCE_MODE", "IN_MEMORY")
-        .withLogConsumer(frame -> System.err.print(frame.getUtf8String()))
-        .withExposedPorts(8080)
-        .waitingFor(Wait.forHttp("/api/proof/jobs").forStatusCode(200))
-        .withStartupTimeout(Duration.ofMinutes(15));
+    static final GenericContainer<?> PROOF_IMAGE =
+        new GenericContainer<>(RegelsucheDockerImages.PROOF)
+            .withEnv("REGELSUCHE_PERSISTENCE_MODE", "IN_MEMORY")
+            .withLogConsumer(frame -> System.err.print(frame.getUtf8String()))
+            .withExposedPorts(8080)
+            .waitingFor(Wait.forHttp("/api/proof/jobs").forStatusCode(200))
+            .withStartupTimeout(Duration.ofMinutes(15));
 
     @Test
     void containsZ3() throws Exception {
@@ -62,12 +52,14 @@ class ProofDockerImageIntegrationTest {
     void proofWorkbenchAcceptsAndListsAJob() throws Exception {
         HttpResponse<String> initial = send(HttpRequest.newBuilder()
             .uri(uri("/api/proof/jobs"))
+            .timeout(Duration.ofSeconds(30))
             .GET()
             .build());
         assertEquals(200, initial.statusCode());
 
         HttpResponse<String> submitted = send(HttpRequest.newBuilder()
             .uri(uri("/api/proof/jobs"))
+            .timeout(Duration.ofSeconds(30))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(
                 "{\"leftPattern\":\"a+0\",\"rightPattern\":\"a\",\"priority\":0}"
@@ -85,6 +77,7 @@ class ProofDockerImageIntegrationTest {
 
         HttpResponse<String> listed = send(HttpRequest.newBuilder()
             .uri(uri("/api/proof/jobs"))
+            .timeout(Duration.ofSeconds(30))
             .GET()
             .build());
         assertEquals(200, listed.statusCode());
