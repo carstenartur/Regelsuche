@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.de/schemas/regelsuche-evolution-study-source-v1.schema.json",
+  "title": "Regelsuche evolution study source v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyId",
+    "executionStatus",
+    "finalTestAccess",
+    "publicationAuthorized",
+    "claimPolicy",
+    "benchmarkSource",
+    "formationBoundary",
+    "populationPolicy",
+    "fitnessModel",
+    "validationSelection",
+    "finalTestPolicy",
+    "diversityAblation",
+    "splitManifest",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.evolution-study-source/v1"},
+    "studyId": {"type": "string", "minLength": 1},
+    "executionStatus": {"enum": ["NOT_STARTED", "RUNNING", "COMPLETED", "FAILED", "INCOMPLETE"]},
+    "finalTestAccess": {"enum": ["NOT_ACCESSED", "ACCESSED_ONCE"]},
+    "publicationAuthorized": {"type": "boolean"},
+    "claimPolicy": {"type": "string", "minLength": 1},
+    "benchmarkSource": {"$ref": "#/$defs/benchmarkSource"},
+    "formationBoundary": {"$ref": "#/$defs/formationBoundary"},
+    "populationPolicy": {"$ref": "#/$defs/populationPolicy"},
+    "fitnessModel": {"$ref": "#/$defs/fitnessModel"},
+    "validationSelection": {"$ref": "#/$defs/validationSelection"},
+    "finalTestPolicy": {"$ref": "#/$defs/finalTestPolicy"},
+    "diversityAblation": {"$ref": "#/$defs/diversityAblation"},
+    "splitManifest": {
+      "type": "array",
+      "minItems": 3,
+      "items": {"$ref": "#/$defs/splitEntry"}
+    },
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "benchmarkSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "schema", "benchmarkId", "canonicalSourceHash"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "schema": {"type": "string", "minLength": 1},
+        "benchmarkId": {"type": "string", "minLength": 1},
+        "canonicalSourceHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "formationBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowedSplits", "prohibitedFields"],
+      "properties": {
+        "allowedSplits": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["TRAIN", "VALIDATION", "TEST"]}
+        },
+        "prohibitedFields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "populationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "randomSeed",
+        "populationSize",
+        "generationBudget",
+        "eliteCount",
+        "maxOffspringPerLineage",
+        "maxEvaluatedGenomes",
+        "minDistinctAlphaStructures",
+        "duplicatePolicy",
+        "replacementPolicy",
+        "terminalOutcomes"
+      ],
+      "properties": {
+        "randomSeed": {"type": "integer"},
+        "populationSize": {"type": "integer", "minimum": 1},
+        "generationBudget": {"type": "integer", "minimum": 1},
+        "eliteCount": {"type": "integer", "minimum": 0},
+        "maxOffspringPerLineage": {"type": "integer", "minimum": 1},
+        "maxEvaluatedGenomes": {"type": "integer", "minimum": 1},
+        "minDistinctAlphaStructures": {"type": "integer", "minimum": 1},
+        "duplicatePolicy": {"type": "string", "minLength": 1},
+        "replacementPolicy": {"type": "string", "minLength": 1},
+        "terminalOutcomes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "fitnessModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hardBlockers", "components", "scalarSelectionProfile"],
+      "properties": {
+        "hardBlockers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/fitnessComponent"}
+        },
+        "scalarSelectionProfile": {"$ref": "#/$defs/scalarSelectionProfile"}
+      }
+    },
+    "fitnessComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "direction", "split"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["MAXIMIZE", "MINIMIZE"]},
+        "split": {"enum": ["TRAIN", "VALIDATION", "TEST"]}
+      }
+    },
+    "scalarSelectionProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "frozenBeforeValidation", "weights"],
+      "properties": {
+        "profileId": {"type": "string", "minLength": 1},
+        "frozenBeforeValidation": {"type": "boolean"},
+        "weights": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"type": "number"}
+        }
+      }
+    },
+    "validationSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["split", "selects", "finalTestVisible", "selectionStatus"],
+      "properties": {
+        "split": {"enum": ["TRAIN", "VALIDATION", "TEST"]},
+        "selects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "finalTestVisible": {"type": "boolean"},
+        "selectionStatus": {"enum": ["NOT_STARTED", "COMPLETED"]}
+      }
+    },
+    "finalTestPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["split", "oneTimeEvaluation", "rerunPolicy", "status", "terminalOutcomes"],
+      "properties": {
+        "split": {"enum": ["TRAIN", "VALIDATION", "TEST"]},
+        "oneTimeEvaluation": {"type": "boolean"},
+        "rerunPolicy": {"type": "string", "minLength": 1},
+        "status": {"enum": ["NOT_ACCESSED", "ACCESSED_ONCE"]},
+        "terminalOutcomes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "diversityAblation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profiles", "identicalBudgets", "selectionSplit", "finalTestUsedForSelection", "status"],
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "identicalBudgets": {"type": "boolean"},
+        "selectionSplit": {"enum": ["TRAIN", "VALIDATION", "TEST"]},
+        "finalTestUsedForSelection": {"type": "boolean"},
+        "status": {"enum": ["NOT_STARTED", "COMPLETED"]}
+      }
+    },
+    "splitEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "challengeId",
+        "familyId",
+        "structuralSignature",
+        "exactFingerprint",
+        "alphaStructuralFingerprint",
+        "split",
+        "formationVisible"
+      ],
+      "properties": {
+        "caseId": {"type": "string", "minLength": 1},
+        "challengeId": {"type": "string", "minLength": 1},
+        "familyId": {"type": "string", "minLength": 1},
+        "structuralSignature": {"type": "string", "minLength": 1},
+        "exactFingerprint": {"$ref": "#/$defs/sha256"},
+        "alphaStructuralFingerprint": {"$ref": "#/$defs/sha256"},
+        "split": {"enum": ["TRAIN", "VALIDATION", "TEST"]},
+        "formationVisible": {"type": "boolean"}
+      }
+    }
+  }
+}
