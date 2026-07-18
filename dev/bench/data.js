@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784310742816,
+  "lastUpdate": 1784380963668,
   "repoUrl": "https://github.com/carstenartur/Regelsuche",
   "entries": {
     "Regelsuche JMH Benchmarks": [
@@ -4902,6 +4902,90 @@ window.BENCHMARK_DATA = {
           {
             "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
             "value": 772.8592387461917,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "carsten.hammer@t-online.de",
+            "name": "Carsten Hammer",
+            "username": "carstenartur"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "02e62621d260cb79749e95094836a78c8c4e3c05",
+          "message": "Add a portable independent-reproduction artifact foundation (#398)\n\nAdvance #387 with a deterministic source/evidence bundle, digest-pinned non-root container, exact and semantic reproduction receipts, fail-closed negative receipts, and a repository-owned self-test. GitHub Actions is reduced to a thin adapter; external attestation remains NOT_COLLECTED.",
+          "timestamp": "2026-07-18T15:20:32+02:00",
+          "tree_id": "ffea4d5b0430c432ff707094c9626ecfc1c1010b",
+          "url": "https://github.com/carstenartur/Regelsuche/commit/02e62621d260cb79749e95094836a78c8c4e3c05"
+        },
+        "date": 1784380959995,
+        "tool": "jmh",
+        "benches": [
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+            "value": 2.8026918521899034,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+            "value": 8.095903293911777,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+            "value": 3500.277312091077,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+            "value": 5.615049603723366,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+            "value": 1528.848135483989,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+            "value": 383.7801589631997,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+            "value": 1.8745634507031614,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+            "value": 82.50588750371703,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+            "value": 184.69996846206868,
+            "unit": "us/op",
+            "extra": "iterations: 3\nforks: 1\nthreads: 1"
+          },
+          {
+            "name": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
+            "value": 895.1190396126099,
             "unit": "us/op",
             "extra": "iterations: 3\nforks: 1\nthreads: 1"
           }
