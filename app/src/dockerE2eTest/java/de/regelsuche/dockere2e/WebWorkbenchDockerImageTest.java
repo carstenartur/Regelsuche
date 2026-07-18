@@ -2,6 +2,7 @@ package de.regelsuche.dockere2e;
 
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
@@ -29,6 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Testcontainers(disabledWithoutDocker = true)
 class WebWorkbenchDockerImageTest {
 
+    private static final org.slf4j.Logger LOG =
+        org.slf4j.LoggerFactory.getLogger(WebWorkbenchDockerImageTest.class);
+
     private static final String PROJECT_ROOT =
         System.getProperty("regelsuche.projectRoot",
             Path.of("").toAbsolutePath().toString());
@@ -39,6 +43,10 @@ class WebWorkbenchDockerImageTest {
         new GenericContainer<>(
             new ImageFromDockerfile()
                 .withFileFromPath(".", Path.of(PROJECT_ROOT)))
+            // Static HTTP behaviour is independent of durable persistence. Avoid
+            // coupling this image-level smoke test to a writable Docker volume.
+            .withEnv("REGELSUCHE_PERSISTENCE_MODE", "IN_MEMORY")
+            .withLogConsumer(new Slf4jLogConsumer(LOG))
             .withExposedPorts(8080)
             .waitingFor(Wait.forHttp("/").forStatusCode(200));
 
@@ -124,7 +132,6 @@ class WebWorkbenchDockerImageTest {
 
     @Test
     void pathTraversalIsRejected() throws Exception {
-        // URL-encoded path traversal attempt
         HttpResponse<String> resp = get("/vendor/..%2F..%2F..%2F..%2Fetc%2Fpasswd");
         assertTrue(resp.statusCode() >= 400,
             "Path traversal should be rejected with 4xx, got " + resp.statusCode());
@@ -132,7 +139,6 @@ class WebWorkbenchDockerImageTest {
 
     @Test
     void rawPathTraversalIsRejected() throws Exception {
-        // Raw dots in path
         HttpResponse<String> resp = get("/vendor/../../../../etc/passwd");
         assertTrue(resp.statusCode() >= 400,
             "Path traversal should be rejected with 4xx, got " + resp.statusCode());
