@@ -1,0 +1,73 @@
+name: Apply CI orchestration refactor for issue 399
+
+on:
+  push:
+    branches: [ "issue-399-local-integration-tests" ]
+    paths:
+      - '.github/workflows/branch-refactor-ci-issue399.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: issue-399-local-integration-tests
+          fetch-depth: 0
+
+      - name: Move integration orchestration to the local Gradle task
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/ci-cd.yml')
+          text = path.read_text(encoding='utf-8')
+
+          text = text.replace(
+              '    name: Unit & integration tests\n',
+              '    name: Unit tests & JVM checks\n',
+              1,
+          )
+          text = text.replace(
+              '    name: Docker-image integration tests (Testcontainers + Playwright)\n',
+              '    name: Infrastructure integration tests (Testcontainers + Playwright)\n',
+              1,
+          )
+          text = text.replace(
+              '      - name: Run Docker-image E2E tests\n'
+              '        run: ./gradlew dockerE2eTest\n',
+              '      - name: Run checkout-local integration suite\n'
+              '        run: ./gradlew integrationTest\n',
+              1,
+          )
+
+          start = text.find('  proof-image:\n')
+          end = text.find('  docker-image-e2e:\n')
+          if start < 0 or end < 0 or end <= start:
+              raise SystemExit('could not locate proof-image job boundaries')
+          text = text[:start] + text[end:]
+
+          if 'docker run -d --rm --name regelsuche-proof-smoke' in text:
+              raise SystemExit('proof-image shell integration logic remains')
+          if 'run: ./gradlew integrationTest' not in text:
+              raise SystemExit('local integration task was not wired into CI')
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit permanent change and remove bootstrap workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/branch-refactor-ci-issue399.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/ci-cd.yml .github/workflows/branch-refactor-ci-issue399.yml
+          git commit -m 'Keep GitHub Actions as thin integration orchestrator'
+          git push origin HEAD:issue-399-local-integration-tests
