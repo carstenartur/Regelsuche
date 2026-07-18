@@ -1,0 +1,84 @@
+{
+  "challengeBaselines": [
+    {
+      "baselineProfiles": [
+        "bounded-polynomial-interpolation",
+        "minimum-description-recurrence-enumerator",
+        "random-valid-recurrence"
+      ],
+      "challengeId": "finite-difference-recurrences",
+      "externalReviewSources": [
+        "integer sequence databases",
+        "recurrence literature",
+        "symbolic sequence packages"
+      ],
+      "informationParityRequired": true,
+      "validationOnlySystemsUseSeparateTrack": true
+    },
+    {
+      "baselineProfiles": [
+        "grammar-enumerative-assumption-aware",
+        "random-valid-rational-pattern",
+        "validation-only-CAS-separate-track"
+      ],
+      "challengeId": "rational-assumption-rewrites",
+      "externalReviewSources": [
+        "computer-algebra rule libraries",
+        "formula and theorem databases",
+        "mathematical literature indexes"
+      ],
+      "informationParityRequired": true,
+      "validationOnlySystemsUseSeparateTrack": true
+    },
+    {
+      "baselineProfiles": [
+        "primitive-inventory-only",
+        "random-valid-macro",
+        "frequency-ranked-path-macro"
+      ],
+      "challengeId": "reusable-search-macros",
+      "externalReviewSources": [
+        "term-rewriting strategy literature",
+        "equality-saturation and macro-rewrite systems",
+        "symbolic simplification benchmarks"
+      ],
+      "informationParityRequired": true,
+      "validationOnlySystemsUseSeparateTrack": true
+    },
+    {
+      "baselineProfiles": [
+        "assumption-aware-grammar-enumerator",
+        "SMT-validation-only-separate-track",
+        "random-valid-inequality-pattern"
+      ],
+      "challengeId": "sign-sensitive-inequality-rewrites",
+      "externalReviewSources": [
+        "inequality theorem libraries",
+        "SMT benchmark suites",
+        "computer-algebra assumption systems"
+      ],
+      "informationParityRequired": true,
+      "validationOnlySystemsUseSeparateTrack": true
+    },
+    {
+      "baselineProfiles": [
+        "random-valid-construction",
+        "greedy-construction",
+        "bounded-enumerative-search"
+      ],
+      "challengeId": "small-combinatorial-constructions",
+      "externalReviewSources": [
+        "combinatorial construction databases",
+        "published best-known tables",
+        "algorithmic construction literature"
+      ],
+      "informationParityRequired": true,
+      "validationOnlySystemsUseSeparateTrack": true
+    }
+  ],
+  "contentHash": "sha256:868f52bc3010139ccba12657572dfabbcbdf7cc60d861853b02eecda33f72496",
+  "portfolioId": "regelsuche-evaluator-backed-challenges-2026-07/v1",
+  "schema": "regelsuche.discovery-challenge-baseline-plan/v1",
+  "sourceHash": "sha256:05376727548db43c639966adedc43e222eb17c406def7c1de0d8b2419416675c",
+  "universalScorePolicy": "NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY"
+}
