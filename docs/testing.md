@@ -1,132 +1,100 @@
 # Testing
 
-Regelsuche fährt vier Test-Schichten, alle als Gradle-Tasks:
+Regelsuche besitzt einen repositoryweiten, von GitHub unabhängigen Testvertrag. Aus einem normalen Checkout startet ein einziger Gradle-Aufruf sämtliche als `Test` modellierten Testschichten:
 
-| Schicht | Gradle-Task | Was läuft? | Wo? |
-| --- | --- | --- | --- |
-| Unit & Integration | `./gradlew test` | JUnit-5-Tests aller Module (`app/src/test/java`) | im JVM, kein Browser |
-| Browser-E2E | `./gradlew e2eTest` | Playwright steuert Chromium gegen die echte `WebWorkbenchServer`-Instanz | `app/src/e2eTest/java` |
-| Docker-Image-E2E | `./gradlew dockerE2eTest` | Testcontainers baut das Dockerfile, fährt den Container hoch und prüft Asset-Serving und KaTeX-Rendering | `app/src/dockerE2eTest/java` |
-| Doku-Assets | `./gradlew test e2eTest -Pregelsuche.recordDocs=true` | Test- + E2E-Läufe schreiben Screenshots/Videos für die [Demo-Gallery](demo-gallery.md) | Output unter `docs/assets/` |
-| Benchmark-Report | `./gradlew benchmarkReport` | rendert `docs/benchmark-report.md` + `docs/assets/benchmark-summary.json` aus der `BenchmarkSuite` | JVM, kein Browser |
+```bash
+./gradlew allTests
+```
 
-## `./gradlew test`
+Der Root-Task sammelt die `Test`-Tasks aller Module dynamisch ein. Damit umfasst derselbe Gradle-Lauf:
 
-Standard-Unit- und Integrationstests. Läuft als Pflicht-CI-Schritt
-(`unit-test`-Job in `.github/workflows/ci-cd.yml`).
+| Schicht | Enthaltener Task | Inhalt |
+| --- | --- | --- |
+| Modul- und Komponententests | alle `test`-Tasks | JUnit-5-Tests aller Java-Module |
+| Browser-Integration | `:app:e2eTest` | Playwright gegen eine echte lokale `WebWorkbenchServer`-Instanz |
+| Container-Integration | `:app:dockerE2eTest` | reale Anwendungs-, PostgreSQL- und Proof-Images über Testcontainers |
+| Externer Solver | `:regelsuche-solver-portfolio:test` | echter Z3-Lauf, sofern Z3 auf dem Rechner verfügbar ist |
 
-## `./gradlew e2eTest`
+Die GitHub-Workflows sind nicht Bestandteil der Testimplementierung. Sie dürfen denselben Gradle-Aufruf ausführen und Reports veröffentlichen, definieren aber weder Fixtures noch Assertions noch die Entscheidung über Erfolg und Fehlschlag.
 
-Treibt den Web-Workbench mit echten Browser-Flows an. Jeder Test:
+## Bedingte Infrastruktur über JUnit
 
-1. startet `WebWorkbenchServer` in-process auf einem zufälligen Port
-   (siehe [`RegelsucheAppEnvironment`](../app/src/e2eTest/java/de/regelsuche/e2e/RegelsucheAppEnvironment.java)),
-2. öffnet die Landing-Page mit Chromium (headless),
-3. klickt den Demo-Button,
-4. prüft Graph-, Replay- und Summary-Panels sowie Proof-Status,
-5. lädt das Export-Bundle herunter und prüft die Größe.
+Nicht überall verfügbare Infrastruktur wird innerhalb der Tests behandelt:
 
-Vor dem ersten Lauf zieht der Sub-Task `installPlaywrightBrowsers`
-Chromium ins lokale `~/.cache/ms-playwright/`. Dieser Schritt ist
-idempotent.
-CI trennt Installation und Testausführung: erst
-`./gradlew installPlaywrightHostDependencies installPlaywrightBrowsers`, dann
-`./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true`, damit während der
-eigentlichen Browser-Tests keine externen Downloads stattfinden.
+- Docker-basierte Klassen verwenden `@Testcontainers(disabledWithoutDocker = true)`. Ohne erreichbaren Docker-Daemon markiert JUnit sie als übersprungen.
+- Der echte Z3-Test trägt `@Tag("external-prover")` und verwendet eine JUnit-Annahme. Fehlt Z3, wird nur dieser Integrationstest übersprungen; die Solver-Unit-Tests laufen weiter.
+- Playwright-Chromium wird vor den Browser- und Docker-Browser-Tests durch den repositoryeigenen Gradle-Task `installPlaywrightBrowsers` bereitgestellt.
 
-Die Browser-Tests verwenden bewusst eine in-Process-Server-Variante statt
-Testcontainers für schnelle Feedback-Loops — ein In-Process-Start ist eine
-Größenordnung schneller als ein Docker-Container-Start.
+Ein fehlendes optionales Werkzeug wird damit nicht über eine GitHub-Variable simuliert und führt auch nicht dazu, dass eine komplette Testklasse aus einem Workflow entfernt werden muss.
 
-Für Asset-Serving-Regressions (z. B. den `/vendor/`-Static-Path-Bug, der im
-Mai 2026 die Mathe-Darstellung über mehrere PRs hinweg gebrochen hat) gibt es
-den ergänzenden `dockerE2eTest`-Layer (siehe unten).
+## JUnit-Tags auswählen
 
-## `./gradlew dockerE2eTest`
+Tags können repositoryweit für jeden Gradle-`Test`-Task gefiltert werden:
 
-Baut das Standard-`Dockerfile` via Testcontainers' `ImageFromDockerfile`,
-fährt den Container auf einem zufälligen Port hoch und prüft via HTTP-Client
-und Playwright, dass:
+```bash
+# Nur Tests mit dem angegebenen JUnit-Tag
+./gradlew allTests -PincludeTestTags=external-prover
 
-- `/`, `/app.js`, `/style.css` mit korrekten MIME-Typen geliefert werden,
-- `/vendor/katex/katex.min.css`, `/vendor/katex/katex.min.js`,
-  `/vendor/katex/contrib/auto-render.min.js` mit Status 200 und korrekten
-  Content-Types ausgeliefert werden,
-- KaTeX-Fonts (`*.woff2`) mit `font/woff2` ausgeliefert werden,
-- `/vendor/cytoscape/cytoscape.min.js` mit Status 200 ausgeliefert wird,
-- Path-Traversal-Versuche (`/vendor/../../../../etc/passwd`) mit 4xx
-  abgelehnt werden,
-- nach Klick auf den Demo-Button „Binomische Formel" mindestens ein
-  `.katex`-Element im DOM vorhanden ist (KaTeX hat wirklich gerendert).
+# Alles außer bestimmten JUnit-Tags
+./gradlew allTests -PexcludeTestTags=external-prover
 
-**Wann laufen diese Tests?** Der Task ist nicht in `check` eingehängt; er
-läuft explizit im CI-Job `docker-image-e2e` oder lokal mit
-`./gradlew dockerE2eTest` (Docker muss verfügbar sein). Ohne erreichbaren
-Docker-Daemon skippen sich die Tests automatisch (via
-`DockerClientFactory.instance().isDockerAvailable()`).
+# Mehrere Tags, kommasepariert
+./gradlew allTests -PexcludeTestTags=external-prover,slow
+```
 
-## `./gradlew test e2eTest -Pregelsuche.recordDocs=true`
+Für einzelne Klassen und Methoden bleibt der normale Gradle/JUnit-Filter verfügbar:
 
-`test` + `e2eTest` im Record-Docs-Modus schreiben zusätzlich:
+```bash
+./gradlew :app:dockerE2eTest \
+  --tests de.regelsuche.dockere2e.ScientificDiscoveryPostgresE2ETest
 
-* `docs/assets/screenshots/*.png` — pro Demo ein Full-Page-Screenshot,
-* `docs/assets/videos/*.webm` — pro Test eine WebM-Aufnahme
-  (gitignoriert; in CI als Artifact hochgeladen),
-* optional `docs/assets/gifs/*.gif`, falls `ffmpeg` im `PATH` liegt
-  (sonst werden nur Videos behalten).
+./gradlew :regelsuche-solver-portfolio:test \
+  --tests de.regelsuche.solver.portfolio.Z3SmtSolverBackendTest.systemZ3ReturnsRealProofObject
+```
 
-Die Screenshots werden danach von [`docs/demo-gallery.md`](demo-gallery.md)
-und vom Projekt-`README.md` referenziert. Da sie aus genau den Tests stammen,
-die auch die Funktion absichern, ist die Doku per Konstruktion aktuell.
+## Einzelne Testschichten
 
-## CI-Integration
+Für schnelle Entwicklungszyklen können die Schichten weiterhin separat ausgeführt werden:
 
-`.github/workflows/ci-cd.yml` fährt sechs voneinander unabhängige Jobs:
+```bash
+./gradlew test
+./gradlew :app:e2eTest
+./gradlew :app:dockerE2eTest
+```
 
-* `unit-test` — `./gradlew test`
-* `browser-e2e` — installiert Chromium und ruft
-  `./gradlew e2eTest -Pregelsuche.skipPlaywrightInstall=true` auf
-  (deckt u. a. die landing-page-spezifischen Flows `landingPageShowsSimplePrimaryFlow`,
-  `tabsHiddenBeforeFirstSearch`, `tabsVisibleAfterSearch`,
-  `goalSelectionIsSubmittedWithSearch` aus
-  [`LandingPageBrowserFlowTest`](../app/src/e2eTest/java/de/regelsuche/e2e/LandingPageBrowserFlowTest.java)
-  und den Proof-Job-Flow `proofJobPanelBrowserFlow` aus
-  [`ProofJobPanelBrowserFlowTest`](../app/src/e2eTest/java/de/regelsuche/e2e/ProofJobPanelBrowserFlowTest.java) ab)
-* `docker-image-e2e` — baut das Standard-Dockerfile, fährt den Container via
-  Testcontainers hoch und verifiziert via HTTP-Client + Playwright das
-  Asset-Serving und KaTeX-Rendering (schützt vor dem `/vendor/`-Bug und
-  ähnlichen Regressions). Zusätzlich laufen PostgreSQL-basierte
-  Discovery-Full-Mode-Tests wie `ScientificDiscoveryPostgresE2ETest`, die
-  wissenschaftliche Seeds reproduzierbar ausführen, Replay-Artefakte erzeugen
-  und Seeds/Search-Runs/Hypothesen/Gegenbeispiele/Reports/Proof-Worker-
-  Metadaten persistieren. Die erzeugten Dateien liegen lokal unter
-  `app/build/discovery-artifacts/scientific-postgres-e2e/` und werden im CI als
-  Artifact `scientific-discovery-artifacts` hochgeladen:
+`./gradlew test` wählt die normalen `test`-Tasks der Module aus. Der vollständige, verbindliche lokale Einstiegspunkt ist dagegen `./gradlew allTests`, weil nur dieser auch die zusätzlich benannten Browser- und Container-`Test`-Tasks umfasst.
 
-  ```bash
-  ./gradlew :app:dockerE2eTest --tests de.regelsuche.dockere2e.ScientificDiscoveryPostgresE2ETest
-  ```
+## Browser-Integration
 
-  Für den schnellen nicht-containerisierten Determinismus-/Budget-Check:
+`e2eTest` startet die Web Workbench in-process auf einem zufälligen Port und steuert Chromium headless. Die Tests prüfen unter anderem Navigation, Such- und Demo-Flows, Graph- und Replay-Panels, Regelautorisierung, Proof-Jobs sowie mathematische Darstellung.
 
-  ```bash
-  ./gradlew :app:test --tests de.regelsuche.discovery.ScientificDiscoveryReproductionTest
-  ```
+Der Browserdownload ist idempotent. Auf Linux-Systemen, denen native Chromium-Bibliotheken fehlen, können diese einmalig über Playwright installiert werden:
 
-  Artefakte: `discovery-report.json` (byte-stabil; volatile Laufzeitfelder sind
-  markiert und stabilisiert), `discovery-report.html`,
-  `discovery-report.md`, `discovery-replay.json`,
-  `discovery-summary.png` (synthetischer Report-Screenshot) und
-  `discovery-replay.gif` (mehrere Replay-Frames). Echte UI-Screenshots bleiben
-  Aufgabe der Playwright-Flows.
-* `docs-assets` — nur auf `main`: `./gradlew test e2eTest -Pregelsuche.recordDocs=true`
-  und lädt die frischen Screenshots/Videos als CI-Artifact hoch.
-* `benchmark-report` — `./gradlew benchmarkReport` rendert die aktuelle
-  Qualitäts-Übersicht und lädt `docs/benchmark-report.md` +
-  `docs/assets/benchmark-summary.json` als Artefakte hoch.
-* `proof-image` — baut `Dockerfile.proof`, prüft die enthaltenen Prover
-  (`z3`, `cvc5`) und macht einen REST-Smoketest gegen `/api/proof/jobs`.
+```bash
+./gradlew :app:installPlaywrightHostDependencies
+```
 
-Bei roten E2E-Tests lädt der Workflow zusätzlich die Playwright-Trace-Dateien
-und den `e2eTest`-HTML-Report hoch, damit Fehler ohne lokalen Re-Run
-diagnostizierbar sind.
+Dieser Betriebssystem-Schritt benötigt je nach Distribution erhöhte Rechte; er ist keine GitHub-Abhängigkeit.
+
+## Docker- und Datenbankintegration
+
+`dockerE2eTest` besitzt den vollständigen Container-Lebenszyklus. Testcontainers:
+
+- baut die wirklichen Projekt-Dockerfiles;
+- vergibt zufällige Host-Ports;
+- startet PostgreSQL und weitere benötigte Dienste;
+- wartet auf die tatsächliche Dienstbereitschaft;
+- stellt Logs in den JUnit-/Gradle-Reports bereit;
+- entfernt Container nach dem Lauf.
+
+Es sind keine fest verdrahteten GitHub-Service-Container, Host-Ports oder Workflow-Credentials erforderlich. PostgreSQL-Discovery-Tests erzeugen ihre wissenschaftlichen Diagnoseartefakte unter `app/build/discovery-artifacts/`; diese Dateien können von jeder CI-Umgebung optional veröffentlicht werden.
+
+## Dokumentationsaufnahmen
+
+Screenshots und Videos sind ein zusätzlicher Ausgabemodus derselben Browser-Tests:
+
+```bash
+./gradlew :app:e2eTest -Pregelsuche.recordDocs=true
+```
+
+Das Ändern von Dokumentationsartefakten ist bewusst nicht Teil von `allTests`, damit ein normaler Verifikationslauf den Checkout nicht verändert.
