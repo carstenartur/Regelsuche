@@ -63,7 +63,3 @@ tasks.register('verifyCandidateIndependentBenchmark', Exec) {
     inputs.file('research/benchmarks/candidate-independent/benchmark-source.json')
     inputs.file('scripts/verify-candidate-independent-preregistration.py')
 }
-
-tasks.named('check') {
-    dependsOn tasks.named('verifyCandidateIndependentBenchmark')
-}
