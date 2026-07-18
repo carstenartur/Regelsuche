@@ -231,16 +231,16 @@ public final class Z3SmtSolverBackend implements SolverBackend {
     }
 
     public static Detection detectSystemZ3() {
-<span class="nc" id="L234">        ProcessRunner runner = new DefaultProcessRunner();</span>
-<span class="nc" id="L235">        ProcessOutput output = runner.run(</span>
-<span class="nc" id="L236">            List.of(&quot;z3&quot;, &quot;-version&quot;), &quot;&quot;, 2_000L);</span>
-<span class="nc bnc" id="L237" title="All 6 branches missed.">        if (!output.available() || output.timedOut() || output.exitCode() != 0) {</span>
-<span class="nc" id="L238">            return new Detection(</span>
+<span class="fc" id="L234">        ProcessRunner runner = new DefaultProcessRunner();</span>
+<span class="fc" id="L235">        ProcessOutput output = runner.run(</span>
+<span class="fc" id="L236">            List.of(&quot;z3&quot;, &quot;-version&quot;), &quot;&quot;, 2_000L);</span>
+<span class="pc bpc" id="L237" title="5 of 6 branches missed.">        if (!output.available() || output.timedOut() || output.exitCode() != 0) {</span>
+<span class="fc" id="L238">            return new Detection(</span>
                 new Z3SmtSolverBackend(
-<span class="nc" id="L240">                    &quot;unavailable&quot;, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
-<span class="nc" id="L241">                    Duration.ofSeconds(20), runner),</span>
+<span class="fc" id="L240">                    &quot;unavailable&quot;, List.of(&quot;z3&quot;, &quot;-in&quot;, &quot;-smt2&quot;),</span>
+<span class="fc" id="L241">                    Duration.ofSeconds(20), runner),</span>
                 BackendAvailability.UNAVAILABLE,
-<span class="nc" id="L243">                normalize(output.stdout() + ' ' + output.stderr()));</span>
+<span class="fc" id="L243">                normalize(output.stdout() + ' ' + output.stderr()));</span>
         }
 <span class="nc" id="L245">        String version = normalize(output.stdout());</span>
 <span class="nc bnc" id="L246" title="All 2 branches missed.">        if (version.isBlank()) {</span>
@@ -300,11 +300,11 @@ public final class Z3SmtSolverBackend implements SolverBackend {
         BackendAvailability availability,
         String detail
     ) {
-<span class="nc" id="L303">        public Detection {</span>
-<span class="nc" id="L304">            Objects.requireNonNull(backend, &quot;backend&quot;);</span>
-<span class="nc" id="L305">            Objects.requireNonNull(availability, &quot;availability&quot;);</span>
-<span class="nc bnc" id="L306" title="All 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
-<span class="nc" id="L307">        }</span>
+<span class="fc" id="L303">        public Detection {</span>
+<span class="fc" id="L304">            Objects.requireNonNull(backend, &quot;backend&quot;);</span>
+<span class="fc" id="L305">            Objects.requireNonNull(availability, &quot;availability&quot;);</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L307">        }</span>
     }
 
     @FunctionalInterface
@@ -335,9 +335,9 @@ public final class Z3SmtSolverBackend implements SolverBackend {
             Process process;
             try {
 <span class="nc" id="L337">                process = new ProcessBuilder(command).start();</span>
-<span class="nc" id="L338">            } catch (IOException exception) {</span>
-<span class="nc" id="L339">                return new ProcessOutput(</span>
-<span class="nc" id="L340">                    false, false, -1, &quot;&quot;, exception.getMessage());</span>
+<span class="fc" id="L338">            } catch (IOException exception) {</span>
+<span class="fc" id="L339">                return new ProcessOutput(</span>
+<span class="fc" id="L340">                    false, false, -1, &quot;&quot;, exception.getMessage());</span>
 <span class="nc" id="L341">            }</span>
 <span class="nc" id="L342">            ThreadFactory factory = runnable -&gt; {</span>
 <span class="nc" id="L343">                Thread thread = new Thread(runnable, &quot;z3-output-reader&quot;);</span>
