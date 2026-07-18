@@ -1,0 +1,47 @@
+name: Apply Discovery Challenge Portfolio
+
+on:
+  push:
+    branches: [ "issue-390-challenge-portfolio" ]
+    paths:
+      - '.github/workflows/branch-apply-issue390.yml'
+      - '.github/issue-390-patch/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/branch-apply-issue390.yml'
+      - '.github/issue-390-patch/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: issue-390-challenge-portfolio
+          fetch-depth: 0
+
+      - name: Decode implementation archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/issue-390-patch/chunk-* | base64 --decode > /tmp/issue390.tar.gz
+          tar -tzf /tmp/issue390.tar.gz
+          tar -xzf /tmp/issue390.tar.gz
+          test -s scripts/generate-discovery-challenge-portfolio.py
+          test -s research/challenges/challenge-plan-source.json
+          test -s docs/discovery-challenge-portfolio.md
+          test -s .github/issue-390-apply.sh
+
+      - name: Verify and commit challenge portfolio
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x .github/issue-390-apply.sh
+          .github/issue-390-apply.sh
