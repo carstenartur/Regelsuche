@@ -1,0 +1,96 @@
+{
+  "contentHash": "sha256:d80d1fe11092e373db127caedb6a61c43398c9b70833a360f5cab2ddb00c476c",
+  "evaluatedCampaignStatus": "NOT_STARTED",
+  "evaluations": [
+    {
+      "candidateRepresentation": "normalized finite-difference polynomial or bounded recurrence with declared order and assumptions",
+      "certificateRoute": "domain-specific finite-data witness plus optional solver obligation for the recurrence relation",
+      "challengeId": "finite-difference-recurrences",
+      "complexityTier": "INTERMEDIATE",
+      "decision": "SELECTED_FOR_PREREGISTRATION",
+      "independentEvaluator": {
+        "evaluatorId": "finite-sequence-holdout-and-recurrence-check/v1",
+        "method": "evaluate the frozen recurrence on held-out terms and verify finite-difference or recurrence consistency over the declared finite domain",
+        "resultStrength": "FINITE_DATA_VALIDATION_CERTIFICATE",
+        "unsupportedBoundary": "does not prove uniqueness of an infinite sequence or external novelty"
+      },
+      "multipleSolutionPolicy": "retain all valid hypotheses and score coverage, simplicity, and ambiguity separately",
+      "nullResultPolicy": "retain no-fit, multiple-fit, unsupported-order, timeout, and failed-holdout outcomes",
+      "pilotRequirement": "characterize ambiguous finite prefixes and ensure no unique-infinite-sequence claim is emitted",
+      "splitUnit": "recurrence-order, coefficient-shape, and finite-difference-signature family"
+    },
+    {
+      "candidateRepresentation": "directed AST pattern pair plus normalized assumption predicates",
+      "certificateRoute": "solver-neutral obligation with denominator assumptions and retained symbolic result",
+      "challengeId": "rational-assumption-rewrites",
+      "complexityTier": "INTERMEDIATE",
+      "decision": "SELECTED_FOR_PREREGISTRATION",
+      "independentEvaluator": {
+        "evaluatorId": "rational-cross-multiplication-and-counterexamples/v1",
+        "method": "cross-multiply under declared nonzero denominators, compare exact polynomial normal forms, and search bounded rational counterexamples",
+        "resultStrength": "SYMBOLIC_IDENTITY_UNDER_EXPLICIT_ASSUMPTIONS",
+        "unsupportedBoundary": "transcendental functions, undeclared branch cuts, or assumptions not expressible in the normalized predicate language"
+      },
+      "multipleSolutionPolicy": "credit every distinct valid normalized rule; do not require equality with a hidden reference",
+      "nullResultPolicy": "retain zero-output, refuted, unsupported, timeout, and incomplete-assumption outcomes",
+      "pilotRequirement": "verify denominator-assumption propagation and false-positive rejection on development-only examples",
+      "splitUnit": "denominator-factor topology and normalized placeholder-incidence signature"
+    },
+    {
+      "candidateRepresentation": "versioned macro operator with ordered primitive steps, applicability guards, and assumptions",
+      "certificateRoute": "replayable derivation trace plus paired utility and regression report",
+      "challengeId": "reusable-search-macros",
+      "complexityTier": "INTERMEDIATE",
+      "decision": "SELECTED_FOR_PREREGISTRATION",
+      "independentEvaluator": {
+        "evaluatorId": "paired-held-out-macro-utility/v1",
+        "method": "verify every primitive step and compare baseline versus macro-enabled search under identical held-out inputs, targets, inventory, strategy, and budgets",
+        "resultStrength": "DERIVATION_TRACE_AND_PAIRED_SEARCH_UTILITY",
+        "unsupportedBoundary": "utility is not truth, novelty, or mathematical importance"
+      },
+      "multipleSolutionPolicy": "compare every valid macro independently; equivalent step sequences share one normalized identity",
+      "nullResultPolicy": "retain no-macro, no-gain, trade-off, regression, timeout, and unsupported-task outcomes",
+      "pilotRequirement": "measure candidate volume and duplicate collapse while preserving exact primitive-step provenance",
+      "splitUnit": "transformation motif, source family, and macro-structure signature"
+    },
+    {
+      "candidateRepresentation": "directed relation pattern, comparison-direction effect, and normalized sign assumptions",
+      "certificateRoute": "solver-neutral inequality obligation with assumption and translation evidence",
+      "challengeId": "sign-sensitive-inequality-rewrites",
+      "complexityTier": "ADVANCED",
+      "decision": "DEFERRED_AFTER_PILOT",
+      "independentEvaluator": {
+        "evaluatorId": "inequality-smt-and-rational-counterexamples/v1",
+        "method": "translate supported polynomial inequalities and assumptions to the solver-neutral IR, request refutation or confirmation, and search bounded rational counterexamples",
+        "resultStrength": "SOLVER_VALIDATED_ON_SUPPORTED_FRAGMENT",
+        "unsupportedBoundary": "non-polynomial ordering, incomplete sign assumptions, and translation loss"
+      },
+      "multipleSolutionPolicy": "credit distinct valid transformations with non-equivalent assumption sets separately",
+      "nullResultPolicy": "retain unknown, unsupported, missing-assumption, refuted, and timeout outcomes",
+      "pilotRequirement": "build a domain adapter and demonstrate that missing or weakened sign assumptions fail closed",
+      "splitUnit": "comparison-direction transition, sign-context topology, and polynomial structure signature"
+    },
+    {
+      "candidateRepresentation": "canonical finite object plus constructive operation lineage",
+      "certificateRoute": "canonical object, constraint-check receipt, objective score, and optional exhaustive optimality certificate at small size",
+      "challengeId": "small-combinatorial-constructions",
+      "complexityTier": "ADVANCED",
+      "decision": "DEFERRED_AFTER_PILOT",
+      "independentEvaluator": {
+        "evaluatorId": "finite-construction-validity-and-score/v1",
+        "method": "check every constraint exactly and compute the declared objective; exhaustively verify selected small sizes where feasible",
+        "resultStrength": "EXACT_FINITE_VALIDITY_AND_OBJECTIVE",
+        "unsupportedBoundary": "scales only to preregistered finite sizes and does not prove asymptotic optimality"
+      },
+      "multipleSolutionPolicy": "retain all non-isomorphic valid constructions at each objective score",
+      "nullResultPolicy": "retain invalid, duplicate, no-improvement, timeout, and incomplete-exhaustion outcomes",
+      "pilotRequirement": "add a generic finite-construction domain, isomorphism-aware identity, and bounded exact evaluator",
+      "splitUnit": "object size, constraint topology, and construction-operator signature"
+    }
+  ],
+  "externalNoveltyStatus": "NOT_EVALUATED",
+  "pilotEvidenceStatus": "DEVELOPMENT_ONLY",
+  "portfolioId": "regelsuche-evaluator-backed-challenges-2026-07/v1",
+  "schema": "regelsuche.discovery-challenge-feasibility/v1",
+  "sourceHash": "sha256:05376727548db43c639966adedc43e222eb17c406def7c1de0d8b2419416675c"
+}
