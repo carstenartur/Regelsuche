@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT="$(cd "${ROOT}/.." && pwd)/independent-reproduction-output"
@@ -52,6 +52,23 @@ if [[ ${#ENVIRONMENT_ID} -gt 256 ]]; then
   exit 2
 fi
 
+python3 - <<'PY'
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    observed = version("jsonschema")
+except PackageNotFoundError as exc:
+    raise SystemExit(
+        "jsonschema==4.25.1 is required on the host; "
+        "install it with: python3 -m pip install jsonschema==4.25.1"
+    ) from exc
+if observed != "4.25.1":
+    raise SystemExit(
+        "jsonschema==4.25.1 is required on the host; "
+        f"observed version: {observed}"
+    )
+PY
+
 if [[ "${VERIFY_ONLY}" == true ]]; then
   exec python3 "${ROOT}/scripts/verify-independent-reproduction.py" \
     verify-artifact --root "${ROOT}"
@@ -80,13 +97,19 @@ if (
         "output directory must be separate from filesystem root, home and artifact root"
     )
 marker = out / ".regelsuche-independent-reproduction-output"
+marker_content = "regelsuche.independent-reproduction-output/v1\n"
 if out.exists():
     if not out.is_dir():
         raise SystemExit("output path must be a directory")
     entries = list(out.iterdir())
-    if entries and not marker.is_file():
+    if entries and (
+        marker.is_symlink()
+        or not marker.is_file()
+        or marker.read_text(encoding="utf-8") != marker_content
+    ):
         raise SystemExit(
-            "refusing to replace a non-empty output directory without the reproduction marker"
+            "refusing to replace a non-empty output directory without the exact "
+            "regular reproduction marker"
         )
     for child in entries:
         if child.is_symlink() or child.is_file():
@@ -95,10 +118,7 @@ if out.exists():
             shutil.rmtree(child)
 else:
     out.mkdir(parents=True)
-marker.write_text(
-    "regelsuche.independent-reproduction-output/v1\n",
-    encoding="utf-8",
-)
+marker.write_text(marker_content, encoding="utf-8")
 print(out)
 PY
 )"
