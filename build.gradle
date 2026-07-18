@@ -1,4 +1,5 @@
 def aiKnowledgeEnabled = System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
+def pythonExecutable = providers.gradleProperty('pythonExecutable').getOrElse('python3')
 
 def configuredIncludeTags = providers.gradleProperty('includeTestTags').orNull
 def configuredExcludeTags = providers.gradleProperty('excludeTestTags').orNull
@@ -99,6 +100,46 @@ if (aiKnowledgeEnabled) {
             throw new GradleException('AI knowledge extractor is disabled for this build.')
         }
     }
+}
+
+tasks.register('docsLint', Exec) {
+    group = 'verification'
+    description = 'Checks Markdown display-math layout using a checked-in verifier.'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/check-docs-math.py'
+    inputs.files(fileTree('docs') { include '**/*.md' })
+    inputs.file('scripts/check-docs-math.py')
+}
+
+tasks.register('verifyDiscoveryGallery', Exec) {
+    group = 'verification'
+    description = 'Regenerates and verifies the committed discovery gallery.'
+    dependsOn ':app:generateDiscoveryGallery'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/verify-generated-discovery-gallery.py'
+    inputs.file('scripts/verify-generated-discovery-gallery.py')
+    inputs.dir('docs/generated/discovery')
+    inputs.file('docs/demo-gallery.md')
+    inputs.file('README.md')
+}
+
+tasks.register('verifyStaticReferencePage', Exec) {
+    group = 'verification'
+    description = 'Generates and verifies the static reference-page contract.'
+    dependsOn ':app:generateStaticReferencePage'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/verify-static-reference-page.py'
+    inputs.file('scripts/verify-static-reference-page.py')
+}
+
+tasks.register('generateCiPages', Exec) {
+    group = 'reporting'
+    description = 'Renders coverage and test badge pages from local Gradle reports.'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/generate-ci-pages.py'
+    inputs.file('scripts/generate-ci-pages.py')
+    outputs.dir('public/coverage')
+    outputs.dir('public/tests')
 }
 
 tasks.register('verifyCandidateIndependentBenchmark', Exec) {
