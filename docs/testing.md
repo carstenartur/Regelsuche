@@ -88,6 +88,8 @@ Dieser Betriebssystem-Schritt benötigt je nach Distribution erhöhte Rechte; er
 - stellt Logs in den JUnit-/Gradle-Reports bereit;
 - entfernt Container nach dem Lauf.
 
+Das normale `Dockerfile` erzeugt bewusst das schlanke Web-Workbench-Runtime-Image und installiert keine externen Beweiser. Der Proof-Integrationstest baut separat `Dockerfile.proof`; dieses Image installiert Z3 und cvc5. Der JUnit-Test führt im gestarteten Container sowohl `z3 --version` als auch `cvc5 --version` aus und prüft zusätzlich die Proof-Job-REST-Schnittstelle. Testcontainers stellt die Solver also nicht selbst bereit, sondern startet das versionierte Projektimage, in dem sie installiert sind.
+
 Es sind keine fest verdrahteten GitHub-Service-Container, Host-Ports oder Workflow-Credentials erforderlich. PostgreSQL-Discovery-Tests erzeugen ihre wissenschaftlichen Diagnoseartefakte unter `app/build/discovery-artifacts/`; diese Dateien können von jeder CI-Umgebung optional veröffentlicht werden.
 
 ## Dokumentationsaufnahmen
