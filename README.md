@@ -18,6 +18,7 @@
 [Discovery Engine](docs/discovery-engine.md) ·
 [Discovery Evidence v1](docs/discovery-evidence-v1.md) ·
 [Capability status](docs/generated/capability-status.md) ·
+[Independent Reproduction](docs/independent-reproduction.md) ·
 [Macro Rules](docs/macro-rules.md) ·
 [Erweiterungssystem](docs/extension-system.md)
 
@@ -180,6 +181,18 @@ Neuheit, Promotion und Public Evidence bleiben ausdrücklich getrennt und
 ![Generated autonomous discovery evidence sequence](docs/generated/autonomous-discovery-walkthrough/sequence.svg)
 
 [Walkthrough, Container-Befehl und unabhängiger Verifier](docs/autonomous-discovery-walkthrough.md)
+
+## Independent Reproduction Artifact
+
+Aus derselben qualifizierten Evidence kann ein deterministisches, unveränderlich gebundenes Reproduktionspaket mit Quellarchiv, Manifest, gepinntem Container und maschinenlesbarem Receipt gebaut werden. Nach dem Entpacken lautet der unterstützte Aufruf:
+
+```bash
+./reproduce.sh --output /path/to/reproduction-output
+```
+
+Die technische Paketierung sowie lokale und Container-Reproduktion sind maschinenprüfbar. Eine auf unabhängig administrierter Infrastruktur veröffentlichte Drittanbieter-Attestation liegt noch nicht vor und bleibt explizit `NOT_COLLECTED`.
+
+[Artifact-, Receipt- und Attestation-Vertrag](docs/independent-reproduction.md)
 
 ## Scientific Discovery Walkthrough
 

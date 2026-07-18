@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.independent-reproduction-receipt/v1",
+  "title": "Regelsuche independent reproduction receipt v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "artifactManifestHash",
+    "artifactManifestHashSource",
+    "artifactManifestFileSha256",
+    "artifactId",
+    "environmentIdentity",
+    "executionStartedAt",
+    "executionFinishedAt",
+    "containerImageId",
+    "environmentDiagnostics",
+    "executionExitCode",
+    "exactComparison",
+    "semanticComparison",
+    "reproductionStatus",
+    "claimPolicy",
+    "externalAttestationStatus",
+    "reproducerAttestationHash",
+    "semanticReceiptHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.independent-reproduction-receipt/v1"},
+    "artifactManifestHash": {"$ref": "#/$defs/sha256"},
+    "artifactManifestHashSource": {
+      "enum": ["CLAIMED_CONTENT_HASH", "FILE_SHA256_FALLBACK"]
+    },
+    "artifactManifestFileSha256": {"$ref": "#/$defs/sha256"},
+    "artifactId": {"$ref": "#/$defs/identifier"},
+    "environmentIdentity": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "executionStartedAt": {"type": "string", "format": "date-time"},
+    "executionFinishedAt": {"type": "string", "format": "date-time"},
+    "containerImageId": {"$ref": "#/$defs/nonBlank"},
+    "environmentDiagnostics": {
+      "type": "object",
+      "required": [
+        "platform",
+        "dockerVersion",
+        "pythonVersion",
+        "networkPolicy"
+      ],
+      "properties": {
+        "platform": {"$ref": "#/$defs/nonBlank"},
+        "dockerVersion": {"$ref": "#/$defs/nonBlank"},
+        "pythonVersion": {"$ref": "#/$defs/nonBlank"},
+        "networkPolicy": {"const": "DISABLED_DURING_EVALUATED_RUN"}
+      },
+      "additionalProperties": false
+    },
+    "executionExitCode": {"type": "integer", "minimum": 0},
+    "exactComparison": {
+      "type": "object",
+      "required": [
+        "designatedFileCount",
+        "matchedFileCount",
+        "expectedExactByteRoot",
+        "observedExactByteRoot",
+        "missingPaths",
+        "differingPaths",
+        "unexpectedPaths",
+        "allDesignatedBytesMatch"
+      ],
+      "properties": {
+        "designatedFileCount": {"type": "integer", "minimum": 0},
+        "matchedFileCount": {"type": "integer", "minimum": 0},
+        "expectedExactByteRoot": {"$ref": "#/$defs/sha256"},
+        "observedExactByteRoot": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"const": "NOT_AVAILABLE"}
+          ]
+        },
+        "missingPaths": {"$ref": "#/$defs/pathArray"},
+        "differingPaths": {"$ref": "#/$defs/pathArray"},
+        "unexpectedPaths": {"$ref": "#/$defs/pathArray"},
+        "allDesignatedBytesMatch": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "semanticComparison": {
+      "type": "object",
+      "required": [
+        "expectedRoots",
+        "observedRoots",
+        "missingRoots",
+        "differingRoots",
+        "inputArtifactFailures",
+        "requiredStatusFailures",
+        "allSemanticRootsMatch"
+      ],
+      "properties": {
+        "expectedRoots": {"$ref": "#/$defs/rootMap"},
+        "observedRoots": {"$ref": "#/$defs/rootMap"},
+        "missingRoots": {"$ref": "#/$defs/textArray"},
+        "differingRoots": {"$ref": "#/$defs/textArray"},
+        "inputArtifactFailures": {"$ref": "#/$defs/textArray"},
+        "requiredStatusFailures": {"$ref": "#/$defs/textArray"},
+        "allSemanticRootsMatch": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "reproductionStatus": {
+      "enum": [
+        "EXACT_BYTE_REPRODUCED",
+        "SEMANTICALLY_REPRODUCED",
+        "NOT_REPRODUCED"
+      ]
+    },
+    "claimPolicy": {"const": "REPRODUCTION_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"},
+    "externalAttestationStatus": {"const": "NOT_COLLECTED"},
+    "reproducerAttestationHash": {"$ref": "#/$defs/sha256"},
+    "semanticReceiptHash": {"$ref": "#/$defs/sha256"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "exactComparison": {
+          "properties": {"allDesignatedBytesMatch": {"const": true}}
+        },
+        "semanticComparison": {
+          "properties": {"allSemanticRootsMatch": {"const": true}}
+        },
+        "reproductionStatus": {"const": "EXACT_BYTE_REPRODUCED"}
+      }
+    },
+    {
+      "properties": {
+        "exactComparison": {
+          "properties": {"allDesignatedBytesMatch": {"const": false}}
+        },
+        "semanticComparison": {
+          "properties": {"allSemanticRootsMatch": {"const": true}}
+        },
+        "reproductionStatus": {"const": "SEMANTICALLY_REPRODUCED"}
+      }
+    },
+    {
+      "properties": {
+        "semanticComparison": {
+          "properties": {"allSemanticRootsMatch": {"const": false}}
+        },
+        "reproductionStatus": {"const": "NOT_REPRODUCED"}
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{1,191}$"
+    },
+    "nonBlank": {"type": "string", "minLength": 1},
+    "path": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+    },
+    "pathArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/path"}
+    },
+    "textArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "rootMap": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/sha256"}
+    }
+  }
+}
