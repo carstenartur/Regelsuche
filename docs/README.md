@@ -4,6 +4,8 @@
 
 - [Aktueller Discovery-Stand](discovery-status.md) — gemessene Ergebnisse, wissenschaftliche Grenzen und nächste Arbeitsschritte.
 - [Release Readiness für Regelsuche 0.2](release-readiness.md) — getrennte Evidence Profiles, qualifizierter Autonomie-Claim sowie Gradle-/Docker-Reproduktion.
+- [Capability- und Claim-Status](capability-status.md) — kontrolliertes Statusvokabular, Trust-Grenzen und lokaler Reproduktionsvertrag.
+- [Generierte Capability-Matrix](generated/capability-status.md) — aus kanonischer Release-, Domain- und Plugin-Contract-Evidence erzeugter Status.
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md) — kanonische Problemverträge, strukturierte Annahmen, Backend-Capabilities und zwei unabhängige Adapter.
 - [Capability-aware Solver-Portfolio](solver-portfolio.md) — rollenbasierte Backend-Auswahl, Budgets, Timeouts, Cache, Konflikte und formale Z3-Bestätigung.
 - [Vergleichende Discovery-Benchmarks](discovery-benchmarks.md) — informationsgleiche, track-spezifische Baselines ohne universelles Leaderboard.
@@ -62,6 +64,7 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Domain-Generic-Profile-Katalog-Schema v1](schemas/regelsuche-domain-generic-evidence-profile-catalog-v1.schema.json)
 - [Domain-Generic-Qualification-Schema v1](schemas/regelsuche-domain-generic-discovery-qualification-v1.schema.json)
 - [Domain-Generic-Qualification-Run-Schema v1](schemas/regelsuche-domain-generic-discovery-qualification-run-v1.schema.json)
+- [Capability-Status-Schema v1](schemas/regelsuche-capability-status-v1.schema.json)
 - [Comparative-Benchmark-Schema v1](schemas/regelsuche-comparative-benchmark-v1.schema.json)
 - [Solver-Portfolio-Report-Schema v1](schemas/regelsuche-solver-portfolio-report-v1.schema.json)
 - [Solver-Obligation-Schema v1](schemas/regelsuche-solver-obligation-v1.schema.json)
@@ -81,11 +84,11 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Review-Consensus-Schema v1](schemas/regelsuche-interestingness-review-consensus-v1.schema.json)
 - [Calibration-Corpus-Schema v1](schemas/regelsuche-interestingness-calibration-corpus-v1.schema.json)
 - [Autopilot: targetfreie Campaign-Planung](autopilot-planner.md)
-- [Autonomous-Research-Brief-Schema v1](schemas/regelsuche-autonomous-research-brief-v1.schema.json)
-- [Campaign-Budget-Ledger-Schema v1](schemas/regelsuche-campaign-budget-ledger-v1.schema.json)
-- [Autonomous-Campaign-Plan-Schema v1](schemas/regelsuche-autonomous-campaign-plan-v1.schema.json)
-- [Autonomous-Campaign-Execution-Schema v1](schemas/regelsuche-autonomous-campaign-execution-v1.schema.json)
-- [Autonomous-Campaign-Round-Schema v1](schemas/regelsuche-autonomous-campaign-round-v1.schema.json)
+- [Autonomous-Research-Brief-Schema v2](schemas/regelsuche-autonomous-research-brief-v2.schema.json)
+- [Autonomous-Stage-Resource-Ledger-Schema v2](schemas/regelsuche-autonomous-stage-resource-ledger-v2.schema.json)
+- [Autonomous-Campaign-Plan-Schema v2](schemas/regelsuche-autonomous-campaign-plan-v2.schema.json)
+- [Autonomous-Campaign-Execution-Schema v2](schemas/regelsuche-autonomous-campaign-execution-v2.schema.json)
+- [Autonomous-Campaign-Round-Schema v2](schemas/regelsuche-autonomous-campaign-round-v2.schema.json)
 - [Hypothesis Mining](hypothesis-mining.md)
 - [Rule Discovery](rule-discovery.md)
 - [Scientific Reproducibility](scientific-reproducibility.md)
