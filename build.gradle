@@ -32,12 +32,20 @@ project(':app') {
     }
 }
 
-tasks.register('allTests') {
+def repositoryTestTasks = subprojects.collect { candidateProject ->
+    candidateProject.tasks.withType(org.gradle.api.tasks.testing.Test)
+}
+
+def repositoryTest = tasks.register('test') {
     group = 'verification'
     description = 'Runs every Gradle Test task in the repository, including browser, Docker/Testcontainers and external-tool integration tests.'
-    dependsOn subprojects.collect { candidateProject ->
-        candidateProject.tasks.withType(org.gradle.api.tasks.testing.Test)
-    }
+    dependsOn repositoryTestTasks
+}
+
+tasks.register('allTests') {
+    group = 'verification'
+    description = 'Explicit alias for the complete repository test run.'
+    dependsOn repositoryTest
 }
 
 buildscript {
