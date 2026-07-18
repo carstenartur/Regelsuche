@@ -30,6 +30,19 @@ tasks.named('test') {
     finalizedBy tasks.named('jacocoTestReport')
 }
 
+tasks.register('verifyEvolutionStudy', Exec) {
+    group = 'verification'
+    description = 'Verifies the frozen population study, nested splits and FINAL TEST boundary.'
+    workingDir rootProject.projectDir
+    commandLine 'python3',
+        'scripts/verify-evolution-study.py',
+        'research/evolution/evolution-study-source.json'
+    inputs.file(rootProject.file('scripts/verify-evolution-study.py'))
+    inputs.file(rootProject.file('research/evolution/evolution-study-source.json'))
+    inputs.file(rootProject.file('research/benchmarks/candidate-independent/benchmark-source.json'))
+    inputs.file(rootProject.file('docs/schemas/regelsuche-evolution-study-source-v1.schema.json'))
+}
+
 jacoco {
     toolVersion = '0.8.13'
 }
@@ -45,4 +58,5 @@ tasks.named('jacocoTestReport') {
 
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
+    dependsOn tasks.named('verifyEvolutionStudy')
 }
