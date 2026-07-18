@@ -48,7 +48,10 @@
         "type": "object",
         "required": ["path", "sha256"],
         "properties": {
-          "path": {"type": "string", "pattern": "^paper/[A-Za-z0-9._/-]+$"},
+          "path": {
+            "type": "string",
+            "pattern": "^paper/(?:[A-Za-z0-9_][A-Za-z0-9._-]*/)*[A-Za-z0-9_][A-Za-z0-9._-]*$"
+          },
           "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
         },
         "additionalProperties": false
