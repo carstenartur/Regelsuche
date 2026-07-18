@@ -1,0 +1,285 @@
+{
+  "schema": "regelsuche.discovery-challenge-plan-source/v1",
+  "portfolioId": "regelsuche-evaluator-backed-challenges-2026-07/v1",
+  "claimPolicy": "EVALUATOR_BACKED_DOES_NOT_IMPLY_EXTERNAL_NOVELTY",
+  "selectionPolicy": {
+    "minimumAssessedClasses": 5,
+    "minimumSelectedClasses": 2,
+    "requireIndependentEvaluator": true,
+    "requireFrozenSplitUnit": true,
+    "requireInformationParityBaselines": true,
+    "externalSearchVisibility": "POST_FORMATION_ONLY",
+    "pilotEvidenceStatus": "DEVELOPMENT_ONLY"
+  },
+  "challenges": [
+    {
+      "challengeId": "rational-assumption-rewrites",
+      "title": "Assumption-sensitive rational rewrite identities",
+      "decision": "SELECTED_FOR_PREREGISTRATION",
+      "complexityTier": "INTERMEDIATE",
+      "mathematicalObject": "parameterized rational expression rewrite with explicit nonzero assumptions",
+      "candidateRepresentation": "directed AST pattern pair plus normalized assumption predicates",
+      "formationInformation": [
+        "untargeted expression seeds",
+        "primitive semantics-preserving rewrite inventory",
+        "domain and resource budgets"
+      ],
+      "prohibitedFormationInformation": [
+        "expected target expression",
+        "hidden reference rule",
+        "final TEST denominator topology",
+        "literature or CAS match"
+      ],
+      "independentEvaluator": {
+        "evaluatorId": "rational-cross-multiplication-and-counterexamples/v1",
+        "method": "cross-multiply under declared nonzero denominators, compare exact polynomial normal forms, and search bounded rational counterexamples",
+        "resultStrength": "SYMBOLIC_IDENTITY_UNDER_EXPLICIT_ASSUMPTIONS",
+        "unsupportedBoundary": "transcendental functions, undeclared branch cuts, or assumptions not expressible in the normalized predicate language"
+      },
+      "certificateRoute": "solver-neutral obligation with denominator assumptions and retained symbolic result",
+      "splitUnit": "denominator-factor topology and normalized placeholder-incidence signature",
+      "leakageControls": [
+        "exact canonical fingerprint isolation",
+        "alpha-normalized pattern isolation",
+        "denominator-topology isolation",
+        "post-formation external search only"
+      ],
+      "baselineProfiles": [
+        "grammar-enumerative-assumption-aware",
+        "random-valid-rational-pattern",
+        "validation-only-CAS-separate-track"
+      ],
+      "multipleSolutionPolicy": "credit every distinct valid normalized rule; do not require equality with a hidden reference",
+      "nullResultPolicy": "retain zero-output, refuted, unsupported, timeout, and incomplete-assumption outcomes",
+      "budget": {
+        "maximumCampaigns": 24,
+        "maximumStatesPerCampaign": 2000,
+        "maximumCandidateEvaluations": 500,
+        "maximumCounterexampleAttempts": 1000,
+        "maximumProofAttempts": 100
+      },
+      "externalReviewSources": [
+        "computer-algebra rule libraries",
+        "formula and theorem databases",
+        "mathematical literature indexes"
+      ],
+      "pilotRequirement": "verify denominator-assumption propagation and false-positive rejection on development-only examples",
+      "selectionRationale": "extends beyond coefficient collection while retaining exact symbolic evaluation and explicit side-condition failure modes"
+    },
+    {
+      "challengeId": "finite-difference-recurrences",
+      "title": "Finite-difference and recurrence hypotheses for integer sequences",
+      "decision": "SELECTED_FOR_PREREGISTRATION",
+      "complexityTier": "INTERMEDIATE",
+      "mathematicalObject": "integer sequence prefix with a separate continuation holdout",
+      "candidateRepresentation": "normalized finite-difference polynomial or bounded recurrence with declared order and assumptions",
+      "formationInformation": [
+        "observed TRAIN prefix",
+        "sequence-domain generator contracts",
+        "order and resource bounds"
+      ],
+      "prohibitedFormationInformation": [
+        "final TEST continuation",
+        "sequence database identifier",
+        "post-hoc family label",
+        "expected recurrence"
+      ],
+      "independentEvaluator": {
+        "evaluatorId": "finite-sequence-holdout-and-recurrence-check/v1",
+        "method": "evaluate the frozen recurrence on held-out terms and verify finite-difference or recurrence consistency over the declared finite domain",
+        "resultStrength": "FINITE_DATA_VALIDATION_CERTIFICATE",
+        "unsupportedBoundary": "does not prove uniqueness of an infinite sequence or external novelty"
+      },
+      "certificateRoute": "domain-specific finite-data witness plus optional solver obligation for the recurrence relation",
+      "splitUnit": "recurrence-order, coefficient-shape, and finite-difference-signature family",
+      "leakageControls": [
+        "observed/holdout separation",
+        "family and structural-signature isolation",
+        "database lookup after candidate freeze only",
+        "ambiguous continuation retained explicitly"
+      ],
+      "baselineProfiles": [
+        "bounded-polynomial-interpolation",
+        "minimum-description-recurrence-enumerator",
+        "random-valid-recurrence"
+      ],
+      "multipleSolutionPolicy": "retain all valid hypotheses and score coverage, simplicity, and ambiguity separately",
+      "nullResultPolicy": "retain no-fit, multiple-fit, unsupported-order, timeout, and failed-holdout outcomes",
+      "budget": {
+        "maximumCampaigns": 30,
+        "maximumStatesPerCampaign": 1500,
+        "maximumCandidateEvaluations": 600,
+        "maximumCounterexampleAttempts": 600,
+        "maximumProofAttempts": 60
+      },
+      "externalReviewSources": [
+        "integer sequence databases",
+        "recurrence literature",
+        "symbolic sequence packages"
+      ],
+      "pilotRequirement": "characterize ambiguous finite prefixes and ensure no unique-infinite-sequence claim is emitted",
+      "selectionRationale": "uses a distinct mathematical object type with a cheap holdout evaluator and explicit ambiguity semantics"
+    },
+    {
+      "challengeId": "reusable-search-macros",
+      "title": "Reusable symbolic macro and search-strategy discovery",
+      "decision": "SELECTED_FOR_PREREGISTRATION",
+      "complexityTier": "INTERMEDIATE",
+      "mathematicalObject": "bounded composition of semantics-preserving transformations reused across frozen task families",
+      "candidateRepresentation": "versioned macro operator with ordered primitive steps, applicability guards, and assumptions",
+      "formationInformation": [
+        "untargeted search trajectories",
+        "primitive transformation inventory",
+        "TRAIN-only structural telemetry"
+      ],
+      "prohibitedFormationInformation": [
+        "final TEST targets",
+        "qualification outcomes",
+        "post-hoc success labels",
+        "hidden macro reference"
+      ],
+      "independentEvaluator": {
+        "evaluatorId": "paired-held-out-macro-utility/v1",
+        "method": "verify every primitive step and compare baseline versus macro-enabled search under identical held-out inputs, targets, inventory, strategy, and budgets",
+        "resultStrength": "DERIVATION_TRACE_AND_PAIRED_SEARCH_UTILITY",
+        "unsupportedBoundary": "utility is not truth, novelty, or mathematical importance"
+      },
+      "certificateRoute": "replayable derivation trace plus paired utility and regression report",
+      "splitUnit": "transformation motif, source family, and macro-structure signature",
+      "leakageControls": [
+        "family-disjoint held-out tasks",
+        "macro formation without TEST targets",
+        "exact and alpha-normalized step-sequence isolation",
+        "paired information parity"
+      ],
+      "baselineProfiles": [
+        "primitive-inventory-only",
+        "random-valid-macro",
+        "frequency-ranked-path-macro"
+      ],
+      "multipleSolutionPolicy": "compare every valid macro independently; equivalent step sequences share one normalized identity",
+      "nullResultPolicy": "retain no-macro, no-gain, trade-off, regression, timeout, and unsupported-task outcomes",
+      "budget": {
+        "maximumCampaigns": 24,
+        "maximumStatesPerCampaign": 3000,
+        "maximumCandidateEvaluations": 400,
+        "maximumCounterexampleAttempts": 400,
+        "maximumProofAttempts": 100
+      },
+      "externalReviewSources": [
+        "term-rewriting strategy literature",
+        "equality-saturation and macro-rewrite systems",
+        "symbolic simplification benchmarks"
+      ],
+      "pilotRequirement": "measure candidate volume and duplicate collapse while preserving exact primitive-step provenance",
+      "selectionRationale": "offers a systems-level discovery target with directly measurable reusable utility and independently checkable step semantics"
+    },
+    {
+      "challengeId": "sign-sensitive-inequality-rewrites",
+      "title": "Sign-sensitive inequality-preserving transformations",
+      "decision": "DEFERRED_AFTER_PILOT",
+      "complexityTier": "ADVANCED",
+      "mathematicalObject": "parameterized inequality transformation with sign and domain conditions",
+      "candidateRepresentation": "directed relation pattern, comparison-direction effect, and normalized sign assumptions",
+      "formationInformation": [
+        "untargeted inequality seeds",
+        "primitive inequality transformations",
+        "TRAIN-only sign-context telemetry"
+      ],
+      "prohibitedFormationInformation": [
+        "final TEST sign assignments",
+        "hidden reference transformation",
+        "expected comparison direction"
+      ],
+      "independentEvaluator": {
+        "evaluatorId": "inequality-smt-and-rational-counterexamples/v1",
+        "method": "translate supported polynomial inequalities and assumptions to the solver-neutral IR, request refutation or confirmation, and search bounded rational counterexamples",
+        "resultStrength": "SOLVER_VALIDATED_ON_SUPPORTED_FRAGMENT",
+        "unsupportedBoundary": "non-polynomial ordering, incomplete sign assumptions, and translation loss"
+      },
+      "certificateRoute": "solver-neutral inequality obligation with assumption and translation evidence",
+      "splitUnit": "comparison-direction transition, sign-context topology, and polynomial structure signature",
+      "leakageControls": [
+        "sign-assignment isolation",
+        "relation-direction isolation",
+        "exact and alpha-normalized pattern checks",
+        "held-out assumption combinations"
+      ],
+      "baselineProfiles": [
+        "assumption-aware-grammar-enumerator",
+        "SMT-validation-only-separate-track",
+        "random-valid-inequality-pattern"
+      ],
+      "multipleSolutionPolicy": "credit distinct valid transformations with non-equivalent assumption sets separately",
+      "nullResultPolicy": "retain unknown, unsupported, missing-assumption, refuted, and timeout outcomes",
+      "budget": {
+        "maximumCampaigns": 16,
+        "maximumStatesPerCampaign": 1500,
+        "maximumCandidateEvaluations": 300,
+        "maximumCounterexampleAttempts": 1500,
+        "maximumProofAttempts": 300
+      },
+      "externalReviewSources": [
+        "inequality theorem libraries",
+        "SMT benchmark suites",
+        "computer-algebra assumption systems"
+      ],
+      "pilotRequirement": "build a domain adapter and demonstrate that missing or weakened sign assumptions fail closed",
+      "selectionRationale": "scientifically useful but deferred until assumption propagation and relation-direction semantics have dedicated production evidence"
+    },
+    {
+      "challengeId": "small-combinatorial-constructions",
+      "title": "Small finite combinatorial construction improvement",
+      "decision": "DEFERRED_AFTER_PILOT",
+      "complexityTier": "ADVANCED",
+      "mathematicalObject": "bounded finite graph or set-system construction with exact validity and objective score",
+      "candidateRepresentation": "canonical finite object plus constructive operation lineage",
+      "formationInformation": [
+        "object-size and validity constraints",
+        "construction operators",
+        "objective function without hidden best-known target"
+      ],
+      "prohibitedFormationInformation": [
+        "best-known construction",
+        "final TEST instance labels",
+        "post-hoc database match",
+        "expected objective value"
+      ],
+      "independentEvaluator": {
+        "evaluatorId": "finite-construction-validity-and-score/v1",
+        "method": "check every constraint exactly and compute the declared objective; exhaustively verify selected small sizes where feasible",
+        "resultStrength": "EXACT_FINITE_VALIDITY_AND_OBJECTIVE",
+        "unsupportedBoundary": "scales only to preregistered finite sizes and does not prove asymptotic optimality"
+      },
+      "certificateRoute": "canonical object, constraint-check receipt, objective score, and optional exhaustive optimality certificate at small size",
+      "splitUnit": "object size, constraint topology, and construction-operator signature",
+      "leakageControls": [
+        "best-known target hidden during formation",
+        "size-disjoint TEST instances",
+        "canonical isomorphism-aware deduplication",
+        "external comparison after freeze"
+      ],
+      "baselineProfiles": [
+        "random-valid-construction",
+        "greedy-construction",
+        "bounded-enumerative-search"
+      ],
+      "multipleSolutionPolicy": "retain all non-isomorphic valid constructions at each objective score",
+      "nullResultPolicy": "retain invalid, duplicate, no-improvement, timeout, and incomplete-exhaustion outcomes",
+      "budget": {
+        "maximumCampaigns": 20,
+        "maximumStatesPerCampaign": 5000,
+        "maximumCandidateEvaluations": 2000,
+        "maximumCounterexampleAttempts": 0,
+        "maximumProofAttempts": 100
+      },
+      "externalReviewSources": [
+        "combinatorial construction databases",
+        "published best-known tables",
+        "algorithmic construction literature"
+      ],
+      "pilotRequirement": "add a generic finite-construction domain, isomorphism-aware identity, and bounded exact evaluator",
+      "selectionRationale": "potentially strong objective results but deferred because no current production domain adapter or canonical isomorphism layer exists"
+    }
+  ]
+}

@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.discovery-challenge-artifact/v1",
+  "title": "Regelsuche discovery challenge generated artifacts v1",
+  "oneOf": [
+    {"$ref": "#/$defs/landscape"},
+    {"$ref": "#/$defs/feasibility"},
+    {"$ref": "#/$defs/splitPolicy"},
+    {"$ref": "#/$defs/baselinePlan"},
+    {"$ref": "#/$defs/runBudget"},
+    {"$ref": "#/$defs/portfolio"}
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{1,191}$"
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    },
+    "decision": {
+      "enum": ["SELECTED_FOR_PREREGISTRATION", "DEFERRED_AFTER_PILOT"]
+    },
+    "complexityTier": {
+      "enum": ["INTERMEDIATE", "ADVANCED"]
+    },
+    "textArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
+    "textArray2": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
+    "textArray3": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
+    "evaluator": {
+      "type": "object",
+      "required": ["evaluatorId", "method", "resultStrength", "unsupportedBoundary"],
+      "properties": {
+        "evaluatorId": {"$ref": "#/$defs/identifier"},
+        "method": {"$ref": "#/$defs/nonBlank"},
+        "resultStrength": {"$ref": "#/$defs/identifier"},
+        "unsupportedBoundary": {"$ref": "#/$defs/nonBlank"}
+      },
+      "additionalProperties": false
+    },
+    "landscapeChallenge": {
+      "type": "object",
+      "required": [
+        "challengeId",
+        "title",
+        "decision",
+        "complexityTier",
+        "mathematicalObject",
+        "selectionRationale"
+      ],
+      "properties": {
+        "challengeId": {"$ref": "#/$defs/identifier"},
+        "title": {"$ref": "#/$defs/nonBlank"},
+        "decision": {"$ref": "#/$defs/decision"},
+        "complexityTier": {"$ref": "#/$defs/complexityTier"},
+        "mathematicalObject": {"$ref": "#/$defs/nonBlank"},
+        "selectionRationale": {"$ref": "#/$defs/nonBlank"}
+      },
+      "additionalProperties": false
+    },
+    "feasibilityEvaluation": {
+      "type": "object",
+      "required": [
+        "challengeId",
+        "decision",
+        "complexityTier",
+        "candidateRepresentation",
+        "independentEvaluator",
+        "certificateRoute",
+        "splitUnit",
+        "pilotRequirement",
+        "multipleSolutionPolicy",
+        "nullResultPolicy"
+      ],
+      "properties": {
+        "challengeId": {"$ref": "#/$defs/identifier"},
+        "decision": {"$ref": "#/$defs/decision"},
+        "complexityTier": {"$ref": "#/$defs/complexityTier"},
+        "candidateRepresentation": {"$ref": "#/$defs/nonBlank"},
+        "independentEvaluator": {"$ref": "#/$defs/evaluator"},
+        "certificateRoute": {"$ref": "#/$defs/nonBlank"},
+        "splitUnit": {"$ref": "#/$defs/nonBlank"},
+        "pilotRequirement": {"$ref": "#/$defs/nonBlank"},
+        "multipleSolutionPolicy": {"$ref": "#/$defs/nonBlank"},
+        "nullResultPolicy": {"$ref": "#/$defs/nonBlank"}
+      },
+      "additionalProperties": false
+    },
+    "splitPolicyEntry": {
+      "type": "object",
+      "required": [
+        "challengeId",
+        "splitUnit",
+        "formationInformation",
+        "prohibitedFormationInformation",
+        "leakageControls"
+      ],
+      "properties": {
+        "challengeId": {"$ref": "#/$defs/identifier"},
+        "splitUnit": {"$ref": "#/$defs/nonBlank"},
+        "formationInformation": {"$ref": "#/$defs/textArray"},
+        "prohibitedFormationInformation": {"$ref": "#/$defs/textArray"},
+        "leakageControls": {"$ref": "#/$defs/textArray3"}
+      },
+      "additionalProperties": false
+    },
+    "baselineEntry": {
+      "type": "object",
+      "required": [
+        "challengeId",
+        "baselineProfiles",
+        "informationParityRequired",
+        "validationOnlySystemsUseSeparateTrack",
+        "externalReviewSources"
+      ],
+      "properties": {
+        "challengeId": {"$ref": "#/$defs/identifier"},
+        "baselineProfiles": {"$ref": "#/$defs/textArray2"},
+        "informationParityRequired": {"const": true},
+        "validationOnlySystemsUseSeparateTrack": {"const": true},
+        "externalReviewSources": {"$ref": "#/$defs/textArray"}
+      },
+      "additionalProperties": false
+    },
+    "budgetEntry": {
+      "type": "object",
+      "required": [
+        "challengeId",
+        "maximumCampaigns",
+        "maximumStatesPerCampaign",
+        "maximumCandidateEvaluations",
+        "maximumCounterexampleAttempts",
+        "maximumProofAttempts"
+      ],
+      "properties": {
+        "challengeId": {"$ref": "#/$defs/identifier"},
+        "maximumCampaigns": {"type": "integer", "minimum": 1},
+        "maximumStatesPerCampaign": {"type": "integer", "minimum": 1},
+        "maximumCandidateEvaluations": {"type": "integer", "minimum": 1},
+        "maximumCounterexampleAttempts": {"type": "integer", "minimum": 0},
+        "maximumProofAttempts": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "base": {
+      "type": "object",
+      "required": ["schema", "portfolioId", "sourceHash", "contentHash"],
+      "properties": {
+        "schema": {"$ref": "#/$defs/identifier"},
+        "portfolioId": {"$ref": "#/$defs/identifier"},
+        "sourceHash": {"$ref": "#/$defs/sha256"},
+        "contentHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "landscape": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "claimPolicy",
+            "assessedChallengeCount",
+            "selectedChallengeCount",
+            "deferredChallengeCount",
+            "challenges"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-landscape/v1"},
+            "claimPolicy": {"const": "EVALUATOR_BACKED_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"},
+            "assessedChallengeCount": {"type": "integer", "minimum": 5},
+            "selectedChallengeCount": {"type": "integer", "minimum": 2},
+            "deferredChallengeCount": {"type": "integer", "minimum": 0},
+            "challenges": {
+              "type": "array",
+              "minItems": 5,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/landscapeChallenge"}
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "feasibility": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "evaluations",
+            "pilotEvidenceStatus",
+            "evaluatedCampaignStatus",
+            "externalNoveltyStatus"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-feasibility/v1"},
+            "evaluations": {
+              "type": "array",
+              "minItems": 5,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/feasibilityEvaluation"}
+            },
+            "pilotEvidenceStatus": {"const": "DEVELOPMENT_ONLY"},
+            "evaluatedCampaignStatus": {"const": "NOT_STARTED"},
+            "externalNoveltyStatus": {"const": "NOT_EVALUATED"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "splitPolicy": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "externalSearchVisibility",
+            "challengePolicies",
+            "crossSplitCollisionDisposition",
+            "correctedSplitDisposition"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-split-policy/v1"},
+            "externalSearchVisibility": {"const": "POST_FORMATION_ONLY"},
+            "challengePolicies": {
+              "type": "array",
+              "minItems": 5,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/splitPolicyEntry"}
+            },
+            "crossSplitCollisionDisposition": {"const": "BLOCK_PUBLICATION"},
+            "correctedSplitDisposition": {"const": "NEW_PORTFOLIO_IDENTITY"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "baselinePlan": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": ["universalScorePolicy", "challengeBaselines"],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-baseline-plan/v1"},
+            "universalScorePolicy": {"const": "NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY"},
+            "challengeBaselines": {
+              "type": "array",
+              "minItems": 5,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/baselineEntry"}
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "runBudget": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "challengeBudgets",
+            "overspendDisposition",
+            "missingMandatoryEvaluationDisposition"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-run-budget/v1"},
+            "challengeBudgets": {
+              "type": "array",
+              "minItems": 5,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/budgetEntry"}
+            },
+            "overspendDisposition": {"const": "INVALID_RUN"},
+            "missingMandatoryEvaluationDisposition": {"const": "INVALID_RUN"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "portfolio": {
+      "allOf": [
+        {"$ref": "#/$defs/base"},
+        {
+          "type": "object",
+          "required": [
+            "claimPolicy",
+            "selectedChallengeIds",
+            "deferredChallengeIds",
+            "landscapeHash",
+            "feasibilityHash",
+            "splitPolicyHash",
+            "baselinePlanHash",
+            "runBudgetHash",
+            "pilotEvidenceStatus",
+            "evaluatedCampaignStatus",
+            "externalNoveltyStatus",
+            "consumptionTarget"
+          ],
+          "properties": {
+            "schema": {"const": "regelsuche.discovery-challenge-portfolio/v1"},
+            "claimPolicy": {"const": "EVALUATOR_BACKED_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"},
+            "selectedChallengeIds": {
+              "type": "array",
+              "minItems": 2,
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/identifier"}
+            },
+            "deferredChallengeIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/identifier"}
+            },
+            "landscapeHash": {"$ref": "#/$defs/sha256"},
+            "feasibilityHash": {"$ref": "#/$defs/sha256"},
+            "splitPolicyHash": {"$ref": "#/$defs/sha256"},
+            "baselinePlanHash": {"$ref": "#/$defs/sha256"},
+            "runBudgetHash": {"$ref": "#/$defs/sha256"},
+            "pilotEvidenceStatus": {"const": "DEVELOPMENT_ONLY"},
+            "evaluatedCampaignStatus": {"const": "NOT_STARTED"},
+            "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+            "consumptionTarget": {"const": "issue-383-candidate-independent-benchmark"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

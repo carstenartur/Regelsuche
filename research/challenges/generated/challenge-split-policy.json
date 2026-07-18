@@ -1,0 +1,115 @@
+{
+  "challengePolicies": [
+    {
+      "challengeId": "finite-difference-recurrences",
+      "formationInformation": [
+        "observed TRAIN prefix",
+        "sequence-domain generator contracts",
+        "order and resource bounds"
+      ],
+      "leakageControls": [
+        "observed/holdout separation",
+        "family and structural-signature isolation",
+        "database lookup after candidate freeze only",
+        "ambiguous continuation retained explicitly"
+      ],
+      "prohibitedFormationInformation": [
+        "final TEST continuation",
+        "sequence database identifier",
+        "post-hoc family label",
+        "expected recurrence"
+      ],
+      "splitUnit": "recurrence-order, coefficient-shape, and finite-difference-signature family"
+    },
+    {
+      "challengeId": "rational-assumption-rewrites",
+      "formationInformation": [
+        "untargeted expression seeds",
+        "primitive semantics-preserving rewrite inventory",
+        "domain and resource budgets"
+      ],
+      "leakageControls": [
+        "exact canonical fingerprint isolation",
+        "alpha-normalized pattern isolation",
+        "denominator-topology isolation",
+        "post-formation external search only"
+      ],
+      "prohibitedFormationInformation": [
+        "expected target expression",
+        "hidden reference rule",
+        "final TEST denominator topology",
+        "literature or CAS match"
+      ],
+      "splitUnit": "denominator-factor topology and normalized placeholder-incidence signature"
+    },
+    {
+      "challengeId": "reusable-search-macros",
+      "formationInformation": [
+        "untargeted search trajectories",
+        "primitive transformation inventory",
+        "TRAIN-only structural telemetry"
+      ],
+      "leakageControls": [
+        "family-disjoint held-out tasks",
+        "macro formation without TEST targets",
+        "exact and alpha-normalized step-sequence isolation",
+        "paired information parity"
+      ],
+      "prohibitedFormationInformation": [
+        "final TEST targets",
+        "qualification outcomes",
+        "post-hoc success labels",
+        "hidden macro reference"
+      ],
+      "splitUnit": "transformation motif, source family, and macro-structure signature"
+    },
+    {
+      "challengeId": "sign-sensitive-inequality-rewrites",
+      "formationInformation": [
+        "untargeted inequality seeds",
+        "primitive inequality transformations",
+        "TRAIN-only sign-context telemetry"
+      ],
+      "leakageControls": [
+        "sign-assignment isolation",
+        "relation-direction isolation",
+        "exact and alpha-normalized pattern checks",
+        "held-out assumption combinations"
+      ],
+      "prohibitedFormationInformation": [
+        "final TEST sign assignments",
+        "hidden reference transformation",
+        "expected comparison direction"
+      ],
+      "splitUnit": "comparison-direction transition, sign-context topology, and polynomial structure signature"
+    },
+    {
+      "challengeId": "small-combinatorial-constructions",
+      "formationInformation": [
+        "object-size and validity constraints",
+        "construction operators",
+        "objective function without hidden best-known target"
+      ],
+      "leakageControls": [
+        "best-known target hidden during formation",
+        "size-disjoint TEST instances",
+        "canonical isomorphism-aware deduplication",
+        "external comparison after freeze"
+      ],
+      "prohibitedFormationInformation": [
+        "best-known construction",
+        "final TEST instance labels",
+        "post-hoc database match",
+        "expected objective value"
+      ],
+      "splitUnit": "object size, constraint topology, and construction-operator signature"
+    }
+  ],
+  "contentHash": "sha256:ff58c055a1e9035f96feed4c731dc16db6c064ab4bb383f1a38c2273878f9ceb",
+  "correctedSplitDisposition": "NEW_PORTFOLIO_IDENTITY",
+  "crossSplitCollisionDisposition": "BLOCK_PUBLICATION",
+  "externalSearchVisibility": "POST_FORMATION_ONLY",
+  "portfolioId": "regelsuche-evaluator-backed-challenges-2026-07/v1",
+  "schema": "regelsuche.discovery-challenge-split-policy/v1",
+  "sourceHash": "sha256:05376727548db43c639966adedc43e222eb17c406def7c1de0d8b2419416675c"
+}
