@@ -96,6 +96,16 @@ jobs:
           if start < 0 or end < 0:
               raise SystemExit('staged apply script Gradle block not found')
           patched = text[:start] + '\n' + text[end:]
+          commit_marker = 'git add -A\n'
+          if patched.count(commit_marker) != 1:
+              raise SystemExit('staged apply script commit marker not found exactly once')
+          patched = patched.replace(
+              commit_marker,
+              'mv .github/workflows/capability-status.yml '
+              '.github/capability-status-workflow.yml.pending\n'
+              'rm -rf scripts/__pycache__\n'
+              + commit_marker,
+          )
           target = Path('/tmp/issue385-apply-with-evidence.sh')
           target.write_text(patched, encoding='utf-8')
           target.chmod(0o755)
