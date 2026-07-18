@@ -37,19 +37,22 @@ def module_name(path: Path) -> str:
     return path.parts[0] if path.parts and path.parts[0] != "build" else "root"
 
 
-def generate_coverage(public: Path) -> int:
+def generate_coverage(public: Path) -> tuple[int, int, int]:
     coverage_dir = public / "coverage"
     coverage_dir.mkdir(parents=True, exist_ok=True)
     covered = 0
     missed = 0
+    malformed = 0
     reports: list[tuple[str, int, str]] = []
 
     pattern = "**/build/reports/jacoco/**/jacocoTestReport.xml"
-    for report in sorted(Path(".").glob(pattern)):
+    candidates = sorted(Path(".").glob(pattern))
+    for report in candidates:
         try:
             root = ET.parse(report).getroot()
         except ET.ParseError as error:
-            print(f"Skipping malformed JaCoCo XML {report}: {error}")
+            malformed += 1
+            print(f"Malformed JaCoCo XML {report}: {error}")
             continue
         report_covered = 0
         report_missed = 0
@@ -71,20 +74,30 @@ def generate_coverage(public: Path) -> int:
 
     total = covered + missed
     percent = round(covered / total * 100) if total else 0
+    valid_report_count = len(candidates) - malformed
+    if valid_report_count == 0:
+        badge_message = "no reports"
+        badge_color = "red"
+    elif malformed:
+        badge_message = f"{malformed} malformed"
+        badge_color = "red"
+    else:
+        badge_message = f"{percent}%"
+        badge_color = badge_colour(percent)
     write_json(
         coverage_dir / "badge.json",
         {
             "schemaVersion": 1,
             "label": "coverage",
-            "message": f"{percent}%",
-            "color": badge_colour(percent),
+            "message": badge_message,
+            "color": badge_color,
         },
     )
     rows = "\n".join(
         f'<tr><td><a href="{escape(link)}">{escape(module)}</a></td>'
         f"<td>{module_percent}%</td></tr>"
         for module, module_percent, link in reports
-    ) or '<tr><td colspan="2">No JaCoCo HTML reports were generated.</td></tr>'
+    ) or '<tr><td colspan="2">No valid JaCoCo HTML reports were generated.</td></tr>'
     (coverage_dir / "index.html").write_text(
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
         "<title>Regelsuche Coverage</title>"
@@ -92,25 +105,28 @@ def generate_coverage(public: Path) -> int:
         "table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;"
         "padding:.5rem;text-align:left}th{background:#f6f8fa}</style></head><body>"
         f"<h1>Regelsuche Coverage</h1><p>Total instruction coverage: "
-        f"<strong>{percent}%</strong></p><table><thead><tr><th>Module</th>"
+        f"<strong>{percent}%</strong>; valid reports: <strong>{valid_report_count}</strong>; "
+        f"malformed reports: <strong>{malformed}</strong>.</p><table><thead><tr><th>Module</th>"
         f"<th>Instruction coverage</th></tr></thead><tbody>{rows}</tbody></table>"
         "</body></html>\n",
         encoding="utf-8",
     )
-    return percent
+    return percent, valid_report_count, malformed
 
 
-def generate_tests(public: Path) -> tuple[int, int, int]:
+def generate_tests(public: Path) -> tuple[int, int, int, int, int]:
     tests_dir = public / "tests"
     tests_dir.mkdir(parents=True, exist_ok=True)
-    total_tests = failures = errors = skipped = 0
+    total_tests = failures = errors = skipped = malformed = 0
     suites: list[tuple[str, str, str, int, int, int]] = []
 
-    for report in sorted(Path(".").glob("**/build/test-results/*/TEST-*.xml")):
+    candidates = sorted(Path(".").glob("**/build/test-results/*/TEST-*.xml"))
+    for report in candidates:
         try:
             root = ET.parse(report).getroot()
         except ET.ParseError as error:
-            print(f"Skipping malformed JUnit XML {report}: {error}")
+            malformed += 1
+            print(f"Malformed JUnit XML {report}: {error}")
             continue
         suite_tests = int(root.get("tests", 0))
         suite_failures = int(root.get("failures", 0))
@@ -147,14 +163,26 @@ def generate_tests(public: Path) -> tuple[int, int, int]:
 
     failed = failures + errors
     passed = total_tests - failed - skipped
-    message = f"{failed}/{total_tests} failed" if failed else f"{passed} passed"
+    valid_report_count = len(candidates) - malformed
+    if valid_report_count == 0 or total_tests == 0:
+        message = "no reports"
+        color = "red"
+    elif malformed:
+        message = f"{malformed} malformed"
+        color = "red"
+    elif failed:
+        message = f"{failed}/{total_tests} failed"
+        color = "red"
+    else:
+        message = f"{passed} passed"
+        color = "brightgreen"
     write_json(
         tests_dir / "badge.json",
         {
             "schemaVersion": 1,
             "label": "tests",
             "message": message,
-            "color": "red" if failed else "brightgreen",
+            "color": color,
         },
     )
 
@@ -168,7 +196,7 @@ def generate_tests(public: Path) -> tuple[int, int, int]:
             f"<td>{suite_skipped}</td><td>{report_link}</td></tr>"
         )
     rendered_rows = "\n".join(rows) or (
-        '<tr><td colspan="7">No JUnit XML reports were generated.</td></tr>'
+        '<tr><td colspan="7">No valid JUnit XML reports were generated.</td></tr>'
     )
     (tests_dir / "index.html").write_text(
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
@@ -178,20 +206,26 @@ def generate_tests(public: Path) -> tuple[int, int, int]:
         "padding:.5rem;text-align:left}th{background:#f6f8fa}</style></head><body>"
         f"<h1>Regelsuche Tests</h1><p><strong>{passed}</strong> passed, "
         f"<strong>{failed}</strong> failed, <strong>{skipped}</strong> skipped, "
-        f"<strong>{total_tests}</strong> total.</p><table><thead><tr><th>Module</th>"
+        f"<strong>{total_tests}</strong> total; valid reports: "
+        f"<strong>{valid_report_count}</strong>; malformed reports: "
+        f"<strong>{malformed}</strong>.</p><table><thead><tr><th>Module</th>"
         "<th>Task</th><th>Suite</th><th>Tests</th><th>Failed</th><th>Skipped</th>"
         f"<th>Report</th></tr></thead><tbody>{rendered_rows}</tbody></table>"
         "</body></html>\n",
         encoding="utf-8",
     )
-    return total_tests, failed, skipped
+    return total_tests, failed, skipped, valid_report_count, malformed
 
 
 def main() -> None:
     public = Path("public")
-    percent = generate_coverage(public)
-    total, failed, skipped = generate_tests(public)
-    print(f"Coverage: {percent}%   Tests: {total} ({failed} failed, {skipped} skipped)")
+    percent, coverage_reports, malformed_coverage = generate_coverage(public)
+    total, failed, skipped, test_reports, malformed_tests = generate_tests(public)
+    print(
+        f"Coverage: {percent}% ({coverage_reports} valid, {malformed_coverage} malformed)   "
+        f"Tests: {total} ({failed} failed, {skipped} skipped; "
+        f"{test_reports} valid reports, {malformed_tests} malformed)"
+    )
 
 
 if __name__ == "__main__":
