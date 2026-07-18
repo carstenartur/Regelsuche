@@ -26,18 +26,11 @@ allprojects {
     }
 }
 
-def allTestsTask = tasks.register('allTests') {
+tasks.register('allTests') {
     group = 'verification'
     description = 'Runs every Gradle Test task in the repository, including browser, Docker/Testcontainers and external-tool integration tests.'
-}
-
-gradle.projectsEvaluated {
-    def testTaskPaths = allprojects.collectMany { candidateProject ->
+    dependsOn subprojects.collect { candidateProject ->
         candidateProject.tasks.withType(org.gradle.api.tasks.testing.Test)
-            .collect { testTask -> testTask.path }
-    }.sort()
-    allTestsTask.configure {
-        dependsOn testTaskPaths
     }
 }
 
