@@ -84,3 +84,11 @@ VOLUME ["/opt/regelsuche/data"]
 # arguments to `docker run` if you need basic-auth, TLS or a different port.
 ENTRYPOINT ["./bin/app"]
 CMD ["serve", "--host", "0.0.0.0", "--port", "8080"]
+
+# ---------- Qualified autonomous-discovery walkthrough ----------
+FROM build AS walkthrough
+ARG REGELSUCHE_REPOSITORY_REVISION
+ENV REGELSUCHE_REPOSITORY_REVISION=${REGELSUCHE_REPOSITORY_REVISION}
+RUN mkdir -p /out
+VOLUME ["/out"]
+ENTRYPOINT ["./gradlew", "--no-daemon", ":regelsuche-release:runAutonomousDiscoveryWalkthrough", "-PwalkthroughOutput=/out"]

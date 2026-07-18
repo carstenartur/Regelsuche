@@ -120,3 +120,19 @@ tasks.named('jacocoTestReport') {
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
 }
+
+def autonomousDiscoveryWalkthroughOutput = providers.gradleProperty('walkthroughOutput')
+    .orElse(layout.buildDirectory.dir('reports/autonomous-discovery-walkthrough')
+        .map { it.asFile.absolutePath })
+
+tasks.register('runAutonomousDiscoveryWalkthrough', JavaExec) {
+    group = 'verification'
+    description = 'Generate the qualified autonomous-discovery result card and evidence walkthrough.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.release.AutonomousDiscoveryWalkthroughMain'
+    args autonomousDiscoveryWalkthroughOutput.get()
+    def repositoryRevision = providers.gradleProperty('repositoryRevision').orNull
+    if (repositoryRevision != null && !repositoryRevision.isBlank()) {
+        args '--repository-revision', repositoryRevision
+    }
+}
