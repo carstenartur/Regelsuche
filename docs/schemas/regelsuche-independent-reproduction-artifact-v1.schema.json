@@ -97,9 +97,10 @@
         "containerImagePolicy": {"const": "BUILD_FROM_DIGEST_PINNED_DEFINITION"},
         "launcherRequirements": {
           "type": "object",
-          "required": ["python", "docker", "shell"],
+          "required": ["python", "jsonschema", "docker", "shell"],
           "properties": {
             "python": {"const": ">=3.11"},
+            "jsonschema": {"const": "4.25.1"},
             "docker": {"const": ">=24"},
             "shell": {"const": "bash"}
           },
