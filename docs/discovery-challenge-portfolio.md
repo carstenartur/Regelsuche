@@ -1,6 +1,6 @@
 # Evaluator-backed discovery challenge portfolio
 
-Issue #390 defines the research-design input for the candidate-independent benchmark in #383. It does not report successful discovery campaigns. It selects only challenge classes with a bounded candidate representation, an independent evaluator or falsifier, a preregisterable split unit, information-parity baselines, and explicit null-result semantics.
+Issue #390 defines the research-design input for the candidate-independent benchmark in #383. It does not report successful evaluated discovery campaigns. It selects only challenge classes with a bounded candidate representation, an independent evaluator or falsifier, a preregisterable split unit, information-parity baselines, and explicit null-result semantics.
 
 ## Claim boundary
 
@@ -63,7 +63,7 @@ The class has a credible SMT and rational-counterexample evaluator, but it remai
 
 The class offers exact finite validity and objective evaluation, but it remains deferred until Regelsuche has a generic finite-construction domain, canonical isomorphism-aware identity, and bounded evaluator. Portfolio inclusion must not be selected merely because a development pilot happened to find a positive result.
 
-## Generated artifacts
+## Generated design artifacts
 
 The deterministic generator writes:
 
@@ -77,7 +77,7 @@ The deterministic generator writes:
 
 `challenge-portfolio.json` binds the content hashes of every supporting artifact and names #383 as the consumption target.
 
-## Reproduction
+Regenerate the design artifacts with:
 
 ```bash
 python3 scripts/generate-discovery-challenge-portfolio.py \
@@ -85,8 +85,34 @@ python3 scripts/generate-discovery-challenge-portfolio.py \
   --output research/challenges/generated
 ```
 
-The dedicated workflow validates the source and generated schemas, executes two clean generations byte-for-byte, independently recomputes every content hash and cross-artifact root, and rejects target leakage, missing evaluators, elementary selected classes, missing baselines, unbounded budgets, or any positive external-novelty status.
+## Development-only pilots
+
+The selected classes are exercised by a checkout-local pilot runner:
+
+```bash
+python3 scripts/run-discovery-challenge-development-pilots.py
+```
+
+It executes ordinary Gradle/JUnit contracts for:
+
+- finite-difference confirmation, holdout refutation, and incomplete audit budgets;
+- fail-closed rational division without a nonzero assumption and lossless translation with the assumption;
+- replay-based macro learning, independent equivalence validation, guarded reuse, and assumption-preserving rationalization.
+
+The deterministic receipt is written to:
+
+```text
+build/reports/discovery-challenge-pilots/report.json
+```
+
+The receipt is explicitly marked `DEVELOPMENT_ONLY_PASSED`, keeps the benchmark campaign at `NOT_STARTED`, and keeps external novelty at `NOT_EVALUATED`. It binds the frozen portfolio content hash but is not benchmark evidence.
+
+## Verification
+
+The portfolio workflow validates schemas, executes two clean generations byte-for-byte, independently recomputes every content hash and cross-artifact root, and rejects target leakage, missing evaluators, elementary selected classes, missing baselines, unbounded budgets, or any positive external-novelty status.
+
+The development-pilot workflow is only an adapter for the repository script. The same command and JUnit reports are available from a plain checkout; GitHub does not define the pilot cases or their assertions.
 
 ## Remaining work before #390 closes
 
-This slice freezes the portfolio design. The selected challenge pilots must still be executed as development-only evidence, any required domain/evaluator integration must be completed, and #383 must consume the final immutable portfolio identity. A pilot correction creates a new portfolio revision; it does not overwrite this design artifact.
+The development-pilot receipt must pass on the frozen portfolio. After that, #390 can close as the design-and-pilot issue because #383 already consumes the immutable portfolio identity. Evaluated candidate-independent campaigns, retained campaign failures/null results, aggregate benchmark reporting, and reproduction remain in #383.
