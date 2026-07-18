@@ -563,11 +563,16 @@ def compare_exact(root: Path, observed: Path, manifest: dict[str, Any]) -> dict[
     except ValueError:
         expected_refs = {}
     expected_relatives = {value.removeprefix("expected/") for value in expected_paths}
-    observed_files = (
+    expected_directories: set[str] = set()
+    for relative in expected_relatives:
+        parent = PurePosixPath(relative).parent
+        while parent != PurePosixPath("."):
+            expected_directories.add(parent.as_posix())
+            parent = parent.parent
+    observed_entries = (
         {
             path.relative_to(observed).as_posix()
             for path in observed.rglob("*")
-            if path.is_file() or path.is_symlink()
         }
         if observed.is_dir() and not observed.is_symlink()
         else set()
@@ -594,7 +599,8 @@ def compare_exact(root: Path, observed: Path, manifest: dict[str, Any]) -> dict[
             matched += 1
         else:
             differing.append(relative)
-    unexpected = sorted(observed_files - expected_relatives)
+    allowed_entries = expected_relatives | expected_directories
+    unexpected = sorted(observed_entries - allowed_entries)
     observed_root = (
         exact_root(observed_root_items)
         if expected_paths and len(observed_root_items) == len(expected_paths)

@@ -161,6 +161,24 @@ def validate_source_identity(
     release_tag_status: str,
 ) -> None:
     run_git(repository, "cat-file", "-e", f"{revision}^{{commit}}")
+    checked_out = run_git(repository, "rev-parse", "HEAD^{commit}")
+    if checked_out != revision:
+        raise ValueError(
+            "repository checkout does not match the requested source revision: "
+            f"HEAD={checked_out}, requested={revision}"
+        )
+    worktree = run_git(
+        repository,
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    )
+    if worktree:
+        preview = "\n".join(worktree.splitlines()[:20])
+        raise ValueError(
+            "repository worktree must be clean before freezing an artifact; "
+            f"observed changes:\n{preview}"
+        )
     if release_tag_status == "PUBLISHED":
         tagged = run_git(repository, "rev-parse", f"refs/tags/{release_tag}^{{commit}}")
         if tagged != revision:
@@ -527,6 +545,7 @@ def main() -> None:
             "containerImagePolicy": "BUILD_FROM_DIGEST_PINNED_DEFINITION",
             "launcherRequirements": {
                 "python": ">=3.11",
+                "jsonschema": "4.25.1",
                 "docker": ">=24",
                 "shell": "bash",
             },
