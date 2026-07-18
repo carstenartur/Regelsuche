@@ -1,5 +1,6 @@
 def aiKnowledgeEnabled = System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
 
+def pythonExecutable = providers.gradleProperty('pythonExecutable').getOrElse('python3')
 def configuredIncludeTags = providers.gradleProperty('includeTestTags').orNull
 def configuredExcludeTags = providers.gradleProperty('excludeTestTags').orNull
 
@@ -105,9 +106,19 @@ tasks.register('verifyCandidateIndependentBenchmark', Exec) {
     group = 'verification'
     description = 'Verifies the frozen candidate-independent benchmark preregistration from a plain checkout.'
     workingDir rootDir
-    commandLine 'python3',
+    commandLine pythonExecutable,
         'scripts/verify-candidate-independent-preregistration.py',
         'research/benchmarks/candidate-independent/benchmark-source.json'
     inputs.file('research/benchmarks/candidate-independent/benchmark-source.json')
     inputs.file('scripts/verify-candidate-independent-preregistration.py')
+}
+
+tasks.register('verifyWorkflowSemantics', Exec) {
+    group = 'verification'
+    description = 'Rejects unclassified workflows and workflow-owned verification semantics in migrated adapters.'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/verify-workflow-semantics.py'
+    inputs.dir('.github/workflows')
+    inputs.file('config/workflow-semantics-policy.json')
+    inputs.file('scripts/verify-workflow-semantics.py')
 }
