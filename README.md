@@ -1,7 +1,6 @@
 # Regelsuche
 
 [![CI/CD](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml)
-[![Docker Image CI](https://github.com/carstenartur/Regelsuche/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/carstenartur/Regelsuche/actions/workflows/docker-image.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/coverage/badge.json)](https://carstenartur.github.io/Regelsuche/coverage/)
 [![Tests](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/tests/badge.json)](https://carstenartur.github.io/Regelsuche/tests/)
 [![Performance](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/dev/bench/badge.json)](https://carstenartur.github.io/Regelsuche/dev/bench/)
@@ -309,12 +308,12 @@ bleibt für Detail-Recherchen erhalten.
 
 Pull Requests sind willkommen — bitte beachte:
 
-* `./gradlew test` muss grün sein,
-* `./gradlew e2eTest` muss grün sein, sobald UI-Code geändert wurde
+* `./gradlew verificationTest` führt JVM- und Testcontainers-Tests aus,
+* `./gradlew browserE2eTest` muss bei UI-Änderungen grün sein
   (siehe [docs/testing.md](docs/testing.md)),
 * Screenshots in [docs/demo-gallery.md](docs/demo-gallery.md) werden über
-  `./gradlew test e2eTest -Pregelsuche.recordDocs=true`
-  aktualisiert — niemals händisch ersetzen.
+  `./gradlew test browserE2eTest -Pregelsuche.recordDocs=true`
+  aktualisiert — niemals händisch ersetzen,
 * Nutzerseitige Texte (Demo-Gallery, UI, Replay-Karten, Berichte)
   bitte gegen die
   [Documentation Quality Checklist](docs/documentation-quality-checklist.md)
