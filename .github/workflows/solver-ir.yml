@@ -11,108 +11,28 @@ concurrency:
   group: solver-ir-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   contract:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     steps:
       - uses: actions/checkout@v7
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
           java-version: '21'
-          distribution: 'temurin'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
-
-      - name: Test contracts and write canonical examples
-        run: |
-          ./gradlew \
-            :regelsuche-solver-ir:test \
-            :regelsuche-solver-ir:writeSolverIrExample
-
-      - name: Install pinned JSON Schema validator
-        run: python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
-
-      - name: Validate JSON schemas and backend outcomes
-        shell: bash
-        run: |
-          set -o pipefail
-          python3 - <<'PY' 2>&1 | tee solver-ir-validation.log
-          import json
-          from importlib.metadata import version
-          from pathlib import Path
-          from jsonschema import Draft202012Validator
-
-          print("jsonschema=" + version("jsonschema"))
-          root = Path("regelsuche-solver-ir/build/reports/solver-ir")
-          schemas = Path("docs/schemas")
-          obligation_schema = json.loads(
-              (schemas / "regelsuche-solver-obligation-v1.schema.json").read_text()
-          )
-          result_schema = json.loads(
-              (schemas / "regelsuche-solver-result-v1.schema.json").read_text()
-          )
-          Draft202012Validator.check_schema(obligation_schema)
-          Draft202012Validator.check_schema(result_schema)
-          print("schemas=valid")
-
-          obligations = [
-              root / "obligation.json",
-              root / "assumption-obligation.json",
-          ]
-          results = [
-              root / "regelsuche-search-result.json",
-              root / "polynomial-normal-form-result.json",
-              root / "unsupported-result.json",
-          ]
-          for path in obligations:
-              Draft202012Validator(obligation_schema).validate(
-                  json.loads(path.read_text())
-              )
-              print("validated=" + str(path))
-          for path in results:
-              Draft202012Validator(result_schema).validate(
-                  json.loads(path.read_text())
-              )
-              print("validated=" + str(path))
-
-          obligation = json.loads((root / "obligation.json").read_text())
-          search = json.loads((root / "regelsuche-search-result.json").read_text())
-          polynomial = json.loads(
-              (root / "polynomial-normal-form-result.json").read_text()
-          )
-          unsupported = json.loads((root / "unsupported-result.json").read_text())
-          manifest = json.loads((root / "manifest.json").read_text())
-
-          assert search["status"] == "CONFIRMED"
-          assert polynomial["status"] == "CONFIRMED"
-          assert search["translationStatus"] == "LOSSLESS"
-          assert polynomial["translationStatus"] == "LOSSLESS"
-          assert search["obligationHash"] == obligation["contentHash"]
-          assert polynomial["obligationHash"] == obligation["contentHash"]
-          assert polynomial["backendId"] == "polynomial-normal-form"
-          assert polynomial["message"] == "matching deterministic polynomial normal form"
-          assert "DETERMINISTIC_POLYNOMIAL_NORMAL_FORM" in polynomial["usedCapabilities"]
-          assert unsupported["status"] == "UNSUPPORTED"
-          assert unsupported["translationStatus"] == "REJECTED"
-          assert "ASSUMPTIONS_NOT_SUPPORTED" in unsupported["translationIssues"]
-          assert manifest["sameObligationSubmittedToBothBackends"] is True
-          assert manifest["unsupportedBeforeExecution"] is True
-          print("backend-outcomes=valid")
-          PY
-
-      - name: Upload canonical contracts
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+      - name: Run repository-owned Solver IR verification
+        run: bash scripts/run-solver-ir-verification.sh
+      - name: Upload canonical contracts and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: solver-ir-contracts
           path: |
-            solver-ir-validation.log
+            build/logs/solver-ir-*.log
             regelsuche-solver-ir/build/reports/solver-ir/**
             regelsuche-solver-ir/build/reports/tests/**
             regelsuche-solver-ir/build/test-results/**
