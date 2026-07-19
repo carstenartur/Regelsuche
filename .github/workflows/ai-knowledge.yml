@@ -5,22 +5,30 @@ on:
     branches: [ main ]
     paths:
       - 'ai-knowledge/**'
+      - 'ai-knowledge-verification/**'
       - 'docs/generated/discovery/**'
       - '**/src/main/java/**'
       - '**/src/test/java/**'
       - '**/src/jmh/java/**'
       - '**/build.gradle'
+      - 'gradle.properties'
+      - 'gradle/ai-knowledge-verification.gradle'
+      - 'scripts/verify-ai-knowledge-artifacts.py'
       - 'settings.gradle'
       - '.github/workflows/ai-knowledge.yml'
   push:
     branches: [ main ]
     paths:
       - 'ai-knowledge/**'
+      - 'ai-knowledge-verification/**'
       - 'docs/generated/discovery/**'
       - '**/src/main/java/**'
       - '**/src/test/java/**'
       - '**/src/jmh/java/**'
       - '**/build.gradle'
+      - 'gradle.properties'
+      - 'gradle/ai-knowledge-verification.gradle'
+      - 'scripts/verify-ai-knowledge-artifacts.py'
       - 'settings.gradle'
       - '.github/workflows/ai-knowledge.yml'
   workflow_dispatch:
@@ -31,15 +39,13 @@ permissions:
 
 jobs:
   extract:
-    name: Generate AI knowledge index
+    name: Generate and verify AI knowledge index
     runs-on: ubuntu-latest
     env:
+      AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout Regelsuche
-        uses: actions/checkout@v7
-        with:
-          path: Regelsuche
+      - uses: actions/checkout@v7
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -52,150 +58,22 @@ jobs:
         with:
           gradle-home-cache-cleanup: true
 
-      - name: Generate AI knowledge artifacts
-        working-directory: Regelsuche
-        env:
-          AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
-        run: |
-          mkdir -p build/ai-knowledge
-          set +e
-          ./gradlew --no-daemon --no-configuration-cache --stacktrace generateAiKnowledgeIndex analyzeAiComplexity optimizeAiKnowledge benchmarkAiKnowledge > build/ai-knowledge/extractor.out 2> build/ai-knowledge/extractor.err
-          status=$?
-          echo "$status" > build/ai-knowledge/extractor.exit
-          cat build/ai-knowledge/extractor.out
-          cat build/ai-knowledge/extractor.err
-          test "$status" = "0"
-
-      - name: Check AI knowledge index
-        working-directory: Regelsuche
-        env:
-          AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
-        run: |
-          mkdir -p build/ai-knowledge
-          set +e
-          ./gradlew --no-daemon --no-configuration-cache --stacktrace checkAiKnowledgeIndex > build/ai-knowledge/check.out 2> build/ai-knowledge/check.err
-          status=$?
-          echo "$status" > build/ai-knowledge/check.exit
-          cat build/ai-knowledge/check.out
-          cat build/ai-knowledge/check.err
-          test "$status" = "0"
-
-      - name: Validate artifact file presence
-        working-directory: Regelsuche
-        run: |
-          python3 - <<'PY'
-          import sys
-          from pathlib import Path
-
-          ai_dir = Path('build/ai-knowledge')
-          required = [
-              'index.json',
-              'modules.json',
-              'classes.json',
-              'tests.json',
-              'docs.json',
-              'dependencies.json',
-              'capabilities.json',
-              'claims.json',
-              'evidence.json',
-              'complexity.json',
-              'review-context.md',
-              'context-packs/index.json',
-          ]
-          missing = [f for f in required if not (ai_dir / f).exists()]
-          if missing:
-              print('Missing required ai-knowledge-index artifacts:')
-              for f in missing:
-                  print(f'  - {f}')
-              sys.exit(1)
-          print('All required ai-knowledge-index artifacts are present.')
-          PY
-
-      - name: Validate artifact quality
-        working-directory: Regelsuche
-        run: |
-          python3 - <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-
-          ai_dir = Path('build/ai-knowledge')
-          warnings = []
-          errors = []
-
-          evidence_path = ai_dir / 'evidence.json'
-          try:
-              raw = json.loads(evidence_path.read_text(encoding='utf-8'))
-              evidence = raw if isinstance(raw, list) else raw.get('evidence', [])
-          except Exception as exc:
-              errors.append(f'Could not parse evidence.json: {exc}')
-              evidence = []
-          if not evidence:
-              errors.append('evidence.json is empty; expected repository evidence artifacts.')
-
-          try:
-              classes = json.loads((ai_dir / 'classes.json').read_text(encoding='utf-8')).get('classes', [])
-              if not any(c.get('methodFacts') for c in classes):
-                  warnings.append('classes.json contains no methodFacts; Java extraction may be too shallow.')
-          except Exception as exc:
-              errors.append(f'Could not parse classes.json: {exc}')
-
-          # Extractor 0.1.7 must produce a real prioritized-selector measurement.
-          try:
-              complexity = json.loads((ai_dir / 'complexity.json').read_text(encoding='utf-8'))
-              code_complexity = complexity.get('codeComplexity', {})
-              cost_drivers = complexity.get('aiCostDrivers', {})
-              footprint = complexity.get('contextFootprint', {})
-              if 'maxMethodCognitiveComplexity' not in code_complexity:
-                  errors.append('complexity.json lacks codeComplexity.maxMethodCognitiveComplexity.')
-              if 'tokenCostDrivers' not in cost_drivers:
-                  errors.append('complexity.json lacks aiCostDrivers.tokenCostDrivers.')
-              if footprint.get('schemaVersion') != 3:
-                  errors.append('complexity.json lacks contextFootprint schema v3.')
-              if footprint.get('method') != 'line-weighted-prioritized-capability-selector-working-set-proxy':
-                  errors.append('complexity.json contains an unexpected context-footprint method.')
-              if footprint.get('measurementStatus') != 'MEASURED':
-                  errors.append('context footprint is not measured from capability selectors.')
-              capability_count = footprint.get('capabilityCount')
-              sample_count = footprint.get('capabilitySampleCount')
-              if not isinstance(capability_count, int) or capability_count <= 0:
-                  errors.append('context footprint contains no capabilities.')
-              if not isinstance(sample_count, int) or sample_count <= 0:
-                  errors.append('context footprint contains no capability working-set samples.')
-              for field in (
-                  'unresolvedCapabilityTypeReferences',
-                  'unresolvedCapabilityModuleReferences',
-                  'unresolvedCapabilityPackageReferences',
-              ):
-                  unresolved = footprint.get(field)
-                  if unresolved != 0:
-                      errors.append(f'context footprint has {unresolved!r} in {field}.')
-              sources = footprint.get('capabilityWorkingSetSources', {})
-              if not isinstance(sources, dict) or sum(v for v in sources.values() if isinstance(v, int)) <= 0:
-                  errors.append('context footprint contains no working-set selector provenance.')
-              normalized = complexity.get('aiContextDebt')
-              if not isinstance(normalized, (int, float)) or not 0 <= normalized < 100:
-                  errors.append('complexity.json aiContextDebt is not a measured normalized value below 100.')
-              if normalized != footprint.get('normalizedContextDebt'):
-                  errors.append('top-level aiContextDebt differs from contextFootprint.normalizedContextDebt.')
-          except Exception as exc:
-              errors.append(f'Could not parse complexity.json: {exc}')
-
-          for warning in warnings:
-              print(f'WARNING: {warning}')
-          for error in errors:
-              print(f'ERROR: {error}', file=sys.stderr)
-          if errors:
-              sys.exit(1)
-          print('AI knowledge artifacts passed schema-v3 capability-context checks.')
-          PY
+      - name: Run the repository-owned AI knowledge lifecycle
+        run: >-
+          ./gradlew
+          --no-daemon
+          --no-configuration-cache
+          --stacktrace
+          aiKnowledgeCheck
+          --console=plain
 
       - name: Upload AI knowledge artifacts
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ai-knowledge-index
-          path: Regelsuche/build/ai-knowledge/**
+          path: build/ai-knowledge/**
+          if-no-files-found: warn
 
       - name: Upload AI knowledge review reports
         if: always()
@@ -203,20 +81,16 @@ jobs:
         with:
           name: ai-knowledge-review-reports
           path: |
-            Regelsuche/build/ai-knowledge/review-context.md
-            Regelsuche/build/ai-knowledge/context-packs/**
-            Regelsuche/build/ai-knowledge/check.out
-            Regelsuche/build/ai-knowledge/check.err
+            build/ai-knowledge/review-context.md
+            build/ai-knowledge/context-packs/**
+            build/ai-knowledge/check.json
+            build/ai-knowledge/complexity.json
+          if-no-files-found: warn
 
       - name: Summary
         if: always()
         run: |
           echo '### AI knowledge artifacts' >> "$GITHUB_STEP_SUMMARY"
           echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Generated artifacts are uploaded as the `ai-knowledge-index` workflow artifact.' >> "$GITHUB_STEP_SUMMARY"
-          echo 'Review reports (review-context.md, context-packs, check logs) are uploaded as `ai-knowledge-review-reports`.' >> "$GITHUB_STEP_SUMMARY"
-          echo '' >> "$GITHUB_STEP_SUMMARY"
-          find Regelsuche/build/ai-knowledge -maxdepth 1 -type f -printf '- `%f`\n' | sort >> "$GITHUB_STEP_SUMMARY" || true
-          echo '' >> "$GITHUB_STEP_SUMMARY"
-          check_exit="$(cat Regelsuche/build/ai-knowledge/check.exit 2>/dev/null || echo 'n/a')"
-          echo "**checkAiKnowledgeIndex exit code**: \`${check_exit}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Generation and validation are implemented by the checkout-local `aiKnowledgeCheck` Gradle lifecycle.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The complete index and focused review reports are retained as workflow artifacts.' >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,21 @@
+plugins {
+    id 'org.aiknowledge.extractor'
+}
+
+aiKnowledge {
+    outputDirectory = rootProject.layout.buildDirectory.dir('ai-knowledge')
+    docsOutputDirectory = rootProject.layout.projectDirectory.dir('docs/ai-knowledge')
+    seedDirectory = rootProject.layout.projectDirectory.dir('ai-knowledge')
+    modelProfileDirectory = rootProject.layout.projectDirectory.dir('ai-knowledge')
+    failOnWarnings = false
+
+    // Calibrated with the released schema-v3 extractor. The consumed release is
+    // pinned centrally by aiKnowledgeExtractorVersion in gradle.properties.
+    maxCognitiveDebt = 21.7d
+    maxMethodCognitiveComplexity = 65
+    maxMethodCyclomaticComplexity = 35
+    maxAverageMethodCognitiveComplexity = 4.0d
+    maxAverageMethodCyclomaticComplexity = 4.0d
+}
+
+apply from: rootProject.file('gradle/ai-knowledge-verification.gradle')

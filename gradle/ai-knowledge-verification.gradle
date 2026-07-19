@@ -1,0 +1,43 @@
+def aiKnowledgePython = providers.gradleProperty('pythonExecutable').getOrElse('python3')
+def aiKnowledgeArtifactDirectory = rootProject.layout.buildDirectory.dir('ai-knowledge')
+def aiKnowledgeVerifierScript = rootProject.layout.projectDirectory.file(
+    'scripts/verify-ai-knowledge-artifacts.py')
+def aiKnowledgeVerifierPath = aiKnowledgeVerifierScript.asFile.absolutePath
+def aiKnowledgeArtifactPath = aiKnowledgeArtifactDirectory.get().asFile.absolutePath
+
+def extractorTasks = [
+    'generateAiKnowledgeIndex',
+    'analyzeAiComplexity',
+    'optimizeAiKnowledge',
+    'benchmarkAiKnowledge',
+    'checkAiKnowledgeIndex'
+]
+
+tasks.named('checkAiKnowledgeIndex').configure {
+    mustRunAfter(
+        'generateAiKnowledgeIndex',
+        'analyzeAiComplexity',
+        'optimizeAiKnowledge',
+        'benchmarkAiKnowledge')
+}
+
+def verifyAiKnowledgeArtifacts = tasks.register(
+    'verifyAiKnowledgeArtifacts',
+    Exec
+) {
+    group = 'verification'
+    description = 'Verifies generated AI knowledge files, evidence and measured context-footprint contracts.'
+    dependsOn extractorTasks
+    workingDir rootProject.projectDir
+    commandLine aiKnowledgePython,
+        aiKnowledgeVerifierPath,
+        '--root', aiKnowledgeArtifactPath
+    inputs.file(aiKnowledgeVerifierScript)
+    inputs.dir(aiKnowledgeArtifactDirectory)
+}
+
+tasks.register('aiKnowledgeCheck') {
+    group = 'verification'
+    description = 'Runs the complete checkout-local AI knowledge generation and verification lifecycle.'
+    dependsOn verifyAiKnowledgeArtifacts
+}

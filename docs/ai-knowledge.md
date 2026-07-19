@@ -1,24 +1,83 @@
 # AI knowledge index
 
-Regelsuche can consume the separate `ai-knowledge-extractor` project as a local Gradle composite build.
+Regelsuche consumes the released `org.aiknowledge.extractor` Gradle plugin from
+the `carstenartur/ai-knowledge-extractor` GitHub Packages repository. The
+consumer version is pinned once in `gradle.properties`:
 
-## Local setup
-
-Clone both repositories next to each other:
-
-```text
-workspace/
-  Regelsuche/
-  ai-knowledge-extractor/
+```properties
+aiKnowledgeExtractorVersion=0.1.7
 ```
 
-The Regelsuche `settings.gradle` checks for `../ai-knowledge-extractor` and includes it as a composite build when present.
+At the time this contract was introduced, `0.1.7` was the latest published
+release and `0.1.8-SNAPSHOT` was the development version on the extractor's
+`main` branch. Regelsuche never consumes a snapshot implicitly. Updating the
+released dependency requires one explicit version change followed by the normal
+AI Knowledge and repository verification lifecycles.
 
-## Generate the index
+## Released package mode
+
+AI Knowledge is optional so an ordinary Regelsuche checkout does not need
+GitHub Packages credentials. Enabling the lifecycle adds the dedicated
+`ai-knowledge-verification` consumer project. That project applies the released
+plugin through the canonical Gradle plugin DSL:
+
+```groovy
+plugins {
+    id 'org.aiknowledge.extractor'
+}
+```
+
+`settings.gradle` supplies the version and the GitHub Packages plugin repository.
+Provide a GitHub identity and token with package-read permission:
 
 ```bash
-./gradlew generateAiKnowledgeIndex
+GITHUB_ACTOR=<github-user> \
+GITHUB_TOKEN=<package-read-token> \
+AI_KNOWLEDGE_EXTRACTOR_ENABLED=true \
+  ./gradlew --no-configuration-cache aiKnowledgeCheck
 ```
+
+GitHub Packages is an authenticated Maven repository even for this public source
+repository. The credential requirement is therefore a package-registry boundary,
+not a reason to copy plugin verification semantics into GitHub Actions.
+
+## Explicit local plugin development
+
+A sibling checkout no longer overrides the released plugin merely because it
+exists. To test changes to the extractor before releasing them, opt in explicitly:
+
+```bash
+AI_KNOWLEDGE_EXTRACTOR_ENABLED=true \
+  ./gradlew --no-configuration-cache \
+  -PuseLocalAiKnowledgeExtractor=true \
+  -PaiKnowledgeExtractorCheckout=../ai-knowledge-extractor \
+  aiKnowledgeCheck
+```
+
+In this mode `pluginManagement.includeBuild(...)` supplies the same plugin id via
+a Gradle composite build. No GitHub Packages credentials are required. The local
+checkout path defaults to `../ai-knowledge-extractor`, but the override remains
+explicit and visible in the command line.
+
+## Complete verification lifecycle
+
+`aiKnowledgeCheck` executes:
+
+1. `generateAiKnowledgeIndex`;
+2. `analyzeAiComplexity`;
+3. `optimizeAiKnowledge`;
+4. `benchmarkAiKnowledge`;
+5. `checkAiKnowledgeIndex`;
+6. `verifyAiKnowledgeArtifacts`.
+
+The extractor currently requires configuration-cache opt-out. All pass/fail
+semantics nevertheless live in the checkout rather than in GitHub Actions.
+
+The final task runs `scripts/verify-ai-knowledge-artifacts.py`. It rejects
+missing or empty files, malformed or duplicate-field JSON, empty evidence,
+missing context packs, unresolved capability references and drift from the
+measured schema-v3 context-footprint contract. A missing `methodFacts` section
+remains an explicit warning rather than a build failure.
 
 The generated files are written to:
 
@@ -26,7 +85,7 @@ The generated files are written to:
 build/ai-knowledge/
 ```
 
-Important artifacts:
+Important artifacts include:
 
 ```text
 index.json
@@ -38,38 +97,43 @@ capabilities.json
 dependencies.json
 claims.json
 evidence.json
+complexity.json
 review-context.md
 context-packs/index.json
 ```
 
-## Further reports
+## Individual extractor tasks
+
+Root-project aliases preserve the familiar commands while delegating to the
+optional versioned consumer project:
 
 ```bash
+./gradlew generateAiKnowledgeIndex
 ./gradlew analyzeAiComplexity
 ./gradlew optimizeAiKnowledge
 ./gradlew benchmarkAiKnowledge
 ./gradlew checkAiKnowledgeIndex
+./gradlew verifyAiKnowledgeArtifacts
 ./gradlew publishAiKnowledgeIndex
 ```
 
-`checkAiKnowledgeIndex` evaluates rule-bearing claim seeds from `ai-knowledge/claims.seed.yaml`. Claims marked with `severity: error` fail the build; `warning` claims remain advisory.
+These commands require the same enablement flag as `aiKnowledgeCheck`.
+`checkAiKnowledgeIndex` evaluates rule-bearing claim seeds from
+`ai-knowledge/claims.seed.yaml`. Claims marked with `severity: error` fail the
+build; `warning` claims remain advisory.
 
-`publishAiKnowledgeIndex` copies the generated snapshot to `docs/ai-knowledge/` when a committed documentation snapshot is desired.
+`publishAiKnowledgeIndex` copies the generated snapshot to
+`docs/ai-knowledge/` when a committed documentation snapshot is desired. The
+extractor is deterministic and does not require external LLM or SaaS calls.
 
-The extractor is deterministic and does not require external LLM or SaaS calls.
+## CI boundary
 
-## CI workflow
+`.github/workflows/ai-knowledge.yml` remains separate only because GitHub
+Packages authentication is an execution boundary. The workflow provisions Java
+and Gradle, invokes the same root `aiKnowledgeCheck` alias, and uploads generated
+artifacts. It contains no artifact expectations, inline interpreters or
+alternative test graph.
 
-The `.github/workflows/ai-knowledge.yml` workflow is triggered on changes to Java sources (`**/src/main/java/**`, `**/src/test/java/**`, `**/src/jmh/java/**`), seed files (`ai-knowledge/**`), generated discovery docs (`docs/generated/discovery/**`), build scripts (`**/build.gradle`, `settings.gradle`), and the workflow file itself.
-
-It performs the following checks in order:
-
-1. **Generate** — runs `generateAiKnowledgeIndex analyzeAiComplexity optimizeAiKnowledge benchmarkAiKnowledge`.
-2. **Check** — runs `checkAiKnowledgeIndex`; fails the build for any claim with `severity: error`.
-3. **Validate file presence** — asserts that all required artifact files are present in `build/ai-knowledge/`.
-4. **Validate quality** — checks that `evidence.json` contains entries, `review-context.md` is non-trivial, and context packs exist for major capabilities.
-
-Two artifacts are uploaded on every run:
-
-- `ai-knowledge-index` — the complete `build/ai-knowledge/**` output.
-- `ai-knowledge-review-reports` — `review-context.md`, `context-packs/`, and the check logs for human review.
+The implementation and this documentation share the following invariant:
+released package mode is the default, local composite mode is explicit, and the
+plugin version is defined in exactly one repository property.
