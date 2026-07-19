@@ -107,11 +107,32 @@ build/reports/discovery-challenge-pilots/report.json
 
 The receipt is explicitly marked `DEVELOPMENT_ONLY_PASSED`, keeps the benchmark campaign at `NOT_STARTED`, and keeps external novelty at `NOT_EVALUATED`. It binds the frozen portfolio content hash but is not benchmark evidence.
 
-## Verification
+## Checkout-local verification
 
-The portfolio workflow validates schemas, executes two clean generations byte-for-byte, independently recomputes every content hash and cross-artifact root, and rejects target leakage, missing evaluators, elementary selected classes, missing baselines, unbounded budgets, or any positive external-novelty status.
+The authoritative verification command is:
 
-The development-pilot workflow is only an adapter for the repository script. The same command and JUnit reports are available from a plain checkout; GitHub does not define the pilot cases or their assertions.
+```bash
+./gradlew verifyDiscoveryChallengePortfolio
+```
+
+It is part of root `./gradlew check`. The repository-owned verifier:
+
+1. validates the fail-closed source and artifact schemas with the pinned verification environment;
+2. executes two clean generations in isolated temporary directories;
+3. compares both generations byte-for-byte;
+4. compares the generated result with the committed frozen portfolio;
+5. independently recomputes every content hash and cross-artifact root;
+6. verifies assessed/selected/deferred counts and the exact selected challenge identities;
+7. enforces post-formation external search, information-parity baselines and conservative claim statuses;
+8. rejects mutated inputs with missing target prohibitions, blank evaluators or non-executable budgets.
+
+All fixtures, expected values and negative cases live in
+`scripts/verify-discovery-challenge-portfolio.py`. The former dedicated GitHub
+Actions workflow is therefore unnecessary. Central CI invokes the same Gradle
+lifecycle as an ordinary checkout.
+
+The development-pilot workflow remains a thin adapter for the separate
+repository pilot script. GitHub does not define pilot cases or assertions.
 
 ## Remaining work before #390 closes
 
