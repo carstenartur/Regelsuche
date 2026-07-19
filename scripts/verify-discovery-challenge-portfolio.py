@@ -39,6 +39,14 @@ EXPECTED_SELECTED_IDS = {
     "finite-difference-recurrences",
     "reusable-search-macros",
 }
+ARTIFACT_SCHEMA_DEFINITIONS = (
+    "landscape",
+    "feasibility",
+    "splitPolicy",
+    "baselinePlan",
+    "runBudget",
+    "portfolio",
+)
 
 
 def fail(message: str) -> None:
@@ -74,6 +82,18 @@ def digest(value: Any) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def require_fail_closed_artifact_schema(schema: dict[str, Any]) -> None:
+    definitions = schema.get("$defs")
+    require(isinstance(definitions, dict), "artifact schema lacks $defs")
+    for name in ARTIFACT_SCHEMA_DEFINITIONS:
+        definition = definitions.get(name)
+        require(isinstance(definition, dict), f"artifact schema lacks $defs/{name}")
+        require(
+            definition.get("unevaluatedProperties") is False,
+            f"artifact schema definition must fail closed: $defs/{name}",
+        )
 
 
 def run_generator(
@@ -337,10 +357,7 @@ def main() -> int:
         source_schema.get("additionalProperties") is False,
         "source schema must fail closed",
     )
-    require(
-        artifact_schema.get("additionalProperties") is False,
-        "artifact schema must fail closed",
-    )
+    require_fail_closed_artifact_schema(artifact_schema)
     Draft202012Validator.check_schema(source_schema)
     Draft202012Validator.check_schema(artifact_schema)
     source_validator = Draft202012Validator(source_schema)
