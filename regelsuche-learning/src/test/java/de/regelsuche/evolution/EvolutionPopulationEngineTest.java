@@ -93,11 +93,15 @@ class EvolutionPopulationEngineTest {
             List.of(EvolutionMutationKind.GENERALIZE_PLACEHOLDER),
             new PopulationPolicy(4, 3, 1, 2, 2, 3, 17L),
             new StudyBudget(256, 128, 1, 1, 1));
+        MutationCatalog catalog = new MutationCatalog(
+            List.of(),
+            List.of(new FeatureWeight(FitnessSignal.RUNTIME_COST, -100)),
+            List.of(0, 1, 2, 3));
 
         var run = engine.run(
             fixture.plan(),
             fixture.seeds(),
-            MutationCatalog.empty(),
+            catalog,
             genome -> {
                 Map<FitnessComponent, Integer> components = Map.of(
                     FitnessComponent.TRAIN_CASES_NEWLY_SOLVED, 500,
