@@ -64,6 +64,9 @@ SCHEMA_BINDINGS = {
     "production-lifecycle-run.json": (
         "regelsuche-autonomous-production-lifecycle-v3.schema.json"
     ),
+    "production-campaign-manifest.json": (
+        "regelsuche-autonomous-production-campaign-v2.schema.json"
+    ),
 }
 
 
@@ -146,6 +149,10 @@ def main() -> int:
         require(schema_path.is_file(), f"missing schema: {schema_name}")
         schema = load_unique(schema_path)
         require(isinstance(schema, dict), f"schema must be an object: {schema_name}")
+        require(
+            schema.get("additionalProperties") is False,
+            f"schema must fail closed: {schema_name}",
+        )
         Draft202012Validator.check_schema(schema)
         Draft202012Validator(schema).validate(documents[artifact_name])
 
