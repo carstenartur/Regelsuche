@@ -49,55 +49,34 @@ tasks.register('allTests') {
     dependsOn repositoryTest
 }
 
-buildscript {
-    repositories {
-        if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
-            mavenCentral()
-            maven {
-                name = 'GitHubPackages'
-                url = uri('https://maven.pkg.github.com/carstenartur/ai-knowledge-extractor')
-                credentials {
-                    username = System.getenv('GITHUB_ACTOR') ?: ''
-                    password = System.getenv('GITHUB_TOKEN') ?: ''
-                }
+def aiKnowledgeTaskNames = [
+    'generateAiKnowledgeIndex',
+    'analyzeAiComplexity',
+    'optimizeAiKnowledge',
+    'benchmarkAiKnowledge',
+    'checkAiKnowledgeIndex',
+    'publishAiKnowledgeIndex',
+    'verifyAiKnowledgeArtifacts',
+    'aiKnowledgeCheck'
+]
+
+aiKnowledgeTaskNames.each { taskName ->
+    tasks.register(taskName) {
+        group = taskName in ['generateAiKnowledgeIndex', 'publishAiKnowledgeIndex']
+            ? 'documentation'
+            : 'verification'
+        description = aiKnowledgeEnabled
+            ? "Delegates ${taskName} to the versioned AI Knowledge Extractor consumer project."
+            : 'Explains how to enable the AI Knowledge Extractor lifecycle.'
+        if (aiKnowledgeEnabled) {
+            dependsOn ":ai-knowledge-verification:${taskName}"
+        } else {
+            doLast {
+                throw new GradleException(
+                    'AI knowledge verification is disabled. Set '
+                        + 'AI_KNOWLEDGE_EXTRACTOR_ENABLED=true or '
+                        + '-PenableAiKnowledgeExtractor=true.')
             }
-        }
-    }
-
-    dependencies {
-        if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' || project.findProperty('enableAiKnowledgeExtractor') == 'true') {
-            classpath 'org.aiknowledge:ai-knowledge-gradle-plugin:0.1.7'
-        }
-    }
-}
-
-if (aiKnowledgeEnabled) {
-    apply plugin: 'org.aiknowledge.extractor'
-
-    aiKnowledge {
-        outputDirectory = layout.buildDirectory.dir('ai-knowledge')
-        docsOutputDirectory = layout.projectDirectory.dir('docs/ai-knowledge')
-        seedDirectory = layout.projectDirectory.dir('ai-knowledge')
-        modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
-        failOnWarnings = false
-
-        // Extractor 0.1.7 schema v3: main measured 20.28; the deterministic
-        // trajectory + descriptor policy measured 21.50; the bounded frontier-
-        // priority slice measures 21.53. The 21.7 limit leaves a narrow 0.17-point
-        // margin while keeping method-level complexity gates unchanged.
-        maxCognitiveDebt = 21.7d
-
-        maxMethodCognitiveComplexity = 65
-        maxMethodCyclomaticComplexity = 35
-        maxAverageMethodCognitiveComplexity = 4.0d
-        maxAverageMethodCyclomaticComplexity = 4.0d
-    }
-} else {
-    tasks.register('generateAiKnowledgeIndex') {
-        group = 'documentation'
-        description = 'Explains how to enable the AI Knowledge Extractor plugin.'
-        doLast {
-            throw new GradleException('AI knowledge extractor is disabled for this build.')
         }
     }
 }
