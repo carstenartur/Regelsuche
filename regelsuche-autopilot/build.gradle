@@ -73,17 +73,20 @@ tasks.register('runProductionLifecycle', JavaExec) {
         .get().asFile.absolutePath
 }
 
-def productionCampaignOutput = providers.gradleProperty('autopilotOutputDir')
-    .map { new File(it) }
-    .orElse(layout.buildDirectory.dir('reports/autopilot-production-campaign'))
+def productionCampaignOutputPath = providers.gradleProperty('autopilotOutputDir')
+    .orElse(layout.buildDirectory.dir('reports/autopilot-production-campaign')
+        .map { it.asFile.absolutePath })
+def productionCampaignOutputDirectory = productionCampaignOutputPath.map {
+    new File(it)
+}
 
 def runProductionCampaign = tasks.register('runProductionCampaign', JavaExec) {
     group = 'verification'
     description = 'Runs the complete pinned issue-348 autonomous production campaign.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionCampaignMain'
-    args productionCampaignOutput.get().asFile.absolutePath
-    outputs.dir productionCampaignOutput
+    args productionCampaignOutputPath.get()
+    outputs.dir productionCampaignOutputDirectory
 }
 
 tasks.named('test') {
@@ -147,11 +150,11 @@ def verifyAutopilotProductionCampaign = tasks.register(
     workingDir rootProject.projectDir
     inputs.file(campaignVerifier)
     inputs.files(campaignSchemas)
-    inputs.dir(productionCampaignOutput)
+    inputs.dir(productionCampaignOutputDirectory)
     doFirst {
         commandLine verificationPython.get().absolutePath,
             campaignVerifierPath,
-            '--root', productionCampaignOutput.get().asFile.absolutePath,
+            '--root', productionCampaignOutputDirectory.get().absolutePath,
             '--schemas', new File(repositoryRootPath, 'docs/schemas').absolutePath
     }
 }
