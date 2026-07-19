@@ -85,10 +85,16 @@ docker run --rm \
   regelsuche-autonomous-walkthrough
 ```
 
-The dedicated CI workflow runs the local command twice, compares both complete
-outputs byte-for-byte, verifies the schema and independently recomputed values,
-then compares the pinned container output byte-for-byte with the local output.
-It also regenerates the committed gallery SVGs and fails on drift.
+Verification is owned by the checkout rather than by a dedicated GitHub Actions
+workflow. `./gradlew test` runs the deterministic local characterization and a
+Testcontainers test that builds the real `walkthrough` target from a stable
+snapshot of Git-tracked checkout files, executes it as a one-shot container,
+compares the complete container and local outputs byte for byte and rejects
+drift in the committed gallery SVGs. Mutable `.gradle`, `build` and Git metadata
+are excluded from that build context by construction. `./gradlew check` also
+runs the pinned independent Python schema, hash and evidence-link verifier.
+GitHub CI only provisions external tools, invokes these Gradle lifecycles and
+retains their reports.
 
 ## Evidence sequence
 
