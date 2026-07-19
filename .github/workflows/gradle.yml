@@ -35,7 +35,7 @@ jobs:
           z3 -version
       - name: Run the complete repository verification lifecycle
         run: >-
-          ./gradlew
+          env -u GITHUB_SHA ./gradlew
           :app:installPlaywrightHostDependencies
           :app:installPlaywrightBrowsers
           fullCheck
