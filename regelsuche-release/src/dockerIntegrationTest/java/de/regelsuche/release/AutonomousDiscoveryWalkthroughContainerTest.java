@@ -4,10 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
@@ -43,6 +46,7 @@ class AutonomousDiscoveryWalkthroughContainerTest {
         Path containerOutput = temporaryDirectory.resolve("container");
         Path buildContext = createTrackedBuildContext(temporaryDirectory);
         Files.createDirectories(containerOutput);
+        makeContainerWritable(containerOutput);
 
         new AutonomousDiscoveryWalkthroughRunner().run(localOutput, REVISION);
 
@@ -70,6 +74,27 @@ class AutonomousDiscoveryWalkthroughContainerTest {
             "docs/generated/autonomous-discovery-walkthrough");
         assertTrue(Files.isDirectory(committedFigures), committedFigures.toString());
         assertTreesEqual(localOutput.resolve("figures"), committedFigures);
+    }
+
+    /**
+     * Makes a host bind mount writable for rootless Docker and user-namespace
+     * remapping, matching the permission boundary of the former shell workflow.
+     */
+    private static void makeContainerWritable(Path directory) throws Exception {
+        PosixFileAttributeView posix = Files.getFileAttributeView(
+            directory, PosixFileAttributeView.class);
+        if (posix != null) {
+            posix.setPermissions(PosixFilePermissions.fromString("rwxrwxrwx"));
+            return;
+        }
+
+        File file = directory.toFile();
+        assertTrue(file.setReadable(true, false),
+            () -> "could not make bind mount readable: " + directory);
+        assertTrue(file.setWritable(true, false),
+            () -> "could not make bind mount writable: " + directory);
+        assertTrue(file.setExecutable(true, false),
+            () -> "could not make bind mount searchable: " + directory);
     }
 
     /**
