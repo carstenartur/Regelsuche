@@ -37,7 +37,7 @@ if (aiKnowledgeVerificationEnabled) {
             aiKnowledgeVerifierScript.asFile.absolutePath,
             '--root', aiKnowledgeArtifactDirectory.get().asFile.absolutePath
         inputs.file(aiKnowledgeVerifierScript)
-        outputs.upToDateWhen { false }
+        inputs.dir(aiKnowledgeArtifactDirectory)
     }
 
     tasks.register('aiKnowledgeCheck') {
