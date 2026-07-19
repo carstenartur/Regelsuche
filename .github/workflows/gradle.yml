@@ -1,162 +1,162 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
-
-name: Java CI with Gradle
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ main ]
+  workflow_dispatch:
 
 concurrency:
-  group: java-ci-${{ github.repository }}-${{ github.ref }}
+  group: ci-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  build:
+permissions:
+  contents: read
 
+jobs:
+  verification:
+    name: Gradle fullCheck
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
     permissions:
       contents: read
-
     steps:
-    - uses: actions/checkout@v7
-    - name: Set up JDK 21
-      uses: actions/setup-java@v5
-      with:
-        java-version: '21'
-        distribution: 'temurin'
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6.1.0
+      - name: Install external verification tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-venv z3
+          z3 -version
+      - name: Run the complete repository verification lifecycle
+        run: >-
+          ./gradlew
+          :app:installPlaywrightHostDependencies
+          :app:installPlaywrightBrowsers
+          fullCheck
+          jacocoTestReport
+          :app:benchmarkReport
+          generateCiPages
+          --console=plain
+      - name: Upload verification reports and retained evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: repository-verification
+          path: |
+            build/logs/**
+            build/reports/**
+            public/**
+            **/build/reports/tests/**
+            **/build/test-results/**
+            **/build/reports/jacoco/**
+            **/build/reports/domain-*/**
+            **/build/reports/release-readiness*/**
+            **/build/reports/solver-*/**
+            **/build/discovery-artifacts/**
+            docs/benchmark-report.md
+            docs/assets/benchmark-summary.json
+          if-no-files-found: warn
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+  publish-quality-pages:
+    name: Publish quality reports
+    needs: verification
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages-publish-${{ github.repository }}-main
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: repository-verification
+          path: .
+      - name: Ensure gh-pages branch exists
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            echo "gh-pages branch already exists."
+            exit 0
+          fi
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+          git init "$tmp_dir"
+          cd "$tmp_dir"
+          git checkout --orphan gh-pages
+          touch .nojekyll
+          mkdir -p coverage tests dev/bench
+          git add .
+          git -c user.name='github-actions[bot]' \
+            -c user.email='github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Initialize gh-pages'
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin gh-pages
+      - name: Deploy coverage and test reports
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: public
+          keep_files: true
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: Update quality reports (${{ github.sha }})
 
-    - name: Install Playwright host dependencies
-      run: ./gradlew :app:installPlaywrightHostDependencies --console=plain
-
-    - name: Run the complete Gradle test lifecycle
-      shell: bash
-      run: |
-        mkdir -p build/reports/ci
-        set -o pipefail
-        ./gradlew test --console=plain 2>&1 | tee build/reports/ci/gradle-test.log
-
-    - name: Upload Gradle diagnostics
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: gradle-test-diagnostics
-        path: |
-          build/reports/ci/gradle-test.log
-          **/build/reports/tests/**
-          **/build/test-results/**
-        if-no-files-found: warn
-
-    - name: Require hidden-rule pilot evidence after a successful test run
-      if: success()
-      shell: bash
-      run: |
-        test -s app/build/reports/hidden-rule-pilot/report.json
-        test -s app/build/reports/hidden-rule-pilot/runtime.json
-
-    - name: Upload hidden-rule pilot evidence
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: hidden-rule-pilot-evidence
-        path: app/build/reports/hidden-rule-pilot/**
-        if-no-files-found: warn
-
-    - name: Require held-out policy evidence after a successful test run
-      if: success()
-      shell: bash
-      run: |
-        test -s app/build/reports/held-out-policy/report.json
-        test -s app/build/reports/held-out-policy/trajectories.jsonl
-
-    - name: Upload held-out policy evidence
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: held-out-policy-evidence
-        path: app/build/reports/held-out-policy/**
-        if-no-files-found: warn
-
-    - name: Require held-out descriptor-policy evidence after a successful test run
-      if: success()
-      shell: bash
-      run: |
-        test -s app/build/reports/held-out-descriptor-policy/report.json
-        test -s app/build/reports/held-out-descriptor-policy/trajectories.jsonl
-
-    - name: Upload held-out descriptor-policy evidence
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: held-out-descriptor-policy-evidence
-        path: app/build/reports/held-out-descriptor-policy/**
-        if-no-files-found: warn
-
-    - name: Require open-target conjecture evidence after a successful test run
-      if: success()
-      shell: bash
-      run: test -s regelsuche-learning/build/reports/open-target-conjecture-mining/report.json
-
-    - name: Upload open-target conjecture evidence
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: open-target-conjecture-evidence
-        path: regelsuche-learning/build/reports/open-target-conjecture-mining/**
-        if-no-files-found: warn
-
-    - name: Require cross-family bridge transfer evidence after a successful test run
-      if: success()
-      shell: bash
-      run: |
-        test -s regelsuche-learning/build/reports/cross-family-bridge-transfer/hypothesis.json
-        test -s regelsuche-learning/build/reports/cross-family-bridge-transfer/report.json
-
-    - name: Upload cross-family bridge transfer evidence
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: cross-family-bridge-transfer-evidence
-        path: regelsuche-learning/build/reports/cross-family-bridge-transfer/**
-        if-no-files-found: warn
-
-    - name: Require cross-family bridge qualification evidence after a successful test run
-      if: success()
-      shell: bash
-      run: |
-        test -s regelsuche-learning/build/reports/cross-family-bridge-qualification/ablation.json
-        test -s regelsuche-learning/build/reports/cross-family-bridge-qualification/report.json
-
-    - name: Upload cross-family bridge qualification evidence
-      if: always()
-      uses: actions/upload-artifact@v7
-      with:
-        name: cross-family-bridge-qualification-evidence
-        path: regelsuche-learning/build/reports/cross-family-bridge-qualification/**
-        if-no-files-found: warn
-
-  dependency-submission:
+  refresh-doc-assets:
+    name: Refresh documentation media
+    needs: verification
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
+      pull-requests: write
     steps:
-    - uses: actions/checkout@v7
-    - name: Set up JDK 21
-      uses: actions/setup-java@v5
-      with:
-        java-version: '21'
-        distribution: 'temurin'
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6.1.0
+      - name: Record screenshots and videos through Gradle
+        run: >-
+          ./gradlew
+          :app:installPlaywrightHostDependencies
+          :app:installPlaywrightBrowsers
+          :app:test
+          :app:e2eTest
+          -Pregelsuche.recordDocs=true
+          -Pregelsuche.skipPlaywrightInstall=true
+          --console=plain
+      - name: Create or update documentation-media PR
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: chore/docs-screenshots-refresh
+          delete-branch: false
+          commit-message: 'chore(docs): refresh demo-gallery media'
+          title: 'chore(docs): refresh demo-gallery media'
+          body: Automated refresh from the central Gradle CI lifecycle.
+          add-paths: |
+            docs/assets/screenshots/**
+            docs/assets/videos/**
 
-    - name: Generate and submit dependency graph
-      uses: gradle/actions/dependency-submission@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+  dependency-submission:
+    name: Submit dependency graph
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/dependency-submission@v6.1.0
