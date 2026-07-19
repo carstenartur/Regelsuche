@@ -113,19 +113,19 @@ class AutonomousProductionCampaignContainerTest {
             throws Exception {
         Process process = new ProcessBuilder(
             "git", "-C", PROJECT_ROOT.toString(), "ls-files", "-z")
+            .redirectErrorStream(true)
             .start();
-        byte[] trackedOutput = process.getInputStream().readAllBytes();
-        byte[] diagnostics = process.getErrorStream().readAllBytes();
+        byte[] output = process.getInputStream().readAllBytes();
         int exitCode = process.waitFor();
         assertEquals(
             0,
             exitCode,
             () -> "git ls-files failed: "
-                + new String(diagnostics, StandardCharsets.UTF_8));
+                + new String(output, StandardCharsets.UTF_8));
 
         Path context = temporaryDirectory.resolve("docker-context");
         Files.createDirectories(context);
-        for (String trackedPath : new String(trackedOutput, StandardCharsets.UTF_8)
+        for (String trackedPath : new String(output, StandardCharsets.UTF_8)
                 .split("\u0000")) {
             if (trackedPath.isEmpty()) {
                 continue;
