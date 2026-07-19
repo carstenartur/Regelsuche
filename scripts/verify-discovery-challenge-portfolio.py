@@ -7,6 +7,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -16,13 +17,14 @@ from typing import Any
 
 try:
     from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import ValidationError
 except ImportError as error:
     raise SystemExit(
         "jsonschema is required; run ./gradlew prepareVerificationEnvironment"
     ) from error
 
 EXPECTED_JSONSCHEMA_VERSION = "4.25.1"
-ARTIFACT_NAMES = (
+JSON_ARTIFACT_NAMES = (
     "challenge-landscape.json",
     "challenge-feasibility-report.json",
     "challenge-split-policy.json",
@@ -30,6 +32,8 @@ ARTIFACT_NAMES = (
     "challenge-run-budget.json",
     "challenge-portfolio.json",
 )
+SUMMARY_NAME = "challenge-portfolio-summary.md"
+EXPECTED_FILES = (*JSON_ARTIFACT_NAMES, SUMMARY_NAME)
 EXPECTED_SELECTED_IDS = {
     "rational-assumption-rewrites",
     "finite-difference-recurrences",
@@ -73,7 +77,6 @@ def digest(value: Any) -> str:
 
 
 def run_generator(
-    python: str,
     generator: Path,
     source: Path,
     output: Path,
@@ -82,7 +85,7 @@ def run_generator(
 ) -> None:
     result = subprocess.run(
         [
-            python,
+            sys.executable,
             str(generator),
             "--source",
             str(source),
@@ -103,20 +106,40 @@ def run_generator(
         fail(f"{label} unexpectedly passed")
 
 
-def regular_files(root: Path) -> list[Path]:
-    require(root.is_dir(), f"directory is missing: {root}")
-    return sorted(
-        path.relative_to(root)
-        for path in root.rglob("*")
-        if path.is_file()
+def tree_entries(root: Path) -> list[tuple[str, str]]:
+    require(
+        root.is_dir() and not root.is_symlink(),
+        f"directory is missing or symbolic: {root}",
     )
+    entries: list[tuple[str, str]] = []
+    for current, directory_names, file_names in os.walk(
+        root,
+        topdown=True,
+        followlinks=False,
+    ):
+        current_path = Path(current)
+        directory_names.sort()
+        file_names.sort()
+        for name in directory_names:
+            path = current_path / name
+            require(not path.is_symlink(), f"symbolic link is forbidden: {path}")
+            require(path.is_dir(), f"unsupported directory entry: {path}")
+            entries.append(("directory", path.relative_to(root).as_posix()))
+        for name in file_names:
+            path = current_path / name
+            require(not path.is_symlink(), f"symbolic link is forbidden: {path}")
+            require(path.is_file(), f"unsupported file entry: {path}")
+            entries.append(("file", path.relative_to(root).as_posix()))
+    return sorted(entries)
 
 
 def require_identical(first: Path, second: Path, label: str) -> None:
-    first_files = regular_files(first)
-    second_files = regular_files(second)
-    require(first_files == second_files, f"{label} file trees differ")
-    for relative in first_files:
+    first_entries = tree_entries(first)
+    second_entries = tree_entries(second)
+    require(first_entries == second_entries, f"{label} trees differ")
+    for kind, relative in first_entries:
+        if kind != "file":
+            continue
         require(
             (first / relative).read_bytes() == (second / relative).read_bytes(),
             f"{label} differs at {relative}",
@@ -128,23 +151,39 @@ def validate_artifacts(
     generated: Path,
     artifact_validator: Draft202012Validator,
 ) -> None:
-    artifacts: dict[str, dict[str, Any]] = {}
-    generated_json_names = {
-        path.name
-        for path in generated.iterdir()
-        if path.is_file() and path.suffix == ".json"
-    }
+    expected_tree = sorted(("file", name) for name in EXPECTED_FILES)
     require(
-        generated_json_names == set(ARTIFACT_NAMES),
-        "generated JSON artifact set is incomplete or contains extra files",
+        tree_entries(generated) == expected_tree,
+        "generated artifact tree is incomplete or contains extra entries",
     )
-    for name in ARTIFACT_NAMES:
+
+    artifacts: dict[str, dict[str, Any]] = {}
+    for name in JSON_ARTIFACT_NAMES:
         value = load_unique(generated / name)
-        artifact_validator.validate(value)
+        try:
+            artifact_validator.validate(value)
+        except ValidationError as error:
+            fail(f"schema validation failed for {name}: {error.message}")
         without_hash = dict(value)
         content_hash = without_hash.pop("contentHash", None)
         require(content_hash == digest(without_hash), f"contentHash drift: {name}")
         artifacts[name] = value
+
+    summary = (generated / SUMMARY_NAME).read_text(encoding="utf-8")
+    require(summary.strip(), "challenge portfolio summary is empty")
+    require(
+        "Evaluated campaign status: `NOT_STARTED`" in summary,
+        "summary campaign boundary drift",
+    )
+    require(
+        "External novelty status: `NOT_EVALUATED`" in summary,
+        "summary novelty boundary drift",
+    )
+    for challenge_id in EXPECTED_SELECTED_IDS:
+        require(
+            f"`{challenge_id}`" in summary,
+            f"summary omits selected challenge: {challenge_id}",
+        )
 
     landscape = artifacts["challenge-landscape.json"]
     feasibility = artifacts["challenge-feasibility-report.json"]
@@ -218,7 +257,6 @@ def validate_artifacts(
 
 
 def reject_mutations(
-    python: str,
     generator: Path,
     source: dict[str, Any],
     temporary_root: Path,
@@ -251,38 +289,11 @@ def reject_mutations(
             encoding="utf-8",
         )
         run_generator(
-            python,
             generator,
             source_path,
             mutation_root / "output",
             False,
             label,
-        )
-
-
-def require_fail_closed_artifact_definitions(
-    artifact_schema: dict[str, Any],
-) -> None:
-    definitions = artifact_schema.get("$defs")
-    references = artifact_schema.get("oneOf")
-    require(isinstance(definitions, dict), "artifact schema lacks $defs")
-    require(isinstance(references, list) and references, "artifact schema lacks oneOf")
-    for index, reference in enumerate(references):
-        require(isinstance(reference, dict), f"oneOf entry {index} is not an object")
-        pointer = reference.get("$ref")
-        require(
-            isinstance(pointer, str) and pointer.startswith("#/$defs/"),
-            f"oneOf entry {index} does not reference a local artifact definition",
-        )
-        definition_name = pointer.removeprefix("#/$defs/")
-        definition = definitions.get(definition_name)
-        require(
-            isinstance(definition, dict),
-            f"missing artifact definition: {definition_name}",
-        )
-        require(
-            definition.get("unevaluatedProperties") is False,
-            f"artifact definition must fail closed: {definition_name}",
         )
 
 
@@ -318,7 +329,7 @@ def main() -> int:
         source_schema_path,
         artifact_schema_path,
     ):
-        require(path.is_file(), f"required input is missing: {path}")
+        require(path.is_file() and not path.is_symlink(), f"required input is invalid: {path}")
 
     source_schema = load_unique(source_schema_path)
     artifact_schema = load_unique(artifact_schema_path)
@@ -326,43 +337,30 @@ def main() -> int:
         source_schema.get("additionalProperties") is False,
         "source schema must fail closed",
     )
-    require_fail_closed_artifact_definitions(artifact_schema)
+    require(
+        artifact_schema.get("additionalProperties") is False,
+        "artifact schema must fail closed",
+    )
     Draft202012Validator.check_schema(source_schema)
     Draft202012Validator.check_schema(artifact_schema)
     source_validator = Draft202012Validator(source_schema)
     artifact_validator = Draft202012Validator(artifact_schema)
     source = load_unique(source_path)
-    source_validator.validate(source)
+    try:
+        source_validator.validate(source)
+    except ValidationError as error:
+        fail(f"source schema validation failed: {error.message}")
 
     with tempfile.TemporaryDirectory(prefix="regelsuche-challenge-") as directory:
         temporary_root = Path(directory)
         first = temporary_root / "first"
         second = temporary_root / "second"
-        run_generator(
-            sys.executable,
-            generator,
-            source_path,
-            first,
-            True,
-            "first generation",
-        )
-        run_generator(
-            sys.executable,
-            generator,
-            source_path,
-            second,
-            True,
-            "second generation",
-        )
+        run_generator(generator, source_path, first, True, "first generation")
+        run_generator(generator, source_path, second, True, "second generation")
         require_identical(first, second, "clean challenge generations")
         require_identical(first, committed, "committed challenge portfolio")
         validate_artifacts(source, first, artifact_validator)
-        reject_mutations(
-            sys.executable,
-            generator,
-            source,
-            temporary_root,
-        )
+        reject_mutations(generator, source, temporary_root)
 
     print(f"jsonschema={installed}")
     print("discovery-challenge-portfolio=VERIFIED")
