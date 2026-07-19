@@ -71,11 +71,13 @@ buildscript {
     }
 }
 
+def aiKnowledgeOutput = layout.buildDirectory.dir('ai-knowledge')
+def aiKnowledgeCheck
 if (aiKnowledgeEnabled) {
     apply plugin: 'org.aiknowledge.extractor'
 
     aiKnowledge {
-        outputDirectory = layout.buildDirectory.dir('ai-knowledge')
+        outputDirectory = aiKnowledgeOutput
         docsOutputDirectory = layout.projectDirectory.dir('docs/ai-knowledge')
         seedDirectory = layout.projectDirectory.dir('ai-knowledge')
         modelProfileDirectory = layout.projectDirectory.dir('ai-knowledge')
@@ -92,12 +94,48 @@ if (aiKnowledgeEnabled) {
         maxAverageMethodCognitiveComplexity = 4.0d
         maxAverageMethodCyclomaticComplexity = 4.0d
     }
+
+    def aiKnowledgeGenerationTasks = [
+        tasks.named('generateAiKnowledgeIndex'),
+        tasks.named('analyzeAiComplexity'),
+        tasks.named('optimizeAiKnowledge'),
+        tasks.named('benchmarkAiKnowledge')
+    ]
+    def checkAiKnowledgeIndex = tasks.named('checkAiKnowledgeIndex') {
+        mustRunAfter aiKnowledgeGenerationTasks
+    }
+    def verifyAiKnowledgeArtifacts = tasks.register('verifyAiKnowledgeArtifacts', Exec) {
+        group = 'verification'
+        description = 'Validates required AI-knowledge artifacts and measured schema-v3 quality.'
+        dependsOn aiKnowledgeGenerationTasks, checkAiKnowledgeIndex
+        workingDir rootDir
+        commandLine pythonExecutable,
+            'scripts/verify-ai-knowledge-artifacts.py',
+            '--root', aiKnowledgeOutput.get().asFile.absolutePath
+        inputs.file('scripts/verify-ai-knowledge-artifacts.py')
+        inputs.dir(aiKnowledgeOutput)
+        outputs.upToDateWhen { false }
+    }
+    aiKnowledgeCheck = tasks.register('aiKnowledgeCheck') {
+        group = 'verification'
+        description = 'Generates, checks and independently verifies the AI-knowledge index.'
+        dependsOn verifyAiKnowledgeArtifacts
+    }
 } else {
     tasks.register('generateAiKnowledgeIndex') {
         group = 'documentation'
         description = 'Explains how to enable the AI Knowledge Extractor plugin.'
         doLast {
             throw new GradleException('AI knowledge extractor is disabled for this build.')
+        }
+    }
+    aiKnowledgeCheck = tasks.register('aiKnowledgeCheck') {
+        group = 'verification'
+        description = 'Explains how to enable the AI Knowledge Extractor verification lifecycle.'
+        doLast {
+            throw new GradleException(
+                'AI knowledge verification requires AI_KNOWLEDGE_EXTRACTOR_ENABLED=true ' +
+                'or -PenableAiKnowledgeExtractor=true and access to the extractor plugin.')
         }
     }
 }
