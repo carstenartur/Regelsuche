@@ -1,0 +1,48 @@
+def challengeRepositoryRoot = layout.projectDirectory
+def challengeRepositoryRootPath = challengeRepositoryRoot.asFile.absolutePath
+def challengeVerifier = challengeRepositoryRoot.file(
+    'scripts/verify-discovery-challenge-portfolio.py')
+def challengeVerifierPath = challengeVerifier.asFile.absolutePath
+def challengeGenerator = challengeRepositoryRoot.file(
+    'scripts/generate-discovery-challenge-portfolio.py')
+def challengeSource = challengeRepositoryRoot.file(
+    'research/challenges/challenge-plan-source.json')
+def challengeGenerated = challengeRepositoryRoot.dir(
+    'research/challenges/generated')
+def challengeSchemas = [
+    challengeRepositoryRoot.file(
+        'docs/schemas/regelsuche-discovery-challenge-plan-source-v1.schema.json'),
+    challengeRepositoryRoot.file(
+        'docs/schemas/regelsuche-discovery-challenge-artifact-v1.schema.json')
+]
+def challengeVerificationVenv = layout.buildDirectory.dir(
+    'verification-venv')
+def challengeVerificationPython = challengeVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def verifyDiscoveryChallengePortfolio = tasks.register(
+    'verifyDiscoveryChallengePortfolio',
+    Exec
+) {
+    group = 'verification'
+    description = 'Regenerates and independently verifies the frozen discovery challenge portfolio.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir challengeRepositoryRoot
+    inputs.file(challengeVerifier)
+    inputs.file(challengeGenerator)
+    inputs.file(challengeSource)
+    inputs.files(challengeSchemas)
+    inputs.dir(challengeGenerated)
+    doFirst {
+        commandLine challengeVerificationPython.get().absolutePath,
+            challengeVerifierPath,
+            '--repository-root', challengeRepositoryRootPath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyDiscoveryChallengePortfolio
+}
