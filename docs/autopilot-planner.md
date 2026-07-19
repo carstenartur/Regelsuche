@@ -1,104 +1,104 @@
 # Autopilot: targetfreie Discovery-Campaigns
 
-Der Autopilot verteilt begrenzte Ressourcen auf bestehende Discovery- und Evidenzstufen. Seine Entscheidungen sind **keine mathematische Evidenz** und ersetzen weder Falsifikation noch Projekt-Novelty, Proof, Promotion oder Public Evidence.
+Der Autopilot verteilt begrenzte Ressourcen auf vorhandene Discovery- und
+Evidenzstufen. Seine Entscheidungen sind **keine mathematische Evidenz**. Sie
+ersetzen weder Falsifikation noch Project Novelty, solvergestützte Bestätigung,
+formalen Proof, Promotion oder Public Evidence.
 
-## Ein unterstützter Vertrag
+## Unterstützter Vertrag
 
-Regelsuche unterstützt nur noch die aktuelle Autopilot-Architektur. Frühere interne Verträge, eingefrorene Hashes, Schemas und Ausführungsadapter werden nicht als Kompatibilitätsschicht erhalten. Historische Läufe bleiben über den jeweiligen Git-Commit nachvollziehbar; sie begrenzen die aktuelle Architektur nicht.
+Regelsuche unterstützt die aktuelle Autopilot-Architektur ohne parallele
+Kompatibilitätsschicht für frühere interne Schemas. Historische Läufe bleiben
+über ihren jeweiligen Git-Commit reproduzierbar, bestimmen aber nicht den
+aktuellen Produktionsvertrag.
 
-Der aktuelle Research Brief ist:
+Der Research Brief verwendet:
 
 ```text
 regelsuche.autonomous-research-brief/v2
 ```
 
-Er besitzt bewusst keinen Vorgänger-Hash, keinen Zielausdruck und keine versteckte erwartete Antwort. Vor dem Lauf friert er ein:
+Er besitzt keinen Zielausdruck und keine versteckte erwartete Antwort. Vor dem
+Lauf friert er insbesondere ein:
 
-- erlaubte mathematische Domänen,
-- Seed-Generatoren,
-- Inventar-, Pack- und Modellhashes,
-- einen deterministischen Seed,
-- Mindestwerte für Aggregate Inputs, Familien- und Evidenzdiversität,
-- den Output-Namespace,
-- Budgets für jede explizite Evidenzstufe.
+- erlaubte mathematische Domänen und Seed-Generatoren;
+- Inventar-, Pack- und Modellidentitäten;
+- einen deterministischen Seed;
+- Mindestwerte für Input-, Familien- und Evidenzdiversität;
+- den Output-Namespace;
+- getrennte Budgets für jede Evidenzstufe.
 
-## Evidenzstufen
+## Fachliche Stufen
 
-Der Brief trennt die fachlichen Stufen:
+Der Brief trennt:
 
-- `GENERATION`,
-- `CANDIDATE_FORMATION`,
-- `VALIDATION`,
-- `COUNTEREXAMPLE_SEARCH`,
-- `PROJECT_NOVELTY`,
-- `PROOF`,
-- `LIFECYCLE_HANDOFF`.
+```text
+GENERATION
+CANDIDATE_FORMATION
+VALIDATION
+COUNTEREXAMPLE_SEARCH
+PROJECT_NOVELTY
+PROOF
+LIFECYCLE_HANDOFF
+```
 
-Jede Stufe benötigt mindestens eine konfigurierte Nicht-Zeit-Ressource. Projekt-Novelty wird damit nicht in Validation versteckt, und Lifecycle-Handoff wird weder mit Proof noch mit Promotion gleichgesetzt.
+Jede Stufe benötigt eine konfigurierte Nicht-Zeit-Ressource. Project Novelty
+wird nicht in Validation versteckt. Lifecycle Handoff wird weder mit Proof noch
+mit Promotion gleichgesetzt.
 
-## Aggregate Fan-in und Fan-out
+## Aggregate Candidate Formation
 
-`regelsuche.autonomous-aggregate-decision/v2` modelliert die tatsächliche Eingangstopologie des Open-Target-Miners:
+`regelsuche.autonomous-aggregate-decision/v2` beschreibt den tatsächlichen
+Fan-in des Open-Target-Miners:
 
-- Scope `AGGREGATE`,
-- mehrere unveränderliche Observation Branches,
-- ausschließlich `GoalStatus.UNTARGETED`,
-- Mindestzahl der Eingänge,
-- Mindestdiversität der Familien und Evidence-Hashes,
-- Output-Namespace statt vorab erfundener Kandidaten-IDs,
-- geplante `MINING_BATCHES`- und `CANDIDATES`-Kapazität.
+- Scope `AGGREGATE`;
+- mehrere unveränderliche Observation Branches;
+- ausschließlich `GoalStatus.UNTARGETED`;
+- Mindestzahlen für Inputs, Familien und Evidence-Hashes;
+- einen Output-Namespace statt vorab erfundener Kandidatenidentitäten;
+- begrenzte Kapazitäten für Mining-Batches und Kandidaten.
 
-Die Reihenfolge der Inputs beeinflusst weder Decision-Hash noch kanonisches JSON.
+Die Eingangsreihenfolge beeinflusst weder Decision-Hash noch kanonisches JSON.
 
-`regelsuche.autonomous-aggregate-receipt/v2` erlaubt einen Mining-Batch mit null, einem oder mehreren Kandidaten. Ein Kandidatenbranch entsteht erst, wenn der produktive Miner eine konkrete Conjecture-ID erzeugt hat. Abgewiesene Cluster bleiben explizite Evidence, erzeugen aber keinen erfolgreichen Output-Branch.
+`regelsuche.autonomous-aggregate-receipt/v2` erlaubt null, einen oder mehrere
+Kandidaten. Ein Kandidatenbranch entsteht erst, wenn der produktive Miner eine
+konkrete Conjecture-ID erzeugt hat. Abgewiesene Cluster bleiben sichtbare
+Evidence, erzeugen aber keinen erfolgreichen Output-Branch.
 
-Jeder Output bindet nur seine tatsächlich unterstützenden Beobachtungen:
-
-- Observation-ID,
-- Source-Branch-ID,
-- Familien-ID,
-- Snapshot-Hash,
-- Evidence-Hash,
-- Hash des unveränderlichen Observation Branches.
-
-`INCONCLUSIVE` und `BACKEND_UNAVAILABLE` erzeugen keine Kandidatenoutputs. Nicht ausgeführte Ressourcen werden als übersprungen bilanziert und nicht als ausgeführte Arbeit erfunden.
+Jeder Output bindet nur die tatsächlich tragenden Beobachtungen mit
+Observation-, Branch-, Familien-, Snapshot- und Evidence-Identitäten.
+`INCONCLUSIVE` und `BACKEND_UNAVAILABLE` erzeugen keine Kandidatenoutputs.
+Nicht ausgeführte Ressourcen werden als übersprungen und nicht als ausgeführt
+bilanziert.
 
 ## Produktive Open-Target-Bindung
 
-`OpenTargetAutopilotV2Binding` verbindet die Aggregate-Verträge direkt mit dem vorhandenen `OpenTargetConjectureEvidence`:
+`OpenTargetAutopilotV2Binding` verbindet die Aggregate-Verträge mit der
+vorhandenen `OpenTargetConjectureEvidence`:
 
-- der kanonische Mining-Evidence-Hash wird unverändert gebunden,
-- Campaign-ID und Rule-Inventory-Hash werden gegen den Brief geprüft,
-- die Observation-IDs müssen exakt den Seed-Provenienzen entsprechen,
-- nur Conjecture-IDs des produktiven Mining-Reports können Output-Branches erzeugen,
-- Kandidatenlinien enthalten ausschließlich den tatsächlich tragenden Support.
+- der Mining-Evidence-Hash wird unverändert gebunden;
+- Campaign- und Rule-Inventory-Identitäten werden gegen den Brief geprüft;
+- Observation-IDs müssen exakt den Seed-Provenienzen entsprechen;
+- nur Conjecture-IDs des produktiven Mining-Reports können Outputs erzeugen;
+- Kandidaten-Lineage enthält ausschließlich den tatsächlich tragenden Support.
 
 Die Binding-Schicht implementiert keinen zweiten Miner.
 
-## Novelty, Proof und Lifecycle
+## Novelty, Solver und Lifecycle
 
-`regelsuche.autonomous-candidate-lifecycle/v2` bildet die bestehenden fachlichen Reports ohne Bedeutungsvermischung ab:
+`regelsuche.autonomous-candidate-lifecycle/v2` erhält die Bedeutungen der
+bestehenden Reports:
 
-- `EXACT_DUPLICATE` und `ALPHA_EQUIVALENT_DUPLICATE` enden als `DUPLICATE`,
-- `INCONCLUSIVE_UNPARSEABLE` bleibt `INCOMPLETE`,
-- Proof `REFUTED` endet als `DISPROVED`,
-- Proof `INCONCLUSIVE` oder `NOT_RUN` bleibt `INCOMPLETE`,
-- `SYMBOLICALLY_VERIFIED` ohne Lifecycle-Handoff bleibt `INCOMPLETE`,
-- erst der konservative `OpenTargetHypothesisCandidateAdapter`-Handoff schließt die interne Stufenkette als `COMPLETED` ab.
+- exakte und alpha-äquivalente Duplikate enden als `DUPLICATE`;
+- unparsebare oder unvollständige Evidence bleibt `INCOMPLETE`;
+- ein widerlegtes Solver-/Proof-Ergebnis endet als `DISPROVED`;
+- nicht ausgeführte oder nicht unterstützte Bestätigung bleibt `INCOMPLETE`;
+- erst der konservative `OpenTargetHypothesisCandidateAdapter`-Handoff schließt
+  die interne Stufenkette als `COMPLETED` ab.
 
 Der Handoff versucht weder Promotion noch Veröffentlichung.
 
-## Versionierte Campaign-Artefakte
-
-Die Aggregate-Objekte werden von aktuellen äußeren Verträgen referenziert, nicht kopiert:
-
-- `regelsuche.autonomous-campaign-plan/v2`,
-- `regelsuche.autonomous-campaign-execution/v2`,
-- `regelsuche.autonomous-branch-lineage/v2`,
-- `regelsuche.autonomous-campaign-round/v2`,
-- `regelsuche.autonomous-evidence-dag/v2`.
-
-Die DAG verbindet:
+Die aktuelle DAG verbindet:
 
 ```text
 Research Brief
@@ -106,24 +106,31 @@ Research Brief
 → Aggregate Decisions
 → Aggregate Receipts
 → zero-to-many Candidate Branches mit Lineage
-→ getrennte Novelty-, Proof- und Lifecycle-Ausgänge
+→ getrennte Validation-, Novelty-, Solver- und Lifecycle-Ausgänge
 → nächster Campaign-Plan
 ```
 
-Ein Receipt ohne retained Decision oder eine Decision ohne retained Observation Inputs wird abgelehnt.
+Ein Receipt ohne retained Decision oder eine Decision ohne retained Inputs wird
+abgelehnt.
 
-## Produktive Generation für Issue #348
+## Produktive Generation
 
-`PinnedAutonomousProductionCampaign` definiert den ersten tatsächlich ausgeführten Teil der produktiven Mehr-Runden-Campaign. Der Brief enthält kein Target und keine erwartete Antwort. Er bindet das aktive Regel-Inventar der `AstRewriteTransformationEngine`, die Best-First-Suche, `ExpressionScorer`, `ExpressionCanonicalizer` und die Suchheuristik.
-
-Zwei unabhängig parametrisierte Generatorfamilien liefern zwölf deterministische Polynomial-Seeds. Beide verwenden die für den Generalizer sichtbare Relation `B = A + 2`, beziehen ihre Parameter aber aus unterschiedlichen Quellen: einer allgemeinen Abstand-zwei-Folge und einer Folge von Zwillingsprimzahlen. Dadurch kann der vorhandene Miner eine gemeinsame Regel abstrahieren, ohne die Familienbezeichnung zur Clusterbildung zu verwenden:
+`PinnedAutonomousProductionCampaign` definiert die ausgeführte, targetfreie
+Produktionskampagne. Zwei unabhängig parametrisierte Generatorfamilien liefern
+zwölf deterministische Polynomial-Seeds:
 
 ```text
 factor-common-gap-two-generator/v1
 factor-common-twin-prime-generator/v1
 ```
 
-`AutonomousProductionGenerationRunner` führt jeden Seed über die vorhandenen Produktionskomponenten aus:
+Beide Familien stellen die beobachtbare Relation `B = A + 2` bereit, beziehen
+ihre Parameter jedoch aus unterschiedlichen Quellen. Der Miner kann dadurch
+eine gemeinsame Regel abstrahieren, ohne die Familienbezeichnung für die
+Clusterbildung zu verwenden.
+
+`AutonomousProductionGenerationRunner` verwendet die vorhandenen
+Produktionskomponenten:
 
 ```text
 DeterministicDiscoveryExperimentRunner
@@ -134,42 +141,45 @@ DeterministicDiscoveryExperimentRunner
 → unveränderlicher Observation Branch
 ```
 
-Jede Observation hält Seed, Generator, alle erkundeten Zustände, gewichtete Scores, Regelpfade, Äquivalenzflags, Annahmen, Suchmetriken sowie getrennte Snapshot-, Evidence- und Branch-Hashes fest. Diese Daten reichen für die reproduzierbare Candidate Formation aus, ohne auf nur im ursprünglichen JVM-Lauf vorhandene `SearchState`-Objekte angewiesen zu sein.
+Jede Observation hält Seed, Generator, erkundete Zustände, gewichtete Scores,
+Regelpfade, Äquivalenzflags, Annahmen, Suchmetriken und getrennte Snapshot-,
+Evidence- und Branch-Hashes fest.
 
-Der reine Generationslauf lautet:
+Fokussierter Lauf:
 
 ```bash
 ./gradlew :regelsuche-autopilot:runProductionGeneration
 ```
 
-## Produktive Aggregate Candidate Formation
+## Produktives Mining
 
-`AutonomousProductionMiningRunner` setzt die unveränderlichen Generationsergebnisse direkt in den vorhandenen `OpenTargetConjectureMiner` ein. Es gibt keinen zweiten Miner und keinen Fixture-Pfad. Vor der Auswertung werden die vom Miner benötigten `SearchState`-Felder aus den persistierten `StateSnapshot`s rekonstruiert; derselbe Batch wird zusätzlich aus den live erzeugten Suchresultaten ausgewertet. Abweichende Reports brechen den Lauf ab. Damit ist maschinell geprüft, dass Candidate Formation aus der veröffentlichten Observation-Evidence reproduzierbar ist.
+`AutonomousProductionMiningRunner` setzt persistierte Generationsergebnisse in
+den vorhandenen `OpenTargetConjectureMiner` ein. Die benötigten
+`SearchState`-Felder werden aus den retained `StateSnapshot`s rekonstruiert. Der
+gleiche Batch wird zusätzlich aus den live erzeugten Suchresultaten ausgewertet;
+abweichende Reports brechen den Lauf ab.
 
-Die Familienbezeichnungen sind Provenienz. Der Miner verwendet sie nicht zur Clusterbildung; er clustert ausschließlich nach den beobachteten unabhängigen Regelpfaden und Expression-Fingerprints.
+Die Kampagne führt zwei vorab definierte Aggregate Decisions aus:
 
-Ein Lauf führt zwei vorab definierte Aggregate Decisions aus:
+1. Ein vollständiger Batch mit zwölf `UNTARGETED` Observations aus beiden
+   Familien muss mindestens einen parameterisierten Kandidaten mit
+   Zwei-Familien-Lineage erzeugen.
+2. Ein Rejection-Batch mit nur alpha-umbenanntem Support muss null Kandidaten und
+   den Reject-Grund `alpha-distinct-support<2` festhalten.
 
-1. Der vollständige Batch enthält zwölf `UNTARGETED` Observations aus beiden Familien und muss mindestens einen parameterisierten Kandidaten mit exakter Zwei-Familien-Lineage erzeugen.
-2. Der Rejection-Batch enthält ein familienübergreifendes Seed-Paar mit identischen Konstanten und nur einer Alpha-Umbenennung. Er muss null Kandidaten und den Reject-Grund `alpha-distinct-support<2` festhalten.
-
-Für beide Batches entstehen kanonische Mining-Evidence, Binding, Aggregate Receipt, Execution und Lineage. Der übergeordnete Candidate-Formation-Receipt bilanziert für `MINING_BATCHES` und `CANDIDATES`:
-
-```text
-configured = executed + skipped + remaining
-```
-
-Der reproduzierbare Generation-plus-Mining-Lauf lautet:
+Generation und Mining:
 
 ```bash
 ./gradlew :regelsuche-autopilot:runProductionMining
 ```
 
-## Produktive Validation bis Lifecycle-Handoff
+## Validation bis Lifecycle Handoff
 
-`AutonomousProductionLifecycleRunner` übernimmt ausschließlich den bereits gebildeten Kandidatenbranch. Keine Holdout- oder Proof-Information fließt zurück in Generation oder Mining.
+`AutonomousProductionLifecycleRunner` übernimmt ausschließlich den bereits
+gebildeten Kandidatenbranch. Holdout-, Counterexample-, Novelty- oder
+Solver-Information fließt nicht in Generation oder Mining zurück.
 
-Die Downstream-Kette verwendet direkt die vorhandenen Produktionskomponenten:
+Die Downstream-Kette verwendet:
 
 ```text
 OpenTargetConjectureEvaluator
@@ -182,55 +192,117 @@ OpenTargetConjectureEvaluator
 → AutonomousCandidateLifecycleV2
 ```
 
-Die fest gepinnte Validation-Suite enthält drei positive und drei negative Holdouts mit Koeffizienten, die in den zwölf Mining-Seeds nicht vorkommen. Die positiven Fälle prüfen sowohl atomare als auch zusammengesetzte gemeinsame Faktoren. Die negativen Fälle verletzen gezielt den Abstand zwei, den zweiten Koeffizienten oder die Gleichheit des gemeinsamen Faktors.
+Die fest gepinnte Validation-Suite enthält drei positive und drei negative
+Holdouts mit zuvor nicht verwendeten Koeffizienten. Counterexample Search bleibt
+eine eigene Stufe und verwendet deterministische Randwert-, rationale,
+pseudozufällige numerische und komplexe Zuweisungen.
 
-Counterexample Search bleibt eine eigene Evidenzstufe. Der Lauf aktiviert deterministisch:
+Project Novelty wird separat gegen das aktive `KnownRuleRepository` geprüft.
+`NOVEL_WITHIN_PROJECT` ist keine externe mathematische Neuheit;
+`externalNoveltyStatus` bleibt `NOT_EVALUATED`.
 
-- fünf Randwertzuweisungen,
-- vier rationale Zuweisungen,
-- 64 pseudozufällige numerische Zuweisungen,
-- vier komplexe Zuweisungen.
+Eine solverneutrale Obligation darf erst nach akzeptierter Validation entstehen.
+`SYMBOLICALLY_VERIFIED` verlangt ein hashgebundenes `CONFIRMED`-Resultat mit
+`LOSSLESS`-Übersetzung. Nicht unterstützte Konstrukte oder Annahmen blockieren
+den Handoff. Der separate Formal-Proof-Status bleibt `NOT_EVALUATED`.
 
-Matrixzuweisungen sind in diesem pinned Lauf deaktiviert, weil das generalisierte Muster neben `A` die kleingeschriebene Ausdrucksvariable `x` verwendet und der vorhandene Matrix-Backend bewusst nur reine Großbuchstaben-Muster ausführt.
-
-Project Novelty wird danach separat gegen die sieben aktiven Regeln des `KnownRuleRepository` geprüft. `NOVEL_WITHIN_PROJECT` ist keine Aussage über externe mathematische Neuheit; `externalNoveltyStatus` bleibt `NOT_EVALUATED`.
-
-Erst ein vollständig akzeptierter Evaluation-Report darf eine solver-neutrale Obligation erzeugen. `SYMBOLICALLY_VERIFIED` setzt ein hashgebundenes `CONFIRMED`-Resultat mit `LOSSLESS`-Übersetzung voraus. Ein nicht unterstütztes Konstrukt oder eine vom Backend nicht verarbeitete Annahme erzeugt `UNSUPPORTED` und blockiert den Lifecycle-Handoff. Der separate Formal-Proof-Status bleibt `NOT_EVALUATED`.
-
-`regelsuche.autonomous-stage-resource-ledger/v2` hält für Validation, Counterexample Search, Project Novelty, Proof und Lifecycle-Handoff jeweils fest:
-
-```text
-configured = executed + skipped + remaining
-```
-
-`regelsuche.autonomous-production-lifecycle/v3` bindet Validation, Counterexample Search, Novelty, `solver-obligation.json`, `solver-result.json`, Proof Report v2, den konservativen Lifecycle-Kandidaten, die Lifecycle-Entscheidung und den Ressourcenledger in einem Manifest. Das frühere Lifecycle-v2-Schema und `proof-obligation.json` werden nicht weitergeführt.
-
-Der vollständige Lauf von der Generation bis zum Lifecycle-Handoff lautet:
+Vollständiger Lifecycle-Lauf:
 
 ```bash
 ./gradlew :regelsuche-autopilot:runProductionLifecycle
 ```
 
-Alle produktiven Artefakte liegen anschließend unter:
+## Vollständige Produktionskampagne
 
-```text
-regelsuche-autopilot/build/reports/autopilot-production-lifecycle/
+Der kanonische Kampagnenlauf lautet:
+
+```bash
+./gradlew :regelsuche-autopilot:runProductionCampaign
 ```
 
-Promotion, Public Evidence, externe Novelty und formaler Proof bleiben dabei ausdrücklich `NOT_EVALUATED`.
+Er schreibt den vollständigen Artefaktbaum nach:
+
+```text
+regelsuche-autopilot/build/reports/autopilot-production-campaign/
+```
+
+Dazu gehören Research Brief, Seed-Katalog, Observations, Generation Receipt,
+Mining- und Binding-Evidence, Lineages, Validation, Counterexample Search,
+Project Novelty, `solver-obligation.json`, `solver-result.json`,
+`proof-report.json`, Lifecycle Candidate und Decision, Ressourcenledger,
+Campaign Round, Feedback und `production-campaign-manifest.json`.
+
+Das frühere `proof-obligation.json` ist nicht Bestandteil des aktuellen
+Vertrags.
+
+## Checkout-lokale Verifikation
+
+Die vollständige Pass/Fail-Semantik gehört Gradle, JUnit, Testcontainers und den
+geprüften Repository-Skripten.
+
+### Java- und Evidence-Verträge
+
+```bash
+./gradlew :regelsuche-autopilot:test
+./gradlew :regelsuche-autopilot:verifyAutopilotProductionCampaign
+```
+
+`verifyAutopilotProductionCampaign` erzeugt die komplette Kampagne und ruft
+`scripts/verify-autopilot-production-campaign.py` in der gepinnten Python-
+Umgebung auf. Der Verifikator verlangt alle Pflichtartefakte, prüft eindeutiges
+JSON, validiert Solver Obligation, Solver Result, Proof Report und Lifecycle v3
+gegen ihre Draft-2020-12-Schemas und kontrolliert die Hashverkettung:
+
+```text
+solver-result.obligationHash = solver-obligation.contentHash
+proof.solverObligationHash   = solver-obligation.contentHash
+proof.solverResultHash       = solver-result.contentHash
+lifecycle.solver*Hash        = jeweiliger Solver-Hash
+```
+
+Er verlangt außerdem `CONFIRMED`, `LOSSLESS`, ein vollständiges Campaign-
+Manifest und die unveränderten Grenzen:
+
+```text
+targetProvided=false
+campaignCompletionIsMathematicalEvidence=false
+externalNoveltyEvaluated=false
+promotionStatus=NOT_EVALUATED
+publicEvidenceStatus=NOT_EVALUATED
+```
+
+### Docker-Reproduktion
+
+```bash
+./gradlew :regelsuche-autopilot:dockerIntegrationTest
+```
+
+`AutonomousProductionCampaignContainerTest` baut `Dockerfile.autopilot` über
+Testcontainers aus einem stabilen Snapshot ausschließlich Git-getrackter
+Checkout-Dateien. Mutable `.gradle`- und Build-Caches gelangen nicht in den
+Docker-Kontext. Der Test führt die Runtime-Image-Kampagne einmalig aus und
+vergleicht den gesamten lokalen und containerisierten Evidence-Baum bytegenau.
+Bind-Mount-Berechtigungen sind für rootless Docker und User-Namespace-Remapping
+explizit behandelt.
+
+Beide Verifikationsschichten sind Teil des normalen Root-Lebenszyklus:
+
+```bash
+./gradlew test
+./gradlew check
+./gradlew fullCheck
+```
+
+Ein eigener `Autopilot Evidence`-Workflow ist nicht erforderlich. Central CI
+ruft dieselben Gradle-Verträge auf und archiviert deren Reports. GitHub Actions
+definiert keine Fixtures, erwarteten Werte, Schema-Assertions oder Docker-
+Kommandos mehr.
 
 ## Modulgrenze
 
-Die generischen Verträge für Brief, unveränderliche Observation Branches, Aggregate Decisions, Receipts und Evidence DAG liegen in `:regelsuche-experiments`. Das Modul bleibt unabhängig von konkreten Mining-, Novelty-, Proof- und Lifecycle-Typen.
-
-`:regelsuche-autopilot` verbindet diese Verträge mit `:regelsuche-learning` und der solver-neutralen IR. Eine Architekturprüfung verhindert die Rückabhängigkeit `:regelsuche-experiments → :regelsuche-learning`.
-
-## CI-Evidence
-
-Der Workflow `Autopilot Evidence` erzeugt und archiviert ausschließlich aktuelle Artefakte:
-
-- aus `:regelsuche-experiments`: `brief-v2.json`, `aggregate-decision.json`, `aggregate-receipt.json` und `dag.json`,
-- aus `:regelsuche-autopilot`: die bestehenden Binding-, Lifecycle-, Plan-, Execution-, Lineage- und Round-Charakterisierungen,
-- aus dem produktiven Lauf: Research Brief, Seed-Katalog, unveränderliche Observations, Generation Receipt und Manifest, beide Aggregate Decisions, Mining-Evidence, Bindings, Receipts, Executions und Lineages, Candidate-Formation-Receipt und Evidence DAG sowie Validation-, Counterexample-, Project-Novelty-, `proof-report.json`, `solver-obligation.json`, `solver-result.json`, Lifecycle-Candidate-, Lifecycle-Decision-, Ressourcenledger- und Lifecycle-v3-Artefakte.
-
-Der Workflow validiert die Solver-Artefakte gegen Draft-2020-12-Schemas, prüft ihre Hashverkettung und verlangt weiterhin byteidentische Gradle-/Docker-Evidence. Promotion und Public Evidence bleiben `NOT_EVALUATED`.
+Die generischen Verträge für Brief, Observation Branches, Aggregate Decisions,
+Receipts und Evidence DAG liegen in `:regelsuche-experiments`.
+`:regelsuche-autopilot` verbindet sie mit `:regelsuche-learning`, der
+solverneutralen IR und den produktiven Discovery-Komponenten. Eine
+Architekturprüfung verhindert die Rückabhängigkeit
+`:regelsuche-experiments → :regelsuche-learning`.
