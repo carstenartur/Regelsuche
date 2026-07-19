@@ -129,7 +129,8 @@ def campaignSchemas = [
     rootProject.file('docs/schemas/regelsuche-solver-obligation-v1.schema.json'),
     rootProject.file('docs/schemas/regelsuche-solver-result-v1.schema.json'),
     rootProject.file('docs/schemas/regelsuche-open-target-conjecture-proof-v2.schema.json'),
-    rootProject.file('docs/schemas/regelsuche-autonomous-production-lifecycle-v3.schema.json')
+    rootProject.file('docs/schemas/regelsuche-autonomous-production-lifecycle-v3.schema.json'),
+    rootProject.file('docs/schemas/regelsuche-autonomous-production-campaign-v2.schema.json')
 ]
 def verificationEnvironment = rootProject.layout.buildDirectory.dir(
     'verification-venv')
