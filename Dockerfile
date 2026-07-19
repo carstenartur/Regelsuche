@@ -4,7 +4,7 @@ WORKDIR /workspace
 
 # Copy Gradle wrapper and build scripts first to leverage Docker layer caching
 # for dependency downloads.
-COPY gradlew gradle.properties settings.gradle ./
+COPY gradlew gradle.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
 COPY app/build.gradle ./app/build.gradle
 COPY regelsuche-core/build.gradle ./regelsuche-core/build.gradle
@@ -47,6 +47,13 @@ COPY regelsuche-release ./regelsuche-release
 COPY regelsuche-cli ./regelsuche-cli
 COPY regelsuche-discovery ./regelsuche-discovery
 COPY regelsuche-benchmarks ./regelsuche-benchmarks
+
+# Gradle verification tasks declared by the module build scripts reference
+# repository-owned verifiers and public schemas during project configuration.
+# Keep those inputs inside the isolated Docker build context as well, even
+# though installDist does not execute the verification lifecycle itself.
+COPY scripts ./scripts
+COPY docs ./docs
 
 # Build the runnable distribution.
 RUN ./gradlew --no-daemon :app:installDist -x test

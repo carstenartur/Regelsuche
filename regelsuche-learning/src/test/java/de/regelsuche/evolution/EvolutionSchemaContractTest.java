@@ -13,6 +13,10 @@ class EvolutionSchemaContractTest {
         String preflight = readSchema("regelsuche-evolution-preflight-v1.schema.json");
         String mutations = readSchema(
             "regelsuche-evolution-mutation-batch-v1.schema.json");
+        String split = readSchema(
+            "regelsuche-evolution-split-manifest-v1.schema.json");
+        String study = readSchema(
+            "regelsuche-evolution-study-plan-v1.schema.json");
 
         assertTrue(genome.contains("regelsuche.evolution-genome/v1"));
         assertTrue(genome.contains("\"const\": \"TRAIN\""));
@@ -30,7 +34,23 @@ class EvolutionSchemaContractTest {
         for (EvolutionMutationKind kind : EvolutionMutationKind.values()) {
             assertTrue(mutations.contains("\"" + kind.name() + "\""),
                 kind.name());
+            assertTrue(study.contains("\"" + kind.name() + "\""),
+                kind.name());
         }
+        for (EvolutionStudyPlan.FitnessComponent component :
+                EvolutionStudyPlan.FitnessComponent.values()) {
+            assertTrue(study.contains("\"" + component.name() + "\""),
+                component.name());
+        }
+
+        assertTrue(split.contains("regelsuche.evolution-split-manifest/v1"));
+        assertTrue(split.contains("\"finalTestCases\""));
+        assertTrue(split.contains("\"additionalProperties\": false"));
+        assertTrue(study.contains("regelsuche.evolution-study-plan/v1"));
+        assertTrue(study.contains("\"const\": \"NOT_STARTED\""));
+        assertTrue(study.contains(
+            "\"const\": \"ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION\""));
+        assertTrue(study.contains("\"additionalProperties\": false"));
     }
 
     private static String readSchema(String fileName) throws Exception {

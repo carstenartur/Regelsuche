@@ -18,7 +18,13 @@
 .DS_Store
 Thumbs.db
 
-# Docs that don't need to land in the image.
-docs
+# Gradle build definitions may declare public JSON schemas as verification
+# inputs even when an image target only runs installDist. Keep the schemas in
+# the isolated build context, but continue to exclude documentation media and
+# prose from application images.
+docs/**
+!docs/schemas/
+!docs/schemas/**
+
 LICENSE
 README.md
