@@ -138,7 +138,20 @@ einen Finite-Difference-Sequence-Export. Negative Tests decken ab:
 - ungültige Grenzen und Null-Eingaben;
 - defensive Kopien und private Konstruktion des authority-bearing Ergebnisses.
 
-Lokale Reproduktion:
+Die vollständige Prüfung gehört dem Checkout. Der Modul-Task führt die JUnit-
+Erzeugung und anschließend den unabhängigen Python-Quercheck aus:
+
+```bash
+./gradlew :regelsuche-discovery:verifyDomainDiscoveryExportEvidence
+```
+
+Der Task ist Teil von `./gradlew check`. Das Skript
+`scripts/verify-domain-discovery-export.py` validiert beide öffentlichen
+Export-Schemas, die Descriptor-/Evidence-/Handoff-Schemas, exakte Bytes,
+kanonische Manifest- und Receipt-Hashes, Identitätsbindungen sowie die
+Repräsentationsgrenze. GitHub Actions benötigt dafür keinen eigenen Testgraphen.
+
+Für fokussierte Java-Entwicklung bleiben die JUnit-Tests direkt ausführbar:
 
 ```bash
 ./gradlew :regelsuche-discovery:test \
