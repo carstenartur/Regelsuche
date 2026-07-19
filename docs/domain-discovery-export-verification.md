@@ -124,6 +124,18 @@ Der Verifier lehnt Exporte ab, die diese Status im Handoff oder in der Discovery
 Evidence hochstufen. Das Receipt selbst hält die mathematische Validierung daher
 explizit auf `NOT_EVALUATED`.
 
+## Trust Boundary und Sicherheitsmodell
+
+Die JUnit-Tests erzeugen die kanonische Exportwurzel und prüfen die Java-seitige
+Schreib-, Wiederholungs- und Sicherheitslogik. Anschließend validiert
+`scripts/verify-domain-discovery-export.py` dieselben retained Bytes unabhängig
+gegen die öffentlichen Schemas und rekonstruiert Manifest- und Receipt-Hashes.
+
+Die Python-Prüfung besitzt keine eigene Fixture- oder Generatorlogik. Sie
+konsumiert ausschließlich die von der normalen `Test`-Task erzeugte Wurzel. Ein
+Fehler in JUnit, Exporter, Schema, Bytebindung oder Receipt blockiert denselben
+Gradle-`check`-Lauf.
+
 ## Reproduzierbarkeit
 
 Die Referenztests erzeugen und verifizieren je einen Expression-Rewrite- und
@@ -138,18 +150,37 @@ einen Finite-Difference-Sequence-Export. Negative Tests decken ab:
 - ungültige Grenzen und Null-Eingaben;
 - defensive Kopien und private Konstruktion des authority-bearing Ergebnisses.
 
-Lokale Reproduktion:
+Gezielte lokale Tests und unabhängige Vertragsprüfung:
 
 ```bash
 ./gradlew :regelsuche-discovery:test \
   --tests de.regelsuche.discovery.domain.DomainDiscoveryExportTest \
   --tests de.regelsuche.discovery.domain.DomainDiscoveryExportVerifierTest
+
+./gradlew :regelsuche-discovery:verifyDomainDiscoveryExport
 ```
+
+Der vollständige Repositoryvertrag lautet weiterhin:
+
+```bash
+./gradlew check
+```
+
+Es gibt keinen dedizierten GitHub-Action-Testpfad. Die zentrale CI ruft denselben
+Gradle-Lifecycle auf und kann die bereits geprüften Reports lediglich hochladen.
 
 Schemas:
 
 - `docs/schemas/regelsuche-domain-discovery-export-v1.schema.json`
 - `docs/schemas/regelsuche-domain-discovery-export-verification-v1.schema.json`
+
+## Consumer-Prüfverfahren
+
+Ein Consumer prüft zuerst das Manifest und alle drei exakten Bytes, verifiziert
+dann Cross-Document-Identitäten und erzeugt zuletzt das hashgebundene Receipt.
+Bei einer Abweichung darf kein teilweise gültiger Snapshot als verifiziert
+weitergegeben werden. Proof, Novelty, Promotion und Public Evidence bleiben auch
+nach erfolgreicher Byteprüfung getrennte, nicht ausgeführte Gates.
 
 ## Verbleibender Umfang von #224
 
