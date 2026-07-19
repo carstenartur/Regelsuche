@@ -75,7 +75,7 @@ The deterministic generator writes:
 - `challenge-portfolio.json`;
 - `challenge-portfolio-summary.md`.
 
-`challenge-portfolio.json` binds the content hashes of every supporting artifact and names #383 as the consumption target.
+`challenge-portfolio.json` binds the content hashes of every supporting JSON artifact and names #383 as the consumption target. The Markdown summary is presentation output rather than a separately hash-addressed contract document, but it remains part of the byte-for-byte generated tree and is therefore still covered by reproducibility checks.
 
 Regenerate the design artifacts with:
 
@@ -107,11 +107,36 @@ build/reports/discovery-challenge-pilots/report.json
 
 The receipt is explicitly marked `DEVELOPMENT_ONLY_PASSED`, keeps the benchmark campaign at `NOT_STARTED`, and keeps external novelty at `NOT_EVALUATED`. It binds the frozen portfolio content hash but is not benchmark evidence.
 
-## Verification
+## Checkout-local verification
 
-The portfolio workflow validates schemas, executes two clean generations byte-for-byte, independently recomputes every content hash and cross-artifact root, and rejects target leakage, missing evaluators, elementary selected classes, missing baselines, unbounded budgets, or any positive external-novelty status.
+The authoritative verification command is:
 
-The development-pilot workflow is only an adapter for the repository script. The same command and JUnit reports are available from a plain checkout; GitHub does not define the pilot cases or their assertions.
+```bash
+./gradlew verifyDiscoveryChallengePortfolio
+```
+
+It is part of root `./gradlew check`. The repository-owned verifier:
+
+1. validates the fail-closed source and artifact schemas with the pinned verification environment;
+2. follows all six local `oneOf` references in the combined artifact schema and requires `unevaluatedProperties: false` on every referenced artifact definition;
+3. executes two clean generations in isolated temporary directories;
+4. compares both complete generated trees byte-for-byte, including `challenge-portfolio-summary.md`;
+5. compares the complete generated tree with the committed frozen portfolio;
+6. separately requires exactly the six expected JSON contract artifacts and no additional JSON files;
+7. independently recomputes every JSON content hash and cross-artifact root;
+8. verifies assessed/selected/deferred counts and the exact selected challenge identities;
+9. enforces post-formation external search, information-parity baselines and conservative claim statuses;
+10. rejects mutated inputs with missing target prohibitions, blank evaluators or non-executable budgets.
+
+The distinction between the six JSON contract artifacts and the complete generated tree is intentional: schema and hash checks apply to the JSON contracts, while byte reproducibility also covers the Markdown summary.
+
+All fixtures, expected values and negative cases live in
+`scripts/verify-discovery-challenge-portfolio.py`. The former dedicated GitHub
+Actions workflow is therefore unnecessary. Central CI invokes the same Gradle
+lifecycle as an ordinary checkout.
+
+The development-pilot workflow remains a thin adapter for the separate
+repository pilot script. GitHub does not define pilot cases or assertions.
 
 ## Remaining work before #390 closes
 
