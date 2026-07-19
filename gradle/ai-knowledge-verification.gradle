@@ -1,0 +1,67 @@
+def aiKnowledgeVerificationEnabled =
+    System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' ||
+    providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
+def aiKnowledgePython = providers.gradleProperty('pythonExecutable').getOrElse('python3')
+def aiKnowledgeArtifactDirectory = layout.buildDirectory.dir('ai-knowledge')
+def aiKnowledgeVerifierScript = layout.projectDirectory.file(
+    'scripts/verify-ai-knowledge-artifacts.py')
+
+if (aiKnowledgeVerificationEnabled) {
+    def extractorTasks = [
+        'generateAiKnowledgeIndex',
+        'analyzeAiComplexity',
+        'optimizeAiKnowledge',
+        'benchmarkAiKnowledge',
+        'checkAiKnowledgeIndex'
+    ]
+
+    tasks.configureEach { task ->
+        if (task.name == 'checkAiKnowledgeIndex') {
+            task.mustRunAfter(
+                'generateAiKnowledgeIndex',
+                'analyzeAiComplexity',
+                'optimizeAiKnowledge',
+                'benchmarkAiKnowledge')
+        }
+    }
+
+    def verifyAiKnowledgeArtifacts = tasks.register(
+        'verifyAiKnowledgeArtifacts',
+        Exec
+    ) {
+        group = 'verification'
+        description = 'Verifies generated AI knowledge files, evidence and measured context-footprint contracts.'
+        dependsOn extractorTasks
+        workingDir rootDir
+        commandLine aiKnowledgePython,
+            aiKnowledgeVerifierScript.asFile.absolutePath,
+            '--root', aiKnowledgeArtifactDirectory.get().asFile.absolutePath
+        inputs.file(aiKnowledgeVerifierScript)
+        outputs.upToDateWhen { false }
+    }
+
+    tasks.register('aiKnowledgeCheck') {
+        group = 'verification'
+        description = 'Runs the complete checkout-local AI knowledge generation and verification lifecycle.'
+        dependsOn verifyAiKnowledgeArtifacts
+    }
+} else {
+    def disabledAiKnowledgeVerification = tasks.register(
+        'verifyAiKnowledgeArtifacts'
+    ) {
+        group = 'verification'
+        description = 'Explains how to enable AI knowledge artifact verification.'
+        doLast {
+            throw new GradleException(
+                'AI knowledge verification is disabled. Set '
+                    + 'AI_KNOWLEDGE_EXTRACTOR_ENABLED=true or '
+                    + '-PenableAiKnowledgeExtractor=true.')
+        }
+    }
+
+    tasks.register('aiKnowledgeCheck') {
+        group = 'verification'
+        description = 'Explains how to enable the AI knowledge lifecycle.'
+        dependsOn disabledAiKnowledgeVerification
+    }
+}
