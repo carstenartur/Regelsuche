@@ -159,10 +159,13 @@ def verify(root: Path) -> tuple[list[str], list[str]]:
                 "unresolvedCapabilityModuleReferences",
                 "unresolvedCapabilityPackageReferences",
             ):
-                unresolved = footprint.get(field)
+                if field not in footprint:
+                    errors.append(f"context footprint lacks required field {field}")
+                    continue
+                unresolved = footprint[field]
                 if unresolved != 0:
                     errors.append(
-                        f"context footprint has {unresolved!r} in {field}"
+                        f"context footprint has {unresolved!r} in {field}; expected 0"
                     )
 
             sources = footprint.get("capabilityWorkingSetSources", {})
