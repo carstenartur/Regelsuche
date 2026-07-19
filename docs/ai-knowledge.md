@@ -1,34 +1,65 @@
 # AI knowledge index
 
-Regelsuche can consume the separate `ai-knowledge-extractor` project either as
-a local Gradle composite build or from GitHub Packages.
+Regelsuche consumes the released `org.aiknowledge.extractor` Gradle plugin from
+the `carstenartur/ai-knowledge-extractor` GitHub Packages repository. The
+consumer version is pinned once in `gradle.properties`:
 
-## Local setup
-
-Clone both repositories next to each other:
-
-```text
-workspace/
-  Regelsuche/
-  ai-knowledge-extractor/
+```properties
+aiKnowledgeExtractorVersion=0.1.7
 ```
 
-`settings.gradle` detects `../ai-knowledge-extractor` and includes it as a
-composite build when present. In package mode, provide `GITHUB_ACTOR` and a
-`GITHUB_TOKEN` with package-read access.
+At the time this contract was introduced, `0.1.7` was the latest published
+release and `0.1.8-SNAPSHOT` was the development version on the extractor's
+`main` branch. Regelsuche never consumes a snapshot implicitly. Updating the
+released dependency requires one explicit version change followed by the normal
+AI Knowledge and repository verification lifecycles.
 
-## Complete verification lifecycle
+## Released package mode
 
-Run generation, complexity analysis, optimization, benchmarking, claim checks
-and independent artifact verification through one checkout-local Gradle task:
+AI Knowledge is optional so an ordinary Regelsuche checkout does not need
+GitHub Packages credentials. Enabling the lifecycle adds the dedicated
+`ai-knowledge-verification` consumer project. That project applies the released
+plugin through the canonical Gradle plugin DSL:
+
+```groovy
+plugins {
+    id 'org.aiknowledge.extractor'
+}
+```
+
+`settings.gradle` supplies the version and the GitHub Packages plugin repository.
+Provide a GitHub identity and token with package-read permission:
 
 ```bash
+GITHUB_ACTOR=<github-user> \
+GITHUB_TOKEN=<package-read-token> \
 AI_KNOWLEDGE_EXTRACTOR_ENABLED=true \
   ./gradlew --no-configuration-cache aiKnowledgeCheck
 ```
 
-The extractor currently requires configuration-cache opt-out. All verification
-semantics nevertheless live in the checkout rather than in GitHub Actions.
+GitHub Packages is an authenticated Maven repository even for this public source
+repository. The credential requirement is therefore a package-registry boundary,
+not a reason to copy plugin verification semantics into GitHub Actions.
+
+## Explicit local plugin development
+
+A sibling checkout no longer overrides the released plugin merely because it
+exists. To test changes to the extractor before releasing them, opt in explicitly:
+
+```bash
+AI_KNOWLEDGE_EXTRACTOR_ENABLED=true \
+  ./gradlew --no-configuration-cache \
+  -PuseLocalAiKnowledgeExtractor=true \
+  -PaiKnowledgeExtractorCheckout=../ai-knowledge-extractor \
+  aiKnowledgeCheck
+```
+
+In this mode `pluginManagement.includeBuild(...)` supplies the same plugin id via
+a Gradle composite build. No GitHub Packages credentials are required. The local
+checkout path defaults to `../ai-knowledge-extractor`, but the override remains
+explicit and visible in the command line.
+
+## Complete verification lifecycle
 
 `aiKnowledgeCheck` executes:
 
@@ -38,6 +69,9 @@ semantics nevertheless live in the checkout rather than in GitHub Actions.
 4. `benchmarkAiKnowledge`;
 5. `checkAiKnowledgeIndex`;
 6. `verifyAiKnowledgeArtifacts`.
+
+The extractor currently requires configuration-cache opt-out. All pass/fail
+semantics nevertheless live in the checkout rather than in GitHub Actions.
 
 The final task runs `scripts/verify-ai-knowledge-artifacts.py`. It rejects
 missing or empty files, malformed or duplicate-field JSON, empty evidence,
@@ -70,7 +104,8 @@ context-packs/index.json
 
 ## Individual extractor tasks
 
-The component tasks remain available for focused development:
+Root-project aliases preserve the familiar commands while delegating to the
+optional versioned consumer project:
 
 ```bash
 ./gradlew generateAiKnowledgeIndex
@@ -82,6 +117,7 @@ The component tasks remain available for focused development:
 ./gradlew publishAiKnowledgeIndex
 ```
 
+These commands require the same enablement flag as `aiKnowledgeCheck`.
 `checkAiKnowledgeIndex` evaluates rule-bearing claim seeds from
 `ai-knowledge/claims.seed.yaml`. Claims marked with `severity: error` fail the
 build; `warning` claims remain advisory.
@@ -94,7 +130,10 @@ extractor is deterministic and does not require external LLM or SaaS calls.
 
 `.github/workflows/ai-knowledge.yml` remains separate only because GitHub
 Packages authentication is an execution boundary. The workflow provisions Java
-and Gradle, invokes `aiKnowledgeCheck`, and uploads the generated artifacts. It
-contains no artifact expectations, inline interpreters or alternative test
-graph. The same command can be run from any ordinary checkout with either the
-local composite build or package credentials.
+and Gradle, invokes the same root `aiKnowledgeCheck` alias, and uploads generated
+artifacts. It contains no artifact expectations, inline interpreters or
+alternative test graph.
+
+The implementation and this documentation share the following invariant:
+released package mode is the default, local composite mode is explicit, and the
+plugin version is defined in exactly one repository property.
