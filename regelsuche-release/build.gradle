@@ -18,6 +18,20 @@ application {
     mainClass = 'de.regelsuche.release.ReleaseReadinessMain'
 }
 
+sourceSets {
+    dockerIntegrationTest {
+        java.srcDir 'src/dockerIntegrationTest/java'
+        resources.srcDir 'src/dockerIntegrationTest/resources'
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+    }
+}
+
+configurations {
+    dockerIntegrationTestImplementation.extendsFrom testImplementation
+    dockerIntegrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
 dependencies {
     api project(':regelsuche-autopilot')
     api project(':regelsuche-discovery')
@@ -25,6 +39,12 @@ dependencies {
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    dockerIntegrationTestImplementation platform(libs.testcontainers.bom)
+    dockerIntegrationTestImplementation libs.testcontainers.core
+    dockerIntegrationTestImplementation libs.testcontainers.junit
+    dockerIntegrationTestImplementation libs.junit.jupiter
+    dockerIntegrationTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 def hiddenRuleReport = project(':app').layout.buildDirectory
@@ -104,6 +124,20 @@ tasks.named('test') {
     finalizedBy tasks.named('jacocoTestReport')
 }
 
+tasks.register('dockerIntegrationTest', Test) {
+    group = 'verification'
+    description = 'Reproduces the autonomous-discovery walkthrough in the Docker target via Testcontainers.'
+    testClassesDirs = sourceSets.dockerIntegrationTest.output.classesDirs
+    classpath = sourceSets.dockerIntegrationTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
+    systemProperty 'regelsuche.projectRoot', rootProject.projectDir.absolutePath
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
+    }
+}
+
 jacoco {
     toolVersion = '0.8.13'
 }
@@ -117,22 +151,70 @@ tasks.named('jacocoTestReport') {
     }
 }
 
-tasks.named('check') {
-    dependsOn tasks.named('jacocoTestReport')
-}
-
 def autonomousDiscoveryWalkthroughOutput = providers.gradleProperty('walkthroughOutput')
     .orElse(layout.buildDirectory.dir('reports/autonomous-discovery-walkthrough')
         .map { it.asFile.absolutePath })
+def autonomousDiscoveryWalkthroughDirectory = autonomousDiscoveryWalkthroughOutput
+    .map { new File(it) }
 
-tasks.register('runAutonomousDiscoveryWalkthrough', JavaExec) {
+def autonomousDiscoveryRepositoryRevision = providers.gradleProperty('repositoryRevision')
+    .orElse(providers.environmentVariable('REGELSUCHE_REPOSITORY_REVISION'))
+    .orElse(providers.exec {
+        commandLine 'git', 'rev-parse', 'HEAD'
+    }.standardOutput.asText.map { it.trim() })
+
+def runAutonomousDiscoveryWalkthrough = tasks.register(
+    'runAutonomousDiscoveryWalkthrough',
+    JavaExec
+) {
     group = 'verification'
     description = 'Generate the qualified autonomous-discovery result card and evidence walkthrough.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.regelsuche.release.AutonomousDiscoveryWalkthroughMain'
     args autonomousDiscoveryWalkthroughOutput.get()
-    def repositoryRevision = providers.gradleProperty('repositoryRevision').orNull
-    if (repositoryRevision != null && !repositoryRevision.isBlank()) {
-        args '--repository-revision', repositoryRevision
+    inputs.property('repositoryRevision', autonomousDiscoveryRepositoryRevision)
+    outputs.dir autonomousDiscoveryWalkthroughDirectory
+    doFirst {
+        args '--repository-revision', autonomousDiscoveryRepositoryRevision.get()
     }
+}
+
+def verificationEnvironment = rootProject.layout.buildDirectory.dir('verification-venv')
+def walkthroughVerificationScript = rootProject.file(
+    'scripts/verify-autonomous-discovery-walkthrough.py')
+def walkthroughResultCardSchema = rootProject.file(
+    'docs/schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json')
+def verificationPython = verificationEnvironment.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+        ? 'Scripts/python.exe'
+        : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def verifyAutonomousDiscoveryWalkthrough = tasks.register(
+    'verifyAutonomousDiscoveryWalkthrough',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies the generated walkthrough schema, hashes and evidence links.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        runAutonomousDiscoveryWalkthrough
+    workingDir rootProject.rootDir
+    inputs.file(walkthroughVerificationScript)
+    inputs.file(walkthroughResultCardSchema)
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            walkthroughVerificationScript.absolutePath,
+            '--root', autonomousDiscoveryWalkthroughDirectory.get().absolutePath,
+            '--schema', walkthroughResultCardSchema.absolutePath
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('jacocoTestReport'), verifyAutonomousDiscoveryWalkthrough
+}
+
+rootProject.tasks.named('check') {
+    dependsOn verifyAutonomousDiscoveryWalkthrough
 }
