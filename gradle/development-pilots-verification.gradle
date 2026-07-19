@@ -1,0 +1,19 @@
+def verifyDiscoveryChallengeDevelopmentPilots = tasks.register(
+    'verifyDiscoveryChallengeDevelopmentPilots',
+    Exec
+) {
+    group = 'verification'
+    description = 'Verifies the selected development-pilot JUnit methods and writes the bounded receipt.'
+    dependsOn 'test'
+    workingDir rootDir
+    commandLine providers.gradleProperty('pythonExecutable').getOrElse('python3'),
+        'scripts/run-discovery-challenge-development-pilots.py',
+        '--skip-tests'
+    inputs.file('scripts/run-discovery-challenge-development-pilots.py')
+    inputs.file('research/challenges/generated/challenge-portfolio.json')
+    outputs.file('build/reports/discovery-challenge-pilots/report.json')
+}
+
+tasks.matching { it.name == 'check' }.configureEach {
+    dependsOn verifyDiscoveryChallengeDevelopmentPilots
+}
