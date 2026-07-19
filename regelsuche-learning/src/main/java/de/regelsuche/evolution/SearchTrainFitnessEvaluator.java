@@ -34,18 +34,36 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
     private final EvolutionTrainSearchSuite suite;
     private final Set<FitnessComponent> requiredComponents;
     private final EvolutionGenomeCompiler compiler;
+    private final GoalSearchRunner searchRunner;
 
     public SearchTrainFitnessEvaluator(
         EvolutionTrainSearchSuite suite,
         Set<FitnessComponent> requiredComponents
     ) {
-        this(suite, requiredComponents, new EvolutionGenomeCompiler());
+        this(
+            suite,
+            requiredComponents,
+            new EvolutionGenomeCompiler(),
+            SearchTrainFitnessEvaluator::search);
     }
 
     SearchTrainFitnessEvaluator(
         EvolutionTrainSearchSuite suite,
         Set<FitnessComponent> requiredComponents,
         EvolutionGenomeCompiler compiler
+    ) {
+        this(
+            suite,
+            requiredComponents,
+            compiler,
+            SearchTrainFitnessEvaluator::search);
+    }
+
+    SearchTrainFitnessEvaluator(
+        EvolutionTrainSearchSuite suite,
+        Set<FitnessComponent> requiredComponents,
+        EvolutionGenomeCompiler compiler,
+        GoalSearchRunner searchRunner
     ) {
         this.suite = Objects.requireNonNull(suite, "suite");
         Objects.requireNonNull(requiredComponents, "requiredComponents");
@@ -54,6 +72,7 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
         }
         this.requiredComponents = Set.copyOf(requiredComponents);
         this.compiler = Objects.requireNonNull(compiler, "compiler");
+        this.searchRunner = Objects.requireNonNull(searchRunner, "searchRunner");
     }
 
     public static SearchTrainFitnessEvaluator forPlan(
@@ -97,10 +116,13 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
             new ArrayList<>();
         for (EvolutionTrainSearchSuite.TrainCase trainCase : suite.cases()) {
             try {
-                measurements.add(evaluateCase(genome, program, trainCase));
+                measurements.add(evaluateCase(
+                    genome, program, trainCase, blockers));
             } catch (RuntimeException exception) {
                 blockers.add("TRAIN_CASE_EVALUATION_FAILED:"
-                    + trainCase.caseId() + ":" + stableFailure(exception));
+                    + trainCase.caseId() + ":SETUP:" + stableFailure(exception));
+                measurements.add(failedMeasurement(
+                    trainCase, "EVALUATION_FAILED", "NOT_RUN"));
             }
         }
 
@@ -127,8 +149,10 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
     private EvolutionTrainFitnessEvidence.CaseMeasurement evaluateCase(
         EvolutionGenome genome,
         EvolutionGenomeCompiler.CompiledProgram program,
-        EvolutionTrainSearchSuite.TrainCase trainCase
+        EvolutionTrainSearchSuite.TrainCase trainCase,
+        List<String> blockers
     ) {
+        SearchHeuristic heuristic = effectiveHeuristic(genome);
         List<RewriteRule> baselineRules = AstRewriteTransformationEngine.defaultRules();
         List<RewriteRule> candidateRules = new ArrayList<>(baselineRules);
         candidateRules.addAll(program.rules());
@@ -137,20 +161,52 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
             new AstRewriteTransformationEngine(
                 baselineRules,
                 genome.budget().maxAstGrowthPerStep(),
-                genome.budget().maxCandidatesPerState());
+                heuristic.maxCandidatesPerState());
         AstRewriteTransformationEngine candidateEngine =
             new AstRewriteTransformationEngine(
                 candidateRules,
                 genome.budget().maxAstGrowthPerStep(),
-                genome.budget().maxCandidatesPerState());
-        SearchHeuristic heuristic = effectiveHeuristic(genome);
+                heuristic.maxCandidatesPerState());
 
-        GoalSearchResult baseline = search(
-            baselineEngine, trainCase.inputExpression(),
-            trainCase.targetExpression(), heuristic);
-        GoalSearchResult candidate = search(
-            candidateEngine, trainCase.inputExpression(),
-            trainCase.targetExpression(), heuristic);
+        GoalSearchResult baseline;
+        try {
+            baseline = searchRunner.search(
+                baselineEngine,
+                trainCase.inputExpression(),
+                trainCase.targetExpression(),
+                heuristic);
+        } catch (RuntimeException exception) {
+            blockers.add("TRAIN_CASE_EVALUATION_FAILED:"
+                + trainCase.caseId() + ":BASELINE:" + stableFailure(exception));
+            return failedMeasurement(
+                trainCase, "EVALUATION_FAILED", "NOT_RUN");
+        }
+
+        GoalSearchResult candidate;
+        try {
+            candidate = searchRunner.search(
+                candidateEngine,
+                trainCase.inputExpression(),
+                trainCase.targetExpression(),
+                heuristic);
+        } catch (RuntimeException exception) {
+            blockers.add("TRAIN_CASE_EVALUATION_FAILED:"
+                + trainCase.caseId() + ":CANDIDATE:" + stableFailure(exception));
+            return new EvolutionTrainFitnessEvidence.CaseMeasurement(
+                trainCase.caseId(),
+                trainCase.familyId(),
+                baseline.status().name(),
+                "EVALUATION_FAILED",
+                baseline.reached(),
+                false,
+                depth(baseline),
+                -1,
+                baseline.metrics().exploredStates(),
+                0,
+                false,
+                baseline.reached());
+        }
+
         boolean newlySolved = !baseline.reached() && candidate.reached();
         boolean correctnessRegression = baseline.reached() && !candidate.reached();
         return new EvolutionTrainFitnessEvidence.CaseMeasurement(
@@ -168,6 +224,32 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
             correctnessRegression);
     }
 
+    private static EvolutionTrainFitnessEvidence.CaseMeasurement failedMeasurement(
+        EvolutionTrainSearchSuite.TrainCase trainCase,
+        String baselineStatus,
+        String candidateStatus
+    ) {
+        return new EvolutionTrainFitnessEvidence.CaseMeasurement(
+            trainCase.caseId(),
+            trainCase.familyId(),
+            baselineStatus,
+            candidateStatus,
+            false,
+            false,
+            -1,
+            -1,
+            0,
+            0,
+            false,
+            false);
+    }
+
+    private EvolutionTrainSearchSuite.TrainCase requireTrainCase(
+        EvolutionTrainSearchSuite.TrainCase trainCase
+    ) {
+        return Objects.requireNonNull(trainCase, "trainCase");
+    }
+
     private SearchHeuristic effectiveHeuristic(EvolutionGenome genome) {
         SearchHeuristic configured = suite.heuristic();
         return new SearchHeuristic(
@@ -182,7 +264,7 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
             configured.beamWidth());
     }
 
-    private static GoalSearchResult search(
+    static GoalSearchResult search(
         AstRewriteTransformationEngine engine,
         String input,
         String target,
@@ -326,5 +408,14 @@ public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator 
             + (message == null || message.isBlank()
                 ? ""
                 : ":" + message.replaceAll("\\s+", " ").trim());
+    }
+
+    @FunctionalInterface
+    interface GoalSearchRunner {
+        GoalSearchResult search(
+            AstRewriteTransformationEngine engine,
+            String input,
+            String target,
+            SearchHeuristic heuristic);
     }
 }
