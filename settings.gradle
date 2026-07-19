@@ -21,6 +21,14 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
+gradle.beforeProject { candidate ->
+    if (candidate.path == ':') {
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/ai-knowledge-verification.gradle')
+    }
+}
+
 rootProject.name = 'Regelsuche'
 include(
     'regelsuche-core',
