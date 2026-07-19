@@ -75,7 +75,7 @@ The deterministic generator writes:
 - `challenge-portfolio.json`;
 - `challenge-portfolio-summary.md`.
 
-`challenge-portfolio.json` binds the content hashes of every supporting artifact and names #383 as the consumption target.
+`challenge-portfolio.json` binds the content hashes of every supporting JSON artifact and names #383 as the consumption target. The Markdown summary is presentation output rather than a separately hash-addressed contract document, but it remains part of the byte-for-byte generated tree and is therefore still covered by reproducibility checks.
 
 Regenerate the design artifacts with:
 
@@ -118,13 +118,17 @@ The authoritative verification command is:
 It is part of root `./gradlew check`. The repository-owned verifier:
 
 1. validates the fail-closed source and artifact schemas with the pinned verification environment;
-2. executes two clean generations in isolated temporary directories;
-3. compares both generations byte-for-byte;
-4. compares the generated result with the committed frozen portfolio;
-5. independently recomputes every content hash and cross-artifact root;
-6. verifies assessed/selected/deferred counts and the exact selected challenge identities;
-7. enforces post-formation external search, information-parity baselines and conservative claim statuses;
-8. rejects mutated inputs with missing target prohibitions, blank evaluators or non-executable budgets.
+2. follows all six local `oneOf` references in the combined artifact schema and requires `unevaluatedProperties: false` on every referenced artifact definition;
+3. executes two clean generations in isolated temporary directories;
+4. compares both complete generated trees byte-for-byte, including `challenge-portfolio-summary.md`;
+5. compares the complete generated tree with the committed frozen portfolio;
+6. separately requires exactly the six expected JSON contract artifacts and no additional JSON files;
+7. independently recomputes every JSON content hash and cross-artifact root;
+8. verifies assessed/selected/deferred counts and the exact selected challenge identities;
+9. enforces post-formation external search, information-parity baselines and conservative claim statuses;
+10. rejects mutated inputs with missing target prohibitions, blank evaluators or non-executable budgets.
+
+The distinction between the six JSON contract artifacts and the complete generated tree is intentional: schema and hash checks apply to the JSON contracts, while byte reproducibility also covers the Markdown summary.
 
 All fixtures, expected values and negative cases live in
 `scripts/verify-discovery-challenge-portfolio.py`. The former dedicated GitHub
