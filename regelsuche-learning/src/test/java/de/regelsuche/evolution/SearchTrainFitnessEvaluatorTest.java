@@ -11,8 +11,10 @@ import de.regelsuche.evolution.EvolutionGenome.Objective;
 import de.regelsuche.evolution.EvolutionGenome.ResourceBudget;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import de.regelsuche.search.SearchHeuristic;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class SearchTrainFitnessEvaluatorTest {
@@ -73,6 +75,69 @@ class SearchTrainFitnessEvaluatorTest {
         assertTrue(json.contains("\"finalTestStatus\":\"NOT_EVALUATED\""));
         assertFalse(json.contains("validationCases"));
         assertFalse(json.contains("finalTestCases"));
+    }
+
+    @Test
+    void effectiveCandidateBudgetConstrainsBothTransformationEngines() {
+        EvolutionGenome genome = genome(
+            manifest(),
+            EvolutionGenomeTestFixtures.gene(
+                "expand_cube", "?A^3", "(?A*?A)*?A"));
+        EvolutionTrainSearchSuite boundedSuite = EvolutionTrainSearchSuite.create(
+            "bounded_train_suite_v1",
+            List.of(new EvolutionTrainSearchSuite.TrainCase(
+                "bounded_candidates", "budget", "(x+0)*1", "x")),
+            new SearchHeuristic(3, 64, 1, 3, 1, 12));
+        List<Integer> emittedCandidates = new ArrayList<>();
+        var evaluator = new SearchTrainFitnessEvaluator(
+            boundedSuite,
+            Set.of(FitnessComponent.SUPPORT),
+            new EvolutionGenomeCompiler(),
+            (engine, input, target, heuristic) -> {
+                emittedCandidates.add(engine.transform(input).size());
+                return SearchTrainFitnessEvaluator.search(
+                    engine, input, target, heuristic);
+            });
+
+        EvolutionTrainFitnessEvidence evidence =
+            evaluator.evaluateWithEvidence(genome);
+
+        assertTrue(evidence.blockers().isEmpty());
+        assertEquals(2, emittedCandidates.size());
+        assertTrue(emittedCandidates.stream().allMatch(count -> count <= 1));
+    }
+
+    @Test
+    void failedCaseEvaluationRemainsInCompleteSuiteEvidence() {
+        EvolutionGenome genome = genome(
+            manifest(),
+            EvolutionGenomeTestFixtures.gene(
+                "expand_cube", "?A^3", "(?A*?A)*?A"));
+        AtomicInteger invocations = new AtomicInteger();
+        var evaluator = new SearchTrainFitnessEvaluator(
+            suite(),
+            Set.of(FitnessComponent.SUPPORT),
+            new EvolutionGenomeCompiler(),
+            (engine, input, target, heuristic) -> {
+                invocations.incrementAndGet();
+                throw new IllegalStateException("deterministic failure");
+            });
+
+        EvolutionTrainFitnessEvidence evidence =
+            evaluator.evaluateWithEvidence(genome);
+
+        assertEquals(suite().cases().size(), evidence.cases().size());
+        assertEquals(suite().cases().size(), invocations.get());
+        assertTrue(evidence.cases().stream().allMatch(item ->
+            item.baselineStatus().equals("EVALUATION_FAILED")
+                && item.candidateStatus().equals("NOT_RUN")
+                && !item.baselineReached()
+                && !item.candidateReached()));
+        assertEquals(0, evidence.rawComponents().get(FitnessComponent.SUPPORT));
+        assertEquals(suite().cases().size(), evidence.blockers().stream()
+            .filter(item -> item.startsWith(
+                "TRAIN_CASE_EVALUATION_FAILED:"))
+            .count());
     }
 
     @Test
