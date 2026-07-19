@@ -5,11 +5,13 @@ on:
     branches: [ main ]
     paths:
       - 'ai-knowledge/**'
+      - 'ai-knowledge-verification/**'
       - 'docs/generated/discovery/**'
       - '**/src/main/java/**'
       - '**/src/test/java/**'
       - '**/src/jmh/java/**'
       - '**/build.gradle'
+      - 'gradle.properties'
       - 'gradle/ai-knowledge-verification.gradle'
       - 'scripts/verify-ai-knowledge-artifacts.py'
       - 'settings.gradle'
@@ -18,11 +20,13 @@ on:
     branches: [ main ]
     paths:
       - 'ai-knowledge/**'
+      - 'ai-knowledge-verification/**'
       - 'docs/generated/discovery/**'
       - '**/src/main/java/**'
       - '**/src/test/java/**'
       - '**/src/jmh/java/**'
       - '**/build.gradle'
+      - 'gradle.properties'
       - 'gradle/ai-knowledge-verification.gradle'
       - 'scripts/verify-ai-knowledge-artifacts.py'
       - 'settings.gradle'
