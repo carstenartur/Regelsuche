@@ -129,10 +129,14 @@ def validate_artifacts(
     artifact_validator: Draft202012Validator,
 ) -> None:
     artifacts: dict[str, dict[str, Any]] = {}
+    generated_json_names = {
+        path.name
+        for path in generated.iterdir()
+        if path.is_file() and path.suffix == ".json"
+    }
     require(
-        set(path.name for path in generated.iterdir() if path.is_file())
-        == set(ARTIFACT_NAMES),
-        "generated artifact set is incomplete or contains extra files",
+        generated_json_names == set(ARTIFACT_NAMES),
+        "generated JSON artifact set is incomplete or contains extra files",
     )
     for name in ARTIFACT_NAMES:
         value = load_unique(generated / name)
@@ -256,6 +260,32 @@ def reject_mutations(
         )
 
 
+def require_fail_closed_artifact_definitions(
+    artifact_schema: dict[str, Any],
+) -> None:
+    definitions = artifact_schema.get("$defs")
+    references = artifact_schema.get("oneOf")
+    require(isinstance(definitions, dict), "artifact schema lacks $defs")
+    require(isinstance(references, list) and references, "artifact schema lacks oneOf")
+    for index, reference in enumerate(references):
+        require(isinstance(reference, dict), f"oneOf entry {index} is not an object")
+        pointer = reference.get("$ref")
+        require(
+            isinstance(pointer, str) and pointer.startswith("#/$defs/"),
+            f"oneOf entry {index} does not reference a local artifact definition",
+        )
+        definition_name = pointer.removeprefix("#/$defs/")
+        definition = definitions.get(definition_name)
+        require(
+            isinstance(definition, dict),
+            f"missing artifact definition: {definition_name}",
+        )
+        require(
+            definition.get("unevaluatedProperties") is False,
+            f"artifact definition must fail closed: {definition_name}",
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository-root", type=Path, default=Path("."))
@@ -296,10 +326,7 @@ def main() -> int:
         source_schema.get("additionalProperties") is False,
         "source schema must fail closed",
     )
-    require(
-        artifact_schema.get("additionalProperties") is False,
-        "artifact schema must fail closed",
-    )
+    require_fail_closed_artifact_definitions(artifact_schema)
     Draft202012Validator.check_schema(source_schema)
     Draft202012Validator.check_schema(artifact_schema)
     source_validator = Draft202012Validator(source_schema)
