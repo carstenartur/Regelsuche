@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-generation-report/v1",
+  "title": "Regelsuche evolution generation report v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "generation",
+    "candidates",
+    "selectedGenomeHashes",
+    "acceptedLineage",
+    "rejectedMutations",
+    "distinctAlphaStructures",
+    "budgetCumulative",
+    "outcome",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-generation-report/v1"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 200000,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "selectedGenomeHashes": {
+      "type": "array",
+      "maxItems": 100000,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "acceptedLineage": {
+      "type": "array",
+      "maxItems": 200000,
+      "items": {
+        "$ref": "#/$defs/lineage"
+      }
+    },
+    "rejectedMutations": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "$ref": "#/$defs/rejection"
+      }
+    },
+    "distinctAlphaStructures": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    "budgetCumulative": {
+      "$ref": "#/$defs/budget"
+    },
+    "outcome": {
+      "enum": [
+        "CONTINUE",
+        "COMPLETED",
+        "EXTINCT",
+        "STAGNATED",
+        "DIVERSITY_FLOOR_UNMET",
+        "MUTATION_BUDGET_EXHAUSTED",
+        "TRAIN_EVALUATION_BUDGET_EXHAUSTED"
+      ]
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "fitnessComponents": {
+      "type": "object",
+      "properties": {
+        "TRAIN_CASES_NEWLY_SOLVED": { "$ref": "#/$defs/fitnessValue" },
+        "TRAIN_PATH_LENGTH_REDUCTION": { "$ref": "#/$defs/fitnessValue" },
+        "TRAIN_EXPLORED_STATE_REDUCTION": { "$ref": "#/$defs/fitnessValue" },
+        "SUPPORT": { "$ref": "#/$defs/fitnessValue" },
+        "STRUCTURAL_DIVERSITY": { "$ref": "#/$defs/fitnessValue" },
+        "PROJECT_NOVELTY": { "$ref": "#/$defs/fitnessValue" },
+        "ASSUMPTION_SIMPLICITY": { "$ref": "#/$defs/fitnessValue" },
+        "CANDIDATE_COMPLEXITY": { "$ref": "#/$defs/fitnessValue" },
+        "COUNTEREXAMPLE_RISK": { "$ref": "#/$defs/fitnessValue" },
+        "PROOF_COST_PROXY": { "$ref": "#/$defs/fitnessValue" }
+      },
+      "additionalProperties": false
+    },
+    "fitnessValue": {
+      "type": "integer",
+      "minimum": -1000,
+      "maximum": 1000
+    },
+    "blockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 10000,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "genomeHash",
+        "alphaStructuralHash",
+        "rawComponents",
+        "weightedScorePermille",
+        "status",
+        "blockers"
+      ],
+      "properties": {
+        "genomeHash": { "$ref": "#/$defs/sha256" },
+        "alphaStructuralHash": { "$ref": "#/$defs/sha256" },
+        "rawComponents": { "$ref": "#/$defs/fitnessComponents" },
+        "weightedScorePermille": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "status": {
+          "enum": ["ACCEPTED", "BLOCKED"]
+        },
+        "blockers": { "$ref": "#/$defs/blockers" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "ACCEPTED" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "blockers": { "maxItems": 0 } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "BLOCKED" } },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "blockers": { "minItems": 1 } }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "mutationKind": {
+      "enum": [
+        "ADD_ASSUMPTION",
+        "ADD_RANKING_FEATURE",
+        "COMPOSE_REWRITES",
+        "GENERALIZE_PLACEHOLDER",
+        "REMOVE_ASSUMPTION",
+        "REMOVE_RANKING_FEATURE",
+        "REVERSE_REWRITE",
+        "SPECIALIZE_PLACEHOLDER"
+      ]
+    },
+    "lineage": {
+      "type": "object",
+      "required": [
+        "parentGenomeHash",
+        "childGenomeHash",
+        "childAlphaStructuralHash",
+        "mutationKind",
+        "proposalKey"
+      ],
+      "properties": {
+        "parentGenomeHash": { "$ref": "#/$defs/sha256" },
+        "childGenomeHash": { "$ref": "#/$defs/sha256" },
+        "childAlphaStructuralHash": { "$ref": "#/$defs/sha256" },
+        "mutationKind": { "$ref": "#/$defs/mutationKind" },
+        "proposalKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "additionalProperties": false
+    },
+    "rejection": {
+      "type": "object",
+      "required": [
+        "parentGenomeHash",
+        "ordinal",
+        "mutationKind",
+        "proposalKey",
+        "childGenomeHash",
+        "blockers"
+      ],
+      "properties": {
+        "parentGenomeHash": { "$ref": "#/$defs/sha256" },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "mutationKind": { "$ref": "#/$defs/mutationKind" },
+        "proposalKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "childGenomeHash": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "blockers": {
+          "allOf": [
+            { "$ref": "#/$defs/blockers" },
+            { "minItems": 1 }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "budget": {
+      "type": "object",
+      "required": ["mutationAttempts", "trainEvaluations"],
+      "properties": {
+        "mutationAttempts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "trainEvaluations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
