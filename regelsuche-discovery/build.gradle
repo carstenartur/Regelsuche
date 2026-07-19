@@ -42,6 +42,59 @@ tasks.named('jacocoTestReport') {
     }
 }
 
+def repositoryRootDirectory = rootProject.layout.projectDirectory
+def repositoryRootPath = repositoryRootDirectory.asFile.absolutePath
+def domainExportVerifier = repositoryRootDirectory.file(
+    'scripts/verify-domain-discovery-export.py')
+def domainExportVerifierPath = domainExportVerifier.asFile.absolutePath
+def domainExportSchemas = [
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-discovery-domain-descriptor-v1.schema.json'),
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-domain-discovery-evidence-v1.schema.json'),
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'),
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-domain-discovery-export-v1.schema.json'),
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-domain-discovery-export-verification-v1.schema.json')
+]
+def domainExportReportDirectory = layout.buildDirectory.dir(
+    'reports/domain-discovery-export')
+def domainExportVerificationReportDirectory = layout.buildDirectory.dir(
+    'reports/domain-discovery-export-verification')
+def verificationVenvDirectory = rootProject.layout.buildDirectory.dir(
+    'verification-venv')
+def verificationPython = verificationVenvDirectory.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def verifyDomainDiscoveryExportEvidence = tasks.register(
+    'verifyDomainDiscoveryExportEvidence',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies generic domain export schemas, bytes, roots and representation boundaries.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        tasks.named('test')
+    workingDir repositoryRootDirectory
+    inputs.file(domainExportVerifier)
+    inputs.files(domainExportSchemas)
+    inputs.dir(domainExportReportDirectory)
+    inputs.dir(domainExportVerificationReportDirectory)
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            domainExportVerifierPath,
+            '--repository-root', repositoryRootPath
+    }
+}
+
 tasks.named('check') {
-    dependsOn tasks.named('jacocoTestReport')
+    dependsOn tasks.named('jacocoTestReport'), verifyDomainDiscoveryExportEvidence
+}
+
+rootProject.tasks.named('check') {
+    dependsOn verifyDomainDiscoveryExportEvidence
 }
