@@ -55,25 +55,29 @@ class AutonomousDiscoveryWalkthroughContainerTest {
             .withTarget("walkthrough")
             .withBuildArg("REGELSUCHE_REPOSITORY_REVISION", REVISION);
 
-        GenericContainer<?> container = new GenericContainer<>(walkthroughImage)
-            .withFileSystemBind(
-                containerOutput.toString(),
-                "/out",
-                BindMode.READ_WRITE)
-            .withStartupCheckStrategy(
-                new OneShotStartupCheckStrategy().withTimeout(Duration.ofMinutes(30)))
-            .withLogConsumer(frame -> System.err.print(frame.getUtf8String()));
         try {
-            container.start();
-        } finally {
-            container.stop();
-        }
+            GenericContainer<?> container = new GenericContainer<>(walkthroughImage)
+                .withFileSystemBind(
+                    containerOutput.toString(),
+                    "/out",
+                    BindMode.READ_WRITE)
+                .withStartupCheckStrategy(
+                    new OneShotStartupCheckStrategy().withTimeout(Duration.ofMinutes(30)))
+                .withLogConsumer(frame -> System.err.print(frame.getUtf8String()));
+            try {
+                container.start();
+            } finally {
+                container.stop();
+            }
 
-        assertTreesEqual(localOutput, containerOutput);
-        Path committedFigures = PROJECT_ROOT.resolve(
-            "docs/generated/autonomous-discovery-walkthrough");
-        assertTrue(Files.isDirectory(committedFigures), committedFigures.toString());
-        assertTreesEqual(localOutput.resolve("figures"), committedFigures);
+            assertTreesEqual(localOutput, containerOutput);
+            Path committedFigures = PROJECT_ROOT.resolve(
+                "docs/generated/autonomous-discovery-walkthrough");
+            assertTrue(Files.isDirectory(committedFigures), committedFigures.toString());
+            assertTreesEqual(localOutput.resolve("figures"), committedFigures);
+        } finally {
+            makeContainerTreeWritable(walkthroughImage, containerOutput);
+        }
     }
 
     /**
@@ -95,6 +99,30 @@ class AutonomousDiscoveryWalkthroughContainerTest {
             () -> "could not make bind mount writable: " + directory);
         assertTrue(file.setExecutable(true, false),
             () -> "could not make bind mount searchable: " + directory);
+    }
+
+    /**
+     * Restores recursive host access after the root-owned image has written the
+     * bind mount. Otherwise JUnit cannot delete nested container-created paths
+     * when it closes the {@link TempDir} extension context.
+     */
+    private static void makeContainerTreeWritable(
+        ImageFromDockerfile walkthroughImage,
+        Path directory
+    ) {
+        GenericContainer<?> cleanup = new GenericContainer<>(walkthroughImage)
+            .withFileSystemBind(directory.toString(), "/out", BindMode.READ_WRITE)
+            .withCreateContainerCmdModifier(command -> {
+                command.withEntrypoint("/bin/sh", "-c");
+                command.withCmd("chmod -R a+rwX /out");
+            })
+            .withStartupCheckStrategy(
+                new OneShotStartupCheckStrategy().withTimeout(Duration.ofMinutes(2)));
+        try {
+            cleanup.start();
+        } finally {
+            cleanup.stop();
+        }
     }
 
     /**
