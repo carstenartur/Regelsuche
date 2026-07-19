@@ -46,3 +46,45 @@ tasks.named('jacocoTestReport') {
 tasks.named('check') {
     dependsOn tasks.named('jacocoTestReport')
 }
+
+def writeEvolutionStudyPlan = tasks.register('writeEvolutionStudyPlan', JavaExec) {
+    group = 'verification'
+    description = 'Writes the preregistered NOT_STARTED evolution study and split contracts.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.EvolutionStudyPlanExample'
+    args layout.buildDirectory.dir('reports/evolution-study-plan').get().asFile.absolutePath
+    outputs.dir layout.buildDirectory.dir('reports/evolution-study-plan')
+}
+
+def verificationPython = providers.provider {
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+        ? 'Scripts/python.exe'
+        : 'bin/python'
+    new File(rootProject.layout.buildDirectory.dir('verification-venv').get().asFile, executable)
+}
+
+def verifyEvolutionStudyContracts = tasks.register('verifyEvolutionStudyContracts', Exec) {
+    group = 'verification'
+    description = 'Validates the preregistered split and study-plan artifacts independently.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'), writeEvolutionStudyPlan
+    workingDir rootProject.rootDir
+    inputs.file(rootProject.file('scripts/verify-evolution-study-contracts.py'))
+    inputs.files(
+        rootProject.file('docs/schemas/regelsuche-evolution-split-manifest-v1.schema.json'),
+        rootProject.file('docs/schemas/regelsuche-evolution-study-plan-v1.schema.json'))
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            rootProject.file('scripts/verify-evolution-study-contracts.py').absolutePath,
+            '--root', layout.buildDirectory.dir('reports/evolution-study-plan').get().asFile.absolutePath
+    }
+}
+
+tasks.named('check') {
+    dependsOn verifyEvolutionStudyContracts
+}
+
+rootProject.tasks.named('check') {
+    dependsOn verifyEvolutionStudyContracts
+}
