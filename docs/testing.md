@@ -17,6 +17,33 @@ Der Root-Task aggregiert die `Test`-Tasks aller Module. `./gradlew allTests` ble
 
 Die GitHub-Workflows sind nicht Bestandteil der Testimplementierung. Sie dürfen denselben Gradle-Aufruf ausführen und Reports veröffentlichen, definieren aber weder Fixtures noch Assertions noch die Entscheidung über Erfolg und Fehlschlag.
 
+## Standardisierte Verifikations-Lifecycles
+
+Der normale Gradle-Lifecycle ergänzt die JUnit-Tests um checkout-lokale Vertragsprüfungen:
+
+```bash
+./gradlew check
+```
+
+`check` führt zuerst den vollständigen `test`-Graphen aus und prüft danach unter anderem:
+
+- Dokumentations-Mathematik und deterministisch generierte Seiten;
+- die kandidatenunabhängige Benchmark-Präregistrierung;
+- Solver-IR-Schemas, Hashbindungen und kanonische Beispiele;
+- generische Discovery-Domain- und Lifecycle-Handoff-Evidence;
+- Domain-Generic Qualification und Release Readiness;
+- die daraus abgeleitete Capability- und Claim-Matrix.
+
+Die Python-Verifier laufen in einer automatisch erzeugten, gepinnten Umgebung unter `build/verification-venv`. Sie rufen Gradle nicht rekursiv auf. Tests und Evidence-Generatoren sind stattdessen normale Gradle-Abhängigkeiten im selben Taskgraphen.
+
+Der strikte Reproduktionslauf benötigt zusätzlich einen erreichbaren Docker-Daemon und Z3:
+
+```bash
+./gradlew fullCheck
+```
+
+`fullCheck` ergänzt `check` um den realen Solver-Portfolio-Pfad und den byteidentischen Vergleich zwischen Gradle- und Release-Readiness-Runtime-Image-Evidence. Die zentrale CI ruft genau diesen Gradle-Lifecycle auf. Eigene Solver-, Domain-, Docker-, Capability- oder Release-Readiness-Workflows sind dafür nicht erforderlich.
+
 ## Bedingte Infrastruktur über JUnit
 
 Nicht überall verfügbare Infrastruktur wird innerhalb der Tests behandelt:
@@ -47,7 +74,6 @@ Für einzelne Klassen und Methoden bleibt der normale Gradle/JUnit-Filter verfü
 ```bash
 ./gradlew :app:dockerE2eTest \
   --tests de.regelsuche.dockere2e.ScientificDiscoveryPostgresE2ETest
-
 ./gradlew :regelsuche-solver-portfolio:test \
   --tests de.regelsuche.solver.portfolio.Z3SmtSolverBackendTest.systemZ3ReturnsRealProofObject
 ```
