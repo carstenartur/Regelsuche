@@ -21,6 +21,16 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
+// Keep cross-module receipt generation modular without creating another
+// GitHub Actions test graph. The script registers a root Gradle task and hooks
+// it into the central `check` lifecycle before the root project is evaluated.
+gradle.beforeProject { project ->
+    if (project == gradle.rootProject) {
+        project.apply from: new File(settingsDir,
+            'gradle/development-pilots-verification.gradle')
+    }
+}
+
 rootProject.name = 'Regelsuche'
 include(
     'regelsuche-core',
