@@ -51,8 +51,10 @@ class EvolutionPopulationEngineTest {
                 .map(EvolutionPopulationEngine.GenerationReport::toCanonicalJson)
                 .toList());
         assertFalse(first.generationReports().isEmpty());
-        assertTrue(first.mutationAttempts() <= fixture.plan().budget().maxMutationAttempts());
-        assertTrue(first.trainEvaluations() <= fixture.plan().budget().maxTrainEvaluations());
+        assertTrue(first.mutationAttempts()
+            <= fixture.plan().budget().maxMutationAttempts());
+        assertTrue(first.trainEvaluations()
+            <= fixture.plan().budget().maxTrainEvaluations());
         assertEquals(
             first.finalPopulation().size(),
             new HashSet<>(first.finalPopulation().stream()
@@ -77,7 +79,8 @@ class EvolutionPopulationEngineTest {
                     EvolutionPopulationEngine.LineageEdge::parentGenomeHash,
                     Collectors.counting()));
             assertTrue(offspringPerParent.values().stream().allMatch(count ->
-                count <= fixture.plan().populationPolicy().maxOffspringPerLineage()));
+                count <= fixture.plan().populationPolicy()
+                    .maxOffspringPerLineage()));
         }
 
         String runJson = first.toCanonicalJson();
@@ -97,6 +100,11 @@ class EvolutionPopulationEngineTest {
             List.of(),
             List.of(new FeatureWeight(FitnessSignal.RUNTIME_COST, -100)),
             List.of(0, 1, 2, 3));
+        EvolutionGenome blockedSeed = fixture.seeds().stream()
+            .filter(genome -> genome.rewrites().getFirst().geneId()
+                .equals("remove_additive_zero"))
+            .findFirst()
+            .orElseThrow();
 
         var run = engine.run(
             fixture.plan(),
@@ -106,7 +114,7 @@ class EvolutionPopulationEngineTest {
                 Map<FitnessComponent, Integer> components = Map.of(
                     FitnessComponent.TRAIN_CASES_NEWLY_SOLVED, 500,
                     FitnessComponent.STRUCTURAL_DIVERSITY, 500);
-                if (!genome.seedGenomeHashes().isEmpty()) {
+                if (genome.contentHash().equals(blockedSeed.contentHash())) {
                     return EvolutionPopulationEngine.TrainFitness.blocked(
                         components,
                         "SYNTHETIC_HARD_BLOCKER");
@@ -117,7 +125,8 @@ class EvolutionPopulationEngineTest {
         assertTrue(run.generationReports().stream()
             .flatMap(report -> report.candidates().stream())
             .anyMatch(candidate ->
-                candidate.blockers().contains("SYNTHETIC_HARD_BLOCKER")
+                candidate.genomeHash().equals(blockedSeed.contentHash())
+                    && candidate.blockers().contains("SYNTHETIC_HARD_BLOCKER")
                     && candidate.weightedScorePermille() == 0));
         assertTrue(run.generationReports().stream()
             .flatMap(report -> report.acceptedLineage().stream())
@@ -127,8 +136,8 @@ class EvolutionPopulationEngineTest {
             .flatMap(report -> report.rejectedMutations().stream())
             .anyMatch(rejection -> rejection.blockers().stream().anyMatch(blocker ->
                 blocker.startsWith("MUTATION_KIND_NOT_PREREGISTERED:"))));
-        assertTrue(run.finalPopulation().stream().allMatch(genome ->
-            genome.seedGenomeHashes().isEmpty()));
+        assertTrue(run.finalPopulation().stream().noneMatch(genome ->
+            genome.contentHash().equals(blockedSeed.contentHash())));
     }
 
     @Test
