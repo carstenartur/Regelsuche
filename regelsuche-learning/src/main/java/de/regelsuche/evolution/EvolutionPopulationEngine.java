@@ -10,6 +10,7 @@ import de.regelsuche.evolution.EvolutionStudyPlan.FitnessWeight;
 import de.regelsuche.json.JsonWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,14 +28,13 @@ import java.util.concurrent.Future;
 /**
  * Deterministic, bounded TRAIN-only population orchestration.
  *
- * <p>The engine evaluates only the preregistered TRAIN fitness components. Hard
- * safety, leakage, correctness and evaluator failures remain blockers and are
- * never converted into negative scalar fitness. VALIDATION selection, FINAL
- * TEST evaluation, proof, novelty, promotion and Public Evidence are outside
- * this class and require separate versioned artifacts.</p>
+ * <p>Fitness is not proof, novelty or promotion. The engine never receives
+ * VALIDATION or FINAL TEST cases and retains hard blockers separately from the
+ * preregistered scalar selection profile.</p>
  */
 public final class EvolutionPopulationEngine {
-    public static final String RUN_SCHEMA = "regelsuche.evolution-population-run/v1";
+    public static final String RUN_SCHEMA =
+        "regelsuche.evolution-population-run/v1";
     public static final String GENERATION_SCHEMA =
         "regelsuche.evolution-generation-report/v1";
     private static final int MAX_GENERATED_POOL_MULTIPLIER = 2;
@@ -49,7 +49,7 @@ public final class EvolutionPopulationEngine {
         this.mutator = Objects.requireNonNull(mutator, "mutator");
     }
 
-    /** Executes the preregistered number of TRAIN population generations. */
+    /** Executes the frozen number of TRAIN generations. */
     public PopulationRun run(
         EvolutionStudyPlan plan,
         List<EvolutionGenome> seedGenomes,
@@ -59,139 +59,132 @@ public final class EvolutionPopulationEngine {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(mutationCatalog, "mutationCatalog");
         Objects.requireNonNull(evaluator, "evaluator");
+
         List<EvolutionGenome> population = validateSeeds(plan, seedGenomes);
-        BudgetLedger ledger = new BudgetLedger();
-        Map<String, CandidateEvaluation> evaluationCache = new HashMap<>();
+        Map<String, CandidateEvaluation> evaluations = new HashMap<>();
+        BudgetLedger budget = new BudgetLedger();
         List<GenerationReport> reports = new ArrayList<>();
-        TerminalOutcome terminalOutcome = null;
+        TerminalOutcome terminal = null;
 
         for (int generation = 1;
                 generation <= plan.populationPolicy().generationCount();
                 generation++) {
-            evaluateCandidates(plan, population, evaluator, evaluationCache, ledger);
-            List<EvolutionGenome> rankedParents = rankEligible(population, evaluationCache);
-            if (rankedParents.isEmpty()) {
-                GenerationReport report = GenerationReport.create(
+            evaluate(plan, population, evaluator, evaluations, budget);
+            List<EvolutionGenome> parents = eligible(population, evaluations);
+            if (parents.isEmpty()) {
+                reports.add(GenerationReport.create(
                     generation,
-                    evaluations(population, evaluationCache),
+                    candidateEvaluations(population, evaluations),
                     List.of(),
                     List.of(),
                     List.of(),
                     0,
-                    ledger.mutationAttempts,
-                    ledger.trainEvaluations,
-                    GenerationOutcome.EXTINCT);
-                reports.add(report);
+                    budget.mutationAttempts,
+                    budget.trainEvaluations,
+                    GenerationOutcome.EXTINCT));
                 population = List.of();
-                terminalOutcome = TerminalOutcome.EXTINCT;
+                terminal = TerminalOutcome.EXTINCT;
                 break;
             }
 
-            MutationRound mutationRound = generateChildren(
+            MutationRound mutations = mutate(
                 plan,
                 generation,
-                rankedParents,
+                parents,
                 population,
                 mutationCatalog,
-                ledger);
-            evaluateCandidates(
-                plan,
-                mutationRound.children(),
-                evaluator,
-                evaluationCache,
-                ledger);
+                budget);
+            evaluate(plan, mutations.children(), evaluator, evaluations, budget);
 
-            List<EvolutionGenome> candidatePool = mergePopulation(
-                population,
-                mutationRound.children());
-            List<EvolutionGenome> selected = selectPopulation(
-                plan,
-                population,
-                candidatePool,
-                evaluationCache);
+            List<EvolutionGenome> pool = merge(population, mutations.children());
+            List<EvolutionGenome> selected = select(
+                plan, population, pool, evaluations);
             int distinctStructures = Math.toIntExact(selected.stream()
                 .map(EvolutionGenome::alphaStructuralHash)
                 .distinct()
                 .count());
-            GenerationOutcome outcome = determineOutcome(
+            GenerationOutcome outcome = outcome(
                 plan,
                 generation,
                 population,
                 selected,
-                mutationRound,
+                mutations,
                 distinctStructures,
-                ledger);
+                budget);
+
             reports.add(GenerationReport.create(
                 generation,
-                evaluations(candidatePool, evaluationCache),
+                candidateEvaluations(pool, evaluations),
                 selected.stream().map(EvolutionGenome::contentHash).toList(),
-                mutationRound.lineage(),
-                mutationRound.rejections(),
+                mutations.lineage(),
+                mutations.rejections(),
                 distinctStructures,
-                ledger.mutationAttempts,
-                ledger.trainEvaluations,
+                budget.mutationAttempts,
+                budget.trainEvaluations,
                 outcome));
             population = selected;
 
             if (outcome != GenerationOutcome.CONTINUE) {
-                terminalOutcome = outcome.toTerminalOutcome();
+                terminal = outcome.terminal();
                 break;
             }
         }
 
-        if (terminalOutcome == null) {
-            terminalOutcome = TerminalOutcome.COMPLETED;
+        if (terminal == null) {
+            terminal = TerminalOutcome.COMPLETED;
         }
         return PopulationRun.create(
             plan,
             seedGenomes,
             reports,
             population,
-            terminalOutcome,
-            ledger.mutationAttempts,
-            ledger.trainEvaluations);
+            terminal,
+            budget.mutationAttempts,
+            budget.trainEvaluations);
     }
 
-    private MutationRound generateChildren(
+    private MutationRound mutate(
         EvolutionStudyPlan plan,
         int generation,
-        List<EvolutionGenome> rankedParents,
+        List<EvolutionGenome> parents,
         List<EvolutionGenome> population,
-        MutationCatalog mutationCatalog,
-        BudgetLedger ledger
+        MutationCatalog catalog,
+        BudgetLedger budget
     ) {
         List<EvolutionGenome> children = new ArrayList<>();
         List<LineageEdge> lineage = new ArrayList<>();
         List<MutationRejection> rejections = new ArrayList<>();
-        Set<String> contentHashes = new LinkedHashSet<>();
-        Set<String> alphaHashes = new LinkedHashSet<>();
+        Set<String> genomeHashes = new LinkedHashSet<>();
+        Set<String> structureHashes = new LinkedHashSet<>();
         population.forEach(genome -> {
-            contentHashes.add(genome.contentHash());
-            alphaHashes.add(genome.alphaStructuralHash());
+            genomeHashes.add(genome.contentHash());
+            structureHashes.add(genome.alphaStructuralHash());
         });
+
+        Set<EvolutionMutationKind> permitted = Set.copyOf(
+            plan.mutationOperators());
         int poolLimit = Math.multiplyExact(
             plan.populationPolicy().populationSize(),
             MAX_GENERATED_POOL_MULTIPLIER);
-        Set<EvolutionMutationKind> permittedKinds = Set.copyOf(
-            plan.mutationOperators());
 
-        for (EvolutionGenome parent : rankedParents) {
-            int remainingAttempts = plan.budget().maxMutationAttempts()
-                - ledger.mutationAttempts;
-            if (remainingAttempts <= 0 || children.size() >= poolLimit) {
+        for (EvolutionGenome parent : parents) {
+            int remaining = plan.budget().maxMutationAttempts()
+                - budget.mutationAttempts;
+            if (remaining <= 0 || children.size() >= poolLimit) {
                 break;
             }
-            int maxProposals = Math.min(128, remainingAttempts);
+
+            int maxProposals = Math.min(128, remaining);
             int maxAccepted = Math.min(
                 plan.populationPolicy().maxOffspringPerLineage(),
                 maxProposals);
             MutationBatch batch = mutator.mutate(
                 parent,
-                mutationCatalog,
+                catalog,
                 mutationSeed(plan.contentHash(), generation, parent.contentHash()),
                 new MutationLimits(maxProposals, maxAccepted));
-            ledger.mutationAttempts = Math.addExact(
-                ledger.mutationAttempts,
+            budget.mutationAttempts = Math.addExact(
+                budget.mutationAttempts,
                 batch.attempts().size());
 
             int acceptedIndex = 0;
@@ -201,15 +194,17 @@ public final class EvolutionPopulationEngine {
                         parent.contentHash(), attempt, attempt.blockers()));
                     continue;
                 }
+
                 EvolutionGenome child = batch.acceptedChildren().get(acceptedIndex++);
                 List<String> blockers = new ArrayList<>();
-                if (!permittedKinds.contains(attempt.kind())) {
-                    blockers.add("MUTATION_KIND_NOT_PREREGISTERED:" + attempt.kind());
+                if (!permitted.contains(attempt.kind())) {
+                    blockers.add(
+                        "MUTATION_KIND_NOT_PREREGISTERED:" + attempt.kind());
                 }
-                if (contentHashes.contains(child.contentHash())) {
+                if (genomeHashes.contains(child.contentHash())) {
                     blockers.add("DUPLICATE_GENOME:contentHash");
                 }
-                if (alphaHashes.contains(child.alphaStructuralHash())) {
+                if (structureHashes.contains(child.alphaStructuralHash())) {
                     blockers.add(
                         "STRUCTURAL_DIVERSITY_DUPLICATE:populationAlphaStructuralHash");
                 }
@@ -218,8 +213,9 @@ public final class EvolutionPopulationEngine {
                         parent.contentHash(), attempt, blockers));
                     continue;
                 }
-                contentHashes.add(child.contentHash());
-                alphaHashes.add(child.alphaStructuralHash());
+
+                genomeHashes.add(child.contentHash());
+                structureHashes.add(child.alphaStructuralHash());
                 children.add(child);
                 lineage.add(new LineageEdge(
                     parent.contentHash(),
@@ -232,15 +228,15 @@ public final class EvolutionPopulationEngine {
                 }
             }
         }
-        return new MutationRound(children, lineage, rejections);
+        return MutationRound.create(children, lineage, rejections);
     }
 
-    private static void evaluateCandidates(
+    private static void evaluate(
         EvolutionStudyPlan plan,
         Collection<EvolutionGenome> candidates,
         TrainFitnessEvaluator evaluator,
         Map<String, CandidateEvaluation> cache,
-        BudgetLedger ledger
+        BudgetLedger budget
     ) {
         List<EvolutionGenome> pending = candidates.stream()
             .filter(candidate -> !cache.containsKey(candidate.contentHash()))
@@ -250,19 +246,18 @@ public final class EvolutionPopulationEngine {
             return;
         }
 
-        int available = Math.max(0,
-            plan.budget().maxTrainEvaluations() - ledger.trainEvaluations);
-        int evaluatedCount = Math.min(available, pending.size());
-        List<EvolutionGenome> evaluated = pending.subList(0, evaluatedCount);
-        List<CandidateEvaluation> results = parallelEvaluate(plan, evaluated, evaluator);
-        for (int index = 0; index < evaluated.size(); index++) {
-            cache.put(evaluated.get(index).contentHash(), results.get(index));
+        int remaining = Math.max(0,
+            plan.budget().maxTrainEvaluations() - budget.trainEvaluations);
+        int count = Math.min(remaining, pending.size());
+        List<EvolutionGenome> executable = pending.subList(0, count);
+        List<CandidateEvaluation> completed = evaluateParallel(
+            plan, executable, evaluator);
+        for (int index = 0; index < executable.size(); index++) {
+            cache.put(executable.get(index).contentHash(), completed.get(index));
         }
-        ledger.trainEvaluations = Math.addExact(
-            ledger.trainEvaluations,
-            evaluatedCount);
+        budget.trainEvaluations = Math.addExact(budget.trainEvaluations, count);
 
-        for (int index = evaluatedCount; index < pending.size(); index++) {
+        for (int index = count; index < pending.size(); index++) {
             EvolutionGenome candidate = pending.get(index);
             cache.put(candidate.contentHash(), CandidateEvaluation.blocked(
                 candidate,
@@ -271,7 +266,7 @@ public final class EvolutionPopulationEngine {
         }
     }
 
-    private static List<CandidateEvaluation> parallelEvaluate(
+    private static List<CandidateEvaluation> evaluateParallel(
         EvolutionStudyPlan plan,
         List<EvolutionGenome> candidates,
         TrainFitnessEvaluator evaluator
@@ -287,27 +282,27 @@ public final class EvolutionPopulationEngine {
             List<Future<TrainFitness>> futures = candidates.stream()
                 .map(candidate -> executor.submit(() -> evaluator.evaluate(candidate)))
                 .toList();
-            List<CandidateEvaluation> results = new ArrayList<>();
+            List<CandidateEvaluation> result = new ArrayList<>();
             for (int index = 0; index < candidates.size(); index++) {
                 EvolutionGenome candidate = candidates.get(index);
                 try {
-                    TrainFitness fitness = futures.get(index).get();
-                    results.add(toEvaluation(plan, candidate, fitness));
+                    result.add(toEvaluation(
+                        plan, candidate, futures.get(index).get()));
                 } catch (InterruptedException exception) {
                     Thread.currentThread().interrupt();
-                    results.add(CandidateEvaluation.blocked(
+                    result.add(CandidateEvaluation.blocked(
                         candidate,
                         Map.of(),
                         List.of("TRAIN_EVALUATION_INTERRUPTED")));
                 } catch (ExecutionException exception) {
-                    results.add(CandidateEvaluation.blocked(
+                    result.add(CandidateEvaluation.blocked(
                         candidate,
                         Map.of(),
                         List.of("TRAIN_EVALUATION_FAILED:"
                             + stableFailure(exception.getCause()))));
                 }
             }
-            return List.copyOf(results);
+            return List.copyOf(result);
         } finally {
             executor.shutdownNow();
         }
@@ -324,106 +319,105 @@ public final class EvolutionPopulationEngine {
                 Map.of(),
                 List.of("TRAIN_EVALUATOR_RETURNED_NULL"));
         }
+
         Map<FitnessComponent, Integer> components = fitness.components();
         List<String> blockers = new ArrayList<>(fitness.blockers());
         Set<FitnessComponent> declared = plan.fitnessWeights().stream()
             .map(FitnessWeight::component)
             .collect(java.util.stream.Collectors.toSet());
-        for (FitnessComponent component : declared) {
-            if (!components.containsKey(component)) {
-                blockers.add("MISSING_FITNESS_COMPONENT:" + component);
-            }
-        }
-        for (FitnessComponent component : components.keySet()) {
-            if (!declared.contains(component)) {
-                blockers.add("UNDECLARED_FITNESS_COMPONENT:" + component);
-            }
-        }
-        blockers = blockers.stream().distinct().sorted().toList();
+        declared.stream()
+            .filter(component -> !components.containsKey(component))
+            .forEach(component -> blockers.add(
+                "MISSING_FITNESS_COMPONENT:" + component));
+        components.keySet().stream()
+            .filter(component -> !declared.contains(component))
+            .forEach(component -> blockers.add(
+                "UNDECLARED_FITNESS_COMPONENT:" + component));
+        blockers = canonicalStrings(blockers);
         if (!blockers.isEmpty()) {
             return CandidateEvaluation.blocked(candidate, components, blockers);
         }
-        long weighted = 0;
+
+        long weighted = 0L;
         for (FitnessWeight weight : plan.fitnessWeights()) {
-            weighted = Math.addExact(
-                weighted,
-                Math.multiplyExact(
-                    components.get(weight.component()).longValue(),
-                    weight.weightPermille()));
+            weighted = Math.addExact(weighted, Math.multiplyExact(
+                components.get(weight.component()).longValue(),
+                weight.weightPermille()));
         }
-        int score = Math.toIntExact(weighted / 1000L);
-        return CandidateEvaluation.accepted(candidate, components, score);
+        return CandidateEvaluation.accepted(
+            candidate,
+            components,
+            Math.toIntExact(weighted / 1000L));
     }
 
-    private static List<EvolutionGenome> selectPopulation(
+    private static List<EvolutionGenome> select(
         EvolutionStudyPlan plan,
         List<EvolutionGenome> current,
-        List<EvolutionGenome> candidatePool,
-        Map<String, CandidateEvaluation> cache
+        List<EvolutionGenome> pool,
+        Map<String, CandidateEvaluation> evaluations
     ) {
-        Comparator<EvolutionGenome> ranking = ranking(cache);
-        List<EvolutionGenome> selected = new ArrayList<>();
-        Set<String> selectedHashes = new HashSet<>();
-        Set<String> selectedStructures = new HashSet<>();
+        Comparator<EvolutionGenome> ranking = ranking(evaluations);
+        List<EvolutionGenome> result = new ArrayList<>();
+        Set<String> genomeHashes = new HashSet<>();
+        Set<String> structures = new HashSet<>();
 
         current.stream()
-            .filter(genome -> cache.get(genome.contentHash()).accepted())
+            .filter(genome -> evaluations.get(genome.contentHash()).accepted())
             .sorted(ranking)
             .limit(plan.populationPolicy().eliteCount())
-            .forEach(genome -> addIfUnique(
-                selected, selectedHashes, selectedStructures, genome));
-
-        candidatePool.stream()
-            .filter(genome -> cache.get(genome.contentHash()).accepted())
+            .forEach(genome -> addUnique(
+                result, genomeHashes, structures, genome));
+        pool.stream()
+            .filter(genome -> evaluations.get(genome.contentHash()).accepted())
             .sorted(ranking)
             .forEach(genome -> {
-                if (selected.size() < plan.populationPolicy().populationSize()) {
-                    addIfUnique(selected, selectedHashes, selectedStructures, genome);
+                if (result.size() < plan.populationPolicy().populationSize()) {
+                    addUnique(result, genomeHashes, structures, genome);
                 }
             });
-        return List.copyOf(selected);
+        return List.copyOf(result);
     }
 
-    private static void addIfUnique(
-        List<EvolutionGenome> selected,
-        Set<String> hashes,
+    private static void addUnique(
+        List<EvolutionGenome> result,
+        Set<String> genomeHashes,
         Set<String> structures,
         EvolutionGenome genome
     ) {
-        if (hashes.add(genome.contentHash())
+        if (genomeHashes.add(genome.contentHash())
                 && structures.add(genome.alphaStructuralHash())) {
-            selected.add(genome);
+            result.add(genome);
         }
     }
 
+    private static List<EvolutionGenome> eligible(
+        List<EvolutionGenome> population,
+        Map<String, CandidateEvaluation> evaluations
+    ) {
+        return population.stream()
+            .filter(genome -> evaluations.get(genome.contentHash()).accepted())
+            .sorted(ranking(evaluations))
+            .toList();
+    }
+
     private static Comparator<EvolutionGenome> ranking(
-        Map<String, CandidateEvaluation> cache
+        Map<String, CandidateEvaluation> evaluations
     ) {
         return Comparator
-            .comparingInt((EvolutionGenome genome) ->
-                cache.get(genome.contentHash()).weightedScorePermille())
+            .comparingInt((EvolutionGenome genome) -> evaluations
+                .get(genome.contentHash()).weightedScorePermille())
             .reversed()
             .thenComparing(EvolutionGenome::contentHash);
     }
 
-    private static List<EvolutionGenome> rankEligible(
-        List<EvolutionGenome> population,
-        Map<String, CandidateEvaluation> cache
-    ) {
-        return population.stream()
-            .filter(genome -> cache.get(genome.contentHash()).accepted())
-            .sorted(ranking(cache))
-            .toList();
-    }
-
-    private static GenerationOutcome determineOutcome(
+    private static GenerationOutcome outcome(
         EvolutionStudyPlan plan,
         int generation,
         List<EvolutionGenome> previous,
         List<EvolutionGenome> selected,
-        MutationRound mutationRound,
+        MutationRound mutations,
         int distinctStructures,
-        BudgetLedger ledger
+        BudgetLedger budget
     ) {
         if (selected.isEmpty()) {
             return GenerationOutcome.EXTINCT;
@@ -435,20 +429,19 @@ public final class EvolutionPopulationEngine {
         if (generation >= plan.populationPolicy().generationCount()) {
             return GenerationOutcome.COMPLETED;
         }
-        if (ledger.trainEvaluations >= plan.budget().maxTrainEvaluations()) {
+        if (budget.trainEvaluations >= plan.budget().maxTrainEvaluations()) {
             return GenerationOutcome.TRAIN_EVALUATION_BUDGET_EXHAUSTED;
         }
-        if (ledger.mutationAttempts >= plan.budget().maxMutationAttempts()) {
+        if (budget.mutationAttempts >= plan.budget().maxMutationAttempts()) {
             return GenerationOutcome.MUTATION_BUDGET_EXHAUSTED;
         }
-        List<String> previousHashes = previous.stream()
+        List<String> oldHashes = previous.stream()
             .map(EvolutionGenome::contentHash)
             .toList();
-        List<String> selectedHashes = selected.stream()
+        List<String> newHashes = selected.stream()
             .map(EvolutionGenome::contentHash)
             .toList();
-        if (mutationRound.children().isEmpty()
-                || previousHashes.equals(selectedHashes)) {
+        if (mutations.children().isEmpty() || oldHashes.equals(newHashes)) {
             return GenerationOutcome.STAGNATED;
         }
         if (selected.size() < plan.populationPolicy().populationSize()) {
@@ -457,26 +450,23 @@ public final class EvolutionPopulationEngine {
         return GenerationOutcome.CONTINUE;
     }
 
-    private static List<EvolutionGenome> mergePopulation(
+    private static List<EvolutionGenome> merge(
         List<EvolutionGenome> current,
         List<EvolutionGenome> children
     ) {
         Map<String, EvolutionGenome> result = new LinkedHashMap<>();
-        current.stream()
-            .sorted(Comparator.comparing(EvolutionGenome::contentHash))
-            .forEach(genome -> result.put(genome.contentHash(), genome));
-        children.stream()
+        java.util.stream.Stream.concat(current.stream(), children.stream())
             .sorted(Comparator.comparing(EvolutionGenome::contentHash))
             .forEach(genome -> result.putIfAbsent(genome.contentHash(), genome));
         return List.copyOf(result.values());
     }
 
-    private static List<CandidateEvaluation> evaluations(
-        List<EvolutionGenome> candidates,
-        Map<String, CandidateEvaluation> cache
+    private static List<CandidateEvaluation> candidateEvaluations(
+        Collection<EvolutionGenome> candidates,
+        Map<String, CandidateEvaluation> evaluations
     ) {
         return candidates.stream()
-            .map(genome -> cache.get(genome.contentHash()))
+            .map(genome -> evaluations.get(genome.contentHash()))
             .filter(Objects::nonNull)
             .sorted(Comparator.comparing(CandidateEvaluation::genomeHash))
             .toList();
@@ -490,17 +480,20 @@ public final class EvolutionPopulationEngine {
         if (seeds.isEmpty()) {
             throw new IllegalArgumentException("seedGenomes must not be empty");
         }
-        List<EvolutionGenome> normalized = seeds.stream()
+        List<EvolutionGenome> result = seeds.stream()
             .map(seed -> Objects.requireNonNull(seed, "seed genome"))
             .sorted(Comparator.comparing(EvolutionGenome::contentHash))
             .toList();
-        if (normalized.size() > plan.populationPolicy().populationSize()) {
-            throw new IllegalArgumentException("seed population exceeds populationSize");
+        if (result.size() > plan.populationPolicy().populationSize()) {
+            throw new IllegalArgumentException(
+                "seed population exceeds populationSize");
         }
-        if (normalized.stream().anyMatch(seed -> seed.objective() != plan.objective())) {
-            throw new IllegalArgumentException("seed objective differs from study plan");
+        if (result.stream().anyMatch(seed ->
+                seed.objective() != plan.objective())) {
+            throw new IllegalArgumentException(
+                "seed objective differs from study plan");
         }
-        List<String> hashes = normalized.stream()
+        List<String> hashes = result.stream()
             .map(EvolutionGenome::contentHash)
             .toList();
         if (!hashes.equals(plan.seedGenomeHashes())) {
@@ -510,14 +503,12 @@ public final class EvolutionPopulationEngine {
         if (new HashSet<>(hashes).size() != hashes.size()) {
             throw new IllegalArgumentException("seed genomes must be unique");
         }
-        long structures = normalized.stream()
-            .map(EvolutionGenome::alphaStructuralHash)
-            .distinct()
-            .count();
-        if (structures != normalized.size()) {
-            throw new IllegalArgumentException("seed genomes must be alpha-unique");
+        if (result.stream().map(EvolutionGenome::alphaStructuralHash)
+                .distinct().count() != result.size()) {
+            throw new IllegalArgumentException(
+                "seed genomes must be alpha-unique");
         }
-        return List.copyOf(normalized);
+        return List.copyOf(result);
     }
 
     private static long mutationSeed(
@@ -529,7 +520,8 @@ public final class EvolutionPopulationEngine {
             "regelsuche.evolution-mutation-seed/v1\nplan=" + planHash
                 + "\ngeneration=" + generation
                 + "\nparent=" + parentHash);
-        return Long.parseUnsignedLong(hash.substring("sha256:".length(), 23), 16);
+        return Long.parseUnsignedLong(
+            hash.substring("sha256:".length(), 23), 16);
     }
 
     private static String stableFailure(Throwable failure) {
@@ -543,23 +535,24 @@ public final class EvolutionPopulationEngine {
                 : ":" + message.replaceAll("\\s+", " ").trim());
     }
 
-    /** TRAIN-only evaluator. It must not inspect VALIDATION or FINAL TEST data. */
     @FunctionalInterface
     public interface TrainFitnessEvaluator {
         TrainFitness evaluate(EvolutionGenome genome);
     }
 
-    /** Raw, named TRAIN components and hard blockers returned by an evaluator. */
+    /** Raw named TRAIN components plus fail-closed blockers. */
     public record TrainFitness(
         Map<FitnessComponent, Integer> components,
         List<String> blockers
     ) {
         public TrainFitness {
-            components = normalizeComponents(components);
-            blockers = normalizeStrings(blockers);
+            components = canonicalComponents(components);
+            blockers = canonicalStrings(blockers);
         }
 
-        public static TrainFitness scored(Map<FitnessComponent, Integer> components) {
+        public static TrainFitness scored(
+            Map<FitnessComponent, Integer> components
+        ) {
             return new TrainFitness(components, List.of());
         }
 
@@ -576,7 +569,6 @@ public final class EvolutionPopulationEngine {
         BLOCKED
     }
 
-    /** A candidate's retained raw components and derived scalar selection score. */
     public record CandidateEvaluation(
         String genomeHash,
         String alphaStructuralHash,
@@ -588,15 +580,15 @@ public final class EvolutionPopulationEngine {
         public CandidateEvaluation {
             EvolutionGenome.requireSha256(genomeHash, "genomeHash");
             EvolutionGenome.requireSha256(
-                alphaStructuralHash,
-                "alphaStructuralHash");
-            rawComponents = normalizeComponents(rawComponents);
-            if (weightedScorePermille < -1000 || weightedScorePermille > 1000) {
+                alphaStructuralHash, "alphaStructuralHash");
+            rawComponents = canonicalComponents(rawComponents);
+            if (weightedScorePermille < -1000
+                    || weightedScorePermille > 1000) {
                 throw new IllegalArgumentException(
                     "weightedScorePermille must be in [-1000,1000]");
             }
             Objects.requireNonNull(status, "status");
-            blockers = normalizeStrings(blockers);
+            blockers = canonicalStrings(blockers);
             if (status == EvaluationStatus.ACCEPTED && !blockers.isEmpty()) {
                 throw new IllegalArgumentException(
                     "accepted candidate cannot have blockers");
@@ -640,7 +632,6 @@ public final class EvolutionPopulationEngine {
         }
     }
 
-    /** Accepted parent-to-child relation retained independently of fitness. */
     public record LineageEdge(
         String parentGenomeHash,
         String childGenomeHash,
@@ -649,17 +640,16 @@ public final class EvolutionPopulationEngine {
         String proposalKey
     ) {
         public LineageEdge {
-            EvolutionGenome.requireSha256(parentGenomeHash, "parentGenomeHash");
+            EvolutionGenome.requireSha256(
+                parentGenomeHash, "parentGenomeHash");
             EvolutionGenome.requireSha256(childGenomeHash, "childGenomeHash");
             EvolutionGenome.requireSha256(
-                childAlphaStructuralHash,
-                "childAlphaStructuralHash");
+                childAlphaStructuralHash, "childAlphaStructuralHash");
             Objects.requireNonNull(mutationKind, "mutationKind");
             requireText(proposalKey, "proposalKey");
         }
     }
 
-    /** Pre-evaluation mutation rejection retained with stable blocker codes. */
     public record MutationRejection(
         String parentGenomeHash,
         int ordinal,
@@ -669,18 +659,21 @@ public final class EvolutionPopulationEngine {
         List<String> blockers
     ) {
         public MutationRejection {
-            EvolutionGenome.requireSha256(parentGenomeHash, "parentGenomeHash");
+            EvolutionGenome.requireSha256(
+                parentGenomeHash, "parentGenomeHash");
             if (ordinal < 1) {
                 throw new IllegalArgumentException("ordinal must be positive");
             }
             Objects.requireNonNull(mutationKind, "mutationKind");
             requireText(proposalKey, "proposalKey");
             if (childGenomeHash != null) {
-                EvolutionGenome.requireSha256(childGenomeHash, "childGenomeHash");
+                EvolutionGenome.requireSha256(
+                    childGenomeHash, "childGenomeHash");
             }
-            blockers = normalizeStrings(blockers);
+            blockers = canonicalStrings(blockers);
             if (blockers.isEmpty()) {
-                throw new IllegalArgumentException("mutation rejection requires blockers");
+                throw new IllegalArgumentException(
+                    "mutation rejection requires blockers");
             }
         }
 
@@ -708,7 +701,7 @@ public final class EvolutionPopulationEngine {
         MUTATION_BUDGET_EXHAUSTED,
         TRAIN_EVALUATION_BUDGET_EXHAUSTED;
 
-        TerminalOutcome toTerminalOutcome() {
+        TerminalOutcome terminal() {
             return switch (this) {
                 case CONTINUE -> throw new IllegalStateException(
                     "CONTINUE is not terminal");
@@ -734,7 +727,7 @@ public final class EvolutionPopulationEngine {
         TRAIN_EVALUATION_BUDGET_EXHAUSTED
     }
 
-    /** Canonical report for one population generation. */
+    /** Canonical evidence for one generation. */
     public record GenerationReport(
         String schema,
         int generation,
@@ -754,32 +747,14 @@ public final class EvolutionPopulationEngine {
                     "unsupported generation-report schema");
             }
             if (generation < 1) {
-                throw new IllegalArgumentException("generation must be positive");
+                throw new IllegalArgumentException(
+                    "generation must be positive");
             }
-            candidates = candidates == null
-                ? List.of()
-                : candidates.stream()
-                    .map(item -> Objects.requireNonNull(item, "candidate"))
-                    .sorted(Comparator.comparing(CandidateEvaluation::genomeHash))
-                    .toList();
-            selectedGenomeHashes = normalizeHashes(selectedGenomeHashes);
-            acceptedLineage = acceptedLineage == null
-                ? List.of()
-                : acceptedLineage.stream()
-                    .map(item -> Objects.requireNonNull(item, "lineage edge"))
-                    .sorted(Comparator
-                        .comparing(LineageEdge::parentGenomeHash)
-                        .thenComparing(LineageEdge::childGenomeHash))
-                    .toList();
-            rejectedMutations = rejectedMutations == null
-                ? List.of()
-                : rejectedMutations.stream()
-                    .map(item -> Objects.requireNonNull(item, "rejection"))
-                    .sorted(Comparator
-                        .comparing(MutationRejection::parentGenomeHash)
-                        .thenComparingInt(MutationRejection::ordinal)
-                        .thenComparing(MutationRejection::proposalKey))
-                    .toList();
+            candidates = canonicalCandidates(candidates);
+            selectedGenomeHashes = canonicalHashes(
+                selectedGenomeHashes, false);
+            acceptedLineage = canonicalLineage(acceptedLineage);
+            rejectedMutations = canonicalRejections(rejectedMutations);
             if (distinctAlphaStructures < 0
                     || cumulativeMutationAttempts < 0
                     || cumulativeTrainEvaluations < 0) {
@@ -820,29 +795,36 @@ public final class EvolutionPopulationEngine {
             int trainEvaluations,
             GenerationOutcome outcome
         ) {
-            String payload = renderGeneration(
+            List<CandidateEvaluation> canonicalCandidates =
+                canonicalCandidates(candidates);
+            List<String> canonicalSelected = canonicalHashes(
+                selectedGenomeHashes, false);
+            List<LineageEdge> canonicalLineage = canonicalLineage(lineage);
+            List<MutationRejection> canonicalRejections =
+                canonicalRejections(rejections);
+            String hash = EvolutionGenome.hash(renderGeneration(
                 generation,
-                candidates,
-                selectedGenomeHashes,
-                lineage,
-                rejections,
+                canonicalCandidates,
+                canonicalSelected,
+                canonicalLineage,
+                canonicalRejections,
                 distinctStructures,
                 mutationAttempts,
                 trainEvaluations,
                 outcome,
-                null);
+                null));
             return new GenerationReport(
                 GENERATION_SCHEMA,
                 generation,
-                candidates,
-                selectedGenomeHashes,
-                lineage,
-                rejections,
+                canonicalCandidates,
+                canonicalSelected,
+                canonicalLineage,
+                canonicalRejections,
                 distinctStructures,
                 mutationAttempts,
                 trainEvaluations,
                 outcome,
-                EvolutionGenome.hash(payload));
+                hash);
         }
 
         public String toCanonicalJson() {
@@ -860,7 +842,7 @@ public final class EvolutionPopulationEngine {
         }
     }
 
-    /** Root identity for a deterministic TRAIN population execution. */
+    /** Root identity for one TRAIN-only population execution. */
     public record PopulationRun(
         String schema,
         String studyPlanHash,
@@ -878,35 +860,19 @@ public final class EvolutionPopulationEngine {
                     "unsupported population-run schema");
             }
             EvolutionGenome.requireSha256(studyPlanHash, "studyPlanHash");
-            seedGenomeHashes = normalizeHashes(seedGenomeHashes);
-            generationReports = generationReports == null
-                ? List.of()
-                : generationReports.stream()
-                    .map(item -> Objects.requireNonNull(item, "generation report"))
-                    .sorted(Comparator.comparingInt(GenerationReport::generation))
-                    .toList();
-            for (int index = 0; index < generationReports.size(); index++) {
-                if (generationReports.get(index).generation() != index + 1) {
-                    throw new IllegalArgumentException(
-                        "generation reports must be contiguous");
-                }
-            }
-            finalPopulation = finalPopulation == null
-                ? List.of()
-                : finalPopulation.stream()
-                    .map(item -> Objects.requireNonNull(item, "final genome"))
-                    .toList();
-            long distinctFinalStructures = finalPopulation.stream()
-                .map(EvolutionGenome::alphaStructuralHash)
-                .distinct()
-                .count();
-            if (distinctFinalStructures != finalPopulation.size()) {
+            seedGenomeHashes = canonicalHashes(seedGenomeHashes, true);
+            generationReports = canonicalReports(generationReports);
+            finalPopulation = canonicalPopulation(finalPopulation);
+            if (mutationAttempts < 0 || trainEvaluations < 0) {
                 throw new IllegalArgumentException(
-                    "final population must be alpha-structurally unique");
+                    "run counts must be non-negative");
             }
             Objects.requireNonNull(terminalOutcome, "terminalOutcome");
-            if (mutationAttempts < 0 || trainEvaluations < 0) {
-                throw new IllegalArgumentException("run counts must be non-negative");
+            if (finalPopulation.stream()
+                    .map(EvolutionGenome::alphaStructuralHash)
+                    .distinct().count() != finalPopulation.size()) {
+                throw new IllegalArgumentException(
+                    "final population must be alpha-structurally unique");
             }
             EvolutionGenome.requireSha256(contentHash, "contentHash");
             String expected = EvolutionGenome.hash(renderRun(
@@ -929,33 +895,34 @@ public final class EvolutionPopulationEngine {
             List<EvolutionGenome> seeds,
             List<GenerationReport> reports,
             List<EvolutionGenome> finalPopulation,
-            TerminalOutcome terminalOutcome,
+            TerminalOutcome outcome,
             int mutationAttempts,
             int trainEvaluations
         ) {
-            List<String> seedHashes = seeds.stream()
-                .map(EvolutionGenome::contentHash)
-                .sorted()
-                .toList();
-            String payload = renderRun(
+            List<String> seedHashes = canonicalHashes(seeds.stream()
+                .map(EvolutionGenome::contentHash).toList(), true);
+            List<GenerationReport> canonicalReports = canonicalReports(reports);
+            List<EvolutionGenome> canonicalPopulation =
+                canonicalPopulation(finalPopulation);
+            String hash = EvolutionGenome.hash(renderRun(
                 plan.contentHash(),
                 seedHashes,
-                reports,
-                finalPopulation,
-                terminalOutcome,
+                canonicalReports,
+                canonicalPopulation,
+                outcome,
                 mutationAttempts,
                 trainEvaluations,
-                null);
+                null));
             return new PopulationRun(
                 RUN_SCHEMA,
                 plan.contentHash(),
                 seedHashes,
-                reports,
-                finalPopulation,
-                terminalOutcome,
+                canonicalReports,
+                canonicalPopulation,
+                outcome,
                 mutationAttempts,
                 trainEvaluations,
-                EvolutionGenome.hash(payload));
+                hash);
         }
 
         public String toCanonicalJson() {
@@ -1056,15 +1023,12 @@ public final class EvolutionPopulationEngine {
             .property("studyPlanHash", studyPlanHash)
             .stringArray("seedGenomeHashes", seedHashes)
             .stringArray("generationReportHashes", reports.stream()
-                .map(GenerationReport::contentHash)
-                .toList())
+                .map(GenerationReport::contentHash).toList())
             .stringArray("finalPopulationGenomeHashes", finalPopulation.stream()
-                .map(EvolutionGenome::contentHash)
-                .toList())
+                .map(EvolutionGenome::contentHash).toList())
             .stringArray("finalPopulationAlphaStructuralHashes",
                 finalPopulation.stream()
-                    .map(EvolutionGenome::alphaStructuralHash)
-                    .toList())
+                    .map(EvolutionGenome::alphaStructuralHash).toList())
             .property("terminalOutcome", outcome.name())
             .object("budgetUsed", object -> object
                 .property("mutationAttempts", mutationAttempts)
@@ -1081,22 +1045,20 @@ public final class EvolutionPopulationEngine {
         return json.endObject().toString();
     }
 
-    private static Map<FitnessComponent, Integer> normalizeComponents(
+    private static Map<FitnessComponent, Integer> canonicalComponents(
         Map<FitnessComponent, Integer> components
     ) {
         if (components == null || components.isEmpty()) {
             return Map.of();
         }
-        Map<FitnessComponent, Integer> result = new LinkedHashMap<>();
+        LinkedHashMap<FitnessComponent, Integer> result = new LinkedHashMap<>();
         components.entrySet().stream()
-            .sorted(Map.Entry.comparingByKey(Comparator.comparing(Enum::name)))
+            .sorted(Comparator.comparing(entry -> entry.getKey().name()))
             .forEach(entry -> {
                 FitnessComponent component = Objects.requireNonNull(
-                    entry.getKey(),
-                    "fitness component");
+                    entry.getKey(), "fitness component");
                 Integer value = Objects.requireNonNull(
-                    entry.getValue(),
-                    "fitness component value");
+                    entry.getValue(), "fitness component value");
                 if (value < -1000 || value > 1000) {
                     throw new IllegalArgumentException(
                         "fitness component must be in [-1000,1000]: "
@@ -1104,10 +1066,10 @@ public final class EvolutionPopulationEngine {
                 }
                 result.put(component, value);
             });
-        return Map.copyOf(result);
+        return Collections.unmodifiableMap(result);
     }
 
-    private static List<String> normalizeStrings(List<String> values) {
+    private static List<String> canonicalStrings(List<String> values) {
         if (values == null) {
             return List.of();
         }
@@ -1118,7 +1080,10 @@ public final class EvolutionPopulationEngine {
             .toList();
     }
 
-    private static List<String> normalizeHashes(List<String> values) {
+    private static List<String> canonicalHashes(
+        List<String> values,
+        boolean sort
+    ) {
         if (values == null) {
             return List.of();
         }
@@ -1127,12 +1092,80 @@ public final class EvolutionPopulationEngine {
                 EvolutionGenome.requireSha256(value, "hash");
                 return value;
             })
-            .distinct()
             .toList();
-        if (result.size() != values.size()) {
+        if (new HashSet<>(result).size() != result.size()) {
             throw new IllegalArgumentException("hashes must be unique");
         }
-        return List.copyOf(result);
+        return sort ? result.stream().sorted().toList() : List.copyOf(result);
+    }
+
+    private static List<CandidateEvaluation> canonicalCandidates(
+        List<CandidateEvaluation> values
+    ) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+            .map(value -> Objects.requireNonNull(value, "candidate"))
+            .sorted(Comparator.comparing(CandidateEvaluation::genomeHash))
+            .toList();
+    }
+
+    private static List<LineageEdge> canonicalLineage(
+        List<LineageEdge> values
+    ) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+            .map(value -> Objects.requireNonNull(value, "lineage edge"))
+            .sorted(Comparator.comparing(LineageEdge::parentGenomeHash)
+                .thenComparing(LineageEdge::childGenomeHash))
+            .toList();
+    }
+
+    private static List<MutationRejection> canonicalRejections(
+        List<MutationRejection> values
+    ) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+            .map(value -> Objects.requireNonNull(value, "rejection"))
+            .sorted(Comparator.comparing(MutationRejection::parentGenomeHash)
+                .thenComparingInt(MutationRejection::ordinal)
+                .thenComparing(MutationRejection::proposalKey))
+            .toList();
+    }
+
+    private static List<GenerationReport> canonicalReports(
+        List<GenerationReport> values
+    ) {
+        if (values == null) {
+            return List.of();
+        }
+        List<GenerationReport> result = values.stream()
+            .map(value -> Objects.requireNonNull(value, "generation report"))
+            .sorted(Comparator.comparingInt(GenerationReport::generation))
+            .toList();
+        for (int index = 0; index < result.size(); index++) {
+            if (result.get(index).generation() != index + 1) {
+                throw new IllegalArgumentException(
+                    "generation reports must be contiguous");
+            }
+        }
+        return result;
+    }
+
+    private static List<EvolutionGenome> canonicalPopulation(
+        List<EvolutionGenome> values
+    ) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+            .map(value -> Objects.requireNonNull(value, "final genome"))
+            .toList();
     }
 
     private static String requireText(String value, String name) {
@@ -1147,10 +1180,17 @@ public final class EvolutionPopulationEngine {
         List<LineageEdge> lineage,
         List<MutationRejection> rejections
     ) {
-        MutationRound {
-            children = List.copyOf(children);
-            lineage = List.copyOf(lineage);
-            rejections = List.copyOf(rejections);
+        static MutationRound create(
+            List<EvolutionGenome> children,
+            List<LineageEdge> lineage,
+            List<MutationRejection> rejections
+        ) {
+            return new MutationRound(
+                children.stream()
+                    .sorted(Comparator.comparing(EvolutionGenome::contentHash))
+                    .toList(),
+                canonicalLineage(lineage),
+                canonicalRejections(rejections));
         }
     }
 
