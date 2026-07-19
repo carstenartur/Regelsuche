@@ -6,27 +6,56 @@
  */
 
 pluginManagement {
-    def aiKnowledgeExtractor = file('../ai-knowledge-extractor')
-    if (aiKnowledgeExtractor.isDirectory()) {
-        includeBuild(aiKnowledgeExtractor)
+    def aiKnowledgeEnabled =
+        System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' ||
+        providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
+    def useLocalAiKnowledgeExtractor =
+        providers.gradleProperty('useLocalAiKnowledgeExtractor').orNull == 'true'
+    def aiKnowledgeExtractorVersion = providers
+        .gradleProperty('aiKnowledgeExtractorVersion')
+        .getOrElse('0.1.7')
+
+    if (useLocalAiKnowledgeExtractor) {
+        def checkout = file(providers
+            .gradleProperty('aiKnowledgeExtractorCheckout')
+            .getOrElse('../ai-knowledge-extractor'))
+        if (!checkout.isDirectory()) {
+            throw new GradleException(
+                "Local AI Knowledge Extractor checkout does not exist: ${checkout}")
+        }
+        includeBuild(checkout)
     }
+
+    plugins {
+        id 'org.aiknowledge.extractor' version aiKnowledgeExtractorVersion
+    }
+
     repositories {
         gradlePluginPortal()
         mavenCentral()
+        if (aiKnowledgeEnabled && !useLocalAiKnowledgeExtractor) {
+            maven {
+                name = 'AiKnowledgeGitHubPackages'
+                url = uri('https://maven.pkg.github.com/carstenartur/ai-knowledge-extractor')
+                credentials {
+                    username = providers.gradleProperty('gpr.user')
+                        .orElse(providers.environmentVariable('GITHUB_ACTOR'))
+                        .getOrElse('')
+                    password = providers.gradleProperty('gpr.key')
+                        .orElse(providers.environmentVariable('GITHUB_TOKEN'))
+                        .getOrElse('')
+                }
+                content {
+                    includeGroupByRegex 'org\\.aiknowledge(\\..*)?'
+                }
+            }
+        }
     }
 }
 
 plugins {
     // Apply the foojay-resolver plugin to allow automatic download of JDKs
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
-}
-
-gradle.beforeProject { candidate ->
-    if (candidate.path == ':') {
-        candidate.apply from: new File(
-            settingsDir,
-            'gradle/ai-knowledge-verification.gradle')
-    }
 }
 
 rootProject.name = 'Regelsuche'
@@ -50,3 +79,8 @@ include(
     'regelsuche-benchmarks',
     'app'
 )
+
+if (System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' ||
+        providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true') {
+    include 'ai-knowledge-verification'
+}
