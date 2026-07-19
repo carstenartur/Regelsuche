@@ -17,6 +17,10 @@ class EvolutionSchemaContractTest {
             "regelsuche-evolution-split-manifest-v1.schema.json");
         String study = readSchema(
             "regelsuche-evolution-study-plan-v1.schema.json");
+        String generation = readSchema(
+            "regelsuche-evolution-generation-report-v1.schema.json");
+        String population = readSchema(
+            "regelsuche-evolution-population-run-v1.schema.json");
 
         assertTrue(genome.contains("regelsuche.evolution-genome/v1"));
         assertTrue(genome.contains("\"const\": \"TRAIN\""));
@@ -36,11 +40,25 @@ class EvolutionSchemaContractTest {
                 kind.name());
             assertTrue(study.contains("\"" + kind.name() + "\""),
                 kind.name());
+            assertTrue(generation.contains("\"" + kind.name() + "\""),
+                kind.name());
         }
         for (EvolutionStudyPlan.FitnessComponent component :
                 EvolutionStudyPlan.FitnessComponent.values()) {
             assertTrue(study.contains("\"" + component.name() + "\""),
                 component.name());
+            assertTrue(generation.contains("\"" + component.name() + "\""),
+                component.name());
+        }
+        for (EvolutionPopulationEngine.GenerationOutcome outcome :
+                EvolutionPopulationEngine.GenerationOutcome.values()) {
+            assertTrue(generation.contains("\"" + outcome.name() + "\""),
+                outcome.name());
+        }
+        for (EvolutionPopulationEngine.TerminalOutcome outcome :
+                EvolutionPopulationEngine.TerminalOutcome.values()) {
+            assertTrue(population.contains("\"" + outcome.name() + "\""),
+                outcome.name());
         }
 
         assertTrue(split.contains("regelsuche.evolution-split-manifest/v1"));
@@ -51,6 +69,14 @@ class EvolutionSchemaContractTest {
         assertTrue(study.contains(
             "\"const\": \"ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION\""));
         assertTrue(study.contains("\"additionalProperties\": false"));
+        assertTrue(generation.contains(
+            "regelsuche.evolution-generation-report/v1"));
+        assertTrue(generation.contains("\"rawComponents\""));
+        assertTrue(generation.contains("\"additionalProperties\": false"));
+        assertTrue(population.contains("regelsuche.evolution-population-run/v1"));
+        assertTrue(population.contains("\"validationStatus\""));
+        assertTrue(population.contains("\"const\": \"NOT_EVALUATED\""));
+        assertTrue(population.contains("\"additionalProperties\": false"));
     }
 
     private static String readSchema(String fileName) throws Exception {

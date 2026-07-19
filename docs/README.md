@@ -15,6 +15,7 @@
 - [Verifikation generischer Domain-Discovery-Exporte](domain-discovery-export-verification.md) — größenbegrenzte, symlink-sichere Byte-Snapshots und fehlersicher sperrende Wurzelbindungen für persistierte Mehrdomänen-Evidence.
 - [Qualification für domänengenerische Discovery](domain-generic-qualification.md) — versioniertes, fehlersicher sperrendes Evidence Profile für drei reproduzierbare Läufe über Algebra- und Zahlenfolgen-Domänen.
 - [Evolution Study und Split Contracts](evolution-study-contracts.md) — preregistrierte TRAIN/VALIDATION/FINAL-TEST-Trennung, Populationspolitik und `NOT_STARTED`-Claimgrenze.
+- [Deterministische TRAIN-Populationen](evolution-population-engine.md) — begrenzte parallele Fitnessauswertung, Diversität, Lineage, harte Blocker und explizite Terminalzustände ohne VALIDATION-/FINAL-TEST-Zugriff.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
@@ -63,8 +64,11 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Verifikation generischer Domain-Discovery-Exporte](domain-discovery-export-verification.md)
 - [Qualification für domänengenerische Discovery](domain-generic-qualification.md)
 - [Evolution Study und Split Contracts](evolution-study-contracts.md)
+- [Deterministische TRAIN-Populationen](evolution-population-engine.md)
 - [Evolution-Split-Manifest-Schema v1](schemas/regelsuche-evolution-split-manifest-v1.schema.json)
 - [Evolution-Study-Plan-Schema v1](schemas/regelsuche-evolution-study-plan-v1.schema.json)
+- [Evolution-Generation-Report-Schema v1](schemas/regelsuche-evolution-generation-report-v1.schema.json)
+- [Evolution-Population-Run-Schema v1](schemas/regelsuche-evolution-population-run-v1.schema.json)
 - [Discovery-Domain-Descriptor-Schema v1](schemas/regelsuche-discovery-domain-descriptor-v1.schema.json)
 - [Domain-Discovery-Evidence-Schema v1](schemas/regelsuche-domain-discovery-evidence-v1.schema.json)
 - [Discovery-Lifecycle-Handoff-Schema v1](schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json)
