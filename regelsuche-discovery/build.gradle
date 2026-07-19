@@ -42,6 +42,51 @@ tasks.named('jacocoTestReport') {
     }
 }
 
+def repositoryRootDirectory = rootProject.layout.projectDirectory
+def domainExportVerifier = repositoryRootDirectory.file(
+    'scripts/verify-domain-discovery-export.py')
+def domainExportSchemas = [
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-discovery-domain-descriptor-v1.schema.json'),
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-domain-discovery-evidence-v1.schema.json'),
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-discovery-lifecycle-handoff-v1.schema.json'),
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-domain-discovery-export-v1.schema.json'),
+    repositoryRootDirectory.file(
+        'docs/schemas/regelsuche-domain-discovery-export-verification-v1.schema.json')
+]
+def verificationPython = providers.provider {
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(rootProject.layout.buildDirectory
+        .dir('verification-venv').get().asFile, executable)
+}
+
+def verifyDomainDiscoveryExportEvidence = tasks.register(
+    'verifyDomainDiscoveryExportEvidence',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies generic domain export schemas, bytes, roots and representation boundaries.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        tasks.named('test')
+    workingDir repositoryRootDirectory
+    inputs.file(domainExportVerifier)
+    inputs.files(domainExportSchemas)
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            domainExportVerifier.asFile.absolutePath,
+            '--repository-root', repositoryRootDirectory.asFile.absolutePath
+    }
+}
+
 tasks.named('check') {
-    dependsOn tasks.named('jacocoTestReport')
+    dependsOn tasks.named('jacocoTestReport'), verifyDomainDiscoveryExportEvidence
+}
+
+rootProject.tasks.named('check') {
+    dependsOn verifyDomainDiscoveryExportEvidence
 }
