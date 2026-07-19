@@ -42,6 +42,37 @@ tasks.named('jacocoTestReport') {
     }
 }
 
+def verificationPython = providers.provider {
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+        ? 'Scripts/python.exe'
+        : 'bin/python'
+    new File(rootProject.layout.buildDirectory.dir('verification-venv').get().asFile, executable)
+}
+
+def verifyDomainDiscoveryExport = tasks.register('verifyDomainDiscoveryExport', Exec) {
+    group = 'verification'
+    description = 'Validates retained domain-discovery export bytes, identities and receipts.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'), tasks.named('test')
+    workingDir rootProject.rootDir
+    inputs.file(rootProject.file('scripts/verify-domain-discovery-export.py'))
+    inputs.files(rootProject.fileTree('docs/schemas') {
+        include 'regelsuche-discovery-domain-descriptor-v1.schema.json'
+        include 'regelsuche-domain-discovery-evidence-v1.schema.json'
+        include 'regelsuche-discovery-lifecycle-handoff-v1.schema.json'
+        include 'regelsuche-domain-discovery-export-v1.schema.json'
+        include 'regelsuche-domain-discovery-export-verification-v1.schema.json'
+    })
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            rootProject.file('scripts/verify-domain-discovery-export.py').absolutePath
+    }
+}
+
 tasks.named('check') {
-    dependsOn tasks.named('jacocoTestReport')
+    dependsOn tasks.named('jacocoTestReport'), verifyDomainDiscoveryExport
+}
+
+rootProject.tasks.named('check') {
+    dependsOn verifyDomainDiscoveryExport
 }
