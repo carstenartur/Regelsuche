@@ -69,6 +69,7 @@ jobs:
         with:
           name: ai-knowledge-index
           path: build/ai-knowledge/**
+          if-no-files-found: warn
 
       - name: Upload AI knowledge review reports
         if: always()
@@ -80,6 +81,7 @@ jobs:
             build/ai-knowledge/context-packs/**
             build/ai-knowledge/check.json
             build/ai-knowledge/complexity.json
+          if-no-files-found: warn
 
       - name: Summary
         if: always()
