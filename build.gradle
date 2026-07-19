@@ -115,10 +115,220 @@ tasks.register('verifyCandidateIndependentBenchmark', Exec) {
 
 tasks.register('verifyWorkflowSemantics', Exec) {
     group = 'verification'
-    description = 'Rejects unclassified workflows and workflow-owned verification semantics in migrated adapters.'
+    description = 'Rejects unclassified workflows and workflow-owned verification semantics.'
     workingDir rootDir
     commandLine pythonExecutable, 'scripts/verify-workflow-semantics.py'
     inputs.dir('.github/workflows')
     inputs.file('config/workflow-semantics-policy.json')
     inputs.file('scripts/verify-workflow-semantics.py')
+}
+
+def verificationVenvDirectory = layout.buildDirectory.dir('verification-venv')
+def verificationPythonFile = providers.provider {
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+        ? 'Scripts/python.exe'
+        : 'bin/python'
+    new File(verificationVenvDirectory.get().asFile, executable)
+}
+
+def prepareVerificationEnvironment = tasks.register('prepareVerificationEnvironment', Exec) {
+    group = 'verification'
+    description = 'Creates the pinned checkout-local Python environment used by verification tasks.'
+    workingDir rootDir
+    inputs.file('scripts/prepare-verification-environment.py')
+    outputs.file(verificationVenvDirectory.map { it.file('.regelsuche-verification-environment.json') })
+    doFirst {
+        commandLine pythonExecutable,
+            'scripts/prepare-verification-environment.py',
+            '--venv', verificationVenvDirectory.get().asFile.absolutePath
+    }
+}
+
+def checkDocumentationMath = tasks.register('checkDocumentationMath', Exec) {
+    group = 'verification'
+    description = 'Checks documentation math delimiters from a plain checkout.'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/check-docs-math.py'
+    inputs.files(fileTree('docs') { include '**/*.md' })
+    inputs.file('README.md')
+    inputs.file('scripts/check-docs-math.py')
+}
+
+def verifyGeneratedDiscoveryGallery = tasks.register('verifyGeneratedDiscoveryGallery', Exec) {
+    group = 'verification'
+    description = 'Regenerates and verifies the deterministic discovery gallery.'
+    dependsOn ':app:generateDiscoveryGallery'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/verify-generated-discovery-gallery.py'
+    inputs.file('scripts/verify-generated-discovery-gallery.py')
+    doFirst {
+        environment.remove('GITHUB_SHA')
+    }
+}
+
+def verifyStaticReferencePage = tasks.register('verifyStaticReferencePage', Exec) {
+    group = 'verification'
+    description = 'Generates and verifies the static reference-page contract.'
+    dependsOn ':app:generateStaticReferencePage'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/verify-static-reference-page.py'
+    inputs.file('scripts/verify-static-reference-page.py')
+}
+
+def verifySolverIrEvidence = tasks.register('verifySolverIrEvidence', Exec) {
+    group = 'verification'
+    description = 'Verifies canonical solver-IR schemas, hashes and backend outcomes.'
+    dependsOn prepareVerificationEnvironment, ':regelsuche-solver-ir:writeSolverIrExample'
+    workingDir rootDir
+    inputs.file('scripts/verify-solver-ir-evidence.py')
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath, 'scripts/verify-solver-ir-evidence.py'
+    }
+}
+
+def verifyGenericDiscoveryDomainsEvidence = tasks.register('verifyGenericDiscoveryDomainsEvidence', Exec) {
+    group = 'verification'
+    description = 'Verifies evidence emitted by all generic discovery-domain JUnit tests.'
+    dependsOn prepareVerificationEnvironment, repositoryTest
+    workingDir rootDir
+    inputs.file('scripts/verify-generic-discovery-domains.py')
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath, 'scripts/verify-generic-discovery-domains.py'
+    }
+}
+
+def verifyDomainLifecycleHandoffEvidence = tasks.register('verifyDomainLifecycleHandoffEvidence', Exec) {
+    group = 'verification'
+    description = 'Verifies lifecycle-handoff and production-export evidence emitted by JUnit tests.'
+    dependsOn prepareVerificationEnvironment, repositoryTest
+    workingDir rootDir
+    inputs.file('scripts/verify-domain-lifecycle-handoff.py')
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath, 'scripts/verify-domain-lifecycle-handoff.py'
+    }
+}
+
+def verifyDomainGenericQualificationEvidence = tasks.register('verifyDomainGenericQualificationEvidence', Exec) {
+    group = 'verification'
+    description = 'Generates and verifies the domain-generic qualification profile.'
+    dependsOn prepareVerificationEnvironment, ':regelsuche-release:runDomainGenericQualification'
+    workingDir rootDir
+    inputs.file('scripts/verify-domain-generic-qualification.py')
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath, 'scripts/verify-domain-generic-qualification.py'
+    }
+}
+
+def verifyReleaseReadinessEvidence = tasks.register('verifyReleaseReadinessEvidence', Exec) {
+    group = 'verification'
+    description = 'Generates and verifies qualified release-readiness evidence.'
+    dependsOn prepareVerificationEnvironment, repositoryTest,
+        ':regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence'
+    workingDir rootDir
+    inputs.file('scripts/verify-release-readiness-evidence.py')
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath,
+            'scripts/verify-release-readiness-evidence.py',
+            '--root', 'regelsuche-release/build/reports/release-readiness-qualified'
+    }
+}
+
+def generateCapabilityStatusForVerification = tasks.register('generateCapabilityStatusForVerification', Exec) {
+    group = 'verification'
+    description = 'Regenerates the public capability matrix from retained release and domain evidence.'
+    dependsOn prepareVerificationEnvironment,
+        ':regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence',
+        ':regelsuche-release:runDomainGenericQualification'
+    workingDir rootDir
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath,
+            'scripts/generate-capability-status.py',
+            '--repository-root', '.',
+            '--release-report', 'regelsuche-release/build/reports/release-readiness-qualified/release-readiness-report.json',
+            '--release-run', 'regelsuche-release/build/reports/release-readiness-qualified/release-readiness-run.json',
+            '--domain-report', 'regelsuche-release/build/reports/domain-generic-qualification/qualification-report.json',
+            '--domain-run', 'regelsuche-release/build/reports/domain-generic-qualification/qualification-run.json',
+            '--repository-revision', 'WORKTREE',
+            '--json-output', 'docs/generated/capability-status.json',
+            '--markdown-output', 'docs/generated/capability-status.md',
+            '--check', '--check-docs'
+    }
+}
+
+def verifyCapabilityStatus = tasks.register('verifyCapabilityStatus', Exec) {
+    group = 'verification'
+    description = 'Verifies the generated capability matrix, status vocabulary and content hash.'
+    dependsOn prepareVerificationEnvironment, generateCapabilityStatusForVerification
+    workingDir rootDir
+    inputs.file('scripts/verify-capability-status.py')
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath, 'scripts/verify-capability-status.py'
+    }
+}
+
+def generateCiPages = tasks.register('generateCiPages', Exec) {
+    group = 'reporting'
+    description = 'Renders coverage and JUnit report pages from local Gradle outputs.'
+    workingDir rootDir
+    commandLine pythonExecutable, 'scripts/generate-ci-pages.py'
+    inputs.file('scripts/generate-ci-pages.py')
+    outputs.dir('public')
+}
+
+def repositoryCheck = tasks.register('check') {
+    group = 'verification'
+    description = 'Runs the complete local test lifecycle and checkout-local contract verification.'
+    dependsOn repositoryTest,
+        tasks.named('verifyWorkflowSemantics'),
+        tasks.named('verifyCandidateIndependentBenchmark'),
+        checkDocumentationMath,
+        verifyGeneratedDiscoveryGallery,
+        verifyStaticReferencePage,
+        verifySolverIrEvidence,
+        verifyGenericDiscoveryDomainsEvidence,
+        verifyDomainLifecycleHandoffEvidence,
+        verifyDomainGenericQualificationEvidence,
+        verifyReleaseReadinessEvidence,
+        verifyCapabilityStatus
+}
+
+def verifySolverPortfolioEvidence = tasks.register('verifySolverPortfolioEvidence', Exec) {
+    group = 'verification'
+    description = 'Requires real Z3 and verifies the canonical solver-portfolio evidence chain.'
+    dependsOn prepareVerificationEnvironment, repositoryTest,
+        ':regelsuche-solver-portfolio:writeSolverPortfolioExample'
+    mustRunAfter repositoryCheck
+    workingDir rootDir
+    inputs.file('scripts/verify-solver-portfolio-evidence.py')
+    doFirst {
+        commandLine verificationPythonFile.get().absolutePath, 'scripts/verify-solver-portfolio-evidence.py'
+    }
+}
+
+def verifyReleaseReadinessDockerReproduction = tasks.register('verifyReleaseReadinessDockerReproduction', Exec) {
+    group = 'verification'
+    description = 'Requires Docker and compares release-readiness Gradle and runtime-image evidence byte for byte.'
+    dependsOn prepareVerificationEnvironment, verifyReleaseReadinessEvidence
+    mustRunAfter repositoryCheck
+    workingDir rootDir
+    inputs.file('scripts/verify-release-readiness-docker-reproduction.sh')
+    doFirst {
+        environment 'REGELSUCHE_VERIFICATION_PYTHON', verificationPythonFile.get().absolutePath
+        commandLine 'bash', 'scripts/verify-release-readiness-docker-reproduction.sh'
+    }
+}
+
+tasks.register('fullCheck') {
+    group = 'verification'
+    description = 'Runs check plus strict external-tool and Docker reproducibility verification.'
+    dependsOn repositoryCheck, verifySolverPortfolioEvidence, verifyReleaseReadinessDockerReproduction
+}
+
+gradle.projectsEvaluated {
+    project(':regelsuche-release').tasks.named('runQualifiedReleaseReadinessWithHiddenRuleEvidence').configure {
+        mustRunAfter repositoryTest
+    }
+    project(':regelsuche-release').tasks.named('runDomainGenericQualification').configure {
+        mustRunAfter repositoryTest
+    }
 }
