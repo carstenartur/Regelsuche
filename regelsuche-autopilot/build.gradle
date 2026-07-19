@@ -18,12 +18,32 @@ application {
     mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionCampaignMain'
 }
 
+sourceSets {
+    dockerIntegrationTest {
+        java.srcDir 'src/dockerIntegrationTest/java'
+        resources.srcDir 'src/dockerIntegrationTest/resources'
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+    }
+}
+
+configurations {
+    dockerIntegrationTestImplementation.extendsFrom testImplementation
+    dockerIntegrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+
 dependencies {
     api project(':regelsuche-experiments')
     api project(':regelsuche-learning')
 
     testImplementation libs.junit.jupiter
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    dockerIntegrationTestImplementation platform(libs.testcontainers.bom)
+    dockerIntegrationTestImplementation libs.testcontainers.core
+    dockerIntegrationTestImplementation libs.testcontainers.junit
+    dockerIntegrationTestImplementation libs.junit.jupiter
+    dockerIntegrationTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.register('runProductionGeneration', JavaExec) {
@@ -53,19 +73,39 @@ tasks.register('runProductionLifecycle', JavaExec) {
         .get().asFile.absolutePath
 }
 
-tasks.register('runProductionCampaign', JavaExec) {
+def productionCampaignOutputPath = providers.gradleProperty('autopilotOutputDir')
+    .orElse(layout.buildDirectory.dir('reports/autopilot-production-campaign')
+        .map { it.asFile.absolutePath })
+def productionCampaignOutputDirectory = productionCampaignOutputPath.map {
+    new File(it)
+}
+
+def runProductionCampaign = tasks.register('runProductionCampaign', JavaExec) {
     group = 'verification'
     description = 'Runs the complete pinned issue-348 autonomous production campaign.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.regelsuche.experiments.autopilot.AutonomousProductionCampaignMain'
-    args providers.gradleProperty('autopilotOutputDir').getOrElse(
-        layout.buildDirectory.dir('reports/autopilot-production-campaign')
-            .get().asFile.absolutePath)
+    args productionCampaignOutputPath.get()
+    outputs.dir productionCampaignOutputDirectory
 }
 
 tasks.named('test') {
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.register('dockerIntegrationTest', Test) {
+    group = 'verification'
+    description = 'Reproduces the complete Autopilot campaign in Docker via Testcontainers.'
+    testClassesDirs = sourceSets.dockerIntegrationTest.output.classesDirs
+    classpath = sourceSets.dockerIntegrationTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('test')
+    systemProperty 'regelsuche.projectRoot', rootProject.projectDir.absolutePath
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
+    }
 }
 
 jacoco {
@@ -81,6 +121,51 @@ tasks.named('jacocoTestReport') {
     }
 }
 
+def repositoryRootPath = rootProject.projectDir.absolutePath
+def campaignVerifier = rootProject.file(
+    'scripts/verify-autopilot-production-campaign.py')
+def campaignVerifierPath = campaignVerifier.absolutePath
+def campaignSchemas = [
+    rootProject.file('docs/schemas/regelsuche-solver-obligation-v1.schema.json'),
+    rootProject.file('docs/schemas/regelsuche-solver-result-v1.schema.json'),
+    rootProject.file('docs/schemas/regelsuche-open-target-conjecture-proof-v2.schema.json'),
+    rootProject.file('docs/schemas/regelsuche-autonomous-production-lifecycle-v3.schema.json'),
+    rootProject.file('docs/schemas/regelsuche-autonomous-production-campaign-v2.schema.json')
+]
+def verificationEnvironment = rootProject.layout.buildDirectory.dir(
+    'verification-venv')
+def verificationPython = verificationEnvironment.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def verifyAutopilotProductionCampaign = tasks.register(
+    'verifyAutopilotProductionCampaign',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies complete Autopilot campaign artifacts and solver/proof bindings.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        runProductionCampaign
+    workingDir rootProject.projectDir
+    inputs.file(campaignVerifier)
+    inputs.files(campaignSchemas)
+    inputs.dir(productionCampaignOutputDirectory)
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            campaignVerifierPath,
+            '--root', productionCampaignOutputDirectory.get().absolutePath,
+            '--schemas', new File(repositoryRootPath, 'docs/schemas').absolutePath
+    }
+}
+
 tasks.named('check') {
-    dependsOn tasks.named('jacocoTestReport')
+    dependsOn tasks.named('jacocoTestReport'),
+        tasks.named('dockerIntegrationTest'),
+        verifyAutopilotProductionCampaign
+}
+
+rootProject.tasks.named('check') {
+    dependsOn verifyAutopilotProductionCampaign
 }
