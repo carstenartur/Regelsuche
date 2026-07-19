@@ -21,6 +21,10 @@ class EvolutionSchemaContractTest {
             "regelsuche-evolution-generation-report-v1.schema.json");
         String population = readSchema(
             "regelsuche-evolution-population-run-v1.schema.json");
+        String trainSuite = readSchema(
+            "regelsuche-evolution-train-search-suite-v1.schema.json");
+        String trainFitness = readSchema(
+            "regelsuche-evolution-train-fitness-v1.schema.json");
 
         assertTrue(genome.contains("regelsuche.evolution-genome/v1"));
         assertTrue(genome.contains("\"const\": \"TRAIN\""));
@@ -48,6 +52,8 @@ class EvolutionSchemaContractTest {
             assertTrue(study.contains("\"" + component.name() + "\""),
                 component.name());
             assertTrue(generation.contains("\"" + component.name() + "\""),
+                component.name());
+            assertTrue(trainFitness.contains("\"" + component.name() + "\""),
                 component.name());
         }
         for (EvolutionPopulationEngine.GenerationOutcome outcome :
@@ -77,6 +83,16 @@ class EvolutionSchemaContractTest {
         assertTrue(population.contains("\"validationStatus\""));
         assertTrue(population.contains("\"const\": \"NOT_EVALUATED\""));
         assertTrue(population.contains("\"additionalProperties\": false"));
+        assertTrue(trainSuite.contains(
+            "regelsuche.evolution-train-search-suite/v1"));
+        assertTrue(trainSuite.contains("\"targetExpression\""));
+        assertTrue(trainSuite.contains("\"additionalProperties\": false"));
+        assertTrue(trainFitness.contains(
+            "regelsuche.evolution-train-fitness/v1"));
+        assertTrue(trainFitness.contains("\"baselineExploredStates\""));
+        assertTrue(trainFitness.contains("\"validationStatus\""));
+        assertTrue(trainFitness.contains("\"const\": \"NOT_EVALUATED\""));
+        assertTrue(trainFitness.contains("\"additionalProperties\": false"));
     }
 
     private static String readSchema(String fileName) throws Exception {
