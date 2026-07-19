@@ -12,6 +12,7 @@ from typing import Any
 
 try:
     from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import ValidationError
 except ImportError as error:
     raise SystemExit(
         "jsonschema is required; run ./gradlew prepareVerificationEnvironment"
@@ -68,6 +69,49 @@ SCHEMA_BINDINGS = {
         "regelsuche-autonomous-production-campaign-v2.schema.json"
     ),
 }
+MANIFEST_ROOT_BINDINGS = {
+    "briefHash": "brief-v2.json",
+    "generationRunHash": "generation-run.json",
+    "miningRunHash": "production-mining-run.json",
+    "lifecycleRunHash": "production-lifecycle-run.json",
+    "initialPlanHash": "plan-v2.json",
+    "nextPlanHash": "next-plan-v2.json",
+    "campaignRoundHash": "campaign-round-v2.json",
+    "feedbackReallocationHash": "feedback-reallocation.json",
+    "campaignResourceLedgerHash": "campaign-resource-ledger.json",
+}
+MANIFEST_ARTIFACT_BINDINGS = {
+    "research-brief": "brief-v2.json",
+    "seed-catalog": "seeds.json",
+    "observation-bundle": "observations.json",
+    "generation-receipt": "generation-receipt.json",
+    "generation-run": "generation-run.json",
+    "initial-plan": "plan-v2.json",
+    "full-decision": "full-decision.json",
+    "full-mining-evidence": "full-mining-evidence.json",
+    "full-binding": "full-binding.json",
+    "full-aggregate-receipt": "full-receipt.json",
+    "full-execution": "full-execution-v2.json",
+    "full-lineage": "full-lineage-v2.json",
+    "rejection-decision": "rejection-decision.json",
+    "rejection-mining-evidence": "rejection-mining-evidence.json",
+    "rejection-binding": "rejection-binding.json",
+    "rejection-aggregate-receipt": "rejection-receipt.json",
+    "rejection-execution": "rejection-execution-v2.json",
+    "rejection-lineage": "rejection-lineage-v2.json",
+    "candidate-formation-receipt": "candidate-formation-receipt.json",
+    "evidence-dag": "evidence-dag.json",
+    "mining-run": "production-mining-run.json",
+    "solver-obligation": "solver-obligation.json",
+    "solver-result": "solver-result.json",
+    "lifecycle-decision": "lifecycle-decision.json",
+    "stage-resource-ledger": "stage-resource-ledger.json",
+    "lifecycle-run": "production-lifecycle-run.json",
+    "next-plan": "next-plan-v2.json",
+    "campaign-round": "campaign-round-v2.json",
+    "feedback-reallocation": "feedback-reallocation.json",
+    "campaign-resource-ledger": "campaign-resource-ledger.json",
+}
 
 
 def fail(message: str) -> None:
@@ -106,6 +150,14 @@ def require_sha256(value: Any, label: str) -> str:
     return value
 
 
+def document_hash(
+    documents: dict[str, dict[str, Any]],
+    file_name: str,
+) -> str:
+    document = documents[file_name]
+    return require_sha256(document.get("contentHash"), f"{file_name}.contentHash")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
@@ -118,7 +170,10 @@ def main() -> int:
     root = arguments.root.resolve()
     schema_root = arguments.schemas.resolve()
 
-    require(root.is_dir(), f"campaign directory does not exist: {root}")
+    require(
+        root.is_dir() and not root.is_symlink(),
+        f"campaign directory does not exist or is symbolic: {root}",
+    )
     try:
         installed = version("jsonschema")
     except PackageNotFoundError:
@@ -131,7 +186,10 @@ def main() -> int:
     documents: dict[str, dict[str, Any]] = {}
     for name in REQUIRED_FILES:
         path = root / name
-        require(path.is_file(), f"missing required artifact: {name}")
+        require(
+            path.is_file() and not path.is_symlink(),
+            f"missing, non-regular or symbolic required artifact: {name}",
+        )
         require(path.stat().st_size > 0, f"empty required artifact: {name}")
         document = load_unique(path)
         require(isinstance(document, dict), f"artifact must be an object: {name}")
@@ -146,7 +204,10 @@ def main() -> int:
 
     for artifact_name, schema_name in SCHEMA_BINDINGS.items():
         schema_path = schema_root / schema_name
-        require(schema_path.is_file(), f"missing schema: {schema_name}")
+        require(
+            schema_path.is_file() and not schema_path.is_symlink(),
+            f"missing or symbolic schema: {schema_name}",
+        )
         schema = load_unique(schema_path)
         require(isinstance(schema, dict), f"schema must be an object: {schema_name}")
         require(
@@ -154,7 +215,10 @@ def main() -> int:
             f"schema must fail closed: {schema_name}",
         )
         Draft202012Validator.check_schema(schema)
-        Draft202012Validator(schema).validate(documents[artifact_name])
+        try:
+            Draft202012Validator(schema).validate(documents[artifact_name])
+        except ValidationError as error:
+            fail(f"schema validation failed for {artifact_name}: {error.message}")
 
     obligation = documents["solver-obligation.json"]
     result = documents["solver-result.json"]
@@ -162,10 +226,8 @@ def main() -> int:
     lifecycle = documents["production-lifecycle-run.json"]
     manifest = documents["production-campaign-manifest.json"]
 
-    obligation_hash = require_sha256(
-        obligation.get("contentHash"), "solver obligation contentHash"
-    )
-    result_hash = require_sha256(result.get("contentHash"), "solver result contentHash")
+    obligation_hash = document_hash(documents, "solver-obligation.json")
+    result_hash = document_hash(documents, "solver-result.json")
     require(result.get("obligationHash") == obligation_hash, "solver result obligation binding drift")
     require(proof.get("solverObligationHash") == obligation_hash, "proof obligation binding drift")
     require(proof.get("solverResultHash") == result_hash, "proof result binding drift")
@@ -173,6 +235,12 @@ def main() -> int:
     require(lifecycle.get("solverResultHash") == result_hash, "lifecycle result binding drift")
     require(result.get("status") == "CONFIRMED", "solver result is not confirmed")
     require(result.get("translationStatus") == "LOSSLESS", "solver translation is not lossless")
+
+    for manifest_field, file_name in MANIFEST_ROOT_BINDINGS.items():
+        require(
+            manifest.get(manifest_field) == document_hash(documents, file_name),
+            f"manifest {manifest_field} binding drift: {file_name}",
+        )
 
     require(manifest.get("status") == "COMPLETED", "campaign manifest is not completed")
     require(manifest.get("targetProvided") is False, "campaign received a target")
@@ -186,18 +254,33 @@ def main() -> int:
     )
     require(manifest.get("promotionStatus") == "NOT_EVALUATED", "promotion status inflated")
     require(manifest.get("publicEvidenceStatus") == "NOT_EVALUATED", "public evidence status inflated")
+
     artifacts = manifest.get("artifacts")
     require(isinstance(artifacts, list) and len(artifacts) >= 30, "campaign manifest lacks artifact roots")
-    artifact_types = [item.get("artifactType") for item in artifacts if isinstance(item, dict)]
-    require(len(artifact_types) == len(set(artifact_types)), "campaign artifact types are duplicated")
+    artifact_roots: dict[str, str] = {}
     for index, item in enumerate(artifacts):
         require(isinstance(item, dict), f"manifest artifact {index} is not an object")
-        require(isinstance(item.get("artifactType"), str) and item["artifactType"], f"manifest artifact {index} lacks type")
-        require_sha256(item.get("contentHash"), f"manifest artifact {index} contentHash")
+        artifact_type = item.get("artifactType")
+        require(
+            isinstance(artifact_type, str) and artifact_type,
+            f"manifest artifact {index} lacks type",
+        )
+        require(artifact_type not in artifact_roots, f"duplicate campaign artifact type: {artifact_type}")
+        artifact_roots[artifact_type] = require_sha256(
+            item.get("contentHash"),
+            f"manifest artifact {index} contentHash",
+        )
+
+    for artifact_type, file_name in MANIFEST_ARTIFACT_BINDINGS.items():
+        require(
+            artifact_roots.get(artifact_type) == document_hash(documents, file_name),
+            f"manifest artifact root drift: {artifact_type} -> {file_name}",
+        )
 
     print(f"jsonschema={installed}")
     print("autopilot-production-campaign=VERIFIED")
     print(f"required-artifacts={len(REQUIRED_FILES)}")
+    print(f"manifest-root-bindings={len(MANIFEST_ROOT_BINDINGS)}")
     return 0
 
 
