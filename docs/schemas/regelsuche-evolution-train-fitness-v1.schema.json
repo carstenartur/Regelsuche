@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-evolution-train-fitness-v1.schema.json",
+  "title": "Regelsuche evolution paired TRAIN fitness v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "suiteHash",
+    "genomeHash",
+    "cases",
+    "rawComponents",
+    "blockers",
+    "validationStatus",
+    "finalTestStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-train-fitness/v1"
+    },
+    "suiteHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "genomeHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "cases": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "caseId",
+          "familyId",
+          "baselineStatus",
+          "candidateStatus",
+          "baselineReached",
+          "candidateReached",
+          "baselinePathLength",
+          "candidatePathLength",
+          "baselineExploredStates",
+          "candidateExploredStates",
+          "newlySolved",
+          "correctnessRegression"
+        ],
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+          },
+          "familyId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+          },
+          "baselineStatus": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "candidateStatus": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "baselineReached": {
+            "type": "boolean"
+          },
+          "candidateReached": {
+            "type": "boolean"
+          },
+          "baselinePathLength": {
+            "type": "integer",
+            "minimum": -1
+          },
+          "candidatePathLength": {
+            "type": "integer",
+            "minimum": -1
+          },
+          "baselineExploredStates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "candidateExploredStates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "newlySolved": {
+            "type": "boolean"
+          },
+          "correctnessRegression": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "rawComponents": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "TRAIN_CASES_NEWLY_SOLVED",
+          "TRAIN_PATH_LENGTH_REDUCTION",
+          "TRAIN_EXPLORED_STATE_REDUCTION",
+          "SUPPORT",
+          "STRUCTURAL_DIVERSITY",
+          "PROJECT_NOVELTY",
+          "ASSUMPTION_SIMPLICITY",
+          "CANDIDATE_COMPLEXITY",
+          "COUNTEREXAMPLE_RISK",
+          "PROOF_COST_PROXY"
+        ]
+      },
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": -1000,
+        "maximum": 1000
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "validationStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "finalTestStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
