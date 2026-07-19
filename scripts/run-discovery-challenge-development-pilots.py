@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Execute and retain the development-only pilots selected by issue #390.
+"""Execute or verify the development-only pilots selected by issue #390.
 
-The script is intentionally CI-agnostic. It invokes ordinary Gradle/JUnit tests,
-checks their XML reports, and writes a deterministic receipt. It does not run the
-candidate-independent benchmark and does not authorize any novelty claim.
+The script is CI-agnostic. By default it can execute the selected ordinary
+Gradle/JUnit tests for a focused local reproduction. With ``--skip-tests`` it
+only verifies JUnit XML already produced by the central Gradle ``test``
+lifecycle and writes the deterministic receipt. It never runs the
+candidate-independent benchmark and never authorizes a novelty claim.
 """
 
 from __future__ import annotations
@@ -142,7 +144,7 @@ def load_portfolio(root: Path) -> dict:
     return portfolio
 
 
-def run_pilot(root: Path, pilot: Pilot) -> dict:
+def execute_pilot(root: Path, pilot: Pilot) -> None:
     command = pilot.command()
     completed = subprocess.run(command, cwd=root, check=False)
     if completed.returncode != 0:
@@ -151,28 +153,49 @@ def run_pilot(root: Path, pilot: Pilot) -> dict:
             f"{completed.returncode}: {' '.join(command)}"
         )
 
+
+def verify_testcase(testcase: ET.Element, pilot: Pilot) -> None:
+    problems = []
+    for child_name in ("failure", "error", "skipped"):
+        child = testcase.find(child_name)
+        if child is not None:
+            problems.append(child_name)
+    if problems:
+        raise RuntimeError(
+            f"pilot {pilot.challenge_id} method {testcase.get('name', '')} "
+            f"was not successful: {problems}"
+        )
+
+
+def verify_pilot_report(root: Path, pilot: Pilot) -> dict:
     report_path = root / pilot.report
     if not report_path.is_file():
         raise RuntimeError(
             f"pilot {pilot.challenge_id} produced no JUnit XML: {pilot.report}"
         )
-    suite = ET.parse(report_path).getroot()
-    failures = int(suite.get("failures", "0"))
-    errors = int(suite.get("errors", "0"))
-    skipped = int(suite.get("skipped", "0"))
-    methods = sorted(
-        testcase.get("name", "") for testcase in suite.findall("testcase")
-    )
-    missing = sorted(set(pilot.expected_methods) - set(methods))
-    if failures or errors or skipped or missing:
+    try:
+        suite = ET.parse(report_path).getroot()
+    except ET.ParseError as exc:
         raise RuntimeError(
-            f"pilot {pilot.challenge_id} incomplete: failures={failures}, "
-            f"errors={errors}, skipped={skipped}, missing={missing}, methods={methods}"
+            f"pilot {pilot.challenge_id} produced malformed JUnit XML: {exc}"
+        ) from exc
+
+    testcases = {
+        testcase.get("name", ""): testcase
+        for testcase in suite.findall("testcase")
+    }
+    missing = sorted(set(pilot.expected_methods) - set(testcases))
+    if missing:
+        raise RuntimeError(
+            f"pilot {pilot.challenge_id} is missing expected methods: {missing}; "
+            f"available={sorted(testcases)}"
         )
+    for method in pilot.expected_methods:
+        verify_testcase(testcases[method], pilot)
 
     return {
         "challengeId": pilot.challenge_id,
-        "command": command,
+        "command": pilot.command(),
         "evidenceStrength": pilot.evidence_strength,
         "executedTestMethods": list(pilot.expected_methods),
         "limitation": pilot.limitation,
@@ -219,12 +242,20 @@ def main() -> int:
         type=Path,
         default=Path("build/reports/discovery-challenge-pilots/report.json"),
     )
+    parser.add_argument(
+        "--skip-tests",
+        action="store_true",
+        help="Verify existing JUnit XML instead of starting nested Gradle runs.",
+    )
     args = parser.parse_args()
     root = args.root.resolve()
 
     try:
         portfolio = load_portfolio(root)
-        results = [run_pilot(root, pilot) for pilot in PILOTS]
+        if not args.skip_tests:
+            for pilot in PILOTS:
+                execute_pilot(root, pilot)
+        results = [verify_pilot_report(root, pilot) for pilot in PILOTS]
         write_report(root, args.output, portfolio, results)
     except RuntimeError as exc:
         print(f"development challenge pilots failed: {exc}", file=sys.stderr)
