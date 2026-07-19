@@ -4,7 +4,7 @@ WORKDIR /workspace
 
 # Copy Gradle wrapper and build scripts first to leverage Docker layer caching
 # for dependency downloads.
-COPY gradlew gradle.properties settings.gradle ./
+COPY gradlew gradle.properties settings.gradle build.gradle ./
 COPY gradle ./gradle
 COPY app/build.gradle ./app/build.gradle
 COPY regelsuche-core/build.gradle ./regelsuche-core/build.gradle
