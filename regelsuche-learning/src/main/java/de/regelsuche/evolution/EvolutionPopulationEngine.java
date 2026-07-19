@@ -321,19 +321,21 @@ public final class EvolutionPopulationEngine {
         }
 
         Map<FitnessComponent, Integer> components = fitness.components();
-        List<String> blockers = new ArrayList<>(fitness.blockers());
+        List<String> rawBlockers = new ArrayList<>(fitness.blockers());
         Set<FitnessComponent> declared = plan.fitnessWeights().stream()
             .map(FitnessWeight::component)
             .collect(java.util.stream.Collectors.toSet());
-        declared.stream()
-            .filter(component -> !components.containsKey(component))
-            .forEach(component -> blockers.add(
-                "MISSING_FITNESS_COMPONENT:" + component));
-        components.keySet().stream()
-            .filter(component -> !declared.contains(component))
-            .forEach(component -> blockers.add(
-                "UNDECLARED_FITNESS_COMPONENT:" + component));
-        blockers = canonicalStrings(blockers);
+        for (FitnessComponent component : declared) {
+            if (!components.containsKey(component)) {
+                rawBlockers.add("MISSING_FITNESS_COMPONENT:" + component);
+            }
+        }
+        for (FitnessComponent component : components.keySet()) {
+            if (!declared.contains(component)) {
+                rawBlockers.add("UNDECLARED_FITNESS_COMPONENT:" + component);
+            }
+        }
+        List<String> blockers = canonicalStrings(rawBlockers);
         if (!blockers.isEmpty()) {
             return CandidateEvaluation.blocked(candidate, components, blockers);
         }
