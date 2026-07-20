@@ -4,6 +4,10 @@
 # Ignore Gradle build output directory
 build
 
+# Generated coverage, test and benchmark pages are CI outputs. They are
+# uploaded and published from the central Gradle lifecycle, not source inputs.
+public/
+
 # Ignore Kotlin plugin data
 .kotlin
 
