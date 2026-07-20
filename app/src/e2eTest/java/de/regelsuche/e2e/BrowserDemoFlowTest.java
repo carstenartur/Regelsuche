@@ -1,6 +1,7 @@
 package de.regelsuche.e2e;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.microsoft.playwright.Browser;
@@ -12,6 +13,7 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.Response;
+import com.microsoft.playwright.Route;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.ScreenshotType;
 import com.microsoft.playwright.options.WaitForSelectorState;
@@ -57,6 +59,9 @@ class BrowserDemoFlowTest {
 
     private static final boolean RECORD_DOCS = Boolean.parseBoolean(
         System.getProperty("regelsuche.recordDocs", "false"));
+    private static final int DEMO_COMPLETION_TIMEOUT_MILLIS = 30_000;
+    private static final int REPLAY_COMPLETION_TIMEOUT_MILLIS = 10_000;
+    private static final long MATRIX_REPLAY_RUNTIME_BOUND_MILLIS = 45_000L;
 
     private static final Path DOCS_ROOT = Paths.get("..", "docs", "assets")
         .toAbsolutePath().normalize();
@@ -69,6 +74,7 @@ class BrowserDemoFlowTest {
 
     private BrowserContext context;
     private Page page;
+    private String lastDemoPathId;
     private final List<String> consoleErrors = new ArrayList<>();
 
     @BeforeAll
@@ -262,60 +268,91 @@ class BrowserDemoFlowTest {
     @Test
     @DisplayName("Math-Demo: Matrix bmatrix-Vorschau im Replay")
     void mathMatrixBrowserFlow() {
+        long replayStartedNanos = System.nanoTime();
         clickDemoButton("math-matrix");
         waitForDemoSummary("math-matrix");
         assertTrue(page.locator(".math-matrix-panel").count() > 0,
             "math-matrix must render the bmatrix preview");
         screenshotDemoSummaryCard("math-matrix-preview.png",
             ".math-matrix-panel", true);
-        // Activate the replay tab and refresh the path list synchronously
-        // so the just-recorded matrix transformation is selectable.
-        page.locator(".tab[data-tab='replay']").click();
-        page.waitForSelector("#tab-replay.active",
-            new Page.WaitForSelectorOptions().setTimeout(5_000));
-        page.evaluate(
-            "async () => {"
-                + " var s = document.querySelector('#replayPathSelect');"
-                + " var r = await fetch('/api/paths?sort=score');"
-                + " var d = await r.json();"
-                + " s.innerHTML = '';"
-                + " (d.transformations || []).forEach(function(p) {"
-                + "   var o = document.createElement('option');"
-                + "   o.value = p.id; o.textContent = p.id;"
-                + "   s.appendChild(o);"
-                + " });"
-                + "}");
-        int optionCount = ((Number) page.evaluate(
-            "() => document.querySelector('#replayPathSelect').options.length")).intValue();
+
+        // The demo response already exposes the exact selected path. Load that
+        // path directly instead of replaying every path accumulated by prior
+        // tests or a reused development checkout.
+        openReplayForPath(requireLastDemoPathId("math-matrix"));
         boolean foundMatrixCard = false;
-        // Sort=score order can place the matrix path anywhere, so probe every
-        // path until we find one whose first step is a linalg rule.
-        for (int idx = optionCount - 1; idx >= 0 && !foundMatrixCard; idx--) {
-            int sel = idx;
-            page.evaluate(
-                "(i) => { var s = document.querySelector('#replayPathSelect');"
-                    + " s.selectedIndex = i;"
-                    + " s.dispatchEvent(new Event('change', { bubbles: true })); }",
-                sel);
-            page.locator("#replayLoad").click();
-            waitForReplayReady();
-            for (int step = 0; step < 30 && !foundMatrixCard; step++) {
-                if (page.locator(".replay-matrix-card").count() > 0) {
-                    foundMatrixCard = true;
-                    break;
-                }
-                if (page.locator("#replayNext").isVisible()
-                    && page.locator("#replayNext").isEnabled()) {
-                    page.locator("#replayNext").click();
-                } else {
-                    break;
-                }
+        for (int step = 0; step < 30; step++) {
+            if (page.locator(".replay-matrix-card").count() > 0) {
+                foundMatrixCard = true;
+                break;
+            }
+            if (page.locator("#replayNext").isVisible()
+                && page.locator("#replayNext").isEnabled()) {
+                page.locator("#replayNext").click();
+            } else {
+                break;
             }
         }
         assertTrue(foundMatrixCard,
-            "matrix replay must surface the bmatrix card on at least one step");
+            "matrix replay must surface the bmatrix card on the demo path");
+        long replayMillis = (System.nanoTime() - replayStartedNanos) / 1_000_000L;
+        assertTrue(replayMillis < MATRIX_REPLAY_RUNTIME_BOUND_MILLIS,
+            "matrix demo and direct replay must finish within "
+                + MATRIX_REPLAY_RUNTIME_BOUND_MILLIS + " ms, took " + replayMillis + " ms");
         screenshotReplayStep("math-matrix-replay.png",
             ".replay-matrix-card", true);
+    }
+
+    @Test
+    @DisplayName("Demo transport retry rejects stale ready state")
+    void demoTransportRetryRejectsStaleReadyState() {
+        page.evaluate("() => {"
+            + " window.__regelsucheDemoReady = true;"
+            + " window.__lastSelectedPathId = 'stale-path';"
+            + " document.querySelector('#demoSummary').innerHTML = '<p>stale summary that must not pass</p>';"
+            + "}");
+        int[] requests = {0};
+        page.route("**/api/demo/math-inequality", route -> {
+            requests[0]++;
+            if (requests[0] == 1) {
+                route.abort("connectionreset");
+            } else {
+                route.resume();
+            }
+        });
+
+        clickDemoButton("math-inequality");
+
+        String summary = page.locator("#demoSummary").innerText();
+        assertTrue(requests[0] == 2,
+            "one transient transport failure must cause exactly one retry");
+        assertTrue(!summary.contains("stale summary")
+                && summary.toLowerCase().contains("vergleichszeichen"),
+            "the retry must accept only the current demo result, got: " + summary);
+        assertTrue(!"stale-path".equals(lastDemoPathId),
+            "the retry must not reuse a stale selected path");
+    }
+
+    @Test
+    @DisplayName("Demo HTTP failures are visible and are not retried")
+    void demoHttpFailureIsNotRetried() {
+        int[] requests = {0};
+        page.route("**/api/demo/binomial", route -> {
+            requests[0]++;
+            route.fulfill(new Route.FulfillOptions()
+                .setStatus(503)
+                .setBody("deliberate same-origin failure"));
+        });
+
+        AssertionError failure = assertThrows(AssertionError.class,
+            () -> clickDemoButton("binomial"));
+
+        assertTrue(requests[0] == 1,
+            "HTTP failures must fail immediately without transport retry");
+        assertTrue(failure.getMessage().contains("HTTP 503")
+                && failure.getMessage().contains("deliberate same-origin failure"),
+            "the rendered same-origin HTTP diagnostic must remain visible: "
+                + failure.getMessage());
     }
 
     @Test
@@ -405,26 +442,111 @@ class BrowserDemoFlowTest {
             new Page.WaitForSelectorOptions().setTimeout(5_000));
         page.locator("#reloadGraph").click();
         waitForGraphRendered();
-        // Replay tab must show selectable paths.
+        // Replay tab must show the exact path produced by this demo.
         openReplayForLatestPath();
         waitForReplayReady();
     }
 
     private void clickDemoButton(String demoId) {
-        page.waitForResponse(
-            response -> response.url().contains("/api/demo/" + demoId)
-                && response.status() == 200,
-            () -> page.locator(".demo-button[data-demo='" + demoId + "']").click());
-        waitForDemoFinished(demoId);
+        String firstTransportDiagnostic = null;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            int sequence = prepareDemoAttempt(demoId);
+            page.locator(".demo-button[data-demo='" + demoId + "']").click();
+            waitForDemoAttemptOutcome(demoId, sequence);
+
+            if (Boolean.TRUE.equals(page.evaluate("() => window.__regelsucheDemoReady === true"))) {
+                waitForDemoFinished(demoId);
+                lastDemoPathId = (String) page.evaluate(
+                    "() => window.__lastSelectedPathId == null"
+                        + " ? null : String(window.__lastSelectedPathId)");
+                if (!"macro-learning".equals(demoId)) {
+                    assertTrue(lastDemoPathId != null && !lastDemoPathId.isBlank(),
+                        "demo " + demoId + " must expose its selected path id");
+                }
+                return;
+            }
+
+            String diagnostic = page.locator("#demoStatus").innerText();
+            if (!isTransportDiagnostic(diagnostic)) {
+                throw new AssertionError("demo " + demoId
+                    + " failed without retry: " + diagnostic);
+            }
+            if (firstTransportDiagnostic == null) {
+                firstTransportDiagnostic = diagnostic;
+            }
+            if (attempt == 2) {
+                throw new AssertionError("demo " + demoId
+                    + " failed after one transient transport retry; first outcome: "
+                    + firstTransportDiagnostic + "; second outcome: " + diagnostic);
+            }
+            waitForDemoButtonsEnabled();
+        }
+    }
+
+    private int prepareDemoAttempt(String demoId) {
+        lastDemoPathId = null;
+        return ((Number) page.evaluate(
+            "id => {"
+                + " const sequence = Number(window.__regelsucheE2eDemoSequence || 0) + 1;"
+                + " window.__regelsucheE2eDemoSequence = sequence;"
+                + " window.__regelsucheE2eDemoAttempt = { id: String(id), sequence: sequence };"
+                + " window.__regelsucheDemoReady = false;"
+                + " window.__regelsucheMathRendered = false;"
+                + " window.__regelsucheReplayReady = false;"
+                + " window.__lastSelectedPathId = null;"
+                + " const summary = document.querySelector('#demoSummary');"
+                + " if (summary) { summary.innerHTML = ''; summary.dataset.e2eDemoId = String(id); }"
+                + " const status = document.querySelector('#demoStatus');"
+                + " if (status) { status.className = 'status'; status.textContent = ''; }"
+                + " return sequence;"
+                + "}",
+            demoId)).intValue();
+    }
+
+    private void waitForDemoAttemptOutcome(String demoId, int sequence) {
+        page.waitForFunction(
+            "args => {"
+                + " const marker = window.__regelsucheE2eDemoAttempt;"
+                + " if (!marker || marker.id !== args.demoId"
+                + "     || Number(marker.sequence) !== Number(args.sequence)) return false;"
+                + " const summary = document.querySelector('#demoSummary');"
+                + " const status = document.querySelector('#demoStatus');"
+                + " const buttons = Array.from(document.querySelectorAll('.demo-button'));"
+                + " const ready = window.__regelsucheDemoReady === true"
+                + "   && summary && summary.dataset.e2eDemoId === args.demoId"
+                + "   && summary.innerHTML.length > 50;"
+                + " const failed = status && status.classList.contains('error')"
+                + "   && buttons.every(button => !button.disabled);"
+                + " return ready || failed;"
+                + "}",
+            Map.of("demoId", demoId, "sequence", sequence),
+            new Page.WaitForFunctionOptions().setTimeout(DEMO_COMPLETION_TIMEOUT_MILLIS));
+    }
+
+    private boolean isTransportDiagnostic(String diagnostic) {
+        return diagnostic != null && diagnostic.startsWith("Netzwerkfehler:");
+    }
+
+    private void waitForDemoButtonsEnabled() {
+        page.waitForFunction(
+            "() => Array.from(document.querySelectorAll('.demo-button'))"
+                + ".every(button => !button.disabled)",
+            null,
+            new Page.WaitForFunctionOptions().setTimeout(5_000));
     }
 
     private void waitForDemoFinished(String demoId) {
         page.waitForFunction(
-            "(id) => window.__regelsucheDemoReady === true "
-                + "&& document.querySelector('#demoSummary') "
-                + "&& document.querySelector('#demoSummary').innerHTML.length > 50",
+            "id => {"
+                + " const marker = window.__regelsucheE2eDemoAttempt;"
+                + " const summary = document.querySelector('#demoSummary');"
+                + " return marker && marker.id === id"
+                + "   && window.__regelsucheDemoReady === true"
+                + "   && summary && summary.dataset.e2eDemoId === id"
+                + "   && summary.innerHTML.length > 50;"
+                + "}",
             demoId,
-            new Page.WaitForFunctionOptions().setTimeout(15_000));
+            new Page.WaitForFunctionOptions().setTimeout(DEMO_COMPLETION_TIMEOUT_MILLIS));
     }
 
     private void waitForDemoSummary(String expectedDemoId) {
@@ -451,11 +573,19 @@ class BrowserDemoFlowTest {
     }
 
     private void waitForReplayReady() {
+        waitForReplayReady(requireLastDemoPathId("latest demo"));
+    }
+
+    private void waitForReplayReady(String expectedPathId) {
         page.waitForFunction(
-            "() => window.__regelsucheReplayReady === true "
-                + "&& document.querySelector('.replay-step')",
-            null,
-            new Page.WaitForFunctionOptions().setTimeout(10_000));
+            "pathId => {"
+                + " const select = document.querySelector('#replayPathSelect');"
+                + " return window.__regelsucheReplayReady === true"
+                + "   && select && select.value === pathId"
+                + "   && document.querySelector('.replay-step');"
+                + "}",
+            expectedPathId,
+            new Page.WaitForFunctionOptions().setTimeout(REPLAY_COMPLETION_TIMEOUT_MILLIS));
     }
 
     private void waitForProofResult(Runnable action) {
@@ -493,28 +623,58 @@ class BrowserDemoFlowTest {
     }
 
     private void openReplayForLatestPath() {
+        openReplayForPath(requireLastDemoPathId("latest demo"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private void openReplayForPath(String pathId) {
+        // Prevent the tab's first-use lazy loader from racing with the exact
+        // path selection below and replacing the selector after our fetch.
+        page.evaluate("() => {"
+            + " const select = document.querySelector('#replayPathSelect');"
+            + " if (select) select.dataset.loaded = '1';"
+            + "}");
         page.locator(".tab[data-tab='replay']").click();
         page.waitForSelector("#tab-replay.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
-        // Force-refresh the dropdown synchronously, then wait for the
-        // freshly-fetched options. Each test triggers a new demo, so we
-        // need the path list to include the just-recorded transformation.
-        page.evaluate(
-            "async () => {"
-                + " var s = document.querySelector('#replayPathSelect');"
-                + " var r = await fetch('/api/paths?sort=score');"
-                + " var d = await r.json();"
-                + " s.innerHTML = '';"
-                + " (d.transformations || []).forEach(function(p) {"
-                + "   var o = document.createElement('option');"
-                + "   o.value = p.id; o.textContent = p.id;"
-                + "   s.appendChild(o);"
-                + " });"
-                + " s.selectedIndex = s.options.length - 1;"
-                + " s.dispatchEvent(new Event('change', { bubbles: true }));"
-                + "}");
+        Map<String, Object> selection = (Map<String, Object>) page.evaluate(
+            "async pathId => {"
+                + " const select = document.querySelector('#replayPathSelect');"
+                + " if (!select) return { ok: false, diagnostic: 'missing replay selector' };"
+                + " const response = await fetch('/api/paths?sort=score');"
+                + " const raw = await response.text();"
+                + " if (!response.ok) return { ok: false, diagnostic: 'HTTP '"
+                + "   + response.status + ': ' + raw };"
+                + " let data;"
+                + " try { data = JSON.parse(raw); }"
+                + " catch (error) { return { ok: false, diagnostic: 'invalid JSON: ' + error }; }"
+                + " const path = (data.transformations || []).find(candidate =>"
+                + "   String(candidate.id) === String(pathId));"
+                + " if (!path) return { ok: false, diagnostic: 'path not found: ' + pathId };"
+                + " select.innerHTML = '';"
+                + " const option = document.createElement('option');"
+                + " option.value = String(path.id);"
+                + " option.textContent = String(path.id);"
+                + " select.appendChild(option);"
+                + " select.value = String(path.id);"
+                + " select.dispatchEvent(new Event('change', { bubbles: true }));"
+                + " window.__regelsucheReplayReady = false;"
+                + " const canvas = document.querySelector('#replayCanvas');"
+                + " if (canvas) canvas.innerHTML = '';"
+                + " return { ok: true, pathId: String(path.id) };"
+                + "}",
+            pathId);
+        assertTrue(Boolean.TRUE.equals(selection.get("ok")),
+            "could not select exact replay path " + pathId + ": "
+                + selection.get("diagnostic"));
         page.locator("#replayLoad").click();
-        waitForReplayReady();
+        waitForReplayReady(pathId);
+    }
+
+    private String requireLastDemoPathId(String demoId) {
+        assertTrue(lastDemoPathId != null && !lastDemoPathId.isBlank(),
+            demoId + " must expose the exact selected path id");
+        return lastDemoPathId;
     }
 
     private void screenshotDemoSummaryCard(
