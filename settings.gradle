@@ -63,6 +63,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/discovery-challenge-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/paper-foundation-verification.gradle')
     }
 }
 
