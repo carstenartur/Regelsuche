@@ -1,20 +1,20 @@
 {
   "claimPolicy": "PROFILE_AVAILABILITY_DOES_NOT_ESTABLISH_CASE_SUCCESS",
-  "contentHash": "sha256:d5e78b3ee5db9257fcc54a43912ec4f7a12962ceb83805ba31cd9978f93c1997",
+  "contentHash": "sha256:66243fe4b5d61a41c1fe14e4e0addf3601969745b445042f993c84c694b8105e",
   "formationPolicy": "NO_EVALUATION_TARGETS_OR_HELD_OUT_ASSUMPTION_COMBINATIONS",
   "operations": [
-    {
-      "implementationStatus": "ADAPTER_REQUIRED",
-      "operationId": "COMMON_FACTOR_CANCELLATION",
-      "requiredAssumptionKinds": [
-        "NONZERO_FACTOR"
-      ]
-    },
     {
       "implementationStatus": "ADAPTER_REQUIRED",
       "operationId": "AFFINE_FACTOR_CANCELLATION",
       "requiredAssumptionKinds": [
         "NONZERO_AFFINE_FACTOR"
+      ]
+    },
+    {
+      "implementationStatus": "ADAPTER_REQUIRED",
+      "operationId": "COMMON_FACTOR_CANCELLATION",
+      "requiredAssumptionKinds": [
+        "NONZERO_FACTOR"
       ]
     },
     {
@@ -27,16 +27,16 @@
     },
     {
       "implementationStatus": "ADAPTER_REQUIRED",
-      "operationId": "PARTIAL_FRACTION_DECOMPOSITION",
+      "operationId": "NESTED_DIVISION_NORMALIZATION",
       "requiredAssumptionKinds": [
-        "NONZERO_DENOMINATOR_FACTORS"
+        "NONZERO_INNER_DENOMINATORS"
       ]
     },
     {
       "implementationStatus": "ADAPTER_REQUIRED",
-      "operationId": "NESTED_DIVISION_NORMALIZATION",
+      "operationId": "PARTIAL_FRACTION_DECOMPOSITION",
       "requiredAssumptionKinds": [
-        "NONZERO_INNER_DENOMINATORS"
+        "NONZERO_DENOMINATOR_FACTORS"
       ]
     }
   ],
