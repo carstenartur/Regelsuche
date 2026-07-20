@@ -1,0 +1,51 @@
+def paperRepositoryRoot = layout.projectDirectory
+def paperRepositoryRootPath = paperRepositoryRoot.asFile.absolutePath
+def paperReproductionVerifier = paperRepositoryRoot.file(
+    'scripts/verify-paper-foundation-reproduction.py')
+def paperFoundationVerifier = paperRepositoryRoot.file(
+    'scripts/verify-paper-foundation.py')
+def paperManifest = paperRepositoryRoot.file(
+    'paper/paper-artifact-manifest.json')
+def paperManifestSchema = paperRepositoryRoot.file(
+    'docs/schemas/regelsuche-paper-artifact-manifest-v1.schema.json')
+def paperSources = [
+    paperRepositoryRoot.file('paper/manuscript.md'),
+    paperRepositoryRoot.file('paper/claims-and-evidence.md'),
+    paperRepositoryRoot.file('paper/limitations.md'),
+    paperRepositoryRoot.file('paper/artifact-appendix.md'),
+    paperRepositoryRoot.file('paper/README.md'),
+    paperRepositoryRoot.file('paper/reproduce-paper.sh')
+]
+def paperGenerated = paperRepositoryRoot.dir('paper/generated')
+def paperVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def paperVerificationPython = paperVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def verifyPaperFoundation = tasks.register(
+    'verifyPaperFoundation',
+    Exec
+) {
+    group = 'verification'
+    description = 'Reproduces and independently verifies the claim-bounded paper foundation.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir paperRepositoryRoot
+    inputs.file(paperReproductionVerifier)
+    inputs.file(paperFoundationVerifier)
+    inputs.file(paperManifest)
+    inputs.file(paperManifestSchema)
+    inputs.files(paperSources)
+    inputs.dir(paperGenerated)
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine paperVerificationPython.get().absolutePath,
+            paperReproductionVerifier.asFile.absolutePath,
+            '--repository-root', paperRepositoryRootPath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyPaperFoundation
+}
