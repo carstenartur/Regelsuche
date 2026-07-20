@@ -1,0 +1,52 @@
+{
+  "claimPolicy": "PROFILE_MAPPING_DOES_NOT_ESTABLISH_MACRO_UTILITY_OR_CASE_SUCCESS",
+  "contentHash": "sha256:b381dc63a16d76ee094391ae3854f1702c0d849d0162ffd6d16a7ff18a1d742e",
+  "implementationBoundary": "PROFILE_OPERATIONS_MAP_TO_ONE_OR_MORE_CURRENT_REWRITE_RULE_IDS",
+  "operations": [
+    {
+      "implementationRuleIds": [
+        "ast_add_zero_left",
+        "ast_add_zero_right"
+      ],
+      "operationId": "ast_add_zero"
+    },
+    {
+      "implementationRuleIds": [
+        "ast_double_term",
+        "ast_canonical_normalize"
+      ],
+      "operationId": "ast_collect_like_terms"
+    },
+    {
+      "implementationRuleIds": [
+        "ast_distribute_left_add",
+        "ast_distribute_right_add",
+        "ast_distribute_left_subtract",
+        "ast_distribute_right_subtract"
+      ],
+      "operationId": "ast_distribute"
+    },
+    {
+      "implementationRuleIds": [
+        "ast_multiply_one_left",
+        "ast_multiply_one_right"
+      ],
+      "operationId": "ast_multiply_identity"
+    },
+    {
+      "implementationRuleIds": [
+        "ast_power_two_to_product"
+      ],
+      "operationId": "ast_power_expand"
+    },
+    {
+      "implementationRuleIds": [
+        "ast_linear_offset_simplify",
+        "ast_canonical_normalize"
+      ],
+      "operationId": "ast_subtract_cancel"
+    }
+  ],
+  "profileId": "macro-primitives/v1",
+  "schema": "regelsuche.macro-primitive-profile/v1"
+}

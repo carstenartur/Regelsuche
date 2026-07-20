@@ -1,0 +1,21 @@
+{
+  "ambiguityPolicy": "RETAIN_ALL_VALID_FINITE_DATA_HYPOTHESES_NO_UNIQUE_INFINITE_SEQUENCE_CLAIM",
+  "claimPolicy": "FINITE_DATA_FIT_DOES_NOT_ESTABLISH_UNIQUENESS_PROOF_OR_EXTERNAL_NOVELTY",
+  "contentHash": "sha256:235f9196671e23e96b12ce213b8224ed5d0e9f1ca3fe932aadea179cbde7d331",
+  "formationPolicy": "OBSERVED_PREFIX_ONLY_HOLDOUT_NEVER_VISIBLE",
+  "forms": [
+    {
+      "formId": "FINITE_DIFFERENCE_POLYNOMIAL",
+      "implementationClass": "de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain",
+      "implementationStatus": "AVAILABLE",
+      "maximumOrder": 8
+    },
+    {
+      "formId": "LINEAR_RECURRENCE",
+      "implementationStatus": "ADAPTER_REQUIRED",
+      "maximumOrder": 8
+    }
+  ],
+  "profileId": "finite-sequence-candidate-forms/v1",
+  "schema": "regelsuche.finite-sequence-candidate-form-profile/v1"
+}

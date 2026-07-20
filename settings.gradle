@@ -72,6 +72,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/candidate-independent-execution-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/candidate-independent-corpus-verification.gradle')
     }
 }
 

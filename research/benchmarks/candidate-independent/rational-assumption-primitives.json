@@ -1,0 +1,45 @@
+{
+  "claimPolicy": "PROFILE_AVAILABILITY_DOES_NOT_ESTABLISH_CASE_SUCCESS",
+  "contentHash": "sha256:66243fe4b5d61a41c1fe14e4e0addf3601969745b445042f993c84c694b8105e",
+  "formationPolicy": "NO_EVALUATION_TARGETS_OR_HELD_OUT_ASSUMPTION_COMBINATIONS",
+  "operations": [
+    {
+      "implementationStatus": "ADAPTER_REQUIRED",
+      "operationId": "AFFINE_FACTOR_CANCELLATION",
+      "requiredAssumptionKinds": [
+        "NONZERO_AFFINE_FACTOR"
+      ]
+    },
+    {
+      "implementationStatus": "ADAPTER_REQUIRED",
+      "operationId": "COMMON_FACTOR_CANCELLATION",
+      "requiredAssumptionKinds": [
+        "NONZERO_FACTOR"
+      ]
+    },
+    {
+      "implementationRuleIds": [
+        "ast_square_difference_factor"
+      ],
+      "implementationStatus": "AVAILABLE",
+      "operationId": "DIFFERENCE_OF_SQUARES_FACTORING",
+      "requiredAssumptionKinds": []
+    },
+    {
+      "implementationStatus": "ADAPTER_REQUIRED",
+      "operationId": "NESTED_DIVISION_NORMALIZATION",
+      "requiredAssumptionKinds": [
+        "NONZERO_INNER_DENOMINATORS"
+      ]
+    },
+    {
+      "implementationStatus": "ADAPTER_REQUIRED",
+      "operationId": "PARTIAL_FRACTION_DECOMPOSITION",
+      "requiredAssumptionKinds": [
+        "NONZERO_DENOMINATOR_FACTORS"
+      ]
+    }
+  ],
+  "profileId": "rational-assumption-primitives/v1",
+  "schema": "regelsuche.rational-assumption-primitive-profile/v1"
+}
