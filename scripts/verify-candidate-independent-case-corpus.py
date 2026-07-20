@@ -21,14 +21,23 @@ except ImportError:
     )
     raise SystemExit(2)
 
-SOURCE = Path("research/benchmarks/candidate-independent/benchmark-source.json")
-CORPUS = Path("research/benchmarks/candidate-independent/case-corpus.json")
-RECEIPT = Path("research/benchmarks/candidate-independent/corpus-freeze-receipt.json")
+ROOT = Path("research/benchmarks/candidate-independent")
+SOURCE = ROOT / "benchmark-source.json"
+CORPUS = ROOT / "case-corpus.json"
+RECEIPT = ROOT / "corpus-freeze-receipt.json"
+PROFILE_FILES = {
+    "finite-sequence-candidate-forms/v1": ROOT / "finite-sequence-candidate-forms.json",
+    "macro-primitives/v1": ROOT / "macro-primitives.json",
+    "rational-assumption-primitives/v1": ROOT / "rational-assumption-primitives.json",
+}
 CORPUS_SCHEMA = Path(
     "docs/schemas/regelsuche-candidate-independent-case-corpus-v1.schema.json"
 )
 RECEIPT_SCHEMA = Path(
     "docs/schemas/regelsuche-candidate-independent-corpus-freeze-receipt-v1.schema.json"
+)
+PROFILE_SCHEMA = Path(
+    "docs/schemas/regelsuche-candidate-independent-formation-inventory-profile-v1.schema.json"
 )
 EXPECTED_SOURCE_BLOB = "742caf75ea01290259b7952dbcc826bb6beaeed7"
 EXPECTED_FOUNDATION_COMMIT = "f4e221273088e8b044baa9db81f23d060c856fc5"
@@ -139,7 +148,54 @@ def unique_ids(values: list[dict[str, Any]], field: str, label: str) -> None:
     need(len(identities) == len(set(identities)), f"duplicate {label} identity")
 
 
-def verify_case_payload(case: dict[str, Any], source_case: dict[str, Any]) -> None:
+def verify_profiles(
+    profiles: dict[str, dict[str, Any]],
+    profile_schema: dict[str, Any],
+) -> dict[str, str]:
+    need(set(profiles) == set(PROFILE_FILES), "formation profile set drift")
+    for profile_id, document in profiles.items():
+        validate(profile_schema, document, f"formation profile {profile_id}")
+        need(document["profileId"] == profile_id, f"profile identity drift: {profile_id}")
+
+    rational = profiles["rational-assumption-primitives/v1"]
+    rational_operations = rational["operations"]
+    unique_ids(rational_operations, "operationId", "rational operation")
+    need(
+        any(item["implementationStatus"] == "ADAPTER_REQUIRED" for item in rational_operations),
+        "rational profile hides adapter-required operations",
+    )
+
+    finite = profiles["finite-sequence-candidate-forms/v1"]
+    forms = finite["forms"]
+    unique_ids(forms, "formId", "finite-sequence form")
+    need(
+        [item["formId"] for item in forms]
+        == ["FINITE_DIFFERENCE_POLYNOMIAL", "LINEAR_RECURRENCE"],
+        "finite-sequence candidate form drift",
+    )
+    need(
+        not finite["ambiguityPolicy"].startswith("UNIQUE"),
+        "finite-data profile implies unique infinite continuation",
+    )
+
+    macro = profiles["macro-primitives/v1"]
+    operations = macro["operations"]
+    unique_ids(operations, "operationId", "macro operation")
+    need(
+        all(operation["implementationRuleIds"] for operation in operations),
+        "macro profile has an unbound operation",
+    )
+    return {
+        profile_id: profiles[profile_id]["contentHash"]
+        for profile_id in sorted(profiles)
+    }
+
+
+def verify_case_payload(
+    case: dict[str, Any],
+    source_case: dict[str, Any],
+    profiles: dict[str, dict[str, Any]],
+) -> None:
     for field in ("caseId", "challengeId", "split", "structuralCluster"):
         need(case[field] == source_case[field], f"{field} drift in {case['caseId']}")
     need(case["contentHash"] == document_hash(case), f"case hash drift: {case['caseId']}")
@@ -163,6 +219,12 @@ def verify_case_payload(case: dict[str, Any], source_case: dict[str, Any]) -> No
     challenge = case["challengeId"]
     evaluation = case["evaluationInput"]
     if challenge == "finite-difference-recurrences":
+        finite_profile = profiles["finite-sequence-candidate-forms/v1"]
+        frozen_forms = [item["formId"] for item in finite_profile["forms"]]
+        need(
+            evaluation["candidateFormsAllowed"] == frozen_forms,
+            f"sequence form-profile drift in {case['caseId']}",
+        )
         need(
             len(evaluation["observedPrefix"]) >= 4
             and len(evaluation["holdoutContinuation"]) >= 2,
@@ -178,8 +240,7 @@ def verify_case_payload(case: dict[str, Any], source_case: dict[str, Any]) -> No
             need(
                 formation["observedPrefix"] == evaluation["observedPrefix"]
                 and formation["indexOrigin"] == evaluation["indexOrigin"]
-                and formation["candidateFormsAllowed"]
-                == evaluation["candidateFormsAllowed"]
+                and formation["candidateFormsAllowed"] == frozen_forms
                 and formation["maximumOrder"] == evaluation["maximumOrder"]
                 and not formation["holdoutVisible"],
                 f"sequence TRAIN/evaluator binding drift in {case['caseId']}",
@@ -192,13 +253,19 @@ def verify_case_payload(case: dict[str, Any], source_case: dict[str, Any]) -> No
             f"trivial rational task in {case['caseId']}",
         )
         if split == "TRAIN":
+            formation = case["formationInput"]
+            need(
+                formation["primitiveInventoryProfile"]
+                == profiles["rational-assumption-primitives/v1"]["profileId"],
+                f"rational profile drift in {case['caseId']}",
+            )
             unique_ids(
-                case["formationInput"]["seedExpressions"],
+                formation["seedExpressions"],
                 "seedId",
                 f"rational seed {case['caseId']}",
             )
             need(
-                not case["formationInput"]["targetExpressionsVisible"],
+                not formation["targetExpressionsVisible"],
                 f"rational target leak in {case['caseId']}",
             )
     elif challenge == "reusable-search-macros":
@@ -209,11 +276,24 @@ def verify_case_payload(case: dict[str, Any], source_case: dict[str, Any]) -> No
             f"trivial macro task in {case['caseId']}",
         )
         if split == "TRAIN":
-            traces = case["formationInput"]["replayTraces"]
+            formation = case["formationInput"]
+            macro_profile = profiles["macro-primitives/v1"]
+            need(
+                formation["primitiveInventoryProfile"] == macro_profile["profileId"],
+                f"macro profile drift in {case['caseId']}",
+            )
+            allowed_operations = {
+                operation["operationId"] for operation in macro_profile["operations"]
+            }
+            traces = formation["replayTraces"]
             unique_ids(traces, "traceId", f"macro trace {case['caseId']}")
             need(
-                all(trace["primitiveSteps"] for trace in traces)
-                and not case["formationInput"]["heldOutTargetsVisible"],
+                all(
+                    trace["primitiveSteps"]
+                    and set(trace["primitiveSteps"]).issubset(allowed_operations)
+                    for trace in traces
+                )
+                and not formation["heldOutTargetsVisible"],
                 f"macro formation boundary drift in {case['caseId']}",
             )
     else:
@@ -225,11 +305,14 @@ def verify_documents(
     source: dict[str, Any],
     corpus: dict[str, Any],
     receipt: dict[str, Any],
+    profiles: dict[str, dict[str, Any]],
     corpus_schema: dict[str, Any],
     receipt_schema: dict[str, Any],
+    profile_schema: dict[str, Any],
 ) -> dict[str, Any]:
     validate(corpus_schema, corpus, "case corpus")
     validate(receipt_schema, receipt, "freeze receipt")
+    inventory_hashes = verify_profiles(profiles, profile_schema)
 
     source_hash = semantic_hash(source)
     need(
@@ -265,7 +348,7 @@ def verify_documents(
         "corpus case set/order drift",
     )
     for case, source_case in zip(corpus_cases, source_cases, strict=True):
-        verify_case_payload(case, source_case)
+        verify_case_payload(case, source_case, profiles)
 
     split_counts = {
         split: sum(1 for case in corpus_cases if case["split"] == split)
@@ -283,6 +366,10 @@ def verify_documents(
     need(receipt["benchmarkSourceContentHash"] == source_hash, "receipt source hash drift")
     need(receipt["caseCorpusContentHash"] == corpus["contentHash"], "receipt corpus hash drift")
     need(
+        receipt["formationInventoryContentHashes"] == inventory_hashes,
+        "receipt formation-inventory hash drift",
+    )
+    need(
         receipt["priorExecutionFoundationCommit"] == EXPECTED_FOUNDATION_COMMIT,
         "receipt foundation commit drift",
     )
@@ -290,6 +377,7 @@ def verify_documents(
         {
             "benchmarkSourceContentHash": source_hash,
             "caseCorpusContentHash": corpus["contentHash"],
+            "formationInventoryContentHashes": inventory_hashes,
             "amendmentId": corpus["amendmentId"],
             "priorExecutionFoundationCommit": EXPECTED_FOUNDATION_COMMIT,
         }
@@ -308,6 +396,7 @@ def verify_documents(
         "benchmarkId": corpus["benchmarkId"],
         "benchmarkSourceContentHash": source_hash,
         "caseCorpusContentHash": corpus["contentHash"],
+        "formationInventoryContentHashes": inventory_hashes,
         "combinedPreregistrationHash": combined,
         "caseCount": len(corpus_cases),
         "splitCounts": split_counts,
@@ -338,6 +427,7 @@ def write_report(directory: Path, summary: dict[str, Any]) -> None:
             "missing-case",
             "structural-cluster-substitution",
             "held-out-formation-payload",
+            "formation-inventory-drift",
             "post-execution-freeze-receipt",
         ],
     }
@@ -350,10 +440,11 @@ def write_report(directory: Path, summary: dict[str, Any]) -> None:
         "# Candidate-independent case-corpus freeze\n\n"
         "- Status: `VERIFIED_FROZEN_BEFORE_EVALUATED_EXECUTION`\n"
         "- Cases: `18` (`6 TRAIN / 6 VALIDATION / 6 TEST`)\n"
+        "- Formation inventories: `3`, hash-bound before execution\n"
         "- Evaluated campaigns / evaluations: `0 / 0`\n"
         "- Benchmark success and external novelty: `NOT_EVALUATED`\n"
         "- Publication authorized: `false`\n\n"
-        "The amendment repairs an omitted concrete-payload layer before any "
+        "The amendment repairs omitted payload and inventory layers before any "
         "evaluated execution. It is not a benchmark result.\n",
         encoding="utf-8",
     )
@@ -369,15 +460,22 @@ def main() -> int:
         source = load_unique(repository / SOURCE)
         corpus = load_unique(repository / CORPUS)
         receipt = load_unique(repository / RECEIPT)
+        profiles = {
+            profile_id: load_unique(repository / path)
+            for profile_id, path in PROFILE_FILES.items()
+        }
         corpus_schema = load_unique(repository / CORPUS_SCHEMA)
         receipt_schema = load_unique(repository / RECEIPT_SCHEMA)
+        profile_schema = load_unique(repository / PROFILE_SCHEMA)
         summary = verify_documents(
             repository,
             source,
             corpus,
             receipt,
+            profiles,
             corpus_schema,
             receipt_schema,
+            profile_schema,
         )
 
         missing = copy.deepcopy(corpus)
@@ -386,7 +484,8 @@ def main() -> int:
         require_negative(
             "missing-case",
             lambda: verify_documents(
-                repository, source, missing, receipt, corpus_schema, receipt_schema
+                repository, source, missing, receipt, profiles,
+                corpus_schema, receipt_schema, profile_schema
             ),
         )
 
@@ -397,7 +496,8 @@ def main() -> int:
         require_negative(
             "structural-cluster-substitution",
             lambda: verify_documents(
-                repository, source, substituted, receipt, corpus_schema, receipt_schema
+                repository, source, substituted, receipt, profiles,
+                corpus_schema, receipt_schema, profile_schema
             ),
         )
 
@@ -409,7 +509,23 @@ def main() -> int:
         require_negative(
             "held-out-formation-payload",
             lambda: verify_documents(
-                repository, source, leaked, receipt, corpus_schema, receipt_schema
+                repository, source, leaked, receipt, profiles,
+                corpus_schema, receipt_schema, profile_schema
+            ),
+        )
+
+        profile_drift = copy.deepcopy(profiles)
+        profile_drift["macro-primitives/v1"]["operations"][0]["implementationRuleIds"] = [
+            "unregistered-post-hoc-rule"
+        ]
+        profile_drift["macro-primitives/v1"]["contentHash"] = document_hash(
+            profile_drift["macro-primitives/v1"]
+        )
+        require_negative(
+            "formation-inventory-drift",
+            lambda: verify_documents(
+                repository, source, corpus, receipt, profile_drift,
+                corpus_schema, receipt_schema, profile_schema
             ),
         )
 
@@ -419,12 +535,8 @@ def main() -> int:
         require_negative(
             "post-execution-freeze-receipt",
             lambda: verify_documents(
-                repository,
-                source,
-                corpus,
-                post_execution,
-                corpus_schema,
-                receipt_schema,
+                repository, source, corpus, post_execution, profiles,
+                corpus_schema, receipt_schema, profile_schema
             ),
         )
         write_report(args.report_directory.resolve(), summary)
