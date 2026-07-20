@@ -1,0 +1,51 @@
+def corpusRepositoryRoot = layout.projectDirectory
+def corpusRepositoryRootPath = corpusRepositoryRoot.asFile.absolutePath
+def corpusSource = corpusRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/benchmark-source.json')
+def corpusDocument = corpusRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def corpusReceipt = corpusRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def corpusSchema = corpusRepositoryRoot.file(
+    'docs/schemas/regelsuche-candidate-independent-case-corpus-v1.schema.json')
+def corpusReceiptSchema = corpusRepositoryRoot.file(
+    'docs/schemas/regelsuche-candidate-independent-corpus-freeze-receipt-v1.schema.json')
+def corpusVerifier = corpusRepositoryRoot.file(
+    'scripts/verify-candidate-independent-case-corpus.py')
+def corpusReports = layout.buildDirectory.dir(
+    'reports/candidate-independent-corpus-freeze')
+def corpusVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def corpusVerificationPython = corpusVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def verifyCandidateIndependentCaseCorpus = tasks.register(
+    'verifyCandidateIndependentCaseCorpus',
+    Exec
+) {
+    group = 'verification'
+    description = 'Verifies the concrete 18-case corpus was frozen before any evaluated #383 execution.'
+    dependsOn 'prepareVerificationEnvironment',
+        'verifyCandidateIndependentExecutionFoundation'
+    workingDir corpusRepositoryRoot
+    inputs.file corpusSource
+    inputs.file corpusDocument
+    inputs.file corpusReceipt
+    inputs.file corpusSchema
+    inputs.file corpusReceiptSchema
+    inputs.file corpusVerifier
+    outputs.dir corpusReports
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine corpusVerificationPython.get().absolutePath,
+            corpusVerifier.asFile.absolutePath,
+            '--repository-root', corpusRepositoryRootPath,
+            '--report-directory', corpusReports.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentCaseCorpus
+}
