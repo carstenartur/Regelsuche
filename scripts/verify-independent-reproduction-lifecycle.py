@@ -14,7 +14,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-from typing import Any, Iterable
+from typing import Any
 
 EXPECTED_WRAPPER_SHA256 = (
     "bafc141b619ad6350fd975fc903156dd5c151998cc8b058e8c1044ab5f7b031f"
@@ -44,6 +44,13 @@ def fail(message: str) -> None:
 def require(condition: bool, message: str) -> None:
     if not condition:
         fail(message)
+
+
+def require_regular_file(path: Path, label: str) -> Path:
+    require(path.exists(), f"{label} is missing: {path}")
+    require(not path.is_symlink(), f"{label} must not be symbolic: {path}")
+    require(path.is_file(), f"{label} must be a regular file: {path}")
+    return path
 
 
 def run(
@@ -143,34 +150,52 @@ def require_safe_archive(path: Path) -> list[str]:
                 f"archive member escapes canonical root: {name}",
             )
             parts = Path(name).parts
-            require(not name.startswith("/") and ".." not in parts,
-                f"unsafe archive member: {name}")
-            require(not member.issym() and not member.islnk(),
-                f"archive link is forbidden: {name}")
+            require(
+                not name.startswith("/") and ".." not in parts,
+                f"unsafe archive member: {name}",
+            )
+            require(
+                not member.issym() and not member.islnk(),
+                f"archive link is forbidden: {name}",
+            )
     require(bool(names), "archive is empty")
     return names
 
 
 def verify_frozen_sources(repository: Path) -> None:
-    wrapper = repository / "gradle/wrapper/gradle-wrapper.properties"
+    wrapper = require_regular_file(
+        repository / "gradle/wrapper/gradle-wrapper.properties",
+        "Gradle wrapper properties",
+    )
     wrapper_lines = wrapper.read_text(encoding="utf-8").splitlines()
     require(
         f"distributionSha256Sum={EXPECTED_WRAPPER_SHA256}" in wrapper_lines,
         "Gradle wrapper digest differs from the frozen contract",
     )
-    dockerfile = repository / "reproduction/Dockerfile.reproduction"
+
+    dockerfile = require_regular_file(
+        repository / "reproduction/Dockerfile.reproduction",
+        "reproduction Dockerfile",
+    )
+    dockerfile_lines = dockerfile.read_text(encoding="utf-8").splitlines()
+    require(bool(dockerfile_lines), "reproduction Dockerfile is empty")
     require(
-        dockerfile.read_text(encoding="utf-8").splitlines()[0].strip()
-        == EXPECTED_IMAGE_FROM,
+        dockerfile_lines[0].strip() == EXPECTED_IMAGE_FROM,
         "reproduction Dockerfile base digest differs from the frozen contract",
     )
-    run(["bash", "-n", "reproduction/reproduce.sh"], cwd=repository)
+
+    launcher = require_regular_file(
+        repository / "reproduction/reproduce.sh",
+        "reproduction launcher",
+    )
+    run(["bash", "-n", str(launcher)], cwd=repository)
+
     for relative in (
         "scripts/build-independent-reproduction-artifact.py",
         "scripts/verify-independent-reproduction.py",
         "scripts/verify-independent-reproduction-lifecycle.py",
     ):
-        source = repository / relative
+        source = require_regular_file(repository / relative, relative)
         compile(source.read_text(encoding="utf-8"), relative, "exec")
 
 
@@ -196,21 +221,35 @@ def verify_artifact(
         "artifact status is not the conservative development status",
     )
     source = manifest.get("source", {})
-    require(source.get("revision") == source_revision,
-        "artifact source revision differs from Gradle input")
-    require(source.get("releaseTagStatus") == "DEVELOPMENT_REVISION",
-        "artifact release tag status is not DEVELOPMENT_REVISION")
-    require(manifest.get("externalAttestationStatus") == "NOT_COLLECTED",
-        "external attestation must remain NOT_COLLECTED")
+    require(
+        source.get("revision") == source_revision,
+        "artifact source revision differs from Gradle input",
+    )
+    require(
+        source.get("releaseTagStatus") == "DEVELOPMENT_REVISION",
+        "artifact release tag status is not DEVELOPMENT_REVISION",
+    )
+    require(
+        manifest.get("externalAttestationStatus") == "NOT_COLLECTED",
+        "external attestation must remain NOT_COLLECTED",
+    )
     environment = manifest.get("declaredEnvironment", {})
-    require(environment.get("evaluatedRunNetworkPolicy") == "DISABLED",
-        "evaluated run network policy must be DISABLED")
-    require(environment.get("javaImageIndexDigest") == EXPECTED_IMAGE_DIGEST,
-        "manifest Java image digest differs from frozen contract")
-    require(environment.get("gradleDistributionSha256") == EXPECTED_WRAPPER_SHA256,
-        "manifest Gradle digest differs from frozen contract")
-    require(environment.get("launcherRequirements") == EXPECTED_LAUNCHERS,
-        "launcher requirements differ from frozen contract")
+    require(
+        environment.get("evaluatedRunNetworkPolicy") == "DISABLED",
+        "evaluated run network policy must be DISABLED",
+    )
+    require(
+        environment.get("javaImageIndexDigest") == EXPECTED_IMAGE_DIGEST,
+        "manifest Java image digest differs from frozen contract",
+    )
+    require(
+        environment.get("gradleDistributionSha256") == EXPECTED_WRAPPER_SHA256,
+        "manifest Gradle digest differs from frozen contract",
+    )
+    require(
+        environment.get("launcherRequirements") == EXPECTED_LAUNCHERS,
+        "launcher requirements differ from frozen contract",
+    )
     return manifest
 
 
@@ -292,10 +331,15 @@ def verify_source_negatives(
         cwd=repository,
         expect_success=False,
     )
-    require("checkout does not match" in mismatch.stdout,
-        "mismatched revision did not retain the expected diagnostic")
+    require(
+        "checkout does not match" in mismatch.stdout,
+        "mismatched revision did not retain the expected diagnostic",
+    )
 
-    readme = repository / "reproduction/README.md"
+    readme = require_regular_file(
+        repository / "reproduction/README.md",
+        "reproduction README",
+    )
     original = readme.read_bytes()
     original_mode = stat.S_IMODE(readme.stat().st_mode)
     try:
@@ -314,8 +358,10 @@ def verify_source_negatives(
             cwd=repository,
             expect_success=False,
         )
-        require("worktree must be clean" in dirty.stdout,
-            "dirty checkout did not retain the expected diagnostic")
+        require(
+            "worktree must be clean" in dirty.stdout,
+            "dirty checkout did not retain the expected diagnostic",
+        )
     finally:
         readme.write_bytes(original)
         readme.chmod(original_mode)
@@ -323,13 +369,18 @@ def verify_source_negatives(
         ["git", "status", "--porcelain=v1", "--", "reproduction/README.md"],
         cwd=repository,
     ).stdout
-    require(not status.strip(), "dirty-checkout negative did not restore README bytes")
+    require(
+        not status.strip(),
+        "dirty-checkout negative did not restore README bytes",
+    )
 
 
 def reproduction_environment() -> dict[str, str]:
     environment = os.environ.copy()
     executable_directory = str(Path(sys.executable).resolve().parent)
-    environment["PATH"] = executable_directory + os.pathsep + environment.get("PATH", "")
+    environment["PATH"] = (
+        executable_directory + os.pathsep + environment.get("PATH", "")
+    )
     return environment
 
 
@@ -358,10 +409,14 @@ def verify_marker_negatives(repository: Path, artifact: Path, temporary: Path) -
             expect_success=False,
             environment=environment,
         )
-        require((output / "sentinel.txt").is_file(),
-            f"{label} marker negative removed unrelated sentinel")
-        require("exact regular reproduction marker" in result.stdout,
-            f"{label} marker negative lost ownership diagnostic")
+        require(
+            (output / "sentinel.txt").is_file(),
+            f"{label} marker negative removed unrelated sentinel",
+        )
+        require(
+            "exact regular reproduction marker" in result.stdout,
+            f"{label} marker negative lost ownership diagnostic",
+        )
         if symbolic:
             require(marker.is_symlink(), "symbolic marker was replaced")
 
@@ -463,18 +518,31 @@ def verify_receipt_semantics(
     )
     first = verify_receipt(repository, artifact, first_path)
     second = verify_receipt(repository, artifact, second_path)
-    require(first["reproductionStatus"] == "EXACT_BYTE_REPRODUCED",
-        "first receipt is not exact")
-    require(second["reproductionStatus"] == "EXACT_BYTE_REPRODUCED",
-        "second receipt is not exact")
-    require(first["semanticReceiptHash"] == second["semanticReceiptHash"],
-        "non-semantic metadata changed semantic receipt identity")
-    require(first["reproducerAttestationHash"] == second["reproducerAttestationHash"],
-        "non-semantic metadata changed reproducer attestation identity")
-    require(first["contentHash"] != second["contentHash"],
-        "different retained metadata must change complete receipt content hash")
-    require(first["externalAttestationStatus"] == "NOT_COLLECTED",
-        "self-test must not claim external attestation")
+    require(
+        first["reproductionStatus"] == "EXACT_BYTE_REPRODUCED",
+        "first receipt is not exact",
+    )
+    require(
+        second["reproductionStatus"] == "EXACT_BYTE_REPRODUCED",
+        "second receipt is not exact",
+    )
+    require(
+        first["semanticReceiptHash"] == second["semanticReceiptHash"],
+        "non-semantic metadata changed semantic receipt identity",
+    )
+    require(
+        first["reproducerAttestationHash"]
+        == second["reproducerAttestationHash"],
+        "non-semantic metadata changed reproducer attestation identity",
+    )
+    require(
+        first["contentHash"] != second["contentHash"],
+        "different retained metadata must change complete receipt content hash",
+    )
+    require(
+        first["externalAttestationStatus"] == "NOT_COLLECTED",
+        "self-test must not claim external attestation",
+    )
 
     missing_root = temporary / "missing-artifact"
     shutil.copytree(artifact, missing_root)
@@ -495,8 +563,10 @@ def verify_receipt_semantics(
         expect_success=False,
     )
     missing = verify_receipt(repository, missing_root, missing_receipt)
-    require(missing["reproductionStatus"] == "NOT_REPRODUCED",
-        "missing input did not retain NOT_REPRODUCED")
+    require(
+        missing["reproductionStatus"] == "NOT_REPRODUCED",
+        "missing input did not retain NOT_REPRODUCED",
+    )
     require(
         "missing artifact file: expected/result-card.md"
         in missing["semanticComparison"]["inputArtifactFailures"],
@@ -506,7 +576,9 @@ def verify_receipt_semantics(
     corrupt_root = temporary / "corrupt-artifact"
     shutil.copytree(artifact, corrupt_root)
     (corrupt_root / "artifact-manifest.json").write_text(
-        "{not-json\n", encoding="utf-8")
+        "{not-json\n",
+        encoding="utf-8",
+    )
     corrupt_receipt = reports / "reproduction-receipt-unreadable-manifest.json"
     run(
         compare_command(
@@ -523,10 +595,14 @@ def verify_receipt_semantics(
         expect_success=False,
     )
     corrupt = verify_receipt(repository, corrupt_root, corrupt_receipt)
-    require(corrupt["reproductionStatus"] == "NOT_REPRODUCED",
-        "unreadable manifest did not retain NOT_REPRODUCED")
-    require(corrupt["artifactManifestHashSource"] == "FILE_SHA256_FALLBACK",
-        "unreadable manifest did not retain fallback file identity")
+    require(
+        corrupt["reproductionStatus"] == "NOT_REPRODUCED",
+        "unreadable manifest did not retain NOT_REPRODUCED",
+    )
+    require(
+        corrupt["artifactManifestHashSource"] == "FILE_SHA256_FALLBACK",
+        "unreadable manifest did not retain fallback file identity",
+    )
 
     extra_observed = temporary / "extra-observed"
     shutil.copytree(observed, extra_observed)
@@ -546,11 +622,15 @@ def verify_receipt_semantics(
         cwd=repository,
     )
     extra = verify_receipt(repository, artifact, extra_receipt)
-    require(extra["reproductionStatus"] == "SEMANTICALLY_REPRODUCED",
-        "extra empty directory must remain a semantic-only reproduction")
-    require(extra["exactComparison"]["unexpectedPaths"]
+    require(
+        extra["reproductionStatus"] == "SEMANTICALLY_REPRODUCED",
+        "extra empty directory must remain a semantic-only reproduction",
+    )
+    require(
+        extra["exactComparison"]["unexpectedPaths"]
         == ["unexpected-empty-directory"],
-        "extra directory receipt lost the exact unexpected path")
+        "extra directory receipt lost the exact unexpected path",
+    )
     return {
         "semanticReceiptHash": first["semanticReceiptHash"],
         "reproducerAttestationHash": first["reproducerAttestationHash"],
@@ -615,8 +695,10 @@ def main() -> None:
 
     verify_frozen_sources(repository)
     require_identical_trees(artifact_a, artifact_b)
-    require(archive_a.read_bytes() == archive_b.read_bytes(),
-        "artifact archives are not byte-identical")
+    require(
+        archive_a.read_bytes() == archive_b.read_bytes(),
+        "artifact archives are not byte-identical",
+    )
     require_safe_archive(archive_a)
     require_safe_archive(archive_b)
     manifest_a = verify_artifact(repository, artifact_a, args.source_revision)
