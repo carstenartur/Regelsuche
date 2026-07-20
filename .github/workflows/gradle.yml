@@ -34,15 +34,20 @@ jobs:
           sudo apt-get install -y --no-install-recommends python3-venv z3
           z3 -version
       - name: Run the complete repository verification lifecycle
-        run: >-
-          env -u GITHUB_SHA ./gradlew
-          :app:installPlaywrightHostDependencies
-          :app:installPlaywrightBrowsers
-          fullCheck
-          jacocoTestReport
-          :app:benchmarkReport
-          generateCiPages
-          --console=plain
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/logs
+          env -u GITHUB_SHA ./gradlew \
+            :app:installPlaywrightHostDependencies \
+            :app:installPlaywrightBrowsers \
+            fullCheck \
+            jacocoTestReport \
+            :app:benchmarkReport \
+            generateCiPages \
+            --console=plain \
+            --stacktrace \
+            2>&1 | tee build/logs/full-check.log
       - name: Upload verification reports and retained evidence
         if: always()
         uses: actions/upload-artifact@v7
