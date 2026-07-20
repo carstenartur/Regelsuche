@@ -36,9 +36,6 @@ import org.testcontainers.utility.DockerImageName;
  */
 @Testcontainers(disabledWithoutDocker = true)
 class IndependentReproductionContainerTest {
-    private static final Path ARTIFACT_ROOT = Path.of(System.getProperty(
-        "regelsuche.independentReproductionArtifactRoot"
-    )).toAbsolutePath().normalize();
     private static final String SOURCE_REVISION = System.getProperty(
         "regelsuche.independentReproductionSourceRevision"
     );
@@ -51,15 +48,16 @@ class IndependentReproductionContainerTest {
     void publicArtifactImageReproducesExpectedEvidenceWithoutNetwork(
         @TempDir Path temporaryDirectory
     ) throws Exception {
-        assertTrue(Files.isDirectory(ARTIFACT_ROOT), ARTIFACT_ROOT.toString());
+        Path artifactRoot = requireArtifactRoot();
+        assertTrue(Files.isDirectory(artifactRoot), artifactRoot.toString());
         assertTrue(
             SOURCE_REVISION != null && SOURCE_REVISION.matches("[0-9a-f]{40}"),
             "source revision must be an exact Git commit"
         );
-        Path dockerfile = ARTIFACT_ROOT.resolve(
+        Path dockerfile = artifactRoot.resolve(
             "environment/Dockerfile.reproduction"
         );
-        Path expected = ARTIFACT_ROOT.resolve("expected");
+        Path expected = artifactRoot.resolve("expected");
         assertTrue(Files.isRegularFile(dockerfile), dockerfile.toString());
         assertTrue(Files.isDirectory(expected), expected.toString());
 
@@ -68,7 +66,7 @@ class IndependentReproductionContainerTest {
         makeContainerWritable(observed);
 
         ImageFromDockerfile image = new ImageFromDockerfile()
-            .withFileFromPath(".", ARTIFACT_ROOT)
+            .withFileFromPath(".", artifactRoot)
             .withDockerfilePath("./environment/Dockerfile.reproduction")
             .withTarget("independent-reproduction")
             .withBuildArg("REGELSUCHE_REPOSITORY_REVISION", SOURCE_REVISION)
@@ -126,6 +124,18 @@ class IndependentReproductionContainerTest {
         } finally {
             makeContainerTreeWritable(builtImage, observed);
         }
+    }
+
+    private static Path requireArtifactRoot() {
+        String value = System.getProperty(
+            "regelsuche.independentReproductionArtifactRoot"
+        );
+        assertTrue(
+            value != null && !value.isBlank(),
+            "system property regelsuche.independentReproductionArtifactRoot "
+                + "must point to the generated artifact directory"
+        );
+        return Path.of(value).toAbsolutePath().normalize();
     }
 
     private static void makeContainerWritable(Path directory) throws Exception {
