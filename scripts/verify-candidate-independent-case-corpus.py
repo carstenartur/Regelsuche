@@ -140,6 +140,8 @@ def git_output(repository: Path, *arguments: str) -> str:
 
 
 def unique_ids(values: list[dict[str, Any]], field: str, label: str) -> None:
+    need(all(isinstance(value, dict) for value in values), f"{label} entry is not an object")
+    need(all(field in value for value in values), f"{label} entry misses {field}")
     identities = [str(value[field]) for value in values]
     need(
         identities == sorted(identities),
@@ -197,6 +199,7 @@ def verify_case_payload(
     profiles: dict[str, dict[str, Any]],
 ) -> None:
     for field in ("caseId", "challengeId", "split", "structuralCluster"):
+        need(field in case and field in source_case, f"missing {field} in case binding")
         need(case[field] == source_case[field], f"{field} drift in {case['caseId']}")
     need(case["contentHash"] == document_hash(case), f"case hash drift: {case['caseId']}")
 
@@ -316,8 +319,8 @@ def verify_documents(
 
     source_hash = semantic_hash(source)
     need(
-        source["executionStatus"] == "NOT_STARTED"
-        and not source["publicationAuthorized"],
+        source.get("executionStatus") == "NOT_STARTED"
+        and source.get("publicationAuthorized") is False,
         "original source no longer represents a pre-execution state",
     )
     need(corpus["amendmentId"] == EXPECTED_AMENDMENT, "amendment identity drift")
@@ -325,7 +328,12 @@ def verify_documents(
         corpus["priorBenchmarkSourceContentHash"] == source_hash,
         "corpus source semantic hash drift",
     )
-    source_blob = git_output(repository, "hash-object", str(repository / SOURCE))
+    source_blob = git_output(
+        repository,
+        "hash-object",
+        f"--path={SOURCE.as_posix()}",
+        str(repository / SOURCE),
+    )
     need(source_blob == EXPECTED_SOURCE_BLOB, "original benchmark source Git blob drift")
     need(
         corpus["priorBenchmarkSourceGitBlobSha"] == source_blob,
@@ -338,8 +346,12 @@ def verify_documents(
     )
     git_output(repository, "merge-base", "--is-ancestor", EXPECTED_FOUNDATION_COMMIT, "HEAD")
 
-    source_cases = source["cases"]
-    corpus_cases = corpus["cases"]
+    source_cases = source.get("cases")
+    corpus_cases = corpus.get("cases")
+    need(isinstance(source_cases, list), "source cases must be an array")
+    need(isinstance(corpus_cases, list), "corpus cases must be an array")
+    need(all(isinstance(case, dict) for case in source_cases), "source case is not an object")
+    need(all(isinstance(case, dict) for case in corpus_cases), "corpus case is not an object")
     unique_ids(source_cases, "caseId", "source case")
     unique_ids(corpus_cases, "caseId", "corpus case")
     need(
