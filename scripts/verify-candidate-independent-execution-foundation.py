@@ -6,7 +6,15 @@ import argparse, copy, hashlib, json, os, re, shutil, sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
-from jsonschema import Draft202012Validator
+
+try:
+    from jsonschema import Draft202012Validator
+except ImportError:
+    print(
+        "Missing pinned jsonschema. Run ./gradlew prepareVerificationEnvironment.",
+        file=sys.stderr,
+    )
+    raise SystemExit(2)
 
 SOURCE = Path("research/benchmarks/candidate-independent/benchmark-source.json")
 SCHEMA_DIR = Path("docs/schemas")
@@ -189,6 +197,14 @@ def eval_path(campaign: str, case_id: str) -> str:
     return f"case-evaluations/{safe(campaign)}--{safe(case_id)}.json"
 
 
+def require_membership(actual: set[str], expected: set[str]) -> None:
+    need(
+        actual == expected,
+        f"bundle membership drift missing={sorted(expected-actual)} "
+        f"unexpected={sorted(actual-expected)}",
+    )
+
+
 def bind_eval(
     value: dict[str, Any],
     campaign: dict[str, Any],
@@ -310,11 +326,7 @@ def verify(
             expected_files.add(name)
             bindings[name] = (campaign, challenge_cases[case_id])
     actual_files = set(tree(root))
-    need(
-        actual_files == expected_files,
-        f"bundle membership drift missing={sorted(expected_files-actual_files)} "
-        f"unexpected={sorted(actual_files-expected_files)}",
-    )
+    require_membership(actual_files, expected_files)
 
     evaluations, inventory = [], []
     for name in sorted(bindings):
@@ -402,7 +414,7 @@ def verify(
     missing.remove(sorted(bindings)[0])
     expect_failure(
         "missing evaluation",
-        lambda: need(missing == expected_files, "missing evaluation"),
+        lambda: require_membership(missing, expected_files),
     )
     test_name = next(
         name
