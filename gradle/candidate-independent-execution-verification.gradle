@@ -1,0 +1,95 @@
+def benchmarkRepositoryRoot = layout.projectDirectory
+def benchmarkRepositoryRootPath = benchmarkRepositoryRoot.asFile.absolutePath
+def benchmarkSource = benchmarkRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/benchmark-source.json')
+def benchmarkGenerator = benchmarkRepositoryRoot.file(
+    'scripts/generate-candidate-independent-execution-foundation.py')
+def benchmarkVerifier = benchmarkRepositoryRoot.file(
+    'scripts/verify-candidate-independent-execution-foundation.py')
+def benchmarkSchemas = [
+    'regelsuche-candidate-independent-campaign-batch-v1.schema.json',
+    'regelsuche-candidate-independent-case-evaluation-v1.schema.json',
+    'regelsuche-candidate-independent-benchmark-report-v1.schema.json',
+    'regelsuche-candidate-independent-benchmark-run-v1.schema.json'
+].collect { name ->
+    benchmarkRepositoryRoot.file("docs/schemas/${name}")
+}
+
+def benchmarkBuildRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-execution')
+def benchmarkFirst = benchmarkBuildRoot.map { it.dir('first') }
+def benchmarkSecond = benchmarkBuildRoot.map { it.dir('second') }
+def benchmarkVerification = benchmarkBuildRoot.map { it.dir('verification') }
+def benchmarkGenerationPython = providers.gradleProperty(
+    'pythonExecutable').getOrElse('python3')
+def benchmarkVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def benchmarkVerificationPython = benchmarkVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureBenchmarkGeneration = { task, outputDirectory ->
+    task.group = 'verification'
+    task.description = 'Generates one deterministic incomplete execution-accounting bundle for #383.'
+    task.dependsOn 'verifyCandidateIndependentBenchmark'
+    task.workingDir benchmarkRepositoryRoot
+    task.inputs.file benchmarkSource
+    task.inputs.file benchmarkGenerator
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.dir outputDirectory
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine benchmarkGenerationPython,
+            benchmarkGenerator.asFile.absolutePath,
+            '--source', benchmarkSource.asFile.absolutePath,
+            '--output', outputDirectory.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def generateCandidateIndependentExecutionFoundationFirst = tasks.register(
+    'generateCandidateIndependentExecutionFoundationFirst',
+    Exec
+) {
+    configureBenchmarkGeneration(delegate, benchmarkFirst)
+}
+
+def generateCandidateIndependentExecutionFoundationSecond = tasks.register(
+    'generateCandidateIndependentExecutionFoundationSecond',
+    Exec
+) {
+    configureBenchmarkGeneration(delegate, benchmarkSecond)
+}
+
+def verifyCandidateIndependentExecutionFoundation = tasks.register(
+    'verifyCandidateIndependentExecutionFoundation',
+    Exec
+) {
+    group = 'verification'
+    description = 'Verifies complete fail-closed accounting before evaluated #383 campaigns run.'
+    dependsOn 'prepareVerificationEnvironment',
+        generateCandidateIndependentExecutionFoundationFirst,
+        generateCandidateIndependentExecutionFoundationSecond
+    workingDir benchmarkRepositoryRoot
+    inputs.file benchmarkSource
+    inputs.file benchmarkGenerator
+    inputs.file benchmarkVerifier
+    inputs.files benchmarkSchemas
+    inputs.dir benchmarkFirst
+    inputs.dir benchmarkSecond
+    outputs.dir benchmarkVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine benchmarkVerificationPython.get().absolutePath,
+            benchmarkVerifier.asFile.absolutePath,
+            '--repository-root', benchmarkRepositoryRootPath,
+            '--first', benchmarkFirst.get().asFile.absolutePath,
+            '--second', benchmarkSecond.get().asFile.absolutePath,
+            '--report-directory', benchmarkVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentExecutionFoundation
+}
