@@ -20,8 +20,6 @@ def benchmarkBuildRoot = layout.buildDirectory.dir(
 def benchmarkFirst = benchmarkBuildRoot.map { it.dir('first') }
 def benchmarkSecond = benchmarkBuildRoot.map { it.dir('second') }
 def benchmarkVerification = benchmarkBuildRoot.map { it.dir('verification') }
-def benchmarkGenerationPython = providers.gradleProperty(
-    'pythonExecutable').getOrElse('python3')
 def benchmarkVerificationVenv = layout.buildDirectory.dir('verification-venv')
 def benchmarkVerificationPython = benchmarkVerificationVenv.map { directory ->
     def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
@@ -32,7 +30,8 @@ def benchmarkVerificationPython = benchmarkVerificationVenv.map { directory ->
 def configureBenchmarkGeneration = { task, outputDirectory ->
     task.group = 'verification'
     task.description = 'Generates one deterministic incomplete execution-accounting bundle for #383.'
-    task.dependsOn 'verifyCandidateIndependentBenchmark'
+    task.dependsOn 'prepareVerificationEnvironment',
+        'verifyCandidateIndependentBenchmark'
     task.workingDir benchmarkRepositoryRoot
     task.inputs.file benchmarkSource
     task.inputs.file benchmarkGenerator
@@ -40,7 +39,7 @@ def configureBenchmarkGeneration = { task, outputDirectory ->
     task.outputs.dir outputDirectory
     task.outputs.upToDateWhen { false }
     task.doFirst {
-        commandLine benchmarkGenerationPython,
+        commandLine benchmarkVerificationPython.get().absolutePath,
             benchmarkGenerator.asFile.absolutePath,
             '--source', benchmarkSource.asFile.absolutePath,
             '--output', outputDirectory.get().asFile.absolutePath,
