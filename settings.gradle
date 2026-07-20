@@ -69,6 +69,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/independent-reproduction-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/candidate-independent-execution-verification.gradle')
     }
 }
 
