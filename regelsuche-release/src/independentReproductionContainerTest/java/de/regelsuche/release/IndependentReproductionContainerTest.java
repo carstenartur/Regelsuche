@@ -23,6 +23,7 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.startupcheck.OneShotStartupCheckStrategy;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 /**
  * Executes the public independent-reproduction image contract through
@@ -72,9 +73,10 @@ class IndependentReproductionContainerTest {
             .withTarget("independent-reproduction")
             .withBuildArg("REGELSUCHE_REPOSITORY_REVISION", SOURCE_REVISION)
             .withBuildImageCmdModifier(command -> command.withPlatform(ARCHITECTURE));
+        DockerImageName builtImage = DockerImageName.parse(image.get());
 
         try {
-            GenericContainer<?> container = new GenericContainer<>(image)
+            GenericContainer<?> container = new GenericContainer<>(builtImage)
                 .withFileSystemBind(
                     observed.toString(),
                     "/out",
@@ -122,7 +124,7 @@ class IndependentReproductionContainerTest {
 
             assertTreesEqual(expected, observed);
         } finally {
-            makeContainerTreeWritable(image, observed);
+            makeContainerTreeWritable(builtImage, observed);
         }
     }
 
@@ -146,7 +148,7 @@ class IndependentReproductionContainerTest {
     }
 
     private static void makeContainerTreeWritable(
-        ImageFromDockerfile image,
+        DockerImageName image,
         Path directory
     ) {
         if (!Files.exists(directory)) {
@@ -156,12 +158,13 @@ class IndependentReproductionContainerTest {
             .withFileSystemBind(directory.toString(), "/out", BindMode.READ_WRITE)
             .withNetworkMode("none")
             .withCreateContainerCmdModifier(command -> {
-                command.withEntrypoint("/bin/sh", "-c");
-                command.withCmd("chmod -R a+rwX /out");
+                command.withEntrypoint("/bin/sh");
+                command.withCmd("-c", "chmod -R a+rwX /out");
             })
             .withStartupCheckStrategy(
                 new OneShotStartupCheckStrategy().withTimeout(Duration.ofMinutes(2))
-            );
+            )
+            .withLogConsumer(frame -> System.err.print(frame.getUtf8String()));
         try {
             cleanup.start();
         } finally {
