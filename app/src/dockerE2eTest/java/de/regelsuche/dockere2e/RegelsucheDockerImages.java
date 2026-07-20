@@ -51,14 +51,14 @@ final class RegelsucheDockerImages {
                 .toAbsolutePath().normalize();
             Process process = new ProcessBuilder(
                 "git", "-C", PROJECT_ROOT.toString(), "ls-files", "-z")
+                .redirectErrorStream(true)
                 .start();
             byte[] trackedOutput = process.getInputStream().readAllBytes();
-            byte[] diagnostics = process.getErrorStream().readAllBytes();
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 throw new IllegalStateException(
                     "git ls-files failed with exit code " + exitCode + ": "
-                        + new String(diagnostics, StandardCharsets.UTF_8));
+                        + new String(trackedOutput, StandardCharsets.UTF_8));
             }
 
             for (String trackedPath : new String(
