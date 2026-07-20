@@ -103,8 +103,8 @@ def verifyIndependentReproductionArtifact = tasks.register(
             '--archive-b', reproductionArchiveB.get().asFile.absolutePath,
             '--source-revision', reproductionSourceRevision.get(),
             '--report-directory', reproductionReports.get().asFile.absolutePath
-        environment 'PATH', reproductionVerificationPython.get().asFile.parent
-            + File.pathSeparator + System.getenv('PATH')
+        environment 'PATH', reproductionVerificationPython.get().parent
+            + File.pathSeparator + (System.getenv('PATH') ?: '')
     }
 }
 
