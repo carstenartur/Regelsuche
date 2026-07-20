@@ -64,6 +64,7 @@ jobs:
             **/build/discovery-artifacts/**
             docs/benchmark-report.md
             docs/assets/benchmark-summary.json
+          include-hidden-files: true
           if-no-files-found: warn
 
   publish-quality-pages:
