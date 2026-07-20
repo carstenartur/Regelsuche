@@ -13,6 +13,7 @@ import de.regelsuche.persistence.PersistenceConfig;
 import de.regelsuche.persistence.relational.RelationalPersistenceAdapters;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -29,7 +30,11 @@ class ScientificDiscoveryPostgresE2ETest {
         .withEnv("POSTGRES_USER", "regelsuche")
         .withEnv("POSTGRES_PASSWORD", "regelsuche-demo")
         .withExposedPorts(5432)
-        .waitingFor(Wait.forListeningPort());
+        .waitingFor(Wait.forLogMessage(
+            ".*database system is ready to accept connections.*\\s",
+            2
+        ))
+        .withStartupTimeout(Duration.ofMinutes(2));
 
     @TempDir
     Path tempDir;
