@@ -22,8 +22,6 @@ def corpusProfileSchema = corpusRepositoryRoot.file(
     'docs/schemas/regelsuche-candidate-independent-formation-inventory-profile-v1.schema.json')
 def corpusVerifier = corpusRepositoryRoot.file(
     'scripts/verify-candidate-independent-case-corpus.py')
-def corpusVerifierEntrypoint = corpusRepositoryRoot.file(
-    'scripts/verify-candidate-independent-case-corpus-entrypoint.py')
 def corpusReports = layout.buildDirectory.dir(
     'reports/candidate-independent-corpus-freeze')
 def corpusVerificationVenv = layout.buildDirectory.dir('verification-venv')
@@ -50,12 +48,11 @@ def verifyCandidateIndependentCaseCorpus = tasks.register(
     inputs.file corpusReceiptSchema
     inputs.file corpusProfileSchema
     inputs.file corpusVerifier
-    inputs.file corpusVerifierEntrypoint
     outputs.dir corpusReports
     outputs.upToDateWhen { false }
     doFirst {
         commandLine corpusVerificationPython.get().absolutePath,
-            corpusVerifierEntrypoint.asFile.absolutePath,
+            corpusVerifier.asFile.absolutePath,
             '--repository-root', corpusRepositoryRootPath,
             '--report-directory', corpusReports.get().asFile.absolutePath
     }
