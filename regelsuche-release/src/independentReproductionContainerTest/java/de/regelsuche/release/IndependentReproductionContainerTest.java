@@ -159,7 +159,10 @@ class IndependentReproductionContainerTest {
             .withNetworkMode("none")
             .withCreateContainerCmdModifier(command -> {
                 command.withEntrypoint("/bin/sh");
-                command.withCmd("-c", "chmod -R a+rwX /out");
+                command.withCmd(
+                    "-c",
+                    "find /out -mindepth 1 -exec chmod a+rwX {} +"
+                );
             })
             .withStartupCheckStrategy(
                 new OneShotStartupCheckStrategy().withTimeout(Duration.ofMinutes(2))
