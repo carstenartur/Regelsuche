@@ -628,6 +628,12 @@ class BrowserDemoFlowTest {
 
     @SuppressWarnings("unchecked")
     private void openReplayForPath(String pathId) {
+        // Prevent the tab's first-use lazy loader from racing with the exact
+        // path selection below and replacing the selector after our fetch.
+        page.evaluate("() => {"
+            + " const select = document.querySelector('#replayPathSelect');"
+            + " if (select) select.dataset.loaded = '1';"
+            + "}");
         page.locator(".tab[data-tab='replay']").click();
         page.waitForSelector("#tab-replay.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
