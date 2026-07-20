@@ -86,10 +86,43 @@ def verifyEvolutionStudyContracts = tasks.register('verifyEvolutionStudyContract
     }
 }
 
+def independentReviewOutput = layout.buildDirectory.dir(
+    'reports/independent-review-protocol')
+def independentReviewVerifier = rootProject.file(
+    'scripts/verify-independent-interestingness-review.py')
+def independentReviewPlanSchema = rootProject.file(
+    'docs/schemas/regelsuche-independent-review-study-plan-v1.schema.json')
+def independentReviewIntakeSchema = rootProject.file(
+    'docs/schemas/regelsuche-independent-review-intake-v1.schema.json')
+def independentReviewSchemasPath = rootProject.file('docs/schemas').absolutePath
+
+def verifyIndependentInterestingnessReview = tasks.register(
+    'verifyIndependentInterestingnessReview',
+    Exec
+) {
+    group = 'verification'
+    description = 'Verifies frozen review-plan, privacy, split, hash and development-only intake contracts.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        tasks.named('test')
+    workingDir rootProject.rootDir
+    inputs.file(independentReviewVerifier)
+    inputs.files(independentReviewPlanSchema, independentReviewIntakeSchema)
+    inputs.dir(independentReviewOutput)
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            independentReviewVerifier.absolutePath,
+            '--root', independentReviewOutput.get().asFile.absolutePath,
+            '--schemas', independentReviewSchemasPath
+    }
+}
+
 tasks.named('check') {
-    dependsOn verifyEvolutionStudyContracts
+    dependsOn verifyEvolutionStudyContracts,
+        verifyIndependentInterestingnessReview
 }
 
 rootProject.tasks.named('check') {
-    dependsOn verifyEvolutionStudyContracts
+    dependsOn verifyEvolutionStudyContracts,
+        verifyIndependentInterestingnessReview
 }

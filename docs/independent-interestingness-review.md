@@ -2,7 +2,7 @@
 
 Dieser Baustein bereitet den empirischen Teil von Issue #332 vor. Er friert
 Kandidaten, Reviewregeln und Akzeptanzschwellen ein, bevor Relevanzurteile
-erhoben werden. Die mitgelieferte CI-Evidence verwendet ausschließlich
+erhoben werden. Die mitgelieferte Referenzevidence verwendet ausschließlich
 `DEVELOPMENT_FIXTURE` und ist ausdrücklich **keine** unabhängige Expertenstudie.
 
 ## Studienplan vor der Reviewerhebung
@@ -27,8 +27,8 @@ und Akzeptanzschwellen verändern diesen Hash nicht.
 
 Mindestens zwei Fälle pro Split sind bereits für die Protokollvalidierung
 notwendig. Die tatsächliche empirische Studie aus #332 benötigt darüber hinaus
-einen ausreichend großen und begründeten Korpus; die kleine CI-Fixture ist kein
-Ersatz dafür.
+einen ausreichend großen und begründeten Korpus; die kleine Development-Fixture
+ist kein Ersatz dafür.
 
 ## Expositionsledger
 
@@ -108,17 +108,41 @@ Der vorhandene Ablauf bleibt:
 Promotion und Public Evidence bleiben sowohl im Plan als auch im Intake
 `NOT_EVALUATED`.
 
-## CI-Evidence
+## Checkout-lokale Protokollverifikation
 
-Der dedizierte Workflow schreibt:
+Der maßgebliche Softwarevertrag ist lokal ausführbar:
+
+```bash
+./gradlew :regelsuche-learning:verifyIndependentInterestingnessReview
+```
+
+Der Task gehört zu `:regelsuche-learning:check` und zum Root-`check`. Er führt
+die vorhandenen JUnit-Verträge aus, die folgende Development-Artefakte schreiben:
 
 - `study-plan.json`;
 - `development-intake.json`.
 
-Er verlangt byte-identische Wiederholungen, validiert beide Draft-2020-12-
-Schemas, prüft Hashverkettungen, Split-Isolation, Schwellenbindung und bestätigt,
-dass die gespeicherte Referenz null gezählte Expertenreviews und
-`DEVELOPMENT_ONLY` enthält.
+Anschließend prüft
+`scripts/verify-independent-interestingness-review.py` unabhängig:
+
+- die beiden fail-closed Draft-2020-12-Schemas mit der gepinnten
+  `jsonschema`-Version;
+- eindeutiges JSON ohne Duplicate Fields oder Symlinks;
+- `predictiveCorpusHash`, `thresholdLockHash`, Plan- und Intake-`contentHash`;
+- sämtliche Decision-`contentHash`-Identitäten;
+- disjunkte CALIBRATION-/TEST-Familien und strukturelle Signaturen;
+- dass kein historisch exponiertes Artefakt als frischer TEST-Fall verwendet
+  wird;
+- Study-Plan-, Case-, Candidate-, Corpus- und Threshold-Bindungen;
+- den vollständigen `labeledEvaluationHash`;
+- exakt eine Development-only-Referenz ohne gezählte Expertenreviews;
+- unveränderte `NOT_COLLECTED`-, `NOT_EVALUATED`- und
+  `DEVELOPMENT_ONLY`-Grenzen.
+
+Ein eigener GitHub-Actions-Testgraph ist dafür nicht erforderlich. Zentrale CI
+ruft denselben Gradle-Vertrag auf und kann die erzeugten Reports archivieren.
+Dies bestätigt ausschließlich die Software- und Protokollstruktur, nicht die
+Unabhängigkeit, Qualifikation oder tatsächliche Existenz externer Reviewer.
 
 ## Versionierte Schemas
 
