@@ -1,0 +1,118 @@
+def reproductionRepositoryRoot = layout.projectDirectory
+def reproductionRepositoryRootPath = reproductionRepositoryRoot.asFile.absolutePath
+def reproductionVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def reproductionVerificationPython = reproductionVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def reproductionSourceRevision = providers.gradleProperty(
+    'independentReproductionSourceRevision').orElse(providers.exec {
+        commandLine 'git', '-C', reproductionRepositoryRootPath,
+            'rev-parse', 'HEAD^{commit}'
+    }.standardOutput.asText.map { it.trim() })
+def reproductionReleaseTag = providers.gradleProperty(
+    'independentReproductionReleaseTag').orElse(
+        reproductionSourceRevision.map { revision -> "development-${revision}" })
+def reproductionReleaseTagStatus = providers.gradleProperty(
+    'independentReproductionReleaseTagStatus').getOrElse('DEVELOPMENT_REVISION')
+def reproductionArchitecture = providers.gradleProperty(
+    'independentReproductionArchitecture').getOrElse('linux/amd64')
+
+def reproductionWalkthrough = project(':regelsuche-release').layout.buildDirectory.dir(
+    'reports/autonomous-discovery-walkthrough')
+def reproductionBuildRoot = layout.buildDirectory.dir('independent-reproduction')
+def reproductionArtifactA = reproductionBuildRoot.map { it.dir('artifact-a') }
+def reproductionArtifactB = reproductionBuildRoot.map { it.dir('artifact-b') }
+def reproductionArchiveA = reproductionBuildRoot.map { it.file('artifact-a.tar.gz') }
+def reproductionArchiveB = reproductionBuildRoot.map { it.file('artifact-b.tar.gz') }
+def reproductionReports = reproductionBuildRoot.map { it.dir('reports') }
+def reproductionBuilder = reproductionRepositoryRoot.file(
+    'scripts/build-independent-reproduction-artifact.py')
+def reproductionVerifier = reproductionRepositoryRoot.file(
+    'scripts/verify-independent-reproduction.py')
+def reproductionLifecycleVerifier = reproductionRepositoryRoot.file(
+    'scripts/verify-independent-reproduction-lifecycle.py')
+
+def configureArtifactBuild = { task, outputDirectory, archiveOutput ->
+    task.group = 'verification'
+    task.dependsOn 'prepareVerificationEnvironment',
+        ':regelsuche-release:runAutonomousDiscoveryWalkthrough'
+    task.workingDir reproductionRepositoryRoot
+    task.inputs.file reproductionBuilder
+    task.inputs.file reproductionVerifier
+    task.inputs.dir reproductionWalkthrough
+    task.inputs.property 'sourceRevision', reproductionSourceRevision
+    task.inputs.property 'releaseTag', reproductionReleaseTag
+    task.inputs.property 'releaseTagStatus', reproductionReleaseTagStatus
+    task.inputs.property 'architecture', reproductionArchitecture
+    task.outputs.dir outputDirectory
+    task.outputs.file archiveOutput
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine reproductionVerificationPython.get().absolutePath,
+            reproductionBuilder.asFile.absolutePath,
+            '--repository-root', reproductionRepositoryRootPath,
+            '--walkthrough-root', reproductionWalkthrough.get().asFile.absolutePath,
+            '--source-revision', reproductionSourceRevision.get(),
+            '--release-tag', reproductionReleaseTag.get(),
+            '--release-tag-status', reproductionReleaseTagStatus,
+            '--architecture', reproductionArchitecture,
+            '--output-directory', outputDirectory.get().asFile.absolutePath,
+            '--archive-output', archiveOutput.get().asFile.absolutePath
+    }
+}
+
+def buildIndependentReproductionArtifactA = tasks.register(
+    'buildIndependentReproductionArtifactA', Exec) {
+    description = 'Builds the first deterministic independent-reproduction artifact.'
+    configureArtifactBuild(delegate, reproductionArtifactA, reproductionArchiveA)
+}
+
+def buildIndependentReproductionArtifactB = tasks.register(
+    'buildIndependentReproductionArtifactB', Exec) {
+    description = 'Builds the second deterministic independent-reproduction artifact.'
+    configureArtifactBuild(delegate, reproductionArtifactB, reproductionArchiveB)
+}
+
+def verifyIndependentReproductionArtifact = tasks.register(
+    'verifyIndependentReproductionArtifact', Exec) {
+    group = 'verification'
+    description = 'Verifies deterministic artifact bytes, manifests, security negatives and receipt semantics.'
+    dependsOn buildIndependentReproductionArtifactA,
+        buildIndependentReproductionArtifactB
+    workingDir reproductionRepositoryRoot
+    inputs.file reproductionLifecycleVerifier
+    inputs.file reproductionVerifier
+    inputs.file reproductionBuilder
+    inputs.dir reproductionArtifactA
+    inputs.dir reproductionArtifactB
+    inputs.file reproductionArchiveA
+    inputs.file reproductionArchiveB
+    inputs.property 'sourceRevision', reproductionSourceRevision
+    outputs.dir reproductionReports
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine reproductionVerificationPython.get().absolutePath,
+            reproductionLifecycleVerifier.asFile.absolutePath,
+            '--repository-root', reproductionRepositoryRootPath,
+            '--artifact-a', reproductionArtifactA.get().asFile.absolutePath,
+            '--artifact-b', reproductionArtifactB.get().asFile.absolutePath,
+            '--archive-a', reproductionArchiveA.get().asFile.absolutePath,
+            '--archive-b', reproductionArchiveB.get().asFile.absolutePath,
+            '--source-revision', reproductionSourceRevision.get(),
+            '--report-directory', reproductionReports.get().asFile.absolutePath
+        def verificationPath = (
+            reproductionVerificationPython.get().parent
+                + File.pathSeparator
+                + (System.getenv('PATH') ?: '')
+        )
+        environment 'PATH', verificationPath
+    }
+}
+
+tasks.matching { task -> task.name == 'fullCheck' }.configureEach {
+    dependsOn verifyIndependentReproductionArtifact,
+        ':regelsuche-release:independentReproductionContainerTest'
+}

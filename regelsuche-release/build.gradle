@@ -25,11 +25,19 @@ sourceSets {
         compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
         runtimeClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
     }
+    independentReproductionContainerTest {
+        java.srcDir 'src/independentReproductionContainerTest/java'
+        resources.srcDir 'src/independentReproductionContainerTest/resources'
+        compileClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+        runtimeClasspath += sourceSets.main.output + configurations.testRuntimeClasspath
+    }
 }
 
 configurations {
     dockerIntegrationTestImplementation.extendsFrom testImplementation
     dockerIntegrationTestRuntimeOnly.extendsFrom testRuntimeOnly
+    independentReproductionContainerTestImplementation.extendsFrom testImplementation
+    independentReproductionContainerTestRuntimeOnly.extendsFrom testRuntimeOnly
 }
 
 dependencies {
@@ -45,6 +53,12 @@ dependencies {
     dockerIntegrationTestImplementation libs.testcontainers.junit
     dockerIntegrationTestImplementation libs.junit.jupiter
     dockerIntegrationTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    independentReproductionContainerTestImplementation platform(libs.testcontainers.bom)
+    independentReproductionContainerTestImplementation libs.testcontainers.core
+    independentReproductionContainerTestImplementation libs.testcontainers.junit
+    independentReproductionContainerTestImplementation libs.junit.jupiter
+    independentReproductionContainerTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 def hiddenRuleReport = project(':app').layout.buildDirectory
@@ -176,6 +190,36 @@ def runAutonomousDiscoveryWalkthrough = tasks.register(
     outputs.dir autonomousDiscoveryWalkthroughDirectory
     doFirst {
         args '--repository-revision', autonomousDiscoveryRepositoryRevision.get()
+    }
+}
+
+def independentReproductionArtifactRoot = rootProject.layout.buildDirectory.dir(
+    'independent-reproduction/artifact-a')
+def independentReproductionArchitecture = providers.gradleProperty(
+    'independentReproductionArchitecture').getOrElse('linux/amd64')
+
+tasks.register('independentReproductionContainerTest', Test) {
+    group = 'verification'
+    description = 'Runs the frozen independent-reproduction artifact through Testcontainers without network.'
+    dependsOn rootProject.tasks.named('buildIndependentReproductionArtifactA')
+    testClassesDirs = sourceSets.independentReproductionContainerTest.output.classesDirs
+    classpath = sourceSets.independentReproductionContainerTest.runtimeClasspath
+    useJUnitPlatform()
+    shouldRunAfter tasks.named('dockerIntegrationTest')
+    inputs.dir independentReproductionArtifactRoot
+    inputs.property 'sourceRevision', autonomousDiscoveryRepositoryRevision
+    inputs.property 'architecture', independentReproductionArchitecture
+    doFirst {
+        systemProperty 'regelsuche.independentReproductionArtifactRoot',
+            independentReproductionArtifactRoot.get().asFile.absolutePath
+        systemProperty 'regelsuche.independentReproductionSourceRevision',
+            autonomousDiscoveryRepositoryRevision.get()
+        systemProperty 'regelsuche.independentReproductionArchitecture',
+            independentReproductionArchitecture
+    }
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
     }
 }
 

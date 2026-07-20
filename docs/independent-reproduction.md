@@ -1,103 +1,169 @@
 # Independent autonomous-discovery reproduction
 
-Issue #387 packages the qualified autonomous-discovery walkthrough as a frozen,
-independently executable artifact. Packaging, execution and comparison are
-machine-verifiable. External mathematical novelty is outside this protocol.
+Regelsuche packages the qualified autonomous-discovery walkthrough as a frozen,
+independently executable artifact. The repository verifies deterministic
+packaging, artifact integrity, fail-closed receipts and isolated container
+execution. External mathematical novelty and independent third-party
+attestation remain separate claims.
 
-## Build the artifact
+## Authoritative checkout commands
 
-After generating the qualified result card for the exact repository revision:
+The complete contract is owned by Gradle, JUnit/Testcontainers and checked-in
+Python verifiers. It is runnable from an ordinary Git checkout:
 
 ```bash
-REVISION="$(git rev-parse HEAD)"
-./gradlew :regelsuche-release:runAutonomousDiscoveryWalkthrough \
-  -PrepositoryRevision="$REVISION" \
-  -PwalkthroughOutput="$PWD/build/walkthrough"
-
-python3 scripts/build-independent-reproduction-artifact.py \
-  --repository-root . \
-  --walkthrough-root build/walkthrough \
-  --source-revision "$REVISION" \
-  --release-tag "development-$REVISION" \
-  --release-tag-status DEVELOPMENT_REVISION \
-  --output-directory build/independent-reproduction \
-  --archive-output build/independent-reproduction.tar.gz
+./gradlew verifyIndependentReproductionArtifact
+./gradlew independentReproductionContainerTest
+./gradlew fullCheck
 ```
 
-For a public frozen release, `--release-tag-status PUBLISHED` fails unless the
-named Git tag resolves to the exact source revision. Development artifacts are
-clearly marked `DEVELOPMENT_READY_FOR_INDEPENDENT_EXECUTION`; a published tag
-produces `FROZEN_PUBLIC_RELEASE`.
+`verifyIndependentReproductionArtifact` generates the qualified walkthrough,
+builds the artifact twice into isolated output directories and verifies the
+complete lifecycle. `independentReproductionContainerTest` builds the public
+`independent-reproduction` Docker target from the generated artifact and runs
+it with the evaluated network disabled. `fullCheck` includes both contracts.
 
-The manifest binds:
+GitHub Actions is only a provisioning and artifact-retention adapter. It does
+not define expected files, hashes, negative cases, receipt semantics or Docker
+execution policy.
 
-- the source revision, release-label status and deterministic source archive;
-- a digest-pinned Temurin 21.0.11 container definition;
-- the Gradle 9.5.1 distribution URL and SHA-256;
-- OS, architecture, non-root runtime and network policies;
-- the proof backend ID, version, invocation and retained solver result;
+## Generated outputs
+
+The development lifecycle writes below `build/independent-reproduction/`:
+
+- `artifact-a/` and `artifact-b/` — independently generated artifact trees;
+- `artifact-a.tar.gz` and `artifact-b.tar.gz` — canonical bundle archives;
+- `reports/lifecycle-verification.json` — machine-readable lifecycle result;
+- `reports/lifecycle-summary.md` — human-readable verification summary;
+- retained positive and negative reproduction receipts.
+
+The two artifact trees and archives must be byte-identical. The archive uses the
+single canonical top-level directory
+`regelsuche-independent-reproduction/`. Absolute paths, traversal entries,
+duplicate members and symbolic or hard links are rejected.
+
+## Frozen input identities
+
+The artifact manifest binds:
+
+- the exact Git commit, development or published release label and deterministic
+  source archive;
+- the digest-pinned Eclipse Temurin 21.0.11 image definition;
+- the Gradle distribution URL and SHA-256;
+- operating system, architecture, runtime user and network policies;
+- proof-backend identity, version, invocation and retained result;
 - Research Brief, inventory, model, candidate lineage, qualification suite and
   split identities;
 - expected semantic roots and all portable exact-byte paths;
-- schemas, commands, license, citation and CodeMeta metadata.
+- schemas, public commands, license, citation and CodeMeta metadata.
 
-Two builds into differently named directories must produce byte-identical
-bundle archives. The archive itself always uses the fixed top-level directory
-`regelsuche-independent-reproduction/`.
+By default the checkout tasks create a
+`DEVELOPMENT_READY_FOR_INDEPENDENT_EXECUTION` artifact named
+`development-<commit>`. A public artifact may be built with status `PUBLISHED`
+only when the named Git tag resolves to the exact checked-out commit; the
+builder then emits `FROZEN_PUBLIC_RELEASE`.
 
-## Execute on separate infrastructure
+## Determinism and source-state guarantees
 
-The host requires Bash, Python 3.11 or newer, `jsonschema==4.25.1` and Docker
-24 or newer. Install the pinned validator before verifying or executing the
-bundle:
+The builder fails closed unless:
+
+- the requested revision is a real commit and equals `HEAD`;
+- the worktree, including untracked files, is clean;
+- the Gradle wrapper URL and digest match the frozen contract;
+- the container base image and index digest match the frozen contract;
+- the walkthrough and every required source, schema and launcher file exist as
+  regular non-symbolic files.
+
+The checkout-owned verifier repeats these checks independently. It also creates
+an unreferenced commit identity to prove that revision substitution fails and
+temporarily dirties a tracked file to prove that dirty-checkout rejection is
+fail-closed and restores the original bytes and mode afterwards.
+
+## Output ownership and marker safety
+
+`reproduce.sh` treats an output directory as owned only when it is empty or
+contains the exact regular marker
+`.regelsuche-independent-reproduction-output`. A wrong marker, a symbolic
+marker or an unrelated populated directory is rejected. Negative tests retain
+unrelated sentinel files, so a failed run cannot silently erase user data.
+
+Container-created output is handled through rootless/user-namespace-safe bind
+mounts. Testcontainers performs best-effort permission normalization with the
+same frozen image before temporary host directories are removed.
+
+## Container and network boundary
+
+The Testcontainers contract builds the real artifact Dockerfile and target,
+not a test-only substitute. The evaluated run:
+
+- executes as the image's non-root `reproducer` user (UID 10001);
+- uses Gradle offline mode inside the image;
+- has Docker network mode `none`;
+- drops every declared Linux capability;
+- enables `no-new-privileges`;
+- retains the declared PID limit;
+- receives only one writable host mount for observed evidence.
+
+Dependency resolution is confined to the image build and is explicitly distinct
+from the evaluated campaign. The evaluated run has no undeclared repository,
+database, service or network dependency.
+
+## Independent execution from the artifact
+
+The extracted artifact requires Bash, Python 3.11 or newer,
+`jsonschema==4.25.1` and Docker 24 or newer. Install the pinned validator, then
+run the public launcher:
 
 ```bash
 python3 -m pip install jsonschema==4.25.1
-```
-
-Extract the archive without modifying it and run:
-
-```bash
 ./reproduce.sh --output /path/to/reproduction-output \
   --environment-id anonymous-independent-run
 ```
 
-The launcher first checks the manifest, complete file inventory, source archive,
-wrapper checksum, container base digest, result-card schema, cross-artifact
-identities and proof backend. The container build uses only the immutable bundle
-context. The evaluated run uses UID 10001, Gradle offline mode,
-`--cap-drop ALL`, `no-new-privileges` and `--network none`.
-
-Build-time dependency resolution is declared separately and is not part of the
-evaluated campaign. The evaluated run has no undeclared network, repository,
-database or host-path dependency other than the writable output mount.
+The launcher verifies the immutable input before building or executing the
+container. The complete observed evidence, logs and
+`reproduction-receipt.json` remain under the selected output directory on both
+success and failure.
 
 ## Receipt semantics
 
 `regelsuche.independent-reproduction-receipt/v1` retains:
 
-- semantic and exact hashes of the artifact manifest;
+- semantic and complete hashes of the artifact manifest;
 - expected and observed exact-byte roots;
 - every missing, differing and unexpected path;
-- expected and observed semantic roots;
-- input-verification and required-status failures;
-- execution exit code and non-semantic environment diagnostics;
+- expected and observed semantic roots and required statuses;
+- input-verification failures and execution exit code;
+- non-semantic environment diagnostics;
 - `EXACT_BYTE_REPRODUCED`, `SEMANTICALLY_REPRODUCED` or `NOT_REPRODUCED`;
-- semantic, attestation-payload and complete receipt hashes.
+- semantic, reproducer-attestation and complete receipt hashes.
 
-The verifier independently recomputes all three receipt hashes and checks that
-the status follows from the comparisons. Valid manifests with missing files,
-evaluated-run failures and even unreadable manifests retain machine-readable
-`NOT_REPRODUCED` receipts rather than hiding the first failure.
+Timestamps, platform diagnostics, Docker version and the locally resolved image
+ID are retained but excluded from semantic identity. The lifecycle verifier
+proves that changing only those fields preserves `semanticReceiptHash` and
+`reproducerAttestationHash` while changing the complete receipt hash.
 
-## Scope boundary
+Missing artifact input, an unreadable manifest and unexpected observed paths
+all produce explicit machine-readable receipts. They are never normalized away
+or converted into an apparent exact reproduction.
 
-The repository workflow proves deterministic packaging and an exact
-maintainer-controlled container reproduction. It also exercises a deliberate
-failure and validates the retained failure receipt.
+## Threat model
 
-This does **not** satisfy the final independent-execution criterion. Until a
-person or organization uninvolved in the evaluated implementation executes the
-frozen public release on separately administered infrastructure and publishes
-or returns its receipt, `externalAttestationStatus` remains `NOT_COLLECTED` and
-issue #387 remains open.
+The checkout contract is designed to detect accidental drift and deliberate
+substitution of the revision, worktree, manifest, expected files, archive
+layout, output marker, launcher requirements, receipt roots or retained
+statuses. It does not claim protection from a compromised host kernel, Docker
+daemon, Git client, dependency registry, signing key or hardware platform.
+Those trust anchors must be governed separately by an independent reproducer.
+
+## Claim boundary
+
+A green local or CI run establishes that maintainers can deterministically
+package and reproduce the declared result under the frozen contract. It does
+**not** establish external mathematical novelty, formal proof beyond the
+retained backend evidence, publication acceptance or independent attestation.
+
+Until a person or organization uninvolved in the evaluated implementation runs
+a frozen public artifact on separately administered infrastructure and retains
+or publishes the first receipt, `externalAttestationStatus` remains
+`NOT_COLLECTED` and the independent-execution criterion remains open.

@@ -4,407 +4,85 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'reproduction/**'
-      - 'scripts/build-independent-reproduction-artifact.py'
-      - 'scripts/verify-independent-reproduction.py'
-      - 'scripts/verify-autonomous-discovery-walkthrough.py'
-      - 'docs/independent-reproduction.md'
-      - 'docs/schemas/regelsuche-independent-reproduction-*.schema.json'
-      - 'docs/schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json'
-      - 'gradle/wrapper/gradle-wrapper.properties'
-      - 'regelsuche-autopilot/**'
-      - 'regelsuche-release/**'
-      - '.github/workflows/independent-reproduction-artifact.yml'
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - "settings.gradle"
+      - "build.gradle"
+      - "gradle.properties"
+      - "scripts/build-independent-reproduction-artifact.py"
+      - "scripts/verify-independent-reproduction.py"
+      - "scripts/verify-independent-reproduction-lifecycle.py"
+      - "reproduction/**"
+      - "regelsuche-*/src/**"
+      - "regelsuche-*/build.gradle"
+      - ".github/workflows/independent-reproduction-artifact.yml"
   pull_request:
     branches: [ "main" ]
     paths:
-      - 'reproduction/**'
-      - 'scripts/build-independent-reproduction-artifact.py'
-      - 'scripts/verify-independent-reproduction.py'
-      - 'scripts/verify-autonomous-discovery-walkthrough.py'
-      - 'docs/independent-reproduction.md'
-      - 'docs/schemas/regelsuche-independent-reproduction-*.schema.json'
-      - 'docs/schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json'
-      - 'gradle/wrapper/gradle-wrapper.properties'
-      - 'regelsuche-autopilot/**'
-      - 'regelsuche-release/**'
-      - '.github/workflows/independent-reproduction-artifact.yml'
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - "settings.gradle"
+      - "build.gradle"
+      - "gradle.properties"
+      - "scripts/build-independent-reproduction-artifact.py"
+      - "scripts/verify-independent-reproduction.py"
+      - "scripts/verify-independent-reproduction-lifecycle.py"
+      - "reproduction/**"
+      - "regelsuche-*/src/**"
+      - "regelsuche-*/build.gradle"
+      - ".github/workflows/independent-reproduction-artifact.yml"
   workflow_dispatch:
 
 concurrency:
-  group: independent-reproduction-${{ github.repository }}-${{ github.ref }}
+  group: independent-reproduction-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
+env:
+  SOURCE_REVISION: ${{ github.sha }}
+  RELEASE_TAG: development-${{ github.sha }}
+  RELEASE_TAG_STATUS: DEVELOPMENT_REVISION
+
 jobs:
   artifact:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
-
-      - name: Install schema validator
-        run: python3 -m pip install --disable-pip-version-check --quiet jsonschema==4.25.1
-
-      - name: Require frozen wrapper and container inputs
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6.1.0
+      - name: Verify and execute the checkout-owned reproduction contract
         shell: bash
         run: |
-          set -euo pipefail
-          grep -qx \
-            'distributionSha256Sum=bafc141b619ad6350fd975fc903156dd5c151998cc8b058e8c1044ab5f7b031f' \
-            gradle/wrapper/gradle-wrapper.properties
-          grep -qx \
-            'FROM eclipse-temurin:21.0.11_10-jdk-noble@sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080 AS build' \
-            reproduction/Dockerfile.reproduction
-          bash -n reproduction/reproduce.sh
-          python3 - <<'PY'
-          from pathlib import Path
-          for name in (
-              'scripts/build-independent-reproduction-artifact.py',
-              'scripts/verify-independent-reproduction.py',
-          ):
-              compile(Path(name).read_text(encoding='utf-8'), name, 'exec')
-          PY
-
-      - name: Generate the qualified expected walkthrough
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf build/independent-walkthrough
-          mkdir -p build/logs
-          REGELSUCHE_REPOSITORY_REVISION="$GITHUB_SHA" ./gradlew \
-            :regelsuche-release:runAutonomousDiscoveryWalkthrough \
-            -PwalkthroughOutput="$PWD/build/independent-walkthrough" \
-            --rerun-tasks --console=plain \
-            2>&1 | tee build/logs/independent-walkthrough.log
-          python3 scripts/verify-autonomous-discovery-walkthrough.py \
-            --root build/independent-walkthrough \
-            --schema docs/schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json
-
-      - name: Build the frozen artifact twice byte-for-byte
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf \
-            build/independent-reproduction-a \
-            build/independent-reproduction-b \
-            build/independent-reproduction-a.tar.gz \
-            build/independent-reproduction-b.tar.gz
-          COMMON_ARGS=(
-            --repository-root .
-            --walkthrough-root build/independent-walkthrough
-            --source-revision "$GITHUB_SHA"
-            --release-tag "development-$GITHUB_SHA"
-            --release-tag-status DEVELOPMENT_REVISION
-            --architecture linux/amd64
-          )
-          python3 scripts/build-independent-reproduction-artifact.py \
-            "${COMMON_ARGS[@]}" \
-            --output-directory build/independent-reproduction-a \
-            --archive-output build/independent-reproduction-a.tar.gz \
-            | tee build/logs/artifact-build-a.log
-          python3 scripts/build-independent-reproduction-artifact.py \
-            "${COMMON_ARGS[@]}" \
-            --output-directory build/independent-reproduction-b \
-            --archive-output build/independent-reproduction-b.tar.gz \
-            | tee build/logs/artifact-build-b.log
-          diff -ru \
-            build/independent-reproduction-a \
-            build/independent-reproduction-b
-          cmp \
-            build/independent-reproduction-a.tar.gz \
-            build/independent-reproduction-b.tar.gz
-
-      - name: Reject mismatched or dirty source checkouts
-        shell: bash
-        run: |
-          set -euo pipefail
-          COMMON_ARGS=(
-            --repository-root .
-            --walkthrough-root build/independent-walkthrough
-            --release-tag-status DEVELOPMENT_REVISION
-            --architecture linux/amd64
-          )
-          parent_revision="$(git rev-parse "$GITHUB_SHA^1")"
-          set +e
-          python3 scripts/build-independent-reproduction-artifact.py \
-            "${COMMON_ARGS[@]}" \
-            --source-revision "$parent_revision" \
-            --release-tag "development-$parent_revision" \
-            --output-directory build/rejected-mismatched-checkout \
-            --archive-output build/rejected-mismatched-checkout.tar.gz \
-            >build/logs/rejected-mismatched-checkout.log 2>&1
-          mismatch_rc=$?
-          set -e
-          test "$mismatch_rc" -ne 0
-          grep -q 'checkout does not match' \
-            build/logs/rejected-mismatched-checkout.log
-
-          cp reproduction/README.md build/reproduction-readme.clean
-          printf '\nreview-negative-dirty-worktree\n' >> reproduction/README.md
-          set +e
-          python3 scripts/build-independent-reproduction-artifact.py \
-            "${COMMON_ARGS[@]}" \
-            --source-revision "$GITHUB_SHA" \
-            --release-tag "development-$GITHUB_SHA" \
-            --output-directory build/rejected-dirty-worktree \
-            --archive-output build/rejected-dirty-worktree.tar.gz \
-            >build/logs/rejected-dirty-worktree.log 2>&1
-          dirty_rc=$?
-          set -e
-          mv build/reproduction-readme.clean reproduction/README.md
-          test "$dirty_rc" -ne 0
-          grep -q 'worktree must be clean' build/logs/rejected-dirty-worktree.log
-          git diff --exit-code -- reproduction/README.md
-
-      - name: Validate manifests, file roots and fixed archive identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          for root in \
-            build/independent-reproduction-a \
-            build/independent-reproduction-b; do
-            python3 scripts/verify-independent-reproduction.py \
-              verify-artifact --root "$root"
-          done
-          python3 - <<'PY'
-          import hashlib
-          import json
-          from pathlib import Path
-          import tarfile
-
-          root = Path('build/independent-reproduction-a')
-          manifest = json.loads((root / 'artifact-manifest.json').read_text())
-          assert manifest['artifactStatus'] == (
-              'DEVELOPMENT_READY_FOR_INDEPENDENT_EXECUTION'
-          )
-          assert manifest['source']['releaseTagStatus'] == 'DEVELOPMENT_REVISION'
-          assert manifest['externalAttestationStatus'] == 'NOT_COLLECTED'
-          assert manifest['declaredEnvironment']['evaluatedRunNetworkPolicy'] == 'DISABLED'
-          assert manifest['declaredEnvironment']['javaImageIndexDigest'] == (
-              'sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080'
-          )
-          assert manifest['declaredEnvironment']['gradleDistributionSha256'] == (
-              'bafc141b619ad6350fd975fc903156dd5c151998cc8b058e8c1044ab5f7b031f'
-          )
-          assert manifest['declaredEnvironment']['launcherRequirements'] == {
-              'python': '>=3.11',
-              'jsonschema': '4.25.1',
-              'docker': '>=24',
-              'shell': 'bash',
-          }
-          archive = Path('build/independent-reproduction-a.tar.gz')
-          with tarfile.open(archive, 'r:gz') as bundle:
-              names = [member.name for member in bundle.getmembers()]
-          assert names
-          assert all(
-              name == 'regelsuche-independent-reproduction'
-              or name.startswith('regelsuche-independent-reproduction/')
-              for name in names
-          )
-          assert not any('/../' in name or name.startswith('/') for name in names)
-          print('archiveSha256=sha256:' + hashlib.sha256(archive.read_bytes()).hexdigest())
-          PY
-
-      - name: Reject substituted output ownership markers
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT=build/independent-reproduction-a
-          rm -rf /tmp/reproduction-wrong-marker /tmp/reproduction-symlink-marker
-
-          mkdir -p /tmp/reproduction-wrong-marker
-          printf 'sentinel\n' > /tmp/reproduction-wrong-marker/sentinel.txt
-          printf 'wrong-marker-version\n' \
-            > /tmp/reproduction-wrong-marker/.regelsuche-independent-reproduction-output
-          set +e
-          "$ROOT/reproduce.sh" \
-            --output /tmp/reproduction-wrong-marker \
-            --environment-id marker-negative-test \
-            >build/logs/rejected-wrong-marker.log 2>&1
-          wrong_rc=$?
-          set -e
-          test "$wrong_rc" -ne 0
-          test -f /tmp/reproduction-wrong-marker/sentinel.txt
-          grep -q 'exact regular reproduction marker' \
-            build/logs/rejected-wrong-marker.log
-
-          mkdir -p /tmp/reproduction-symlink-marker
-          printf 'regelsuche.independent-reproduction-output/v1\n' \
-            > /tmp/reproduction-symlink-marker/marker-target.txt
-          printf 'sentinel\n' > /tmp/reproduction-symlink-marker/sentinel.txt
-          ln -s marker-target.txt \
-            /tmp/reproduction-symlink-marker/.regelsuche-independent-reproduction-output
-          set +e
-          "$ROOT/reproduce.sh" \
-            --output /tmp/reproduction-symlink-marker \
-            --environment-id marker-negative-test \
-            >build/logs/rejected-symlink-marker.log 2>&1
-          symlink_rc=$?
-          set -e
-          test "$symlink_rc" -ne 0
-          test -f /tmp/reproduction-symlink-marker/sentinel.txt
-          test -L /tmp/reproduction-symlink-marker/.regelsuche-independent-reproduction-output
-          grep -q 'exact regular reproduction marker' \
-            build/logs/rejected-symlink-marker.log
-
-      - name: Run the one-command reproduction in the isolated container
-        shell: bash
-        run: |
-          set -o pipefail
-          rm -rf build/independent-reproduction-self-test
-          build/independent-reproduction-a/reproduce.sh \
-            --output "$PWD/build/independent-reproduction-self-test" \
-            --environment-id maintainer-ci-self-test \
-            2>&1 | tee build/logs/independent-reproduction-self-test.log
-
-      - name: Verify exact self-test receipt and non-semantic stability
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT=build/independent-reproduction-a
-          OUTPUT=build/independent-reproduction-self-test
-          python3 scripts/verify-independent-reproduction.py \
-            verify-receipt \
-            --root "$ROOT" \
-            --receipt "$OUTPUT/reproduction-receipt.json"
-          python3 scripts/verify-independent-reproduction.py compare \
-            --root "$ROOT" \
-            --observed "$OUTPUT/observed" \
-            --receipt build/reproduction-receipt-second-metadata.json \
-            --environment-id maintainer-ci-self-test \
-            --started-at 2030-01-01T00:00:00Z \
-            --finished-at 2030-01-01T00:00:01Z \
-            --container-image-id sha256:non-semantic-local-image-id \
-            --execution-exit-code 0 \
-            --platform alternate-non-semantic-platform \
-            --docker-version alternate-non-semantic-version
-          python3 scripts/verify-independent-reproduction.py \
-            verify-receipt \
-            --root "$ROOT" \
-            --receipt build/reproduction-receipt-second-metadata.json
-          python3 - <<'PY'
-          import json
-          first = json.load(open(
-              'build/independent-reproduction-self-test/reproduction-receipt.json'
-          ))
-          second = json.load(open(
-              'build/reproduction-receipt-second-metadata.json'
-          ))
-          assert first['reproductionStatus'] == 'EXACT_BYTE_REPRODUCED'
-          assert second['reproductionStatus'] == 'EXACT_BYTE_REPRODUCED'
-          assert first['semanticReceiptHash'] == second['semanticReceiptHash']
-          assert first['reproducerAttestationHash'] == second['reproducerAttestationHash']
-          assert first['contentHash'] != second['contentHash']
-          assert first['externalAttestationStatus'] == 'NOT_COLLECTED'
-          PY
-
-      - name: Retain failure receipts for missing and unreadable inputs
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/independent-reproduction-missing /tmp/independent-reproduction-corrupt
-          cp -a build/independent-reproduction-a /tmp/independent-reproduction-missing
-          rm /tmp/independent-reproduction-missing/expected/result-card.md
-          set +e
-          python3 scripts/verify-independent-reproduction.py compare \
-            --root /tmp/independent-reproduction-missing \
-            --observed build/independent-reproduction-self-test/observed \
-            --receipt build/reproduction-receipt-missing-input.json \
-            --environment-id maintainer-ci-negative-test \
-            --started-at 2030-01-01T00:00:00Z \
-            --finished-at 2030-01-01T00:00:01Z \
-            --execution-exit-code 125
-          missing_rc=$?
-          set -e
-          test "$missing_rc" -ne 0
-          python3 scripts/verify-independent-reproduction.py verify-receipt \
-            --root /tmp/independent-reproduction-missing \
-            --receipt build/reproduction-receipt-missing-input.json
-
-          cp -a build/independent-reproduction-a /tmp/independent-reproduction-corrupt
-          printf '{not-json\n' \
-            > /tmp/independent-reproduction-corrupt/artifact-manifest.json
-          set +e
-          python3 scripts/verify-independent-reproduction.py compare \
-            --root /tmp/independent-reproduction-corrupt \
-            --observed build/independent-reproduction-self-test/observed \
-            --receipt build/reproduction-receipt-unreadable-manifest.json \
-            --environment-id maintainer-ci-negative-test \
-            --started-at 2030-01-01T00:00:00Z \
-            --finished-at 2030-01-01T00:00:01Z \
-            --execution-exit-code 125
-          corrupt_rc=$?
-          set -e
-          test "$corrupt_rc" -ne 0
-          python3 scripts/verify-independent-reproduction.py verify-receipt \
-            --root /tmp/independent-reproduction-corrupt \
-            --receipt build/reproduction-receipt-unreadable-manifest.json
-
-          rm -rf /tmp/independent-reproduction-extra-directory
-          cp -a build/independent-reproduction-self-test/observed \
-            /tmp/independent-reproduction-extra-directory
-          mkdir /tmp/independent-reproduction-extra-directory/unexpected-empty-directory
-          python3 scripts/verify-independent-reproduction.py compare \
-            --root build/independent-reproduction-a \
-            --observed /tmp/independent-reproduction-extra-directory \
-            --receipt build/reproduction-receipt-extra-directory.json \
-            --environment-id maintainer-ci-negative-test \
-            --started-at 2030-01-01T00:00:00Z \
-            --finished-at 2030-01-01T00:00:01Z \
-            --execution-exit-code 0
-          python3 scripts/verify-independent-reproduction.py verify-receipt \
-            --root build/independent-reproduction-a \
-            --receipt build/reproduction-receipt-extra-directory.json
-
-          python3 - <<'PY'
-          import json
-          missing = json.load(open('build/reproduction-receipt-missing-input.json'))
-          corrupt = json.load(open('build/reproduction-receipt-unreadable-manifest.json'))
-          extra_directory = json.load(open(
-              'build/reproduction-receipt-extra-directory.json'
-          ))
-          assert missing['reproductionStatus'] == 'NOT_REPRODUCED'
-          assert any(
-              value == 'missing artifact file: expected/result-card.md'
-              for value in missing['semanticComparison']['inputArtifactFailures']
-          )
-          assert extra_directory['reproductionStatus'] == 'SEMANTICALLY_REPRODUCED'
-          assert extra_directory['exactComparison']['unexpectedPaths'] == [
-              'unexpected-empty-directory'
-          ]
-          assert corrupt['reproductionStatus'] == 'NOT_REPRODUCED'
-          assert corrupt['artifactManifestHashSource'] == 'FILE_SHA256_FALLBACK'
-          assert any(
-              value.startswith('artifact manifest is unreadable:')
-              for value in corrupt['semanticComparison']['inputArtifactFailures']
-          )
-          PY
-
-      - name: Upload frozen bundle, receipts and diagnostics
+          mkdir -p build/independent-reproduction/diagnostics
+          log=build/independent-reproduction/diagnostics/gradle.log
+          if ./gradlew \
+            verifyIndependentReproductionArtifact \
+            independentReproductionContainerTest \
+            -PindependentReproductionSourceRevision="${SOURCE_REVISION}" \
+            -PindependentReproductionReleaseTag="${RELEASE_TAG}" \
+            -PindependentReproductionReleaseTagStatus="${RELEASE_TAG_STATUS}" \
+            -PindependentReproductionArchitecture=linux/amd64 \
+            --console=plain >"${log}" 2>&1; then
+            tail -n 80 "${log}"
+          else
+            tail -n 240 "${log}" >&2
+            exit 1
+          fi
+      - name: Upload reproduction artifact, receipts and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: independent-autonomous-discovery-reproduction
-          path: |
-            build/logs/**
-            build/independent-reproduction-a.tar.gz
-            build/independent-reproduction-a/artifact-manifest.json
-            build/independent-reproduction-self-test/**
-            build/reproduction-receipt-*.json
-            regelsuche-release/build/test-results/**
-            regelsuche-release/build/reports/tests/**
-          if-no-files-found: warn
+          name: regelsuche-independent-reproduction-${{ github.sha }}
+          path: build/independent-reproduction/**
+          include-hidden-files: true
+          if-no-files-found: error
