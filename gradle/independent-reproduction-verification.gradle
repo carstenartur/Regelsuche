@@ -113,5 +113,6 @@ def verifyIndependentReproductionArtifact = tasks.register(
 }
 
 tasks.matching { task -> task.name == 'fullCheck' }.configureEach {
-    dependsOn verifyIndependentReproductionArtifact
+    dependsOn verifyIndependentReproductionArtifact,
+        ':regelsuche-release:independentReproductionContainerTest'
 }
