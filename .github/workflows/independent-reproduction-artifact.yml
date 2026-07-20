@@ -61,15 +61,23 @@ jobs:
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v6.1.0
       - name: Verify and execute the checkout-owned reproduction contract
-        run: >-
-          ./gradlew
-          verifyIndependentReproductionArtifact
-          independentReproductionContainerTest
-          -PindependentReproductionSourceRevision=${SOURCE_REVISION}
-          -PindependentReproductionReleaseTag=${RELEASE_TAG}
-          -PindependentReproductionReleaseTagStatus=${RELEASE_TAG_STATUS}
-          -PindependentReproductionArchitecture=linux/amd64
-          --console=plain
+        shell: bash
+        run: |
+          mkdir -p build/independent-reproduction/diagnostics
+          log=build/independent-reproduction/diagnostics/gradle.log
+          if ./gradlew \
+            verifyIndependentReproductionArtifact \
+            independentReproductionContainerTest \
+            -PindependentReproductionSourceRevision="${SOURCE_REVISION}" \
+            -PindependentReproductionReleaseTag="${RELEASE_TAG}" \
+            -PindependentReproductionReleaseTagStatus="${RELEASE_TAG_STATUS}" \
+            -PindependentReproductionArchitecture=linux/amd64 \
+            --console=plain >"${log}" 2>&1; then
+            tail -n 80 "${log}"
+          else
+            tail -n 240 "${log}" >&2
+            exit 1
+          fi
       - name: Upload reproduction artifact, receipts and diagnostics
         if: always()
         uses: actions/upload-artifact@v7
