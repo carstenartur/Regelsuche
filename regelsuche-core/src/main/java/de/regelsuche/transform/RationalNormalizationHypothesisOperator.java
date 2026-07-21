@@ -38,41 +38,68 @@ public class RationalNormalizationHypothesisOperator implements HypothesisOperat
             .toList();
     }
 
-    private void addSameDenominatorCandidate(Expr root, Map<String, Transformation> candidates) {
+    private void addSameDenominatorCandidate(
+        Expr root,
+        Map<String, Transformation> candidates
+    ) {
         if (!(root instanceof BinaryExpr binary)
-            || (binary.operator() != BinaryOperator.ADD && binary.operator() != BinaryOperator.SUB)) {
+            || (binary.operator() != BinaryOperator.ADD
+                && binary.operator() != BinaryOperator.SUB)) {
             return;
         }
         DivisionParts left = division(binary.left());
         DivisionParts right = division(binary.right());
-        if (left == null || right == null || !same(left.denominator(), right.denominator())) {
+        if (left == null || right == null
+                || !same(left.denominator(), right.denominator())
+                || isExplicitZero(left.denominator())) {
             return;
         }
-        Expr numerator = new BinaryExpr(left.numerator(), binary.operator(), right.numerator());
-        Expr combined = new BinaryExpr(numerator, BinaryOperator.DIV, left.denominator());
-        addCandidate(root, combined, candidates);
+        Expr numerator = new BinaryExpr(
+            left.numerator(), binary.operator(), right.numerator());
+        Expr combined = new BinaryExpr(
+            numerator, BinaryOperator.DIV, left.denominator());
+        addCandidate(
+            root,
+            combined,
+            nonZeroAssumptions(left.denominator()),
+            candidates);
     }
 
-    private void addCancellationCandidate(Expr root, Map<String, Transformation> candidates) {
-        if (!(root instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.DIV) {
+    private void addCancellationCandidate(
+        Expr root,
+        Map<String, Transformation> candidates
+    ) {
+        if (!(root instanceof BinaryExpr binary)
+                || binary.operator() != BinaryOperator.DIV) {
             return;
         }
         List<Expr> numeratorFactors = flattenMultiplication(binary.left());
         List<Expr> denominatorFactors = flattenMultiplication(binary.right());
-        Expr common = firstCommonNonNumericFactor(numeratorFactors, denominatorFactors);
+        Expr common = firstCommonNonNumericFactor(
+            numeratorFactors, denominatorFactors);
         if (common == null) {
             return;
         }
+        Expr remainingNumerator = buildProduct(
+            removeFirstMatch(numeratorFactors, common));
+        Expr remainingDenominator = buildProduct(
+            removeFirstMatch(denominatorFactors, common));
+        if (isExplicitZero(remainingDenominator)) {
+            return;
+        }
         Expr simplified = new BinaryExpr(
-            buildProduct(removeFirstMatch(numeratorFactors, common)),
+            remainingNumerator,
             BinaryOperator.DIV,
-            buildProduct(removeFirstMatch(denominatorFactors, common))
-        );
-        addCandidate(root, simplified, candidates);
+            remainingDenominator);
+        List<String> assumptions = new ArrayList<>();
+        assumptions.addAll(nonZeroAssumptions(common));
+        assumptions.addAll(nonZeroAssumptions(remainingDenominator));
+        addCandidate(root, simplified, assumptions, candidates);
     }
 
     private DivisionParts division(Expr expression) {
-        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.DIV) {
+        if (expression instanceof BinaryExpr binary
+                && binary.operator() == BinaryOperator.DIV) {
             return new DivisionParts(binary.left(), binary.right());
         }
         return null;
@@ -86,28 +113,50 @@ public class RationalNormalizationHypothesisOperator implements HypothesisOperat
             }
         }
         for (Expr factor : left) {
-            if (!(factor instanceof NumberExpr) && rightByHash.containsKey(hash(factor))) {
+            if (!(factor instanceof NumberExpr)
+                    && rightByHash.containsKey(hash(factor))) {
                 return factor;
             }
         }
         return null;
     }
 
-    private void addCandidate(Expr original, Expr candidate, Map<String, Transformation> candidates) {
+    private void addCandidate(
+        Expr original,
+        Expr candidate,
+        List<String> assumptions,
+        Map<String, Transformation> candidates
+    ) {
         String formattedInput = ExpressionFormatter.format(original);
         String formatted = ExpressionFormatter.format(candidate);
         if (formatted.equals(formattedInput)) {
             return;
         }
-        candidates.putIfAbsent(canonicalizer.stableHash(formatted), new Transformation(
-            RULE_ID,
-            formatted,
-            RewriteKind.NORMALIZE,
-            false,
-            -1,
-            true,
-            RULE_ID + ":" + canonicalizer.stableHash(formattedInput) + "->" + canonicalizer.stableHash(formatted)
-        ));
+        candidates.putIfAbsent(
+            canonicalizer.stableHash(formatted),
+            new Transformation(
+                RULE_ID,
+                formatted,
+                RewriteKind.NORMALIZE,
+                false,
+                -1,
+                true,
+                RULE_ID + ":" + canonicalizer.stableHash(formattedInput)
+                    + "->" + canonicalizer.stableHash(formatted),
+                assumptions));
+    }
+
+    private List<String> nonZeroAssumptions(Expr expression) {
+        if (expression instanceof NumberExpr number) {
+            return number.value() == 0
+                ? List.of("0 != 0")
+                : List.of();
+        }
+        return List.of(ExpressionFormatter.format(expression) + " != 0");
+    }
+
+    private boolean isExplicitZero(Expr expression) {
+        return expression instanceof NumberExpr number && number.value() == 0;
     }
 
     private boolean same(Expr left, Expr right) {
@@ -115,7 +164,8 @@ public class RationalNormalizationHypothesisOperator implements HypothesisOperat
     }
 
     private List<Expr> flattenMultiplication(Expr expression) {
-        if (expression instanceof BinaryExpr binary && binary.operator() == BinaryOperator.MUL) {
+        if (expression instanceof BinaryExpr binary
+                && binary.operator() == BinaryOperator.MUL) {
             List<Expr> result = new ArrayList<>();
             result.addAll(flattenMultiplication(binary.left()));
             result.addAll(flattenMultiplication(binary.right()));
@@ -144,7 +194,8 @@ public class RationalNormalizationHypothesisOperator implements HypothesisOperat
         }
         Expr result = factors.getFirst();
         for (int index = 1; index < factors.size(); index++) {
-            result = new BinaryExpr(result, BinaryOperator.MUL, factors.get(index));
+            result = new BinaryExpr(
+                result, BinaryOperator.MUL, factors.get(index));
         }
         return result;
     }
