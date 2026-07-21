@@ -20,7 +20,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +32,7 @@ import java.util.TreeSet;
  *
  * <p>The runner consumes only TRAIN {@code formationInput} while forming the
  * available candidate form. Frozen holdouts are read only by the evaluation
- * stage. The still unavailable linear-recurrence adapter remains an explicit
+ * stage. The unavailable linear-recurrence adapter remains an explicit
  * coverage blocker, so a failed finite-difference fit is retained as
  * incomplete rather than misreported as a refutation.</p>
  */
@@ -79,7 +78,8 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
             ObjectNode campaign = executeCampaign(
                 corpus, profile, cases, trainCases, index);
             campaigns.add(campaign);
-            for (JsonNode evaluation : campaign.withArray("evaluations")) {
+            for (JsonNode evaluation : requireArray(
+                    campaign, "evaluations", "campaign evaluations")) {
                 if ("CONFIRMED_FINITE_DIFFERENCE_FIT".equals(
                         text(evaluation, "outcome"))) {
                     confirmedEvaluations++;
@@ -143,15 +143,17 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
         ArrayNode formationEvidence = JSON.createArrayNode();
         boolean availableFormSelected = false;
         for (ObjectNode trainCase : trainCases) {
-            ObjectNode formation = trainCase.with("formationInput");
-            require(!formation.isEmpty(),
-                "TRAIN case " + text(trainCase, "caseId")
-                    + " has no formationInput");
+            String trainCaseId = text(trainCase, "caseId");
+            ObjectNode formation = requireObjectField(
+                trainCase,
+                "formationInput",
+                "TRAIN case " + trainCaseId + " formationInput");
             require(!formation.has("holdoutContinuation"),
                 "formationInput exposes a frozen holdout");
             require(!formation.path("holdoutVisible").asBoolean(true),
                 "formationInput unexpectedly exposes a holdout");
-            ObjectNode evidence = executeFormation(campaignId, trainCase, formation);
+            ObjectNode evidence = executeFormation(
+                campaignId, trainCase, formation);
             formationEvidence.add(evidence);
             availableFormSelected |= "SELECTED".equals(
                 text(evidence, "candidateFormStatus"));
@@ -190,19 +192,27 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
         ObjectNode benchmarkCase,
         ObjectNode formation
     ) {
-        List<Long> observed = numbers(formation.withArray("observedPrefix"));
-        int maximumOrder = formation.path("maximumOrder").asInt();
-        long syntheticHoldout = extrapolateFromObservedPrefix(observed, maximumOrder);
+        String caseId = text(benchmarkCase, "caseId");
+        List<Long> observed = numbers(requireArray(
+            formation,
+            "observedPrefix",
+            "case " + caseId + " formation observedPrefix"));
+        int maximumOrder = integer(
+            formation,
+            "maximumOrder",
+            "case " + caseId + " formation maximumOrder");
+        long syntheticHoldout = extrapolateFromObservedPrefix(
+            observed, maximumOrder);
         DomainDiscoveryEvidence evidence = runProductionDomain(
-            campaignId + "-formation-" + text(benchmarkCase, "caseId"),
-            text(benchmarkCase, "caseId") + "-formation-seed",
+            campaignId + "-formation-" + caseId,
+            caseId + "-formation-seed",
             observed,
             List.of(syntheticHoldout),
             maximumOrder,
-            "candidate-independent-frozen-formation/" + text(benchmarkCase, "caseId"));
+            "candidate-independent-frozen-formation/" + caseId);
 
         ObjectNode result = JSON.createObjectNode();
-        result.put("caseId", text(benchmarkCase, "caseId"));
+        result.put("caseId", caseId);
         result.put("caseContentHash", text(benchmarkCase, "contentHash"));
         result.put("inputSurface", "formationInput");
         result.put("evaluationInputRead", false);
@@ -226,23 +236,35 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
         String campaignId,
         ObjectNode benchmarkCase
     ) {
-        ObjectNode evaluationInput = benchmarkCase.with("evaluationInput");
-        List<Long> observed = numbers(evaluationInput.withArray("observedPrefix"));
-        List<Long> holdout = numbers(
-            evaluationInput.withArray("holdoutContinuation"));
-        int maximumOrder = evaluationInput.path("maximumOrder").asInt();
+        String caseId = text(benchmarkCase, "caseId");
+        ObjectNode evaluationInput = requireObjectField(
+            benchmarkCase,
+            "evaluationInput",
+            "case " + caseId + " evaluationInput");
+        List<Long> observed = numbers(requireArray(
+            evaluationInput,
+            "observedPrefix",
+            "case " + caseId + " observedPrefix"));
+        List<Long> holdout = numbers(requireArray(
+            evaluationInput,
+            "holdoutContinuation",
+            "case " + caseId + " holdoutContinuation"));
+        int maximumOrder = integer(
+            evaluationInput,
+            "maximumOrder",
+            "case " + caseId + " maximumOrder");
         DomainDiscoveryEvidence evidence = runProductionDomain(
-            campaignId + "-evaluation-" + text(benchmarkCase, "caseId"),
-            text(benchmarkCase, "caseId") + "-evaluation-seed",
+            campaignId + "-evaluation-" + caseId,
+            caseId + "-evaluation-seed",
             observed,
             holdout,
             maximumOrder,
-            "candidate-independent-frozen-evaluation/" + text(benchmarkCase, "caseId"));
+            "candidate-independent-frozen-evaluation/" + caseId);
 
         boolean confirmed = evidence.outcome()
             == DomainDiscoveryEvidence.Outcome.CONFIRMED;
         ObjectNode result = JSON.createObjectNode();
-        result.put("caseId", text(benchmarkCase, "caseId"));
+        result.put("caseId", caseId);
         result.put("caseContentHash", text(benchmarkCase, "contentHash"));
         result.put("split", text(benchmarkCase, "split"));
         result.put("structuralCluster", text(benchmarkCase, "structuralCluster"));
@@ -282,7 +304,8 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
     ) {
         require(maximumOrder >= 1 && maximumOrder <= 8,
             "maximumOrder is outside the frozen profile boundary");
-        FiniteDifferenceSequenceDomain domain = new FiniteDifferenceSequenceDomain();
+        FiniteDifferenceSequenceDomain domain =
+            new FiniteDifferenceSequenceDomain();
         DiscoveryBudget budget = new DiscoveryBudget(
             maximumOrder,
             Math.max(16, maximumOrder + 2),
@@ -295,7 +318,8 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
             domain.domainId(),
             "observed=" + csv(observed) + ";holdout=" + csv(holdout),
             sourceReference);
-        return new DomainDiscoveryRunner().run(campaignId, domain, seed, budget)
+        return new DomainDiscoveryRunner()
+            .run(campaignId, domain, seed, budget)
             .evidence();
     }
 
@@ -315,33 +339,38 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
                 text(receipt, "caseCorpusContentHash")),
             "case corpus is not bound by the freeze receipt");
         require(text(profile, "contentHash").equals(
-                receipt.path("formationInventoryContentHashes").path(PROFILE_ID).asText()),
+                receipt.path("formationInventoryContentHashes")
+                    .path(PROFILE_ID).asText()),
             "finite-sequence profile is not bound by the freeze receipt");
         require("IMPLEMENT_EXECUTION_ADAPTERS_WITHOUT_MODIFYING_FROZEN_CASE_PAYLOADS"
                 .equals(text(receipt, "allowedNextStep")),
             "freeze receipt does not authorize adapter implementation");
-        require("NOT_STARTED".equals(text(receipt, "executionStatusAtFreeze")),
+        require("NOT_STARTED".equals(
+                text(receipt, "executionStatusAtFreeze")),
             "corpus was not frozen before execution");
         require(!receipt.path("publicationAuthorized").asBoolean(true),
             "freeze receipt unexpectedly authorizes publication");
 
         Map<String, JsonNode> forms = new LinkedHashMap<>();
-        for (JsonNode form : profile.withArray("forms")) {
+        for (JsonNode form : requireArray(
+                profile, "forms", "formation profile forms")) {
             forms.put(text(form, "formId"), form);
         }
-        require("AVAILABLE".equals(text(forms.get(AVAILABLE_FORM),
-                "implementationStatus")),
+        require("AVAILABLE".equals(text(
+                forms.get(AVAILABLE_FORM), "implementationStatus")),
             "finite-difference form is not available in the frozen profile");
-        require("ADAPTER_REQUIRED".equals(text(forms.get(MISSING_FORM),
-                "implementationStatus")),
+        require("ADAPTER_REQUIRED".equals(text(
+                forms.get(MISSING_FORM), "implementationStatus")),
             "linear recurrence limitation disappeared from the frozen profile");
     }
 
     private static List<ObjectNode> finiteCases(ObjectNode corpus) {
         List<ObjectNode> result = new ArrayList<>();
-        for (JsonNode item : corpus.withArray("cases")) {
+        for (JsonNode item : requireArray(
+                corpus, "cases", "case corpus cases")) {
             ObjectNode benchmarkCase = requireObject(item, "benchmark case");
-            requireHash(benchmarkCase, "benchmark case " + text(item, "caseId"));
+            requireHash(benchmarkCase,
+                "benchmark case " + text(item, "caseId"));
             if (CHALLENGE.equals(text(item, "challengeId"))) {
                 result.add(benchmarkCase);
             }
@@ -354,18 +383,23 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
                 item -> text(item, "split"),
                 java.util.TreeMap::new,
                 java.util.stream.Collectors.counting()));
-        require(splits.equals(Map.of("TRAIN", 2L, "VALIDATION", 2L, "TEST", 2L)),
+        require(splits.equals(Map.of(
+                "TRAIN", 2L,
+                "VALIDATION", 2L,
+                "TEST", 2L)),
             "finite-sequence split counts changed: " + splits);
         return List.copyOf(result);
     }
 
     private static String availableImplementationClass(ObjectNode profile) {
-        for (JsonNode form : profile.withArray("forms")) {
+        for (JsonNode form : requireArray(
+                profile, "forms", "formation profile forms")) {
             if (AVAILABLE_FORM.equals(text(form, "formId"))) {
                 return text(form, "implementationClass");
             }
         }
-        throw new IllegalArgumentException("available form missing from profile");
+        throw new IllegalArgumentException(
+            "available form missing from profile");
     }
 
     private static long extrapolateFromObservedPrefix(
@@ -378,7 +412,8 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
             List<Long> previous = rows.getLast();
             List<Long> next = new ArrayList<>(previous.size() - 1);
             for (int index = 0; index + 1 < previous.size(); index++) {
-                next.add(Math.subtractExact(previous.get(index + 1), previous.get(index)));
+                next.add(Math.subtractExact(
+                    previous.get(index + 1), previous.get(index)));
             }
             rows.add(next);
         }
@@ -391,18 +426,58 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
     }
 
     private static ObjectNode readObject(Path path) throws IOException {
-        require(Files.isRegularFile(path), "missing regular JSON file: " + path);
+        require(Files.isRegularFile(path),
+            "missing regular JSON file: " + path);
         return requireObject(JSON.readTree(path.toFile()), path.toString());
     }
 
-    private static ObjectNode requireObject(JsonNode node, String description) {
+    private static ObjectNode requireObject(
+        JsonNode node,
+        String description
+    ) {
         if (!(node instanceof ObjectNode object)) {
-            throw new IllegalArgumentException(description + " must be a JSON object");
+            throw new IllegalArgumentException(
+                description + " must be a JSON object");
         }
         return object;
     }
 
-    private static void requireHash(ObjectNode value, String description) {
+    private static ObjectNode requireObjectField(
+        ObjectNode object,
+        String field,
+        String description
+    ) {
+        return requireObject(object.get(field), description);
+    }
+
+    private static ArrayNode requireArray(
+        ObjectNode object,
+        String field,
+        String description
+    ) {
+        JsonNode value = object.get(field);
+        if (!(value instanceof ArrayNode array)) {
+            throw new IllegalArgumentException(
+                description + " must be a JSON array");
+        }
+        return array;
+    }
+
+    private static int integer(
+        ObjectNode object,
+        String field,
+        String description
+    ) {
+        JsonNode value = object.get(field);
+        require(value != null && value.isIntegralNumber(),
+            description + " must be an integer");
+        return value.intValue();
+    }
+
+    private static void requireHash(
+        ObjectNode value,
+        String description
+    ) {
         String retained = text(value, "contentHash");
         ObjectNode unhashed = value.deepCopy();
         unhashed.remove("contentHash");
@@ -426,9 +501,9 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
     private static String canonicalJson(JsonNode value) {
         try {
             if (value.isObject()) {
-                List<String> fields = new TreeSet<String>() {{
-                    value.fieldNames().forEachRemaining(this::add);
-                }}.stream().toList();
+                List<String> fields = new ArrayList<>();
+                value.fieldNames().forEachRemaining(fields::add);
+                fields.sort(String::compareTo);
                 StringBuilder result = new StringBuilder("{");
                 for (int index = 0; index < fields.size(); index++) {
                     if (index > 0) {
@@ -453,7 +528,8 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
             }
             return JSON.writeValueAsString(value);
         } catch (IOException exception) {
-            throw new IllegalStateException("cannot canonicalize JSON", exception);
+            throw new IllegalStateException(
+                "cannot canonicalize JSON", exception);
         }
     }
 
@@ -461,7 +537,8 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
         try {
             return MessageDigest.getInstance("SHA-256").digest(value);
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
+            throw new IllegalStateException(
+                "SHA-256 is unavailable", exception);
         }
     }
 
@@ -474,10 +551,12 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
     }
 
     private static List<Long> numbers(ArrayNode array) {
-        require(!array.isEmpty(), "numeric sequence must not be empty");
+        require(!array.isEmpty(),
+            "numeric sequence must not be empty");
         List<Long> result = new ArrayList<>();
         for (JsonNode item : array) {
-            require(item.isIntegralNumber(), "sequence term must be an integer");
+            require(item.isIntegralNumber(),
+                "sequence term must be an integer");
             result.add(item.longValue());
         }
         return List.copyOf(result);
@@ -494,14 +573,17 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
     }
 
     private static String csv(List<Long> values) {
-        return values.stream().map(String::valueOf)
+        return values.stream()
+            .map(String::valueOf)
             .collect(java.util.stream.Collectors.joining(","));
     }
 
     private static String text(JsonNode node, String field) {
         Objects.requireNonNull(node, "node");
         JsonNode value = node.get(field);
-        require(value != null && value.isTextual() && !value.asText().isBlank(),
+        require(value != null
+                && value.isTextual()
+                && !value.asText().isBlank(),
             "missing textual field " + field);
         return value.asText();
     }
@@ -526,11 +608,15 @@ public final class CandidateIndependentFiniteSequenceAdapterMain {
                     "arguments must be supplied as --name value pairs");
                 require(args[index].startsWith("--"),
                     "unexpected argument " + args[index]);
-                require(values.putIfAbsent(args[index], args[index + 1]) == null,
+                require(values.putIfAbsent(
+                        args[index], args[index + 1]) == null,
                     "duplicate argument " + args[index]);
             }
             TreeSet<String> expected = new TreeSet<>(List.of(
-                "--corpus", "--profile", "--freeze-receipt", "--output",
+                "--corpus",
+                "--profile",
+                "--freeze-receipt",
+                "--output",
                 "--repository-revision"));
             require(values.keySet().equals(expected),
                 "arguments differ: expected=" + expected
