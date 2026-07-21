@@ -27,6 +27,24 @@ class SmtProofBridgeTest {
     }
 
     @Test
+    void emitsSmtObligationForRetainedAutonomousProductionCandidate() {
+        SmtProofBridge bridge = new SmtProofBridge();
+
+        ProofBridge.ProofAttempt attempt = bridge.prove(
+            "(A + 2)*x + A*x",
+            "(2*A + 2)*x",
+            List.of());
+
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, attempt.status());
+        assertEquals("smtlib2", attempt.tool());
+        String artifact = attempt.artifact();
+        assertTrue(artifact.contains("(declare-const A Real)"));
+        assertTrue(artifact.contains("(declare-const x Real)"));
+        assertTrue(artifact.contains("(assert (not (="));
+        assertTrue(artifact.contains("(check-sat)"));
+    }
+
+    @Test
     void includesDistinctAssertionForNonZeroAssumptions() {
         SmtProofBridge bridge = new SmtProofBridge();
         ProofBridge.ProofAttempt attempt = bridge.prove(
