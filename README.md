@@ -146,11 +146,16 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
 2. **Suchgraph + Replay ansehen.** `Graph`-Tab zeigt den entdeckten
    Transformationsraum; `Replay` spielt den besten Pfad Schritt für Schritt
    ab.
-3. **Proof-Job anlegen.** Im `Proof-Jobs`-Tab `Left=a + 0`, `Right=a`
-   eintippen und _Job einreichen_ klicken — der Status der asynchronen
-   Pipeline wird live aktualisiert, Artefakte (`proof.smt2`, `proof.lean`,
-   `metadata.json`, `stdout.txt`, `stderr.txt`) liegen unter
-   `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`.
+3. **Den retained Discovery-Kandidaten formal prüfen.** Im `Proof-Jobs`-Tab
+   `Left=(A + 2)*x + A*x`, `Right=(2*A + 2)*x` und den Worker `smtlib2`
+   wählen, dann _Job einreichen_. Das ist exakt die von der autonomen
+   Produktionskampagne erzeugte und anschließend unabhängig qualifizierte
+   Regel — keine eigens für die Demo eingebaute Identität. Z3 beziehungsweise
+   cvc5 prüft die Unerfüllbarkeit der negierten Gleichheit; Status und
+   Solver-Ausgabe werden live aktualisiert. Das Bundle (`proof.smt2`,
+   `metadata.json`, `stdout.txt`, `stderr.txt`) liegt unter
+   `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`. `FORMALLY_PROVED` wird nur
+   gesetzt, wenn der konfigurierte Solver die Obligation tatsächlich bestätigt.
    ![Proof-Job-Panel](docs/assets/screenshots/proof-job-panel.png)
 4. **Qualitätsdashboard prüfen.** `Benchmark`-Tab → jede Zeile zeigt
    Ampelstatus, `expectedResultMatched`, e-Graph-Größe, Saturation-Sparung
@@ -287,6 +292,8 @@ davon getrennte, noch nicht qualifizierte Capabilities.
   Seed-Auswertung, Budgets, Parallelität.
 * [Replay & Reports](docs/replay-and-reports.md) — Replay-UX, Discovery-Report-
   Artefakte, Browser-Screenshots/GIFs.
+* [Exakte lineare Rekurrenzen](docs/linear-recurrence-discovery-domain.md) —
+  kandidatunabhängige Sequenzbildung mit rationaler Arithmetik und Holdout-Prüfung.
 * [Erweiterungssystem](docs/extension-system.md) — Java-Plugins, Regel-DSL,
   Knowledge Packs, Makros, Discovery-Operatoren und Capabilities im Vergleich.
 * [Plugins](docs/plugins.md) und [Plugin-API](docs/plugin-api.md) — externe
