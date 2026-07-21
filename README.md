@@ -1,7 +1,6 @@
 # Regelsuche
 
-[![CI/CD](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml/badge.svg?branch=main)](https://github.com/carstenartur/Regelsuche/actions/workflows/ci-cd.yml)
-[![Docker Image CI](https://github.com/carstenartur/Regelsuche/actions/workflows/docker-image.yml/badge.svg?branch=main)](https://github.com/carstenartur/Regelsuche/actions/workflows/docker-image.yml)
+[![CI / fullCheck](https://github.com/carstenartur/Regelsuche/actions/workflows/gradle.yml/badge.svg?branch=main)](https://github.com/carstenartur/Regelsuche/actions/workflows/gradle.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/coverage/badge.json)](https://carstenartur.github.io/Regelsuche/coverage/)
 [![Tests](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/tests/badge.json)](https://carstenartur.github.io/Regelsuche/tests/)
 [![Performance](https://img.shields.io/endpoint?url=https://carstenartur.github.io/Regelsuche/dev/bench/badge.json)](https://carstenartur.github.io/Regelsuche/dev/bench/)
@@ -146,11 +145,20 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
 2. **Suchgraph + Replay ansehen.** `Graph`-Tab zeigt den entdeckten
    Transformationsraum; `Replay` spielt den besten Pfad Schritt für Schritt
    ab.
-3. **Proof-Job anlegen.** Im `Proof-Jobs`-Tab `Left=a + 0`, `Right=a`
-   eintippen und _Job einreichen_ klicken — der Status der asynchronen
-   Pipeline wird live aktualisiert, Artefakte (`proof.smt2`, `proof.lean`,
-   `metadata.json`, `stdout.txt`, `stderr.txt`) liegen unter
-   `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`.
+3. **Eine nichttriviale Identität formal prüfen.** Im `Proof-Jobs`-Tab
+   `Left=a^4 + 4*b^4` und
+   `Right=(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)` eintragen, dann
+   _Job einreichen_. Das ist die Sophie-Germain-Identität, die auch in der
+   generierten Discovery Gallery als Hidden-Structure-Bridge mit
+   Makrowiederverwendung dokumentiert ist — nicht nur eine Neutralregel wie
+   `a + 0 = a`. Nichtnegative ganzzahlige Exponenten werden vom SMT-Bridge in
+   gewöhnliche nichtlineare reelle Arithmetik expandiert. Der von der
+   Anwendung konfigurierte Proof-Worker prüft die Gleichheit; im Proof-Image
+   steht dafür der SMT-Pfad mit Z3 beziehungsweise cvc5 bereit. Status und
+   Solver-Ausgabe werden live aktualisiert. Das Bundle (`proof.lean` oder
+   `proof.smt2`, `metadata.json`, `stdout.txt`, `stderr.txt`) liegt unter
+   `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`. `FORMALLY_PROVED` wird nur
+   gesetzt, wenn der konfigurierte Solver die Obligation tatsächlich bestätigt.
    ![Proof-Job-Panel](docs/assets/screenshots/proof-job-panel.png)
 4. **Qualitätsdashboard prüfen.** `Benchmark`-Tab → jede Zeile zeigt
    Ampelstatus, `expectedResultMatched`, e-Graph-Größe, Saturation-Sparung
@@ -287,6 +295,8 @@ davon getrennte, noch nicht qualifizierte Capabilities.
   Seed-Auswertung, Budgets, Parallelität.
 * [Replay & Reports](docs/replay-and-reports.md) — Replay-UX, Discovery-Report-
   Artefakte, Browser-Screenshots/GIFs.
+* [Exakte lineare Rekurrenzen](docs/linear-recurrence-discovery-domain.md) —
+  kandidatunabhängige Sequenzbildung mit rationaler Arithmetik und Holdout-Prüfung.
 * [Erweiterungssystem](docs/extension-system.md) — Java-Plugins, Regel-DSL,
   Knowledge Packs, Makros, Discovery-Operatoren und Capabilities im Vergleich.
 * [Plugins](docs/plugins.md) und [Plugin-API](docs/plugin-api.md) — externe

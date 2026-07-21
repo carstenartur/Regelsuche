@@ -13,10 +13,32 @@ persistent queue and write a structured artefact bundle per job.
 
 `ProofJobPanelBrowserFlowTest#proofJobPanelBrowserFlow` startet die
 Workbench in-process mit einem deterministischen
-`StubAlwaysSucceedsWorker`, öffnet den `Proof-Jobs`-Tab, schickt einen
-Job für `a + 0 → a` ab, wartet auf die Jobliste, ruft die Artefakt-Liste
-auf und macht einen Screenshot. So funktioniert die Pipeline auch in
-CI-Runnern ohne Z3 / Lean.
+`StubAlwaysSucceedsWorker`, öffnet den `Proof-Jobs`-Tab und reicht die
+Sophie-Germain-Identität ein:
+
+```text
+a^4 + 4*b^4
+→ (a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)
+```
+
+Die Identität ist auch in der generierten Discovery Gallery als
+Hidden-Structure-Bridge mit gelernter Makrowiederverwendung dokumentiert.
+Sie ersetzt im sichtbaren Produktfluss die frühere Neutralregel
+`a + 0 → a`, die zwar technisch korrekt, als Demonstration der
+Proof-Workbench aber nicht aussagekräftig war.
+
+Der SMT-Bridge expandiert begrenzte nichtnegative ganzzahlige Exponenten in
+gewöhnliche nichtlineare reelle Arithmetik. Andere Exponenten verwenden eine
+korrekt zweistellig deklarierte `pow`-Fallback-Funktion. Dadurch ist die
+sichtbare `a^4`-Schreibweise nicht nur kosmetisch, sondern erzeugt einen
+gültigen Beweisauftrag.
+
+Der Browser-Test wartet auf die Jobliste, ruft die Artefakt-Liste auf und
+erzeugt den Dokumentations-Screenshot. Der Stub prüft dabei bewusst nur den
+kompletten Browser-, Queue-, Scheduler- und Artefaktfluss; die mathematische
+Solverausführung wird separat mit den realen SMT-Workern und dem Proof-Image
+getestet. So bleibt der Browserflow auch auf CI-Runnern ohne lokal
+installiertes Z3 oder Lean deterministisch.
 
 ## Architecture
 
@@ -42,12 +64,16 @@ restarts.
 
 | Verb + path | Purpose |
 | --- | --- |
-| `POST /api/proof/jobs` | Submit a new job. Body: `{ leftPattern, rightPattern, assumptions[], priority, worker }`. Returns `201 { jobId, status, workerId }`. |
+| `POST /api/proof/jobs` | Submit a new job. Body: `{ leftPattern, rightPattern, assumptions[], priority }`. Returns `201 { jobId, status, workerId }`. |
 | `GET /api/proof/jobs` | List all jobs (most recent first in the UI). |
 | `GET /api/proof/jobs/{id}` | Job detail incl. status, retries, error. |
 | `POST /api/proof/jobs/{id}/cancel` | Cancel a queued or running job. |
 | `GET /api/proof/jobs/{id}/artifacts` | List artefact filenames for the job's bundle. |
 | `GET /api/proof/jobs/{id}/artifacts/{name}` | Stream a single artefact file. Path-traversal is rejected. |
+
+The active worker or worker composition is configured by the application,
+not selected per request. A non-empty `worker` field is rejected instead of
+silently changing the proof boundary.
 
 When `REGELSUCHE_PROOF_ENABLED=false`, the entire `/api/proof/jobs`
 context responds with `503` so callers can gracefully degrade.
@@ -98,15 +124,32 @@ docker build -f Dockerfile.proof --build-arg INSTALL_LEAN=true \
     -t regelsuche-proof-lean .
 ```
 
-The CI job `proof-image` builds this image on every push, verifies that
-`z3 --version` and `cvc5 --version` work inside the container and
-smoke-tests `POST /api/proof/jobs` end-to-end.
+The image verification is not implemented in a GitHub-specific shell
+workflow. `ProofDockerImageIntegrationTest` builds the real
+`Dockerfile.proof` through Testcontainers, checks the installed Z3 and cvc5
+executables, submits the Sophie-Germain job through the REST API, waits for
+`DONE / FORMALLY_PROVED` and verifies `proof.smt2` plus the complete bundle.
+The authoritative checkout-local command is:
+
+```bash
+./gradlew :app:dockerE2eTest \
+  --tests de.regelsuche.dockere2e.ProofDockerImageIntegrationTest
+```
+
+The central CI only invokes the repository-wide Gradle `fullCheck` contract
+that contains this test.
 
 ## Tests
 
 - `ProofJobsApiTest` — full submit → list → get → cancel → artefacts loop.
 - `JsonFileProofArtifactRepositoryBundleTest` — bundle layout & traversal.
 - `ProofConfigTest` — env-var precedence and boolean aliases.
+- `SmtProofBridgeTest` — integer-power expansion, binary `pow` fallback,
+  Sophie-Germain obligation and retained autonomous-production candidate.
+- `ProofJobPanelBrowserFlowTest` — Sophie-Germain identity through UI, queue,
+  scheduler and artefact listing.
+- `ProofDockerImageIntegrationTest` — real Z3 proof and artifact bundle in the
+  versioned proof image.
 
 See [`docs/proof-bridge.md`](proof-bridge.md) for the synchronous
 `/api/proof-bridge` endpoint (the pre-existing one-shot proof helper).

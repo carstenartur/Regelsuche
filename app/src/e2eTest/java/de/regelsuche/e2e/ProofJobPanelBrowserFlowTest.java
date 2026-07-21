@@ -32,12 +32,19 @@ import org.junit.jupiter.api.TestInfo;
  * runner. The flow:</p>
  * <ol>
  *   <li>open the Proof-Jobs tab,</li>
- *   <li>submit a job for {@code a + 0 → a},</li>
+ *   <li>submit the Sophie-Germain identity
+ *       {@code a^4 + 4b^4 = (a^2 - 2ab + 2b^2)(a^2 + 2ab + 2b^2)},</li>
  *   <li>poll the job list until the job appears with a status,</li>
  *   <li>open the artefact list and verify a {@code proof.*} entry is present,</li>
  *   <li>capture {@code docs/assets/screenshots/proof-job-panel.png} (and a
  *       {@code proof-job-panel.webm} video when {@code recordDocs=true}).</li>
  * </ol>
+ *
+ * <p>The current SMT bridge expands bounded non-negative integral powers into
+ * ordinary nonlinear real arithmetic, so the browser flow uses the readable
+ * exponent notation shown to users. The stub characterizes the browser,
+ * queue, scheduler and artifact flow. Real solver correctness remains covered
+ * by the dedicated proof-worker and proof-image tests.</p>
  */
 class ProofJobPanelBrowserFlowTest {
 
@@ -113,7 +120,7 @@ class ProofJobPanelBrowserFlowTest {
     }
 
     @Test
-    @DisplayName("Proof-Workbench: Job für a + 0 -> a einreichen und Artefakte ansehen")
+    @DisplayName("Proof-Workbench: Sophie-Germain-Identität durch Queue und Artefakte")
     void proofJobPanelBrowserFlow() throws Exception {
         // 1. start the primary search flow once so non-entry tabs become visible
         // (body.pre-search hides them until the first search/demo interaction).
@@ -128,15 +135,17 @@ class ProofJobPanelBrowserFlowTest {
         page.waitForSelector("#tab-proofJobs.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
 
-        // 3. submit a job for "a + 0 -> a"
-        page.locator("#proofJobLeft").fill("a + 0");
-        page.locator("#proofJobRight").fill("a");
+        // 3. submit the nontrivial Sophie-Germain identity
+        page.locator("#proofJobLeft").fill("a^4 + 4*b^4");
+        page.locator("#proofJobRight").fill(
+            "(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)");
         page.locator("#proofJobSubmit").click();
 
         // 4. poll the job list until the job appears
         page.waitForFunction(
             "() => { var l = document.querySelector('#proofJobList');"
-                + " return l && l.innerText.includes('a + 0')"
+                + " return l && l.innerText.includes('a^4 + 4*b^4')"
+                + " && l.innerText.includes('(a^2 - 2*a*b + 2*b^2)')"
                 + " && l.innerText.includes('Status:'); }",
             null, new Page.WaitForFunctionOptions().setTimeout(20_000));
 
