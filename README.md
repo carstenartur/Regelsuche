@@ -146,17 +146,19 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
 2. **Suchgraph + Replay ansehen.** `Graph`-Tab zeigt den entdeckten
    Transformationsraum; `Replay` spielt den besten Pfad Schritt für Schritt
    ab.
-3. **Den retained Discovery-Kandidaten formal prüfen.** Im `Proof-Jobs`-Tab
-   `Left=(A + 2)*x + A*x` und `Right=(2*A + 2)*x` eintragen, dann
-   _Job einreichen_. Das ist exakt die von der autonomen
-   Produktionskampagne erzeugte und anschließend unabhängig qualifizierte
-   Regel — keine eigens für die Demo eingebaute Identität. Der von der
-   Anwendung konfigurierte Proof-Worker prüft die Gleichheit; im Proof-Image
-   steht dafür der SMT-Pfad mit Z3 beziehungsweise cvc5 bereit. Status und
-   Solver-Ausgabe werden live aktualisiert. Das Bundle (`proof.smt2`,
-   `metadata.json`, `stdout.txt`, `stderr.txt`) liegt unter
-   `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`. `FORMALLY_PROVED` wird nur
-   gesetzt, wenn der konfigurierte Solver die Obligation tatsächlich bestätigt.
+3. **Eine nichttriviale Identität formal prüfen.** Im `Proof-Jobs`-Tab
+   `Left=a*a*a*a + 4*b*b*b*b` und
+   `Right=(a*a - 2*a*b + 2*b*b)*(a*a + 2*a*b + 2*b*b)` eintragen, dann
+   _Job einreichen_. Das ist die Sophie-Germain-Identität, die auch in der
+   generierten Discovery Gallery als Hidden-Structure-Bridge mit
+   Makrowiederverwendung dokumentiert ist — nicht nur eine Neutralregel wie
+   `a + 0 = a`. Der von der Anwendung konfigurierte Proof-Worker prüft die
+   Gleichheit; im Proof-Image steht dafür der SMT-Pfad mit Z3 beziehungsweise
+   cvc5 bereit. Status und Solver-Ausgabe werden live aktualisiert. Das Bundle
+   (`proof.lean` oder `proof.smt2`, `metadata.json`, `stdout.txt`,
+   `stderr.txt`) liegt unter `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`.
+   `FORMALLY_PROVED` wird nur gesetzt, wenn der konfigurierte Solver die
+   Obligation tatsächlich bestätigt.
    ![Proof-Job-Panel](docs/assets/screenshots/proof-job-panel.png)
 4. **Qualitätsdashboard prüfen.** `Benchmark`-Tab → jede Zeile zeigt
    Ampelstatus, `expectedResultMatched`, e-Graph-Größe, Saturation-Sparung
