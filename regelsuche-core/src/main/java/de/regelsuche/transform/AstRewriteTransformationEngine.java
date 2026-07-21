@@ -1,5 +1,6 @@
 package de.regelsuche.transform;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
@@ -81,7 +82,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 rule.estimatedCostDelta(),
                 rule.isEquivalencePreservingByConstruction(),
                 rule.id() + ":" + result.sourceSubtreeHash(),
-                rule.assumptions(root).stream().map(de.regelsuche.assumption.Assumption::expression).toList(),
+                result.assumptions().stream().map(Assumption::expression).toList(),
                 rule.descriptor().packId(),
                 rule.descriptor().license()
             ));
@@ -99,7 +100,11 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             if (rule.matches(subtree)) {
                 Expr rewritten = rule.apply(subtree);
                 if (!rewritten.equals(subtree)) {
-                    results.add(new RewriteResult(rule, rewritten, subtreeHash));
+                    results.add(new RewriteResult(
+                        rule,
+                        rewritten,
+                        subtreeHash,
+                        rule.assumptions(subtree)));
                 }
             }
         }
@@ -109,14 +114,16 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 results.add(new RewriteResult(
                     leftRewrite.rule(),
                     new BinaryExpr(leftRewrite.expression(), binaryExpr.operator(), binaryExpr.right()),
-                    leftRewrite.sourceSubtreeHash()
+                    leftRewrite.sourceSubtreeHash(),
+                    leftRewrite.assumptions()
                 ));
             }
             for (RewriteResult rightRewrite : rewriteEverywhere(binaryExpr.right())) {
                 results.add(new RewriteResult(
                     rightRewrite.rule(),
                     new BinaryExpr(binaryExpr.left(), binaryExpr.operator(), rightRewrite.expression()),
-                    rightRewrite.sourceSubtreeHash()
+                    rightRewrite.sourceSubtreeHash(),
+                    rightRewrite.assumptions()
                 ));
             }
         } else if (subtree instanceof FunctionExpr functionExpr) {
@@ -129,7 +136,8 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                     results.add(new RewriteResult(
                         argRewrite.rule(),
                         new FunctionExpr(functionExpr.name(), replaced),
-                        argRewrite.sourceSubtreeHash()
+                        argRewrite.sourceSubtreeHash(),
+                        argRewrite.assumptions()
                     ));
                 }
             }
@@ -199,7 +207,15 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         return PatternExpr.op(operator, left, right);
     }
 
-    private record RewriteResult(RewriteRule rule, Expr expression, String sourceSubtreeHash) {
+    private record RewriteResult(
+        RewriteRule rule,
+        Expr expression,
+        String sourceSubtreeHash,
+        List<Assumption> assumptions
+    ) {
+        private RewriteResult {
+            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);
+        }
     }
 
     private abstract static class MetadataRule implements RewriteRule {
