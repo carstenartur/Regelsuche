@@ -11,6 +11,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -92,7 +94,8 @@ class ProofDockerImageIntegrationTest {
         assertEquals("a^4 + 4*b^4", completed.path("leftPattern").asText());
 
         JsonNode artifacts = getJson("/api/proof/jobs/" + jobId + "/artifacts");
-        var names = artifacts.path("artifacts").findValuesAsText("");
+        List<String> names = new ArrayList<>();
+        artifacts.path("artifacts").forEach(item -> names.add(item.asText()));
         assertTrue(names.contains("proof.smt2"), artifacts::toPrettyString);
         assertTrue(names.contains("metadata.json"), artifacts::toPrettyString);
         assertTrue(names.contains("stdout.txt"), artifacts::toPrettyString);
