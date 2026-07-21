@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-candidate-independent-finite-sequence-adapter-run-v1.schema.json",
+  "title": "Regelsuche candidate-independent finite-sequence adapter run v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmarkId",
+    "challengeId",
+    "repositoryRevision",
+    "caseCorpusContentHash",
+    "formationProfileId",
+    "formationProfileContentHash",
+    "freezeReceiptContentHash",
+    "combinedPreregistrationHash",
+    "adapterStatus",
+    "availableCandidateForm",
+    "recurrenceAdapterStatus",
+    "configuredCampaigns",
+    "executedCampaigns",
+    "configuredEvaluations",
+    "executedEvaluations",
+    "confirmedFiniteDifferenceEvaluations",
+    "incompleteAdapterCoverageEvaluations",
+    "uniqueInfiniteContinuationClaimAuthorized",
+    "formalProofStatus",
+    "externalNoveltyStatus",
+    "publicationAuthorized",
+    "campaigns",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.candidate-independent-finite-sequence-adapter-run/v1"
+    },
+    "benchmarkId": {
+      "const": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1"
+    },
+    "challengeId": {
+      "const": "finite-difference-recurrences"
+    },
+    "repositoryRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "caseCorpusContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "formationProfileId": {
+      "const": "finite-sequence-candidate-forms/v1"
+    },
+    "formationProfileContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "freezeReceiptContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "combinedPreregistrationHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "adapterStatus": {
+      "const": "PARTIAL_EXECUTION_WITH_INCOMPLETE_ADAPTER_COVERAGE"
+    },
+    "availableCandidateForm": {
+      "const": "FINITE_DIFFERENCE_POLYNOMIAL"
+    },
+    "recurrenceAdapterStatus": {
+      "const": "ADAPTER_REQUIRED"
+    },
+    "configuredCampaigns": {
+      "const": 4
+    },
+    "executedCampaigns": {
+      "const": 4
+    },
+    "configuredEvaluations": {
+      "const": 24
+    },
+    "executedEvaluations": {
+      "const": 24
+    },
+    "confirmedFiniteDifferenceEvaluations": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 24
+    },
+    "incompleteAdapterCoverageEvaluations": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 24
+    },
+    "uniqueInfiniteContinuationClaimAuthorized": {
+      "const": false
+    },
+    "formalProofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicationAuthorized": {
+      "const": false
+    },
+    "campaigns": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/campaign"
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "campaignId",
+        "challengeId",
+        "configuredSeed",
+        "status",
+        "candidateForm",
+        "candidateFormImplementationClass",
+        "formationVisibility",
+        "heldOutInputAccess",
+        "recurrenceAdapterStatus",
+        "publicationEligible",
+        "formationCaseIds",
+        "formationEvidence",
+        "evaluations",
+        "contentHash"
+      ],
+      "properties": {
+        "campaignId": {
+          "pattern": "^finite-difference-recurrences-campaign-0[1-4]$"
+        },
+        "challengeId": {
+          "const": "finite-difference-recurrences"
+        },
+        "configuredSeed": {
+          "$ref": "#/$defs/sha256"
+        },
+        "status": {
+          "const": "PARTIAL_EXECUTION_WITH_INCOMPLETE_ADAPTER_COVERAGE"
+        },
+        "candidateForm": {
+          "const": "FINITE_DIFFERENCE_POLYNOMIAL"
+        },
+        "candidateFormImplementationClass": {
+          "const": "de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain"
+        },
+        "formationVisibility": {
+          "const": "TRAIN_ONLY"
+        },
+        "heldOutInputAccess": {
+          "const": "EVALUATION_ONLY"
+        },
+        "recurrenceAdapterStatus": {
+          "const": "ADAPTER_REQUIRED"
+        },
+        "publicationEligible": {
+          "const": false
+        },
+        "formationCaseIds": {
+          "const": ["case-07", "case-08"]
+        },
+        "formationEvidence": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/formationEvidence"
+          }
+        },
+        "evaluations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/evaluation"
+          }
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "formationEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "caseContentHash",
+        "inputSurface",
+        "evaluationInputRead",
+        "holdoutVisible",
+        "syntheticHoldoutSource",
+        "syntheticHoldout",
+        "maximumOrder",
+        "productionOutcome",
+        "productionEvidenceContentHash",
+        "candidateFormStatus",
+        "formalProofStatus",
+        "externalNoveltyStatus",
+        "contentHash"
+      ],
+      "properties": {
+        "caseId": {
+          "enum": ["case-07", "case-08"]
+        },
+        "caseContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "inputSurface": {
+          "const": "formationInput"
+        },
+        "evaluationInputRead": {
+          "const": false
+        },
+        "holdoutVisible": {
+          "const": false
+        },
+        "syntheticHoldoutSource": {
+          "const": "DERIVED_FROM_OBSERVED_PREFIX_ONLY"
+        },
+        "syntheticHoldout": {
+          "type": "integer"
+        },
+        "maximumOrder": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "productionOutcome": {
+          "enum": [
+            "CONFIRMED",
+            "REFUTED",
+            "INCONCLUSIVE",
+            "NO_RESULT",
+            "INVALID_SEED",
+            "UNSUPPORTED"
+          ]
+        },
+        "productionEvidenceContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidateFormStatus": {
+          "enum": ["SELECTED", "NO_FINITE_DIFFERENCE_CANDIDATE"]
+        },
+        "formalProofStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "externalNoveltyStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "caseContentHash",
+        "split",
+        "structuralCluster",
+        "formationVisibility",
+        "heldOutInputReadStage",
+        "candidateForm",
+        "productionOutcome",
+        "productionEvidenceContentHash",
+        "outcome",
+        "reasonCode",
+        "uniqueInfiniteContinuationClaimAuthorized",
+        "formalProofStatus",
+        "externalNoveltyStatus",
+        "publicationEligible",
+        "resourceUse",
+        "contentHash"
+      ],
+      "properties": {
+        "caseId": {
+          "pattern": "^case-(0[7-9]|1[0-2])$"
+        },
+        "caseContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split": {
+          "enum": ["TRAIN", "VALIDATION", "TEST"]
+        },
+        "structuralCluster": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formationVisibility": {
+          "enum": ["ALLOWED", "PROHIBITED"]
+        },
+        "heldOutInputReadStage": {
+          "const": "EVALUATION_ONLY"
+        },
+        "candidateForm": {
+          "const": "FINITE_DIFFERENCE_POLYNOMIAL"
+        },
+        "productionOutcome": {
+          "enum": [
+            "CONFIRMED",
+            "REFUTED",
+            "INCONCLUSIVE",
+            "NO_RESULT",
+            "INVALID_SEED",
+            "UNSUPPORTED"
+          ]
+        },
+        "productionEvidenceContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "outcome": {
+          "enum": [
+            "CONFIRMED_FINITE_DIFFERENCE_FIT",
+            "INCOMPLETE_ADAPTER_COVERAGE"
+          ]
+        },
+        "reasonCode": {
+          "enum": [
+            "FINITE_DIFFERENCE_HOLDOUT_CONFIRMED",
+            "LINEAR_RECURRENCE_ADAPTER_REQUIRED"
+          ]
+        },
+        "uniqueInfiniteContinuationClaimAuthorized": {
+          "const": false
+        },
+        "formalProofStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "externalNoveltyStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "publicationEligible": {
+          "const": false
+        },
+        "resourceUse": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exploredStates",
+            "generatedSuccessors",
+            "candidateAttempts",
+            "proofAttempts"
+          ],
+          "properties": {
+            "exploredStates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "generatedSuccessors": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "candidateAttempts": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "proofAttempts": {
+              "const": 0
+            }
+          }
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
