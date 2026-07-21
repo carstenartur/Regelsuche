@@ -1,0 +1,52 @@
+def finiteBudgetRepositoryRoot = layout.projectDirectory
+def finiteBudgetSource = finiteBudgetRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/benchmark-source.json')
+def finiteBudgetCorpus = finiteBudgetRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def finiteBudgetFreezeReceipt = finiteBudgetRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def finiteBudgetVerifier = finiteBudgetRepositoryRoot.file(
+    'scripts/verify-candidate-independent-finite-sequence-budget.py')
+def finiteBudgetBuildRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-finite-sequence-adapter')
+def finiteBudgetFirst = finiteBudgetBuildRoot.map { it.file('first/run.json') }
+def finiteBudgetSecond = finiteBudgetBuildRoot.map { it.file('second/run.json') }
+def finiteBudgetReport = finiteBudgetBuildRoot.map { it.dir('budget-verification') }
+def finiteBudgetVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def finiteBudgetVerificationPython = finiteBudgetVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def verifyCandidateIndependentFiniteSequenceBudget = tasks.register(
+    'verifyCandidateIndependentFiniteSequenceBudget',
+    Exec
+) {
+    group = 'verification'
+    description = 'Binds the evaluated finite-sequence slice to the preregistered campaign seeds and resource ceilings.'
+    dependsOn 'prepareVerificationEnvironment',
+        'verifyCandidateIndependentFiniteSequenceAdapter'
+    workingDir finiteBudgetRepositoryRoot
+    inputs.file finiteBudgetSource
+    inputs.file finiteBudgetCorpus
+    inputs.file finiteBudgetFreezeReceipt
+    inputs.file finiteBudgetVerifier
+    inputs.files finiteBudgetFirst, finiteBudgetSecond
+    outputs.dir finiteBudgetReport
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine finiteBudgetVerificationPython.get().absolutePath,
+            finiteBudgetVerifier.asFile.absolutePath,
+            '--source', finiteBudgetSource.asFile.absolutePath,
+            '--corpus', finiteBudgetCorpus.asFile.absolutePath,
+            '--freeze-receipt', finiteBudgetFreezeReceipt.asFile.absolutePath,
+            '--first', finiteBudgetFirst.get().asFile.absolutePath,
+            '--second', finiteBudgetSecond.get().asFile.absolutePath,
+            '--report-directory', finiteBudgetReport.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentFiniteSequenceBudget
+}

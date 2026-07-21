@@ -1,0 +1,102 @@
+def finiteAdapterRepositoryRoot = layout.projectDirectory
+def finiteAdapterRepositoryRootPath = finiteAdapterRepositoryRoot.asFile.absolutePath
+def finiteAdapterReleaseProject = project(':regelsuche-release')
+def finiteAdapterRuntimeClasspath = providers.provider {
+    finiteAdapterReleaseProject.extensions
+        .getByType(org.gradle.api.tasks.SourceSetContainer)
+        .named('main').get().runtimeClasspath
+}
+
+def finiteAdapterCorpus = finiteAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def finiteAdapterProfile = finiteAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/finite-sequence-candidate-forms.json')
+def finiteAdapterFreezeReceipt = finiteAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def finiteAdapterSchema = finiteAdapterRepositoryRoot.file(
+    'docs/schemas/regelsuche-candidate-independent-finite-sequence-adapter-run-v1.schema.json')
+def finiteAdapterVerifier = finiteAdapterRepositoryRoot.file(
+    'scripts/verify-candidate-independent-finite-sequence-adapter.py')
+def finiteAdapterMainSource = finiteAdapterRepositoryRoot.file(
+    'regelsuche-release/src/main/java/de/regelsuche/release/CandidateIndependentFiniteSequenceAdapterMain.java')
+
+def finiteAdapterBuildRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-finite-sequence-adapter')
+def finiteAdapterFirst = finiteAdapterBuildRoot.map { it.file('first/run.json') }
+def finiteAdapterSecond = finiteAdapterBuildRoot.map { it.file('second/run.json') }
+def finiteAdapterVerification = finiteAdapterBuildRoot.map { it.dir('verification') }
+def finiteAdapterVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def finiteAdapterVerificationPython = finiteAdapterVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureFiniteAdapterRun = { task, outputFile ->
+    task.group = 'verification'
+    task.description = 'Executes the available finite-difference form against the frozen candidate-independent corpus.'
+    task.dependsOn ':regelsuche-release:classes',
+        'verifyCandidateIndependentCaseCorpus'
+    task.classpath = files(finiteAdapterRuntimeClasspath)
+    task.mainClass = 'de.regelsuche.release.CandidateIndependentFiniteSequenceAdapterMain'
+    task.inputs.file finiteAdapterCorpus
+    task.inputs.file finiteAdapterProfile
+    task.inputs.file finiteAdapterFreezeReceipt
+    task.inputs.file finiteAdapterMainSource
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        args '--corpus', finiteAdapterCorpus.asFile.absolutePath,
+            '--profile', finiteAdapterProfile.asFile.absolutePath,
+            '--freeze-receipt', finiteAdapterFreezeReceipt.asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def runCandidateIndependentFiniteSequenceAdapterFirst = tasks.register(
+    'runCandidateIndependentFiniteSequenceAdapterFirst',
+    JavaExec
+) {
+    configureFiniteAdapterRun(delegate, finiteAdapterFirst)
+}
+
+def runCandidateIndependentFiniteSequenceAdapterSecond = tasks.register(
+    'runCandidateIndependentFiniteSequenceAdapterSecond',
+    JavaExec
+) {
+    configureFiniteAdapterRun(delegate, finiteAdapterSecond)
+}
+
+def verifyCandidateIndependentFiniteSequenceAdapter = tasks.register(
+    'verifyCandidateIndependentFiniteSequenceAdapter',
+    Exec
+) {
+    group = 'verification'
+    description = 'Verifies two clean finite-sequence adapter runs, frozen bindings, exposure boundaries and fail-closed negative cases.'
+    dependsOn 'prepareVerificationEnvironment',
+        runCandidateIndependentFiniteSequenceAdapterFirst,
+        runCandidateIndependentFiniteSequenceAdapterSecond
+    workingDir finiteAdapterRepositoryRoot
+    inputs.file finiteAdapterCorpus
+    inputs.file finiteAdapterProfile
+    inputs.file finiteAdapterFreezeReceipt
+    inputs.file finiteAdapterSchema
+    inputs.file finiteAdapterVerifier
+    inputs.files finiteAdapterFirst, finiteAdapterSecond
+    outputs.dir finiteAdapterVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine finiteAdapterVerificationPython.get().absolutePath,
+            finiteAdapterVerifier.asFile.absolutePath,
+            '--repository-root', finiteAdapterRepositoryRootPath,
+            '--first', finiteAdapterFirst.get().asFile.absolutePath,
+            '--second', finiteAdapterSecond.get().asFile.absolutePath,
+            '--report-directory', finiteAdapterVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentFiniteSequenceAdapter
+}

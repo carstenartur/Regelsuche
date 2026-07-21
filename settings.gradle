@@ -75,6 +75,12 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/candidate-independent-corpus-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/candidate-independent-finite-sequence-adapter.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/candidate-independent-finite-sequence-budget-verification.gradle')
     }
 }
 
