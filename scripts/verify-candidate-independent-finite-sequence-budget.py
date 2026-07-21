@@ -16,6 +16,7 @@ CHALLENGE = "finite-difference-recurrences"
 EXPECTED_CAMPAIGNS = [
     f"{CHALLENGE}-campaign-{index:02d}" for index in range(1, 5)
 ]
+EXPECTED_FORMATION_CASES = ["case-07", "case-08"]
 
 
 class Invalid(RuntimeError):
@@ -81,6 +82,11 @@ def configured_seed(benchmark_id: str, campaign_id: str, index: int) -> str:
     )
 
 
+def non_negative_integer(value: Any, label: str) -> int:
+    need(isinstance(value, int) and value >= 0, f"invalid {label}: {value!r}")
+    return value
+
+
 def verify(
     source: dict[str, Any],
     corpus: dict[str, Any],
@@ -112,19 +118,25 @@ def verify(
         "maxStatesPerCampaign": 3000,
     }
     need(budgets == expected_budget, f"frozen budget drift: {budgets!r}")
-    need(first.get("configuredCampaigns") == budgets["campaignsPerChallenge"], "campaign count exceeds or differs from frozen budget")
+    need(first.get("configuredCampaigns") == budgets["campaignsPerChallenge"], "campaign count differs from frozen budget")
 
     campaigns = first.get("campaigns")
     need(isinstance(campaigns, list), "adapter campaigns are missing")
     need([item.get("campaignId") for item in campaigns] == EXPECTED_CAMPAIGNS, "campaign identities changed")
 
-    total_states = 0
-    total_candidates = 0
+    total_conservative_states = 0
+    total_conservative_candidates = 0
     total_proofs = 0
-    maximum_states = 0
-    maximum_candidates = 0
+    total_observed_evaluation_states = 0
+    total_observed_evaluation_candidates = 0
+    total_formation_state_ceiling = 0
+    total_formation_candidate_ceiling = 0
+    maximum_conservative_states = 0
+    maximum_conservative_candidates = 0
     maximum_proofs = 0
     evaluation_count = 0
+    campaign_accounting: list[dict[str, Any]] = []
+
     for index, campaign in enumerate(campaigns, start=1):
         campaign_id = EXPECTED_CAMPAIGNS[index - 1]
         need(
@@ -132,42 +144,89 @@ def verify(
             == configured_seed(source["benchmarkId"], campaign_id, index),
             f"configured seed drift for {campaign_id}",
         )
+
+        formation = campaign.get("formationEvidence")
+        need(isinstance(formation, list) and len(formation) == 2, f"formation matrix drift for {campaign_id}")
+        need([item.get("caseId") for item in formation] == EXPECTED_FORMATION_CASES, f"formation identities changed for {campaign_id}")
+        formation_state_ceiling = 0
+        formation_candidate_ceiling = 0
+        for item in formation:
+            need(isinstance(item, dict), f"non-object formation evidence in {campaign_id}")
+            maximum_order = non_negative_integer(item.get("maximumOrder"), "maximumOrder")
+            need(1 <= maximum_order <= 8, f"maximumOrder outside frozen profile in {campaign_id}")
+            # CandidateIndependentFiniteSequenceAdapterMain constructs the
+            # production-domain budget as max(16, order+2) states and
+            # max(4, order+1) candidate attempts. The raw formation evidence is
+            # hash-bound but not duplicated in this adapter report, therefore
+            # the global campaign check conservatively charges the complete
+            # local ceiling rather than an unretained observed value.
+            formation_state_ceiling += max(16, maximum_order + 2)
+            formation_candidate_ceiling += max(4, maximum_order + 1)
+
         evaluations = campaign.get("evaluations")
         need(isinstance(evaluations, list) and len(evaluations) == 6, f"evaluation matrix drift for {campaign_id}")
-        campaign_states = 0
-        campaign_candidates = 0
-        campaign_proofs = 0
+        evaluation_states = 0
+        evaluation_candidates = 0
+        evaluation_proofs = 0
         for evaluation in evaluations:
             need(isinstance(evaluation, dict), f"non-object evaluation in {campaign_id}")
             resource_use = evaluation.get("resourceUse")
             need(isinstance(resource_use, dict), f"resourceUse missing in {campaign_id}")
-            states = resource_use.get("exploredStates")
-            candidates = resource_use.get("candidateAttempts")
-            proofs = resource_use.get("proofAttempts")
-            generated = resource_use.get("generatedSuccessors")
-            need(all(isinstance(value, int) and value >= 0 for value in (states, candidates, proofs, generated)), f"invalid resource count in {campaign_id}")
-            campaign_states += states
-            campaign_candidates += candidates
-            campaign_proofs += proofs
+            states = non_negative_integer(resource_use.get("exploredStates"), "exploredStates")
+            candidates = non_negative_integer(resource_use.get("candidateAttempts"), "candidateAttempts")
+            proofs = non_negative_integer(resource_use.get("proofAttempts"), "proofAttempts")
+            non_negative_integer(resource_use.get("generatedSuccessors"), "generatedSuccessors")
+            evaluation_states += states
+            evaluation_candidates += candidates
+            evaluation_proofs += proofs
             evaluation_count += 1
+
+        conservative_states = formation_state_ceiling + evaluation_states
+        conservative_candidates = formation_candidate_ceiling + evaluation_candidates
         need(
-            campaign_states <= budgets["maxStatesPerCampaign"],
-            f"{campaign_id} exceeds frozen state budget: {campaign_states}",
+            conservative_states <= budgets["maxStatesPerCampaign"],
+            f"{campaign_id} exceeds frozen state budget: {conservative_states}",
         )
         need(
-            campaign_candidates <= budgets["maxCandidateEvaluations"],
-            f"{campaign_id} exceeds frozen candidate budget: {campaign_candidates}",
+            conservative_candidates <= budgets["maxCandidateEvaluations"],
+            f"{campaign_id} exceeds frozen candidate budget: {conservative_candidates}",
         )
         need(
-            campaign_proofs <= budgets["maxProofAttempts"],
-            f"{campaign_id} exceeds frozen proof budget: {campaign_proofs}",
+            evaluation_proofs <= budgets["maxProofAttempts"],
+            f"{campaign_id} exceeds frozen proof budget: {evaluation_proofs}",
         )
-        total_states += campaign_states
-        total_candidates += campaign_candidates
-        total_proofs += campaign_proofs
-        maximum_states = max(maximum_states, campaign_states)
-        maximum_candidates = max(maximum_candidates, campaign_candidates)
-        maximum_proofs = max(maximum_proofs, campaign_proofs)
+
+        campaign_accounting.append(
+            {
+                "campaignId": campaign_id,
+                "formationConservativeCeiling": {
+                    "exploredStates": formation_state_ceiling,
+                    "candidateEvaluations": formation_candidate_ceiling,
+                    "proofAttempts": 0,
+                },
+                "evaluationObserved": {
+                    "exploredStates": evaluation_states,
+                    "candidateEvaluations": evaluation_candidates,
+                    "proofAttempts": evaluation_proofs,
+                },
+                "conservativeCampaignBound": {
+                    "exploredStates": conservative_states,
+                    "candidateEvaluations": conservative_candidates,
+                    "proofAttempts": evaluation_proofs,
+                },
+                "withinFrozenBudget": True,
+            }
+        )
+        total_conservative_states += conservative_states
+        total_conservative_candidates += conservative_candidates
+        total_proofs += evaluation_proofs
+        total_observed_evaluation_states += evaluation_states
+        total_observed_evaluation_candidates += evaluation_candidates
+        total_formation_state_ceiling += formation_state_ceiling
+        total_formation_candidate_ceiling += formation_candidate_ceiling
+        maximum_conservative_states = max(maximum_conservative_states, conservative_states)
+        maximum_conservative_candidates = max(maximum_conservative_candidates, conservative_candidates)
+        maximum_proofs = max(maximum_proofs, evaluation_proofs)
 
     need(evaluation_count == 24, f"expected 24 evaluated rows, found {evaluation_count}")
     need(first.get("executedEvaluations") == evaluation_count, "top-level evaluation count drift")
@@ -179,17 +238,23 @@ def verify(
         "caseCorpusContentHash": corpus["contentHash"],
         "combinedPreregistrationHash": receipt["combinedPreregistrationHash"],
         "adapterRunContentHash": first["contentHash"],
+        "resourceAccountingPolicy": "FORMATION_LOCAL_CEILINGS_PLUS_OBSERVED_EVALUATION_USAGE",
         "frozenBudget": expected_budget,
         "campaignsVerified": len(campaigns),
         "evaluationsVerified": evaluation_count,
-        "maximumObservedPerCampaign": {
-            "exploredStates": maximum_states,
-            "candidateEvaluations": maximum_candidates,
+        "campaignAccounting": campaign_accounting,
+        "maximumConservativePerCampaign": {
+            "exploredStates": maximum_conservative_states,
+            "candidateEvaluations": maximum_conservative_candidates,
             "proofAttempts": maximum_proofs,
         },
-        "totalObserved": {
-            "exploredStates": total_states,
-            "candidateEvaluations": total_candidates,
+        "totals": {
+            "formationConservativeStateCeiling": total_formation_state_ceiling,
+            "formationConservativeCandidateCeiling": total_formation_candidate_ceiling,
+            "observedEvaluationStates": total_observed_evaluation_states,
+            "observedEvaluationCandidateEvaluations": total_observed_evaluation_candidates,
+            "conservativeExploredStates": total_conservative_states,
+            "conservativeCandidateEvaluations": total_conservative_candidates,
             "proofAttempts": total_proofs,
         },
         "budgetExceeded": False,
@@ -226,7 +291,7 @@ def main() -> int:
         )
         print(f"finiteSequenceBudgetVerification={target}")
         print(f"contentHash={report['contentHash']}")
-        print(f"maximumObservedPerCampaign={report['maximumObservedPerCampaign']}")
+        print(f"maximumConservativePerCampaign={report['maximumConservativePerCampaign']}")
     except (Invalid, OSError) as error:
         print(f"finite-sequence budget verification failed: {error}", file=sys.stderr)
         return 1
