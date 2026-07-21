@@ -13,10 +13,19 @@ persistent queue and write a structured artefact bundle per job.
 
 `ProofJobPanelBrowserFlowTest#proofJobPanelBrowserFlow` startet die
 Workbench in-process mit einem deterministischen
-`StubAlwaysSucceedsWorker`, öffnet den `Proof-Jobs`-Tab, schickt einen
-Job für `a + 0 → a` ab, wartet auf die Jobliste, ruft die Artefakt-Liste
-auf und macht einen Screenshot. So funktioniert die Pipeline auch in
-CI-Runnern ohne Z3 / Lean.
+`StubAlwaysSucceedsWorker`, öffnet den `Proof-Jobs`-Tab und reicht genau den
+retained Kandidaten der autonomen Produktionskampagne ein:
+
+```text
+(A + 2)*x + A*x → (2*A + 2)*x
+```
+
+Der Test wartet auf die Jobliste, ruft die Artefakt-Liste auf und erzeugt den
+Dokumentations-Screenshot. Der Stub prüft dabei bewusst nur den kompletten
+Browser-, Queue-, Scheduler- und Artefaktfluss; die mathematische
+Solverausführung wird separat mit den realen SMT-Workern und dem Proof-Image
+getestet. So bleibt der Browserflow auch auf CI-Runnern ohne lokal
+installiertes Z3 oder Lean deterministisch.
 
 ## Architecture
 
@@ -42,12 +51,16 @@ restarts.
 
 | Verb + path | Purpose |
 | --- | --- |
-| `POST /api/proof/jobs` | Submit a new job. Body: `{ leftPattern, rightPattern, assumptions[], priority, worker }`. Returns `201 { jobId, status, workerId }`. |
+| `POST /api/proof/jobs` | Submit a new job. Body: `{ leftPattern, rightPattern, assumptions[], priority }`. Returns `201 { jobId, status, workerId }`. |
 | `GET /api/proof/jobs` | List all jobs (most recent first in the UI). |
 | `GET /api/proof/jobs/{id}` | Job detail incl. status, retries, error. |
 | `POST /api/proof/jobs/{id}/cancel` | Cancel a queued or running job. |
 | `GET /api/proof/jobs/{id}/artifacts` | List artefact filenames for the job's bundle. |
 | `GET /api/proof/jobs/{id}/artifacts/{name}` | Stream a single artefact file. Path-traversal is rejected. |
+
+The active worker or worker composition is configured by the application,
+not selected per request. A non-empty `worker` field is rejected instead of
+silently changing the proof boundary.
 
 When `REGELSUCHE_PROOF_ENABLED=false`, the entire `/api/proof/jobs`
 context responds with `503` so callers can gracefully degrade.
@@ -107,6 +120,8 @@ smoke-tests `POST /api/proof/jobs` end-to-end.
 - `ProofJobsApiTest` — full submit → list → get → cancel → artefacts loop.
 - `JsonFileProofArtifactRepositoryBundleTest` — bundle layout & traversal.
 - `ProofConfigTest` — env-var precedence and boolean aliases.
+- `ProofJobPanelBrowserFlowTest` — retained production candidate through UI,
+  queue, scheduler and artefact listing.
 
 See [`docs/proof-bridge.md`](proof-bridge.md) for the synchronous
 `/api/proof-bridge` endpoint (the pre-existing one-shot proof helper).
