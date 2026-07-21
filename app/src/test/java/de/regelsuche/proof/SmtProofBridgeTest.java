@@ -27,6 +27,25 @@ class SmtProofBridgeTest {
     }
 
     @Test
+    void emitsSmtObligationForSophieGermainIdentity() {
+        SmtProofBridge bridge = new SmtProofBridge();
+
+        ProofBridge.ProofAttempt attempt = bridge.prove(
+            "a*a*a*a + 4*b*b*b*b",
+            "(a*a - 2*a*b + 2*b*b)*(a*a + 2*a*b + 2*b*b)",
+            List.of());
+
+        assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, attempt.status());
+        assertEquals("smtlib2", attempt.tool());
+        String artifact = attempt.artifact();
+        assertTrue(artifact.contains("(declare-const a Real)"));
+        assertTrue(artifact.contains("(declare-const b Real)"));
+        assertTrue(artifact.contains("(assert (not (="));
+        assertTrue(artifact.contains("(* (* (* a a) a) a)"));
+        assertTrue(artifact.contains("(check-sat)"));
+    }
+
+    @Test
     void emitsSmtObligationForRetainedAutonomousProductionCandidate() {
         SmtProofBridge bridge = new SmtProofBridge();
 
