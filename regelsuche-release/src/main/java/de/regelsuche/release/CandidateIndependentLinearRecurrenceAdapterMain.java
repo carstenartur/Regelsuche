@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoveryBudget;
@@ -35,12 +34,11 @@ import java.util.TreeSet;
  * Executes the post-freeze linear-recurrence adapter against the immutable
  * candidate-independent finite-sequence corpus.
  *
- * <p>The frozen profile is retained unchanged with
- * {@code LINEAR_RECURRENCE=ADAPTER_REQUIRED}. This runner records that the
- * adapter became available after the freeze and binds every execution to the
- * original corpus, profile and freeze receipt. Formation reads only the two
- * TRAIN {@code formationInput} payloads; VALIDATION and TEST holdouts are read
- * only by the evaluation stage.</p>
+ * <p>The frozen profile remains unchanged and still records
+ * {@code LINEAR_RECURRENCE=ADAPTER_REQUIRED}. This runner records the later
+ * implementation as a separate runtime fact. Candidate formation reads only
+ * TRAIN {@code formationInput}; frozen holdouts are read only during
+ * evaluation.</p>
  */
 public final class CandidateIndependentLinearRecurrenceAdapterMain {
     public static final String SCHEMA =
@@ -57,9 +55,7 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
     private static final ObjectMapper JSON = new ObjectMapper(
         JsonFactory.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-            .build())
-        .enable(SerializationFeature.INDENT_OUTPUT)
-        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
+            .build());
 
     private CandidateIndependentLinearRecurrenceAdapterMain() {
     }
@@ -97,6 +93,8 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
                 }
             }
         }
+        require(confirmed == 16 && refuted == 4 && inconclusive == 4,
+            "frozen recurrence accounting changed");
 
         ObjectNode run = JSON.createObjectNode();
         run.put("schema", SCHEMA);
@@ -132,7 +130,9 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
 
         Path output = arguments.output().toAbsolutePath().normalize();
         Files.createDirectories(output.getParent());
-        Files.writeString(output, JSON.writeValueAsString(run) + "\n",
+        Files.writeString(
+            output,
+            JSON.writerWithDefaultPrettyPrinter().writeValueAsString(run) + "\n",
             StandardCharsets.UTF_8);
         System.out.println("candidateIndependentLinearRecurrenceAdapter=" + output);
         System.out.println("contentHash=" + text(run, "contentHash"));
@@ -161,10 +161,6 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
                 trainCase,
                 "formationInput",
                 "TRAIN case " + text(trainCase, "caseId") + " formationInput");
-            require(!formation.has("holdoutContinuation"),
-                "formationInput exposes a frozen holdout");
-            require(!formation.path("holdoutVisible").asBoolean(true),
-                "formationInput unexpectedly exposes a holdout");
             ObjectNode evidence = executeFormation(campaignId, trainCase, formation);
             formationEvidence.add(evidence);
             selected |= "SELECTED".equals(text(evidence, "candidateFormStatus"));
@@ -205,21 +201,34 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
         ObjectNode formation
     ) {
         String caseId = text(benchmarkCase, "caseId");
+        require(!formation.has("holdoutContinuation"),
+            "formationInput exposes a frozen holdout");
+        require(!formation.path("holdoutVisible").asBoolean(true),
+            "formationInput unexpectedly exposes a holdout");
         List<Long> observed = numbers(requireArray(
-            formation, "observedPrefix", "case " + caseId + " formation observedPrefix"));
+            formation,
+            "observedPrefix",
+            "case " + caseId + " formation observedPrefix"));
         int maximumOrder = integer(
-            formation, "maximumOrder", "case " + caseId + " formation maximumOrder");
-        Optional<RecurrenceModel> visibleModel =
+            formation,
+            "maximumOrder",
+            "case " + caseId + " formation maximumOrder");
+        Optional<RecurrenceModel> model =
             LinearRecurrenceSequenceDomain.inferUniqueRecurrence(observed, maximumOrder);
-        SyntheticHoldout synthetic = syntheticHoldout(observed, visibleModel);
+        SyntheticHoldout synthetic = syntheticHoldout(observed, model);
         DomainDiscoveryRunner.RunResult<LinearRecurrenceCandidate,
-            LinearRecurrenceCertificate> run = runProductionDomain(
+            LinearRecurrenceCertificate> production = runProductionDomain(
                 campaignId + "-formation-" + caseId,
                 caseId + "-formation-seed",
                 observed,
                 List.of(synthetic.value()),
                 maximumOrder,
                 "candidate-independent-frozen-formation/" + caseId);
+
+        DomainDiscoveryEvidence.Outcome productionOutcome = production.evidence().outcome();
+        require(productionOutcome == DomainDiscoveryEvidence.Outcome.CONFIRMED
+                || productionOutcome == DomainDiscoveryEvidence.Outcome.INCONCLUSIVE,
+            "unexpected formation outcome for " + caseId + ": " + productionOutcome);
 
         ObjectNode result = JSON.createObjectNode();
         result.put("caseId", caseId);
@@ -231,16 +240,16 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
         result.put("syntheticHoldout", synthetic.value());
         result.put("maximumOrder", maximumOrder);
         result.put("formedModelStatus",
-            visibleModel.isPresent() ? "UNIQUE_MODEL" : "NO_UNIQUE_MODEL");
-        result.put("recurrenceOrder", visibleModel.map(RecurrenceModel::order).orElse(0));
+            model.isPresent() ? "UNIQUE_MODEL" : "NO_UNIQUE_MODEL");
+        result.put("recurrenceOrder", model.map(RecurrenceModel::order).orElse(0));
         result.set("coefficients", rationalStrings(
-            visibleModel.map(RecurrenceModel::coefficients).orElse(List.of())));
-        result.put("productionOutcome", run.evidence().outcome().name());
-        result.put("productionEvidenceContentHash", run.evidence().contentHash());
+            model.map(RecurrenceModel::coefficients).orElse(List.of())));
+        result.put("productionOutcome", productionOutcome.name());
+        result.put("productionEvidenceContentHash", production.evidence().contentHash());
         result.put("candidateFormStatus",
-            run.evidence().outcome() == DomainDiscoveryEvidence.Outcome.CONFIRMED
+            productionOutcome == DomainDiscoveryEvidence.Outcome.CONFIRMED
                 ? "SELECTED" : "NO_UNIQUE_LINEAR_RECURRENCE");
-        result.set("resourceUse", resourceUse(run.evidence()));
+        result.set("resourceUse", resourceUse(production.evidence()));
         result.put("formalProofStatus", "NOT_EVALUATED");
         result.put("externalNoveltyStatus", "NOT_EVALUATED");
         addContentHash(result);
@@ -252,23 +261,23 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
         ObjectNode benchmarkCase
     ) {
         String caseId = text(benchmarkCase, "caseId");
-        ObjectNode evaluationInput = requireObjectField(
+        ObjectNode input = requireObjectField(
             benchmarkCase,
             "evaluationInput",
             "case " + caseId + " evaluationInput");
         List<Long> observed = numbers(requireArray(
-            evaluationInput, "observedPrefix", "case " + caseId + " observedPrefix"));
+            input, "observedPrefix", "case " + caseId + " observedPrefix"));
         List<Long> holdout = numbers(requireArray(
-            evaluationInput, "holdoutContinuation", "case " + caseId + " holdout"));
+            input, "holdoutContinuation", "case " + caseId + " holdout"));
         int maximumOrder = integer(
-            evaluationInput, "maximumOrder", "case " + caseId + " maximumOrder");
-        Optional<RecurrenceModel> visibleModel =
+            input, "maximumOrder", "case " + caseId + " maximumOrder");
+        Optional<RecurrenceModel> model =
             LinearRecurrenceSequenceDomain.inferUniqueRecurrence(observed, maximumOrder);
-        List<Rational> predicted = visibleModel
-            .map(model -> predictContinuation(model, observed, holdout.size()))
+        List<Rational> predicted = model
+            .map(value -> predictContinuation(value, observed, holdout.size()))
             .orElse(List.of());
         DomainDiscoveryRunner.RunResult<LinearRecurrenceCandidate,
-            LinearRecurrenceCertificate> run = runProductionDomain(
+            LinearRecurrenceCertificate> production = runProductionDomain(
                 campaignId + "-evaluation-" + caseId,
                 caseId + "-evaluation-seed",
                 observed,
@@ -276,7 +285,7 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
                 maximumOrder,
                 "candidate-independent-frozen-evaluation/" + caseId);
 
-        DomainDiscoveryEvidence.Outcome productionOutcome = run.evidence().outcome();
+        DomainDiscoveryEvidence.Outcome productionOutcome = production.evidence().outcome();
         String outcome;
         String reasonCode;
         if (productionOutcome == DomainDiscoveryEvidence.Outcome.CONFIRMED) {
@@ -287,8 +296,7 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
             reasonCode = "OBSERVED_PREFIX_RECURRENCE_REFUTED_BY_HOLDOUT";
         } else {
             require(productionOutcome == DomainDiscoveryEvidence.Outcome.INCONCLUSIVE,
-                "unexpected production outcome for frozen recurrence case " + caseId
-                    + ": " + productionOutcome);
+                "unexpected recurrence outcome for " + caseId + ": " + productionOutcome);
             outcome = "NO_UNIQUE_LINEAR_RECURRENCE";
             reasonCode = "NO_UNIQUE_MODEL_WITHIN_FROZEN_ORDER_BOUND";
         }
@@ -303,21 +311,21 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
         result.put("heldOutInputReadStage", "EVALUATION_ONLY");
         result.put("candidateForm", CANDIDATE_FORM);
         result.put("formedModelStatus",
-            visibleModel.isPresent() ? "UNIQUE_MODEL" : "NO_UNIQUE_MODEL");
-        result.put("recurrenceOrder", visibleModel.map(RecurrenceModel::order).orElse(0));
+            model.isPresent() ? "UNIQUE_MODEL" : "NO_UNIQUE_MODEL");
+        result.put("recurrenceOrder", model.map(RecurrenceModel::order).orElse(0));
         result.set("coefficients", rationalStrings(
-            visibleModel.map(RecurrenceModel::coefficients).orElse(List.of())));
+            model.map(RecurrenceModel::coefficients).orElse(List.of())));
         result.set("expectedHoldout", longStrings(holdout));
         result.set("predictedHoldout", rationalStrings(predicted));
         result.put("productionOutcome", productionOutcome.name());
-        result.put("productionEvidenceContentHash", run.evidence().contentHash());
+        result.put("productionEvidenceContentHash", production.evidence().contentHash());
         result.put("outcome", outcome);
         result.put("reasonCode", reasonCode);
         result.put("uniqueInfiniteContinuationClaimAuthorized", false);
         result.put("formalProofStatus", "NOT_EVALUATED");
         result.put("externalNoveltyStatus", "NOT_EVALUATED");
         result.put("publicationEligible", false);
-        result.set("resourceUse", resourceUse(run.evidence()));
+        result.set("resourceUse", resourceUse(production.evidence()));
         addContentHash(result);
         return result;
     }
@@ -356,12 +364,12 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
         Optional<RecurrenceModel> model
     ) {
         if (model.isPresent()) {
-            Rational predicted = model.orElseThrow().predictNext(observed);
-            if (predicted.isInteger()) {
-                return new SyntheticHoldout(
-                    predicted.longValueExact(),
-                    "UNIQUE_VISIBLE_PREFIX_RECURRENCE_PREDICTION");
-            }
+            Rational next = model.orElseThrow().predictNext(observed);
+            require(next.isInteger(),
+                "TRAIN recurrence predicts a non-integral synthetic holdout");
+            return new SyntheticHoldout(
+                next.longValueExact(),
+                "UNIQUE_VISIBLE_PREFIX_RECURRENCE_PREDICTION");
         }
         return new SyntheticHoldout(
             observed.getLast(),
@@ -381,9 +389,9 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
         while (generated.size() < targetSize) {
             int index = generated.size();
             Rational next = Rational.of(0);
-            for (int coefficient = 0; coefficient < model.order(); coefficient++) {
-                next = next.add(model.coefficients().get(coefficient).multiply(
-                    generated.get(index - coefficient - 1)));
+            for (int offset = 0; offset < model.order(); offset++) {
+                next = next.add(model.coefficients().get(offset).multiply(
+                    generated.get(index - offset - 1)));
             }
             generated.add(next);
         }
@@ -407,15 +415,14 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
         requireContentHash(corpus, "case corpus");
         requireContentHash(profile, "finite-sequence candidate-form profile");
         requireContentHash(receipt, "corpus-freeze receipt");
-        require(Objects.equals(text(corpus, "contentHash"),
-            text(receipt, "caseCorpusContentHash")),
+        require(text(corpus, "contentHash").equals(
+                text(receipt, "caseCorpusContentHash")),
             "case corpus is not bound by the freeze receipt");
         ObjectNode inventories = requireObjectField(
             receipt,
             "formationInventoryContentHashes",
             "freeze receipt formation inventory roots");
-        require(Objects.equals(text(profile, "contentHash"),
-            text(inventories, PROFILE_ID)),
+        require(text(profile, "contentHash").equals(text(inventories, PROFILE_ID)),
             "finite-sequence profile is not bound by the freeze receipt");
         require("NOT_STARTED".equals(text(receipt, "executionStatusAtFreeze")),
             "benchmark execution was not NOT_STARTED at freeze time");
@@ -425,6 +432,9 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
             "freeze receipt already contains evaluations");
         require(!receipt.path("publicationAuthorized").asBoolean(true),
             "freeze receipt unexpectedly authorizes publication");
+        require("IMPLEMENT_EXECUTION_ADAPTERS_WITHOUT_MODIFYING_FROZEN_CASE_PAYLOADS"
+                .equals(text(receipt, "allowedNextStep")),
+            "freeze receipt does not authorize adapter implementation");
 
         ObjectNode recurrence = null;
         for (JsonNode form : requireArray(profile, "forms", "candidate forms")) {
@@ -443,21 +453,86 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
     private static List<ObjectNode> finiteCases(ObjectNode corpus) {
         List<ObjectNode> result = new ArrayList<>();
         for (JsonNode item : requireArray(corpus, "cases", "case corpus cases")) {
-            if (item.isObject() && CHALLENGE.equals(text(item, "challengeId"))) {
-                ObjectNode benchmarkCase = (ObjectNode) item;
-                requireContentHash(benchmarkCase,
-                    "frozen benchmark case " + text(benchmarkCase, "caseId"));
-                result.add(benchmarkCase);
+            if (!item.isObject() || !CHALLENGE.equals(text(item, "challengeId"))) {
+                continue;
             }
+            ObjectNode benchmarkCase = (ObjectNode) item;
+            String caseId = text(benchmarkCase, "caseId");
+            requireContentHash(benchmarkCase, "frozen benchmark case " + caseId);
+            validateExposure(benchmarkCase);
+            result.add(benchmarkCase);
         }
         result.sort(Comparator.comparing(item -> text(item, "caseId")));
         require(result.stream().map(item -> text(item, "caseId")).toList().equals(
             List.of("case-07", "case-08", "case-09", "case-10", "case-11", "case-12")),
             "finite-sequence case identities changed");
+        Map<String, Long> splits = result.stream().collect(
+            java.util.stream.Collectors.groupingBy(
+                item -> text(item, "split"),
+                java.util.TreeMap::new,
+                java.util.stream.Collectors.counting()));
+        require(splits.equals(Map.of("TRAIN", 2L, "VALIDATION", 2L, "TEST", 2L)),
+            "finite-sequence split counts changed: " + splits);
         return List.copyOf(result);
     }
 
+    private static void validateExposure(ObjectNode benchmarkCase) {
+        String caseId = text(benchmarkCase, "caseId");
+        String split = text(benchmarkCase, "split");
+        ObjectNode policy = requireObjectField(
+            benchmarkCase, "exposurePolicy", "case " + caseId + " exposure policy");
+        ArrayNode mayRead = requireArray(
+            policy, "candidateFormationMayRead", "case " + caseId + " readable inputs");
+        ArrayNode mustNotRead = requireArray(
+            policy, "candidateFormationMustNotRead", "case " + caseId + " prohibited inputs");
+        require(mustNotRead.size() == 1
+                && "evaluationInput".equals(mustNotRead.get(0).asText()),
+            "case " + caseId + " does not prohibit evaluator input during formation");
+        ObjectNode evaluation = requireObjectField(
+            benchmarkCase, "evaluationInput", "case " + caseId + " evaluation input");
+        require(containsText(requireArray(
+                evaluation, "candidateFormsAllowed", "case " + caseId + " candidate forms"),
+                CANDIDATE_FORM),
+            "case " + caseId + " does not permit linear recurrences");
+        require(!evaluation.path("uniquenessOfInfiniteContinuationClaimAllowed")
+                .asBoolean(true),
+            "case " + caseId + " authorizes a unique infinite continuation claim");
+
+        JsonNode formation = benchmarkCase.get("formationInput");
+        if ("TRAIN".equals(split)) {
+            require(formation != null && formation.isObject(),
+                "TRAIN case " + caseId + " has no formation input");
+            require(mayRead.size() == 1 && "formationInput".equals(mayRead.get(0).asText()),
+                "TRAIN case " + caseId + " formation surface changed");
+            ObjectNode formationObject = (ObjectNode) formation;
+            require(!formationObject.path("holdoutVisible").asBoolean(true),
+                "TRAIN case " + caseId + " exposes its holdout");
+            require(containsText(requireArray(
+                    formationObject,
+                    "candidateFormsAllowed",
+                    "TRAIN case " + caseId + " candidate forms"),
+                    CANDIDATE_FORM),
+                "TRAIN case " + caseId + " does not permit linear recurrences");
+        } else {
+            require(formation == null || formation.isNull(),
+                "held-out case " + caseId + " exposes formation input");
+            require(mayRead.isEmpty(),
+                "held-out case " + caseId + " exposes a formation surface");
+        }
+    }
+
+    private static boolean containsText(ArrayNode array, String expected) {
+        for (JsonNode item : array) {
+            if (item.isTextual() && expected.equals(item.asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static ObjectNode readObject(Path path) throws IOException {
+        require(Files.isRegularFile(path) && !Files.isSymbolicLink(path),
+            "expected regular non-symbolic JSON file: " + path);
         JsonNode value = JSON.readTree(Files.readString(path, StandardCharsets.UTF_8));
         require(value != null && value.isObject(), "expected JSON object: " + path);
         return (ObjectNode) value;
@@ -482,36 +557,43 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             return "sha256:" + java.util.HexFormat.of().formatHex(
-                digest.digest(canonical(value).getBytes(StandardCharsets.UTF_8)));
+                digest.digest(canonicalJson(value).getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 
-    private static String canonical(JsonNode value) {
+    private static String canonicalJson(JsonNode value) {
         try {
-            return JSON.writeValueAsString(canonicalNode(value));
+            if (value.isObject()) {
+                TreeSet<String> fields = new TreeSet<>();
+                value.fieldNames().forEachRemaining(fields::add);
+                StringBuilder result = new StringBuilder("{");
+                int index = 0;
+                for (String field : fields) {
+                    if (index++ > 0) {
+                        result.append(',');
+                    }
+                    result.append(JSON.writeValueAsString(field))
+                        .append(':')
+                        .append(canonicalJson(value.get(field)));
+                }
+                return result.append('}').toString();
+            }
+            if (value.isArray()) {
+                StringBuilder result = new StringBuilder("[");
+                for (int index = 0; index < value.size(); index++) {
+                    if (index > 0) {
+                        result.append(',');
+                    }
+                    result.append(canonicalJson(value.get(index)));
+                }
+                return result.append(']').toString();
+            }
+            return JSON.writeValueAsString(value);
         } catch (IOException exception) {
             throw new IllegalStateException("cannot canonicalize JSON", exception);
         }
-    }
-
-    private static JsonNode canonicalNode(JsonNode value) {
-        if (value.isObject()) {
-            ObjectNode result = JSON.createObjectNode();
-            TreeSet<String> names = new TreeSet<>();
-            value.fieldNames().forEachRemaining(names::add);
-            for (String name : names) {
-                result.set(name, canonicalNode(value.get(name)));
-            }
-            return result;
-        }
-        if (value.isArray()) {
-            ArrayNode result = JSON.createArrayNode();
-            value.forEach(item -> result.add(canonicalNode(item)));
-            return result;
-        }
-        return value.deepCopy();
     }
 
     private static ObjectNode object(Map<String, ?> values) {
@@ -547,7 +629,8 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
     }
 
     private static String csv(List<Long> values) {
-        return values.stream().map(String::valueOf)
+        return values.stream()
+            .map(String::valueOf)
             .collect(java.util.stream.Collectors.joining(","));
     }
 
@@ -573,7 +656,8 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
 
     private static String text(JsonNode value, String field) {
         JsonNode child = value.get(field);
-        require(child != null && child.isTextual(), "missing text field " + field);
+        require(child != null && child.isTextual() && !child.asText().isBlank(),
+            "missing text field " + field);
         return child.textValue();
     }
 
@@ -607,21 +691,23 @@ public final class CandidateIndependentLinearRecurrenceAdapterMain {
                     "arguments must use --name value pairs");
                 require(args[index].startsWith("--"),
                     "argument name must start with --: " + args[index]);
-                require(values.put(args[index], args[index + 1]) == null,
+                require(values.putIfAbsent(args[index], args[index + 1]) == null,
                     "duplicate argument: " + args[index]);
             }
+            TreeSet<String> expected = new TreeSet<>(List.of(
+                "--corpus",
+                "--profile",
+                "--freeze-receipt",
+                "--output",
+                "--repository-revision"));
+            require(values.keySet().equals(expected),
+                "arguments differ: expected=" + expected + " actual=" + values.keySet());
             return new Arguments(
-                Path.of(required(values, "--corpus")),
-                Path.of(required(values, "--profile")),
-                Path.of(required(values, "--freeze-receipt")),
-                Path.of(required(values, "--output")),
-                required(values, "--repository-revision"));
-        }
-
-        private static String required(Map<String, String> values, String name) {
-            String value = values.get(name);
-            require(value != null && !value.isBlank(), "missing argument " + name);
-            return value;
+                Path.of(values.get("--corpus")),
+                Path.of(values.get("--profile")),
+                Path.of(values.get("--freeze-receipt")),
+                Path.of(values.get("--output")),
+                values.get("--repository-revision"));
         }
     }
 }
