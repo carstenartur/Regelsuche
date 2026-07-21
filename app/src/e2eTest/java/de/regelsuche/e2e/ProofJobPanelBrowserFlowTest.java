@@ -40,11 +40,11 @@ import org.junit.jupiter.api.TestInfo;
  *       {@code proof-job-panel.webm} video when {@code recordDocs=true}).</li>
  * </ol>
  *
- * <p>The identity is entered with explicit multiplication so the browser flow
- * exercises exactly the expression surface accepted by the current proof
- * bridge. The stub characterizes the browser, queue, scheduler and artifact
- * flow. Real solver correctness remains covered by the dedicated proof-worker
- * and proof-image tests.</p>
+ * <p>The current SMT bridge expands bounded non-negative integral powers into
+ * ordinary nonlinear real arithmetic, so the browser flow uses the readable
+ * exponent notation shown to users. The stub characterizes the browser,
+ * queue, scheduler and artifact flow. Real solver correctness remains covered
+ * by the dedicated proof-worker and proof-image tests.</p>
  */
 class ProofJobPanelBrowserFlowTest {
 
@@ -136,16 +136,16 @@ class ProofJobPanelBrowserFlowTest {
             new Page.WaitForSelectorOptions().setTimeout(5_000));
 
         // 3. submit the nontrivial Sophie-Germain identity
-        page.locator("#proofJobLeft").fill("a*a*a*a + 4*b*b*b*b");
+        page.locator("#proofJobLeft").fill("a^4 + 4*b^4");
         page.locator("#proofJobRight").fill(
-            "(a*a - 2*a*b + 2*b*b)*(a*a + 2*a*b + 2*b*b)");
+            "(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)");
         page.locator("#proofJobSubmit").click();
 
         // 4. poll the job list until the job appears
         page.waitForFunction(
             "() => { var l = document.querySelector('#proofJobList');"
-                + " return l && l.innerText.includes('a*a*a*a + 4*b*b*b*b')"
-                + " && l.innerText.includes('(a*a - 2*a*b + 2*b*b)')"
+                + " return l && l.innerText.includes('a^4 + 4*b^4')"
+                + " && l.innerText.includes('(a^2 - 2*a*b + 2*b^2)')"
                 + " && l.innerText.includes('Status:'); }",
             null, new Page.WaitForFunctionOptions().setTimeout(20_000));
 
