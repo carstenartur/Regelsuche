@@ -13,12 +13,19 @@ persistent queue and write a structured artefact bundle per job.
 
 `ProofJobPanelBrowserFlowTest#proofJobPanelBrowserFlow` startet die
 Workbench in-process mit einem deterministischen
-`StubAlwaysSucceedsWorker`, öffnet den `Proof-Jobs`-Tab und reicht genau den
-retained Kandidaten der autonomen Produktionskampagne ein:
+`StubAlwaysSucceedsWorker`, öffnet den `Proof-Jobs`-Tab und reicht die
+Sophie-Germain-Identität ein:
 
 ```text
-(A + 2)*x + A*x → (2*A + 2)*x
+a*a*a*a + 4*b*b*b*b
+→ (a*a - 2*a*b + 2*b*b)*(a*a + 2*a*b + 2*b*b)
 ```
+
+Die Identität ist auch in der generierten Discovery Gallery als
+Hidden-Structure-Bridge mit gelernter Makrowiederverwendung dokumentiert.
+Sie ersetzt im sichtbaren Produktfluss die frühere Neutralregel
+`a + 0 → a`, die zwar technisch korrekt, als Demonstration der
+Proof-Workbench aber nicht aussagekräftig war.
 
 Der Test wartet auf die Jobliste, ruft die Artefakt-Liste auf und erzeugt den
 Dokumentations-Screenshot. Der Stub prüft dabei bewusst nur den kompletten
@@ -120,8 +127,10 @@ smoke-tests `POST /api/proof/jobs` end-to-end.
 - `ProofJobsApiTest` — full submit → list → get → cancel → artefacts loop.
 - `JsonFileProofArtifactRepositoryBundleTest` — bundle layout & traversal.
 - `ProofConfigTest` — env-var precedence and boolean aliases.
-- `ProofJobPanelBrowserFlowTest` — retained production candidate through UI,
-  queue, scheduler and artefact listing.
+- `SmtProofBridgeTest` — generated SMT obligation for the Sophie-Germain
+  identity and the retained autonomous-production candidate.
+- `ProofJobPanelBrowserFlowTest` — Sophie-Germain identity through UI, queue,
+  scheduler and artefact listing.
 
 See [`docs/proof-bridge.md`](proof-bridge.md) for the synchronous
 `/api/proof-bridge` endpoint (the pre-existing one-shot proof helper).
