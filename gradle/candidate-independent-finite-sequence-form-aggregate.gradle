@@ -1,0 +1,141 @@
+def sequenceAggregateRepositoryRoot = layout.projectDirectory
+def sequenceAggregateRepositoryRootPath = sequenceAggregateRepositoryRoot.asFile.absolutePath
+
+def sequenceAggregateCorpus = sequenceAggregateRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def sequenceAggregateSchema = sequenceAggregateRepositoryRoot.file(
+    'docs/schemas/regelsuche-candidate-independent-finite-sequence-form-aggregate-v1.schema.json')
+def sequenceAggregateGenerator = sequenceAggregateRepositoryRoot.file(
+    'scripts/generate-candidate-independent-finite-sequence-form-aggregate.py')
+def sequenceAggregateVerifier = sequenceAggregateRepositoryRoot.file(
+    'scripts/verify-candidate-independent-finite-sequence-form-aggregate.py')
+
+def sequenceAggregateFiniteRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-finite-sequence-adapter')
+def sequenceAggregateRecurrenceRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-linear-recurrence-adapter')
+def sequenceAggregateBuildRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-finite-sequence-form-aggregate')
+
+def sequenceAggregateFiniteFirst = sequenceAggregateFiniteRoot.map {
+    it.file('first/run.json')
+}
+def sequenceAggregateFiniteSecond = sequenceAggregateFiniteRoot.map {
+    it.file('second/run.json')
+}
+def sequenceAggregateRecurrenceFirst = sequenceAggregateRecurrenceRoot.map {
+    it.file('first/run.json')
+}
+def sequenceAggregateRecurrenceSecond = sequenceAggregateRecurrenceRoot.map {
+    it.file('second/run.json')
+}
+def sequenceAggregateFirst = sequenceAggregateBuildRoot.map {
+    it.file('first/run.json')
+}
+def sequenceAggregateSecond = sequenceAggregateBuildRoot.map {
+    it.file('second/run.json')
+}
+def sequenceAggregateVerification = sequenceAggregateBuildRoot.map {
+    it.dir('verification')
+}
+
+def sequenceAggregateVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def sequenceAggregatePython = sequenceAggregateVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureSequenceAggregateRun = {
+    task,
+    finiteRun,
+    recurrenceRun,
+    outputFile,
+    finiteTaskName,
+    recurrenceTaskName ->
+    task.group = 'verification'
+    task.description = 'Aggregates both frozen finite-sequence candidate forms without hiding refuted alternative models.'
+    task.dependsOn 'prepareVerificationEnvironment', finiteTaskName, recurrenceTaskName
+    task.workingDir sequenceAggregateRepositoryRoot
+    task.inputs.file sequenceAggregateCorpus
+    task.inputs.file sequenceAggregateGenerator
+    task.inputs.file finiteRun
+    task.inputs.file recurrenceRun
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine sequenceAggregatePython.get().absolutePath,
+            sequenceAggregateGenerator.asFile.absolutePath,
+            '--corpus', sequenceAggregateCorpus.asFile.absolutePath,
+            '--finite-run', finiteRun.get().asFile.absolutePath,
+            '--recurrence-run', recurrenceRun.get().asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath
+    }
+}
+
+def runCandidateIndependentFiniteSequenceFormAggregateFirst = tasks.register(
+    'runCandidateIndependentFiniteSequenceFormAggregateFirst',
+    Exec
+) {
+    configureSequenceAggregateRun(
+        delegate,
+        sequenceAggregateFiniteFirst,
+        sequenceAggregateRecurrenceFirst,
+        sequenceAggregateFirst,
+        'runCandidateIndependentFiniteSequenceAdapterFirst',
+        'runCandidateIndependentLinearRecurrenceAdapterFirst')
+}
+
+def runCandidateIndependentFiniteSequenceFormAggregateSecond = tasks.register(
+    'runCandidateIndependentFiniteSequenceFormAggregateSecond',
+    Exec
+) {
+    configureSequenceAggregateRun(
+        delegate,
+        sequenceAggregateFiniteSecond,
+        sequenceAggregateRecurrenceSecond,
+        sequenceAggregateSecond,
+        'runCandidateIndependentFiniteSequenceAdapterSecond',
+        'runCandidateIndependentLinearRecurrenceAdapterSecond')
+}
+
+def verifyCandidateIndependentFiniteSequenceFormAggregate = tasks.register(
+    'verifyCandidateIndependentFiniteSequenceFormAggregate',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies complete candidate-form coverage, exact arithmetic, source roots, retained conflicts and non-claims.'
+    dependsOn 'verifyCandidateIndependentFiniteSequenceAdapter',
+        'verifyCandidateIndependentLinearRecurrenceAdapter',
+        runCandidateIndependentFiniteSequenceFormAggregateFirst,
+        runCandidateIndependentFiniteSequenceFormAggregateSecond
+    workingDir sequenceAggregateRepositoryRoot
+    inputs.file sequenceAggregateCorpus
+    inputs.file sequenceAggregateSchema
+    inputs.file sequenceAggregateGenerator
+    inputs.file sequenceAggregateVerifier
+    inputs.files sequenceAggregateFiniteFirst,
+        sequenceAggregateFiniteSecond,
+        sequenceAggregateRecurrenceFirst,
+        sequenceAggregateRecurrenceSecond,
+        sequenceAggregateFirst,
+        sequenceAggregateSecond
+    outputs.dir sequenceAggregateVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine sequenceAggregatePython.get().absolutePath,
+            sequenceAggregateVerifier.asFile.absolutePath,
+            '--repository-root', sequenceAggregateRepositoryRootPath,
+            '--finite-first', sequenceAggregateFiniteFirst.get().asFile.absolutePath,
+            '--finite-second', sequenceAggregateFiniteSecond.get().asFile.absolutePath,
+            '--recurrence-first', sequenceAggregateRecurrenceFirst.get().asFile.absolutePath,
+            '--recurrence-second', sequenceAggregateRecurrenceSecond.get().asFile.absolutePath,
+            '--aggregate-first', sequenceAggregateFirst.get().asFile.absolutePath,
+            '--aggregate-second', sequenceAggregateSecond.get().asFile.absolutePath,
+            '--report-directory', sequenceAggregateVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentFiniteSequenceFormAggregate
+}

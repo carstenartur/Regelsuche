@@ -84,6 +84,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/candidate-independent-linear-recurrence-adapter.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/candidate-independent-finite-sequence-form-aggregate.gradle')
     }
 }
 
