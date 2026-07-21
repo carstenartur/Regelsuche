@@ -32,12 +32,17 @@ import org.junit.jupiter.api.TestInfo;
  * runner. The flow:</p>
  * <ol>
  *   <li>open the Proof-Jobs tab,</li>
- *   <li>submit a job for {@code a + 0 → a},</li>
+ *   <li>submit the retained autonomous-production candidate
+ *       {@code (A + 2)*x + A*x → (2*A + 2)*x},</li>
  *   <li>poll the job list until the job appears with a status,</li>
  *   <li>open the artefact list and verify a {@code proof.*} entry is present,</li>
  *   <li>capture {@code docs/assets/screenshots/proof-job-panel.png} (and a
  *       {@code proof-job-panel.webm} video when {@code recordDocs=true}).</li>
  * </ol>
+ *
+ * <p>The stub characterizes the browser, queue, scheduler and artifact flow.
+ * Real solver correctness remains covered by the dedicated proof-worker and
+ * proof-image tests.</p>
  */
 class ProofJobPanelBrowserFlowTest {
 
@@ -113,7 +118,7 @@ class ProofJobPanelBrowserFlowTest {
     }
 
     @Test
-    @DisplayName("Proof-Workbench: Job für a + 0 -> a einreichen und Artefakte ansehen")
+    @DisplayName("Proof-Workbench: retained Produktionskandidat durch Queue und Artefakte")
     void proofJobPanelBrowserFlow() throws Exception {
         // 1. start the primary search flow once so non-entry tabs become visible
         // (body.pre-search hides them until the first search/demo interaction).
@@ -128,15 +133,16 @@ class ProofJobPanelBrowserFlowTest {
         page.waitForSelector("#tab-proofJobs.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
 
-        // 3. submit a job for "a + 0 -> a"
-        page.locator("#proofJobLeft").fill("a + 0");
-        page.locator("#proofJobRight").fill("a");
+        // 3. submit the exact retained autonomous-production candidate
+        page.locator("#proofJobLeft").fill("(A + 2)*x + A*x");
+        page.locator("#proofJobRight").fill("(2*A + 2)*x");
         page.locator("#proofJobSubmit").click();
 
         // 4. poll the job list until the job appears
         page.waitForFunction(
             "() => { var l = document.querySelector('#proofJobList');"
-                + " return l && l.innerText.includes('a + 0')"
+                + " return l && l.innerText.includes('(A + 2)*x + A*x')"
+                + " && l.innerText.includes('(2*A + 2)*x')"
                 + " && l.innerText.includes('Status:'); }",
             null, new Page.WaitForFunctionOptions().setTimeout(20_000));
 
