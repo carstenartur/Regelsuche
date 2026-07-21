@@ -124,9 +124,20 @@ docker build -f Dockerfile.proof --build-arg INSTALL_LEAN=true \
     -t regelsuche-proof-lean .
 ```
 
-The CI job `proof-image` builds this image on every push, verifies that
-`z3 --version` and `cvc5 --version` work inside the container and
-smoke-tests `POST /api/proof/jobs` end-to-end.
+The image verification is not implemented in a GitHub-specific shell
+workflow. `ProofDockerImageIntegrationTest` builds the real
+`Dockerfile.proof` through Testcontainers, checks the installed Z3 and cvc5
+executables, submits the Sophie-Germain job through the REST API, waits for
+`DONE / FORMALLY_PROVED` and verifies `proof.smt2` plus the complete bundle.
+The authoritative checkout-local command is:
+
+```bash
+./gradlew :app:dockerE2eTest \
+  --tests de.regelsuche.dockere2e.ProofDockerImageIntegrationTest
+```
+
+The central CI only invokes the repository-wide Gradle `fullCheck` contract
+that contains this test.
 
 ## Tests
 
@@ -137,6 +148,8 @@ smoke-tests `POST /api/proof/jobs` end-to-end.
   Sophie-Germain obligation and retained autonomous-production candidate.
 - `ProofJobPanelBrowserFlowTest` — Sophie-Germain identity through UI, queue,
   scheduler and artefact listing.
+- `ProofDockerImageIntegrationTest` — real Z3 proof and artifact bundle in the
+  versioned proof image.
 
 See [`docs/proof-bridge.md`](proof-bridge.md) for the synchronous
 `/api/proof-bridge` endpoint (the pre-existing one-shot proof helper).
