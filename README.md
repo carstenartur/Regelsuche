@@ -147,11 +147,12 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
    Transformationsraum; `Replay` spielt den besten Pfad Schritt für Schritt
    ab.
 3. **Den retained Discovery-Kandidaten formal prüfen.** Im `Proof-Jobs`-Tab
-   `Left=(A + 2)*x + A*x`, `Right=(2*A + 2)*x` und den Worker `smtlib2`
-   wählen, dann _Job einreichen_. Das ist exakt die von der autonomen
+   `Left=(A + 2)*x + A*x` und `Right=(2*A + 2)*x` eintragen, dann
+   _Job einreichen_. Das ist exakt die von der autonomen
    Produktionskampagne erzeugte und anschließend unabhängig qualifizierte
-   Regel — keine eigens für die Demo eingebaute Identität. Z3 beziehungsweise
-   cvc5 prüft die Unerfüllbarkeit der negierten Gleichheit; Status und
+   Regel — keine eigens für die Demo eingebaute Identität. Der von der
+   Anwendung konfigurierte Proof-Worker prüft die Gleichheit; im Proof-Image
+   steht dafür der SMT-Pfad mit Z3 beziehungsweise cvc5 bereit. Status und
    Solver-Ausgabe werden live aktualisiert. Das Bundle (`proof.smt2`,
    `metadata.json`, `stdout.txt`, `stderr.txt`) liegt unter
    `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`. `FORMALLY_PROVED` wird nur
