@@ -1,14 +1,17 @@
 package de.regelsuche.rules;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.BinaryExpr;
 import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionFormatter;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class RationalRulesTest {
@@ -27,6 +30,37 @@ class RationalRulesTest {
         assertTrue(rule.matches(fraction));
         Expr cancelled = rule.apply(fraction);
         assertTrue(ExpressionFormatter.format(cancelled).contains("y / z"));
+    }
+
+    @Test
+    void cancelCommonFactorRetainsCancelledAndRemainingDenominatorAssumptions() {
+        RationalRules.CancelCommonFactorRule rule = new RationalRules.CancelCommonFactorRule();
+        VariableExpr x = new VariableExpr("x");
+        VariableExpr y = new VariableExpr("y");
+        VariableExpr z = new VariableExpr("z");
+        Expr fraction = new BinaryExpr(
+            new BinaryExpr(x, BinaryOperator.MUL, y),
+            BinaryOperator.DIV,
+            new BinaryExpr(x, BinaryOperator.MUL, z)
+        );
+
+        assertEquals(
+            List.of(Assumption.nonZero("x"), Assumption.nonZero("z")),
+            rule.assumptions(fraction));
+    }
+
+    @Test
+    void cancelCommonFactorDoesNotDuplicateEquivalentNonZeroAssumptions() {
+        RationalRules.CancelCommonFactorRule rule = new RationalRules.CancelCommonFactorRule();
+        VariableExpr x = new VariableExpr("x");
+        VariableExpr y = new VariableExpr("y");
+        Expr fraction = new BinaryExpr(
+            new BinaryExpr(x, BinaryOperator.MUL, y),
+            BinaryOperator.DIV,
+            new BinaryExpr(x, BinaryOperator.MUL, x)
+        );
+
+        assertEquals(List.of(Assumption.nonZero("x")), rule.assumptions(fraction));
     }
 
     @Test
