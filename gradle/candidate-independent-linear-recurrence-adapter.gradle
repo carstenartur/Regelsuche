@@ -1,0 +1,105 @@
+def recurrenceAdapterRepositoryRoot = layout.projectDirectory
+def recurrenceAdapterRepositoryRootPath = recurrenceAdapterRepositoryRoot.asFile.absolutePath
+def recurrenceAdapterReleaseProject = project(':regelsuche-release')
+def recurrenceAdapterRuntimeClasspath = providers.provider {
+    recurrenceAdapterReleaseProject.extensions
+        .getByType(org.gradle.api.tasks.SourceSetContainer)
+        .named('main').get().runtimeClasspath
+}
+
+def recurrenceAdapterCorpus = recurrenceAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def recurrenceAdapterProfile = recurrenceAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/finite-sequence-candidate-forms.json')
+def recurrenceAdapterFreezeReceipt = recurrenceAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def recurrenceAdapterSchema = recurrenceAdapterRepositoryRoot.file(
+    'docs/schemas/regelsuche-candidate-independent-linear-recurrence-adapter-run-v1.schema.json')
+def recurrenceAdapterVerifier = recurrenceAdapterRepositoryRoot.file(
+    'scripts/verify-candidate-independent-linear-recurrence-adapter.py')
+def recurrenceAdapterMainSource = recurrenceAdapterRepositoryRoot.file(
+    'regelsuche-release/src/main/java/de/regelsuche/release/CandidateIndependentLinearRecurrenceAdapterMain.java')
+def recurrenceAdapterDomainSource = recurrenceAdapterRepositoryRoot.file(
+    'regelsuche-discovery/src/main/java/de/regelsuche/discovery/domain/LinearRecurrenceSequenceDomain.java')
+
+def recurrenceAdapterBuildRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-linear-recurrence-adapter')
+def recurrenceAdapterFirst = recurrenceAdapterBuildRoot.map { it.file('first/run.json') }
+def recurrenceAdapterSecond = recurrenceAdapterBuildRoot.map { it.file('second/run.json') }
+def recurrenceAdapterVerification = recurrenceAdapterBuildRoot.map { it.dir('verification') }
+def recurrenceAdapterVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def recurrenceAdapterVerificationPython = recurrenceAdapterVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureRecurrenceAdapterRun = { task, outputFile ->
+    task.group = 'verification'
+    task.description = 'Executes the exact linear-recurrence form against the frozen candidate-independent sequence corpus.'
+    task.dependsOn ':regelsuche-release:classes',
+        'verifyCandidateIndependentCaseCorpus'
+    task.classpath = files(recurrenceAdapterRuntimeClasspath)
+    task.mainClass = 'de.regelsuche.release.CandidateIndependentLinearRecurrenceAdapterMain'
+    task.inputs.file recurrenceAdapterCorpus
+    task.inputs.file recurrenceAdapterProfile
+    task.inputs.file recurrenceAdapterFreezeReceipt
+    task.inputs.file recurrenceAdapterMainSource
+    task.inputs.file recurrenceAdapterDomainSource
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        args '--corpus', recurrenceAdapterCorpus.asFile.absolutePath,
+            '--profile', recurrenceAdapterProfile.asFile.absolutePath,
+            '--freeze-receipt', recurrenceAdapterFreezeReceipt.asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def runCandidateIndependentLinearRecurrenceAdapterFirst = tasks.register(
+    'runCandidateIndependentLinearRecurrenceAdapterFirst',
+    JavaExec
+) {
+    configureRecurrenceAdapterRun(delegate, recurrenceAdapterFirst)
+}
+
+def runCandidateIndependentLinearRecurrenceAdapterSecond = tasks.register(
+    'runCandidateIndependentLinearRecurrenceAdapterSecond',
+    JavaExec
+) {
+    configureRecurrenceAdapterRun(delegate, recurrenceAdapterSecond)
+}
+
+def verifyCandidateIndependentLinearRecurrenceAdapter = tasks.register(
+    'verifyCandidateIndependentLinearRecurrenceAdapter',
+    Exec
+) {
+    group = 'verification'
+    description = 'Verifies two clean recurrence runs, exact independent arithmetic, frozen bindings, exposure boundaries and fail-closed negative cases.'
+    dependsOn 'prepareVerificationEnvironment',
+        runCandidateIndependentLinearRecurrenceAdapterFirst,
+        runCandidateIndependentLinearRecurrenceAdapterSecond
+    workingDir recurrenceAdapterRepositoryRoot
+    inputs.file recurrenceAdapterCorpus
+    inputs.file recurrenceAdapterProfile
+    inputs.file recurrenceAdapterFreezeReceipt
+    inputs.file recurrenceAdapterSchema
+    inputs.file recurrenceAdapterVerifier
+    inputs.files recurrenceAdapterFirst, recurrenceAdapterSecond
+    outputs.dir recurrenceAdapterVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine recurrenceAdapterVerificationPython.get().absolutePath,
+            recurrenceAdapterVerifier.asFile.absolutePath,
+            '--repository-root', recurrenceAdapterRepositoryRootPath,
+            '--first', recurrenceAdapterFirst.get().asFile.absolutePath,
+            '--second', recurrenceAdapterSecond.get().asFile.absolutePath,
+            '--report-directory', recurrenceAdapterVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentLinearRecurrenceAdapter
+}
