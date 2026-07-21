@@ -1,6 +1,7 @@
 package de.regelsuche.proof;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
@@ -27,12 +28,12 @@ class SmtProofBridgeTest {
     }
 
     @Test
-    void emitsSmtObligationForSophieGermainIdentity() {
+    void expandsIntegralPowersForSophieGermainIdentity() {
         SmtProofBridge bridge = new SmtProofBridge();
 
         ProofBridge.ProofAttempt attempt = bridge.prove(
-            "a*a*a*a + 4*b*b*b*b",
-            "(a*a - 2*a*b + 2*b*b)*(a*a + 2*a*b + 2*b*b)",
+            "a^4 + 4*b^4",
+            "(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)",
             List.of());
 
         assertEquals(CandidateProofStatus.FORMALLY_PROVABLE, attempt.status());
@@ -40,9 +41,23 @@ class SmtProofBridgeTest {
         String artifact = attempt.artifact();
         assertTrue(artifact.contains("(declare-const a Real)"));
         assertTrue(artifact.contains("(declare-const b Real)"));
-        assertTrue(artifact.contains("(assert (not (="));
         assertTrue(artifact.contains("(* (* (* a a) a) a)"));
+        assertTrue(artifact.contains("(* b b)"));
+        assertFalse(artifact.contains("(declare-fun pow"));
+        assertFalse(artifact.contains("(pow "));
         assertTrue(artifact.contains("(check-sat)"));
+    }
+
+    @Test
+    void declaresFallbackPowWithCorrectBinaryArity() {
+        SmtProofBridge bridge = new SmtProofBridge();
+
+        ProofBridge.ProofAttempt attempt = bridge.prove("a^n", "pow(a,n)", List.of());
+
+        String artifact = attempt.artifact();
+        assertTrue(artifact.contains("(declare-fun pow (Real Real) Real)"));
+        assertTrue(artifact.contains("(pow a n)"));
+        assertFalse(artifact.contains("(declare-fun pow (Real) Real)"));
     }
 
     @Test
