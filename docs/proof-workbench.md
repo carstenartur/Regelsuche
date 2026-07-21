@@ -17,8 +17,8 @@ Workbench in-process mit einem deterministischen
 Sophie-Germain-Identität ein:
 
 ```text
-a*a*a*a + 4*b*b*b*b
-→ (a*a - 2*a*b + 2*b*b)*(a*a + 2*a*b + 2*b*b)
+a^4 + 4*b^4
+→ (a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)
 ```
 
 Die Identität ist auch in der generierten Discovery Gallery als
@@ -27,9 +27,15 @@ Sie ersetzt im sichtbaren Produktfluss die frühere Neutralregel
 `a + 0 → a`, die zwar technisch korrekt, als Demonstration der
 Proof-Workbench aber nicht aussagekräftig war.
 
-Der Test wartet auf die Jobliste, ruft die Artefakt-Liste auf und erzeugt den
-Dokumentations-Screenshot. Der Stub prüft dabei bewusst nur den kompletten
-Browser-, Queue-, Scheduler- und Artefaktfluss; die mathematische
+Der SMT-Bridge expandiert begrenzte nichtnegative ganzzahlige Exponenten in
+gewöhnliche nichtlineare reelle Arithmetik. Andere Exponenten verwenden eine
+korrekt zweistellig deklarierte `pow`-Fallback-Funktion. Dadurch ist die
+sichtbare `a^4`-Schreibweise nicht nur kosmetisch, sondern erzeugt einen
+gültigen Beweisauftrag.
+
+Der Browser-Test wartet auf die Jobliste, ruft die Artefakt-Liste auf und
+erzeugt den Dokumentations-Screenshot. Der Stub prüft dabei bewusst nur den
+kompletten Browser-, Queue-, Scheduler- und Artefaktfluss; die mathematische
 Solverausführung wird separat mit den realen SMT-Workern und dem Proof-Image
 getestet. So bleibt der Browserflow auch auf CI-Runnern ohne lokal
 installiertes Z3 oder Lean deterministisch.
@@ -127,8 +133,8 @@ smoke-tests `POST /api/proof/jobs` end-to-end.
 - `ProofJobsApiTest` — full submit → list → get → cancel → artefacts loop.
 - `JsonFileProofArtifactRepositoryBundleTest` — bundle layout & traversal.
 - `ProofConfigTest` — env-var precedence and boolean aliases.
-- `SmtProofBridgeTest` — generated SMT obligation for the Sophie-Germain
-  identity and the retained autonomous-production candidate.
+- `SmtProofBridgeTest` — integer-power expansion, binary `pow` fallback,
+  Sophie-Germain obligation and retained autonomous-production candidate.
 - `ProofJobPanelBrowserFlowTest` — Sophie-Germain identity through UI, queue,
   scheduler and artefact listing.
 
