@@ -1,0 +1,127 @@
+def rationalAdapterRepositoryRoot = layout.projectDirectory
+def rationalAdapterRepositoryRootPath = rationalAdapterRepositoryRoot.asFile.absolutePath
+def rationalAdapterReleaseProject = project(':regelsuche-release')
+def rationalAdapterRuntimeClasspath = providers.provider {
+    rationalAdapterReleaseProject.extensions
+        .getByType(org.gradle.api.tasks.SourceSetContainer)
+        .named('main').get().runtimeClasspath
+}
+
+def rationalAdapterBenchmarkSource = rationalAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/benchmark-source.json')
+def rationalAdapterCorpus = rationalAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def rationalAdapterProfile = rationalAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/rational-assumption-primitives.json')
+def rationalAdapterFreezeReceipt = rationalAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def rationalAdapterSchema = rationalAdapterRepositoryRoot.file(
+    'docs/schemas/regelsuche-candidate-independent-rational-assumption-adapter-run-v1.schema.json')
+def rationalAdapterVerifier = rationalAdapterRepositoryRoot.file(
+    'scripts/verify-candidate-independent-rational-assumption-adapter.py')
+def rationalAdapterVerifierRunner = rationalAdapterRepositoryRoot.file(
+    'scripts/run-candidate-independent-rational-assumption-verifier.py')
+def rationalAdapterMainSource = rationalAdapterRepositoryRoot.file(
+    'regelsuche-release/src/main/java/de/regelsuche/release/CandidateIndependentRationalAssumptionAdapterMain.java')
+def rationalAdapterProductionSource = rationalAdapterRepositoryRoot.file(
+    'regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/equivalence/RationalAssumptionRewriteAdapter.java')
+def rationalAdapterEquivalenceSource = rationalAdapterRepositoryRoot.file(
+    'regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/equivalence/RationalFunctionNormalFormEquivalenceService.java')
+
+def rationalAdapterBuildRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-rational-assumption-adapter')
+def rationalAdapterFirst = rationalAdapterBuildRoot.map {
+    it.file('first/run.json')
+}
+def rationalAdapterSecond = rationalAdapterBuildRoot.map {
+    it.file('second/run.json')
+}
+def rationalAdapterVerification = rationalAdapterBuildRoot.map {
+    it.dir('verification')
+}
+def rationalAdapterVerificationVenv = layout.buildDirectory.dir(
+    'verification-venv')
+def rationalAdapterVerificationPython = rationalAdapterVerificationVenv.map {
+    directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureRationalAdapterRun = { task, outputFile ->
+    task.group = 'verification'
+    task.description = 'Executes target-free rational candidate formation and the complete frozen held-out task matrix.'
+    task.dependsOn ':regelsuche-release:classes',
+        'verifyCandidateIndependentCaseCorpus'
+    task.classpath = files(rationalAdapterRuntimeClasspath)
+    task.mainClass = 'de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain'
+    task.inputs.file rationalAdapterBenchmarkSource
+    task.inputs.file rationalAdapterCorpus
+    task.inputs.file rationalAdapterProfile
+    task.inputs.file rationalAdapterFreezeReceipt
+    task.inputs.file rationalAdapterMainSource
+    task.inputs.file rationalAdapterProductionSource
+    task.inputs.file rationalAdapterEquivalenceSource
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        args '--benchmark-source',
+            rationalAdapterBenchmarkSource.asFile.absolutePath,
+            '--corpus', rationalAdapterCorpus.asFile.absolutePath,
+            '--profile', rationalAdapterProfile.asFile.absolutePath,
+            '--freeze-receipt',
+            rationalAdapterFreezeReceipt.asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def runCandidateIndependentRationalAssumptionAdapterFirst = tasks.register(
+    'runCandidateIndependentRationalAssumptionAdapterFirst',
+    JavaExec
+) {
+    configureRationalAdapterRun(delegate, rationalAdapterFirst)
+}
+
+def runCandidateIndependentRationalAssumptionAdapterSecond = tasks.register(
+    'runCandidateIndependentRationalAssumptionAdapterSecond',
+    JavaExec
+) {
+    configureRationalAdapterRun(delegate, rationalAdapterSecond)
+}
+
+def verifyCandidateIndependentRationalAssumptionAdapter = tasks.register(
+    'verifyCandidateIndependentRationalAssumptionAdapter',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies rational formation isolation, exact paths, null results, resource accounting and non-claims.'
+    dependsOn 'prepareVerificationEnvironment',
+        runCandidateIndependentRationalAssumptionAdapterFirst,
+        runCandidateIndependentRationalAssumptionAdapterSecond
+    workingDir rationalAdapterRepositoryRoot
+    inputs.file rationalAdapterBenchmarkSource
+    inputs.file rationalAdapterCorpus
+    inputs.file rationalAdapterProfile
+    inputs.file rationalAdapterFreezeReceipt
+    inputs.file rationalAdapterSchema
+    inputs.file rationalAdapterVerifier
+    inputs.file rationalAdapterVerifierRunner
+    inputs.files rationalAdapterFirst, rationalAdapterSecond
+    outputs.dir rationalAdapterVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine rationalAdapterVerificationPython.get().absolutePath,
+            rationalAdapterVerifierRunner.asFile.absolutePath,
+            '--repository-root', rationalAdapterRepositoryRootPath,
+            '--first', rationalAdapterFirst.get().asFile.absolutePath,
+            '--second', rationalAdapterSecond.get().asFile.absolutePath,
+            '--report-directory',
+            rationalAdapterVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentRationalAssumptionAdapter
+}
