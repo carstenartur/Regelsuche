@@ -1,0 +1,174 @@
+def rationalAdapterRepositoryRoot = layout.projectDirectory
+def rationalAdapterRepositoryRootPath = rationalAdapterRepositoryRoot.asFile.absolutePath
+def rationalAdapterReleaseProject = project(':regelsuche-release')
+def rationalAdapterRuntimeClasspath = providers.provider {
+    rationalAdapterReleaseProject.extensions
+        .getByType(org.gradle.api.tasks.SourceSetContainer)
+        .named('main').get().runtimeClasspath
+}
+
+def rationalAdapterBenchmarkSource = rationalAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/benchmark-source.json')
+def rationalAdapterCorpus = rationalAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def rationalAdapterProfile = rationalAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/rational-assumption-primitives.json')
+def rationalAdapterFreezeReceipt = rationalAdapterRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def rationalAdapterSchema = rationalAdapterRepositoryRoot.file(
+    'docs/schemas/regelsuche-candidate-independent-rational-assumption-adapter-run-v1.schema.json')
+def rationalAdapterVerifier = rationalAdapterRepositoryRoot.file(
+    'scripts/verify-candidate-independent-rational-assumption-adapter.py')
+def rationalAdapterVerifierRunner = rationalAdapterRepositoryRoot.file(
+    'scripts/run-candidate-independent-rational-assumption-verifier.py')
+def rationalAdapterMainSource = rationalAdapterRepositoryRoot.file(
+    'regelsuche-release/src/main/java/de/regelsuche/release/CandidateIndependentRationalAssumptionAdapterMain.java')
+def rationalAdapterProductionSource = rationalAdapterRepositoryRoot.file(
+    'regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/equivalence/RationalAssumptionRewriteAdapter.java')
+def rationalAdapterEquivalenceSource = rationalAdapterRepositoryRoot.file(
+    'regelsuche-math-algorithms/src/main/java/de/regelsuche/math/algorithms/equivalence/RationalFunctionNormalFormEquivalenceService.java')
+
+def rationalAdapterBuildRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-rational-assumption-adapter')
+def rationalAdapterAdaptedBenchmarkSource = rationalAdapterBuildRoot.map {
+    it.file('inputs/benchmark-source-with-freeze-hash.json')
+}
+def rationalAdapterFirst = rationalAdapterBuildRoot.map {
+    it.file('first/run.json')
+}
+def rationalAdapterSecond = rationalAdapterBuildRoot.map {
+    it.file('second/run.json')
+}
+def rationalAdapterVerification = rationalAdapterBuildRoot.map {
+    it.dir('verification')
+}
+def rationalAdapterVerificationVenv = layout.buildDirectory.dir(
+    'verification-venv')
+def rationalAdapterVerificationPython = rationalAdapterVerificationVenv.map {
+    directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+/*
+ * The original preregistration predates the later convention of embedding a
+ * document's semantic hash in its own JSON object. The corpus-freeze receipt
+ * already binds that exact semantic root. Execution receives a temporary,
+ * generated adapter copy with only that retained root added; the source-
+ * controlled preregistration remains byte-for-byte unchanged and the
+ * independent verifier continues to validate the original file directly.
+ */
+def prepareCandidateIndependentRationalBenchmarkSource = tasks.register(
+    'prepareCandidateIndependentRationalBenchmarkSource'
+) {
+    group = 'verification'
+    description = 'Adds the freeze-receipt-bound semantic root to a temporary legacy benchmark-source adapter copy.'
+    inputs.file rationalAdapterBenchmarkSource
+    inputs.file rationalAdapterFreezeReceipt
+    outputs.file rationalAdapterAdaptedBenchmarkSource
+    doLast {
+        def parser = new groovy.json.JsonSlurper()
+        def source = parser.parse(rationalAdapterBenchmarkSource.asFile)
+        def receipt = parser.parse(rationalAdapterFreezeReceipt.asFile)
+        if (!(source instanceof Map) || !(receipt instanceof Map)) {
+            throw new GradleException('candidate-independent benchmark source and receipt must be JSON objects')
+        }
+        if (source.containsKey('contentHash')) {
+            throw new GradleException('legacy benchmark source unexpectedly already embeds contentHash')
+        }
+        def retained = receipt.benchmarkSourceContentHash
+        if (!(retained instanceof String)
+                || !(retained ==~ /sha256:[0-9a-f]{64}/)) {
+            throw new GradleException('freeze receipt has no valid benchmarkSourceContentHash')
+        }
+        def adapted = new LinkedHashMap(source)
+        adapted.contentHash = retained
+        def output = rationalAdapterAdaptedBenchmarkSource.get().asFile
+        output.parentFile.mkdirs()
+        output.setText(
+            groovy.json.JsonOutput.prettyPrint(
+                groovy.json.JsonOutput.toJson(adapted)) + '\n',
+            'UTF-8')
+    }
+}
+
+def configureRationalAdapterRun = { task, outputFile ->
+    task.group = 'verification'
+    task.description = 'Executes target-free rational candidate formation and the complete frozen held-out task matrix.'
+    task.dependsOn ':regelsuche-release:classes',
+        'verifyCandidateIndependentCaseCorpus',
+        prepareCandidateIndependentRationalBenchmarkSource
+    task.classpath = files(rationalAdapterRuntimeClasspath)
+    task.mainClass = 'de.regelsuche.release.CandidateIndependentRationalAssumptionAdapterMain'
+    task.inputs.file rationalAdapterBenchmarkSource
+    task.inputs.file rationalAdapterAdaptedBenchmarkSource
+    task.inputs.file rationalAdapterCorpus
+    task.inputs.file rationalAdapterProfile
+    task.inputs.file rationalAdapterFreezeReceipt
+    task.inputs.file rationalAdapterMainSource
+    task.inputs.file rationalAdapterProductionSource
+    task.inputs.file rationalAdapterEquivalenceSource
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        args '--benchmark-source',
+            rationalAdapterAdaptedBenchmarkSource.get().asFile.absolutePath,
+            '--corpus', rationalAdapterCorpus.asFile.absolutePath,
+            '--profile', rationalAdapterProfile.asFile.absolutePath,
+            '--freeze-receipt',
+            rationalAdapterFreezeReceipt.asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def runCandidateIndependentRationalAssumptionAdapterFirst = tasks.register(
+    'runCandidateIndependentRationalAssumptionAdapterFirst',
+    JavaExec
+) {
+    configureRationalAdapterRun(delegate, rationalAdapterFirst)
+}
+
+def runCandidateIndependentRationalAssumptionAdapterSecond = tasks.register(
+    'runCandidateIndependentRationalAssumptionAdapterSecond',
+    JavaExec
+) {
+    configureRationalAdapterRun(delegate, rationalAdapterSecond)
+}
+
+def verifyCandidateIndependentRationalAssumptionAdapter = tasks.register(
+    'verifyCandidateIndependentRationalAssumptionAdapter',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies rational formation isolation, exact paths, null results, resource accounting and non-claims.'
+    dependsOn 'prepareVerificationEnvironment',
+        runCandidateIndependentRationalAssumptionAdapterFirst,
+        runCandidateIndependentRationalAssumptionAdapterSecond
+    workingDir rationalAdapterRepositoryRoot
+    inputs.file rationalAdapterBenchmarkSource
+    inputs.file rationalAdapterCorpus
+    inputs.file rationalAdapterProfile
+    inputs.file rationalAdapterFreezeReceipt
+    inputs.file rationalAdapterSchema
+    inputs.file rationalAdapterVerifier
+    inputs.file rationalAdapterVerifierRunner
+    inputs.files rationalAdapterFirst, rationalAdapterSecond
+    outputs.dir rationalAdapterVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine rationalAdapterVerificationPython.get().absolutePath,
+            rationalAdapterVerifierRunner.asFile.absolutePath,
+            '--repository-root', rationalAdapterRepositoryRootPath,
+            '--first', rationalAdapterFirst.get().asFile.absolutePath,
+            '--second', rationalAdapterSecond.get().asFile.absolutePath,
+            '--report-directory',
+            rationalAdapterVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentRationalAssumptionAdapter
+}
