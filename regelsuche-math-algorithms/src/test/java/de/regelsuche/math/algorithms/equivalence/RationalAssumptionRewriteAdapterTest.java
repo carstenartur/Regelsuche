@@ -50,6 +50,24 @@ class RationalAssumptionRewriteAdapterTest {
     }
 
     @Test
+    void formationBudgetExhaustionFailsClosedWithBalancedEvidence() {
+        var stateExhausted = adapter.formCandidate(
+            formationSeeds(),
+            new ResourceBudget(5, 1, 200));
+        var candidateExhausted = adapter.formCandidate(
+            formationSeeds(),
+            new ResourceBudget(5, 200, 1));
+
+        assertEquals(FormationStatus.NO_CANDIDATE, stateExhausted.status());
+        assertTrue(stateExhausted.detail().contains("budget"));
+        assertBalanced(stateExhausted.resourceUse());
+
+        assertEquals(FormationStatus.NO_CANDIDATE, candidateExhausted.status());
+        assertTrue(candidateExhausted.detail().contains("budget"));
+        assertBalanced(candidateExhausted.resourceUse());
+    }
+
+    @Test
     void reachesTrainCancellationAndAffineFamilies() {
         var formation = adapter.formCandidate(formationSeeds(), BUDGET);
 
