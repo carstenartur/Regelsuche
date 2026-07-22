@@ -1,0 +1,668 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-candidate-independent-rational-assumption-adapter-run-v1.schema.json",
+  "title": "Regelsuche candidate-independent rational-assumption adapter run v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmarkId",
+    "challengeId",
+    "repositoryRevision",
+    "benchmarkSourceContentHash",
+    "caseCorpusContentHash",
+    "formationProfileId",
+    "formationProfileContentHash",
+    "freezeReceiptContentHash",
+    "combinedPreregistrationHash",
+    "adapterStatus",
+    "candidateForm",
+    "candidateFormImplementationClass",
+    "frozenImplementationStatus",
+    "runtimeImplementationStatus",
+    "frozenProfileModified",
+    "configuredCampaigns",
+    "executedCampaigns",
+    "configuredTaskEvaluations",
+    "executedTaskEvaluations",
+    "reachedAndConfirmedTaskEvaluations",
+    "noResultTaskEvaluations",
+    "budgetExhaustedTaskEvaluations",
+    "candidateNotFormedTaskEvaluations",
+    "targetRefutedTaskEvaluations",
+    "correctnessRegressions",
+    "configuredStatesPerCampaign",
+    "configuredCandidateEvaluationsPerCampaign",
+    "configuredProofAttemptsPerCampaign",
+    "executedProofAttempts",
+    "uniqueGeneralRuleClaimAuthorized",
+    "formalProofStatus",
+    "externalNoveltyStatus",
+    "publicationAuthorized",
+    "campaigns",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.candidate-independent-rational-assumption-adapter-run/v1"
+    },
+    "benchmarkId": {
+      "const": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1"
+    },
+    "challengeId": {
+      "const": "rational-assumption-rewrites"
+    },
+    "repositoryRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmarkSourceContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "caseCorpusContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "formationProfileId": {
+      "const": "rational-assumption-primitives/v1"
+    },
+    "formationProfileContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "freezeReceiptContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "combinedPreregistrationHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "adapterStatus": {
+      "const": "POST_FREEZE_ASSUMPTION_AWARE_CANCELLATION_EXECUTION"
+    },
+    "candidateForm": {
+      "const": "ASSUMPTION_SENSITIVE_FACTOR_CANCELLATION"
+    },
+    "candidateFormImplementationClass": {
+      "const": "de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter"
+    },
+    "frozenImplementationStatus": {
+      "const": "ADAPTER_REQUIRED"
+    },
+    "runtimeImplementationStatus": {
+      "const": "AVAILABLE_AFTER_FREEZE"
+    },
+    "frozenProfileModified": {
+      "const": false
+    },
+    "configuredCampaigns": {
+      "const": 4
+    },
+    "executedCampaigns": {
+      "const": 4
+    },
+    "configuredTaskEvaluations": {
+      "const": 48
+    },
+    "executedTaskEvaluations": {
+      "const": 48
+    },
+    "reachedAndConfirmedTaskEvaluations": {
+      "const": 24
+    },
+    "noResultTaskEvaluations": {
+      "const": 24
+    },
+    "budgetExhaustedTaskEvaluations": {
+      "const": 0
+    },
+    "candidateNotFormedTaskEvaluations": {
+      "const": 0
+    },
+    "targetRefutedTaskEvaluations": {
+      "const": 0
+    },
+    "correctnessRegressions": {
+      "const": 0
+    },
+    "configuredStatesPerCampaign": {
+      "const": 3000
+    },
+    "configuredCandidateEvaluationsPerCampaign": {
+      "const": 600
+    },
+    "configuredProofAttemptsPerCampaign": {
+      "const": 100
+    },
+    "executedProofAttempts": {
+      "const": 0
+    },
+    "uniqueGeneralRuleClaimAuthorized": {
+      "const": false
+    },
+    "formalProofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicationAuthorized": {
+      "const": false
+    },
+    "campaigns": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/campaign"
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "resourceUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuredStates",
+        "executedStates",
+        "remainingStates",
+        "configuredCandidateEvaluations",
+        "executedCandidateEvaluations",
+        "remainingCandidateEvaluations"
+      ],
+      "properties": {
+        "configuredStates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "executedStates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remainingStates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "configuredCandidateEvaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "executedCandidateEvaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remainingCandidateEvaluations": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "campaignResourceUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "configuredStates",
+        "executedStates",
+        "remainingStates",
+        "configuredCandidateEvaluations",
+        "executedCandidateEvaluations",
+        "remainingCandidateEvaluations",
+        "configuredProofAttempts",
+        "executedProofAttempts",
+        "remainingProofAttempts"
+      ],
+      "properties": {
+        "configuredStates": {
+          "const": 3000
+        },
+        "executedStates": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3000
+        },
+        "remainingStates": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3000
+        },
+        "configuredCandidateEvaluations": {
+          "const": 600
+        },
+        "executedCandidateEvaluations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600
+        },
+        "remainingCandidateEvaluations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600
+        },
+        "configuredProofAttempts": {
+          "const": 100
+        },
+        "executedProofAttempts": {
+          "const": 0
+        },
+        "remainingProofAttempts": {
+          "const": 100
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateFormId",
+        "operatorId",
+        "implementationClass",
+        "supportSeedIds",
+        "frozenPrimitiveRuleIds",
+        "contentHash"
+      ],
+      "properties": {
+        "candidateFormId": {
+          "const": "ASSUMPTION_SENSITIVE_FACTOR_CANCELLATION"
+        },
+        "operatorId": {
+          "const": "hypothesis_rational_normalization"
+        },
+        "implementationClass": {
+          "const": "de.regelsuche.transform.RationalNormalizationHypothesisOperator"
+        },
+        "supportSeedIds": {
+          "const": [
+            "case-01-seed-1",
+            "case-01-seed-2",
+            "case-02-seed-1",
+            "case-02-seed-2"
+          ]
+        },
+        "frozenPrimitiveRuleIds": {
+          "const": [
+            "ast_divide_one",
+            "ast_square_difference_factor"
+          ]
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "formationEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seedId",
+        "sourceReference",
+        "inputExpression",
+        "declaredAssumptions",
+        "selectedExpression",
+        "candidateAssumptions",
+        "inputAstNodes",
+        "selectedAstNodes",
+        "requiredNonZeroFactors",
+        "providedNonZeroFactors",
+        "leftCrossNormalForm",
+        "rightCrossNormalForm",
+        "evaluationInputRead",
+        "targetVisible",
+        "contentHash"
+      ],
+      "properties": {
+        "seedId": {
+          "enum": [
+            "case-01-seed-1",
+            "case-01-seed-2",
+            "case-02-seed-1",
+            "case-02-seed-2"
+          ]
+        },
+        "sourceReference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputExpression": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declaredAssumptions": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "selectedExpression": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidateAssumptions": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "inputAstNodes": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "selectedAstNodes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "requiredNonZeroFactors": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "providedNonZeroFactors": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "leftCrossNormalForm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rightCrossNormalForm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluationInputRead": {
+          "const": false
+        },
+        "targetVisible": {
+          "const": false
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence",
+        "ruleId",
+        "source",
+        "target",
+        "generatedAssumptions",
+        "requiredNonZeroFactors",
+        "providedNonZeroFactors",
+        "leftCrossNormalForm",
+        "rightCrossNormalForm",
+        "contentHash"
+      ],
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ruleId": {
+          "enum": [
+            "ast_divide_one",
+            "ast_square_difference_factor",
+            "hypothesis_rational_normalization"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedAssumptions": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "requiredNonZeroFactors": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "providedNonZeroFactors": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "leftCrossNormalForm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rightCrossNormalForm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "taskEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "caseContentHash",
+        "split",
+        "structuralCluster",
+        "taskId",
+        "formationVisibility",
+        "targetReadStage",
+        "source",
+        "target",
+        "assumptions",
+        "outcome",
+        "reasonCode",
+        "detail",
+        "steps",
+        "resourceUse",
+        "correctnessRegression",
+        "formalProofStatus",
+        "externalNoveltyStatus",
+        "publicationEligible",
+        "contentHash"
+      ],
+      "properties": {
+        "caseId": {
+          "type": "string",
+          "pattern": "^case-0[1-6]$"
+        },
+        "caseContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split": {
+          "enum": [
+            "TRAIN",
+            "VALIDATION",
+            "TEST"
+          ]
+        },
+        "structuralCluster": {
+          "type": "string",
+          "minLength": 1
+        },
+        "taskId": {
+          "type": "string",
+          "pattern": "^case-0[1-6]-task-[12]$"
+        },
+        "formationVisibility": {
+          "enum": [
+            "ALLOWED",
+            "PROHIBITED"
+          ]
+        },
+        "targetReadStage": {
+          "const": "EVALUATION_ONLY"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assumptions": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "outcome": {
+          "enum": [
+            "REACHED_AND_CONFIRMED",
+            "NO_RESULT",
+            "BUDGET_EXHAUSTED",
+            "CANDIDATE_NOT_FORMED",
+            "TARGET_REFUTED"
+          ]
+        },
+        "reasonCode": {
+          "enum": [
+            "TARGET_REACHED_BY_SELECTED_FORM_AND_FROZEN_PRIMITIVES",
+            "NO_PATH_WITH_SELECTED_FORM_AND_FROZEN_PRIMITIVES",
+            "FROZEN_BUDGET_EXHAUSTED",
+            "FORMATION_SELECTED_NO_CANDIDATE",
+            "REACHED_TARGET_FAILED_INDEPENDENT_VALIDATION"
+          ]
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "resourceUse": {
+          "$ref": "#/$defs/resourceUse"
+        },
+        "correctnessRegression": {
+          "const": false
+        },
+        "formalProofStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "externalNoveltyStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "publicationEligible": {
+          "const": false
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "campaignId",
+        "challengeId",
+        "configuredSeed",
+        "status",
+        "candidateForm",
+        "formationVisibility",
+        "heldOutTargetAccess",
+        "publicationEligible",
+        "formationCaseIds",
+        "formationSeedIds",
+        "candidate",
+        "formationEvidence",
+        "taskEvaluations",
+        "resourceUse",
+        "reachedAndConfirmedTasks",
+        "noResultTasks",
+        "budgetExhaustedTasks",
+        "correctnessRegressions",
+        "formalProofStatus",
+        "externalNoveltyStatus",
+        "contentHash"
+      ],
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "pattern": "^rational-assumption-rewrites-campaign-0[1-4]$"
+        },
+        "challengeId": {
+          "const": "rational-assumption-rewrites"
+        },
+        "configuredSeed": {
+          "$ref": "#/$defs/sha256"
+        },
+        "status": {
+          "const": "POST_FREEZE_ASSUMPTION_AWARE_CANCELLATION_EXECUTION"
+        },
+        "candidateForm": {
+          "const": "ASSUMPTION_SENSITIVE_FACTOR_CANCELLATION"
+        },
+        "formationVisibility": {
+          "const": "TRAIN_ONLY"
+        },
+        "heldOutTargetAccess": {
+          "const": "EVALUATION_ONLY"
+        },
+        "publicationEligible": {
+          "const": false
+        },
+        "formationCaseIds": {
+          "const": [
+            "case-01",
+            "case-02"
+          ]
+        },
+        "formationSeedIds": {
+          "const": [
+            "case-01-seed-1",
+            "case-01-seed-2",
+            "case-02-seed-1",
+            "case-02-seed-2"
+          ]
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "formationEvidence": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/formationEvidence"
+          }
+        },
+        "taskEvaluations": {
+          "type": "array",
+          "minItems": 12,
+          "maxItems": 12,
+          "items": {
+            "$ref": "#/$defs/taskEvaluation"
+          }
+        },
+        "resourceUse": {
+          "$ref": "#/$defs/campaignResourceUse"
+        },
+        "reachedAndConfirmedTasks": {
+          "const": 6
+        },
+        "noResultTasks": {
+          "const": 6
+        },
+        "budgetExhaustedTasks": {
+          "const": 0
+        },
+        "correctnessRegressions": {
+          "const": 0
+        },
+        "formalProofStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "externalNoveltyStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
