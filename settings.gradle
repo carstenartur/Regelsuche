@@ -46,7 +46,7 @@ pluginManagement {
                         .getOrElse('')
                 }
                 content {
-                    includeGroupByRegex 'org\\.aiknowledge(\\..*)?'
+                    includeGroupByRegex 'org[.]aiknowledge([.].*)?'
                 }
             }
         }
@@ -81,6 +81,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/candidate-independent-finite-sequence-budget-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/candidate-independent-rational-assumption-adapter.gradle')
     }
 }
 
