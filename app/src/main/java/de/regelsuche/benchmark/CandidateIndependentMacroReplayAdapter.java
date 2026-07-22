@@ -129,6 +129,15 @@ public final class CandidateIndependentMacroReplayAdapter {
 
     public ReplayResult replay(ReplayTrace trace) {
         Objects.requireNonNull(trace, "trace");
+        List<String> unknownOperations = trace.primitiveSteps().stream()
+            .filter(operation -> !operationRuleIds.containsKey(operation))
+            .distinct().sorted().toList();
+        if (!unknownOperations.isEmpty()) {
+            throw new IllegalArgumentException(
+                "replay trace " + trace.traceId()
+                    + " references unknown macro operations: "
+                    + unknownOperations);
+        }
         ArrayDeque<Node> queue = new ArrayDeque<>();
         Set<String> visited = new LinkedHashSet<>();
         queue.add(new Node(trace.source(), List.of(), List.of(), 0, -1));
@@ -251,6 +260,12 @@ public final class CandidateIndependentMacroReplayAdapter {
         List<String> required,
         List<String> available
     ) {
+        if (required == null || required.isEmpty()) {
+            return true;
+        }
+        if (available == null || available.isEmpty()) {
+            return false;
+        }
         Set<String> normalizedAvailable = new LinkedHashSet<>(
             AssumptionSignature.ofExpressions(available)
                 .normalizedAssumptions());
