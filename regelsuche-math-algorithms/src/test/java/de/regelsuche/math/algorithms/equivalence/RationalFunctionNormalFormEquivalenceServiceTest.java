@@ -72,6 +72,33 @@ class RationalFunctionNormalFormEquivalenceServiceTest {
     }
 
     @Test
+    void zeroExponentPreservesVisibleDenominatorRequirements() {
+        var confirmed = service.evaluate(
+            "(1/x)^0",
+            "1",
+            List.of("x != 0"));
+        var missing = service.evaluate(
+            "(1/x)^0",
+            "1",
+            List.of());
+
+        assertEquals(
+            RationalFunctionNormalFormEquivalenceService.Status.CONFIRMED,
+            confirmed.status());
+        assertEquals(
+            RationalFunctionNormalFormEquivalenceService.Status.MISSING_ASSUMPTION,
+            missing.status());
+        assertTrue(missing.missingNonZeroFactors().getFirst().contains("x"));
+    }
+
+    @Test
+    void zeroToZeroFailsClosed() {
+        assertEquals(
+            RationalFunctionNormalFormEquivalenceService.Status.UNSUPPORTED,
+            service.evaluate("0^0", "1", List.of()).status());
+    }
+
+    @Test
     void differingCrossProductsProduceARefutation() {
         var evaluation = service.evaluate(
             "(x+1)/x",
