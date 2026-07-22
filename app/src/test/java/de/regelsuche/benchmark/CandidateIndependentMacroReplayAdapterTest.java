@@ -58,6 +58,25 @@ class CandidateIndependentMacroReplayAdapterTest {
     }
 
     @Test
+    void rejectsTraceOperationsOutsideTheFrozenProfile() {
+        CandidateIndependentMacroReplayAdapter adapter =
+            new CandidateIndependentMacroReplayAdapter(profile());
+        ReplayTrace invalid = new ReplayTrace(
+            "unknown-operation",
+            "x + 0",
+            "x",
+            List.of("ast_unknown_operation"),
+            List.of());
+
+        IllegalArgumentException error = assertThrows(
+            IllegalArgumentException.class,
+            () -> adapter.replay(invalid));
+
+        assertTrue(error.getMessage().contains("ast_unknown_operation"));
+        assertTrue(error.getMessage().contains("unknown-operation"));
+    }
+
+    @Test
     void rejectsProfileRulesThatAreNotInTheProductionInventory() {
         Map<String, List<String>> profile = new LinkedHashMap<>(profile());
         profile.put("invented-operation", List.of("invented_rule"));
