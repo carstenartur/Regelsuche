@@ -435,7 +435,14 @@ public final class RationalFunctionNormalFormEquivalenceService {
 
         private RationalFunction pow(int exponent) {
             if (exponent == 0) {
-                return polynomial(Polynomial.constant(Rational.ONE));
+                if (numerator.isZero()) {
+                    throw new UnsupportedExpression(
+                        "zero to the zero power is outside the rational evaluator");
+                }
+                return new RationalFunction(
+                    Polynomial.constant(Rational.ONE),
+                    Polynomial.constant(Rational.ONE),
+                    denominatorFactors);
             }
             List<Polynomial> factors = new ArrayList<>();
             for (int index = 0; index < exponent; index++) {
