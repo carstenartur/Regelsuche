@@ -14,7 +14,7 @@ conditions.
 
 The service accepts expressions built from:
 
-- exact decimal or integer constants;
+- integer and finite decimal literals accepted by the existing double-based expression parser;
 - symbolic variables;
 - addition and subtraction;
 - multiplication and division;
@@ -45,8 +45,10 @@ and
 N_2 * D_1.
 ```
 
-This is an exact symbolic comparison for the supported domain; it is not a
-numeric sample test.
+After parsing, all arithmetic is exact rational/polynomial arithmetic; it is
+not a numeric sample test. Decimal source literals are first interpreted by the
+existing IEEE-754 `double` parser, so the evaluator does not claim arbitrary-
+precision decimal input parsing.
 
 ## Assumption audit
 
