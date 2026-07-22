@@ -47,7 +47,8 @@ public final class RationalRules {
     /**
      * {@code (A*B)/(A*C) -> B/C} when {@code A} is structurally identical on
      * both sides. Refuses to apply when the divisor would become a literal
-     * zero.
+     * zero. The retained assumptions include both the cancelled factor
+     * {@code A != 0} and the remaining denominator {@code C != 0}.
      */
     public static final class CancelCommonFactorRule implements RewriteRule {
         @Override
@@ -81,9 +82,18 @@ public final class RationalRules {
             if (terms == null) {
                 return java.util.List.of();
             }
+            String cancelledFactor = de.regelsuche.parse.ExpressionFormatter.format(
+                terms.cancelledFactor());
+            String remainingDenominator = de.regelsuche.parse.ExpressionFormatter.format(
+                terms.remainingDenominator());
+            de.regelsuche.assumption.Assumption cancelledFactorNonZero =
+                de.regelsuche.assumption.Assumption.nonZero(cancelledFactor);
+            if (cancelledFactor.equals(remainingDenominator)) {
+                return java.util.List.of(cancelledFactorNonZero);
+            }
             return java.util.List.of(
-                de.regelsuche.assumption.Assumption.nonZero(
-                    de.regelsuche.parse.ExpressionFormatter.format(terms.remainingDenominator())));
+                cancelledFactorNonZero,
+                de.regelsuche.assumption.Assumption.nonZero(remainingDenominator));
         }
 
         @Override
@@ -116,13 +126,15 @@ public final class RationalRules {
                 if (isZero(denominator.right())) {
                     return null;
                 }
-                return new Cancellable(numerator.right(), denominator.right());
+                return new Cancellable(
+                    numerator.left(), numerator.right(), denominator.right());
             }
             if (numerator.right().equals(denominator.right())) {
                 if (isZero(denominator.left())) {
                     return null;
                 }
-                return new Cancellable(numerator.left(), denominator.left());
+                return new Cancellable(
+                    numerator.right(), numerator.left(), denominator.left());
             }
             return null;
         }
@@ -131,7 +143,11 @@ public final class RationalRules {
             return expr instanceof NumberExpr number && number.value() == 0;
         }
 
-        private record Cancellable(Expr remainingNumerator, Expr remainingDenominator) {
+        private record Cancellable(
+            Expr cancelledFactor,
+            Expr remainingNumerator,
+            Expr remainingDenominator
+        ) {
         }
     }
 
