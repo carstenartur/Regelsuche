@@ -1,0 +1,122 @@
+def benchmarkExecutionV2Root = layout.projectDirectory
+def benchmarkExecutionV2RootPath = benchmarkExecutionV2Root.asFile.absolutePath
+def benchmarkExecutionV2Generator = benchmarkExecutionV2Root.file(
+    'scripts/generate-candidate-independent-benchmark-execution-v2.py')
+def benchmarkExecutionV2Verifier = benchmarkExecutionV2Root.file(
+    'scripts/verify-candidate-independent-benchmark-execution-v2.py')
+def benchmarkExecutionV2Schema = benchmarkExecutionV2Root.file(
+    'docs/schemas/regelsuche-candidate-independent-benchmark-execution-v2.schema.json')
+
+def foundationRoot = layout.buildDirectory.dir('reports/candidate-independent-execution')
+def sequenceRoot = layout.buildDirectory.dir('reports/candidate-independent-finite-sequence-form-aggregate')
+def rationalRoot = layout.buildDirectory.dir('reports/candidate-independent-rational-assumption-adapter')
+def macroRoot = layout.buildDirectory.dir('reports/candidate-independent-reusable-macro-batch')
+def executionRoot = layout.buildDirectory.dir('reports/candidate-independent-benchmark-execution-v2')
+
+def foundationFirst = foundationRoot.map { it.dir('first') }
+def foundationSecond = foundationRoot.map { it.dir('second') }
+def sequenceFirst = sequenceRoot.map { it.file('first/run.json') }
+def sequenceSecond = sequenceRoot.map { it.file('second/run.json') }
+def rationalFirst = rationalRoot.map { it.file('first/run.json') }
+def rationalSecond = rationalRoot.map { it.file('second/run.json') }
+def macroFirst = macroRoot.map { it.file('first/run.json') }
+def macroSecond = macroRoot.map { it.file('second/run.json') }
+def executionFirst = executionRoot.map { it.file('first/run.json') }
+def executionSecond = executionRoot.map { it.file('second/run.json') }
+def executionVerification = executionRoot.map { it.dir('verification') }
+def executionPython = layout.buildDirectory.dir('verification-venv').map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureExecutionV2 = { task, foundation, sequence, rational, macro, output,
+                               foundationTask, sequenceTask, rationalTask, macroTask ->
+    task.group = 'verification'
+    task.description = 'Binds the frozen #383 foundation to all three canonical challenge executions.'
+    task.dependsOn 'prepareVerificationEnvironment', foundationTask, sequenceTask,
+        rationalTask, macroTask
+    task.workingDir benchmarkExecutionV2Root
+    task.inputs.file benchmarkExecutionV2Generator
+    task.inputs.dir foundation
+    task.inputs.file sequence
+    task.inputs.file rational
+    task.inputs.file macro
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file output
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine executionPython.get().absolutePath,
+            benchmarkExecutionV2Generator.asFile.absolutePath,
+            '--foundation', foundation.get().asFile.absolutePath,
+            '--sequence', sequence.get().asFile.absolutePath,
+            '--rational', rational.get().asFile.absolutePath,
+            '--macro', macro.get().asFile.absolutePath,
+            '--output', output.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def generateCandidateIndependentBenchmarkExecutionV2First = tasks.register(
+    'generateCandidateIndependentBenchmarkExecutionV2First', Exec
+) {
+    configureExecutionV2(delegate, foundationFirst, sequenceFirst, rationalFirst,
+        macroFirst, executionFirst,
+        'generateCandidateIndependentExecutionFoundationFirst',
+        'runCandidateIndependentFiniteSequenceFormAggregateFirst',
+        'runCandidateIndependentRationalAssumptionAdapterFirst',
+        'runCandidateIndependentReusableMacroBatchFirst')
+}
+
+def generateCandidateIndependentBenchmarkExecutionV2Second = tasks.register(
+    'generateCandidateIndependentBenchmarkExecutionV2Second', Exec
+) {
+    configureExecutionV2(delegate, foundationSecond, sequenceSecond, rationalSecond,
+        macroSecond, executionSecond,
+        'generateCandidateIndependentExecutionFoundationSecond',
+        'runCandidateIndependentFiniteSequenceFormAggregateSecond',
+        'runCandidateIndependentRationalAssumptionAdapterSecond',
+        'runCandidateIndependentReusableMacroBatchSecond')
+}
+
+def verifyCandidateIndependentBenchmarkExecutionV2 = tasks.register(
+    'verifyCandidateIndependentBenchmarkExecutionV2', Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies 12 campaigns, 72 frozen case slots and all challenge roots.'
+    dependsOn 'verifyCandidateIndependentExecutionFoundation',
+        'verifyCandidateIndependentFiniteSequenceFormAggregate',
+        'verifyCandidateIndependentRationalAssumptionAdapter',
+        'verifyCandidateIndependentReusableMacroBatch',
+        generateCandidateIndependentBenchmarkExecutionV2First,
+        generateCandidateIndependentBenchmarkExecutionV2Second
+    workingDir benchmarkExecutionV2Root
+    inputs.file benchmarkExecutionV2Generator
+    inputs.file benchmarkExecutionV2Verifier
+    inputs.file benchmarkExecutionV2Schema
+    inputs.files executionFirst, executionSecond, sequenceFirst, sequenceSecond,
+        rationalFirst, rationalSecond, macroFirst, macroSecond
+    inputs.dirs foundationFirst, foundationSecond
+    outputs.dir executionVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine executionPython.get().absolutePath,
+            benchmarkExecutionV2Verifier.asFile.absolutePath,
+            '--repository-root', benchmarkExecutionV2RootPath,
+            '--first', executionFirst.get().asFile.absolutePath,
+            '--second', executionSecond.get().asFile.absolutePath,
+            '--foundation-first', foundationFirst.get().asFile.absolutePath,
+            '--foundation-second', foundationSecond.get().asFile.absolutePath,
+            '--sequence-first', sequenceFirst.get().asFile.absolutePath,
+            '--sequence-second', sequenceSecond.get().asFile.absolutePath,
+            '--rational-first', rationalFirst.get().asFile.absolutePath,
+            '--rational-second', rationalSecond.get().asFile.absolutePath,
+            '--macro-first', macroFirst.get().asFile.absolutePath,
+            '--macro-second', macroSecond.get().asFile.absolutePath,
+            '--report-directory', executionVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentBenchmarkExecutionV2
+}
