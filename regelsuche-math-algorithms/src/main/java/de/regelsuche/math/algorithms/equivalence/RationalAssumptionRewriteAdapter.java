@@ -91,8 +91,17 @@ public final class RationalAssumptionRewriteAdapter {
         BudgetLedger ledger = new BudgetLedger(budget);
         List<FormationEvidence> evidence = new ArrayList<>();
         for (FormationSeed seed : seeds) {
-            Optional<FormationEvidence> selected = selectFormationCandidate(
-                seed, ledger);
+            Optional<FormationEvidence> selected;
+            try {
+                selected = selectFormationCandidate(seed, ledger);
+            } catch (BudgetExceededException exception) {
+                return new FormationResult(
+                    FormationStatus.NO_CANDIDATE,
+                    Optional.empty(),
+                    List.copyOf(evidence),
+                    ledger.snapshot(),
+                    exception.getMessage());
+            }
             if (selected.isEmpty()) {
                 return new FormationResult(
                     FormationStatus.NO_CANDIDATE,
@@ -543,8 +552,8 @@ public final class RationalAssumptionRewriteAdapter {
 
         private void exploreState() {
             if (!canExplore()) {
-                throw new IllegalStateException(
-                    "explored-state budget exceeded");
+                throw new BudgetExceededException(
+                    "formation explored-state budget exhausted");
             }
             exploredStates++;
         }
@@ -556,8 +565,8 @@ public final class RationalAssumptionRewriteAdapter {
 
         private void evaluateCandidate() {
             if (!canEvaluateCandidate()) {
-                throw new IllegalStateException(
-                    "candidate-evaluation budget exceeded");
+                throw new BudgetExceededException(
+                    "formation candidate-evaluation budget exhausted");
             }
             candidateEvaluations++;
         }
@@ -570,6 +579,12 @@ public final class RationalAssumptionRewriteAdapter {
                 budget.maxCandidateEvaluations(),
                 candidateEvaluations,
                 budget.maxCandidateEvaluations() - candidateEvaluations);
+        }
+    }
+
+    private static final class BudgetExceededException extends RuntimeException {
+        private BudgetExceededException(String message) {
+            super(message);
         }
     }
 
