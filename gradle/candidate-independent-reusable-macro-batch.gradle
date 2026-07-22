@@ -1,0 +1,115 @@
+def macroBatchRepositoryRoot = layout.projectDirectory
+def macroBatchRepositoryRootPath = macroBatchRepositoryRoot.asFile.absolutePath
+def macroBatchAppProject = project(':app')
+def macroBatchRuntimeClasspath = providers.provider {
+    macroBatchAppProject.extensions
+        .getByType(org.gradle.api.tasks.SourceSetContainer)
+        .named('main').get().runtimeClasspath
+}
+
+def macroBatchBenchmarkSource = macroBatchRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/benchmark-source.json')
+def macroBatchCorpus = macroBatchRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def macroBatchProfile = macroBatchRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/macro-primitives.json')
+def macroBatchFreezeReceipt = macroBatchRepositoryRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def macroBatchSchema = macroBatchRepositoryRoot.file(
+    'docs/schemas/regelsuche-candidate-independent-reusable-macro-batch-v1.schema.json')
+def macroBatchVerifier = macroBatchRepositoryRoot.file(
+    'scripts/verify-candidate-independent-reusable-macro-batch.py')
+def macroBatchMainSource = macroBatchRepositoryRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/CandidateIndependentReusableMacroBatchMain.java')
+def macroBatchAdapterSource = macroBatchRepositoryRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/CandidateIndependentReusableMacroAdapter.java')
+def macroBatchFormationSource = macroBatchRepositoryRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/CandidateIndependentMacroFormation.java')
+def macroBatchUtilitySource = macroBatchRepositoryRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/CandidateIndependentMacroUtilityEvaluator.java')
+def macroBatchReplaySource = macroBatchRepositoryRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/CandidateIndependentMacroReplayAdapter.java')
+
+def macroBatchBuildRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-reusable-macro-batch')
+def macroBatchFirst = macroBatchBuildRoot.map { it.file('first/run.json') }
+def macroBatchSecond = macroBatchBuildRoot.map { it.file('second/run.json') }
+def macroBatchVerification = macroBatchBuildRoot.map { it.dir('verification') }
+def macroBatchVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def macroBatchVerificationPython = macroBatchVerificationVenv.map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureMacroBatchRun = { task, outputFile ->
+    task.group = 'verification'
+    task.description = 'Executes four frozen reusable-macro formation and paired-utility campaigns.'
+    task.dependsOn ':app:classes', 'verifyCandidateIndependentCaseCorpus'
+    task.classpath = files(macroBatchRuntimeClasspath)
+    task.mainClass = 'de.regelsuche.benchmark.CandidateIndependentReusableMacroBatchMain'
+    task.inputs.file macroBatchBenchmarkSource
+    task.inputs.file macroBatchCorpus
+    task.inputs.file macroBatchProfile
+    task.inputs.file macroBatchFreezeReceipt
+    task.inputs.file macroBatchMainSource
+    task.inputs.file macroBatchAdapterSource
+    task.inputs.file macroBatchFormationSource
+    task.inputs.file macroBatchUtilitySource
+    task.inputs.file macroBatchReplaySource
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        args '--benchmark-source', macroBatchBenchmarkSource.asFile.absolutePath,
+            '--corpus', macroBatchCorpus.asFile.absolutePath,
+            '--profile', macroBatchProfile.asFile.absolutePath,
+            '--freeze-receipt', macroBatchFreezeReceipt.asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def runCandidateIndependentReusableMacroBatchFirst = tasks.register(
+    'runCandidateIndependentReusableMacroBatchFirst', JavaExec
+) {
+    configureMacroBatchRun(delegate, macroBatchFirst)
+}
+
+def runCandidateIndependentReusableMacroBatchSecond = tasks.register(
+    'runCandidateIndependentReusableMacroBatchSecond', JavaExec
+) {
+    configureMacroBatchRun(delegate, macroBatchSecond)
+}
+
+def verifyCandidateIndependentReusableMacroBatch = tasks.register(
+    'verifyCandidateIndependentReusableMacroBatch', Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies macro formation isolation, paired best-first utility, resources and non-claims.'
+    dependsOn 'prepareVerificationEnvironment',
+        runCandidateIndependentReusableMacroBatchFirst,
+        runCandidateIndependentReusableMacroBatchSecond
+    workingDir macroBatchRepositoryRoot
+    inputs.file macroBatchBenchmarkSource
+    inputs.file macroBatchCorpus
+    inputs.file macroBatchProfile
+    inputs.file macroBatchFreezeReceipt
+    inputs.file macroBatchSchema
+    inputs.file macroBatchVerifier
+    inputs.files macroBatchFirst, macroBatchSecond
+    outputs.dir macroBatchVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine macroBatchVerificationPython.get().absolutePath,
+            macroBatchVerifier.asFile.absolutePath,
+            '--repository-root', macroBatchRepositoryRootPath,
+            '--first', macroBatchFirst.get().asFile.absolutePath,
+            '--second', macroBatchSecond.get().asFile.absolutePath,
+            '--report-directory', macroBatchVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyCandidateIndependentReusableMacroBatch
+}
