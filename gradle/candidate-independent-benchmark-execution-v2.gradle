@@ -37,8 +37,8 @@ def configureExecutionV2 = { task, foundation, sequence, rational, macro, output
     task.dependsOn 'prepareVerificationEnvironment', foundationTask, sequenceTask,
         rationalTask, macroTask
     task.workingDir benchmarkExecutionV2Root
-    task.inputs.file benchmarkExecutionV2Generator
     task.inputs.dir foundation
+    task.inputs.file benchmarkExecutionV2Generator
     task.inputs.file sequence
     task.inputs.file rational
     task.inputs.file macro
@@ -95,8 +95,8 @@ def verifyCandidateIndependentBenchmarkExecutionV2 = tasks.register(
     inputs.file benchmarkExecutionV2Verifier
     inputs.file benchmarkExecutionV2Schema
     inputs.files executionFirst, executionSecond, sequenceFirst, sequenceSecond,
-        rationalFirst, rationalSecond, macroFirst, macroSecond
-    inputs.dirs foundationFirst, foundationSecond
+        rationalFirst, rationalSecond, macroFirst, macroSecond,
+        foundationFirst, foundationSecond
     outputs.dir executionVerification
     outputs.upToDateWhen { false }
     doFirst {
