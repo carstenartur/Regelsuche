@@ -90,6 +90,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/candidate-independent-reusable-macro-batch.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/candidate-independent-rational-assumption-adapter.gradle')
     }
 }
 
