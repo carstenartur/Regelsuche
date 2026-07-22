@@ -8,7 +8,6 @@ from functools import cmp_to_key
 import importlib.util
 from pathlib import Path
 import sys
-from typing import Any
 
 MODULE_PATH = Path(__file__).with_name(
     "verify-candidate-independent-rational-assumption-adapter.py"
@@ -116,5 +115,31 @@ def monic_text(value: Polynomial) -> str:
 VERIFIER.ordered_terms = ordered_terms
 VERIFIER.poly_key = polynomial_text
 VERIFIER.monic_key = monic_text
+
+_original_validate_resource_use = VERIFIER.validate_resource_use
+
+
+def validate_resource_use(value: object, context: str) -> tuple[int, int]:
+    executed = _original_validate_resource_use(value, context)
+    if not isinstance(value, dict):
+        VERIFIER.fail(f"{context} resource use is not an object")
+    if context.startswith("task ") or "/" in context:
+        if value.get("configuredStates") != 245:
+            VERIFIER.fail(f"{context} does not use the fixed 245-state contract")
+        if value.get("configuredCandidateEvaluations") != 45:
+            VERIFIER.fail(
+                f"{context} does not use the fixed 45-evaluation contract"
+            )
+    elif context.startswith("campaign "):
+        if value.get("configuredStates") != 3000:
+            VERIFIER.fail(f"{context} does not retain the frozen state budget")
+        if value.get("configuredCandidateEvaluations") != 600:
+            VERIFIER.fail(
+                f"{context} does not retain the frozen candidate budget"
+            )
+    return executed
+
+
+VERIFIER.validate_resource_use = validate_resource_use
 
 raise SystemExit(VERIFIER.main())
