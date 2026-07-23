@@ -1,10 +1,10 @@
 # Claim-Bounded Autonomous Symbolic Rule Discovery with Machine-Checkable Evidence
 
-**Working methods-paper foundation — not an archival result release**
+**Working methods-paper evaluation — not an archival result release**
 
 ## Abstract
 
-Symbolic systems can generate transformation candidates, validate identities, search for counterexamples, and accelerate later problem solving. These capabilities are often reported through one overloaded success label, making it difficult to distinguish candidate formation from validation, proof, novelty, utility, and reproducibility. We present the Regelsuche evidence architecture for target-free symbolic rule discovery. The system derives executable rule candidates from self-generated search observations and retains separate, fail-closed artifacts for lineage, validation, counterexamples, project-internal novelty, proof strength, held-out utility, lifecycle disposition, and claim authorization. This working manuscript defines the methods and evaluation protocol. Final quantitative conclusions are intentionally deferred until the preregistered candidate-independent benchmark, information-parity baselines, ablations, end-to-end cost analysis, and independent reproduction are complete.
+Symbolic systems can generate transformation candidates, validate identities, search for counterexamples, and accelerate later problem solving. These capabilities are often reported through one overloaded success label, making it difficult to distinguish candidate formation from validation, proof, novelty, utility, and reproducibility. We present the Regelsuche evidence architecture for target-free symbolic rule discovery. The system derives executable rule candidates from self-generated search observations and retains separate, fail-closed artifacts for lineage, validation, counterexamples, project-internal novelty, proof strength, held-out utility, lifecycle disposition, and claim authorization. A preregistered candidate-independent benchmark has now been executed completely across three structural challenges: all 12 configured campaigns and 72 frozen case slots are retained, including 20 no-result slots and zero correctness regressions. The present manuscript reports this bounded execution result and the evidence architecture. Information-parity baseline comparisons, required ablations, complete lifecycle amortization, external mathematical novelty, and expert-rated interestingness remain open and are not inferred from the benchmark.
 
 ## 1. Research question
 
@@ -16,7 +16,7 @@ The question concerns autonomous symbolic rule formation and evidence architectu
 
 ## 2. Contributions under evaluation
 
-The manuscript will evaluate the following bounded contributions:
+The manuscript evaluates the following bounded contributions:
 
 1. a target-free pipeline from a versioned Research Brief and seed generation to executable candidate rules;
 2. exact candidate lineage across generation, aggregate mining, validation, and qualification;
@@ -24,11 +24,11 @@ The manuscript will evaluate the following bounded contributions:
 4. leakage-resistant boundaries between candidate formation, selection, qualification, and final TEST evaluation;
 5. complete positive, negative, counterexample, unsupported, incomplete, and zero-output accounting;
 6. paired held-out utility under identical information and search budgets;
-7. canonical evidence that can be reproduced across clean runs and pinned containers;
+7. canonical evidence reproduced across clean runs and pinned containers;
 8. domain-neutral discovery contracts demonstrated on distinct mathematical object types;
 9. machine-readable authorization of exact claims rather than a single `discovered` flag.
 
-The final paper will retain only contributions whose evidence requirements in `claims-and-evidence.md` are satisfied.
+The candidate-independent execution result supports only the bounded claims listed as `SUPPORTED_BOUNDED_383` in `claims-and-evidence.md`. Comparative superiority and complete amortization remain under evaluation.
 
 ## 3. Threat model and scientific boundaries
 
@@ -72,22 +72,35 @@ Every transition retains source identities, configured and executed resources, t
 
 ## 5. Candidate-independent experimental design
 
-The final evaluation will use the corpus and split protocol from #383, informed by the evaluator-backed challenge portfolio in #390. Corpus construction, structural clusters, split assignments, budgets, metrics, and thresholds must be frozen before evaluated campaigns run.
+The benchmark from #383 was preregistered and frozen before evaluated execution. It contains 18 cases across three independent challenges:
 
-The design requires:
+- rational assumption-sensitive rewrites;
+- finite-difference and linear-recurrence sequence models;
+- reusable search macros.
 
-- multiple independent structural clusters;
-- disjoint generation/TRAIN, selection/VALIDATION, and final TEST families and structural signatures;
-- positive, negative, boundary, unsupported, and no-result cases;
-- retention of every configured campaign, including zero-output and disproved branches;
-- fixed policies for multiple valid outputs and ambiguous candidates;
-- no selective reruns after TEST inspection.
+Each challenge contains two cases in each of TRAIN, VALIDATION, and TEST. Four deterministic campaigns are configured per challenge. Candidate formation can read only the declared TRAIN formation surface; targets, expected answers, hidden references, TEST labels, and post-hoc family labels remain unavailable during formation.
 
-## 6. Baselines and ablations
+The execution retains positive, negative, unsupported, ambiguous, refuted-model, and no-result outcomes. Multiple candidate forms remain separate where a mathematical prefix admits more than one compatible model. No campaign or case was removed after TEST inspection.
+
+## 6. Candidate-independent benchmark results
+
+The generated table `paper/generated/candidate-independent-benchmark.md` is produced from the canonical `regelsuche.candidate-independent-benchmark-execution/v2` artifact. It binds every number to the benchmark execution content hash.
+
+Across the three challenges, all 12 configured campaigns and all 72 frozen case slots were executed. The aggregate contains 52 successful case slots, 20 retained no-result slots, 120 challenge-native detailed evidence rows, and zero correctness regressions.
+
+These totals are accounting results, not a universal cross-domain success score. The challenges have different candidate forms and evaluation semantics:
+
+- the sequence challenge confirms every frozen case by at least one preregistered candidate form while retaining a refuted alternative model where applicable;
+- the rational challenge reaches direct, affine, and parameterized factor-cancellation families while retaining literal-square, partial-fraction, and nested-division no-results;
+- the macro challenge forms three TRAIN-derived reusable macros and records selected held-out improvements, neutral successful pairs, and explicit no-results without correctness regression.
+
+The benchmark aggregate does not evaluate external novelty, expert interestingness, or formal proof and does not authorize publication by itself.
+
+## 7. Baselines and ablations
 
 Comparisons are track-scoped under #235. Target-directed search, hidden-rule rediscovery, open-target formation, cross-family transfer, equality validation, proof, and campaign control are not collapsed into one leaderboard.
 
-The final open-target evaluation will include at least:
+The open-target evaluation still requires:
 
 - an information-equivalent enumerative or grammar-based rule-induction baseline;
 - a randomized valid-candidate baseline;
@@ -95,52 +108,50 @@ The final open-target evaluation will include at least:
 - at least three discovery-component ablations;
 - at least two campaign-controller ablations.
 
-All configurations must receive the same information and budgets within a track. Unsupported capabilities remain visible.
+All configurations must receive the same information and budgets within a track. Unsupported capabilities remain visible. No baseline-superiority conclusion is made in the present revision.
 
-## 7. Utility and amortization
+## 8. Utility and amortization
 
 Paired held-out evaluation compares baseline search with search using exactly one frozen retained candidate. Inputs, targets, inventory, strategy, and budgets remain identical. Correctness regressions are blocking.
 
-The end-to-end study in #384 additionally accounts for generation, search, mining, validation, counterexample, novelty, proof, and qualification cost. Vector resource accounting is authoritative. Optional scalar profiles must be preregistered and accompanied by sensitivity analysis. The result must state a reproducible break-even index or `NO_BREAK_EVEN_OBSERVED`.
+The macro track provides bounded candidate-independent paired evidence: selected held-out binomial tasks are solved with fewer explored states and candidate evaluations, while other successful pairs remain neutral and unsupported cross-family tasks remain no-results. This supports the exact bounded utility claim C7; it does not establish end-to-end amortization.
 
-## 8. Reproducibility
+The cost study in #384 retains vector resources without implicit conversion. Its current phase reports 36,000 configured versus 756 executed explored states, 7,200 configured versus 760 executed candidate evaluations, and 1,200 configured proof attempts with none executed. For one macro campaign reference, 13 formation candidate evaluations amortize at the first downstream task, whereas 25 formation states do not amortize within the twelve-task stream. Counterexample, novelty, proof, and qualification costs are incomplete, so the authoritative overall lifecycle status remains `NOT_ESTABLISHED`.
 
-The archival artifact will distinguish:
+## 9. Reproducibility
+
+The artifact distinguishes:
 
 - exact byte reproduction;
 - semantic reproduction through canonical roots;
 - non-reproduction with retained mismatches.
 
-The independent artifact in #387 must execute without undocumented maintainer knowledge, undeclared network access, or mutable external inputs. Corrective changes receive new immutable artifact identities.
+The benchmark execution is reproduced through checkout-local Gradle contracts and a pinned independent container artifact. Reproduction includes the frozen corpus, all challenge runs, aggregate roots, schemas, independent recomputation, and negative mutation tests. This establishes the repository's retained artifact contract; it is not represented as an unaffiliated replication study.
 
-## 9. Results
+## 10. Remaining result dependencies
 
-Primary tables and figures are intentionally absent from this foundation revision. They will be generated from retained evidence after #383, #235, and #384 freeze their evaluated outputs.
+The following primary result families remain pending:
 
-Required result families include:
+- information-parity baseline and ablation comparisons;
+- complete end-to-end cost and amortization;
+- any empirical expert-interestingness result;
+- any external mathematical novelty decision;
+- final archival release and DOI.
 
-- campaign and candidate terminal accounting;
-- split and leakage audits;
-- positive, negative, unsupported, and incomplete evaluation;
-- baseline and ablation comparisons;
-- per-case paired utility;
-- cumulative amortization and break-even;
-- reproduction matrix;
-- claim-status matrix;
-- failure taxonomy.
+Failures, null results, unsupported cases, and incomplete evidence remain reportable results rather than grounds for post-hoc removal.
 
-No primary result may be copied manually into the manuscript.
-
-## 10. Limitations
+## 11. Limitations
 
 The mandatory limitations are maintained in `limitations.md`. The final paper must discuss candidate simplicity, benchmark scope, evaluator coverage, external novelty status, reviewer status, compute bounds, and the distinction between symbolic validation and formal proof.
 
-## 11. Related work
+The retained production candidate is elementary algebra. The candidate-independent benchmark broadens structural coverage but remains a finite, project-defined corpus. Complete execution does not imply universal theorem discovery, mathematical importance, or superiority over information-equivalent alternatives.
+
+## 12. Related work
 
 The final related-work review will cover symbolic term rewriting, equality saturation, inductive and grammar-guided program synthesis, automated conjecture generation, theorem proving, algorithm and mathematical discovery systems, benchmark leakage, and reproducible artifact evaluation.
 
 Candidate generation must be distinguished from candidate validation and proof. A system that validates an equality is not treated as a failed open-target generator, and a generator receives no proof credit it did not produce.
 
-## 12. Conclusion
+## 13. Conclusion
 
-This foundation defines a falsifiable, claim-bounded evaluation of autonomous symbolic rule discovery. The final conclusion will be written only after the candidate-independent experiments, comparisons, amortization study, and independent artifact reproduction are frozen.
+Regelsuche demonstrates a content-addressed, fail-closed architecture for target-free symbolic rule formation and has completed a preregistered candidate-independent benchmark across three structural challenges without dropping no-result cases or conflating evidence axes. The bounded benchmark execution is now reportable. Comparative superiority, complete lifecycle break-even, externally novel mathematics, and expert-rated importance remain open questions and are deliberately excluded from the present conclusion.
