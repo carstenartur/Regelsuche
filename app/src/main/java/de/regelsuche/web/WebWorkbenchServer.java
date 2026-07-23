@@ -2736,7 +2736,11 @@ public class WebWorkbenchServer {
         } else if (path.startsWith("/static/")) {
             String resource = "/web" + path.substring("/static".length());
             sendStaticResource(exchange, resource, mimeFor(resource));
-        } else if (path.startsWith("/vendor/") || path.equals("/app.js") || path.equals("/style.css")) {
+        } else if (path.startsWith("/vendor/")
+            || path.equals("/app.js")
+            || path.equals("/style.css")
+            || path.equals("/rule-radar.js")
+            || path.equals("/rule-radar.css")) {
             sendStaticResource(exchange, "/web" + path, mimeFor(path));
         } else {
             sendStatus(exchange, 404, "not found");
