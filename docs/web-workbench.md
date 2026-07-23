@@ -32,7 +32,7 @@ Die Web-Workbench ist die grafische Bedienoberfläche für die Funktionen, die d
 | **Exporte** | Ergebnisse in geeigneter Form weiterverwenden | Downloads für Dokumentation, mathematische Texte, Graphwerkzeuge und maschinelle Verarbeitung | Exports |
 | **Didaktik** | Erklär- und Bewertungsfunktionen für Lernwege verwenden | Unterrichtsnahe Darstellung und didaktische Qualitätsinformationen | Didactics |
 | **AST-Regelradar** | Ausdruck als AST untersuchen, einen Knoten wählen, dort anwendbare Züge prüfen und eine Anwendung zunächst als Vorschau betrachten | Zoombarer Ausdrucksbaum mit positionsgebundenen Grund-, Erweiterungs- und Makroregeln, Bindungen, Annahmen, Folgeausdruck sowie Auswahl-, Anwendungs- und Pruningstatus | Rule Radar |
-| **Hilfe** | Syntax, Begriffe und Bedienhinweise nachschlagen | Kontextnahe Kurzhilfe ohne Wechsel in eine technische API-Referenz | — |
+| **Hilfe** | Syntax, Begriffe und Bedienhinweise nachschlagen; technische Referenz öffnen | Kontextnahe Kurzhilfe sowie direkte Links zur lokalen Swagger-UI und OpenAPI-Spezifikation | — |
 
 Die Namen in der letzten Spalte sind fachliche Zuordnungen. Die verbindlichen Operationen und Schemata stehen in der Swagger/OpenAPI-Dokumentation der laufenden Installation.
 
