@@ -52,7 +52,7 @@
         "pathKey": {"type": "string"},
         "ruleId": {"type": "string"},
         "origin": {"$ref": "#/$defs/origin"},
-        "outcome": {"const": "APPLIED"}
+        "outcome": {"$ref": "#/$defs/outcome"}
       }
     },
     "event": {
