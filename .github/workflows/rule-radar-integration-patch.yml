@@ -1,6 +1,10 @@
 name: Apply and verify AST rule radar integration
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/rule-radar-integration-patch.yml
   schedule:
     - cron: '*/5 * * * *'
   issue_comment:
@@ -17,6 +21,7 @@ permissions:
 jobs:
   patch-and-verify:
     if: >-
+      github.event_name == 'push' ||
       github.event_name == 'schedule' ||
       (github.event.issue.pull_request &&
        github.event.issue.number == 468 &&
@@ -88,7 +93,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java \
+                  app/src/main/java/de/regelsuche/radar/AstRuleRadarService.java \
                   app/src/main/resources/web/index.html \
+                  app/src/main/resources/web/rule-radar.js \
+                  docs/README.md \
                   docs/ast-rule-radar.md \
                   docs/generated/rule-radar-ci-status.txt
           if git diff --cached --quiet; then
@@ -97,6 +105,6 @@ jobs:
             git commit -m "Integrate and verify AST rule radar"
             git push origin HEAD:issue-467-ast-rule-radar
           fi
-      - name: Fail scheduled verification when fullCheck failed
+      - name: Fail verification when fullCheck failed
         if: steps.completed.outputs.skip != 'true' && steps.verification.outputs.status != '0'
         run: exit 1
