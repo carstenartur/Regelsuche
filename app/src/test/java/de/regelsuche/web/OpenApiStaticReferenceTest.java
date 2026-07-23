@@ -52,6 +52,16 @@ class OpenApiStaticReferenceTest {
     }
 
     @Test
+    void workbenchHelpLinksToTheCanonicalOpenApiReference() throws IOException {
+        StaticResource workbench = get("/");
+        assertEquals(200, workbench.status());
+        assertTrue(workbench.contentType().startsWith("text/html"));
+        assertTrue(workbench.body().contains("Technische REST-Referenz"));
+        assertTrue(workbench.body().contains("href=\"/static/openapi/index.html\""));
+        assertTrue(workbench.body().contains("href=\"/static/openapi/openapi.json\""));
+    }
+
+    @Test
     void servesOfflineOpenApiReferenceAndPinnedOfficialSwaggerUiAssets() throws IOException {
         StaticResource page = get("/static/openapi/index.html");
         assertEquals(200, page.status());
