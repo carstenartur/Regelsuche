@@ -1,0 +1,139 @@
++            "downloadClusterMarkdown");
++        assertAllowed(registry, "/api/exports", "/api/exports/path/path-1.tex", "GET",
++            "downloadPathLatex");
++        assertAllowed(registry, "/api/exports", "/api/exports/identity/identity-1.md", "GET",
++            "downloadIdentityMarkdown");
++    }
++
++    @Test
++    void distinguishesWrongMethodsFromUnknownSubpaths() {
++        OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
++
++        OpenApiRouteRegistry.Match wrongMethod = registry.match("/api/paths", "/api/paths", "POST");
++        assertEquals(OpenApiRouteRegistry.MatchStatus.METHOD_NOT_ALLOWED, wrongMethod.status());
++        assertEquals(Set.of("GET"), wrongMethod.allowedMethods());
++
++        OpenApiRouteRegistry.Match multiMethod = registry.match("/api/inventory", "/api/inventory", "DELETE");
++        assertEquals(OpenApiRouteRegistry.MatchStatus.METHOD_NOT_ALLOWED, multiMethod.status());
++        assertEquals(Set.of("GET", "POST"), multiMethod.allowedMethods());
++
++        OpenApiRouteRegistry.Match unknown = registry.match(
++            "/api/paths", "/api/paths/path-42/undocumented", "GET");
++        assertEquals(OpenApiRouteRegistry.MatchStatus.NOT_FOUND, unknown.status());
++    }
++
++    @Test
++    void acceptsOneOptionalTrailingSlashButNotAdditionalSegments() {
++        OpenApiRouteRegistry registry = OpenApiRouteRegistry.load();
++
++        assertAllowed(registry, "/api/search", "/api/search/", "POST", "startSearch");
++        assertEquals(OpenApiRouteRegistry.MatchStatus.NOT_FOUND,
++            registry.match("/api/search", "/api/search/extra", "POST").status());
++        assertEquals(OpenApiRouteRegistry.MatchStatus.NOT_FOUND,
++            registry.match("/api/didactic", "/api/didactic/export/worksheet/path-1.txt", "GET").status());
++        assertEquals(OpenApiRouteRegistry.MatchStatus.NOT_FOUND,
++            registry.match("/api/inspect", "/api/inspect", "POST").status());
++        assertEquals(OpenApiRouteRegistry.MatchStatus.NOT_FOUND,
++            registry.match("/api/inspect", "/api/inspect/apply", "POST").status());
++    }
++
++    private static void assertAllowed(
++        OpenApiRouteRegistry registry,
++        String context,
++        String path,
++        String method,
++        String operationId
++    ) {
++        OpenApiRouteRegistry.Match match = registry.match(context, path, method);
++        assertEquals(OpenApiRouteRegistry.MatchStatus.ALLOWED, match.status());
++        assertEquals(operationId, match.operationId());
++    }
++}
+diff --git a/app/src/test/java/de/regelsuche/web/OpenApiStaticReferenceTest.java b/app/src/test/java/de/regelsuche/web/OpenApiStaticReferenceTest.java
+index dbac85f6af4eb58d8fdc568be7f3cd9acc16eef7..5b6fe8adf6bf82712aa72d5a051d465c15cdc836 100644
+--- a/app/src/test/java/de/regelsuche/web/OpenApiStaticReferenceTest.java
++++ b/app/src/test/java/de/regelsuche/web/OpenApiStaticReferenceTest.java
+@@ -14,22 +14,15 @@ import java.io.InputStream;
+ import java.net.HttpURLConnection;
+ import java.net.URI;
+ import java.nio.charset.StandardCharsets;
+-import java.nio.file.Files;
+-import java.nio.file.Path;
+-import java.util.ArrayList;
+ import java.util.LinkedHashSet;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+-import java.util.regex.Matcher;
+-import java.util.regex.Pattern;
+ import org.junit.jupiter.api.AfterEach;
+ import org.junit.jupiter.api.BeforeEach;
+ import org.junit.jupiter.api.Test;
+ 
+ class OpenApiStaticReferenceTest {
+-    private static final Pattern REGISTERED_API_CONTEXT =
+-        Pattern.compile("createContext\\(\\\"(/api/[^\\\"]+)\\\"");
+     private static final Set<String> HTTP_METHODS =
+         Set.of("get", "post", "put", "patch", "delete", "options", "head");
+ 
+@@ -61,6 +54,33 @@ class OpenApiStaticReferenceTest {
+         assertTrue(workbench.body().contains("href=\"/static/openapi/openapi.json\""));
+     }
+ 
++    @Test
++    void enforcesDocumentedMethodsAndConcretePathTemplatesBeforeDispatch() throws IOException {
++        StaticResource pathsWithWrongMethod = request("POST", "/api/paths");
++        assertEquals(405, pathsWithWrongMethod.status());
++        assertTrue(pathsWithWrongMethod.allow().contains("GET"));
++
++        StaticResource searchWithWrongMethod = request("GET", "/api/search");
++        assertEquals(405, searchWithWrongMethod.status());
++        assertTrue(searchWithWrongMethod.allow().contains("POST"));
++
++        StaticResource undocumentedSubpath = get("/api/paths/example/undocumented");
++        assertEquals(404, undocumentedSubpath.status());
++        assertTrue(undocumentedSubpath.body().contains("API route not found"));
++
++        StaticResource canonicalInspectRoute = get("/api/inspect/tree");
++        assertEquals(400, canonicalInspectRoute.status());
++        assertTrue(canonicalInspectRoute.body().contains("expression query parameter is required"));
++
++        StaticResource inspectWithWrongMethod = request("POST", "/api/inspect/tree");
++        assertEquals(405, inspectWithWrongMethod.status());
++        assertTrue(inspectWithWrongMethod.allow().contains("GET"));
++
++        StaticResource obsoleteInspectRoute = request("POST", "/api/inspect");
++        assertEquals(404, obsoleteInspectRoute.status());
++        assertTrue(obsoleteInspectRoute.body().contains("API route not found"));
++    }
++
+     @Test
+     void servesOfflineOpenApiReferenceAndPinnedOfficialSwaggerUiAssets() throws IOException {
+         StaticResource page = get("/static/openapi/index.html");
+@@ -158,13 +178,13 @@ class OpenApiStaticReferenceTest {
+         assertTrue(operationCount >= 45, "the first public contract must cover the complete workbench surface");
+         assertTrue(usedTags.containsAll(Set.of(
+             "Search", "Paths", "Search Graph", "Proof Jobs", "Didactics", "Rule Radar")));
+-        assertEquals(registeredApiContexts(), documentedContexts,
+-            "OpenAPI context extensions must exactly match production registrations");
++        assertEquals(OpenApiRouteRegistry.load().contexts(), documentedContexts,
++            "OpenAPI context extensions must exactly match the executable route registry");
+     }
+ 
+     @Test
+     void everyOpenApiPathBelongsToItsExplicitRegisteredContext() throws IOException {
+-        Set<String> registeredContexts = registeredApiContexts();
++        Set<String> registeredContexts = OpenApiRouteRegistry.load().contexts();
+         Map<String, Object> paths = object(specification().get("paths"));
+         assertFalse(registeredContexts.isEmpty());
+         assertFalse(paths.isEmpty());
+@@ -191,39 +211,19 @@ class OpenApiStaticReferenceTest {
+         }
+     }
+ 
+-    private Set<String> registeredApiContexts() throws IOException {
+-        Path source = locateServerSource();
+-        String java = Files.readString(source, StandardCharsets.UTF_8);
+-        Matcher matcher = REGISTERED_API_CONTEXT.matcher(java);
+-        Set<String> result = new LinkedHashSet<>();
+-        while (matcher.find()) {
