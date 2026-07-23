@@ -59,6 +59,13 @@ Jeder auslösende Bereich soll mindestens folgende Zustände verständlich darst
 
 Für direkte REST-Nutzung gilt ausschließlich Swagger/OpenAPI. Nutzer- und Feature-Dokumente verweisen höchstens auf den fachlichen Swagger-Bereich oder eine `operationId`; sie wiederholen keine Endpoint-Tabellen oder JSON-Verträge. Siehe [Dokumentationskonvention](documentation-conventions.md).
 
+Nach dem Start der Workbench stehen zwei stabile lokale Zugänge bereit:
+
+- **Swagger UI:** `http://127.0.0.1:8080/static/openapi/index.html`
+- **OpenAPI 3.1 JSON:** `http://127.0.0.1:8080/static/openapi/openapi.json`
+
+Die Swagger-Oberfläche, ihre JavaScript- und CSS-Dateien sowie Lizenz- und Hinweisdateien werden vollständig aus dem gestarteten Checkout ausgeliefert. Für die API-Referenz ist weder ein CDN noch eine Internetverbindung erforderlich.
+
 ## Statische Assets
 
-Die Oberfläche unter `/` lädt ihre HTML-, CSS- und JavaScript-Ressourcen aus dem Classpath-Verzeichnis `app/src/main/resources/web/`. KaTeX und Cytoscape werden selbst gehostet; die Benutzung der Workbench erfordert keine externen CDN-Zugriffe.
+Die Oberfläche unter `/` lädt ihre HTML-, CSS- und JavaScript-Ressourcen aus dem Classpath-Verzeichnis `app/src/main/resources/web/`. KaTeX, Cytoscape und die gepinnte Swagger UI werden selbst gehostet; die Benutzung der Workbench und ihrer technischen API-Referenz erfordert keine externen CDN-Zugriffe.
