@@ -2,19 +2,24 @@ def paperRepositoryRoot = layout.projectDirectory
 def paperRepositoryRootPath = paperRepositoryRoot.asFile.absolutePath
 def paperReproductionVerifier = paperRepositoryRoot.file(
     'scripts/verify-paper-foundation-reproduction.py')
-def paperFoundationVerifier = paperRepositoryRoot.file(
+def paperEvaluationVerifier = paperRepositoryRoot.file(
     'scripts/verify-paper-foundation.py')
+def paperBenchmarkGenerator = paperRepositoryRoot.file(
+    'paper/generate-benchmark-results.py')
 def paperManifest = paperRepositoryRoot.file(
     'paper/paper-artifact-manifest.json')
 def paperManifestSchema = paperRepositoryRoot.file(
-    'docs/schemas/regelsuche-paper-artifact-manifest-v1.schema.json')
+    'docs/schemas/regelsuche-paper-artifact-manifest-v2.schema.json')
+def paperBenchmarkExecution = layout.buildDirectory.file(
+    'reports/candidate-independent-benchmark-execution-v2/first/run.json')
 def paperSources = [
     paperRepositoryRoot.file('paper/manuscript.md'),
     paperRepositoryRoot.file('paper/claims-and-evidence.md'),
     paperRepositoryRoot.file('paper/limitations.md'),
     paperRepositoryRoot.file('paper/artifact-appendix.md'),
     paperRepositoryRoot.file('paper/README.md'),
-    paperRepositoryRoot.file('paper/reproduce-paper.sh')
+    paperRepositoryRoot.file('paper/reproduce-paper.sh'),
+    paperBenchmarkGenerator
 ]
 def paperGenerated = paperRepositoryRoot.dir('paper/generated')
 def paperVerificationVenv = layout.buildDirectory.dir('verification-venv')
@@ -29,20 +34,24 @@ def verifyPaperFoundation = tasks.register(
     Exec
 ) {
     group = 'verification'
-    description = 'Reproduces and independently verifies the claim-bounded paper foundation.'
-    dependsOn 'prepareVerificationEnvironment'
+    description = 'Reproduces and independently verifies the claim-bounded paper evaluation and #383 table.'
+    dependsOn 'prepareVerificationEnvironment',
+        'verifyCandidateIndependentBenchmarkExecutionV2'
     workingDir paperRepositoryRoot
     inputs.file(paperReproductionVerifier)
-    inputs.file(paperFoundationVerifier)
+    inputs.file(paperEvaluationVerifier)
     inputs.file(paperManifest)
     inputs.file(paperManifestSchema)
+    inputs.file(paperBenchmarkExecution)
     inputs.files(paperSources)
     inputs.dir(paperGenerated)
     outputs.upToDateWhen { false }
     doFirst {
         commandLine paperVerificationPython.get().absolutePath,
             paperReproductionVerifier.asFile.absolutePath,
-            '--repository-root', paperRepositoryRootPath
+            '--repository-root', paperRepositoryRootPath,
+            '--benchmark-execution',
+            paperBenchmarkExecution.get().asFile.absolutePath
     }
 }
 
