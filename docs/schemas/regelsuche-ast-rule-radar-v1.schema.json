@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-ast-rule-radar-v1.schema.json",
+  "title": "Regelsuche AST Rule Radar Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "expression", "canonicalExpression", "valid", "context", "nodes", "candidates", "truncation", "diagnostics"],
+  "properties": {
+    "schema": {"const": "regelsuche.ast-rule-radar/v1"},
+    "expression": {"type": "string"},
+    "canonicalExpression": {"type": "string"},
+    "valid": {"type": "boolean"},
+    "context": {"$ref": "#/$defs/context"},
+    "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
+    "candidates": {"type": "array", "items": {"$ref": "#/$defs/candidate"}},
+    "truncation": {"$ref": "#/$defs/truncation"},
+    "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}}
+  },
+  "$defs": {
+    "origin": {"enum": ["CORE", "KNOWLEDGE_PACK", "RULE_FILE", "PLUGIN", "LEARNED_MACRO"]},
+    "outcome": {"enum": ["AVAILABLE", "SELECTED", "APPLIED", "PRUNED_BUDGET", "PRUNED_DUPLICATE", "PRUNED_KNOWN_BETTER", "REJECTED_ASSUMPTION", "REJECTED_VALIDATION", "FAILED_APPLICATION"]},
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knowledgeProfile", "enabledPacks", "disabledPacks", "includePlugins", "includeLearnedMacros", "minMacroProofStatus", "searchProfile", "goalExpression", "maxCandidatesPerPosition", "maxCandidatesTotal", "assumptions", "includeRejectedCandidates", "selectedCandidateId"],
+      "properties": {
+        "knowledgeProfile": {"type": "string"},
+        "enabledPacks": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "disabledPacks": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "includePlugins": {"type": "boolean"},
+        "includeLearnedMacros": {"type": "boolean"},
+        "minMacroProofStatus": {"type": "string"},
+        "searchProfile": {"type": "string"},
+        "goalExpression": {"type": "string"},
+        "maxCandidatesPerPosition": {"type": "integer", "minimum": 1, "maximum": 200},
+        "maxCandidatesTotal": {"type": "integer", "minimum": 1, "maximum": 2000},
+        "assumptions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "includeRejectedCandidates": {"type": "boolean"},
+        "selectedCandidateId": {"type": "string"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pathKey", "parentPathKey", "childPathKeys", "nodeKind", "label", "subtree", "depth", "preorderIndex", "candidateIds", "candidateCount", "omittedCandidateCount"],
+      "properties": {
+        "pathKey": {"type": "string", "pattern": "^(root|[0-9]{3}(\\.[0-9]{3})*)$"},
+        "parentPathKey": {"type": "string"},
+        "childPathKeys": {"type": "array", "items": {"type": "string"}},
+        "nodeKind": {"type": "string"},
+        "label": {"type": "string"},
+        "subtree": {"type": "string"},
+        "depth": {"type": "integer", "minimum": 0},
+        "preorderIndex": {"type": "integer", "minimum": 0},
+        "candidateIds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "candidateCount": {"type": "integer", "minimum": 0},
+        "omittedCandidateCount": {"type": "integer", "minimum": 0}
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value", "kind"],
+      "properties": {"name": {"type": "string"}, "value": {"type": "string"}, "kind": {"type": "string"}}
+    },
+    "atomicStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "beforeExpression", "afterExpression", "ruleId", "ruleKind", "assumptions"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "beforeExpression": {"type": "string"},
+        "afterExpression": {"type": "string"},
+        "ruleId": {"type": "string"},
+        "ruleKind": {"type": "string"},
+        "assumptions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "macroEvidence": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["reusableRuleId", "supportingPathIds", "confidenceScore", "occurrenceCount", "compressionRatio", "atomicSteps"],
+      "properties": {
+        "reusableRuleId": {"type": "string"},
+        "supportingPathIds": {"type": "array", "items": {"type": "string"}},
+        "confidenceScore": {"type": "number"},
+        "occurrenceCount": {"type": "integer", "minimum": 0},
+        "compressionRatio": {"type": "number", "minimum": 1},
+        "atomicSteps": {"type": "array", "items": {"$ref": "#/$defs/atomicStep"}}
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateId", "pathKey", "ruleId", "displayName", "origin", "sourceReference", "license", "ruleKind", "bindings", "assumptions", "subtreeBefore", "subtreeAfter", "expressionBefore", "expressionAfter", "applicable", "validationStatus", "equivalencePreserving", "mayIncreaseComplexity", "estimatedCostDelta", "outcome", "selected", "orderingKey", "macroEvidence"],
+      "properties": {
+        "candidateId": {"type": "string", "pattern": "^move:[0-9a-f]{64}$"},
+        "pathKey": {"type": "string"},
+        "ruleId": {"type": "string", "minLength": 1},
+        "displayName": {"type": "string"},
+        "origin": {"$ref": "#/$defs/origin"},
+        "sourceReference": {"type": "string"},
+        "license": {"type": "string"},
+        "ruleKind": {"type": "string"},
+        "bindings": {"type": "array", "items": {"$ref": "#/$defs/binding"}},
+        "assumptions": {"type": "array", "items": {"type": "string"}},
+        "subtreeBefore": {"type": "string"},
+        "subtreeAfter": {"type": "string"},
+        "expressionBefore": {"type": "string"},
+        "expressionAfter": {"type": "string"},
+        "applicable": {"type": "boolean"},
+        "validationStatus": {"type": "string"},
+        "equivalencePreserving": {"type": "boolean"},
+        "mayIncreaseComplexity": {"type": "boolean"},
+        "estimatedCostDelta": {"type": "integer"},
+        "outcome": {"$ref": "#/$defs/outcome"},
+        "selected": {"type": "boolean"},
+        "macroEvidence": {"$ref": "#/$defs/macroEvidence"},
+        "orderingKey": {"type": "string"}
+      }
+    },
+    "truncation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["truncated", "generatedCandidateCount", "returnedCandidateCount", "omittedCandidateCount", "omittedByPath"],
+      "properties": {
+        "truncated": {"type": "boolean"},
+        "generatedCandidateCount": {"type": "integer", "minimum": 0},
+        "returnedCandidateCount": {"type": "integer", "minimum": 0},
+        "omittedCandidateCount": {"type": "integer", "minimum": 0},
+        "omittedByPath": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}}
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "pathKey"],
+      "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "pathKey": {"type": "string"}}
+    }
+  }
+}
