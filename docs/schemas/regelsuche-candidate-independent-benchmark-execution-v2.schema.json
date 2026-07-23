@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://carstenartur.github.io/Regelsuche/schemas/regelsuche-candidate-independent-benchmark-execution-v2.schema.json",
+  "type":"object","additionalProperties":false,
+  "required":["schema","benchmarkId","repositoryRevision","foundation","challengeExecutions","totals","benchmarkStatus","claimPolicy","formalProofStatus","externalNoveltyStatus","expertInterestingnessStatus","publicationAuthorized","contentHash"],
+  "properties":{
+    "schema":{"const":"regelsuche.candidate-independent-benchmark-execution/v2"},
+    "benchmarkId":{"const":"regelsuche-candidate-independent-autonomous-discovery-2026-07/v1"},
+    "repositoryRevision":{"type":"string","minLength":1},
+    "foundation":{"type":"object","additionalProperties":false,"required":["schema","runContentHash","runExactHash","campaignBatchContentHash","benchmarkReportContentHash","caseEvaluationSetContentHash","configuredCampaigns","configuredCaseSlots","executionStatus"],"properties":{"schema":{"const":"regelsuche.candidate-independent-benchmark-run/v1"},"runContentHash":{"$ref":"#/$defs/hash"},"runExactHash":{"$ref":"#/$defs/hash"},"campaignBatchContentHash":{"$ref":"#/$defs/hash"},"benchmarkReportContentHash":{"$ref":"#/$defs/hash"},"caseEvaluationSetContentHash":{"$ref":"#/$defs/hash"},"configuredCampaigns":{"const":12},"configuredCaseSlots":{"const":72},"executionStatus":{"const":"FROZEN_NOT_EXECUTED"}}},
+    "challengeExecutions":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"object","required":["challengeId","schema","contentHash","executedCampaigns","caseSlots","successfulCaseSlots","noResultCaseSlots","detailedEvaluationRows","correctnessRegressions","challengeStatus"],"properties":{"challengeId":{"enum":["finite-difference-recurrences","rational-assumption-rewrites","reusable-search-macros"]},"schema":{"type":"string","minLength":1},"contentHash":{"$ref":"#/$defs/hash"},"executedCampaigns":{"const":4},"caseSlots":{"const":24},"successfulCaseSlots":{"type":"integer","minimum":0,"maximum":24},"noResultCaseSlots":{"type":"integer","minimum":0,"maximum":24},"detailedEvaluationRows":{"type":"integer","minimum":24},"correctnessRegressions":{"const":0},"challengeStatus":{"type":"string","minLength":1}},"additionalProperties":true}},
+    "totals":{"type":"object","additionalProperties":false,"required":["configuredCampaigns","executedCampaigns","configuredCaseSlots","executedCaseSlots","successfulCaseSlots","noResultCaseSlots","detailedEvaluationRows","correctnessRegressions"],"properties":{"configuredCampaigns":{"const":12},"executedCampaigns":{"const":12},"configuredCaseSlots":{"const":72},"executedCaseSlots":{"const":72},"successfulCaseSlots":{"const":52},"noResultCaseSlots":{"const":20},"detailedEvaluationRows":{"const":120},"correctnessRegressions":{"const":0}}},
+    "benchmarkStatus":{"const":"COMPLETE_FROZEN_CHALLENGE_EXECUTION"},
+    "claimPolicy":{"const":"EXECUTED_BENCHMARK_DOES_NOT_AUTHORIZE_NOVELTY_PROOF_OR_PUBLICATION"},
+    "formalProofStatus":{"const":"NOT_EVALUATED_AT_BENCHMARK_AGGREGATE"},
+    "externalNoveltyStatus":{"const":"NOT_EVALUATED"},
+    "expertInterestingnessStatus":{"const":"NOT_EVALUATED"},
+    "publicationAuthorized":{"const":false},
+    "contentHash":{"$ref":"#/$defs/hash"}
+  },"$defs":{"hash":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}}
+}
