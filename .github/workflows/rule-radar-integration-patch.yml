@@ -34,10 +34,12 @@ jobs:
           else
             echo 'skip=false' >> "$GITHUB_OUTPUT"
           fi
-      - name: Apply remaining strict integration anchors
+      - name: Apply strict integration and review fixes
         if: steps.completed.outputs.skip != 'true'
-        run: python3 tools/apply-rule-radar-integration.py
-      - name: Persist remaining direct integration
+        run: |
+          python3 tools/apply-rule-radar-integration.py
+          python3 tools/apply-rule-radar-review-fixes.py
+      - name: Persist direct source fixes before verification
         if: steps.completed.outputs.skip != 'true'
         shell: bash
         run: |
@@ -51,7 +53,7 @@ jobs:
                   docs/README.md \
                   docs/ast-rule-radar.md
           if ! git diff --cached --quiet; then
-            git commit -m "Complete AST rule radar workbench integration"
+            git commit -m "Apply AST rule radar review fixes"
             git push origin HEAD:issue-467-ast-rule-radar
           fi
       - uses: actions/setup-java@v5
@@ -74,6 +76,7 @@ jobs:
           set +e
           set -o pipefail
           mkdir -p build/logs docs/generated docs/assets/screenshots
+          verified_head="$(git rev-parse HEAD)"
           env -u GITHUB_SHA ./gradlew \
             :app:installPlaywrightHostDependencies \
             :app:installPlaywrightBrowsers \
@@ -96,15 +99,65 @@ jobs:
               2>&1 | tee build/logs/rule-radar-docs-e2e.log
             status=${PIPESTATUS[0]}
           fi
+
+          python3 - <<'PY' > build/logs/rule-radar-failed-tests.txt
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          failures = 0
+          for xml_path in sorted(Path('.').glob('**/build/test-results/*/TEST-*.xml')):
+              try:
+                  root = ET.parse(xml_path).getroot()
+              except Exception as exc:
+                  print(f"### Could not parse {xml_path}: {exc}")
+                  continue
+              file_failures = []
+              for case in root.iter('testcase'):
+                  nodes = list(case.findall('failure')) + list(case.findall('error'))
+                  for node in nodes:
+                      failures += 1
+                      file_failures.append((case, node))
+              if not file_failures:
+                  continue
+              print(f"### {xml_path}")
+              for case, node in file_failures:
+                  classname = case.attrib.get('classname', '<unknown class>')
+                  name = case.attrib.get('name', '<unknown test>')
+                  message = node.attrib.get('message', '').strip()
+                  details = (node.text or '').strip()
+                  print(f"- {classname} :: {name}")
+                  if message:
+                      print(f"  message: {message}")
+                  if details:
+                      print('  details:')
+                      for line in details[-6000:].splitlines():
+                          print(f"    {line}")
+              stderr = root.find('system-err')
+              if stderr is not None and (stderr.text or '').strip():
+                  print('  suite stderr tail:')
+                  for line in (stderr.text or '').strip()[-4000:].splitlines():
+                      print(f"    {line}")
+          if failures == 0:
+              print('No failed JUnit XML test cases were found.')
+          else:
+              print(f"TOTAL_FAILED_TEST_CASES={failures}")
+          PY
+
           if [ "$status" -eq 0 ] && test -s docs/assets/screenshots/ast-rule-radar.png; then
-            printf 'SUCCESS\n' > docs/generated/rule-radar-ci-status.txt
+            {
+              printf 'SUCCESS\n'
+              printf 'verifiedHead=%s\n' "$verified_head"
+            } > docs/generated/rule-radar-ci-status.txt
           else
             {
-              printf 'FAILURE exit=%s\n\n' "$status"
+              printf 'FAILURE exit=%s\n' "$status"
+              printf 'verifiedHead=%s\n\n' "$verified_head"
+              printf '%s\n' '--- exact failed test cases ---'
+              cat build/logs/rule-radar-failed-tests.txt
               printf '%s\n' '--- fullCheck tail ---'
-              tail -n 500 build/logs/rule-radar-full-check.log 2>/dev/null || true
+              tail -n 300 build/logs/rule-radar-full-check.log 2>/dev/null || true
               printf '%s\n' '--- focused documentation e2e tail ---'
-              tail -n 250 build/logs/rule-radar-docs-e2e.log 2>/dev/null || true
+              tail -n 200 build/logs/rule-radar-docs-e2e.log 2>/dev/null || true
             } > docs/generated/rule-radar-ci-status.txt
             status=1
           fi
