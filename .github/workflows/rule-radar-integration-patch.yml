@@ -9,7 +9,7 @@ on:
     - cron: '*/5 * * * *'
 
 concurrency:
-  group: ast-rule-radar-assets-head-v3
+  group: ast-rule-radar-sequence-head-v4
   cancel-in-progress: false
 
 permissions:
@@ -53,7 +53,7 @@ jobs:
                   docs/README.md \
                   docs/ast-rule-radar.md
           if ! git diff --cached --quiet; then
-            git commit -m "Apply AST rule radar asset-serving fix"
+            git commit -m "Apply AST rule radar request-sequencing fix"
             git push origin HEAD:issue-467-ast-rule-radar
           fi
       - uses: actions/setup-java@v5
