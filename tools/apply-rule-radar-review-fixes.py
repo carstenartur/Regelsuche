@@ -67,4 +67,52 @@ replace_once(
     "            sendStaticResource(exchange, \"/web\" + path, mimeFor(path));",
 )
 
-print("AST rule-radar review and asset-serving fixes applied successfully.")
+UI = "app/src/main/resources/web/rule-radar.js"
+replace_once(
+    UI,
+    "        undo: [],\n"
+    "        zoom: 1,\n"
+    "        search: null\n"
+    "    };",
+    "        undo: [],\n"
+    "        zoom: 1,\n"
+    "        search: null,\n"
+    "        inspectionSequence: 0\n"
+    "    };",
+)
+replace_once(
+    UI,
+    "    function inspect(options = {}) {\n"
+    "        const expression = (options.expression != null ? options.expression : $('radarExpression').value).trim();\n"
+    "        if (!expression) { setStatus('Bitte einen Ausdruck eingeben.', true); return Promise.resolve(); }\n"
+    "        setStatus('AST und lokale Regelanwendungen werden im Backend berechnet …');\n"
+    "        return post('/api/rule-radar/inspect', {\n"
+    "            expression,\n"
+    "            context: context(options)\n"
+    "        }).then(snapshot => {\n"
+    "            state.snapshot = snapshot;",
+    "    function inspect(options = {}) {\n"
+    "        const expression = (options.expression != null ? options.expression : $('radarExpression').value).trim();\n"
+    "        if (!expression) { setStatus('Bitte einen Ausdruck eingeben.', true); return Promise.resolve(); }\n"
+    "        const requestSequence = ++state.inspectionSequence;\n"
+    "        setStatus('AST und lokale Regelanwendungen werden im Backend berechnet …');\n"
+    "        return post('/api/rule-radar/inspect', {\n"
+    "            expression,\n"
+    "            context: context(options)\n"
+    "        }).then(snapshot => {\n"
+    "            if (requestSequence !== state.inspectionSequence) { return; }\n"
+    "            state.snapshot = snapshot;",
+)
+replace_once(
+    UI,
+    "        }).catch(error => setStatus('Fehler: ' + error.message, true));\n"
+    "    }",
+    "        }).catch(error => {\n"
+    "            if (requestSequence === state.inspectionSequence) {\n"
+    "                setStatus('Fehler: ' + error.message, true);\n"
+    "            }\n"
+    "        });\n"
+    "    }",
+)
+
+print("AST rule-radar review, asset-serving and stale-response fixes applied successfully.")
