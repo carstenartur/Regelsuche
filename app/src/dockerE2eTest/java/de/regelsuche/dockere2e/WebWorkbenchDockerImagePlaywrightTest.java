@@ -142,7 +142,7 @@ class WebWorkbenchDockerImagePlaywrightTest {
                     .setState(WaitForSelectorState.VISIBLE)
                     .setTimeout(30_000));
 
-            assertTrue(page.content().contains("Regelsuche Workbench API"),
+            assertTrue(page.content().contains("Regelsuche REST API"),
                 "Swagger UI should render the Regelsuche API title");
             assertTrue(page.content().contains("submitProofJob"),
                 "Swagger UI should render the proof-job operation contract");
