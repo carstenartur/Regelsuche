@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply review fixes for rejected AST rule-radar candidates.
+"""Apply review and integration fixes for the AST rule radar.
 
 The script is strict and idempotent because it is executed once by the temporary
 fixed-head verifier before the final source-only PR is merged.
@@ -54,4 +54,17 @@ replace_once(
     "                List<Binding> bindings = match.bindings().stream()",
 )
 
-print("AST rule-radar review fixes applied successfully.")
+SERVER = "app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java"
+replace_once(
+    SERVER,
+    "        } else if (path.startsWith(\"/vendor/\") || path.equals(\"/app.js\") || path.equals(\"/style.css\")) {\n"
+    "            sendStaticResource(exchange, \"/web\" + path, mimeFor(path));",
+    "        } else if (path.startsWith(\"/vendor/\")\n"
+    "            || path.equals(\"/app.js\")\n"
+    "            || path.equals(\"/style.css\")\n"
+    "            || path.equals(\"/rule-radar.js\")\n"
+    "            || path.equals(\"/rule-radar.css\")) {\n"
+    "            sendStaticResource(exchange, \"/web\" + path, mimeFor(path));",
+)
+
+print("AST rule-radar review and asset-serving fixes applied successfully.")

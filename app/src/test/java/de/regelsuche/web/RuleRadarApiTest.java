@@ -10,6 +10,7 @@ import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.json.JsonReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -162,6 +163,21 @@ class RuleRadarApiTest {
         assertEquals(generated, returned + omitted);
     }
 
+    @Test
+    void servesRadarAssetsReferencedByIndex() throws IOException {
+        StaticResource javascript = get("/rule-radar.js");
+        assertEquals(200, javascript.status());
+        assertTrue(javascript.contentType().startsWith("application/javascript"));
+        assertTrue(javascript.body().contains("radarExpression"));
+        assertTrue(javascript.body().contains("/api/rule-radar/inspect"));
+
+        StaticResource stylesheet = get("/rule-radar.css");
+        assertEquals(200, stylesheet.status());
+        assertTrue(stylesheet.contentType().startsWith("text/css"));
+        assertTrue(stylesheet.body().contains(".radar-tree"));
+        assertTrue(stylesheet.body().contains(".radar-move-point"));
+    }
+
     private Map<String, Object> post(String path, String body) throws IOException {
         URI uri = URI.create("http://127.0.0.1:" + server.boundPort() + path);
         HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
@@ -177,5 +193,28 @@ class RuleRadarApiTest {
         try (var input = connection.getInputStream()) {
             return new JsonReader(new String(input.readAllBytes(), StandardCharsets.UTF_8)).readObject();
         }
+    }
+
+    private StaticResource get(String path) throws IOException {
+        URI uri = URI.create("http://127.0.0.1:" + server.boundPort() + path);
+        HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+        connection.setConnectTimeout(2_000);
+        connection.setReadTimeout(10_000);
+        connection.setRequestMethod("GET");
+        int status = connection.getResponseCode();
+        String contentType = connection.getHeaderField("Content-Type");
+        InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+        String body;
+        if (stream == null) {
+            body = "";
+        } else {
+            try (stream) {
+                body = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
+        return new StaticResource(status, contentType == null ? "" : contentType, body);
+    }
+
+    private record StaticResource(int status, String contentType, String body) {
     }
 }
