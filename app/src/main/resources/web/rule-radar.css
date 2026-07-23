@@ -213,6 +213,15 @@
     background: #fff;
 }
 
+.radar-projected-edge {
+    margin-top: .8rem;
+    padding: .7rem;
+    border: 2px dashed #2563eb;
+    border-radius: .5rem;
+    background: #eff6ff;
+    overflow-wrap: anywhere;
+}
+
 .radar-rewrite-preview,
 .radar-assumptions,
 .radar-macro-evidence {
@@ -238,11 +247,14 @@
 
 .radar-search-state {
     display: grid;
+    width: 100%;
     grid-template-columns: auto auto 1fr;
     gap: .65rem;
     padding: .55rem;
     border: 1px solid var(--border, #d8dde6);
     border-radius: .45rem;
+    background: #fff;
+    text-align: left;
 }
 
 .radar-search-state.target {
@@ -271,9 +283,14 @@
 }
 
 .radar-event-list {
+    display: grid;
+    gap: .35rem;
     max-height: 260px;
     overflow: auto;
 }
+.radar-event-list button { text-align: left; }
+.radar-search-edge.outcome-pruned_duplicate,
+.radar-search-edge.outcome-pruned_known_better { border-style: dashed; opacity: .8; }
 
 @media (max-width: 900px) {
     .radar-layout,

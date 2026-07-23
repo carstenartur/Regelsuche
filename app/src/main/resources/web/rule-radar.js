@@ -87,6 +87,7 @@
             <section id="radarCandidatePanel" class="card" aria-labelledby="radar-candidate-title">
                 <h3 id="radar-candidate-title">Ausgewählte Regelanwendung</h3>
                 <div id="radarCandidateDetail" class="radar-candidate-detail"><p class="hint">Einen Punkt im AST oder eine Tabellenzeile auswählen.</p></div>
+                <div id="radarProjectedEdge" class="radar-projected-edge" aria-live="polite"></div>
                 <div class="actions">
                     <label id="radarAssumptionAckLabel" class="radar-assumption-ack" hidden>
                         <input id="radarAssumptionAck" type="checkbox"> Angezeigte Annahmen für diesen manuellen Schritt bestätigen
@@ -210,6 +211,7 @@
         renderTree();
         renderTable();
         renderCandidateDetail();
+        renderProjectedEdge();
         $('radarUndo').disabled = state.undo.length === 0;
     }
 
@@ -337,7 +339,10 @@
 
     function bindCandidatePoints(root) {
         root.querySelectorAll('[data-candidate-id]').forEach(element => {
+            const preview = () => previewCandidate(element.dataset.candidateId);
             const activate = () => selectCandidate(element.dataset.candidateId, true);
+            element.addEventListener('mouseenter', preview);
+            element.addEventListener('focus', preview);
             element.addEventListener('click', activate);
             element.addEventListener('keydown', event => {
                 if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
@@ -345,11 +350,30 @@
         });
     }
 
+    function previewCandidate(candidateId) {
+        state.selectedId = candidateId;
+        $('radarAssumptionAck').checked = false;
+        renderTable();
+        renderCandidateDetail();
+        renderProjectedEdge();
+    }
+
     function selectCandidate(candidateId, focusDetails = false) {
         state.selectedId = candidateId;
         $('radarAssumptionAck').checked = false;
-        renderTree(); renderTable(); renderCandidateDetail();
+        renderTree(); renderTable(); renderCandidateDetail(); renderProjectedEdge();
         if (focusDetails) { $('radarCandidatePanel').scrollIntoView({behavior: 'smooth', block: 'nearest'}); }
+    }
+
+    function renderProjectedEdge() {
+        const host = $('radarProjectedEdge');
+        const candidate = selectedCandidate();
+        if (!candidate) { host.innerHTML = ''; return; }
+        host.innerHTML = `<strong>Projizierte Suchkante</strong><br>
+            <code>${esc(candidate.expressionBefore)}</code>
+            <span aria-hidden="true">→</span>
+            <code>${esc(candidate.expressionAfter)}</code><br>
+            <span>${esc(candidate.ruleId)} @ ${esc(candidate.pathKey)} · ${esc(candidate.outcome)}</span>`;
     }
 
     function selectedCandidate() {
@@ -474,27 +498,30 @@
         const host = $('radarSearchGraph');
         const result = state.search;
         if (!result) { host.innerHTML = ''; return; }
-        const stateById = new Map((result.states || []).map(item => [item.stateId, item]));
         const edges = result.edges || [];
-        const eventsByCandidate = new Map();
-        (result.events || []).forEach(event => eventsByCandidate.set(event.candidateId, event));
-        host.innerHTML = `<div class="radar-state-list">${(result.states || []).map(item => `<div class="radar-search-state ${item.target ? 'target' : ''}"><strong>${esc(item.stateId)}</strong><span>Tiefe ${item.depth}</span><code>${esc(item.expression)}</code></div>`).join('')}</div>
-            <div class="radar-edge-list"><h4>Angewandte Suchkanten</h4>${edges.length ? edges.map(edge => `<button type="button" class="radar-search-edge" data-search-candidate="${esc(edge.candidateId)}" data-from-expression="${esc(edge.fromExpression)}">
+        const outcomes = result.finalOutcomeByCandidateId || {};
+        host.innerHTML = `<div class="radar-state-list">${(result.states || []).map(item => `<button type="button" class="radar-search-state ${item.target ? 'target' : ''}" data-search-state-expression="${esc(item.expression)}"><strong>${esc(item.stateId)}</strong><span>Tiefe ${item.depth}</span><code>${esc(item.expression)}</code></button>`).join('')}</div>
+            <div class="radar-edge-list"><h4>Suchkanten und kanonische Zusammenführungen</h4>${edges.length ? edges.map(edge => `<button type="button" class="radar-search-edge outcome-${esc(edge.outcome.toLowerCase())}" data-search-candidate="${esc(edge.candidateId)}" data-from-expression="${esc(edge.fromExpression)}">
                 <code>${esc(edge.fromStateId)}</code> → <code>${esc(edge.toStateId)}</code><br>
-                ${esc(edge.ruleId)} @ ${esc(edge.pathKey)} · ${esc(edge.origin)}
-            </button>`).join('') : '<p class="hint">Keine neue Suchkante innerhalb der Budgets.</p>'}</div>
-            <details><summary>Alle Suchentscheidungen (${(result.events || []).length})</summary><ol class="radar-event-list">${(result.events || []).map(event => `<li><code>${esc(event.outcome)}</code> · ${esc(event.ruleId)} @ ${esc(event.pathKey)} — ${esc(event.detail)}</li>`).join('')}</ol></details>`;
+                ${esc(edge.ruleId)} @ ${esc(edge.pathKey)} · ${esc(edge.origin)} · <code>${esc(edge.outcome)}</code>
+            </button>`).join('') : '<p class="hint">Keine Suchkante innerhalb der Budgets.</p>'}</div>
+            <details><summary>Alle Suchentscheidungen (${(result.events || []).length})</summary><div class="radar-event-list">${(result.events || []).map(event => `<button type="button" data-search-event-candidate="${esc(event.candidateId)}" data-search-event-expression="${esc(event.expression)}"><code>${esc(event.outcome)}</code> · ${esc(event.ruleId)} @ ${esc(event.pathKey)} — ${esc(event.detail)}</button>`).join('')}</div></details>`;
+        host.querySelectorAll('[data-search-state-expression]').forEach(button => {
+            button.addEventListener('click', () => inspect({expression: button.dataset.searchStateExpression}));
+        });
         host.querySelectorAll('[data-search-candidate]').forEach(button => {
-            button.addEventListener('click', () => {
-                const outcomes = result.finalOutcomeByCandidateId || {};
-                state.selectedId = button.dataset.searchCandidate;
-                $('radarExpression').value = button.dataset.fromExpression;
-                inspect({
-                    expression: button.dataset.fromExpression,
-                    selectedCandidateId: button.dataset.searchCandidate,
-                    outcomeByCandidateId: outcomes
-                });
-            });
+            button.addEventListener('click', () => inspect({
+                expression: button.dataset.fromExpression,
+                selectedCandidateId: button.dataset.searchCandidate,
+                outcomeByCandidateId: outcomes
+            }));
+        });
+        host.querySelectorAll('[data-search-event-candidate]').forEach(button => {
+            button.addEventListener('click', () => inspect({
+                expression: button.dataset.searchEventExpression,
+                selectedCandidateId: button.dataset.searchEventCandidate,
+                outcomeByCandidateId: outcomes
+            }));
         });
     }
 
