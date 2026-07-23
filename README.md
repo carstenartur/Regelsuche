@@ -118,6 +118,12 @@ Eine kuratierte Übersicht **mit echten, aus den Tests generierten
 Screenshots** zu jeder Demo:
 👉 **[docs/demo-gallery.md](docs/demo-gallery.md)**.
 
+Die technische REST-Referenz derselben laufenden Instanz ist vollständig lokal
+verfügbar: **Swagger UI** unter
+`http://localhost:8080/static/openapi/index.html` und **OpenAPI 3.1 JSON** unter
+`http://localhost:8080/static/openapi/openapi.json`. Der Tab **Hilfe** verlinkt
+beide Zugänge; Swagger lädt keine Assets von einem CDN.
+
 ## Optional: Full Mode mit PostgreSQL/Hibernate
 
 Für persistente, größere Analysen mit PostgreSQL, Hibernate ORM und Hibernate
