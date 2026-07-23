@@ -10,6 +10,8 @@ The stream is derived only from three files frozen before evaluated execution:
 - `research/benchmarks/candidate-independent/corpus-freeze-receipt.json`;
 - `research/benchmarks/candidate-independent/macro-primitives.json`.
 
+The generator's input interface is an explicit allowlist containing exactly those three files and the repository revision. It accepts no batch result, candidate ledger, paired evaluation or report directory as input.
+
 The freeze receipt states that execution had not started and that no evaluated results existed. It also binds both the case corpus and the `macro-primitives/v1` baseline inventory by content hash.
 
 ## Ordering and comparison contract
