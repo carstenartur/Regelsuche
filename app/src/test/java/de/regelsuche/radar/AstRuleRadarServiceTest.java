@@ -12,6 +12,7 @@ import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.validation.CandidateProofStatus;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,10 +77,17 @@ class AstRuleRadarServiceTest {
         assertEquals(
             first.candidates().stream().map(AstRuleRadar.ApplicableMove::candidateId).toList(),
             second.candidates().stream().map(AstRuleRadar.ApplicableMove::candidateId).toList());
-        assertEquals(
-            first.candidates().stream().map(AstRuleRadar.ApplicableMove::orderingKey).toList(),
-            first.candidates().stream().map(AstRuleRadar.ApplicableMove::orderingKey).sorted().toList(),
-            "candidate order must be deterministic after position ordering");
+
+        Map<String, List<String>> orderingKeysByPosition = first.candidates().stream()
+            .collect(java.util.stream.Collectors.groupingBy(
+                AstRuleRadar.ApplicableMove::pathKey,
+                LinkedHashMap::new,
+                java.util.stream.Collectors.mapping(AstRuleRadar.ApplicableMove::orderingKey,
+                    java.util.stream.Collectors.toList())));
+        orderingKeysByPosition.forEach((path, keys) -> assertEquals(
+            keys.stream().sorted().toList(),
+            keys,
+            "candidate order must be deterministic at position " + path));
     }
 
     @Test
