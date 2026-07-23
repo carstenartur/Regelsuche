@@ -1,166 +1,130 @@
 # User Workflows
 
-This page describes the concrete workflows Regelsuche is built to support.
-Every workflow links to the backing UI, REST endpoints and tests.
+Diese Seite beschreibt die wichtigsten Bedienabläufe der Regelsuche-Web-Workbench. Die Schritte verwenden ausschließlich sichtbare Tabs, Felder und Aktionen. Die zugrunde liegenden REST-Verträge werden nicht dupliziert; Methoden, Pfade, Schemata und Statuscodes stehen in Swagger/OpenAPI.
 
 ---
 
-## 1. Teacher / Student — "Show me the textbook path"
+## 1. Lernen und Lehren — „Zeige mir einen nachvollziehbaren Schulweg“
 
-**Goal:** Enter an expression, inspect several derivations, pick the one
-that best matches how the topic is taught, and export the result.
+**Ziel:** Einen Ausdruck eingeben, mehrere Herleitungen prüfen, einen gut erklärbaren Weg auswählen und das Ergebnis weiterverwenden.
 
-1. Open <http://localhost:8080/> and stay on the **Workbench** tab.
-2. Type the expression (e.g. `(x+3)^2`) into the input field.
-3. Pick the **Profil** `TEACHING` (or pick any profile and set
-   **Ziel** to `TEACHING_FRIENDLY` — see
-   [Goal dropdown](#goal-dropdown)).
-4. Click **Suche starten**.
-5. Switch to **Pfade** to compare the derivations, then to **Replay**
-   to walk through the chosen one step by step.
-6. Use the **Exporte** tab → *Markdown / LaTeX* to download the
-   formatted derivation.
+1. Die Web-Workbench öffnen und im Tab **Workbench** bleiben.
+2. Den Ausdruck, zum Beispiel `(x+3)^2`, in das Feld **Ausdruck** eingeben.
+3. Als **Profil** die didaktische Suche wählen oder unter **Ziel** die schulbuchnahe Darstellung auswählen.
+4. **Suche starten** wählen.
+5. Im Tab **Pfade** die gefundenen Rechenwege vergleichen und als Darstellung **Schulbuch** oder **Schritte** wählen.
+6. Einen Pfad öffnen und im Tab **Replay** schrittweise abspielen. Hervorgehobene Änderungen, Regelhinweise und Annahmen prüfen.
+7. Im Tab **Exporte** Markdown für Dokumentation oder LaTeX für mathematische Texte herunterladen.
 
-REST equivalent:
+**Sichtbares Ergebnis:** Ein vollständiger Rechenweg mit Zwischenschritten, verständlicher Erklärung, Annahmen und passendem Export.
 
-```http
-POST /api/search
-Content-Type: application/json
-
-{ "expression": "(x+3)^2", "profile": "TEACHING", "goal": "TEACHING_FRIENDLY" }
-```
-
-E2E coverage: `BrowserDemoFlowTest#binomialDemoBrowserFlow` and
-`mathEquationDemoBrowserFlow`.
+**Technische Zuordnung:** Swagger-Bereiche *Search*, *Paths*, *Replay*, *Explain* und *Exports*.
 
 ---
 
-## 2. Researcher / Developer — "Discover & promote macro rules"
+## 2. Discovery — „Finde wiederkehrende Regeln und Strukturen“
 
-**Goal:** Run a wide search, inspect the resulting rule candidates, then
-promote the most universal ones into the rule inventory.
+**Ziel:** Einen breiteren Suchraum untersuchen, Regelkandidaten bewerten und wiederverwendbare Strukturen erkennen.
 
-1. Pick **Profil** `DISCOVERY_PLUS` to enable the transposition table.
-2. Run several searches on related expressions.
-3. Open the **Regelkandidaten** tab — sort by `proofStatus` and
-   `occurrenceCount`.
-4. Switch to **Suchgedächtnis** → *Universelle Muster* to see which
-   canonical states keep coming back across different searches
-   (universality score) and which rules contribute to them
-   (Rule-Coverage).
-5. Use **Inventar** to enable (`/api/inventory/{id}/enable`) the
-   patterns you want active in future searches.
+1. Im Tab **Workbench** das Profil **Erkundung / Discovery** auswählen.
+2. Passende **Regel-Domänen** aktivieren und mehrere verwandte Ausdrücke nacheinander untersuchen.
+3. Im Tab **Graph** die semantische Erklärung öffnen. Alternative Pfade und Varianten in Clustern nur bei Bedarf einblenden.
+4. Im Tab **Regelkandidaten** Pattern, Beispielanzahl, Bewertung, Status, Proof-Status und Annahmen vergleichen.
+5. Im Tab **Identitäten** prüfen, ob eine wiederkehrende Struktur hinreichend belegt und zur Übernahme geeignet ist.
+6. Im Tab **Suchgedächtnis** unter den universellen Mustern kontrollieren, welche kanonischen Zustände in mehreren Läufen wiederkehren und welche Regeln dazu beitragen.
+7. Im Tab **Inventar** übernommene Regeln auffinden, aktivieren oder mit Tags ordnen.
 
-REST surfaces involved: `/api/search`, `/api/candidates`,
-`/api/memory/universal`, `/api/inventory`.
+**Sichtbares Ergebnis:** Eine nachvollziehbare Kette von konkreten Suchbeobachtungen über Kandidaten und Identitäten bis zum kontrollierten Regelbestand.
+
+**Technische Zuordnung:** Swagger-Bereiche *Search*, *Search Graph*, *Candidates*, *Identities*, *Memory* und *Inventory*.
 
 ---
 
-## 3. CAS comparison — "Don't just give me the answer, give me the alternatives"
+## 3. Alternativen vergleichen — „Gib mir nicht nur ein Ergebnis“
 
-**Goal:** Use Equality-Saturation to share the entire rewrite space in a
-single e-graph, then compare cost models.
+**Ziel:** Unterschiedliche gültige Ergebnisformen und Rechenwege nach fachlichen oder didaktischen Kriterien vergleichen.
 
-1. Pick **Profil** `EQUALITY_SATURATION`.
-2. Switch between **Ziel** values (`SIMPLIFY`, `FACTORIZE`,
-   `NUMERICALLY_STABLE`) to extract a different canonical form from the
-   same saturated graph without re-running the search.
-3. Open the **Vergleich** tab to put two results side by side.
+1. Eine Suche mit dem gewünschten Profil starten.
+2. Im Tab **Pfade** mehrere Rechenwege öffnen und ihre Länge, Regeln und Annahmen prüfen.
+3. Im Tab **Graph** zwischen **Semantische Erklärung**, **Nur Hauptpfad**, **Complexity Map** und **Rohgraph** wechseln.
+4. Über **Ziel** eine andere Präferenz wählen, beispielsweise **Vereinfachen**, **Faktorisieren**, **Schulweg**, **Beweisfreundlich** oder **Numerisch stabil**.
+5. Im Tab **Vergleich** zwei Ergebnisse oder Pfade nebeneinanderstellen.
+6. Das Ergebnis auswählen, das zum konkreten Zweck passt, statt nur die formal kürzeste Form zu übernehmen.
 
-See [`docs/equality-saturation.md`](equality-saturation.md) for the
-underlying e-graph mechanics.
+**Sichtbares Ergebnis:** Unterschiede in Ergebnisform, Rechenweg, Komplexität, Annahmen und Eignung werden direkt vergleichbar.
 
----
-
-## 4. Proof workflow — "Submit, watch, download artefacts"
-
-**Goal:** Take a rule candidate, prove it asynchronously with Lean/SMT,
-and download the artefact bundle.
-
-1. Open **Proof-Jobs** tab.
-2. Enter `leftPattern`, `rightPattern`, optional assumptions and
-   priority. Click **Job einreichen**.
-3. The job appears in the list with its current status. Use
-   **Aktualisieren** to refresh, **Cancel** to interrupt.
-4. Click **Artefakte** on any finished job to inspect / download the
-   bundle (`proof.lean` / `proof.smt2`, `stdout.txt`, `stderr.txt`,
-   `metadata.json`).
-
-REST equivalent:
-
-```http
-POST   /api/proof/jobs          # submit
-GET    /api/proof/jobs          # list
-GET    /api/proof/jobs/{id}     # detail
-POST   /api/proof/jobs/{id}/cancel
-GET    /api/proof/jobs/{id}/artifacts          # bundle file list
-GET    /api/proof/jobs/{id}/artifacts/{name}   # raw file
-```
-
-E2E coverage: `ProofJobsApiTest`. See
-[`docs/proof-workbench.md`](proof-workbench.md) for the configuration
-knobs (`REGELSUCHE_PROOF_*` env vars) and the Docker image
-(`Dockerfile.proof`) that ships Z3 + cvc5 preinstalled.
+**Technische Zuordnung:** Swagger-Bereiche *Search*, *Paths*, *Search Graph* und *Compare*.
 
 ---
 
-## Goal dropdown
+## 4. Proof-Workflow — „Einreichen, verfolgen, Artefakte prüfen“
 
-Every workflow can be biased toward a particular `TransformationGoal`
-without changing the search profile:
+**Ziel:** Eine Identität oder Regel asynchron mit Lean beziehungsweise SMT prüfen und die erzeugten Artefakte nachvollziehen.
 
-| Goal | When to pick it |
+1. Nach dem ersten Suchlauf den Tab **Proof-Jobs** öffnen.
+2. Linkes und rechtes Pattern, optionale Annahmen und die Priorität eingeben.
+3. **Job einreichen** wählen.
+4. Den neuen Eintrag in der Jobliste verfolgen und bei Bedarf mit **Aktualisieren** den Zustand neu laden.
+5. Einen nicht mehr benötigten laufenden Auftrag über **Abbrechen** stoppen.
+6. Bei einem abgeschlossenen Job **Artefakte** öffnen. Beweisskript, Standardausgabe, Fehlerausgabe und Metadaten getrennt prüfen oder herunterladen.
+
+**Sichtbares Ergebnis:** Ein persistenter, verständlich gekennzeichneter Jobzustand mit reproduzierbarem Artefakt-Bundle. Ein Browser-E2E-Test belegt den vollständigen Bedienfluss; reale Solverläufe werden zusätzlich unabhängig getestet.
+
+**Technische Zuordnung:** Swagger-Bereich *Proof Jobs*. Konfiguration und Betriebsgrenzen beschreibt [Proof Workbench](proof-workbench.md).
+
+---
+
+## 5. Qualität bewerten — „Welche Szenarien funktionieren wirklich?“
+
+**Ziel:** Den aktuellen Funktionsstand nicht anhand einzelner Erfolgsmeldungen, sondern anhand reproduzierbarer Szenarien und Qualitätsmetriken beurteilen.
+
+1. Den Tab **Benchmark** öffnen.
+2. Den Benchmark-Lauf über die dort angebotene Aktion starten oder aktualisieren.
+3. Pro Szenario den Ampelstatus und die fachlichen Prüfpunkte betrachten: Wurde ein Ergebnis gefunden, stimmt es mit der Erwartung überein und welcher Proof-Status wurde erreicht?
+4. Zusätzlich Suchaufwand und Strukturmetriken wie besuchte beziehungsweise verworfene Zustände, E-Graph-Klassen, Einsparungen und verwendete gelernte Regeln vergleichen.
+5. Auffällige Szenarien über **Workbench**, **Graph**, **Pfade** und **Replay** gezielt nachvollziehen.
+
+**Sichtbares Ergebnis:** Eine Qualitätsübersicht, die Erfolg, Belegstatus und Suchaufwand zusammenführt und problematische Szenarien in konkrete Untersuchungsschritte überführt.
+
+**Technische Zuordnung:** Swagger-Bereich *Benchmark*.
+
+---
+
+## 6. Regeln bearbeiten — „Eine Regel kontrolliert entwickeln“
+
+**Ziel:** Eine Regel nicht als rohen REST-Aufruf, sondern über einen sichtbaren Erstellungs-, Prüf- und Übernahmeprozess bearbeiten.
+
+1. Den Tab **Rule-IDE** öffnen.
+2. Regelname, linkes und rechtes Pattern, Domäne und erforderliche Annahmen in den vorgesehenen Feldern erfassen.
+3. Die Regel validieren und die Vorschau beziehungsweise Testfälle prüfen.
+4. Fehlerhinweise an den betroffenen Feldern korrigieren, statt eine rohe Serverantwort interpretieren zu müssen.
+5. Eine erfolgreiche Regel in den vorgesehenen kontrollierten Übernahmeprozess geben.
+6. Das Ergebnis anschließend im **Inventar** prüfen und bei Bedarf taggen oder deaktivieren.
+
+**Sichtbares Ergebnis:** Ein nachvollziehbarer Autorenfluss mit Validierung, Testresultat, Übernahmestatus und auffindbarem Inventareintrag.
+
+**Technische Zuordnung:** Swagger-Bereiche *Rules*, *Plugins* und *Inventory*.
+
+---
+
+## Zielauswahl im Workbench-Tab
+
+Die Auswahl **Ziel** beeinflusst, welche Ergebnisform bevorzugt wird, ohne dass Nutzerinnen und Nutzer einen technischen Request bearbeiten müssen.
+
+| Sichtbare Auswahl | Geeignet für |
 | --- | --- |
-| `SIMPLIFY` | Default — shortest / smallest result. |
-| `FACTORIZE` | Prefer factored form over expanded polynomials. |
-| `TEACHING_FRIENDLY` | School-book style: small coefficients, shallow nesting. |
-| `PROOF_FRIENDLY` | Prefer shapes that simplify case analysis. |
-| `NUMERICALLY_STABLE` | Prefer Horner-style / well-conditioned forms. |
+| **Vereinfachen** | Kurze oder kleine Ergebnisform als allgemeiner Standard |
+| **Faktorisieren** | Faktorisierte statt expandierter Polynomform |
+| **Schulweg** | Kleine Schritte, überschaubare Koeffizienten und geringe Verschachtelung |
+| **Beweisfreundlich** | Formen, die Fallunterscheidungen oder formale Beweise erleichtern |
+| **Numerisch stabil** | Gut konditionierte beziehungsweise Horner-artige Formen |
 
-Surfaces:
+Bleibt das Feld auf **vom Profil**, verwendet die Workbench die zum gewählten Profil passende Voreinstellung.
 
-- UI: the **Ziel** dropdown next to **Profil** on the Workbench tab.
-- API: `POST /api/search` accepts `"goal": "..."`. Omitting it falls
-  back to the profile's default goal.
+## Einstieg für neue Nutzerinnen und Nutzer
 
----
+Vor der ersten Suche zeigt die Startseite bewusst nur den primären Einstieg und den Demo-Bereich. Weiterführende Tabs wie **Graph**, **Replay**, **Proof-Jobs**, **Benchmark** und **Exporte** werden nach dem ersten Suchlauf beziehungsweise nach dem Start einer Demo sichtbar. Dadurch beginnt der Ablauf mit einer mathematischen Aufgabe statt mit einer technischen Funktionsliste.
 
-## Landing page entry flow
+## REST-Nutzung
 
-Newcomers see a deliberately reduced landing page: only the workbench
-entry tab is visible, with one primary form
-(_Ausdruck eingeben → Ziel wählen → Suche starten_) and the demo tile
-grid below it. Downstream tabs (`Graph`, `Replay`, `Proof-Jobs`,
-`Export`, `Benchmark`, …) are hidden by CSS (`body.pre-search`) until
-the user starts their first search or clicks a demo tile — see
-[`LandingPageBrowserFlowTest`](../app/src/e2eTest/java/de/regelsuche/e2e/LandingPageBrowserFlowTest.java)
-for the acceptance tests.
-
-## Proof workbench workflow
-
-For a step-by-step proof workflow including the browser flow that
-captures the screenshot below, see
-[Proof Workbench](proof-workbench.md). A typical run from the UI:
-
-1. Open the **Proof-Jobs** tab (revealed automatically after the first
-   search).
-2. Enter `Left = a + 0`, `Right = a`, click **Job einreichen**.
-3. The job appears in the list with a polled status; opening _Artefakte_
-   shows the persisted `proof.smt2` / `proof.lean` / `metadata.json`.
-
-![Proof-Job-Panel](assets/screenshots/proof-job-panel.png)
-
-## Benchmark quality dashboard
-
-The **Benchmark** tab and
-[`docs/benchmark-report.md`](benchmark-report.md) surface, per scenario:
-
-- ✅ / ⚠️ / ❌ Ampelstatus
-- `found`, `expectedResultMatched`, `proofStatus`
-- `visitedStates`, `prunedStates`, `eGraphClasses`, `eGraphNodes`
-- `saturationSavings`, `learnedRuleUsed`, `exportBundleValid`
-
-`./gradlew benchmarkReport` regenerates the Markdown report and the
-machine-readable
-[`docs/assets/benchmark-summary.json`](assets/benchmark-summary.json);
-CI uploads both as `benchmark-report` / `benchmark-summary` artefacts.
+Direkte Integrationen verwenden die Swagger/OpenAPI-Dokumentation der laufenden Installation. Diese Seite bleibt auch dann unverändert, wenn sich ein HTTP-Pfad oder ein JSON-Schema ändert, solange der sichtbare GUI-Ablauf gleich bleibt. Die verbindliche Regel steht in der [Dokumentationskonvention](documentation-conventions.md).
