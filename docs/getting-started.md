@@ -40,14 +40,17 @@ Erfordert JDK 21. Der Server bindet auf
 3. **Suchraum verstehen.** Im Tab **Graph** zwischen semantischer Erklärung,
    Hauptpfad, Complexity Map und Rohgraph wechseln. Filter und Schalter blenden
    Alternativen, triviale Schritte und Varianten gezielt ein oder aus.
-4. **Schritte nachvollziehen.** Im Tab **Replay** den gewählten Rechenweg
+4. **Lokale Züge untersuchen.** Im Tab **AST-Regelradar** den Ausdruck als Baum
+   öffnen, einen AST-Knoten auswählen und die dort konkret anwendbaren Grund-,
+   Erweiterungs- und Makroregeln samt Bindungen, Annahmen und Vorschau prüfen.
+5. **Schritte nachvollziehen.** Im Tab **Replay** den gewählten Rechenweg
    schrittweise abspielen und hervorgehobene Änderungen sowie Annahmen prüfen.
-5. **Ergebnisse bewerten.** Die Tabs **Regelkandidaten**, **Identitäten**,
+6. **Ergebnisse bewerten.** Die Tabs **Regelkandidaten**, **Identitäten**,
    **Dashboard**, **Benchmark**, **Vergleich** und **Suchgedächtnis** zeigen
    wiederkehrende Strukturen, Qualitätsmerkmale und alternative Ergebnisse.
-6. **Weiterverwenden.** Über **Inventar**, **Proof-Jobs**, **Exporte**,
-   **Didaktik** und **Rule-IDE** lassen sich Regeln verwalten, Beweisaufträge
-   ausführen, Ergebnisse herunterladen und fachliche Erweiterungen bearbeiten.
+7. **Weiterverwenden.** Über **Inventar**, **Proof-Jobs**, **Exporte** und
+   **Didaktik** lassen sich Regeln verwalten, Beweisaufträge ausführen,
+   Ergebnisse herunterladen und Lernwege untersuchen.
 
 Der ausführliche, rollenbezogene Ablauf steht unter
 [User Workflows](user-workflows.md); alle Bedienelemente beschreibt das
@@ -63,21 +66,29 @@ beschreibt den grafischen Einstieg in dieselben Funktionen.
 Die verbindliche Trennung ist in der
 [Dokumentationskonvention](documentation-conventions.md) festgehalten.
 
-## Optional: Full Mode mit Neo4j
+## Optional: Full Mode mit PostgreSQL und Neo4j
 
 ```bash
 docker compose up --build
 ```
 
-Startet App + Neo4j 5 Community + persistentes Volume und setzt
-`NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD` automatisch. Die App schaltet
-dann den `REMOTE_NEO4J`-Persistenzmodus aktiv (siehe
-[Architektur](architecture.md)).
+Der Compose-Start ergänzt den lokalen Demo-Modus um PostgreSQL, Hibernate ORM,
+Hibernate Search und ein persistentes Volume. Neo4j bleibt ein optionales Profil
+für mathematische Graph-Provenance:
+
+```bash
+docker compose --profile neo4j up --build
+```
+
+Details stehen in [Persistenz](persistence.md) und
+[Storage Architecture](storage-architecture.md).
 
 ## Nächste Schritte
 
 - [Web-Workbench](web-workbench.md) – Bedienbereiche, sichtbare Ergebnisse und technische Zuordnung.
+- [Web-Workbench-Benutzerhandbuch](web-ui-user-guide.md) – Aktuelle Tabs, Eingaben und Rückmeldungen.
 - [User Workflows](user-workflows.md) – Geführte Abläufe für Lernen, Discovery, Vergleich, Proof und Export.
+- [AST-Regelradar](ast-rule-radar.md) – Lokale, positionsgebundene Regelanwendungen im Ausdrucksbaum.
 - [Demo-Gallery](demo-gallery.md) – Visuelle Übersicht aller Flows.
 - [Architektur](architecture.md) – Leitplanken und Überblick.
 - [Modulstruktur](module-structure.md) – Logische Module und Paketmapping.
