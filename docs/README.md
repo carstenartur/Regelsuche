@@ -126,7 +126,6 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 - [Developer Guide](developer-guide.md)
 - [Testing](testing.md)
 - [Testing-Strategie](testing-strategy.md)
-- [Dokumentationskonvention](documentation-conventions.md) — GUI-zentrierte Nutzertexte und Swagger/OpenAPI als einzige REST-Vertragsquelle.
 - [Documentation Quality Checklist](documentation-quality-checklist.md)
 
 ## Betrieb und Integration
