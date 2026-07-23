@@ -97,6 +97,11 @@ gradle.beforeProject { candidate ->
             settingsDir,
             'gradle/candidate-independent-benchmark-execution-v2.gradle')
     }
+    if (candidate.path == ':app') {
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/swagger-ui-assets.gradle')
+    }
 }
 
 rootProject.name = 'Regelsuche'

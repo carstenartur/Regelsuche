@@ -1,0 +1,29 @@
+def swaggerUiVersion = '5.32.8'
+def swaggerUiConfiguration = configurations.maybeCreate('swaggerUiWebAssets')
+def swaggerUiGeneratedResources = layout.buildDirectory.dir('generated-resources/swagger-ui')
+
+dependencies.add(swaggerUiConfiguration.name, "org.webjars:swagger-ui:${swaggerUiVersion}")
+
+def vendorSwaggerUiAssets = tasks.register('vendorSwaggerUiAssets', Sync) {
+    description = 'Extracts the pinned Swagger UI WebJar into generated classpath resources.'
+    group = 'build setup'
+    from({ zipTree(swaggerUiConfiguration.singleFile) }) {
+        def prefix = "META-INF/resources/webjars/swagger-ui/${swaggerUiVersion}/"
+        include prefix + 'swagger-ui.css'
+        include prefix + 'swagger-ui-bundle.js'
+        include prefix + 'swagger-ui-standalone-preset.js'
+        include prefix + 'LICENSE'
+        eachFile { file ->
+            file.path = 'web/openapi/vendor/' + file.path.substring(prefix.length())
+        }
+        includeEmptyDirs = false
+    }
+    into(swaggerUiGeneratedResources)
+}
+
+plugins.withId('java') {
+    sourceSets.main.resources.srcDir(swaggerUiGeneratedResources)
+    tasks.named('processResources') {
+        dependsOn vendorSwaggerUiAssets
+    }
+}
