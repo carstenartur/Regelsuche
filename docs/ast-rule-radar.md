@@ -1,8 +1,8 @@
 # AST-Regelradar: Wie Regelsuche einen Ausdruck untersucht
 
-- Status: Architektur- und Visualisierungsentwurf
-- Geltungsbereich: Ausdrucks-AST, lokale Regelanwendungen, gelernte Makroregeln und globaler Suchgraph
-- Abgrenzung: Diese Seite beschreibt sowohl den bereits vorhandenen Kern als auch die noch fehlende einheitliche Visualisierungsschicht. Abweichungen sind ausdrücklich als Zielbild markiert.
+- Status: Implementiert (`regelsuche.ast-rule-radar/v1`)
+- Geltungsbereich: Ausdrucks-AST, lokale Regelanwendungen, gelernte Makroregeln und korrelierter begrenzter Suchgraph
+- Abgrenzung: Die Ansicht zeigt die tatsächlich vom Backend enumerierten Kandidaten im gewählten endlichen Kontext. Sie behauptet weder mathematische Vollständigkeit noch formalen Beweis.
 
 ## Kernaussage
 
@@ -54,7 +54,7 @@ E1 = (x + 1)^2
 `E0` und `E1` sind Knoten im globalen Suchgraphen. Die angewandte lokale Umformung ist
 die gerichtete Kante zwischen ihnen.
 
-Der vorhandene Suchgraph und das vorgeschlagene AST-Regelradar konkurrieren daher
+Der vorhandene Suchgraph und das implementierte AST-Regelradar konkurrieren daher
 nicht miteinander:
 
 - Das **AST-Regelradar** erklärt, welche nächsten Züge innerhalb eines Zustands möglich
@@ -273,13 +273,13 @@ Folgezuständen.
 | begrenzte Suche über vollständige Zustände | [`CountableMoveSearchEngine`](../app/src/main/java/de/regelsuche/moves/search/CountableMoveSearchEngine.java) und weitere Strategien | vorhanden |
 | gelernte Regeln als ausführbare Suchzüge verwenden | [`MacroMoveTransformationEngine`](../app/src/main/java/de/regelsuche/mining/MacroMoveTransformationEngine.java) | vorhanden |
 | atomaren Makropfad für Replay bewahren | `MacroMoveExpansion` | vorhanden |
-| AST-Knoten mit einem einheitlichen Regelkreis visualisieren | noch keine gemeinsame produktive Ansicht | fehlt |
-| Grund-, Plugin- und Makroregeln in einem positionsbezogenen Visualisierungs-DTO vereinigen | derzeit mehrere vorhandene Pfade und DTOs | teilweise |
-| Auswahl-, Pruning- und Ausführungsstatus jedes Punkts live darstellen | Suchmetriken vorhanden, aber nicht an ein AST-Regelradar gebunden | fehlt |
+| AST-Knoten mit einem einheitlichen Regelkreis visualisieren | `AstRuleRadarService`, `/api/rule-radar/inspect`, `rule-radar.js` | implementiert |
+| Grund-, Knowledge-Pack-, Regeldatei-, Plugin- und Makroregeln in einem positionsbezogenen DTO vereinigen | `AstRuleRadar.ApplicableMove` mit stabiler Candidate-ID | implementiert |
+| Auswahl-, Pruning- und Ausführungsstatus jedes Punkts live darstellen | `/api/rule-radar/search` und bidirektionale UI-Korrelation | implementiert |
 
-## Zielarchitektur der Visualisierung
+## Implementierte Architektur der Visualisierung
 
-Die Visualisierung sollte keine eigene Mathematik- oder Matchinglogik enthalten. Sie
+Die Visualisierung enthält keine eigene Mathematik- oder Matchinglogik. Sie
 konsumiert ein Backend-Modell, das aus den bestehenden Rewrite-, Inspection-, Search-
 und Macro-Komponenten zusammengesetzt wird.
 
@@ -304,12 +304,12 @@ AstRuleRadarDto
           └─ Export / Accessibility
 ```
 
-Der neue Integrationspunkt sollte bestehende Komponenten adaptieren, nicht parallel
-neu implementieren.
+Der Integrationspunkt adaptiert bestehende Komponenten, statt Matching und Rewrite parallel
+neu zu implementieren.
 
 ## Interaktion in der Weboberfläche
 
-Eine geeignete erste produktive Ansicht besitzt folgende Eigenschaften:
+Die produktive Ansicht besitzt folgende Eigenschaften:
 
 1. Der Ausdruck wird als zoombarer Baum gezeigt.
 2. Jeder Knoten besitzt einen Regelkreis; bei vielen Kandidaten wird geclustert oder
@@ -365,7 +365,7 @@ lokaler Züge.
 - Die AST-Ansicht ersetzt weder E-Graph noch globalen Suchgraph.
 - Die UI darf keine eigenen, vom Backend abweichenden Regelmatches berechnen.
 
-## Empfohlene Umsetzungsschritte
+## Umgesetzte Schritte
 
 1. Ein kanonisches `ApplicableMove`-/`AstRuleRadarDto`-Modell definieren.
 2. `RuleInspectionService`, `AstRewriteTransformationEngine` und
@@ -380,6 +380,12 @@ lokaler Züge.
 7. Replay und globalen Suchgraph bidirektional mit `TreePosition` und Kandidaten-ID
    verknüpfen.
 8. Screenshot-, DTO-, Determinismus- und Accessibility-Tests ergänzen.
+
+## API- und Evidence-Verträge
+
+- [`regelsuche.ast-rule-radar/v1`](schemas/regelsuche-ast-rule-radar-v1.schema.json) beschreibt AST, Kandidaten und Trunkierung.
+- [`regelsuche.ast-rule-radar-search/v1`](schemas/regelsuche-ast-rule-radar-search-v1.schema.json) beschreibt Zustände, Kanten und Kandidatenereignisse.
+- `RuleRadarBrowserFlowTest` erzeugt bei `-Pregelsuche.recordDocs=true` den Screenshot `docs/assets/screenshots/ast-rule-radar.png`; der statische Entwurf oben bleibt als erklärendes Architekturdiagramm erhalten.
 
 ## Verwandte Dokumentation
 

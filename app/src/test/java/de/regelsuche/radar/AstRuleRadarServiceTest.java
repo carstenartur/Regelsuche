@@ -1,0 +1,262 @@
+package de.regelsuche.radar;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import de.regelsuche.graph.InMemoryExpressionGraphStore;
+import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.knowledge.RuleProfile;
+import de.regelsuche.mining.RuleStatus;
+import de.regelsuche.plugin.PluginRuntimeConfig;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+class AstRuleRadarServiceTest {
+    private InMemoryRuleInventoryRepository inventory;
+    private AstRuleRadarService service;
+
+    @BeforeEach
+    void setUp() {
+        inventory = new InMemoryRuleInventoryRepository();
+        inventory.save(binomialMacro());
+        service = new AstRuleRadarService(
+            inventory,
+            new InMemoryExpressionGraphStore(),
+            PluginRuntimeConfig.defaults()
+        );
+    }
+
+    @AfterEach
+    void tearDown() {
+        service.close();
+    }
+
+    @Test
+    void exposesCompleteAstAndConcretePositionBoundCandidates() {
+        AstRuleRadar.Snapshot snapshot = service.inspect("(x + 1)^2 + 0", AstRuleRadar.Context.defaults());
+
+        assertTrue(snapshot.valid(), snapshot.diagnostics().toString());
+        assertTrue(snapshot.nodes().stream().anyMatch(node -> "root".equals(node.pathKey()) && "+".equals(node.label())));
+        assertTrue(snapshot.nodes().stream().anyMatch(node -> "000".equals(node.pathKey()) && "^".equals(node.label())));
+        assertTrue(snapshot.nodes().stream().anyMatch(node -> "000.000.000".equals(node.pathKey()) && "x".equals(node.label())));
+
+        AstRuleRadar.ApplicableMove addZero = snapshot.candidates().stream()
+            .filter(candidate -> "root".equals(candidate.pathKey()))
+            .filter(candidate -> "ast_add_zero_right".equals(candidate.ruleId()))
+            .findFirst().orElseThrow();
+        assertEquals("CORE", addZero.origin().name());
+        assertTrue(addZero.applicable());
+        assertFalse(addZero.candidateId().isBlank());
+        assertFalse(addZero.expressionAfter().contains("+ 0"));
+
+        assertTrue(snapshot.candidates().stream()
+            .anyMatch(candidate -> "000".equals(candidate.pathKey())
+                && "ast_power_two_to_product".equals(candidate.ruleId())),
+            "atomic power expansion must be visible at the power subtree");
+        assertTrue(snapshot.candidates().stream()
+            .anyMatch(candidate -> "000".equals(candidate.pathKey())
+                && candidate.origin() == AstRuleRadar.RuleOrigin.LEARNED_MACRO
+                && "macro_test_binomial".equals(candidate.ruleId())),
+            "qualified learned macro must coexist at the same power subtree");
+    }
+
+    @Test
+    void exposesParameterizedCompleteSquareAtTheNestedQuadraticPosition() {
+        AstRuleRadar.Snapshot snapshot = service.inspect(
+            "sin(x^2 + 6*x + 5)",
+            AstRuleRadar.Context.defaults());
+
+        AstRuleRadar.ApplicableMove completeSquare = snapshot.candidates().stream()
+            .filter(candidate -> "COMPLETE_SQUARE".equals(candidate.displayName()))
+            .findFirst().orElseThrow();
+        assertTrue(completeSquare.applicable());
+        assertEquals("000", completeSquare.pathKey());
+        assertTrue(completeSquare.subtreeBefore().contains("x ^ 2"));
+        assertTrue(completeSquare.subtreeAfter().contains("(x + 3) ^ 2"));
+        assertTrue(completeSquare.expressionAfter().startsWith("sin("));
+        assertTrue(completeSquare.bindings().stream()
+            .anyMatch(binding -> "shift".equals(binding.name()) && "3".equals(binding.value())));
+    }
+
+    @Test
+    void candidateIdentityAndOrderingAreStableForFrozenContext() {
+        AstRuleRadar.Snapshot first = service.inspect("(x + 1)^2 + 0", AstRuleRadar.Context.defaults());
+        AstRuleRadar.Snapshot second = service.inspect("(x + 1)^2 + 0", AstRuleRadar.Context.defaults());
+
+        assertEquals(
+            first.candidates().stream().map(AstRuleRadar.ApplicableMove::candidateId).toList(),
+            second.candidates().stream().map(AstRuleRadar.ApplicableMove::candidateId).toList());
+
+        Map<String, List<String>> orderingKeysByPosition = first.candidates().stream()
+            .collect(java.util.stream.Collectors.groupingBy(
+                AstRuleRadar.ApplicableMove::pathKey,
+                LinkedHashMap::new,
+                java.util.stream.Collectors.mapping(AstRuleRadar.ApplicableMove::orderingKey,
+                    java.util.stream.Collectors.toList())));
+        orderingKeysByPosition.forEach((path, keys) -> assertEquals(
+            keys.stream().sorted().toList(),
+            keys,
+            "candidate order must be deterministic at position " + path));
+    }
+
+    @Test
+    void everyDisplayedApplicableCandidateResolvesToItsAdvertisedSuccessor() {
+        AstRuleRadar.Context context = AstRuleRadar.Context.defaults();
+        AstRuleRadar.Snapshot snapshot = service.inspect("(x + 1)^2 + 0", context);
+
+        for (AstRuleRadar.ApplicableMove displayed : snapshot.candidates().stream()
+            .filter(AstRuleRadar.ApplicableMove::applicable)
+            .toList()) {
+            AstRuleRadar.ApplicableMove resolved = service.resolve(
+                snapshot.expression(), displayed.candidateId(), context).orElseThrow();
+            assertEquals(displayed.candidateId(), resolved.candidateId());
+            assertEquals(displayed.pathKey(), resolved.pathKey());
+            assertEquals(displayed.ruleId(), resolved.ruleId());
+            assertEquals(displayed.expressionAfter(), resolved.expressionAfter());
+        }
+    }
+
+    @Test
+    void bindingsOriginValidationAndMacroEvidenceCannotDisappear() {
+        AstRuleRadar.ApplicableMove macro = service.inspect("(x + 1)^2 + 0", AstRuleRadar.Context.defaults())
+            .candidates().stream()
+            .filter(candidate -> candidate.origin() == AstRuleRadar.RuleOrigin.LEARNED_MACRO)
+            .findFirst().orElseThrow();
+
+        assertEquals("VALIDATED_BY_EXAMPLES", macro.validationStatus());
+        assertTrue(macro.bindings().stream().anyMatch(binding -> "A".equals(binding.name())));
+        assertTrue(macro.bindings().stream().anyMatch(binding -> "B".equals(binding.name())));
+        assertNotNull(macro.macroEvidence());
+        assertEquals("test_binomial", macro.macroEvidence().reusableRuleId());
+        assertEquals(List.of("supporting-path-1"), macro.macroEvidence().supportingPathIds());
+    }
+
+    @Test
+    void rejectedAssumptionIsVisibleButNotExecutable() {
+        inventory.save(assumptionMacro());
+
+        AstRuleRadar.ApplicableMove rejected = service.inspect("x / x", AstRuleRadar.Context.defaults())
+            .candidates().stream()
+            .filter(candidate -> "macro_assumption_macro".equals(candidate.ruleId()))
+            .findFirst().orElseThrow();
+        assertFalse(rejected.applicable());
+        assertEquals(AstRuleRadar.CandidateOutcome.REJECTED_ASSUMPTION, rejected.outcome());
+        assertEquals(List.of("A != 0"), rejected.assumptions());
+    }
+
+    @Test
+    void rejectedCandidatesCanBeExcludedFromTheSnapshot() {
+        inventory.save(assumptionMacro());
+
+        AstRuleRadar.Snapshot snapshot = service.inspect("x / x", context(false, Map.of()));
+
+        assertFalse(snapshot.candidates().stream()
+            .anyMatch(candidate -> "macro_assumption_macro".equals(candidate.ruleId())));
+        assertTrue(snapshot.candidates().stream().allMatch(AstRuleRadar.ApplicableMove::applicable));
+    }
+
+    @Test
+    void emptyOutcomeKeyCannotOverrideEveryOrdinaryCandidate() {
+        AstRuleRadar.Snapshot snapshot = service.inspect(
+            "x + 0",
+            context(true, Map.of("", AstRuleRadar.CandidateOutcome.APPLIED)));
+
+        AstRuleRadar.ApplicableMove addZero = snapshot.candidates().stream()
+            .filter(candidate -> "ast_add_zero_right".equals(candidate.ruleId()))
+            .filter(candidate -> "root".equals(candidate.pathKey()))
+            .findFirst().orElseThrow();
+        assertEquals(AstRuleRadar.CandidateOutcome.AVAILABLE, addZero.outcome());
+    }
+
+    @Test
+    void candidateBudgetsReportExactOmittedCounts() {
+        AstRuleRadar.Context context = new AstRuleRadar.Context(
+            RuleProfile.CORE,
+            Set.of(), Set.of(),
+            false, true,
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            "DISCOVERY", "",
+            1, 2,
+            List.of(), true, "", Map.of());
+
+        AstRuleRadar.Snapshot snapshot = service.inspect("(x + 1)^2 + 0", context);
+        assertTrue(snapshot.truncation().truncated());
+        assertEquals(snapshot.truncation().generatedCandidateCount(),
+            snapshot.truncation().returnedCandidateCount() + snapshot.truncation().omittedCandidateCount());
+        assertTrue(snapshot.nodes().stream().anyMatch(node -> node.omittedCandidateCount() > 0));
+    }
+
+    @Test
+    void invalidInputReturnsStructuredDiagnostic() {
+        AstRuleRadar.Snapshot snapshot = service.inspect("(((", AstRuleRadar.Context.defaults());
+        assertFalse(snapshot.valid());
+        assertTrue(snapshot.nodes().isEmpty());
+        assertEquals("INVALID_EXPRESSION", snapshot.diagnostics().getFirst().code());
+    }
+
+    private AstRuleRadar.Context context(
+        boolean includeRejectedCandidates,
+        Map<String, AstRuleRadar.CandidateOutcome> outcomes
+    ) {
+        return new AstRuleRadar.Context(
+            RuleProfile.CORE,
+            Set.of(), Set.of(),
+            false, true,
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            "DISCOVERY", "",
+            24, 240,
+            List.of(), includeRejectedCandidates, "", outcomes);
+    }
+
+    private ReusableRule assumptionMacro() {
+        return new ReusableRule(
+            "assumption_macro",
+            "A / A",
+            "1",
+            List.of(),
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            RuleStatus.NEW,
+            2,
+            2.0,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            "assumption-hash",
+            null,
+            0,
+            3,
+            List.of(),
+            0.9,
+            List.of("A != 0")
+        );
+    }
+
+    private ReusableRule binomialMacro() {
+        return new ReusableRule(
+            "test_binomial",
+            "(A + B)^2",
+            "A^2 + 2*A*B + B^2",
+            List.of(),
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            RuleStatus.NEW,
+            3,
+            4.0,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            "binomial-hash",
+            null,
+            0,
+            4,
+            List.of("supporting-path-1"),
+            0.95,
+            List.of()
+        );
+    }
+}

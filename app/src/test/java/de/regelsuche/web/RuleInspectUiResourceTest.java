@@ -10,12 +10,25 @@ import org.junit.jupiter.api.Test;
 class RuleInspectUiResourceTest {
 
     @Test
-    void ruleIdeDisplaysFullExpressionAfter() throws IOException {
-        try (var stream = getClass().getResourceAsStream("/web/app.js")) {
-            assertNotNull(stream, "web/app.js resource must exist");
-            String script = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            assertTrue(script.contains("match.expressionAfter"), script);
-            assertTrue(script.contains("Gesamtausdruck nachher"), script);
+    void legacyRuleIdeDisplaysFullExpressionAfter() throws IOException {
+        String script = resource("/web/app.js");
+        assertTrue(script.contains("match.expressionAfter"), script);
+        assertTrue(script.contains("Gesamtausdruck nachher"), script);
+    }
+
+    @Test
+    void astRadarOnlyAppliesTheNewestInspectionResponse() throws IOException {
+        String script = resource("/web/rule-radar.js");
+        assertTrue(script.contains("inspectionSequence: 0"), script);
+        assertTrue(script.contains("const requestSequence = ++state.inspectionSequence"), script);
+        assertTrue(script.contains("requestSequence !== state.inspectionSequence"), script);
+        assertTrue(script.contains("requestSequence === state.inspectionSequence"), script);
+    }
+
+    private String resource(String path) throws IOException {
+        try (var stream = getClass().getResourceAsStream(path)) {
+            assertNotNull(stream, path + " resource must exist");
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 }

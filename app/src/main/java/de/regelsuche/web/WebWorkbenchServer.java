@@ -75,6 +75,7 @@ public class WebWorkbenchServer {
     private final TransformationExportService exportService;
     private final WebSecurityConfig securityConfig;
     private final PluginRuntimeConfig pluginRuntimeConfig;
+    private final de.regelsuche.radar.RuleRadarHttpHandler ruleRadarHandler;
 
     private final TransformationQueryService transformationQuery;
     private final RuleInventoryQueryService inventoryQuery;
@@ -207,6 +208,8 @@ public class WebWorkbenchServer {
         this.didacticEventStore = createDidacticEventStore();
         this.didacticAnalytics = new de.regelsuche.didactic.analytics.DidacticAnalyticsService(didacticEventStore);
         this.didacticStepValidator = new de.regelsuche.didactic.StudentStepValidator(new SymPyEquivalenceService());
+        this.ruleRadarHandler = new de.regelsuche.radar.RuleRadarHttpHandler(
+            inventoryRepository, graphStore, this.pluginRuntimeConfig);
     }
 
     private static de.regelsuche.proof.ProofBridgeService defaultProofBridgeService(
@@ -278,6 +281,7 @@ public class WebWorkbenchServer {
         secure(server.createContext("/api/benchmark", this::handleBenchmark));
         secure(server.createContext("/api/didactic", this::handleDidactic));
         secure(server.createContext("/api/inspect", this::handleInspect));
+        secure(server.createContext("/api/rule-radar", ruleRadarHandler));
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
@@ -338,6 +342,7 @@ public class WebWorkbenchServer {
         if (server != null) {
             server.stop(0);
         }
+        ruleRadarHandler.close();
     }
 
     public int boundPort() {
@@ -2731,7 +2736,11 @@ public class WebWorkbenchServer {
         } else if (path.startsWith("/static/")) {
             String resource = "/web" + path.substring("/static".length());
             sendStaticResource(exchange, resource, mimeFor(resource));
-        } else if (path.startsWith("/vendor/") || path.equals("/app.js") || path.equals("/style.css")) {
+        } else if (path.startsWith("/vendor/")
+            || path.equals("/app.js")
+            || path.equals("/style.css")
+            || path.equals("/rule-radar.js")
+            || path.equals("/rule-radar.css")) {
             sendStaticResource(exchange, "/web" + path, mimeFor(path));
         } else {
             sendStatus(exchange, 404, "not found");
