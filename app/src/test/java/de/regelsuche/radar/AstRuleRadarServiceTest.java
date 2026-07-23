@@ -71,6 +71,24 @@ class AstRuleRadarServiceTest {
     }
 
     @Test
+    void exposesParameterizedCompleteSquareAtTheNestedQuadraticPosition() {
+        AstRuleRadar.Snapshot snapshot = service.inspect(
+            "sin(x^2 + 6*x + 5)",
+            AstRuleRadar.Context.defaults());
+
+        AstRuleRadar.ApplicableMove completeSquare = snapshot.candidates().stream()
+            .filter(candidate -> "COMPLETE_SQUARE".equals(candidate.displayName()))
+            .findFirst().orElseThrow();
+        assertTrue(completeSquare.applicable());
+        assertEquals("000", completeSquare.pathKey());
+        assertTrue(completeSquare.subtreeBefore().contains("x ^ 2"));
+        assertTrue(completeSquare.subtreeAfter().contains("(x + 3) ^ 2"));
+        assertTrue(completeSquare.expressionAfter().startsWith("sin("));
+        assertTrue(completeSquare.bindings().stream()
+            .anyMatch(binding -> "shift".equals(binding.name()) && "3".equals(binding.value())));
+    }
+
+    @Test
     void candidateIdentityAndOrderingAreStableForFrozenContext() {
         AstRuleRadar.Snapshot first = service.inspect("(x + 1)^2 + 0", AstRuleRadar.Context.defaults());
         AstRuleRadar.Snapshot second = service.inspect("(x + 1)^2 + 0", AstRuleRadar.Context.defaults());
