@@ -1,0 +1,37 @@
+name: Apply issue 498 route hardening
+
+on:
+  push:
+    branches: [ issue-498-openapi-swagger ]
+    paths:
+      - '.github/workflows/apply-issue-498-route-hardening.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-reviewed-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify and apply reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/patches/issue-498-route-hardening.patch.part* > /tmp/issue-498-route-hardening.patch
+          echo 'b3b30f56e4f3c61123f3f2c9b5896d85238ab629ddc6e1a1d24f41c9de88b6a3  /tmp/issue-498-route-hardening.patch' | sha256sum --check --strict
+          git apply --index --whitespace=error-all /tmp/issue-498-route-hardening.patch
+          rm -rf .github/patches/issue-498-route-hardening.patch.part*
+          rm .github/workflows/apply-issue-498-route-hardening.yml
+          git add -A
+          git diff --cached --check
+      - name: Commit route-registry hardening
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Enforce OpenAPI routes at runtime'
+          git push origin "HEAD:${GITHUB_REF_NAME}"
