@@ -66,8 +66,18 @@ class RuleAuthoringBrowserFlowTest {
         page.locator("#radarExpression").fill("sin(x^2+6*x+5)");
         page.locator("#radarInspect").click();
 
+        // The radar performs an automatic inspection during initialization. Waiting
+        // merely for any row can therefore observe the default expression instead
+        // of the explicitly requested nested quadratic. Synchronize on the
+        // expression-specific result that this flow is intended to exercise.
         page.waitForFunction(
-            "() => document.querySelectorAll('#radarCandidateRows tr button').length > 0",
+            "() => {"
+                + " const status = document.querySelector('#radarStatus');"
+                + " const rows = Array.from(document.querySelectorAll('#radarCandidateRows tr'));"
+                + " return status"
+                + "   && !status.textContent.includes('werden im Backend berechnet')"
+                + "   && rows.some(row => row.textContent.includes('COMPLETE_SQUARE'));"
+                + " }",
             null,
             new Page.WaitForFunctionOptions().setTimeout(30_000));
 
