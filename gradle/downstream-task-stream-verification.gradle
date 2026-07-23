@@ -75,6 +75,7 @@ def verifyDownstreamTaskStream = tasks.register(
     doFirst {
         commandLine downstreamStreamPython.get().absolutePath,
             downstreamStreamVerifier.asFile.absolutePath,
+            '--generator', downstreamStreamGenerator.asFile.absolutePath,
             '--first-stream', downstreamStreamFirst.get().asFile.absolutePath,
             '--second-stream', downstreamStreamSecond.get().asFile.absolutePath,
             '--corpus', downstreamStreamCorpus.asFile.absolutePath,
