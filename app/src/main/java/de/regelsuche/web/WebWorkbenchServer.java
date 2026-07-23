@@ -5,6 +5,7 @@ import de.regelsuche.validation.CandidateProofStatus;
 import com.sun.net.httpserver.BasicAuthenticator;
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpsConfigurator;
 import com.sun.net.httpserver.HttpsServer;
@@ -52,6 +53,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyStore;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -260,31 +262,70 @@ public class WebWorkbenchServer {
         } else {
             server = HttpServer.create(new InetSocketAddress(host, port), 0);
         }
-        secure(server.createContext("/api/search", this::handleSearch));
-        secure(server.createContext("/api/discover", this::handleDiscover));
-        secure(server.createContext("/api/paths", this::handlePaths));
-        secure(server.createContext("/api/graph", this::handleGraph));
-        secure(server.createContext("/api/search-graph", this::handleSearchGraph));
-        secure(server.createContext("/api/search-graph/semantic", this::handleSemanticSearchGraph));
-        secure(server.createContext("/api/identities", this::handleIdentities));
-        secure(server.createContext("/api/candidates", this::handleCandidates));
-        secure(server.createContext("/api/inventory", this::handleInventory));
-        secure(server.createContext("/api/exports", this::handleExports));
-        secure(server.createContext("/api/explain", this::handleExplain));
-        secure(server.createContext("/api/analyze", this::handleAnalyze));
-        secure(server.createContext("/api/demo", this::handleDemo));
-        secure(server.createContext("/api/plugins", this::handlePlugins));
-        secure(server.createContext("/api/memory", this::handleMemory));
-        secure(server.createContext("/api/proof-status", this::handleProofStatus));
-        secure(server.createContext("/api/proof-bridge", this::handleProofBridge));
-        secure(server.createContext("/api/proof/jobs", this::handleProofJobs));
-        secure(server.createContext("/api/benchmark", this::handleBenchmark));
-        secure(server.createContext("/api/didactic", this::handleDidactic));
-        secure(server.createContext("/api/inspect", this::handleInspect));
-        secure(server.createContext("/api/rule-radar", ruleRadarHandler));
+        OpenApiRouteRegistry routeRegistry = OpenApiRouteRegistry.load();
+        registerApiContexts(routeRegistry);
         secure(server.createContext("/", this::handleStatic));
         server.setExecutor(null);
         server.start();
+    }
+
+    private void registerApiContexts(OpenApiRouteRegistry routeRegistry) {
+        Map<String, HttpHandler> handlers = new LinkedHashMap<>();
+        handlers.put("/api/search", this::handleSearch);
+        handlers.put("/api/discover", this::handleDiscover);
+        handlers.put("/api/paths", this::handlePaths);
+        handlers.put("/api/graph", this::handleGraph);
+        handlers.put("/api/search-graph", this::handleSearchGraph);
+        handlers.put("/api/search-graph/semantic", this::handleSemanticSearchGraph);
+        handlers.put("/api/identities", this::handleIdentities);
+        handlers.put("/api/candidates", this::handleCandidates);
+        handlers.put("/api/inventory", this::handleInventory);
+        handlers.put("/api/exports", this::handleExports);
+        handlers.put("/api/explain", this::handleExplain);
+        handlers.put("/api/analyze", this::handleAnalyze);
+        handlers.put("/api/demo", this::handleDemo);
+        handlers.put("/api/plugins", this::handlePlugins);
+        handlers.put("/api/memory", this::handleMemory);
+        handlers.put("/api/proof-status", this::handleProofStatus);
+        handlers.put("/api/proof-bridge", this::handleProofBridge);
+        handlers.put("/api/proof/jobs", this::handleProofJobs);
+        handlers.put("/api/benchmark", this::handleBenchmark);
+        handlers.put("/api/didactic", this::handleDidactic);
+        handlers.put("/api/inspect", this::handleInspect);
+        handlers.put("/api/rule-radar", ruleRadarHandler);
+
+        if (!handlers.keySet().equals(routeRegistry.contexts())) {
+            throw new IllegalStateException("OpenAPI contexts do not match server handlers: handlers="
+                + handlers.keySet() + ", openApi=" + routeRegistry.contexts());
+        }
+        handlers.forEach((context, handler) -> secure(server.createContext(
+            context,
+            enforceOpenApiRoute(routeRegistry, context, handler)
+        )));
+    }
+
+    private HttpHandler enforceOpenApiRoute(
+        OpenApiRouteRegistry routeRegistry,
+        String context,
+        HttpHandler delegate
+    ) {
+        return exchange -> {
+            OpenApiRouteRegistry.Match match = routeRegistry.match(
+                context,
+                exchange.getRequestURI().getPath(),
+                exchange.getRequestMethod()
+            );
+            if (match.status() == OpenApiRouteRegistry.MatchStatus.NOT_FOUND) {
+                sendStatus(exchange, 404, "API route not found");
+                return;
+            }
+            if (match.status() == OpenApiRouteRegistry.MatchStatus.METHOD_NOT_ALLOWED) {
+                exchange.getResponseHeaders().set("Allow", String.join(", ", match.allowedMethods()));
+                sendStatus(exchange, 405, "method not allowed");
+                return;
+            }
+            delegate.handle(exchange);
+        };
     }
 
     private void secure(HttpContext context) {
@@ -949,7 +990,7 @@ public class WebWorkbenchServer {
             return;
         }
         if ("POST".equalsIgnoreCase(method)) {
-            // POST /api/inventory/import with JSON body { "json": "..." } imports a bundle.
+            // POST /api/inventory with JSON body { "json": "..." } imports a bundle.
             Map<String, Object> body = readJsonObject(exchange);
             String bundleJson = stringValue(body, "json", "");
             if (bundleJson.isBlank()) {

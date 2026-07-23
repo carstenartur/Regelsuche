@@ -1,0 +1,739 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Regelsuche REST API",
+    "version": "0.2.0",
+    "description": "Verbindliche technische Referenz der eingebetteten Regelsuche-Web-Workbench. Die nutzerseitige Dokumentation beschreibt die grafischen Abläufe; Methoden, Pfade, Schemata und Statuscodes werden hier gepflegt."
+  },
+  "servers": [
+    {"url": "/", "description": "Aktuelle lokale Workbench-Instanz"}
+  ],
+  "tags": [
+    {"name": "Search", "description": "Mathematische Suche und Discovery starten."},
+    {"name": "Paths", "description": "Gefundene Rechenwege, Replay und Vergleich."},
+    {"name": "Search Graph", "description": "Roher und semantisch aufbereiteter Suchgraph."},
+    {"name": "Identities", "description": "Emergente Identitäten und Promotion."},
+    {"name": "Candidates", "description": "Geminte Regelkandidaten."},
+    {"name": "Inventory", "description": "Wiederverwendbare Regeln und Import."},
+    {"name": "Exports", "description": "Berichte, Graphen und Artefakt-Bundles."},
+    {"name": "Analysis", "description": "Erklärung und Bewertung einzelner Suchzüge."},
+    {"name": "Demos", "description": "Kuratierte reproduzierbare Produktdemos."},
+    {"name": "Plugins", "description": "Geladene Plugins, Regeln und Profile."},
+    {"name": "Memory", "description": "Suchgedächtnis, Pruning und universelle Muster."},
+    {"name": "Proof", "description": "Proof-Status und synchroner Proof-Bridge-Aufruf."},
+    {"name": "Proof Jobs", "description": "Persistente asynchrone Beweisaufträge und Artefakte."},
+    {"name": "Benchmark", "description": "Reproduzierbare Qualitätsszenarien."},
+    {"name": "Didactics", "description": "Schrittprüfung, Hinweise, Replay, Analytics und Exporte."},
+    {"name": "Rule Inspection", "description": "Baumlokale Regelinspektion und Anwendung."},
+    {"name": "Rule Radar", "description": "Positionsgebundene AST-Kandidaten, Anwendung und begrenzte Suche."}
+  ],
+  "paths": {
+    "/api/search": {
+      "post": {
+        "tags": ["Search"],
+        "operationId": "startSearch",
+        "summary": "Mathematische Suche starten",
+        "description": "Startet eine Suche für Ausdruck, Eingabetyp, Profil und optionales Transformationsziel.",
+        "x-regelsuche-context": "/api/search",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SearchRequest"}}}},
+        "responses": {
+          "200": {"description": "Suchzusammenfassung", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SearchResult"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"}
+        }
+      }
+    },
+    "/api/discover": {
+      "post": {
+        "tags": ["Search"],
+        "operationId": "discoverRules",
+        "summary": "Begrenzte Rule-Discovery ausführen",
+        "x-regelsuche-context": "/api/discover",
+        "requestBody": {"required": false, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DiscoveryRequest"}}}},
+        "responses": {
+          "200": {"description": "Anzahl gefundener Kandidaten und Transformationen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "405": {"$ref": "#/components/responses/MethodNotAllowed"}
+        }
+      }
+    },
+    "/api/paths": {
+      "get": {
+        "tags": ["Paths"],
+        "operationId": "listPaths",
+        "summary": "Gefundene Rechenwege auflisten",
+        "x-regelsuche-context": "/api/paths",
+        "parameters": [
+          {"name": "sort", "in": "query", "required": false, "description": "score, length, teaching oder proof", "schema": {"type": "string", "default": "score"}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 0}}
+        ],
+        "responses": {"200": {"description": "Sortierte Pfadliste", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/paths/compare": {
+      "get": {
+        "tags": ["Paths"],
+        "operationId": "comparePaths",
+        "summary": "Zwei Rechenwege vergleichen",
+        "x-regelsuche-context": "/api/paths",
+        "parameters": [
+          {"name": "left", "in": "query", "required": true, "schema": {"type": "string"}},
+          {"name": "right", "in": "query", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "Vergleich von Regeln, Schritten, Scores und Annahmen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/paths/{pathId}": {
+      "get": {
+        "tags": ["Paths"],
+        "operationId": "getPath",
+        "summary": "Einzelnen Rechenweg laden",
+        "x-regelsuche-context": "/api/paths",
+        "parameters": [{"$ref": "#/components/parameters/PathId"}],
+        "responses": {
+          "200": {"description": "Rechenweg", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/paths/{pathId}/replay": {
+      "get": {
+        "tags": ["Paths"],
+        "operationId": "replayPath",
+        "summary": "Schrittweises Replay eines Rechenwegs laden",
+        "x-regelsuche-context": "/api/paths",
+        "parameters": [{"$ref": "#/components/parameters/PathId"}],
+        "responses": {
+          "200": {"description": "Replay mit mathematischen Layout- und Diff-Informationen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/graph": {
+      "get": {
+        "tags": ["Search Graph"],
+        "operationId": "getMermaidGraph",
+        "summary": "Mermaid-Graph aller Pfade laden",
+        "x-regelsuche-context": "/api/graph",
+        "responses": {"200": {"description": "Mermaid-Quelltext", "content": {"text/plain": {"schema": {"type": "string"}}}}}
+      }
+    },
+    "/api/graph/{pathId}": {
+      "get": {
+        "tags": ["Search Graph"],
+        "operationId": "getPathMermaidGraph",
+        "summary": "Mermaid-Graph eines einzelnen Pfads laden",
+        "x-regelsuche-context": "/api/graph",
+        "parameters": [{"$ref": "#/components/parameters/PathId"}],
+        "responses": {"200": {"description": "Mermaid-Quelltext", "content": {"text/plain": {"schema": {"type": "string"}}}}}
+      }
+    },
+    "/api/search-graph": {
+      "get": {
+        "tags": ["Search Graph"],
+        "operationId": "getSearchGraph",
+        "summary": "Strukturierten Suchgraph laden",
+        "x-regelsuche-context": "/api/search-graph",
+        "parameters": [{"name": "filter", "in": "query", "required": false, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Suchgraph-DTO", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/search-graph/semantic": {
+      "get": {
+        "tags": ["Search Graph"],
+        "operationId": "getSemanticSearchGraph",
+        "summary": "Semantisch aufbereiteten Suchgraph laden",
+        "x-regelsuche-context": "/api/search-graph/semantic",
+        "parameters": [
+          {"name": "mode", "in": "query", "required": false, "schema": {"type": "string", "default": "semantic"}},
+          {"name": "showMacroSteps", "in": "query", "required": false, "schema": {"type": "string", "default": "compact"}},
+          {"name": "showLowSignal", "in": "query", "required": false, "schema": {"type": "boolean", "default": false}},
+          {"name": "showAlternatives", "in": "query", "required": false, "schema": {"type": "boolean", "default": true}},
+          {"name": "showVariants", "in": "query", "required": false, "schema": {"type": "boolean", "default": false}},
+          {"name": "pathId", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Semantischer Suchgraph", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/identities": {
+      "get": {
+        "tags": ["Identities"],
+        "operationId": "listIdentities",
+        "summary": "Emergente Identitäten auflisten",
+        "x-regelsuche-context": "/api/identities",
+        "responses": {"200": {"description": "Identitätskarten mit Evidenz und Status", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/identities/{identityId}/promote": {
+      "post": {
+        "tags": ["Identities"],
+        "operationId": "promoteIdentity",
+        "summary": "Identität als wiederverwendbare Regel übernehmen",
+        "x-regelsuche-context": "/api/identities",
+        "parameters": [{"$ref": "#/components/parameters/IdentityId"}],
+        "responses": {
+          "200": {"description": "Promovierte Regel-ID und Domäne", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/candidates": {
+      "get": {
+        "tags": ["Candidates"],
+        "operationId": "listCandidates",
+        "summary": "Regelkandidaten auflisten",
+        "x-regelsuche-context": "/api/candidates",
+        "responses": {"200": {"description": "Kandidaten mit Score, Status und Proof-Status", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/inventory": {
+      "get": {
+        "tags": ["Inventory"],
+        "operationId": "listInventoryRules",
+        "summary": "Wiederverwendbare Regeln auflisten",
+        "x-regelsuche-context": "/api/inventory",
+        "responses": {"200": {"description": "Regelinventar", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      },
+      "post": {
+        "tags": ["Inventory"],
+        "operationId": "importInventoryBundle",
+        "summary": "Export-Bundle in das Inventar importieren",
+        "x-regelsuche-context": "/api/inventory",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object", "required": ["json"], "properties": {"json": {"type": "string"}}}}}},
+        "responses": {
+          "200": {"description": "Anzahl importierter Regeln", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"}
+        }
+      }
+    },
+    "/api/exports": {
+      "get": {
+        "tags": ["Exports"],
+        "operationId": "getExportBundleJson",
+        "summary": "Komplettes Export-Bundle als JSON laden",
+        "x-regelsuche-context": "/api/exports",
+        "responses": {"200": {"description": "Export-Bundle", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/exports/{format}": {
+      "get": {
+        "tags": ["Exports"],
+        "operationId": "downloadExport",
+        "summary": "Bericht oder Graph in einem unterstützten Format laden",
+        "description": "Unterstützt unter anderem markdown, latex, mermaid, json, search-graph.json, search-graph.mmd, search-graph.graphml, best-path.md, identity-report.tex und bundle.zip. Spezifische Unterressourcen werden ebenfalls unter diesem Kontext ausgeliefert.",
+        "x-regelsuche-context": "/api/exports",
+        "parameters": [{"name": "format", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {
+          "200": {"description": "Exportinhalt im formatspezifischen Medientyp"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/exports/cluster/{clusterId}.md": {
+      "get": {
+        "tags": ["Exports"],
+        "operationId": "downloadClusterMarkdown",
+        "summary": "Suchgraph-Cluster als Markdown laden",
+        "x-regelsuche-context": "/api/exports",
+        "parameters": [{"name": "clusterId", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Markdown-Darstellung des Clusters", "content": {"text/plain": {"schema": {"type": "string"}}}}}
+      }
+    },
+    "/api/exports/path/{pathId}.tex": {
+      "get": {
+        "tags": ["Exports"],
+        "operationId": "downloadPathLatex",
+        "summary": "Rechenweg als LaTeX laden",
+        "x-regelsuche-context": "/api/exports",
+        "parameters": [{"$ref": "#/components/parameters/PathId"}],
+        "responses": {"200": {"description": "LaTeX-Darstellung des Rechenwegs", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/exports/identity/{identityId}.md": {
+      "get": {
+        "tags": ["Exports"],
+        "operationId": "downloadIdentityMarkdown",
+        "summary": "Emergente Identität als Markdown laden",
+        "x-regelsuche-context": "/api/exports",
+        "parameters": [{"$ref": "#/components/parameters/IdentityId"}],
+        "responses": {"200": {"description": "Markdown-Darstellung der Identität", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/explain/{pathId}": {
+      "get": {
+        "tags": ["Analysis"],
+        "operationId": "explainPath",
+        "summary": "Rechenweg in gewählter Darstellungsform erklären",
+        "x-regelsuche-context": "/api/explain",
+        "parameters": [
+          {"$ref": "#/components/parameters/PathId"},
+          {"name": "form", "in": "query", "required": false, "schema": {"type": "string", "default": "SCHOOL"}}
+        ],
+        "responses": {
+          "200": {"description": "Erklärung", "content": {"text/plain": {"schema": {"type": "string"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "404": {"$ref": "#/components/responses/NotFound"}
+        }
+      }
+    },
+    "/api/analyze/move": {
+      "get": {
+        "tags": ["Analysis"],
+        "operationId": "analyzeMove",
+        "summary": "Nächste Züge für einen Ausdruck analysieren",
+        "x-regelsuche-context": "/api/analyze",
+        "parameters": [{"name": "expression", "in": "query", "required": true, "schema": {"type": "string"}}],
+        "responses": {
+          "200": {"description": "Bester Zug, Alternativen und Sackgassen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"}
+        }
+      }
+    },
+    "/api/demo": {
+      "get": {
+        "tags": ["Demos"],
+        "operationId": "listDemos",
+        "summary": "Verfügbare Demos auflisten",
+        "x-regelsuche-context": "/api/demo",
+        "responses": {"200": {"description": "Demo-Katalog", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/demo/{demoId}": {
+      "get": {
+        "tags": ["Demos"],
+        "operationId": "runDemoGet",
+        "summary": "Demo ausführen",
+        "x-regelsuche-context": "/api/demo",
+        "parameters": [{"$ref": "#/components/parameters/DemoId"}],
+        "responses": {"200": {"description": "Vollständiges Demo-Ergebnis", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      },
+      "post": {
+        "tags": ["Demos"],
+        "operationId": "runDemoPost",
+        "summary": "Demo einschließlich zustandsändernder Lernabläufe ausführen",
+        "x-regelsuche-context": "/api/demo",
+        "parameters": [{"$ref": "#/components/parameters/DemoId"}],
+        "responses": {"200": {"description": "Vollständiges Demo-Ergebnis", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/plugins": {
+      "get": {
+        "tags": ["Plugins"],
+        "operationId": "getPluginRuntime",
+        "summary": "Plugin-Laufzeit und Katalog laden",
+        "x-regelsuche-context": "/api/plugins",
+        "parameters": [{"name": "profile", "in": "query", "required": false, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Geladene Plugins, Regeln, Diagnosen und Profile", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/plugins/rules": {
+      "get": {
+        "tags": ["Plugins"],
+        "operationId": "listPluginRules",
+        "summary": "Registrierte Plugin- und Makroregeln laden",
+        "x-regelsuche-context": "/api/plugins",
+        "responses": {"200": {"description": "Regelkatalog", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/plugins/profiles": {
+      "get": {
+        "tags": ["Plugins"],
+        "operationId": "listPluginProfiles",
+        "summary": "Plugin-Aktivierungsprofile laden",
+        "x-regelsuche-context": "/api/plugins",
+        "responses": {"200": {"description": "Profile", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/memory": {
+      "get": {
+        "tags": ["Memory"],
+        "operationId": "getMemoryOverview",
+        "summary": "Suchgedächtnis-Übersicht laden",
+        "x-regelsuche-context": "/api/memory",
+        "responses": {"200": {"description": "Größe, Pruning-Anzahl und Links", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/memory/states": {
+      "get": {
+        "tags": ["Memory"],
+        "operationId": "listMemoryStates",
+        "summary": "Kanonische Gedächtniszustände laden",
+        "x-regelsuche-context": "/api/memory",
+        "responses": {"200": {"description": "Zustände mit Scores, Tiefe und Regelherkunft", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/memory/pruning": {
+      "get": {
+        "tags": ["Memory"],
+        "operationId": "listPruningDecisions",
+        "summary": "Pruning-Entscheidungen laden",
+        "x-regelsuche-context": "/api/memory",
+        "responses": {"200": {"description": "Pruning-Entscheidungen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/memory/macros": {
+      "get": {
+        "tags": ["Memory"],
+        "operationId": "listMemoryMacros",
+        "summary": "Gelernte Makroregeln im Suchgedächtnis laden",
+        "x-regelsuche-context": "/api/memory",
+        "responses": {"200": {"description": "Makroregeln mit Confidence und Verwendung", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/memory/universal": {
+      "get": {
+        "tags": ["Memory"],
+        "operationId": "listUniversalPatterns",
+        "summary": "Universelle Muster und Rule-Coverage laden",
+        "x-regelsuche-context": "/api/memory",
+        "responses": {"200": {"description": "Universelle Muster", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/proof-status": {
+      "get": {
+        "tags": ["Proof"],
+        "operationId": "getProofStatusLegend",
+        "summary": "Proof-Status-Stufen und Bedeutung laden",
+        "x-regelsuche-context": "/api/proof-status",
+        "responses": {"200": {"description": "Proof-Status-Legende", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/proof-bridge": {
+      "post": {
+        "tags": ["Proof"],
+        "operationId": "runProofBridge",
+        "summary": "Synchronen Lean- oder SMT-Proof-Bridge-Aufruf ausführen",
+        "x-regelsuche-context": "/api/proof-bridge",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProofRequest"}}}},
+        "responses": {
+          "200": {"description": "Proof-Artefakt und Ausführungsstatus", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"}
+        }
+      }
+    },
+    "/api/proof/jobs": {
+      "get": {
+        "tags": ["Proof Jobs"],
+        "operationId": "listProofJobs",
+        "summary": "Persistente Proof-Jobs auflisten",
+        "x-regelsuche-context": "/api/proof/jobs",
+        "responses": {"200": {"description": "Jobliste", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "503": {"$ref": "#/components/responses/Unavailable"}}
+      },
+      "post": {
+        "tags": ["Proof Jobs"],
+        "operationId": "submitProofJob",
+        "summary": "Proof-Job einreichen",
+        "x-regelsuche-context": "/api/proof/jobs",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ProofJobRequest"}}}},
+        "responses": {
+          "201": {"description": "Job wurde in die Queue aufgenommen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "503": {"$ref": "#/components/responses/Unavailable"}
+        }
+      }
+    },
+    "/api/proof/jobs/{jobId}": {
+      "get": {
+        "tags": ["Proof Jobs"],
+        "operationId": "getProofJob",
+        "summary": "Proof-Job-Details laden",
+        "x-regelsuche-context": "/api/proof/jobs",
+        "parameters": [{"$ref": "#/components/parameters/JobId"}],
+        "responses": {"200": {"description": "Jobstatus, Retries und Fehler", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "404": {"$ref": "#/components/responses/NotFound"}, "503": {"$ref": "#/components/responses/Unavailable"}}
+      }
+    },
+    "/api/proof/jobs/{jobId}/cancel": {
+      "post": {
+        "tags": ["Proof Jobs"],
+        "operationId": "cancelProofJob",
+        "summary": "Proof-Job abbrechen",
+        "x-regelsuche-context": "/api/proof/jobs",
+        "parameters": [{"$ref": "#/components/parameters/JobId"}],
+        "responses": {"200": {"description": "Aktualisierter Jobzustand", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "404": {"$ref": "#/components/responses/NotFound"}, "409": {"$ref": "#/components/responses/Conflict"}}
+      }
+    },
+    "/api/proof/jobs/{jobId}/artifacts": {
+      "get": {
+        "tags": ["Proof Jobs"],
+        "operationId": "listProofJobArtifacts",
+        "summary": "Artefakte eines Proof-Jobs auflisten",
+        "x-regelsuche-context": "/api/proof/jobs",
+        "parameters": [{"$ref": "#/components/parameters/JobId"}],
+        "responses": {"200": {"description": "Artefaktdateien", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/proof/jobs/{jobId}/artifacts/{artifactName}": {
+      "get": {
+        "tags": ["Proof Jobs"],
+        "operationId": "downloadProofJobArtifact",
+        "summary": "Ein Proof-Artefakt laden",
+        "x-regelsuche-context": "/api/proof/jobs",
+        "parameters": [{"$ref": "#/components/parameters/JobId"}, {"name": "artifactName", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Artefaktinhalt", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/benchmark": {
+      "get": {
+        "tags": ["Benchmark"],
+        "operationId": "runBenchmark",
+        "summary": "Benchmark-Szenarien und Qualitätsmetriken laden",
+        "x-regelsuche-context": "/api/benchmark",
+        "responses": {"200": {"description": "Benchmark-Ergebnisse", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/didactic": {
+      "get": {
+        "tags": ["Didactics"],
+        "operationId": "getDidacticCapabilities",
+        "summary": "Didaktische API-Fähigkeiten auflisten",
+        "x-regelsuche-context": "/api/didactic",
+        "responses": {"200": {"description": "Links zu didaktischen Operationen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/didactic/step-check": {
+      "post": {
+        "tags": ["Didactics"],
+        "operationId": "checkStudentStep",
+        "summary": "Einen eingegebenen Rechenschritt prüfen",
+        "x-regelsuche-context": "/api/didactic",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DidacticStepRequest"}}}},
+        "responses": {"200": {"description": "Korrektheit, didaktische Eignung und mögliche Fehlvorstellung", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}}
+      }
+    },
+    "/api/didactic/hint/{pathId}": {
+      "post": {
+        "tags": ["Didactics"],
+        "operationId": "getDidacticHints",
+        "summary": "Gestufte Hinweise zum nächsten Rechenschritt erzeugen",
+        "x-regelsuche-context": "/api/didactic",
+        "parameters": [{"$ref": "#/components/parameters/PathId"}],
+        "requestBody": {"required": false, "content": {"application/json": {"schema": {"type": "object", "properties": {"currentExpression": {"type": "string"}, "pedagogyProfile": {"type": "string", "default": "SCHOOL"}}}}}},
+        "responses": {"200": {"description": "Hinweisfolge", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/didactic/misconceptions": {
+      "get": {
+        "tags": ["Didactics"],
+        "operationId": "listMisconceptions",
+        "summary": "Katalog typischer Fehlvorstellungen laden",
+        "x-regelsuche-context": "/api/didactic",
+        "responses": {"200": {"description": "Fehlvorstellungskatalog", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/didactic/analytics": {
+      "get": {
+        "tags": ["Didactics"],
+        "operationId": "getDidacticAnalytics",
+        "summary": "Didaktische Nutzungs- und Qualitätsmetriken laden",
+        "x-regelsuche-context": "/api/didactic",
+        "responses": {"200": {"description": "Didaktik-Analytics", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/didactic/replay/{pathId}": {
+      "get": {
+        "tags": ["Didactics"],
+        "operationId": "getDidacticReplay",
+        "summary": "Didaktisch aufbereitetes Replay laden",
+        "x-regelsuche-context": "/api/didactic",
+        "parameters": [{"$ref": "#/components/parameters/PathId"}],
+        "responses": {"200": {"description": "Replay mit Symbol-Diffs", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/didactic/export/{kind}/{pathId}.md": {
+      "get": {
+        "tags": ["Didactics"],
+        "operationId": "downloadDidacticExport",
+        "summary": "Arbeitsblatt, Lösung oder Lehrermodus als Markdown laden",
+        "x-regelsuche-context": "/api/didactic",
+        "parameters": [
+          {"name": "kind", "in": "path", "required": true, "schema": {"type": "string", "enum": ["worksheet", "solution", "teacher"]}},
+          {"$ref": "#/components/parameters/PathId"}
+        ],
+        "responses": {"200": {"description": "Markdown-Export", "content": {"text/markdown": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/inspect/tree": {
+      "get": {
+        "tags": ["Rule Inspection"],
+        "operationId": "inspectExpressionRules",
+        "summary": "Baumpositionen und lokale Regelmatches inspizieren",
+        "x-regelsuche-context": "/api/inspect",
+        "parameters": [
+          {"name": "expression", "in": "query", "required": true, "schema": {"type": "string"}},
+          {"name": "selectedPathKey", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Positionen, Matches, Bindungen und Vorschauen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}}
+      }
+    },
+    "/api/inspect/tree/apply": {
+      "post": {
+        "tags": ["Rule Inspection"],
+        "operationId": "applyInspectedRule",
+        "summary": "Ein zuvor inspiziertes lokales Regelmatch anwenden",
+        "x-regelsuche-context": "/api/inspect",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InspectApplyRequest"}}}},
+        "responses": {"200": {"description": "Folgeausdruck und aktualisierte Inspektion", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "409": {"$ref": "#/components/responses/Conflict"}}
+      }
+    },
+    "/api/rule-radar": {
+      "get": {
+        "tags": ["Rule Radar"],
+        "operationId": "getRuleRadarCapabilities",
+        "summary": "AST-Regelradar-Fähigkeiten und Outcomes laden",
+        "x-regelsuche-context": "/api/rule-radar",
+        "responses": {"200": {"description": "Capability-Dokument", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/rule-radar/inspect": {
+      "post": {
+        "tags": ["Rule Radar"],
+        "operationId": "inspectRuleRadar",
+        "summary": "AST und positionsgebundene Regelanwendungen berechnen",
+        "x-regelsuche-context": "/api/rule-radar",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuleRadarRequest"}}}},
+        "responses": {"200": {"description": "Regelradar-Snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    },
+    "/api/rule-radar/apply": {
+      "post": {
+        "tags": ["Rule Radar"],
+        "operationId": "applyRuleRadarCandidate",
+        "summary": "Exakt angezeigten Radar-Kandidaten anwenden",
+        "x-regelsuche-context": "/api/rule-radar",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuleRadarApplyRequest"}}}},
+        "responses": {"200": {"description": "Anwendung und aktualisierter Snapshot", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}, "409": {"$ref": "#/components/responses/Conflict"}, "422": {"description": "Kandidat ist sichtbar, aber im Kontext nicht ausführbar"}}
+      }
+    },
+    "/api/rule-radar/search": {
+      "post": {
+        "tags": ["Rule Radar"],
+        "operationId": "searchWithRuleRadar",
+        "summary": "Begrenzten Suchgraph mit Kandidatenkorrelation erzeugen",
+        "x-regelsuche-context": "/api/rule-radar",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RuleRadarSearchRequest"}}}},
+        "responses": {"200": {"description": "Korrelierter Suchgraph und Ereignisse", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}}
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "PathId": {"name": "pathId", "in": "path", "required": true, "description": "Stabile ID eines gefundenen Rechenwegs", "schema": {"type": "string"}},
+      "IdentityId": {"name": "identityId", "in": "path", "required": true, "schema": {"type": "string"}},
+      "DemoId": {"name": "demoId", "in": "path", "required": true, "schema": {"type": "string"}},
+      "JobId": {"name": "jobId", "in": "path", "required": true, "schema": {"type": "string"}}
+    },
+    "responses": {
+      "BadRequest": {"description": "Ungültige oder unvollständige Eingabe", "content": {"text/plain": {"schema": {"type": "string"}}}},
+      "NotFound": {"description": "Ressource wurde nicht gefunden", "content": {"text/plain": {"schema": {"type": "string"}}}},
+      "Conflict": {"description": "Der angeforderte Zustand ist veraltet oder nicht mehr anwendbar", "content": {"text/plain": {"schema": {"type": "string"}}}},
+      "MethodNotAllowed": {"description": "HTTP-Methode wird für diese Operation nicht unterstützt"},
+      "Unavailable": {"description": "Funktion ist in der aktuellen Konfiguration deaktiviert oder nicht verfügbar"}
+    },
+    "schemas": {
+      "JsonObject": {"type": "object", "additionalProperties": true},
+      "SearchRequest": {
+        "type": "object",
+        "required": ["expression"],
+        "properties": {
+          "expression": {"type": "string"},
+          "type": {"type": "string", "enum": ["TERM", "EQUATION"], "default": "TERM"},
+          "profile": {"type": "string", "default": "FAST_SIMPLIFY"},
+          "goal": {"type": "string", "enum": ["SIMPLIFY", "FACTORIZE", "TEACHING_FRIENDLY", "PROOF_FRIENDLY", "NUMERICALLY_STABLE"]}
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "required": ["profile", "goal", "inputType", "expression", "successes"],
+        "properties": {
+          "profile": {"type": "string"},
+          "goal": {"type": "string"},
+          "inputType": {"type": "string"},
+          "expression": {"type": "string"},
+          "successes": {"type": "integer", "minimum": 0},
+          "bestExpression": {"type": ["string", "null"]},
+          "improvement": {"type": "integer"}
+        }
+      },
+      "DiscoveryRequest": {"type": "object", "properties": {"min": {"type": "integer", "default": 1}, "max": {"type": "integer", "default": 3}}},
+      "ProofRequest": {
+        "type": "object",
+        "required": ["leftPattern", "rightPattern"],
+        "properties": {
+          "leftPattern": {"type": "string"},
+          "rightPattern": {"type": "string"},
+          "assumptions": {"type": "array", "items": {"type": "string"}},
+          "backend": {"type": "string", "enum": ["lean", "smt"]}
+        }
+      },
+      "ProofJobRequest": {
+        "type": "object",
+        "required": ["leftPattern", "rightPattern"],
+        "properties": {
+          "leftPattern": {"type": "string"},
+          "rightPattern": {"type": "string"},
+          "assumptions": {"type": "array", "items": {"type": "string"}},
+          "priority": {"type": "integer", "default": 0}
+        }
+      },
+      "DidacticStepRequest": {
+        "type": "object",
+        "required": ["currentExpression", "studentStep"],
+        "properties": {
+          "currentExpression": {"type": "string"},
+          "studentStep": {"type": "string"},
+          "difficulty": {"type": "string", "default": "MITTELSTUFE"}
+        }
+      },
+      "InspectApplyRequest": {
+        "type": "object",
+        "required": ["expression", "pathKey"],
+        "anyOf": [{"required": ["matchId"]}, {"required": ["matchIndex"]}],
+        "properties": {
+          "expression": {"type": "string"},
+          "pathKey": {"type": "string"},
+          "matchId": {"type": "string"},
+          "matchIndex": {"type": "integer", "minimum": 0}
+        }
+      },
+      "RuleRadarContext": {
+        "type": "object",
+        "properties": {
+          "knowledgeProfile": {"type": "string", "default": "CORE"},
+          "includePlugins": {"type": "boolean", "default": true},
+          "includeLearnedMacros": {"type": "boolean", "default": true},
+          "minMacroProofStatus": {"type": "string", "default": "VALIDATED_BY_EXAMPLES"},
+          "goalExpression": {"type": "string"},
+          "maxCandidatesPerPosition": {"type": "integer", "minimum": 1, "maximum": 200, "default": 24},
+          "maxCandidatesTotal": {"type": "integer", "minimum": 1, "maximum": 2000, "default": 240},
+          "assumptions": {"type": "array", "items": {"type": "string"}},
+          "includeRejectedCandidates": {"type": "boolean", "default": true}
+        }
+      },
+      "RuleRadarRequest": {
+        "type": "object",
+        "required": ["expression"],
+        "properties": {"expression": {"type": "string"}, "context": {"$ref": "#/components/schemas/RuleRadarContext"}}
+      },
+      "RuleRadarApplyRequest": {
+        "type": "object",
+        "required": ["expression", "candidateId"],
+        "properties": {"expression": {"type": "string"}, "candidateId": {"type": "string"}, "context": {"$ref": "#/components/schemas/RuleRadarContext"}}
+      },
+      "RuleRadarSearchRequest": {
+        "type": "object",
+        "required": ["expression"],
+        "properties": {
+          "expression": {"type": "string"},
+          "targetExpression": {"type": "string"},
+          "maxDepth": {"type": "integer", "minimum": 1, "maximum": 12, "default": 4},
+          "maxStates": {"type": "integer", "minimum": 1, "maximum": 2000, "default": 120},
+          "maxMovesPerState": {"type": "integer", "minimum": 1, "maximum": 500, "default": 60},
+          "context": {"$ref": "#/components/schemas/RuleRadarContext"}
+        }
+      }
+    }
+  }
+}

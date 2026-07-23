@@ -32,7 +32,7 @@ Die Web-Workbench ist die grafische Bedienoberfläche für die Funktionen, die d
 | **Exporte** | Ergebnisse in geeigneter Form weiterverwenden | Downloads für Dokumentation, mathematische Texte, Graphwerkzeuge und maschinelle Verarbeitung | Exports |
 | **Didaktik** | Erklär- und Bewertungsfunktionen für Lernwege verwenden | Unterrichtsnahe Darstellung und didaktische Qualitätsinformationen | Didactics |
 | **AST-Regelradar** | Ausdruck als AST untersuchen, einen Knoten wählen, dort anwendbare Züge prüfen und eine Anwendung zunächst als Vorschau betrachten | Zoombarer Ausdrucksbaum mit positionsgebundenen Grund-, Erweiterungs- und Makroregeln, Bindungen, Annahmen, Folgeausdruck sowie Auswahl-, Anwendungs- und Pruningstatus | Rule Radar |
-| **Hilfe** | Syntax, Begriffe und Bedienhinweise nachschlagen | Kontextnahe Kurzhilfe ohne Wechsel in eine technische API-Referenz | — |
+| **Hilfe** | Syntax, Begriffe und Bedienhinweise nachschlagen; technische Referenz öffnen | Kontextnahe Kurzhilfe sowie direkte Links zur lokalen Swagger-UI und OpenAPI-Spezifikation | — |
 
 Die Namen in der letzten Spalte sind fachliche Zuordnungen. Die verbindlichen Operationen und Schemata stehen in der Swagger/OpenAPI-Dokumentation der laufenden Installation.
 
@@ -59,6 +59,15 @@ Jeder auslösende Bereich soll mindestens folgende Zustände verständlich darst
 
 Für direkte REST-Nutzung gilt ausschließlich Swagger/OpenAPI. Nutzer- und Feature-Dokumente verweisen höchstens auf den fachlichen Swagger-Bereich oder eine `operationId`; sie wiederholen keine Endpoint-Tabellen oder JSON-Verträge. Siehe [Dokumentationskonvention](documentation-conventions.md).
 
+Nach dem Start der Workbench stehen zwei stabile lokale Zugänge bereit:
+
+- **Swagger UI:** `http://127.0.0.1:8080/static/openapi/index.html`
+- **OpenAPI 3.1 JSON:** `http://127.0.0.1:8080/static/openapi/openapi.json`
+
+Die Swagger-Oberfläche, ihre JavaScript- und CSS-Dateien sowie Lizenz- und Hinweisdateien werden vollständig aus dem gestarteten Checkout ausgeliefert. Für die API-Referenz ist weder ein CDN noch eine Internetverbindung erforderlich.
+
+Die Spezifikation ist zugleich ausführbarer Routenvertrag: Beim Serverstart müssen ihre öffentlichen API-Kontexte exakt zu den registrierten Handlern passen. Vor der fachlichen Verarbeitung prüft die Workbench außerdem HTTP-Methode und konkretes Pfadtemplate. Nicht dokumentierte Unterpfade werden mit `404`, für einen bekannten Pfad nicht erlaubte Methoden mit `405` und einem `Allow`-Header abgewiesen.
+
 ## Statische Assets
 
-Die Oberfläche unter `/` lädt ihre HTML-, CSS- und JavaScript-Ressourcen aus dem Classpath-Verzeichnis `app/src/main/resources/web/`. KaTeX und Cytoscape werden selbst gehostet; die Benutzung der Workbench erfordert keine externen CDN-Zugriffe.
+Die Oberfläche unter `/` lädt ihre HTML-, CSS- und JavaScript-Ressourcen aus dem Classpath-Verzeichnis `app/src/main/resources/web/`. KaTeX, Cytoscape und die gepinnte Swagger UI werden selbst gehostet; die Benutzung der Workbench und ihrer technischen API-Referenz erfordert keine externen CDN-Zugriffe.

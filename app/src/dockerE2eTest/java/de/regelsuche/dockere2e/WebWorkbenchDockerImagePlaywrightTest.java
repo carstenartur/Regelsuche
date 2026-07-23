@@ -21,13 +21,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Playwright-based Docker-image tests that verify KaTeX actually renders
- * mathematical expressions in the real container (not just that the JS files
- * are served).
+ * Playwright-based Docker-image tests that verify KaTeX and Swagger UI actually
+ * render in the real container rather than merely checking that files exist.
  *
- * <p>The definitive check is finding at least one {@code .katex} element in the
- * DOM after clicking the Binomial demo button. Raw {@code $...$} strings and
- * {@code math-fallback} elements indicate KaTeX did not run.</p>
+ * <p>The definitive KaTeX check is finding at least one {@code .katex} element
+ * in the DOM after clicking the Binomial demo button. Raw {@code $...$} strings
+ * and {@code math-fallback} elements indicate KaTeX did not run.</p>
  *
  * <p>These tests skip when Docker is not available or when Playwright browsers
  * have not been installed ({@code ./gradlew installPlaywrightBrowsers}).</p>
@@ -117,6 +116,38 @@ class WebWorkbenchDockerImagePlaywrightTest {
                     }
                 }),
                 "Found visible .math-fallback elements – KaTeX rendering did not complete.");
+        }
+    }
+
+    @Test
+    void swaggerUiRendersFromApplicationImageWithoutExternalRequests() {
+        assumeTrue(browser != null, "Browser not initialized – skipping");
+
+        try (Page page = browser.newPage()) {
+            String localBaseUrl = baseUrl();
+            List<String> externalRequests = new java.util.ArrayList<>();
+            page.onRequest(request -> {
+                String url = request.url();
+                if ((url.startsWith("http://") || url.startsWith("https://"))
+                        && !url.startsWith(localBaseUrl)) {
+                    externalRequests.add(url);
+                }
+            });
+
+            page.navigate(localBaseUrl + "/static/openapi/index.html",
+                new Page.NavigateOptions().setTimeout(30_000));
+            page.waitForLoadState();
+            page.waitForSelector(".swagger-ui .opblock-tag",
+                new Page.WaitForSelectorOptions()
+                    .setState(WaitForSelectorState.VISIBLE)
+                    .setTimeout(30_000));
+
+            assertTrue(page.content().contains("Regelsuche REST API"),
+                "Swagger UI should render the Regelsuche API title");
+            assertTrue(page.content().contains("submitProofJob"),
+                "Swagger UI should render the proof-job operation contract");
+            assertTrue(externalRequests.isEmpty(),
+                "Swagger UI from the Docker image issued external requests: " + externalRequests);
         }
     }
 
