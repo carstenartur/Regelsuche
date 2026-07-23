@@ -5,6 +5,12 @@ on:
     branches: [main]
     paths:
       - .github/workflows/rule-radar-integration-patch.yml
+  schedule:
+    - cron: '*/5 * * * *'
+
+concurrency:
+  group: ast-rule-radar-fixed-head
+  cancel-in-progress: false
 
 permissions:
   contents: write
