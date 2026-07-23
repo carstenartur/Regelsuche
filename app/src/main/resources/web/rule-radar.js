@@ -133,7 +133,8 @@
         originVisible: new Set(ORIGINS),
         undo: [],
         zoom: 1,
-        search: null
+        search: null,
+        inspectionSequence: 0
     };
 
     const $ = (id) => document.getElementById(id);
@@ -183,11 +184,13 @@
     function inspect(options = {}) {
         const expression = (options.expression != null ? options.expression : $('radarExpression').value).trim();
         if (!expression) { setStatus('Bitte einen Ausdruck eingeben.', true); return Promise.resolve(); }
+        const requestSequence = ++state.inspectionSequence;
         setStatus('AST und lokale Regelanwendungen werden im Backend berechnet …');
         return post('/api/rule-radar/inspect', {
             expression,
             context: context(options)
         }).then(snapshot => {
+            if (requestSequence !== state.inspectionSequence) { return; }
             state.snapshot = snapshot;
             state.selectedId = options.selectedCandidateId || '';
             $('radarExpression').value = snapshot.expression || expression;
@@ -198,7 +201,11 @@
                 const t = snapshot.truncation || {};
                 setStatus(`${snapshot.nodes.length} AST-Knoten, ${t.returnedCandidateCount || 0} sichtbare von ${t.generatedCandidateCount || 0} konkreten Anwendungen${t.truncated ? ' (Budgetgrenze sichtbar ausgewiesen)' : ''}.`);
             }
-        }).catch(error => setStatus('Fehler: ' + error.message, true));
+        }).catch(error => {
+            if (requestSequence === state.inspectionSequence) {
+                setStatus('Fehler: ' + error.message, true);
+            }
+        });
     }
 
     function setStatus(message, error = false) {
@@ -280,7 +287,7 @@
             }).join('');
             const omitted = node.omittedCandidateCount > 0 ? `<text class="radar-omitted" x="${pos.x + radius - 4}" y="${pos.y + radius - 2}">+${node.omittedCandidateCount}</text>` : '';
             const selectedNode = local.some(candidate => candidate.candidateId === state.selectedId) ? ' selected-node' : '';
-            return `<g class="radar-ast-node${selectedNode}" role="treeitem" aria-label="${esc(node.nodeKind + ' ' + node.label + ', Position ' + node.pathKey + ', ' + node.candidateCount + ' Anwendungen')}">
+            return `<g class="radar-ast-node${selectedNode}" role="treeitem" aria-label="${esc(node.nodeKind + ' ' + node.label + ', Position ' + node.pathKey + ', ' + node.candidateIds.length + ' dargestellte Anwendungen, ' + node.omittedCandidateCount + ' ausgelassen, ' + node.candidateCount + ' insgesamt')}">
                 <circle class="radar-rule-halo" cx="${pos.x}" cy="${pos.y}" r="${radius}"></circle>
                 <circle class="radar-node-body" cx="${pos.x}" cy="${pos.y}" r="27"></circle>
                 <text class="radar-node-label" x="${pos.x}" y="${pos.y + 1}">${esc(node.label)}</text>
