@@ -19,6 +19,8 @@ def macroBatchSchema = macroBatchRepositoryRoot.file(
     'docs/schemas/regelsuche-candidate-independent-reusable-macro-batch-v1.schema.json')
 def macroBatchVerifier = macroBatchRepositoryRoot.file(
     'scripts/verify-candidate-independent-reusable-macro-batch.py')
+def macroBatchCanonicalizer = macroBatchRepositoryRoot.file(
+    'scripts/canonicalize-json-file.py')
 def macroBatchMainSource = macroBatchRepositoryRoot.file(
     'app/src/main/java/de/regelsuche/benchmark/CandidateIndependentReusableMacroBatchMain.java')
 def macroBatchAdapterSource = macroBatchRepositoryRoot.file(
@@ -32,6 +34,8 @@ def macroBatchReplaySource = macroBatchRepositoryRoot.file(
 
 def macroBatchBuildRoot = layout.buildDirectory.dir(
     'reports/candidate-independent-reusable-macro-batch')
+def macroBatchFirstRaw = macroBatchBuildRoot.map { it.file('first/raw-run.json') }
+def macroBatchSecondRaw = macroBatchBuildRoot.map { it.file('second/raw-run.json') }
 def macroBatchFirst = macroBatchBuildRoot.map { it.file('first/run.json') }
 def macroBatchSecond = macroBatchBuildRoot.map { it.file('second/run.json') }
 def macroBatchVerification = macroBatchBuildRoot.map { it.dir('verification') }
@@ -42,9 +46,9 @@ def macroBatchVerificationPython = macroBatchVerificationVenv.map { directory ->
     new File(directory.asFile, executable)
 }
 
-def configureMacroBatchRun = { task, outputFile ->
+def configureMacroBatchExecution = { task, outputFile ->
     task.group = 'verification'
-    task.description = 'Executes four frozen reusable-macro formation and paired-utility campaigns.'
+    task.description = 'Executes four frozen reusable-macro formation and paired-utility campaigns into raw JSON.'
     task.dependsOn ':app:classes', 'verifyCandidateIndependentCaseCorpus'
     task.classpath = files(macroBatchRuntimeClasspath)
     task.mainClass = 'de.regelsuche.benchmark.CandidateIndependentReusableMacroBatchMain'
@@ -70,16 +74,53 @@ def configureMacroBatchRun = { task, outputFile ->
     }
 }
 
-def runCandidateIndependentReusableMacroBatchFirst = tasks.register(
-    'runCandidateIndependentReusableMacroBatchFirst', JavaExec
+def configureMacroBatchCanonicalization = { task, rawFile, outputFile, executionTask ->
+    task.group = 'verification'
+    task.description = 'Canonicalizes one reusable-macro batch with deterministic object-key ordering.'
+    task.dependsOn 'prepareVerificationEnvironment', executionTask
+    task.workingDir macroBatchRepositoryRoot
+    task.inputs.file macroBatchCanonicalizer
+    task.inputs.file rawFile
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine macroBatchVerificationPython.get().absolutePath,
+            macroBatchCanonicalizer.asFile.absolutePath,
+            '--input', rawFile.get().asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath
+    }
+}
+
+def executeCandidateIndependentReusableMacroBatchFirstRaw = tasks.register(
+    'executeCandidateIndependentReusableMacroBatchFirstRaw', JavaExec
 ) {
-    configureMacroBatchRun(delegate, macroBatchFirst)
+    configureMacroBatchExecution(delegate, macroBatchFirstRaw)
+}
+
+def executeCandidateIndependentReusableMacroBatchSecondRaw = tasks.register(
+    'executeCandidateIndependentReusableMacroBatchSecondRaw', JavaExec
+) {
+    configureMacroBatchExecution(delegate, macroBatchSecondRaw)
+}
+
+def runCandidateIndependentReusableMacroBatchFirst = tasks.register(
+    'runCandidateIndependentReusableMacroBatchFirst', Exec
+) {
+    configureMacroBatchCanonicalization(
+        delegate,
+        macroBatchFirstRaw,
+        macroBatchFirst,
+        executeCandidateIndependentReusableMacroBatchFirstRaw)
 }
 
 def runCandidateIndependentReusableMacroBatchSecond = tasks.register(
-    'runCandidateIndependentReusableMacroBatchSecond', JavaExec
+    'runCandidateIndependentReusableMacroBatchSecond', Exec
 ) {
-    configureMacroBatchRun(delegate, macroBatchSecond)
+    configureMacroBatchCanonicalization(
+        delegate,
+        macroBatchSecondRaw,
+        macroBatchSecond,
+        executeCandidateIndependentReusableMacroBatchSecondRaw)
 }
 
 def verifyCandidateIndependentReusableMacroBatch = tasks.register(
@@ -87,8 +128,7 @@ def verifyCandidateIndependentReusableMacroBatch = tasks.register(
 ) {
     group = 'verification'
     description = 'Independently verifies macro formation isolation, paired best-first utility, resources and non-claims.'
-    dependsOn 'prepareVerificationEnvironment',
-        runCandidateIndependentReusableMacroBatchFirst,
+    dependsOn runCandidateIndependentReusableMacroBatchFirst,
         runCandidateIndependentReusableMacroBatchSecond
     workingDir macroBatchRepositoryRoot
     inputs.file macroBatchBenchmarkSource
@@ -97,7 +137,9 @@ def verifyCandidateIndependentReusableMacroBatch = tasks.register(
     inputs.file macroBatchFreezeReceipt
     inputs.file macroBatchSchema
     inputs.file macroBatchVerifier
-    inputs.files macroBatchFirst, macroBatchSecond
+    inputs.file macroBatchCanonicalizer
+    inputs.files macroBatchFirstRaw, macroBatchSecondRaw,
+        macroBatchFirst, macroBatchSecond
     outputs.dir macroBatchVerification
     outputs.upToDateWhen { false }
     doFirst {
