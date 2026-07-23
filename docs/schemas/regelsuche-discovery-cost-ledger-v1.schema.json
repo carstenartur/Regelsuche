@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-discovery-cost-ledger-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "benchmarkId", "repositoryRevision",
+    "benchmarkExecutionContentHash", "accountingPolicy",
+    "configuredCampaigns", "executedCampaigns", "challengeLedgers",
+    "aggregateResourceVector", "lifecycleCoverage",
+    "macroAmortizationReference", "overallAmortizationStatus",
+    "formalProofStatus", "externalNoveltyStatus",
+    "expertInterestingnessStatus", "publicationAuthorized", "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.discovery-cost-ledger/v1"},
+    "benchmarkId": {"const": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1"},
+    "repositoryRevision": {"type": "string", "minLength": 1},
+    "benchmarkExecutionContentHash": {"$ref": "#/$defs/hash"},
+    "accountingPolicy": {"const": "VECTOR_RESOURCES_NO_IMPLICIT_CONVERSION_OR_DOUBLE_COUNTING"},
+    "configuredCampaigns": {"const": 12},
+    "executedCampaigns": {"const": 12},
+    "challengeLedgers": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {"$ref": "#/$defs/challenge"}
+    },
+    "aggregateResourceVector": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {"$ref": "#/$defs/resource"}
+    },
+    "lifecycleCoverage": {
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "items": {"$ref": "#/$defs/coverage"}
+    },
+    "macroAmortizationReference": {"$ref": "#/$defs/amortization"},
+    "overallAmortizationStatus": {"const": "NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST_AND_SINGLE_CANDIDATE_STREAM"},
+    "formalProofStatus": {"const": "NOT_EVALUATED"},
+    "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+    "expertInterestingnessStatus": {"const": "NOT_EVALUATED"},
+    "publicationAuthorized": {"const": false},
+    "contentHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "nullableInteger": {"type": ["integer", "null"], "minimum": 0},
+    "resource": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dimension", "unit", "configured", "executed", "remaining", "status", "sourcePaths"],
+      "properties": {
+        "dimension": {"enum": ["EXPLORED_STATES", "GENERATED_SUCCESSORS", "CANDIDATE_EVALUATIONS", "PROOF_ATTEMPTS"]},
+        "unit": {"enum": ["state", "successor", "candidate", "attempt"]},
+        "configured": {"$ref": "#/$defs/nullableInteger"},
+        "executed": {"type": "integer", "minimum": 0},
+        "remaining": {"$ref": "#/$defs/nullableInteger"},
+        "status": {"enum": ["EXECUTED", "EXECUTED_WITHOUT_CONFIGURED_LIMIT", "CONFIGURED_NOT_EXECUTED"]},
+        "sourcePaths": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "stage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stage", "exploredStates", "candidateEvaluations", "proofAttempts", "status"],
+      "properties": {
+        "stage": {"enum": ["FORMATION", "HELD_OUT_EVALUATION", "PAIRED_HELD_OUT_EVALUATION", "FORMATION_AND_HELD_OUT_EVALUATION"]},
+        "exploredStates": {"type": "integer", "minimum": 0},
+        "candidateEvaluations": {"type": "integer", "minimum": 0},
+        "proofAttempts": {"type": "integer", "minimum": 0},
+        "status": {"enum": ["EXECUTED", "COMBINED_NOT_SEPARATELY_METERED", "RECONSTRUCTED_FROM_BALANCED_CAMPAIGN_AND_TASK_LEDGERS"]}
+      }
+    },
+    "challenge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["challengeId", "sourceContentHashes", "resourceVector", "stageBreakdown"],
+      "properties": {
+        "challengeId": {"enum": ["finite-difference-recurrences", "rational-assumption-rewrites", "reusable-search-macros"]},
+        "sourceContentHashes": {
+          "type": "array", "minItems": 1, "maxItems": 2,
+          "uniqueItems": true, "items": {"$ref": "#/$defs/hash"}
+        },
+        "resourceVector": {
+          "type": "array", "minItems": 3, "maxItems": 4,
+          "items": {"$ref": "#/$defs/resource"}
+        },
+        "stageBreakdown": {
+          "type": "array", "minItems": 1, "maxItems": 2,
+          "items": {"$ref": "#/$defs/stage"}
+        }
+      }
+    },
+    "coverage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stage", "status"],
+      "properties": {
+        "stage": {"enum": ["VALIDATION", "COUNTEREXAMPLE", "PROJECT_NOVELTY", "FORMAL_PROOF", "QUALIFICATION"]},
+        "status": {"enum": ["EMBEDDED_NOT_SEPARATELY_METERED", "NOT_EXECUTED_IN_BENCHMARK", "CONFIGURED_NOT_EXECUTED"]}
+      }
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["index", "taskId", "split", "outcome", "exploredStateSaving", "candidateEvaluationSaving", "cumulativeExploredStateSaving", "cumulativeCandidateEvaluationSaving"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 1, "maximum": 12},
+        "taskId": {"type": "string", "minLength": 1},
+        "split": {"enum": ["TRAIN", "VALIDATION", "TEST"]},
+        "outcome": {"enum": ["IMPROVED", "REACHABILITY_GAIN", "NO_IMPROVEMENT", "NO_RESULT"]},
+        "exploredStateSaving": {"type": "integer"},
+        "candidateEvaluationSaving": {"type": "integer"},
+        "cumulativeExploredStateSaving": {"type": "integer"},
+        "cumulativeCandidateEvaluationSaving": {"type": "integer"}
+      }
+    },
+    "decision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["decision", "firstTaskIndex", "finalNetSaving"],
+      "properties": {
+        "decision": {"enum": ["BREAK_EVEN_OBSERVED", "NO_BREAK_EVEN_OBSERVED"]},
+        "firstTaskIndex": {"type": ["integer", "null"], "minimum": 1, "maximum": 12},
+        "finalNetSaving": {"type": "integer"}
+      }
+    },
+    "amortization": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "campaignsWithIdenticalResult", "frozenTaskCount", "formationCost", "tasks", "breakEven", "totalLifecycleBreakEvenStatus"],
+      "properties": {
+        "status": {"const": "PARTIAL_VECTOR_RESULT_INCOMPLETE_LIFECYCLE_COST"},
+        "campaignsWithIdenticalResult": {"const": 4},
+        "frozenTaskCount": {"const": 12},
+        "formationCost": {
+          "type": "object", "additionalProperties": false,
+          "required": ["exploredStates", "candidateEvaluations"],
+          "properties": {
+            "exploredStates": {"const": 25},
+            "candidateEvaluations": {"const": 13}
+          }
+        },
+        "tasks": {
+          "type": "array", "minItems": 12, "maxItems": 12,
+          "items": {"$ref": "#/$defs/task"}
+        },
+        "breakEven": {
+          "type": "object", "additionalProperties": false,
+          "required": ["exploredStates", "candidateEvaluations"],
+          "properties": {
+            "exploredStates": {"$ref": "#/$defs/decision"},
+            "candidateEvaluations": {"$ref": "#/$defs/decision"}
+          }
+        },
+        "totalLifecycleBreakEvenStatus": {"const": "NOT_ESTABLISHED_UNEXECUTED_LIFECYCLE_STAGES"}
+      }
+    }
+  }
+}
