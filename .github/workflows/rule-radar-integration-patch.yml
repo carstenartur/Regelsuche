@@ -7,9 +7,11 @@ on:
       - .github/workflows/rule-radar-integration-patch.yml
   schedule:
     - cron: '*/5 * * * *'
+  issue_comment:
+    types: [created]
 
 concurrency:
-  group: ast-rule-radar-synchronized-suite-v7
+  group: ast-rule-radar-explicit-final-v8
   cancel-in-progress: false
 
 permissions:
@@ -17,6 +19,13 @@ permissions:
 
 jobs:
   verify-fixed-head:
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       github.event.issue.number == 468 &&
+       github.event.comment.body == '/verify-rule-radar-final')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
