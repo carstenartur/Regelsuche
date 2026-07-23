@@ -60,6 +60,8 @@ class OpenApiStaticReferenceTest {
         assertTrue(page.body().contains("vendor/swagger-ui-bundle.js"));
         assertTrue(page.body().contains("vendor/swagger-ui-standalone-preset.js"));
         assertTrue(page.body().contains("vendor/swagger-ui.css"));
+        assertTrue(page.body().contains("href=\"vendor/LICENSE\""));
+        assertTrue(page.body().contains("href=\"vendor/NOTICE\""));
         assertFalse(page.body().contains("https://"), "the reference page must not load CDN assets");
         assertFalse(page.body().contains("http://"), "the reference page must not load external assets");
 
@@ -93,6 +95,12 @@ class OpenApiStaticReferenceTest {
         StaticResource license = get("/static/openapi/vendor/LICENSE");
         assertEquals(200, license.status());
         assertTrue(license.body().contains("Apache License"));
+        assertTrue(license.body().contains("Version 2.0, January 2004"));
+
+        StaticResource notice = get("/static/openapi/vendor/NOTICE");
+        assertEquals(200, notice.status());
+        assertTrue(notice.body().contains("swagger-ui"));
+        assertTrue(notice.body().contains("SmartBear Software Inc."));
 
         StaticResource specification = get("/static/openapi/openapi.json");
         assertEquals(200, specification.status());
