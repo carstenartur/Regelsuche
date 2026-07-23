@@ -58,6 +58,32 @@ class RuleRadarSearchServiceTest {
     }
 
     @Test
+    void canonicalMergeKeepsAllIncomingApplicationsWithoutDuplicateState() {
+        AstRuleRadar.SearchResult result = search.search(new RuleRadarSearchService.SearchRequest(
+            "(x + 0) + 0",
+            "",
+            AstRuleRadar.Context.defaults(),
+            1,
+            50,
+            50));
+
+        AstRuleRadar.SearchState retained = result.states().stream()
+            .filter(state -> state.expression().replace(" ", "").equals("x+0"))
+            .findFirst().orElseThrow();
+        long incoming = result.edges().stream()
+            .filter(edge -> retained.stateId().equals(edge.toStateId()))
+            .count();
+        assertTrue(incoming >= 2, "root and nested add-zero applications must both remain visible");
+        assertEquals(1, result.states().stream()
+            .filter(state -> retained.canonicalExpression().equals(state.canonicalExpression()))
+            .count(), "canonical successor state must not be duplicated");
+        assertTrue(result.edges().stream().anyMatch(edge ->
+            retained.stateId().equals(edge.toStateId())
+                && (edge.outcome() == AstRuleRadar.CandidateOutcome.PRUNED_DUPLICATE
+                    || edge.outcome() == AstRuleRadar.CandidateOutcome.PRUNED_KNOWN_BETTER)));
+    }
+
+    @Test
     void globalStateBudgetIsReportedAsPruningNotMathematicalFailure() {
         AstRuleRadar.SearchResult result = search.search(new RuleRadarSearchService.SearchRequest(
             "(x + 1)^2 + 0",
