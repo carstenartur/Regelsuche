@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-independent-review-blinded-packet-v1.schema.json",
+  "title": "Regelsuche blinded independent-review packet v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema","packetId","studyPlanHash","reviewerInstructionsHash","reviewerInstructions","blindedPresentation","relevanceScalePermille","confidenceScalePermille","rationaleCodes","blindReviewRequired","reviewCollectionStatus","contentHash"],
+  "properties": {
+    "schema": {"const": "regelsuche.independent-review-blinded-packet/v1"},
+    "packetId": {"type": "string", "pattern": "^packet-[0-9a-f]{24}$"},
+    "studyPlanHash": {"$ref": "#/$defs/sha256"},
+    "reviewerInstructionsHash": {"$ref": "#/$defs/sha256"},
+    "reviewerInstructions": {"type": "string", "minLength": 1},
+    "blindedPresentation": {"type": "string", "minLength": 1},
+    "relevanceScalePermille": {"$ref": "#/$defs/scale"},
+    "confidenceScalePermille": {"$ref": "#/$defs/scale"},
+    "rationaleCodes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "blindReviewRequired": {"const": true},
+    "reviewCollectionStatus": {"const": "NOT_COLLECTED"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "scale": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "integer", "minimum": 0, "maximum": 1000}}
+  }
+}
