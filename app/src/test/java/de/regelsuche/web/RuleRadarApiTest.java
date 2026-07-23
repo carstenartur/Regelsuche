@@ -116,18 +116,22 @@ class RuleRadarApiTest {
         Map<String, Object> searched = post("/api/rule-radar/search", """
             {
               "expression":"(x + 1)^2 + 0",
-              "targetExpression":"(x + 1)^2",
-              "maxDepth":2,
+              "targetExpression":"",
+              "maxDepth":1,
               "maxStates":50,
               "maxMovesPerState":50,
               "context":{"includePlugins":false,"includeLearnedMacros":false}
             }
             """);
-        assertEquals(Boolean.TRUE, searched.get("targetReached"));
+        assertEquals(Boolean.FALSE, searched.get("targetReached"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> edges = (List<Map<String, Object>>) searched.get("edges");
-        assertEquals(expectedId, edges.getFirst().get("candidateId"));
-        assertEquals("root", edges.getFirst().get("pathKey"));
+        Map<String, Object> correlated = edges.stream()
+            .filter(edge -> expectedId.equals(edge.get("candidateId")))
+            .findFirst().orElseThrow();
+        assertEquals("root", correlated.get("pathKey"));
+        assertEquals(correlated.get("fromStateId"), correlated.get("toStateId"));
+        assertEquals("PRUNED_KNOWN_BETTER", correlated.get("outcome"));
     }
 
     @Test

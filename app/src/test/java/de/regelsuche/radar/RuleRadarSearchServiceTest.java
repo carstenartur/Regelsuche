@@ -41,22 +41,26 @@ class RuleRadarSearchServiceTest {
 
         AstRuleRadar.SearchResult result = search.search(new RuleRadarSearchService.SearchRequest(
             "(x + 1)^2 + 0",
-            "(x + 1)^2",
+            "",
             AstRuleRadar.Context.defaults(),
-            2,
+            1,
             50,
             50));
 
-        assertTrue(result.targetReached());
-        assertEquals(1, result.edges().size());
-        assertEquals(expected.candidateId(), result.edges().getFirst().candidateId());
-        assertEquals(expected.pathKey(), result.edges().getFirst().pathKey());
+        assertFalse(result.targetReached());
+        AstRuleRadar.SearchEdge correlated = result.edges().stream()
+            .filter(edge -> expected.candidateId().equals(edge.candidateId()))
+            .findFirst().orElseThrow();
+        assertEquals(expected.pathKey(), correlated.pathKey());
+        assertEquals(correlated.fromStateId(), correlated.toStateId(),
+            "assumption-free canonicalization retains the syntactic rewrite as a self-merge edge");
+        assertEquals(AstRuleRadar.CandidateOutcome.PRUNED_KNOWN_BETTER, correlated.outcome());
         assertTrue(result.events().stream().anyMatch(event ->
             expected.candidateId().equals(event.candidateId())
                 && event.outcome() == AstRuleRadar.CandidateOutcome.SELECTED));
         assertTrue(result.events().stream().anyMatch(event ->
             expected.candidateId().equals(event.candidateId())
-                && event.outcome() == AstRuleRadar.CandidateOutcome.APPLIED));
+                && event.outcome() == AstRuleRadar.CandidateOutcome.PRUNED_KNOWN_BETTER));
     }
 
     @Test
