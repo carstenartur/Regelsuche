@@ -116,6 +116,7 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 ## Architektur und Entwicklung
 
 - [Architektur](architecture.md)
+- [AST-Regelradar](ast-rule-radar.md) — präzises Modell von AST-Positionen, lokal anwendbaren Grund- und Makroregeln, Subtree-Rewrite und globalem Suchgraph.
 - [Modulstruktur](module-structure.md)
 - [Dependency-Regeln](dependency-rules.md)
 - [Developer Guide](developer-guide.md)
