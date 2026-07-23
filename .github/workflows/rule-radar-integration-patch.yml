@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   patch-and-verify:
+    # Final fixed-head run for PR #468; no feature commits occur during this lifecycle.
     if: >-
       github.event_name == 'push' ||
       github.event_name == 'schedule' ||
