@@ -56,49 +56,162 @@ public final class EvolutionPopulationEngine {
         MutationCatalog mutationCatalog,
         TrainFitnessEvaluator evaluator
     ) {
+        validateInputs(plan, mutationCatalog, evaluator);
+        ExecutionState state = initialState(plan, seedGenomes);
+        executeGenerations(
+            plan,
+            mutationCatalog,
+            evaluator,
+            state,
+            1,
+            plan.populationPolicy().generationCount());
+        return completeRun(plan, seedGenomes, state);
+    }
+
+    /**
+     * Executes an exact TRAIN prefix and returns a resumable, content-addressed
+     * checkpoint without evaluating VALIDATION or FINAL TEST data.
+     */
+    public EvolutionPopulationCheckpoint checkpoint(
+        EvolutionStudyPlan plan,
+        List<EvolutionGenome> seedGenomes,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator,
+        int completedGeneration
+    ) {
+        validateInputs(plan, mutationCatalog, evaluator);
+        int generationCount = plan.populationPolicy().generationCount();
+        if (completedGeneration < 1 || completedGeneration >= generationCount) {
+            throw new IllegalArgumentException(
+                "completedGeneration must be in [1,generationCount-1]");
+        }
+        ExecutionState state = initialState(plan, seedGenomes);
+        executeGenerations(
+            plan,
+            mutationCatalog,
+            evaluator,
+            state,
+            1,
+            completedGeneration);
+        if (state.terminal != null) {
+            throw new IllegalStateException(
+                "terminal population run cannot produce a resumable checkpoint: "
+                    + state.terminal);
+        }
+        return EvolutionPopulationCheckpoint.create(
+            plan,
+            mutationCatalog,
+            seedGenomes,
+            completedGeneration,
+            state.population,
+            state.evaluations.values(),
+            state.reports,
+            state.budget.mutationAttempts,
+            state.budget.trainEvaluations);
+    }
+
+    /** Resumes one previously verified TRAIN checkpoint. */
+    public PopulationRun resume(
+        EvolutionStudyPlan plan,
+        List<EvolutionGenome> seedGenomes,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator,
+        EvolutionPopulationCheckpoint checkpoint
+    ) {
+        validateInputs(plan, mutationCatalog, evaluator);
+        Objects.requireNonNull(checkpoint, "checkpoint");
+        checkpoint.requireCompatible(plan, mutationCatalog, seedGenomes);
+        ExecutionState state = new ExecutionState(
+            checkpoint.population(),
+            checkpoint.evaluationsByGenomeHash(),
+            checkpoint.mutationAttempts(),
+            checkpoint.trainEvaluations(),
+            checkpoint.generationReports());
+        executeGenerations(
+            plan,
+            mutationCatalog,
+            evaluator,
+            state,
+            checkpoint.nextGeneration(),
+            plan.populationPolicy().generationCount());
+        return completeRun(plan, seedGenomes, state);
+    }
+
+    private static void validateInputs(
+        EvolutionStudyPlan plan,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator
+    ) {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(mutationCatalog, "mutationCatalog");
         Objects.requireNonNull(evaluator, "evaluator");
+    }
 
-        List<EvolutionGenome> population = validateSeeds(plan, seedGenomes);
-        Map<String, CandidateEvaluation> evaluations = new HashMap<>();
-        BudgetLedger budget = new BudgetLedger();
-        List<GenerationReport> reports = new ArrayList<>();
-        TerminalOutcome terminal = null;
+    private static ExecutionState initialState(
+        EvolutionStudyPlan plan,
+        List<EvolutionGenome> seedGenomes
+    ) {
+        return new ExecutionState(
+            validateSeeds(plan, seedGenomes),
+            Map.of(),
+            0,
+            0,
+            List.of());
+    }
 
-        for (int generation = 1;
-                generation <= plan.populationPolicy().generationCount();
+    private void executeGenerations(
+        EvolutionStudyPlan plan,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator,
+        ExecutionState state,
+        int firstGeneration,
+        int lastGeneration
+    ) {
+        for (int generation = firstGeneration;
+                generation <= lastGeneration;
                 generation++) {
-            evaluate(plan, population, evaluator, evaluations, budget);
-            List<EvolutionGenome> parents = eligible(population, evaluations);
+            evaluate(
+                plan,
+                state.population,
+                evaluator,
+                state.evaluations,
+                state.budget);
+            List<EvolutionGenome> parents = eligible(
+                state.population, state.evaluations);
             if (parents.isEmpty()) {
-                reports.add(GenerationReport.create(
+                state.reports.add(GenerationReport.create(
                     generation,
-                    candidateEvaluations(population, evaluations),
+                    candidateEvaluations(state.population, state.evaluations),
                     List.of(),
                     List.of(),
                     List.of(),
                     0,
-                    budget.mutationAttempts,
-                    budget.trainEvaluations,
+                    state.budget.mutationAttempts,
+                    state.budget.trainEvaluations,
                     GenerationOutcome.EXTINCT));
-                population = List.of();
-                terminal = TerminalOutcome.EXTINCT;
-                break;
+                state.population = List.of();
+                state.terminal = TerminalOutcome.EXTINCT;
+                return;
             }
 
             MutationRound mutations = mutate(
                 plan,
                 generation,
                 parents,
-                population,
+                state.population,
                 mutationCatalog,
-                budget);
-            evaluate(plan, mutations.children(), evaluator, evaluations, budget);
+                state.budget);
+            evaluate(
+                plan,
+                mutations.children(),
+                evaluator,
+                state.evaluations,
+                state.budget);
 
-            List<EvolutionGenome> pool = merge(population, mutations.children());
+            List<EvolutionGenome> pool = merge(
+                state.population, mutations.children());
             List<EvolutionGenome> selected = select(
-                plan, population, pool, evaluations);
+                plan, state.population, pool, state.evaluations);
             int distinctStructures = Math.toIntExact(selected.stream()
                 .map(EvolutionGenome::alphaStructuralHash)
                 .distinct()
@@ -106,41 +219,47 @@ public final class EvolutionPopulationEngine {
             GenerationOutcome outcome = outcome(
                 plan,
                 generation,
-                population,
+                state.population,
                 selected,
                 mutations,
                 distinctStructures,
-                budget);
+                state.budget);
 
-            reports.add(GenerationReport.create(
+            state.reports.add(GenerationReport.create(
                 generation,
-                candidateEvaluations(pool, evaluations),
+                candidateEvaluations(pool, state.evaluations),
                 selected.stream().map(EvolutionGenome::contentHash).toList(),
                 mutations.lineage(),
                 mutations.rejections(),
                 distinctStructures,
-                budget.mutationAttempts,
-                budget.trainEvaluations,
+                state.budget.mutationAttempts,
+                state.budget.trainEvaluations,
                 outcome));
-            population = selected;
+            state.population = selected;
 
             if (outcome != GenerationOutcome.CONTINUE) {
-                terminal = outcome.terminal();
-                break;
+                state.terminal = outcome.terminal();
+                return;
             }
         }
+    }
 
-        if (terminal == null) {
-            terminal = TerminalOutcome.COMPLETED;
-        }
+    private static PopulationRun completeRun(
+        EvolutionStudyPlan plan,
+        List<EvolutionGenome> seedGenomes,
+        ExecutionState state
+    ) {
+        TerminalOutcome terminal = state.terminal == null
+            ? TerminalOutcome.COMPLETED
+            : state.terminal;
         return PopulationRun.create(
             plan,
             seedGenomes,
-            reports,
-            population,
+            state.reports,
+            state.population,
             terminal,
-            budget.mutationAttempts,
-            budget.trainEvaluations);
+            state.budget.mutationAttempts,
+            state.budget.trainEvaluations);
     }
 
     private MutationRound mutate(
@@ -1193,6 +1312,29 @@ public final class EvolutionPopulationEngine {
                     .toList(),
                 canonicalLineage(lineage),
                 canonicalRejections(rejections));
+        }
+    }
+
+    private static final class ExecutionState {
+        private List<EvolutionGenome> population;
+        private final Map<String, CandidateEvaluation> evaluations;
+        private final BudgetLedger budget;
+        private final List<GenerationReport> reports;
+        private TerminalOutcome terminal;
+
+        private ExecutionState(
+            List<EvolutionGenome> population,
+            Map<String, CandidateEvaluation> evaluations,
+            int mutationAttempts,
+            int trainEvaluations,
+            List<GenerationReport> reports
+        ) {
+            this.population = List.copyOf(population);
+            this.evaluations = new HashMap<>(evaluations);
+            this.budget = new BudgetLedger();
+            this.budget.mutationAttempts = mutationAttempts;
+            this.budget.trainEvaluations = trainEvaluations;
+            this.reports = new ArrayList<>(reports);
         }
     }
 
