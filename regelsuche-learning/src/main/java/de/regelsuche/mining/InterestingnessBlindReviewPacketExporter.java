@@ -332,8 +332,13 @@ public final class InterestingnessBlindReviewPacketExporter {
     }
 
     private static String hash(Map<String, Object> value) {
-        return InterestingnessIndependentReviewStudy.sha256(
-            InterestingnessIndependentReviewStudy.canonicalBytes(value));
+        try {
+            return InterestingnessIndependentReviewStudy.sha256(
+                JSON.writeValueAsBytes(value));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException(
+                "cannot hash blind-review packet", exception);
+        }
     }
 
     private static Map<String, Object> map(Object... values) {
