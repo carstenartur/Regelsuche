@@ -36,7 +36,8 @@ class RuleRadarBrowserFlowTest {
         System.getProperty("regelsuche.recordDocs", "false"));
     private static final Path SCREENSHOT = Paths.get("..", "docs", "assets", "screenshots", "ast-rule-radar.png")
         .toAbsolutePath().normalize();
-    private static final Pattern CANDIDATE_COUNT = Pattern.compile(", (\\d+) Anwendungen$");
+    private static final Pattern CANDIDATE_COUNTS = Pattern.compile(
+        ", (\\d+) dargestellte Anwendungen, (\\d+) ausgelassen, (\\d+) insgesamt$");
 
     private static RegelsucheAppEnvironment app;
     private static Playwright playwright;
@@ -93,10 +94,15 @@ class RuleRadarBrowserFlowTest {
         Locator treeNodes = page.locator("#radarTree .radar-ast-node");
         for (int index = 0; index < treeNodes.count(); index++) {
             Locator node = treeNodes.nth(index);
-            Matcher matcher = CANDIDATE_COUNT.matcher(node.getAttribute("aria-label"));
+            Matcher matcher = CANDIDATE_COUNTS.matcher(node.getAttribute("aria-label"));
             assertTrue(matcher.find());
-            assertEquals(Integer.parseInt(matcher.group(1)), node.locator(".radar-move-point").count(),
-                "each visual circle must contain exactly its advertised API candidates");
+            int visible = Integer.parseInt(matcher.group(1));
+            int omitted = Integer.parseInt(matcher.group(2));
+            int total = Integer.parseInt(matcher.group(3));
+            assertEquals(visible, node.locator(".radar-move-point").count(),
+                "each visual circle must contain exactly its advertised visible API candidates");
+            assertEquals(total, visible + omitted,
+                "the accessible count must reconcile visible and explicitly omitted candidates");
         }
 
         // Focus alone exposes the full details and a projected global edge;
