@@ -232,6 +232,36 @@
         }
       }
     },
+    "/api/exports/cluster/{clusterId}.md": {
+      "get": {
+        "tags": ["Exports"],
+        "operationId": "downloadClusterMarkdown",
+        "summary": "Suchgraph-Cluster als Markdown laden",
+        "x-regelsuche-context": "/api/exports",
+        "parameters": [{"name": "clusterId", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"200": {"description": "Markdown-Darstellung des Clusters", "content": {"text/plain": {"schema": {"type": "string"}}}}}
+      }
+    },
+    "/api/exports/path/{pathId}.tex": {
+      "get": {
+        "tags": ["Exports"],
+        "operationId": "downloadPathLatex",
+        "summary": "Rechenweg als LaTeX laden",
+        "x-regelsuche-context": "/api/exports",
+        "parameters": [{"$ref": "#/components/parameters/PathId"}],
+        "responses": {"200": {"description": "LaTeX-Darstellung des Rechenwegs", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
+    "/api/exports/identity/{identityId}.md": {
+      "get": {
+        "tags": ["Exports"],
+        "operationId": "downloadIdentityMarkdown",
+        "summary": "Emergente Identität als Markdown laden",
+        "x-regelsuche-context": "/api/exports",
+        "parameters": [{"$ref": "#/components/parameters/IdentityId"}],
+        "responses": {"200": {"description": "Markdown-Darstellung der Identität", "content": {"text/plain": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
+      }
+    },
     "/api/explain/{pathId}": {
       "get": {
         "tags": ["Analysis"],
@@ -525,17 +555,20 @@
         "responses": {"200": {"description": "Markdown-Export", "content": {"text/markdown": {"schema": {"type": "string"}}}}, "404": {"$ref": "#/components/responses/NotFound"}}
       }
     },
-    "/api/inspect": {
-      "post": {
+    "/api/inspect/tree": {
+      "get": {
         "tags": ["Rule Inspection"],
         "operationId": "inspectExpressionRules",
         "summary": "Baumpositionen und lokale Regelmatches inspizieren",
         "x-regelsuche-context": "/api/inspect",
-        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/InspectRequest"}}}},
+        "parameters": [
+          {"name": "expression", "in": "query", "required": true, "schema": {"type": "string"}},
+          {"name": "selectedPathKey", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
         "responses": {"200": {"description": "Positionen, Matches, Bindungen und Vorschauen", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/JsonObject"}}}}, "400": {"$ref": "#/components/responses/BadRequest"}}
       }
     },
-    "/api/inspect/apply": {
+    "/api/inspect/tree/apply": {
       "post": {
         "tags": ["Rule Inspection"],
         "operationId": "applyInspectedRule",
@@ -654,14 +687,10 @@
           "difficulty": {"type": "string", "default": "MITTELSTUFE"}
         }
       },
-      "InspectRequest": {
-        "type": "object",
-        "required": ["expression"],
-        "properties": {"expression": {"type": "string"}, "pathKey": {"type": "string"}}
-      },
       "InspectApplyRequest": {
         "type": "object",
         "required": ["expression", "pathKey"],
+        "anyOf": [{"required": ["matchId"]}, {"required": ["matchIndex"]}],
         "properties": {
           "expression": {"type": "string"},
           "pathKey": {"type": "string"},

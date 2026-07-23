@@ -14,22 +14,15 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class OpenApiStaticReferenceTest {
-    private static final Pattern REGISTERED_API_CONTEXT =
-        Pattern.compile("createContext\\(\\\"(/api/[^\\\"]+)\\\"");
     private static final Set<String> HTTP_METHODS =
         Set.of("get", "post", "put", "patch", "delete", "options", "head");
 
@@ -59,6 +52,33 @@ class OpenApiStaticReferenceTest {
         assertTrue(workbench.body().contains("Technische REST-Referenz"));
         assertTrue(workbench.body().contains("href=\"/static/openapi/index.html\""));
         assertTrue(workbench.body().contains("href=\"/static/openapi/openapi.json\""));
+    }
+
+    @Test
+    void enforcesDocumentedMethodsAndConcretePathTemplatesBeforeDispatch() throws IOException {
+        StaticResource pathsWithWrongMethod = request("POST", "/api/paths");
+        assertEquals(405, pathsWithWrongMethod.status());
+        assertTrue(pathsWithWrongMethod.allow().contains("GET"));
+
+        StaticResource searchWithWrongMethod = request("GET", "/api/search");
+        assertEquals(405, searchWithWrongMethod.status());
+        assertTrue(searchWithWrongMethod.allow().contains("POST"));
+
+        StaticResource undocumentedSubpath = get("/api/paths/example/undocumented");
+        assertEquals(404, undocumentedSubpath.status());
+        assertTrue(undocumentedSubpath.body().contains("API route not found"));
+
+        StaticResource canonicalInspectRoute = get("/api/inspect/tree");
+        assertEquals(400, canonicalInspectRoute.status());
+        assertTrue(canonicalInspectRoute.body().contains("expression query parameter is required"));
+
+        StaticResource inspectWithWrongMethod = request("POST", "/api/inspect/tree");
+        assertEquals(405, inspectWithWrongMethod.status());
+        assertTrue(inspectWithWrongMethod.allow().contains("GET"));
+
+        StaticResource obsoleteInspectRoute = request("POST", "/api/inspect");
+        assertEquals(404, obsoleteInspectRoute.status());
+        assertTrue(obsoleteInspectRoute.body().contains("API route not found"));
     }
 
     @Test
@@ -158,13 +178,13 @@ class OpenApiStaticReferenceTest {
         assertTrue(operationCount >= 45, "the first public contract must cover the complete workbench surface");
         assertTrue(usedTags.containsAll(Set.of(
             "Search", "Paths", "Search Graph", "Proof Jobs", "Didactics", "Rule Radar")));
-        assertEquals(registeredApiContexts(), documentedContexts,
-            "OpenAPI context extensions must exactly match production registrations");
+        assertEquals(OpenApiRouteRegistry.load().contexts(), documentedContexts,
+            "OpenAPI context extensions must exactly match the executable route registry");
     }
 
     @Test
     void everyOpenApiPathBelongsToItsExplicitRegisteredContext() throws IOException {
-        Set<String> registeredContexts = registeredApiContexts();
+        Set<String> registeredContexts = OpenApiRouteRegistry.load().contexts();
         Map<String, Object> paths = object(specification().get("paths"));
         assertFalse(registeredContexts.isEmpty());
         assertFalse(paths.isEmpty());
@@ -191,39 +211,19 @@ class OpenApiStaticReferenceTest {
         }
     }
 
-    private Set<String> registeredApiContexts() throws IOException {
-        Path source = locateServerSource();
-        String java = Files.readString(source, StandardCharsets.UTF_8);
-        Matcher matcher = REGISTERED_API_CONTEXT.matcher(java);
-        Set<String> result = new LinkedHashSet<>();
-        while (matcher.find()) {
-            result.add(matcher.group(1));
-        }
-        return result;
-    }
-
-    private Path locateServerSource() {
-        List<Path> candidates = new ArrayList<>();
-        candidates.add(Path.of("src/main/java/de/regelsuche/web/WebWorkbenchServer.java"));
-        candidates.add(Path.of("app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java"));
-        candidates.add(Path.of("..", "app", "src", "main", "java", "de", "regelsuche", "web",
-            "WebWorkbenchServer.java"));
-        return candidates.stream()
-            .map(Path::normalize)
-            .filter(Files::isRegularFile)
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException("cannot locate WebWorkbenchServer.java from "
-                + Path.of("").toAbsolutePath()));
-    }
-
     private StaticResource get(String path) throws IOException {
+        return request("GET", path);
+    }
+
+    private StaticResource request(String method, String path) throws IOException {
         URI uri = URI.create("http://127.0.0.1:" + server.boundPort() + path);
         HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
         connection.setConnectTimeout(2_000);
         connection.setReadTimeout(10_000);
-        connection.setRequestMethod("GET");
+        connection.setRequestMethod(method);
         int status = connection.getResponseCode();
         String contentType = connection.getHeaderField("Content-Type");
+        String allow = connection.getHeaderField("Allow");
         InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
         String body;
         if (stream == null) {
@@ -233,7 +233,12 @@ class OpenApiStaticReferenceTest {
                 body = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
             }
         }
-        return new StaticResource(status, contentType == null ? "" : contentType, body);
+        return new StaticResource(
+            status,
+            contentType == null ? "" : contentType,
+            body,
+            allow == null ? "" : allow
+        );
     }
 
     @SuppressWarnings("unchecked")
@@ -246,6 +251,6 @@ class OpenApiStaticReferenceTest {
         return value instanceof List<?> values ? (List<Object>) values : List.of();
     }
 
-    private record StaticResource(int status, String contentType, String body) {
+    private record StaticResource(int status, String contentType, String body, String allow) {
     }
 }
