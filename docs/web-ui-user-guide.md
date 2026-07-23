@@ -12,6 +12,13 @@ Die technische REST-Referenz wird separat über Swagger/OpenAPI gepflegt. Dieses
 
 Danach im Browser `http://127.0.0.1:8080/` öffnen.
 
+Die lokal gestartete Instanz stellt zusätzlich die technische Referenz bereit:
+
+- **Swagger UI:** `http://127.0.0.1:8080/static/openapi/index.html`
+- **OpenAPI 3.1 JSON:** `http://127.0.0.1:8080/static/openapi/openapi.json`
+
+Beide Zugänge sind auch über den Tab **Hilfe** erreichbar und laden keine Assets von einem CDN.
+
 ## Einstieg über die Demo-Karten
 
 Der Startbereich bietet vorbereitete Aufgaben für binomische Formeln, Bruchkürzung, Trigonometrie, Polynom-Expansion, Makroregel-Lernen, Gleichungen, Ungleichungen, Ableitungen und Matrizen.
@@ -116,7 +123,7 @@ Das Regelradar behauptet keine mathematische Vollständigkeit. Es zeigt die im a
 
 ### Hilfe
 
-Der Tab **Hilfe** enthält Syntax, Begriffe und kurze Bedienhinweise. Technische Request- und Response-Verträge gehören nicht hierher, sondern in Swagger/OpenAPI.
+Der Tab **Hilfe** enthält Syntax, Begriffe und kurze Bedienhinweise. Zusätzlich bietet er sichtbare Schaltflächen für die lokale Swagger-UI und das OpenAPI-JSON. Technische Request- und Response-Verträge werden dort nicht dupliziert, sondern ausschließlich aus der kanonischen OpenAPI-Spezifikation dargestellt.
 
 ## Sicherheit
 
@@ -144,4 +151,4 @@ Details zur Implementierung stehen in [Replay Mode](replay-mode.md), [Visual Sea
 
 ## Technische API-Zuordnung
 
-Die grafischen Funktionen verwenden intern die REST-API. Für direkte Integrationen und technische Tests ist die Swagger/OpenAPI-Dokumentation der laufenden Installation verbindlich. Dieses Handbuch nennt deshalb keine HTTP-Pfade, Payloads oder Statuscode-Verträge. Siehe [Dokumentationskonvention](documentation-conventions.md).
+Die grafischen Funktionen verwenden intern die REST-API. Für direkte Integrationen und technische Tests ist die Swagger/OpenAPI-Dokumentation der laufenden Installation verbindlich. Die Swagger-UI liegt unter `http://127.0.0.1:8080/static/openapi/index.html`, die maschinenlesbare OpenAPI-3.1-Spezifikation unter `http://127.0.0.1:8080/static/openapi/openapi.json`. Dieses Handbuch nennt deshalb keine HTTP-Pfade, Payloads oder Statuscode-Verträge. Siehe [Dokumentationskonvention](documentation-conventions.md).
