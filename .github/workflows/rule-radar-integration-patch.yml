@@ -1,32 +1,16 @@
-name: Apply and verify AST rule radar integration
+name: Verify AST rule radar integration once
 
 on:
   push:
     branches: [main]
     paths:
       - .github/workflows/rule-radar-integration-patch.yml
-  schedule:
-    - cron: '*/5 * * * *'
-  issue_comment:
-    types: [created]
-
-concurrency:
-  group: ast-rule-radar-integration
-  cancel-in-progress: true
 
 permissions:
   contents: write
-  pull-requests: read
 
 jobs:
-  patch-and-verify:
-    # Final fixed-head run for PR #468; no feature commits occur during this lifecycle.
-    if: >-
-      github.event_name == 'push' ||
-      github.event_name == 'schedule' ||
-      (github.event.issue.pull_request &&
-       github.event.issue.number == 468 &&
-       github.event.comment.body == '/apply-rule-radar-integration')
+  verify-fixed-head:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -44,10 +28,10 @@ jobs:
           else
             echo 'skip=false' >> "$GITHUB_OUTPUT"
           fi
-      - name: Apply strict integration anchors
+      - name: Apply remaining strict integration anchors
         if: steps.completed.outputs.skip != 'true'
         run: python3 tools/apply-rule-radar-integration.py
-      - name: Commit direct source integration before verification
+      - name: Persist remaining direct integration
         if: steps.completed.outputs.skip != 'true'
         shell: bash
         run: |
@@ -60,9 +44,7 @@ jobs:
                   app/src/main/resources/web/rule-radar.css \
                   docs/README.md \
                   docs/ast-rule-radar.md
-          if git diff --cached --quiet; then
-            echo "Direct integration is already committed."
-          else
+          if ! git diff --cached --quiet; then
             git commit -m "Complete AST rule radar workbench integration"
             git push origin HEAD:issue-467-ast-rule-radar
           fi
@@ -78,7 +60,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3-venv z3
-      - name: Run complete repository verification and record radar evidence
+      - name: Run complete repository verification and browser evidence capture
         if: steps.completed.outputs.skip != 'true'
         id: verification
         shell: bash
@@ -122,7 +104,7 @@ jobs:
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Commit verification status and generated browser evidence
+      - name: Commit verification evidence
         if: steps.completed.outputs.skip != 'true'
         shell: bash
         run: |
@@ -130,12 +112,10 @@ jobs:
           if test -s docs/assets/screenshots/ast-rule-radar.png; then
             git add docs/assets/screenshots/ast-rule-radar.png
           fi
-          if git diff --cached --quiet; then
-            echo "No verification evidence change required."
-          else
+          if ! git diff --cached --quiet; then
             git commit -m "Record AST rule radar verification evidence"
             git push origin HEAD:issue-467-ast-rule-radar
           fi
-      - name: Fail verification when lifecycle or documentation evidence failed
+      - name: Fail when verification failed
         if: steps.completed.outputs.skip != 'true' && steps.verification.outputs.status != '0'
         run: exit 1
