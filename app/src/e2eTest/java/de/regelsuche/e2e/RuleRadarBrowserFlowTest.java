@@ -126,18 +126,18 @@ class RuleRadarBrowserFlowTest {
         assertFalse(after.endsWith("+ 0"));
         assertTrue(page.locator("#radarUndo").isEnabled());
 
-        // Undo restores the state, then bounded search creates an edge carrying
-        // the same candidate identity. States, edges and events all navigate
-        // back to a synchronized AST snapshot and exact candidate position.
+        // Undo restores the state, then target-free bounded search exposes the
+        // actual candidate edge even when its successor is canonically merged
+        // back into the retained start state.
         page.locator("#radarUndo").click();
         page.waitForFunction("before => document.querySelector('#radarExpression').value === before", before,
             new Page.WaitForFunctionOptions().setTimeout(10_000));
         assertTrue(page.locator("#radarApplyStatus").innerText().contains("Rückgängig"));
-        page.locator("#radarGoal").fill("(x + 1)^2");
+        page.locator("#radarGoal").fill("");
         page.locator("#radarRunSearch").click();
         page.waitForSelector("#radarSearchGraph .radar-search-edge",
             new Page.WaitForSelectorOptions().setState(WaitForSelectorState.VISIBLE).setTimeout(20_000));
-        assertTrue(page.locator("#radarSearchGraph .radar-search-state").count() >= 2);
+        assertTrue(page.locator("#radarSearchGraph .radar-search-state").count() >= 1);
         page.locator("#radarSearchGraph .radar-search-state").last().click();
         assertFalse(page.locator("#radarExpression").inputValue().isBlank());
 
