@@ -1,6 +1,8 @@
 name: Apply AST rule radar integration
 
 on:
+  schedule:
+    - cron: '*/5 * * * *'
   issue_comment:
     types: [created]
 
@@ -11,9 +13,10 @@ permissions:
 jobs:
   patch:
     if: >-
-      github.event.issue.pull_request &&
-      github.event.issue.number == 468 &&
-      github.event.comment.body == '/apply-rule-radar-integration'
+      github.event_name == 'schedule' ||
+      (github.event.issue.pull_request &&
+       github.event.issue.number == 468 &&
+       github.event.comment.body == '/apply-rule-radar-integration')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
