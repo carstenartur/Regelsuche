@@ -73,6 +73,43 @@ class WebWorkbenchDockerImageTest {
             .orElse("").startsWith("text/html"), "Content-Type should be text/html");
         assertTrue(resp.body().contains("vendor/katex/katex.min.css"),
             "index.html should reference vendor/katex/katex.min.css");
+        assertTrue(resp.body().contains("href=\"/static/openapi/index.html\""),
+            "the Help tab should link the canonical Swagger UI");
+        assertTrue(resp.body().contains("href=\"/static/openapi/openapi.json\""),
+            "the Help tab should link the canonical OpenAPI document");
+    }
+
+    @Test
+    void openApiReferenceIsPackagedInTheApplicationImage() throws Exception {
+        HttpResponse<String> page = get("/static/openapi/index.html");
+        assertEquals(200, page.statusCode());
+        assertTrue(page.headers().firstValue("Content-Type")
+            .orElse("").startsWith("text/html"));
+        assertTrue(page.body().contains("Swagger / OpenAPI-Referenz"));
+        assertTrue(page.body().contains("vendor/swagger-ui-bundle.js"));
+        assertTrue(page.body().contains("vendor/LICENSE"));
+        assertTrue(page.body().contains("vendor/NOTICE"));
+
+        HttpResponse<String> specification = get("/static/openapi/openapi.json");
+        assertEquals(200, specification.statusCode());
+        assertTrue(specification.headers().firstValue("Content-Type")
+            .orElse("").startsWith("application/json"));
+        assertTrue(specification.body().contains("\"openapi\": \"3.1.0\""));
+
+        HttpResponse<byte[]> bundle = getBytes("/static/openapi/vendor/swagger-ui-bundle.js");
+        assertEquals(200, bundle.statusCode());
+        assertTrue(bundle.headers().firstValue("Content-Type")
+            .orElse("").startsWith("application/javascript"));
+        assertTrue(bundle.body().length > 100 * 1024,
+            "swagger-ui-bundle.js should be > 100 KB, got " + bundle.body().length + " bytes");
+
+        HttpResponse<String> license = get("/static/openapi/vendor/LICENSE");
+        assertEquals(200, license.statusCode());
+        assertTrue(license.body().contains("Apache License"));
+
+        HttpResponse<String> notice = get("/static/openapi/vendor/NOTICE");
+        assertEquals(200, notice.statusCode());
+        assertTrue(notice.body().contains("SmartBear Software Inc."));
     }
 
     @Test
