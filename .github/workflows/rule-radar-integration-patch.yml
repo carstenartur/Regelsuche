@@ -9,7 +9,7 @@ on:
     - cron: '*/5 * * * *'
 
 concurrency:
-  group: ast-rule-radar-direct-js-head-v6
+  group: ast-rule-radar-synchronized-suite-v7
   cancel-in-progress: false
 
 permissions:
@@ -92,6 +92,7 @@ jobs:
 
           if [ "$status" -eq 0 ]; then
             phase="radar-browser-preflight"
+            rm -rf app/build/test-results/e2eTest app/build/reports/tests/e2eTest
             env -u GITHUB_SHA ./gradlew \
               :app:e2eTest \
               --tests 'de.regelsuche.e2e.RuleRadarBrowserFlowTest' \
@@ -105,6 +106,7 @@ jobs:
 
           if [ "$status" -eq 0 ]; then
             phase="full-repository-lifecycle"
+            rm -rf app/build/test-results/e2eTest app/build/reports/tests/e2eTest
             env -u GITHUB_SHA ./gradlew \
               fullCheck \
               jacocoTestReport \
@@ -119,6 +121,7 @@ jobs:
 
           if [ "$status" -eq 0 ]; then
             phase="documentation-browser-evidence"
+            rm -rf app/build/test-results/e2eTest app/build/reports/tests/e2eTest
             env -u GITHUB_SHA ./gradlew \
               :app:e2eTest \
               --tests 'de.regelsuche.e2e.RuleRadarBrowserFlowTest' \
