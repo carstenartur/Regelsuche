@@ -94,6 +94,11 @@ def independentReviewPlanSchema = rootProject.file(
     'docs/schemas/regelsuche-independent-review-study-plan-v1.schema.json')
 def independentReviewIntakeSchema = rootProject.file(
     'docs/schemas/regelsuche-independent-review-intake-v1.schema.json')
+def independentReviewPacketSchemas = [
+    'regelsuche-independent-review-blinded-packet-v1.schema.json',
+    'regelsuche-independent-review-public-packet-manifest-v1.schema.json',
+    'regelsuche-independent-review-private-assignment-manifest-v1.schema.json'
+].collect { name -> rootProject.file("docs/schemas/${name}") }
 def independentReviewSchemasPath = rootProject.file('docs/schemas').absolutePath
 
 def verifyIndependentInterestingnessReview = tasks.register(
@@ -107,6 +112,7 @@ def verifyIndependentInterestingnessReview = tasks.register(
     workingDir rootProject.rootDir
     inputs.file(independentReviewVerifier)
     inputs.files(independentReviewPlanSchema, independentReviewIntakeSchema)
+    inputs.files(independentReviewPacketSchemas)
     inputs.dir(independentReviewOutput)
     outputs.upToDateWhen { false }
     doFirst {
