@@ -45,6 +45,24 @@ jobs:
       - name: Apply strict integration anchors
         if: steps.completed.outputs.skip != 'true'
         run: python3 tools/apply-rule-radar-integration.py
+      - name: Commit direct source integration before verification
+        if: steps.completed.outputs.skip != 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java \
+                  app/src/main/java/de/regelsuche/radar/AstRuleRadarService.java \
+                  app/src/main/resources/web/index.html \
+                  app/src/main/resources/web/rule-radar.js \
+                  docs/README.md \
+                  docs/ast-rule-radar.md
+          if git diff --cached --quiet; then
+            echo "Direct integration is already committed."
+          else
+            git commit -m "Integrate AST rule radar into workbench"
+            git push origin HEAD:issue-467-ast-rule-radar
+          fi
       - uses: actions/setup-java@v5
         if: steps.completed.outputs.skip != 'true'
         with:
@@ -86,23 +104,15 @@ jobs:
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Commit direct integration and verification status
+      - name: Commit verification status
         if: steps.completed.outputs.skip != 'true'
         shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java \
-                  app/src/main/java/de/regelsuche/radar/AstRuleRadarService.java \
-                  app/src/main/resources/web/index.html \
-                  app/src/main/resources/web/rule-radar.js \
-                  docs/README.md \
-                  docs/ast-rule-radar.md \
-                  docs/generated/rule-radar-ci-status.txt
+          git add docs/generated/rule-radar-ci-status.txt
           if git diff --cached --quiet; then
-            echo "No integration or status changes required."
+            echo "No verification status change required."
           else
-            git commit -m "Integrate and verify AST rule radar"
+            git commit -m "Record AST rule radar verification status"
             git push origin HEAD:issue-467-ast-rule-radar
           fi
       - name: Fail verification when fullCheck failed
