@@ -22,7 +22,7 @@
 - [Getting Started](getting-started.md) — Docker, Gradle und der erste grafische Produktfluss.
 - [Web-Workbench](web-workbench.md) — Bedienbereiche, sichtbare Ergebnisse und fachliche Zuordnung zur API.
 - [Web-Workbench-Benutzerhandbuch](web-ui-user-guide.md) — vollständige Beschreibung der aktuellen Tabs und Bedienelemente.
-- [User Workflows](user-workflows.md) — geführte Abläufe für Lernen, Discovery, Vergleich, Proof, Qualität und Regelautoren.
+- [User Workflows](user-workflows.md) — geführte Abläufe für Lernen, Discovery, Vergleich, Proof, Qualität und lokale Regelanalyse.
 - [Demo Gallery](demo-gallery.md) — reproduzierbare UI- und Replay-Beispiele.
 - [Autonomous Discovery Result Card](autonomous-discovery-walkthrough.md) — Ein-Kommando-Walkthrough mit hashgebundener JSON-/Markdown-Karte und generierten Evidence-SVGs.
 - [Unabhängiges Reproduktionsartefakt](independent-reproduction.md) — deterministisches Quell-/Container-Bundle, exakte und semantische Vergleiche sowie kanonische Reproduction Receipts.
@@ -119,7 +119,8 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 ## Architektur und Entwicklung
 
 - [Architektur](architecture.md)
-- [AST-Regelradar](ast-rule-radar.md) — präzises Modell von AST-Positionen, lokal anwendbaren Grund- und Makroregeln, Subtree-Rewrite und globalem Suchgraph.
+- [AST-Regelradar](ast-rule-radar.md) — implementierte positionsgebundene Grund-, Erweiterungs- und Makroregel-Kandidaten, Subtree-Rewrite und korrelierter Suchgraph.
+- [AST-Regelradar-Schema v1](schemas/regelsuche-ast-rule-radar-v1.schema.json) und [Search-Schema v1](schemas/regelsuche-ast-rule-radar-search-v1.schema.json).
 - [Modulstruktur](module-structure.md)
 - [Dependency-Regeln](dependency-rules.md)
 - [Developer Guide](developer-guide.md)
