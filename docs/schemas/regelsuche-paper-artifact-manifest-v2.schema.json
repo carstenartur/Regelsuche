@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.paper-artifact-manifest/v2",
+  "title": "Regelsuche paper artifact manifest v2",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "paperIssue",
+    "primaryResearchQuestion",
+    "manuscript",
+    "claimRegistry",
+    "limitations",
+    "artifactAppendix",
+    "benchmarkExecutionSchema",
+    "benchmarkResultsOutput",
+    "requiredEvidence",
+    "files",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.paper-artifact-manifest/v2"},
+    "status": {"const": "EVALUATION_IN_PROGRESS"},
+    "paperIssue": {"const": 388},
+    "primaryResearchQuestion": {"type": "string", "minLength": 1},
+    "manuscript": {"const": "paper/manuscript.md"},
+    "claimRegistry": {"const": "paper/claims-and-evidence.md"},
+    "limitations": {"const": "paper/limitations.md"},
+    "artifactAppendix": {"const": "paper/artifact-appendix.md"},
+    "benchmarkExecutionSchema": {"const": "regelsuche.candidate-independent-benchmark-execution/v2"},
+    "benchmarkResultsOutput": {"const": "paper/generated/candidate-independent-benchmark.md"},
+    "requiredEvidence": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["issue", "purpose", "status"],
+        "properties": {
+          "issue": {"type": "integer", "minimum": 1},
+          "purpose": {"type": "string", "minLength": 1},
+          "status": {"enum": ["COMPLETE", "PARTIAL", "PENDING", "OPTIONAL"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^paper/(?:[A-Za-z0-9_][A-Za-z0-9._-]*/)*[A-Za-z0-9_][A-Za-z0-9._-]*$"
+          },
+          "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "contentHash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}
