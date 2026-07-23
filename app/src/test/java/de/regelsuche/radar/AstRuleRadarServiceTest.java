@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.mining.RuleStatus;
 import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.validation.CandidateProofStatus;
@@ -124,24 +125,7 @@ class AstRuleRadarServiceTest {
 
     @Test
     void rejectedAssumptionIsVisibleButNotExecutable() {
-        inventory.save(new ReusableRule(
-            "assumption_macro",
-            "A / A",
-            "1",
-            List.of(),
-            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
-            RuleStatus.NEW,
-            2,
-            2.0,
-            Instant.parse("2026-01-01T00:00:00Z"),
-            "hash",
-            null,
-            0,
-            3,
-            List.of(),
-            0.9,
-            List.of("A != 0")
-        ));
+        inventory.save(assumptionMacro());
 
         AstRuleRadar.ApplicableMove rejected = service.inspect("x / x", AstRuleRadar.Context.defaults())
             .candidates().stream()
@@ -153,9 +137,33 @@ class AstRuleRadarServiceTest {
     }
 
     @Test
+    void rejectedCandidatesCanBeExcludedFromTheSnapshot() {
+        inventory.save(assumptionMacro());
+
+        AstRuleRadar.Snapshot snapshot = service.inspect("x / x", context(false, Map.of()));
+
+        assertFalse(snapshot.candidates().stream()
+            .anyMatch(candidate -> "macro_assumption_macro".equals(candidate.ruleId())));
+        assertTrue(snapshot.candidates().stream().allMatch(AstRuleRadar.ApplicableMove::applicable));
+    }
+
+    @Test
+    void emptyOutcomeKeyCannotOverrideEveryOrdinaryCandidate() {
+        AstRuleRadar.Snapshot snapshot = service.inspect(
+            "x + 0",
+            context(true, Map.of("", AstRuleRadar.CandidateOutcome.APPLIED)));
+
+        AstRuleRadar.ApplicableMove addZero = snapshot.candidates().stream()
+            .filter(candidate -> "ast_add_zero_right".equals(candidate.ruleId()))
+            .filter(candidate -> "root".equals(candidate.pathKey()))
+            .findFirst().orElseThrow();
+        assertEquals(AstRuleRadar.CandidateOutcome.AVAILABLE, addZero.outcome());
+    }
+
+    @Test
     void candidateBudgetsReportExactOmittedCounts() {
         AstRuleRadar.Context context = new AstRuleRadar.Context(
-            de.regelsuche.knowledge.RuleProfile.CORE,
+            RuleProfile.CORE,
             Set.of(), Set.of(),
             false, true,
             CandidateProofStatus.VALIDATED_BY_EXAMPLES,
@@ -176,6 +184,41 @@ class AstRuleRadarServiceTest {
         assertFalse(snapshot.valid());
         assertTrue(snapshot.nodes().isEmpty());
         assertEquals("INVALID_EXPRESSION", snapshot.diagnostics().getFirst().code());
+    }
+
+    private AstRuleRadar.Context context(
+        boolean includeRejectedCandidates,
+        Map<String, AstRuleRadar.CandidateOutcome> outcomes
+    ) {
+        return new AstRuleRadar.Context(
+            RuleProfile.CORE,
+            Set.of(), Set.of(),
+            false, true,
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            "DISCOVERY", "",
+            24, 240,
+            List.of(), includeRejectedCandidates, "", outcomes);
+    }
+
+    private ReusableRule assumptionMacro() {
+        return new ReusableRule(
+            "assumption_macro",
+            "A / A",
+            "1",
+            List.of(),
+            CandidateProofStatus.VALIDATED_BY_EXAMPLES,
+            RuleStatus.NEW,
+            2,
+            2.0,
+            Instant.parse("2026-01-01T00:00:00Z"),
+            "assumption-hash",
+            null,
+            0,
+            3,
+            List.of(),
+            0.9,
+            List.of("A != 0")
+        );
     }
 
     private ReusableRule binomialMacro() {
