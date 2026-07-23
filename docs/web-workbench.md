@@ -66,6 +66,8 @@ Nach dem Start der Workbench stehen zwei stabile lokale Zugänge bereit:
 
 Die Swagger-Oberfläche, ihre JavaScript- und CSS-Dateien sowie Lizenz- und Hinweisdateien werden vollständig aus dem gestarteten Checkout ausgeliefert. Für die API-Referenz ist weder ein CDN noch eine Internetverbindung erforderlich.
 
+Die Spezifikation ist zugleich ausführbarer Routenvertrag: Beim Serverstart müssen ihre öffentlichen API-Kontexte exakt zu den registrierten Handlern passen. Vor der fachlichen Verarbeitung prüft die Workbench außerdem HTTP-Methode und konkretes Pfadtemplate. Nicht dokumentierte Unterpfade werden mit `404`, für einen bekannten Pfad nicht erlaubte Methoden mit `405` und einem `Allow`-Header abgewiesen.
+
 ## Statische Assets
 
 Die Oberfläche unter `/` lädt ihre HTML-, CSS- und JavaScript-Ressourcen aus dem Classpath-Verzeichnis `app/src/main/resources/web/`. KaTeX, Cytoscape und die gepinnte Swagger UI werden selbst gehostet; die Benutzung der Workbench und ihrer technischen API-Referenz erfordert keine externen CDN-Zugriffe.
