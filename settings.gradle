@@ -96,6 +96,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/candidate-independent-benchmark-execution-v2.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/discovery-cost-ledger-verification.gradle')
     }
 }
 

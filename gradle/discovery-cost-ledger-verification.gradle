@@ -1,0 +1,156 @@
+def discoveryCostRoot = layout.projectDirectory
+def discoveryCostRootPath = discoveryCostRoot.asFile.absolutePath
+def discoveryCostGenerator = discoveryCostRoot.file(
+    'scripts/generate-discovery-cost-ledger.py')
+def discoveryCostVerifier = discoveryCostRoot.file(
+    'scripts/verify-discovery-cost-ledger.py')
+def discoveryCostSchema = discoveryCostRoot.file(
+    'docs/schemas/regelsuche-discovery-cost-ledger-v1.schema.json')
+
+def benchmarkExecutionRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-benchmark-execution-v2')
+def finiteAdapterRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-finite-sequence-adapter')
+def recurrenceAdapterRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-linear-recurrence-adapter')
+def rationalAdapterRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-rational-assumption-adapter')
+def macroBatchRoot = layout.buildDirectory.dir(
+    'reports/candidate-independent-reusable-macro-batch')
+def discoveryCostBuildRoot = layout.buildDirectory.dir(
+    'reports/discovery-cost-ledger')
+
+def benchmarkFirst = benchmarkExecutionRoot.map { it.file('first/run.json') }
+def benchmarkSecond = benchmarkExecutionRoot.map { it.file('second/run.json') }
+def finiteFirst = finiteAdapterRoot.map { it.file('first/run.json') }
+def finiteSecond = finiteAdapterRoot.map { it.file('second/run.json') }
+def recurrenceFirst = recurrenceAdapterRoot.map { it.file('first/run.json') }
+def recurrenceSecond = recurrenceAdapterRoot.map { it.file('second/run.json') }
+def rationalFirst = rationalAdapterRoot.map { it.file('first/run.json') }
+def rationalSecond = rationalAdapterRoot.map { it.file('second/run.json') }
+def macroFirst = macroBatchRoot.map { it.file('first/run.json') }
+def macroSecond = macroBatchRoot.map { it.file('second/run.json') }
+def costFirst = discoveryCostBuildRoot.map { it.file('first/discovery-cost-ledger.json') }
+def costSecond = discoveryCostBuildRoot.map { it.file('second/discovery-cost-ledger.json') }
+def costVerification = discoveryCostBuildRoot.map { it.dir('verification') }
+def costPython = layout.buildDirectory.dir('verification-venv').map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureDiscoveryCostGeneration = {
+    task,
+    benchmark,
+    finite,
+    recurrence,
+    rational,
+    macro,
+    output,
+    dependencies ->
+    task.group = 'verification'
+    task.description = 'Generates one vector-only discovery cost ledger from canonical #383 evidence.'
+    task.dependsOn 'prepareVerificationEnvironment'
+    dependencies.each { task.dependsOn it }
+    task.workingDir discoveryCostRoot
+    task.inputs.file discoveryCostGenerator
+    task.inputs.files benchmark, finite, recurrence, rational, macro
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file output
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine costPython.get().absolutePath,
+            discoveryCostGenerator.asFile.absolutePath,
+            '--benchmark', benchmark.get().asFile.absolutePath,
+            '--finite', finite.get().asFile.absolutePath,
+            '--recurrence', recurrence.get().asFile.absolutePath,
+            '--rational', rational.get().asFile.absolutePath,
+            '--macro', macro.get().asFile.absolutePath,
+            '--output', output.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def generateDiscoveryCostLedgerFirst = tasks.register(
+    'generateDiscoveryCostLedgerFirst', Exec
+) {
+    configureDiscoveryCostGeneration(
+        delegate,
+        benchmarkFirst,
+        finiteFirst,
+        recurrenceFirst,
+        rationalFirst,
+        macroFirst,
+        costFirst,
+        [
+            'generateCandidateIndependentBenchmarkExecutionV2First',
+            'runCandidateIndependentFiniteSequenceAdapterFirst',
+            'runCandidateIndependentLinearRecurrenceAdapterFirst',
+            'runCandidateIndependentRationalAssumptionAdapterFirst',
+            'runCandidateIndependentReusableMacroBatchFirst'
+        ])
+}
+
+def generateDiscoveryCostLedgerSecond = tasks.register(
+    'generateDiscoveryCostLedgerSecond', Exec
+) {
+    configureDiscoveryCostGeneration(
+        delegate,
+        benchmarkSecond,
+        finiteSecond,
+        recurrenceSecond,
+        rationalSecond,
+        macroSecond,
+        costSecond,
+        [
+            'generateCandidateIndependentBenchmarkExecutionV2Second',
+            'runCandidateIndependentFiniteSequenceAdapterSecond',
+            'runCandidateIndependentLinearRecurrenceAdapterSecond',
+            'runCandidateIndependentRationalAssumptionAdapterSecond',
+            'runCandidateIndependentReusableMacroBatchSecond'
+        ])
+}
+
+def verifyDiscoveryCostLedger = tasks.register(
+    'verifyDiscoveryCostLedger', Exec
+) {
+    group = 'verification'
+    description = 'Independently recomputes vector costs and the bounded macro amortization reference.'
+    dependsOn 'verifyCandidateIndependentBenchmarkExecutionV2',
+        generateDiscoveryCostLedgerFirst,
+        generateDiscoveryCostLedgerSecond
+    workingDir discoveryCostRoot
+    inputs.file discoveryCostGenerator
+    inputs.file discoveryCostVerifier
+    inputs.file discoveryCostSchema
+    inputs.files costFirst, costSecond,
+        benchmarkFirst, benchmarkSecond,
+        finiteFirst, finiteSecond,
+        recurrenceFirst, recurrenceSecond,
+        rationalFirst, rationalSecond,
+        macroFirst, macroSecond
+    outputs.dir costVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine costPython.get().absolutePath,
+            discoveryCostVerifier.asFile.absolutePath,
+            '--first-ledger', costFirst.get().asFile.absolutePath,
+            '--second-ledger', costSecond.get().asFile.absolutePath,
+            '--first-benchmark', benchmarkFirst.get().asFile.absolutePath,
+            '--second-benchmark', benchmarkSecond.get().asFile.absolutePath,
+            '--first-finite', finiteFirst.get().asFile.absolutePath,
+            '--second-finite', finiteSecond.get().asFile.absolutePath,
+            '--first-recurrence', recurrenceFirst.get().asFile.absolutePath,
+            '--second-recurrence', recurrenceSecond.get().asFile.absolutePath,
+            '--first-rational', rationalFirst.get().asFile.absolutePath,
+            '--second-rational', rationalSecond.get().asFile.absolutePath,
+            '--first-macro', macroFirst.get().asFile.absolutePath,
+            '--second-macro', macroSecond.get().asFile.absolutePath,
+            '--schema', discoveryCostSchema.asFile.absolutePath,
+            '--report-directory', costVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyDiscoveryCostLedger
+}
