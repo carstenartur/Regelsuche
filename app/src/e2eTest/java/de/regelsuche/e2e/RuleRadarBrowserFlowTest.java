@@ -146,6 +146,7 @@ class RuleRadarBrowserFlowTest {
             null, new Page.WaitForFunctionOptions().setTimeout(10_000));
         assertTrue(page.locator("#radarCandidateDetail").innerText().contains("Candidate-ID"));
 
+        page.locator("#radarSearchGraph details summary").click();
         Locator event = page.locator("#radarSearchGraph [data-search-event-candidate]").last();
         assertTrue(event.count() == 1);
         event.click();
