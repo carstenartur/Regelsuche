@@ -56,6 +56,21 @@ flowchart BT
     egraph --> core
 ```
 
+## Ausdrucks- und Suchmodell
+
+Die Modulansicht erklärt, **wo** die Komponenten liegen. Das fachliche Zusammenspiel
+innerhalb eines Suchschritts wird im
+[AST-Regelradar](ast-rule-radar.md) beschrieben:
+
+- ein vollständiger Ausdruck ist ein AST und zugleich ein Zustand im globalen Suchgraphen,
+- jede AST-Position besitzt eine endliche Menge konkreter, dort ausführbarer Regelanwendungen,
+- Grundregeln, Erweiterungsregeln und validierte gelernte Makroregeln speisen diese Kandidatenmenge,
+- ein lokaler Subtree-Rewrite erzeugt einen neuen vollständigen Ausdruckszustand,
+- Position, Regelherkunft, Bindungen, Annahmen, Validierung und Makro-Replay bleiben an der Suchkante erhalten.
+
+Diese Trennung verhindert die häufige Verwechslung zwischen dem Baum **innerhalb eines
+Zustands** und dem Graphen **zwischen Zuständen**.
+
 ## Architektur-Leitplanken
 
 - mathematischer Kern bleibt technologie-agnostisch,
