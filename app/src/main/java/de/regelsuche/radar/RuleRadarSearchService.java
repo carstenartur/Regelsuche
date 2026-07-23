@@ -14,7 +14,6 @@ import java.util.Map;
 import static de.regelsuche.radar.AstRuleRadar.ApplicableMove;
 import static de.regelsuche.radar.AstRuleRadar.CandidateOutcome;
 import static de.regelsuche.radar.AstRuleRadar.Context;
-import static de.regelsuche.radar.AstRuleRadar.Diagnostic;
 import static de.regelsuche.radar.AstRuleRadar.SearchEdge;
 import static de.regelsuche.radar.AstRuleRadar.SearchEvent;
 import static de.regelsuche.radar.AstRuleRadar.SearchResult;
@@ -123,8 +122,12 @@ public final class RuleRadarSearchService {
                     CandidateOutcome pruning = knownDepth < nextDepth
                         ? CandidateOutcome.PRUNED_KNOWN_BETTER
                         : CandidateOutcome.PRUNED_DUPLICATE;
+                    SearchState retained = stateByCanonical.get(nextCanonical);
+                    if (retained != null) {
+                        edges.add(edge(current.state(), retained, candidate, pruning));
+                    }
                     sequence = event(events, finalOutcomes, sequence, current.state(), candidate,
-                        pruning, "canonical successor already reached at depth " + knownDepth);
+                        pruning, "canonical successor already retained at depth " + knownDepth);
                     continue;
                 }
 
@@ -140,19 +143,7 @@ public final class RuleRadarSearchService {
                 bestDepthByCanonical.put(nextCanonical, nextDepth);
                 stateByCanonical.put(nextCanonical, next);
                 states.add(next);
-                SearchEdge edge = new SearchEdge(
-                    edgeId(current.state().stateId(), nextStateId, candidate.candidateId()),
-                    current.state().stateId(),
-                    nextStateId,
-                    current.state().expression(),
-                    next.expression(),
-                    candidate.candidateId(),
-                    candidate.pathKey(),
-                    candidate.ruleId(),
-                    candidate.origin(),
-                    CandidateOutcome.APPLIED
-                );
-                edges.add(edge);
+                edges.add(edge(current.state(), next, candidate, CandidateOutcome.APPLIED));
                 sequence = event(events, finalOutcomes, sequence, current.state(), candidate,
                     CandidateOutcome.APPLIED, "successor state " + nextStateId + " created");
                 if (isTarget) {
@@ -180,6 +171,26 @@ public final class RuleRadarSearchService {
             events,
             finalOutcomes,
             List.of()
+        );
+    }
+
+    private SearchEdge edge(
+        SearchState from,
+        SearchState to,
+        ApplicableMove candidate,
+        CandidateOutcome outcome
+    ) {
+        return new SearchEdge(
+            edgeId(from.stateId(), to.stateId(), candidate.candidateId()),
+            from.stateId(),
+            to.stateId(),
+            from.expression(),
+            to.expression(),
+            candidate.candidateId(),
+            candidate.pathKey(),
+            candidate.ruleId(),
+            candidate.origin(),
+            outcome
         );
     }
 
