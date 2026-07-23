@@ -22,6 +22,11 @@ except ImportError as error:
 EXPECTED_JSONSCHEMA_VERSION = "4.25.1"
 PLAN_SCHEMA_NAME = "regelsuche-independent-review-study-plan-v1.schema.json"
 INTAKE_SCHEMA_NAME = "regelsuche-independent-review-intake-v1.schema.json"
+PACKET_SCHEMA_NAMES = [
+    "regelsuche-independent-review-blinded-packet-v1.schema.json",
+    "regelsuche-independent-review-public-packet-manifest-v1.schema.json",
+    "regelsuche-independent-review-private-assignment-manifest-v1.schema.json",
+]
 
 
 def fail(message: str) -> None:
@@ -317,6 +322,8 @@ def main() -> int:
 
     _, plan_validator = validate_schema(schema_root / PLAN_SCHEMA_NAME)
     _, intake_validator = validate_schema(schema_root / INTAKE_SCHEMA_NAME)
+    for schema_name in PACKET_SCHEMA_NAMES:
+        validate_schema(schema_root / schema_name)
     plan = validate_document(root / "study-plan.json", plan_validator)
     intake = validate_document(root / "development-intake.json", intake_validator)
     verify_plan(plan)
