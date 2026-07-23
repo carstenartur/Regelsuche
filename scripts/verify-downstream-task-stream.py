@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import copy
 import hashlib
 import json
@@ -62,12 +63,50 @@ def require_hash(value: dict[str, Any], context: str) -> str:
     return retained
 
 
+def verify_generator_input_allowlist(path: Path) -> list[str]:
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    arguments: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != "add_argument" or not node.args:
+            continue
+        first = node.args[0]
+        if isinstance(first, ast.Constant) and isinstance(first.value, str):
+            arguments.append(first.value)
+    expected = [
+        "--corpus",
+        "--receipt",
+        "--profile",
+        "--repository-revision",
+        "--output",
+    ]
+    if arguments != expected:
+        fail(f"generator CLI input allowlist drift: {arguments}")
+    forbidden_literals = [
+        "pairedEvaluations",
+        "macroEnabled",
+        "candidateId",
+        "macroId",
+        "build/reports",
+        "candidate-independent-reusable-macro-batch",
+    ]
+    leaked = [value for value in forbidden_literals if value in source]
+    if leaked:
+        fail(f"generator references post-execution or candidate data: {leaked}")
+    return arguments
+
+
 def expected_tasks(corpus: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for case in corpus["cases"]:
         if case["challengeId"] != CHALLENGE:
             continue
-        if case["exposurePolicy"]["candidateFormationMustNotRead"] != ["evaluationInput"]:
+        if (
+            case["exposurePolicy"]["candidateFormationMustNotRead"]
+            != ["evaluationInput"]
+        ):
             fail(f"formation exposure drift for {case['caseId']}")
         evaluation = case["evaluationInput"]
         if evaluation["comparisonPolicy"] != COMPARISON:
@@ -156,6 +195,7 @@ def expect_verification_failure(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--generator", required=True, type=Path)
     parser.add_argument("--first-stream", required=True, type=Path)
     parser.add_argument("--second-stream", required=True, type=Path)
     parser.add_argument("--corpus", required=True, type=Path)
@@ -165,6 +205,7 @@ def main() -> int:
     parser.add_argument("--report-directory", required=True, type=Path)
     arguments = parser.parse_args()
 
+    verified_generator_arguments = verify_generator_input_allowlist(arguments.generator)
     schema = load(arguments.schema)
     jsonschema.Draft202012Validator.check_schema(schema)
     first = load(arguments.first_stream)
@@ -179,7 +220,10 @@ def main() -> int:
         fail("clean downstream streams are not byte-identical")
 
     reordered = copy.deepcopy(first)
-    reordered["tasks"][0], reordered["tasks"][1] = reordered["tasks"][1], reordered["tasks"][0]
+    reordered["tasks"][0], reordered["tasks"][1] = (
+        reordered["tasks"][1],
+        reordered["tasks"][0],
+    )
     reordered.pop("contentHash", None)
     reordered["contentHash"] = semantic_hash(reordered)
     expect_verification_failure(reordered, corpus, receipt, profile, "task order")
@@ -206,7 +250,12 @@ def main() -> int:
         "verifiedTaskCount": 12,
         "verifiedSplitCounts": first["splitCounts"],
         "verifiedOrderingPolicy": first["orderingPolicy"],
-        "verifiedMutations": ["task-order", "baseline-inventory", "evaluation-outcome-leak"],
+        "verifiedGeneratorArguments": verified_generator_arguments,
+        "verifiedMutations": [
+            "task-order",
+            "baseline-inventory",
+            "evaluation-outcome-leak",
+        ],
         "evaluationStatus": "NOT_EXECUTED_BY_STREAM_CONSTRUCTION",
         "publicationAuthorized": False,
     }
