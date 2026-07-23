@@ -1,6 +1,6 @@
 FAILURE exit=1
 phase=full-repository-lifecycle
-verifiedHead=fb8d82777cc6dca81c84cfc77acd65a54f2d5991
+verifiedHead=24b915fe339b1517625f0214bbab64fbdb514219
 
 --- exact failed test cases ---
 ### app/build/test-results/e2eTest/TEST-de.regelsuche.e2e.RuleAuthoringBrowserFlowTest.xml
@@ -12,6 +12,8 @@ verifiedHead=fb8d82777cc6dca81c84cfc77acd65a54f2d5991
     	at de.regelsuche.e2e.RuleAuthoringBrowserFlowTest.ruleAuthoringWorkflowWorksEndToEnd(RuleAuthoringBrowserFlowTest.java:81)
 TOTAL_FAILED_TEST_CASES=1
 --- radar unit/API preflight tail ---
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                        |  50% of 175.4 MiB
+|■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                                |  60% of 175.4 MiB
 |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                        |  70% of 175.4 MiB
 |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■                |  80% of 175.4 MiB
 |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 175.4 MiB
@@ -95,7 +97,7 @@ Get:9 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 xfonts-encodings a
 Get:10 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 xfonts-utils amd64 1:7.7+6build3 [94.4 kB]
 Get:11 http://azure.archive.ubuntu.com/ubuntu noble/universe amd64 xfonts-cyrillic all 1:1.0.5+nmu1 [384 kB]
 Get:12 http://azure.archive.ubuntu.com/ubuntu noble/main amd64 xfonts-scalable all 1:1.0.3-1.3 [304 kB]
-Fetched 21.5 MB in 1s (16.3 MB/s)
+Fetched 21.5 MB in 1s (21.1 MB/s)
 Selecting previously unselected package fonts-ipafont-gothic.
 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 202513 files and directories currently installed.)
 Preparing to unpack .../00-fonts-ipafont-gothic_00303-21ubuntu1_all.deb ...
@@ -141,6 +143,19 @@ Setting up xfonts-utils (1:7.7+6build3) ...
 Setting up xfonts-cyrillic (1:1.0.5+nmu1) ...
 Setting up xfonts-scalable (1:1.0.3-1.3) ...
 Processing triggers for libc-bin (2.39-0ubuntu8.7) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+Not building database; man-db/auto-update is not 'true'.
+Processing triggers for fontconfig (2.15.0-1.1ubuntu2) ...
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
 
 > Task :app:installPlaywrightBrowsers
 Chrome for Testing 148.0.7778.96 (playwright chromium v1223) downloaded to /home/runner/.cache/ms-playwright/chromium-1223
@@ -170,90 +185,75 @@ Downloading Chrome Headless Shell 148.0.7778.96 (playwright chromium-headless-sh
 |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■        |  90% of 113.2 MiB
 |■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■| 100% of 113.2 MiB
 Chrome Headless Shell 148.0.7778.96 (playwright chromium-headless-shell v1223) downloaded to /home/runner/.cache/ms-playwright/chromium_headless_shell-1223
-
-> Task :app:installPlaywrightHostDependencies
-Processing triggers for man-db (2.12.0-4build2) ...
-Not building database; man-db/auto-update is not 'true'.
-Processing triggers for fontconfig (2.15.0-1.1ubuntu2) ...
-
-Running kernel seems to be up-to-date.
-
-No services need to be restarted.
-
-No containers need to be restarted.
-
-No user sessions are running outdated binaries.
-
-No VM guests are running outdated hypervisor (qemu) binaries on this host.
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/verification-1784806342543.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/verification-1784807317050.json
 
 [Incubating] Problems report is available at: file:///home/runner/work/Regelsuche/Regelsuche/build/reports/problems/problems-report.html
 
-BUILD SUCCESSFUL in 44s
+BUILD SUCCESSFUL in 51s
 40 actionable tasks: 40 executed
 Configuration cache entry stored.
 --- radar browser preflight tail ---
 Calculating task graph as no cached configuration is available for tasks: :app:e2eTest --tests de.regelsuche.e2e.RuleRadarBrowserFlowTest --tests de.regelsuche.e2e.RuleAuthoringBrowserFlowTest
-> Task :regelsuche-core:compileJava UP-TO-DATE
-> Task :regelsuche-cli:compileJava UP-TO-DATE
-> Task :regelsuche-egraph:compileJava UP-TO-DATE
 > Task :app:vendorKatexAssets UP-TO-DATE
 > Task :app:vendorCytoscapeAssets UP-TO-DATE
 > Task :app:vendorWebAssets UP-TO-DATE
-> Task :regelsuche-validation:compileJava UP-TO-DATE
-> Task :regelsuche-search:compileJava UP-TO-DATE
-> Task :app:processResources UP-TO-DATE
-> Task :regelsuche-persistence:compileJava UP-TO-DATE
-> Task :regelsuche-discovery:compileJava UP-TO-DATE
+> Task :regelsuche-cli:compileJava UP-TO-DATE
+> Task :regelsuche-core:compileJava UP-TO-DATE
 > Task :app:processTestResources UP-TO-DATE
+> Task :app:processResources UP-TO-DATE
 > Task :regelsuche-cli:processResources NO-SOURCE
 > Task :regelsuche-cli:classes UP-TO-DATE
-> Task :regelsuche-math-algorithms:compileJava UP-TO-DATE
-> Task :regelsuche-core:processResources UP-TO-DATE
+> Task :regelsuche-validation:compileJava UP-TO-DATE
+> Task :regelsuche-egraph:compileJava UP-TO-DATE
 > Task :regelsuche-cli:jar UP-TO-DATE
+> Task :regelsuche-persistence:compileJava UP-TO-DATE
+> Task :regelsuche-core:processResources UP-TO-DATE
 > Task :regelsuche-core:classes UP-TO-DATE
 > Task :regelsuche-discovery:processResources NO-SOURCE
-> Task :regelsuche-discovery:classes UP-TO-DATE
-> Task :regelsuche-core:jar UP-TO-DATE
 > Task :regelsuche-egraph:processResources NO-SOURCE
-> Task :regelsuche-solver-ir:compileJava UP-TO-DATE
-> Task :regelsuche-experiments:compileJava UP-TO-DATE
-> Task :regelsuche-discovery:jar UP-TO-DATE
 > Task :regelsuche-egraph:classes UP-TO-DATE
+> Task :regelsuche-search:compileJava UP-TO-DATE
+> Task :regelsuche-math-algorithms:compileJava UP-TO-DATE
+> Task :regelsuche-core:jar UP-TO-DATE
 > Task :regelsuche-experiments:processResources NO-SOURCE
-> Task :regelsuche-experiments:classes UP-TO-DATE
-> Task :regelsuche-experiments:jar UP-TO-DATE
 > Task :regelsuche-egraph:jar UP-TO-DATE
 > Task :regelsuche-learning:processResources NO-SOURCE
 > Task :regelsuche-math-algorithms:processResources NO-SOURCE
-> Task :regelsuche-learning:compileJava UP-TO-DATE
-> Task :regelsuche-learning:classes UP-TO-DATE
 > Task :regelsuche-math-algorithms:classes UP-TO-DATE
-> Task :regelsuche-math-algorithms:jar UP-TO-DATE
-> Task :regelsuche-learning:jar UP-TO-DATE
 > Task :regelsuche-persistence:processResources NO-SOURCE
 > Task :regelsuche-persistence:classes UP-TO-DATE
+> Task :regelsuche-discovery:compileJava UP-TO-DATE
+> Task :regelsuche-solver-ir:compileJava UP-TO-DATE
+> Task :regelsuche-persistence:jar UP-TO-DATE
+> Task :regelsuche-experiments:compileJava UP-TO-DATE
+> Task :regelsuche-math-algorithms:jar UP-TO-DATE
+> Task :regelsuche-experiments:classes UP-TO-DATE
+> Task :regelsuche-learning:compileJava UP-TO-DATE
+> Task :regelsuche-discovery:classes UP-TO-DATE
+> Task :regelsuche-discovery:jar UP-TO-DATE
+> Task :regelsuche-learning:classes UP-TO-DATE
+> Task :regelsuche-experiments:jar UP-TO-DATE
 > Task :regelsuche-solver-portfolio:compileJava UP-TO-DATE
+> Task :regelsuche-learning:jar UP-TO-DATE
 > Task :regelsuche-search:processResources NO-SOURCE
 > Task :regelsuche-persistence-hibernate:processResources UP-TO-DATE
 > Task :regelsuche-search:classes UP-TO-DATE
 > Task :regelsuche-solver-ir:processResources NO-SOURCE
 > Task :regelsuche-solver-ir:classes UP-TO-DATE
-> Task :regelsuche-solver-ir:jar UP-TO-DATE
-> Task :regelsuche-search:jar UP-TO-DATE
 > Task :regelsuche-solver-portfolio:processResources NO-SOURCE
-> Task :regelsuche-validation:processResources NO-SOURCE
 > Task :regelsuche-solver-portfolio:classes UP-TO-DATE
-> Task :regelsuche-validation:classes UP-TO-DATE
-> Task :regelsuche-persistence:jar UP-TO-DATE
-> Task :regelsuche-solver-portfolio:jar UP-TO-DATE
-> Task :regelsuche-validation:jar UP-TO-DATE
 > Task :regelsuche-persistence-hibernate:compileJava UP-TO-DATE
 > Task :regelsuche-persistence-hibernate:classes UP-TO-DATE
-> Task :app:processE2eTestResources UP-TO-DATE
+> Task :regelsuche-solver-ir:jar UP-TO-DATE
+> Task :regelsuche-search:jar UP-TO-DATE
 > Task :regelsuche-persistence-hibernate:jar UP-TO-DATE
+> Task :regelsuche-solver-portfolio:jar UP-TO-DATE
+> Task :app:processE2eTestResources UP-TO-DATE
 > Task :app:compileJava UP-TO-DATE
 > Task :app:classes UP-TO-DATE
+> Task :regelsuche-validation:processResources NO-SOURCE
+> Task :regelsuche-validation:classes UP-TO-DATE
+> Task :regelsuche-validation:jar UP-TO-DATE
 > Task :app:compileTestJava UP-TO-DATE
 > Task :app:testClasses UP-TO-DATE
 > Task :app:compileE2eTestJava UP-TO-DATE
@@ -324,29 +324,60 @@ Playwright Host validation warning:
 ║     libGLESv2.so.2                                   ║
 ║     libx264.so                                       ║
 ╚══════════════════════════════════════════════════════╝
-    at validateDependenciesLinux (/tmp/playwright-java-16030650681601370720/package/lib/coreBundle.js:27798:9)
+    at validateDependenciesLinux (/tmp/playwright-java-1586171316422640904/package/lib/coreBundle.js:27798:9)
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async Registry._validateHostRequirements (/tmp/playwright-java-16030650681601370720/package/lib/coreBundle.js:29203:18)
-    at async Registry._validateHostRequirementsForExecutableIfNeeded (/tmp/playwright-java-16030650681601370720/package/lib/coreBundle.js:29325:11)
-    at async Registry.validateHostRequirementsForExecutablesIfNeeded (/tmp/playwright-java-16030650681601370720/package/lib/coreBundle.js:29314:11)
-    at async installBrowsers (/tmp/playwright-java-16030650681601370720/package/lib/coreBundle.js:64433:5)
-    at async _Command.<anonymous> (/tmp/playwright-java-16030650681601370720/package/lib/coreBundle.js:66045:7)
+    at async Registry._validateHostRequirements (/tmp/playwright-java-1586171316422640904/package/lib/coreBundle.js:29203:18)
+    at async Registry._validateHostRequirementsForExecutableIfNeeded (/tmp/playwright-java-1586171316422640904/package/lib/coreBundle.js:29325:11)
+    at async Registry.validateHostRequirementsForExecutablesIfNeeded (/tmp/playwright-java-1586171316422640904/package/lib/coreBundle.js:29314:11)
+    at async installBrowsers (/tmp/playwright-java-1586171316422640904/package/lib/coreBundle.js:64433:5)
+    at async _Command.<anonymous> (/tmp/playwright-java-1586171316422640904/package/lib/coreBundle.js:66045:7)
 
 > Task :app:e2eTest
 
 RuleAuthoringBrowserFlowTest > AST radar preserves position → match → preview → apply end-to-end PASSED
 
 RuleRadarBrowserFlowTest > AST-Regelradar: candidates, keyboard, apply and search correlation PASSED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/verification-1784806384020.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/verification-1784807365285.json
 
-BUILD SUCCESSFUL in 14s
+BUILD SUCCESSFUL in 17s
 37 actionable tasks: 1 executed, 36 up-to-date
 Configuration cache entry stored.
 --- fullCheck tail ---
-    at async Registry._validateHostRequirementsForExecutableIfNeeded (/tmp/playwright-java-8772587708070922080/package/lib/coreBundle.js:29325:11)
-    at async Registry.validateHostRequirementsForExecutablesIfNeeded (/tmp/playwright-java-8772587708070922080/package/lib/coreBundle.js:29314:11)
-    at async installBrowsers (/tmp/playwright-java-8772587708070922080/package/lib/coreBundle.js:64433:5)
-    at async _Command.<anonymous> (/tmp/playwright-java-8772587708070922080/package/lib/coreBundle.js:66045:7)
+║     libgsttag-1.0.so.0                               ║
+║     libgstvideo-1.0.so.0                             ║
+║     libgstgl-1.0.so.0                                ║
+║     libgstcodecparsers-1.0.so.0                      ║
+║     libgstfft-1.0.so.0                               ║
+║     libflite.so.1                                    ║
+║     libflite_usenglish.so.1                          ║
+║     libflite_cmu_grapheme_lang.so.1                  ║
+║     libflite_cmu_grapheme_lex.so.1                   ║
+║     libflite_cmu_indic_lang.so.1                     ║
+║     libflite_cmu_indic_lex.so.1                      ║
+║     libflite_cmulex.so.1                             ║
+║     libflite_cmu_time_awb.so.1                       ║
+║     libflite_cmu_us_awb.so.1                         ║
+║     libflite_cmu_us_kal16.so.1                       ║
+║     libflite_cmu_us_kal.so.1                         ║
+║     libflite_cmu_us_rms.so.1                         ║
+║     libflite_cmu_us_slt.so.1                         ║
+║     libavif.so.16                                    ║
+║     libharfbuzz-icu.so.0                             ║
+║     libwayland-server.so.0                           ║
+║     libmanette-0.2.so.0                              ║
+║     libhyphen.so.0                                   ║
+║     libsecret-1.so.0                                 ║
+║     libwoff2dec.so.1.0.2                             ║
+║     libGLESv2.so.2                                   ║
+║     libx264.so                                       ║
+╚══════════════════════════════════════════════════════╝
+    at validateDependenciesLinux (/tmp/playwright-java-5913233660444294612/package/lib/coreBundle.js:27798:9)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Registry._validateHostRequirements (/tmp/playwright-java-5913233660444294612/package/lib/coreBundle.js:29203:18)
+    at async Registry._validateHostRequirementsForExecutableIfNeeded (/tmp/playwright-java-5913233660444294612/package/lib/coreBundle.js:29325:11)
+    at async Registry.validateHostRequirementsForExecutablesIfNeeded (/tmp/playwright-java-5913233660444294612/package/lib/coreBundle.js:29314:11)
+    at async installBrowsers (/tmp/playwright-java-5913233660444294612/package/lib/coreBundle.js:64433:5)
+    at async _Command.<anonymous> (/tmp/playwright-java-5913233660444294612/package/lib/coreBundle.js:66045:7)
 
 > Task :app:dockerE2eTest
 
@@ -375,7 +406,7 @@ WebWorkbenchDockerImageTest > cytoscapeJsIsServed() PASSED
 WebWorkbenchDockerImageTest > indexHtmlIsServed() PASSED
 
 WebWorkbenchDockerImageTest > katexJsIsServed() PASSED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/verification-1784806398690.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/verification-1784807383141.json
 
 [Incubating] Problems report is available at: file:///home/runner/work/Regelsuche/Regelsuche/build/reports/problems/problems-report.html
 
@@ -421,37 +452,6 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:e2e
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:328)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
-	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:146)
-	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:131)
-	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:210)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:205)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:67)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:167)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:60)
-	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:54)
-	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$11(DefaultBuildLifecycleController.java:323)
-	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:304)
-	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$9(StateTransitionController.java:215)
-	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:45)
-	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:215)
-	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:314)
-	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$runAndReleaseLocks$0(DefaultWorkerLeaseService.java:300)
-	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:43)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.runAndReleaseLocks(DefaultWorkerLeaseService.java:298)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:294)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:286)
-	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:130)
-	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:182)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:199)
-	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:84)
-	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:199)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:47)
 Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There were failing tests. See the report at: file:///home/runner/work/Regelsuche/Regelsuche/app/build/reports/tests/e2eTest/index.html
@@ -557,10 +557,10 @@ Caused by: org.gradle.api.internal.exceptions.MarkedVerificationException: There
 	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:38)
 	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
 	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
-	... 61 more
+	... 30 more
 
 
-BUILD FAILED in 13m 13s
+BUILD FAILED in 16m 46s
 49 actionable tasks: 13 executed, 36 up-to-date
 Configuration cache entry stored.
 --- focused documentation e2e tail ---
