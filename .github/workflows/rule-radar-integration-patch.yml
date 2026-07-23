@@ -20,7 +20,6 @@ permissions:
 
 jobs:
   patch-and-verify:
-    # Retry marker: feature-branch workflow removed before this verification.
     if: >-
       github.event_name == 'push' ||
       github.event_name == 'schedule' ||
@@ -38,7 +37,8 @@ jobs:
         id: completed
         shell: bash
         run: |
-          if grep -qx 'SUCCESS' docs/generated/rule-radar-ci-status.txt 2>/dev/null; then
+          if grep -qx 'SUCCESS' docs/generated/rule-radar-ci-status.txt 2>/dev/null \
+             && test -s docs/assets/screenshots/ast-rule-radar.png; then
             echo 'skip=true' >> "$GITHUB_OUTPUT"
           else
             echo 'skip=false' >> "$GITHUB_OUTPUT"
@@ -56,12 +56,13 @@ jobs:
                   app/src/main/java/de/regelsuche/radar/AstRuleRadarService.java \
                   app/src/main/resources/web/index.html \
                   app/src/main/resources/web/rule-radar.js \
+                  app/src/main/resources/web/rule-radar.css \
                   docs/README.md \
                   docs/ast-rule-radar.md
           if git diff --cached --quiet; then
             echo "Direct integration is already committed."
           else
-            git commit -m "Integrate AST rule radar into workbench"
+            git commit -m "Complete AST rule radar workbench integration"
             git push origin HEAD:issue-467-ast-rule-radar
           fi
       - uses: actions/setup-java@v5
@@ -76,14 +77,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3-venv z3
-      - name: Run complete repository verification lifecycle
+      - name: Run complete repository verification and record radar evidence
         if: steps.completed.outputs.skip != 'true'
         id: verification
         shell: bash
         run: |
           set +e
           set -o pipefail
-          mkdir -p build/logs docs/generated
+          mkdir -p build/logs docs/generated docs/assets/screenshots
           env -u GITHUB_SHA ./gradlew \
             :app:installPlaywrightHostDependencies \
             :app:installPlaywrightBrowsers \
@@ -96,26 +97,44 @@ jobs:
             2>&1 | tee build/logs/rule-radar-full-check.log
           status=${PIPESTATUS[0]}
           if [ "$status" -eq 0 ]; then
+            env -u GITHUB_SHA ./gradlew \
+              :app:e2eTest \
+              --tests de.regelsuche.e2e.RuleRadarBrowserFlowTest \
+              -Pregelsuche.recordDocs=true \
+              -Pregelsuche.skipPlaywrightInstall=true \
+              --console=plain \
+              --stacktrace \
+              2>&1 | tee build/logs/rule-radar-docs-e2e.log
+            status=${PIPESTATUS[0]}
+          fi
+          if [ "$status" -eq 0 ] && test -s docs/assets/screenshots/ast-rule-radar.png; then
             printf 'SUCCESS\n' > docs/generated/rule-radar-ci-status.txt
           else
             {
               printf 'FAILURE exit=%s\n\n' "$status"
-              tail -n 700 build/logs/rule-radar-full-check.log
+              printf '%s\n' '--- fullCheck tail ---'
+              tail -n 500 build/logs/rule-radar-full-check.log 2>/dev/null || true
+              printf '%s\n' '--- focused documentation e2e tail ---'
+              tail -n 250 build/logs/rule-radar-docs-e2e.log 2>/dev/null || true
             } > docs/generated/rule-radar-ci-status.txt
+            status=1
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Commit verification status
+      - name: Commit verification status and generated browser evidence
         if: steps.completed.outputs.skip != 'true'
         shell: bash
         run: |
           git add docs/generated/rule-radar-ci-status.txt
+          if test -s docs/assets/screenshots/ast-rule-radar.png; then
+            git add docs/assets/screenshots/ast-rule-radar.png
+          fi
           if git diff --cached --quiet; then
-            echo "No verification status change required."
+            echo "No verification evidence change required."
           else
-            git commit -m "Record AST rule radar verification status"
+            git commit -m "Record AST rule radar verification evidence"
             git push origin HEAD:issue-467-ast-rule-radar
           fi
-      - name: Fail verification when fullCheck failed
+      - name: Fail verification when lifecycle or documentation evidence failed
         if: steps.completed.outputs.skip != 'true' && steps.verification.outputs.status != '0'
         run: exit 1
