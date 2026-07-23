@@ -7,6 +7,13 @@ on:
     paths:
       - tools/apply-rule-radar-integration.py
       - .github/workflows/rule-radar-integration-patch.yml
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
+    paths:
+      - tools/apply-rule-radar-integration.py
+      - .github/workflows/rule-radar-integration-patch.yml
 
 permissions:
   contents: write
