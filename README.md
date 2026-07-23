@@ -13,7 +13,9 @@
 📋 **[Test report](https://carstenartur.github.io/Regelsuche/tests/)** ·
 ⚡ **[Performance charts](https://carstenartur.github.io/Regelsuche/dev/bench/)**
 
-**Navigation:** [Demo Gallery](docs/demo-gallery.md) ·
+**Navigation:** [Web Workbench](docs/web-workbench.md) ·
+[User Workflows](docs/user-workflows.md) ·
+[Demo Gallery](docs/demo-gallery.md) ·
 [Discovery Engine](docs/discovery-engine.md) ·
 [Discovery Evidence v1](docs/discovery-evidence-v1.md) ·
 [Capability status](docs/generated/capability-status.md) ·
@@ -139,13 +141,17 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
 
 1. **Demo starten.** Auf `http://localhost:8080/` einen Demo-Button (z.B.
    _Binomische Formel_) klicken. Erst nach diesem Klick werden die Folge-Tabs
-   (Graph, Replay, Proof-Jobs, Export, …) sichtbar — das Landing-Form ist
+   (Graph, Replay, Proof-Jobs, AST-Regelradar, Export, …) sichtbar — das Landing-Form ist
    absichtlich auf einen einzigen Hauptfluss „Ausdruck → Ziel → Suche starten"
    reduziert.
 2. **Suchgraph + Replay ansehen.** `Graph`-Tab zeigt den entdeckten
    Transformationsraum; `Replay` spielt den besten Pfad Schritt für Schritt
    ab.
-3. **Eine nichttriviale Identität formal prüfen.** Im `Proof-Jobs`-Tab
+3. **Lokale Züge verstehen.** Im Tab `AST-Regelradar` einen AST-Knoten
+   auswählen. Die Regelpunkte zeigen, welche konkreten Grund-, Erweiterungs-
+   und Makroregeln dort mit welchen Bindungen und Annahmen anwendbar sind und
+   welchen vollständigen Folgeausdruck sie erzeugen würden.
+4. **Eine nichttriviale Identität formal prüfen.** Im `Proof-Jobs`-Tab
    `Left=a^4 + 4*b^4` und
    `Right=(a^2 - 2*a*b + 2*b^2)*(a^2 + 2*a*b + 2*b^2)` eintragen, dann
    _Job einreichen_. Das ist die Sophie-Germain-Identität, die auch in der
@@ -160,15 +166,19 @@ Eine knappe, geführte Tour für neue Nutzer (≈ 5 Minuten):
    `$REGELSUCHE_PROOF_ARTIFACT_PATH/<jobId>/`. `FORMALLY_PROVED` wird nur
    gesetzt, wenn der konfigurierte Solver die Obligation tatsächlich bestätigt.
    ![Proof-Job-Panel](docs/assets/screenshots/proof-job-panel.png)
-4. **Qualitätsdashboard prüfen.** `Benchmark`-Tab → jede Zeile zeigt
+5. **Qualitätsdashboard prüfen.** `Benchmark`-Tab → jede Zeile zeigt
    Ampelstatus, `expectedResultMatched`, e-Graph-Größe, Saturation-Sparung
    und ob eine gelernte Makroregel beteiligt war. Der vollständige Report
    liegt unter [`docs/benchmark-report.md`](docs/benchmark-report.md) (CI lädt
    ihn als Artefakt `benchmark-report` hoch).
-5. **Bericht exportieren.** Im `Exporte`-Tab den `bundle.zip` Download
+6. **Bericht exportieren.** Im `Exporte`-Tab den `bundle.zip` Download
    starten — enthält Markdown/LaTeX/JSON/Mermaid/GraphML und das aktuelle
    Rule-Inventory.
 
+Die Markdown-Dokumentation beschreibt diese grafischen Abläufe. Für direkte
+REST-Integrationen ist ausschließlich die Swagger/OpenAPI-Dokumentation der
+laufenden Installation verbindlich; HTTP-Pfade, Payloads und Statuscodes werden
+nicht parallel im README gepflegt.
 
 ## Autonomous Discovery Result Card
 
@@ -232,18 +242,20 @@ Artefakte: `discovery-report.json`, `discovery-report.html`,
 * **Discovery+** — domain-aware Mining: gefundene Makroregeln werden
   automatisch mit `equations`, `inequalities`, `calculus` oder
   `linear-algebra` getaggt.
+* **AST-Regelradar** — zoombare Baumansicht mit positionsgebundenen
+  Regelanwendungen, Vorschau, Annahmen, Makro-Expansion und korreliertem
+  Auswahl-, Anwendungs- und Pruningstatus.
 * **Proof-Bridge** generiert ein Lean/SMT-Skript pro Pfad. `FORMALLY_PROVED`
   wird nur gesetzt, wenn der Prover den Beweis bestätigt.
-* **Proof-Workbench** — persistente Job-Queue mit REST-API
-  (`POST /api/proof/jobs`, `GET /api/proof/jobs/{id}`,
-  `POST /api/proof/jobs/{id}/cancel`,
-  `GET /api/proof/jobs/{id}/artifacts`) plus eigener UI-Tab. Jobs, Cache und
-  Artefakt-Bundle (`proof.lean`, `proof.smt2`, `stdout.txt`, `stderr.txt`,
-  `metadata.json` pro Job) werden via `REGELSUCHE_PROOF_ENABLED`,
-  `REGELSUCHE_PROOF_ARTIFACT_PATH`, `REGELSUCHE_PROOF_JOB_STORE` und
-  `REGELSUCHE_PROOF_CACHE` konfiguriert. Für echte Prover gibt es
-  `Dockerfile.proof` (Z3 + cvc5 vorinstalliert, Lean optional via
-  `--build-arg INSTALL_LEAN=true`).
+* **Proof-Workbench** — persistente Job-Queue mit eigenem UI-Tab. Über
+  **Proof-Jobs** lassen sich Aufträge einreichen, verfolgen, abbrechen und ihre
+  Artefakte öffnen. Jobs, Cache und Artefakt-Bundle (`proof.lean`, `proof.smt2`,
+  `stdout.txt`, `stderr.txt`, `metadata.json` pro Job) werden via
+  `REGELSUCHE_PROOF_ENABLED`, `REGELSUCHE_PROOF_ARTIFACT_PATH`,
+  `REGELSUCHE_PROOF_JOB_STORE` und `REGELSUCHE_PROOF_CACHE` konfiguriert.
+  Für echte Prover gibt es `Dockerfile.proof` (Z3 + cvc5 vorinstalliert, Lean
+  optional via `--build-arg INSTALL_LEAN=true`). Der technische REST-Vertrag
+  steht in Swagger/OpenAPI.
 * **Persistenz** als leichter JSON-Demo-Modus, PostgreSQL/Hibernate-Metadaten
   im Full Mode, Hibernate Search für Text/Facetten und optionales Neo4j für
   mathematische Graph-Provenance.
@@ -275,14 +287,17 @@ davon getrennte, noch nicht qualifizierte Capabilities.
 ## Quickstart-Varianten
 
 * [Getting Started](docs/getting-started.md) — Docker, lokaler Gradle-Lauf,
-  wichtige Endpunkte, optionaler Neo4j-Mode.
+  grafischer Einstieg und optionaler Full Mode.
+* [Web-Workbench](docs/web-workbench.md) und
+  [Benutzerhandbuch](docs/web-ui-user-guide.md) — aktuelle GUI-Bereiche,
+  sichtbare Ergebnisse und Zustände.
 * [Docker-/Compose-Setup](docker-compose.yml) — PostgreSQL-Full-Mode und
   optionales Neo4j-Profil.
 * [Architektur](docs/architecture.md) — Leitplanken und Überblick.
 * [Modulstruktur](docs/module-structure.md) — Gradle-Module inkl. Search/Persistence/Learning/Experiments (inkl. Seed-Corpus)/CLI/Discovery, verbleibende logische Module und Paketmapping.
 * [Dependency-Regeln](docs/dependency-rules.md) — erlaubte Abhängigkeitsrichtungen.
-* [Nutzer-Workflows](docs/user-workflows.md) — Lehrer/Schüler,
-  Forscher, CAS-Vergleich, Proof-Workflow.
+* [Nutzer-Workflows](docs/user-workflows.md) — Lernen, Discovery, Vergleich,
+  Proof, Qualität und AST-Regelradar.
 * [Such-Intelligenz](docs/search-intelligence.md) und
   [Equality-Saturation](docs/equality-saturation.md).
 * [Math-Domains](docs/math-domains.md) — semantische Domänen, Replay-Karten,
@@ -315,13 +330,15 @@ davon getrennte, noch nicht qualifizierte Capabilities.
 * [Bekannte Grenzen](docs/limits.md) — bewusst begrenzte Semantik und
   Follow-up-Entscheidungen.
 * [Proof-Bridge](docs/proof-bridge.md) — vom Pfad zum formalen Beweis.
-* [Proof-Workbench](docs/proof-workbench.md) — persistente Jobs, REST,
-  Artefakt-Bundle, Dockerfile.proof.
+* [Proof-Workbench](docs/proof-workbench.md) — grafischer Job-Lebenszyklus,
+  Artefakt-Bundle und Dockerfile.proof.
+* [AST-Regelradar](docs/ast-rule-radar.md) — lokale anwendbare Regeln pro
+  Baumposition und Korrelation mit dem globalen Suchgraphen.
 * [Macro-Rules](docs/macro-rules.md) — wie das System eigene Regeln lernt.
 * [Testing](docs/testing.md) — Task-Referenz der Testpipelines.
 * [Testing-Strategie](docs/testing-strategy.md) — Schichtung nach Core/Integration/E2E.
 * [Developer Guide](docs/developer-guide.md) — Repo-Layout, Build-Kommandos,
-  Konventionen, neue Endpunkte hinzufügen.
+  Konventionen sowie API- und UI-Erweiterungen.
 
 Eine Komplett-Übersicht der Dokumentation findet sich unter
 [`docs/`](docs/). Die historische Langfassung dieses README ist
@@ -342,5 +359,8 @@ Pull Requests sind willkommen — bitte beachte:
   bitte gegen die
   [Documentation Quality Checklist](docs/documentation-quality-checklist.md)
   prüfen.
+* Die [Dokumentationskonvention](docs/documentation-conventions.md) ist
+  verbindlich: GUI-Abläufe in Markdown, REST-Verträge ausschließlich in
+  Swagger/OpenAPI.
 
 Lizenz: [MIT](LICENSE).
