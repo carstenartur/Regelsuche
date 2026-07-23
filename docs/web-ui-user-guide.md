@@ -16,7 +16,7 @@ Danach im Browser `http://127.0.0.1:8080/` öffnen.
 
 Der Startbereich bietet vorbereitete Aufgaben für binomische Formeln, Bruchkürzung, Trigonometrie, Polynom-Expansion, Makroregel-Lernen, Gleichungen, Ungleichungen, Ableitungen und Matrizen.
 
-Ein Klick startet nicht nur eine isolierte Berechnung. Die Workbench führt den vollständigen Ablauf aus, zeigt eine Zusammenfassung und macht anschließend die passenden Bereiche für Suchgraph, Pfade, Replay, Identitäten, Qualität und Export zugänglich.
+Ein Klick startet nicht nur eine isolierte Berechnung. Die Workbench führt den vollständigen Ablauf aus, zeigt eine Zusammenfassung und macht anschließend die passenden Bereiche für Suchgraph, AST-Regelradar, Pfade, Replay, Identitäten, Qualität und Export zugänglich.
 
 ## Oberfläche
 
@@ -39,7 +39,7 @@ Ein leerer Bereich bedeutet, dass zunächst eine Suche oder Demo ausgeführt wer
 
 ### Graph
 
-Der Tab **Graph** macht den Suchraum sichtbar. Verfügbar sind:
+Der Tab **Graph** macht den globalen Suchraum sichtbar. Verfügbar sind:
 
 - **Semantische Erklärung** als nutzerorientierte Standardansicht,
 - **Nur Hauptpfad** für den bevorzugten Rechenweg,
@@ -100,9 +100,19 @@ Der Tab **Exporte** bietet Ausgabeformate nach ihrem Verwendungszweck an:
 
 Der Bereich **Didaktik** erklärt und bewertet Lernwege. Interne Scores werden in verständliche Kriterien übersetzt; Fachbegriffe erhalten kontextnahe Hinweise.
 
-### Rule-IDE
+### AST-Regelradar
 
-Die **Rule-IDE** stellt einen kontrollierten grafischen Autorenfluss für Regeln bereit. Eingaben werden validiert, Fehler an den betroffenen Feldern erklärt und Test- beziehungsweise Vorschauergebnisse vor einer Übernahme sichtbar gemacht.
+Das **AST-Regelradar** zeigt den aktuellen mathematischen Ausdruck als zoombaren Syntaxbaum. Jeder Knoten entspricht einem konkreten Teilausdruck. Die Punkte am Regelkreis eines Knotens stehen für die dort tatsächlich enumerierten Regelanwendungen.
+
+- Hover oder Tastaturfokus zeigt Regelname, Herkunft, Bindungen, Annahmen, lokalen Rewrite und vollständigen Folgeausdruck.
+- Ein Klick wählt einen Zug zunächst nur zur Vorschau aus.
+- Eine getrennte Aktion führt den Zug aus oder übernimmt ihn als nächsten Suchschritt.
+- Grundregeln, Erweiterungsregeln und Makroregeln sind zusätzlich zu ihrer Farbe durch Text beziehungsweise Form unterscheidbar.
+- Statuskennzeichnungen unterscheiden verfügbar, ausgewählt, angewandt, verworfen, Duplikat und wegen Annahmen abgelehnt.
+- Makroregeln lassen sich in ihre atomaren Schritte aufklappen.
+- Beim Wechsel zum globalen Suchgraphen oder Replay bleiben Baumposition und Kandidatenbezug erhalten.
+
+Das Regelradar behauptet keine mathematische Vollständigkeit. Es zeigt die im aktuellen endlichen Suchkontext tatsächlich erzeugte Kandidatenmenge. Weitere fachliche Details stehen unter [AST-Regelradar](ast-rule-radar.md).
 
 ### Hilfe
 
@@ -127,9 +137,10 @@ Die Oberfläche verwendet eine gemeinsame Darstellungspipeline:
 
 - Im Replay werden geänderte mathematische Teile zwischen zwei Schritten hervorgehoben; ein Wechsel der Richtung eines Vergleichszeichens erhält einen deutlichen Hinweis.
 - Der Suchgraph rendert mathematische Knoteninhalte als KaTeX-Overlays über der interaktiven Graphfläche und hält sie beim Zoomen und Verschieben synchron.
+- Das AST-Regelradar verbindet Knoten und Regelkreise mit einer zugänglichen Textalternative und deterministischer Tastatursteuerung.
 - Strukturierte Layoutinformationen unterscheiden Inline-, Display- und ausgerichtete Darstellungen und liefern zusätzlich zugängliche ARIA-Beschriftungen.
 
-Details zur Implementierung stehen in [Replay Mode](replay-mode.md) und [Visual Search Graph](visual-search-graph.md).
+Details zur Implementierung stehen in [Replay Mode](replay-mode.md), [Visual Search Graph](visual-search-graph.md) und [AST-Regelradar](ast-rule-radar.md).
 
 ## Technische API-Zuordnung
 
