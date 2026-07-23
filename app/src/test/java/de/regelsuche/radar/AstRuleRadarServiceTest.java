@@ -91,6 +91,23 @@ class AstRuleRadarServiceTest {
     }
 
     @Test
+    void everyDisplayedApplicableCandidateResolvesToItsAdvertisedSuccessor() {
+        AstRuleRadar.Context context = AstRuleRadar.Context.defaults();
+        AstRuleRadar.Snapshot snapshot = service.inspect("(x + 1)^2 + 0", context);
+
+        for (AstRuleRadar.ApplicableMove displayed : snapshot.candidates().stream()
+            .filter(AstRuleRadar.ApplicableMove::applicable)
+            .toList()) {
+            AstRuleRadar.ApplicableMove resolved = service.resolve(
+                snapshot.expression(), displayed.candidateId(), context).orElseThrow();
+            assertEquals(displayed.candidateId(), resolved.candidateId());
+            assertEquals(displayed.pathKey(), resolved.pathKey());
+            assertEquals(displayed.ruleId(), resolved.ruleId());
+            assertEquals(displayed.expressionAfter(), resolved.expressionAfter());
+        }
+    }
+
+    @Test
     void bindingsOriginValidationAndMacroEvidenceCannotDisappear() {
         AstRuleRadar.ApplicableMove macro = service.inspect("(x + 1)^2 + 0", AstRuleRadar.Context.defaults())
             .candidates().stream()
