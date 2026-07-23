@@ -1,0 +1,57 @@
+-            result.add(matcher.group(1));
+-        }
+-        return result;
+-    }
+-
+-    private Path locateServerSource() {
+-        List<Path> candidates = new ArrayList<>();
+-        candidates.add(Path.of("src/main/java/de/regelsuche/web/WebWorkbenchServer.java"));
+-        candidates.add(Path.of("app/src/main/java/de/regelsuche/web/WebWorkbenchServer.java"));
+-        candidates.add(Path.of("..", "app", "src", "main", "java", "de", "regelsuche", "web",
+-            "WebWorkbenchServer.java"));
+-        return candidates.stream()
+-            .map(Path::normalize)
+-            .filter(Files::isRegularFile)
+-            .findFirst()
+-            .orElseThrow(() -> new IllegalStateException("cannot locate WebWorkbenchServer.java from "
+-                + Path.of("").toAbsolutePath()));
++    private StaticResource get(String path) throws IOException {
++        return request("GET", path);
+     }
+ 
+-    private StaticResource get(String path) throws IOException {
++    private StaticResource request(String method, String path) throws IOException {
+         URI uri = URI.create("http://127.0.0.1:" + server.boundPort() + path);
+         HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
+         connection.setConnectTimeout(2_000);
+         connection.setReadTimeout(10_000);
+-        connection.setRequestMethod("GET");
++        connection.setRequestMethod(method);
+         int status = connection.getResponseCode();
+         String contentType = connection.getHeaderField("Content-Type");
++        String allow = connection.getHeaderField("Allow");
+         InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
+         String body;
+         if (stream == null) {
+@@ -233,7 +233,12 @@ class OpenApiStaticReferenceTest {
+                 body = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+             }
+         }
+-        return new StaticResource(status, contentType == null ? "" : contentType, body);
++        return new StaticResource(
++            status,
++            contentType == null ? "" : contentType,
++            body,
++            allow == null ? "" : allow
++        );
+     }
+ 
+     @SuppressWarnings("unchecked")
+@@ -246,6 +251,6 @@ class OpenApiStaticReferenceTest {
+         return value instanceof List<?> values ? (List<Object>) values : List.of();
+     }
+ 
+-    private record StaticResource(int status, String contentType, String body) {
++    private record StaticResource(int status, String contentType, String body, String allow) {
+     }
+ }
