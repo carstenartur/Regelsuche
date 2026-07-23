@@ -338,8 +338,11 @@ public final class AstRuleRadarService implements AutoCloseable {
             .sorted()
             .toList();
         boolean assumptionsSatisfied = context.assumptions().containsAll(assumptions);
+        if (!assumptionsSatisfied && !context.includeRejectedCandidates()) {
+            return Optional.empty();
+        }
         CandidateOutcome outcome = assumptionsSatisfied
-            ? context.outcomeByCandidateId().getOrDefault("", CandidateOutcome.AVAILABLE)
+            ? CandidateOutcome.AVAILABLE
             : CandidateOutcome.REJECTED_ASSUMPTION;
         List<Binding> bindings = bindings(rule, subtree);
         return Optional.of(candidate(
@@ -451,6 +454,9 @@ public final class AstRuleRadarService implements AutoCloseable {
             for (RuleInspectionDto.RuleMatch match : position.matches()) {
                 if (match.expressionAfter() == null || match.expressionAfter().isBlank()
                     || match.subtreeAfter() == null || match.subtreeAfter().isBlank()) {
+                    continue;
+                }
+                if (!match.applicable() && !context.includeRejectedCandidates()) {
                     continue;
                 }
                 List<Binding> bindings = match.bindings().stream()
