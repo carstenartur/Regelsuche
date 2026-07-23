@@ -1,0 +1,90 @@
+def downstreamStreamRoot = layout.projectDirectory
+def downstreamStreamGenerator = downstreamStreamRoot.file(
+    'scripts/generate-downstream-task-stream.py')
+def downstreamStreamVerifier = downstreamStreamRoot.file(
+    'scripts/verify-downstream-task-stream.py')
+def downstreamStreamSchema = downstreamStreamRoot.file(
+    'docs/schemas/regelsuche-downstream-task-stream-v1.schema.json')
+def downstreamStreamCorpus = downstreamStreamRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def downstreamStreamReceipt = downstreamStreamRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def downstreamStreamProfile = downstreamStreamRoot.file(
+    'research/benchmarks/candidate-independent/macro-primitives.json')
+def downstreamStreamBuildRoot = layout.buildDirectory.dir(
+    'reports/downstream-task-stream')
+def downstreamStreamFirst = downstreamStreamBuildRoot.map {
+    it.file('first/downstream-task-stream.json')
+}
+def downstreamStreamSecond = downstreamStreamBuildRoot.map {
+    it.file('second/downstream-task-stream.json')
+}
+def downstreamStreamReport = downstreamStreamBuildRoot.map { it.dir('verification') }
+def downstreamStreamPython = layout.buildDirectory.dir('verification-venv').map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureDownstreamStreamGeneration = { task, output ->
+    task.group = 'verification'
+    task.description = 'Generates the candidate-independent downstream task stream from frozen inputs.'
+    task.dependsOn 'prepareVerificationEnvironment'
+    task.workingDir downstreamStreamRoot
+    task.inputs.files downstreamStreamGenerator, downstreamStreamCorpus,
+        downstreamStreamReceipt, downstreamStreamProfile
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file output
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine downstreamStreamPython.get().absolutePath,
+            downstreamStreamGenerator.asFile.absolutePath,
+            '--corpus', downstreamStreamCorpus.asFile.absolutePath,
+            '--receipt', downstreamStreamReceipt.asFile.absolutePath,
+            '--profile', downstreamStreamProfile.asFile.absolutePath,
+            '--repository-revision', 'WORKTREE',
+            '--output', output.get().asFile.absolutePath
+    }
+}
+
+def generateDownstreamTaskStreamFirst = tasks.register(
+    'generateDownstreamTaskStreamFirst', Exec
+) {
+    configureDownstreamStreamGeneration(delegate, downstreamStreamFirst)
+}
+
+def generateDownstreamTaskStreamSecond = tasks.register(
+    'generateDownstreamTaskStreamSecond', Exec
+) {
+    configureDownstreamStreamGeneration(delegate, downstreamStreamSecond)
+}
+
+def verifyDownstreamTaskStream = tasks.register(
+    'verifyDownstreamTaskStream', Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies task order, freeze bindings and absence of result leakage.'
+    dependsOn generateDownstreamTaskStreamFirst, generateDownstreamTaskStreamSecond
+    workingDir downstreamStreamRoot
+    inputs.files downstreamStreamGenerator, downstreamStreamVerifier,
+        downstreamStreamSchema, downstreamStreamCorpus,
+        downstreamStreamReceipt, downstreamStreamProfile,
+        downstreamStreamFirst, downstreamStreamSecond
+    outputs.dir downstreamStreamReport
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine downstreamStreamPython.get().absolutePath,
+            downstreamStreamVerifier.asFile.absolutePath,
+            '--first-stream', downstreamStreamFirst.get().asFile.absolutePath,
+            '--second-stream', downstreamStreamSecond.get().asFile.absolutePath,
+            '--corpus', downstreamStreamCorpus.asFile.absolutePath,
+            '--receipt', downstreamStreamReceipt.asFile.absolutePath,
+            '--profile', downstreamStreamProfile.asFile.absolutePath,
+            '--schema', downstreamStreamSchema.asFile.absolutePath,
+            '--report-directory', downstreamStreamReport.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyDownstreamTaskStream
+}
