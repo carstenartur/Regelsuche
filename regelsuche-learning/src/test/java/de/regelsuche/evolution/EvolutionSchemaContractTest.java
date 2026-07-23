@@ -21,6 +21,8 @@ class EvolutionSchemaContractTest {
             "regelsuche-evolution-generation-report-v1.schema.json");
         String population = readSchema(
             "regelsuche-evolution-population-run-v1.schema.json");
+        String checkpoint = readSchema(
+            "regelsuche-evolution-population-checkpoint-v1.schema.json");
         String trainSuite = readSchema(
             "regelsuche-evolution-train-search-suite-v1.schema.json");
         String trainFitness = readSchema(
@@ -83,6 +85,15 @@ class EvolutionSchemaContractTest {
         assertTrue(population.contains("\"validationStatus\""));
         assertTrue(population.contains("\"const\": \"NOT_EVALUATED\""));
         assertTrue(population.contains("\"additionalProperties\": false"));
+        assertTrue(checkpoint.contains(
+            "regelsuche.evolution-population-checkpoint/v1"));
+        assertTrue(checkpoint.contains("\"mutationCatalogHash\""));
+        assertTrue(checkpoint.contains("\"evaluations\""));
+        assertTrue(checkpoint.contains("\"generationReports\""));
+        assertTrue(checkpoint.contains("\"validationStatus\""));
+        assertTrue(checkpoint.contains("\"finalTestStatus\""));
+        assertTrue(checkpoint.contains("\"const\": \"NOT_EVALUATED\""));
+        assertTrue(checkpoint.contains("\"additionalProperties\": false"));
         assertTrue(trainSuite.contains(
             "regelsuche.evolution-train-search-suite/v1"));
         assertTrue(trainSuite.contains("\"targetExpression\""));
