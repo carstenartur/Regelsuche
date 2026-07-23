@@ -68,7 +68,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3-venv z3
-      - name: Run complete repository verification and browser evidence capture
+      - name: Run radar preflight, full lifecycle and browser evidence capture
         if: steps.completed.outputs.skip != 'true'
         id: verification
         shell: bash
@@ -77,21 +77,51 @@ jobs:
           set -o pipefail
           mkdir -p build/logs docs/generated docs/assets/screenshots
           verified_head="$(git rev-parse HEAD)"
+          phase="radar-unit-api-preflight"
+
           env -u GITHUB_SHA ./gradlew \
             :app:installPlaywrightHostDependencies \
             :app:installPlaywrightBrowsers \
-            fullCheck \
-            jacocoTestReport \
-            :app:benchmarkReport \
-            generateCiPages \
+            :app:test \
+            --tests 'de.regelsuche.radar.*' \
+            --tests 'de.regelsuche.web.RuleRadarApiTest' \
             --console=plain \
             --stacktrace \
-            2>&1 | tee build/logs/rule-radar-full-check.log
+            2>&1 | tee build/logs/rule-radar-unit-api-preflight.log
           status=${PIPESTATUS[0]}
+
           if [ "$status" -eq 0 ]; then
+            phase="radar-browser-preflight"
             env -u GITHUB_SHA ./gradlew \
               :app:e2eTest \
-              --tests de.regelsuche.e2e.RuleRadarBrowserFlowTest \
+              --tests 'de.regelsuche.e2e.RuleRadarBrowserFlowTest' \
+              --tests 'de.regelsuche.e2e.RuleAuthoringBrowserFlowTest' \
+              -Pregelsuche.skipPlaywrightInstall=true \
+              --console=plain \
+              --stacktrace \
+              2>&1 | tee build/logs/rule-radar-browser-preflight.log
+            status=${PIPESTATUS[0]}
+          fi
+
+          if [ "$status" -eq 0 ]; then
+            phase="full-repository-lifecycle"
+            env -u GITHUB_SHA ./gradlew \
+              fullCheck \
+              jacocoTestReport \
+              :app:benchmarkReport \
+              generateCiPages \
+              -Pregelsuche.skipPlaywrightInstall=true \
+              --console=plain \
+              --stacktrace \
+              2>&1 | tee build/logs/rule-radar-full-check.log
+            status=${PIPESTATUS[0]}
+          fi
+
+          if [ "$status" -eq 0 ]; then
+            phase="documentation-browser-evidence"
+            env -u GITHUB_SHA ./gradlew \
+              :app:e2eTest \
+              --tests 'de.regelsuche.e2e.RuleRadarBrowserFlowTest' \
               -Pregelsuche.recordDocs=true \
               -Pregelsuche.skipPlaywrightInstall=true \
               --console=plain \
@@ -151,13 +181,18 @@ jobs:
           else
             {
               printf 'FAILURE exit=%s\n' "$status"
+              printf 'phase=%s\n' "$phase"
               printf 'verifiedHead=%s\n\n' "$verified_head"
               printf '%s\n' '--- exact failed test cases ---'
               cat build/logs/rule-radar-failed-tests.txt
+              printf '%s\n' '--- radar unit/API preflight tail ---'
+              tail -n 180 build/logs/rule-radar-unit-api-preflight.log 2>/dev/null || true
+              printf '%s\n' '--- radar browser preflight tail ---'
+              tail -n 180 build/logs/rule-radar-browser-preflight.log 2>/dev/null || true
               printf '%s\n' '--- fullCheck tail ---'
-              tail -n 300 build/logs/rule-radar-full-check.log 2>/dev/null || true
+              tail -n 220 build/logs/rule-radar-full-check.log 2>/dev/null || true
               printf '%s\n' '--- focused documentation e2e tail ---'
-              tail -n 200 build/logs/rule-radar-docs-e2e.log 2>/dev/null || true
+              tail -n 160 build/logs/rule-radar-docs-e2e.log 2>/dev/null || true
             } > docs/generated/rule-radar-ci-status.txt
             status=1
           fi
