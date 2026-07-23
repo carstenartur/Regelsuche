@@ -114,5 +114,10 @@ replace_once(
     "        });\n"
     "    }",
 )
+replace_once(
+    UI,
+    "            return `<g class=\"radar-ast-node${selectedNode}\" role=\"treeitem\" aria-label=\"${esc(node.nodeKind + ' ' + node.label + ', Position ' + node.pathKey + ', ' + node.candidateCount + ' Anwendungen')}\">",
+    "            return `<g class=\"radar-ast-node${selectedNode}\" role=\"treeitem\" aria-label=\"${esc(node.nodeKind + ' ' + node.label + ', Position ' + node.pathKey + ', ' + node.candidateIds.length + ' dargestellte Anwendungen, ' + node.omittedCandidateCount + ' ausgelassen, ' + node.candidateCount + ' insgesamt')}\">",
+)
 
-print("AST rule-radar review, asset-serving and stale-response fixes applied successfully.")
+print("AST rule-radar review, asset-serving, stale-response and accessible-count fixes applied successfully.")
