@@ -19,7 +19,10 @@
 - [Reale TRAIN-Suchfitness](evolution-train-fitness.md) — gepaarte Produktionssuche mit kompilierten Genomen, rohen Messwerten und fehlersicher getrennten Claim-Grenzen.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
-- [Getting Started](getting-started.md) — Docker, Gradle und lokale Nutzung.
+- [Getting Started](getting-started.md) — Docker, Gradle und der erste grafische Produktfluss.
+- [Web-Workbench](web-workbench.md) — Bedienbereiche, sichtbare Ergebnisse und fachliche Zuordnung zur API.
+- [Web-Workbench-Benutzerhandbuch](web-ui-user-guide.md) — vollständige Beschreibung der aktuellen Tabs und Bedienelemente.
+- [User Workflows](user-workflows.md) — geführte Abläufe für Lernen, Discovery, Vergleich, Proof, Qualität und lokale Regelanalyse.
 - [Demo Gallery](demo-gallery.md) — reproduzierbare UI- und Replay-Beispiele.
 - [Autonomous Discovery Result Card](autonomous-discovery-walkthrough.md) — Ein-Kommando-Walkthrough mit hashgebundener JSON-/Markdown-Karte und generierten Evidence-SVGs.
 - [Unabhängiges Reproduktionsartefakt](independent-reproduction.md) — deterministisches Quell-/Container-Bundle, exakte und semantische Vergleiche sowie kanonische Reproduction Receipts.
