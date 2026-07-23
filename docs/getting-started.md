@@ -63,6 +63,15 @@ Dort stehen Methoden, Pfade, Request- und Response-Schemata sowie Statuscodes.
 Dieses Getting-Started-Dokument dupliziert diese Angaben bewusst nicht, sondern
 beschreibt den grafischen Einstieg in dieselben Funktionen.
 
+Nach dem Start sind beide technischen Zugänge lokal und ohne CDN verfügbar:
+
+- **Swagger UI:** `http://127.0.0.1:8080/static/openapi/index.html`
+- **OpenAPI 3.1 JSON:** `http://127.0.0.1:8080/static/openapi/openapi.json`
+
+Bei einem Docker-Start mit `-p 8080:8080` können entsprechend auch die URLs mit
+`localhost` verwendet werden. Der Tab **Hilfe** der Workbench verlinkt beide
+Zugänge direkt.
+
 Die verbindliche Trennung ist in der
 [Dokumentationskonvention](documentation-conventions.md) festgehalten.
 
