@@ -397,7 +397,10 @@ public final class AstRuleRadarService implements AutoCloseable {
         } else {
             outcome = CandidateOutcome.AVAILABLE;
         }
-        boolean applicable = proofAccepted && qualityAccepted && goalAccepted && assumptionsSatisfied;
+        if (!goalAccepted) {
+            return Optional.empty();
+        }
+        boolean applicable = proofAccepted && qualityAccepted && assumptionsSatisfied;
         if (!applicable && !context.includeRejectedCandidates()) {
             return Optional.empty();
         }

@@ -413,7 +413,12 @@
             candidateId: candidate.candidateId,
             context: context({selectedCandidateId: candidate.candidateId})
         }).then(result => {
-            state.undo.push(state.snapshot.expression);
+            state.undo.push({
+                expression: state.snapshot.expression,
+                candidateId: candidate.candidateId,
+                pathKey: candidate.pathKey,
+                ruleId: candidate.ruleId
+            });
             state.snapshot = result.inspection;
             state.selectedId = '';
             $('radarExpression').value = result.expressionAfter;
@@ -423,10 +428,11 @@
     }
 
     function undo() {
-        const expression = state.undo.pop();
-        if (expression == null) { return; }
+        const entry = state.undo.pop();
+        if (entry == null) { return; }
         state.selectedId = '';
-        inspect({expression});
+        $('radarApplyStatus').textContent = `Rückgängig: ${entry.ruleId} an ${entry.pathKey}.`;
+        inspect({expression: entry.expression});
     }
 
     function renderTable() {
@@ -439,7 +445,7 @@
         body.innerHTML = candidates.map(candidate => `<tr class="${candidate.candidateId === state.selectedId ? 'selected' : ''}">
             <td><code>${esc(candidate.pathKey)}</code></td>
             <td><span class="radar-origin-chip origin-${candidate.origin.toLowerCase()}">${esc(candidate.origin)}</span></td>
-            <td><code>${esc(candidate.ruleId)}</code></td>
+            <td><code>${esc(candidate.ruleId)}</code><br><span>${esc(candidate.displayName)}</span></td>
             <td><code>${esc(candidate.expressionAfter)}</code></td>
             <td><code>${esc(candidate.outcome)}</code>${candidate.applicable ? '' : ' · nicht ausführbar'}</td>
             <td><button type="button" data-row-candidate="${esc(candidate.candidateId)}">Auswählen</button></td>
