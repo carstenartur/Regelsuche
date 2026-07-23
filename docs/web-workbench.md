@@ -31,7 +31,7 @@ Die Web-Workbench ist die grafische Bedienoberfläche für die Funktionen, die d
 | **Proof-Jobs** | Beweisauftrag einreichen, Status verfolgen, abbrechen und Artefakte öffnen | Persistenter Jobstatus sowie Lean-/SMT-Artefakte, Ausgaben und Metadaten | Proof Jobs |
 | **Exporte** | Ergebnisse in geeigneter Form weiterverwenden | Downloads für Dokumentation, mathematische Texte, Graphwerkzeuge und maschinelle Verarbeitung | Exports |
 | **Didaktik** | Erklär- und Bewertungsfunktionen für Lernwege verwenden | Unterrichtsnahe Darstellung und didaktische Qualitätsinformationen | Didactics |
-| **Rule-IDE** | Regeln grafisch verfassen, prüfen und in kontrollierten Abläufen verwenden | Validierung, Vorschau, Testresultat und Übernahmezustand | Rules, Plugins |
+| **AST-Regelradar** | Ausdruck als AST untersuchen, einen Knoten wählen, dort anwendbare Züge prüfen und eine Anwendung zunächst als Vorschau betrachten | Zoombarer Ausdrucksbaum mit positionsgebundenen Grund-, Erweiterungs- und Makroregeln, Bindungen, Annahmen, Folgeausdruck sowie Auswahl-, Anwendungs- und Pruningstatus | Rule Radar |
 | **Hilfe** | Syntax, Begriffe und Bedienhinweise nachschlagen | Kontextnahe Kurzhilfe ohne Wechsel in eine technische API-Referenz | — |
 
 Die Namen in der letzten Spalte sind fachliche Zuordnungen. Die verbindlichen Operationen und Schemata stehen in der Swagger/OpenAPI-Dokumentation der laufenden Installation.
@@ -40,9 +40,10 @@ Die Namen in der letzten Spalte sind fachliche Zuordnungen. Die verbindlichen Op
 
 1. Im Demo-Bereich eine Aufgabe wählen oder im Tab **Workbench** eine eigene Suche starten.
 2. In **Pfade**, **Graph** und **Replay** nachvollziehen, wie die Umformung zustande kam.
-3. In **Regelkandidaten**, **Identitäten**, **Dashboard** und **Benchmark** Evidenz und Qualität beurteilen.
-4. In **Inventar**, **Suchgedächtnis**, **Proof-Jobs** oder **Rule-IDE** mit dem Ergebnis weiterarbeiten.
-5. In **Exporte** das passende Ausgabeformat herunterladen.
+3. Im **AST-Regelradar** untersuchen, welche konkreten lokalen Züge an einer ausgewählten Baumposition möglich waren und welche davon die Suche verwendet oder verworfen hat.
+4. In **Regelkandidaten**, **Identitäten**, **Dashboard** und **Benchmark** Evidenz und Qualität beurteilen.
+5. In **Inventar**, **Suchgedächtnis** oder **Proof-Jobs** mit dem Ergebnis weiterarbeiten.
+6. In **Exporte** das passende Ausgabeformat herunterladen.
 
 ## Zustände und Rückmeldungen
 
