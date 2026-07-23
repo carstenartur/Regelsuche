@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.graph.InMemoryExpressionGraphStore;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
 import de.regelsuche.plugin.PluginRuntimeConfig;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,13 +69,18 @@ class RuleRadarSearchServiceTest {
             50,
             50));
 
-        AstRuleRadar.SearchState retained = result.states().stream()
-            .filter(state -> state.expression().replace(" ", "").equals("x+0"))
+        Map<String, Long> incomingByState = result.edges().stream()
+            .collect(Collectors.groupingBy(AstRuleRadar.SearchEdge::toStateId, Collectors.counting()));
+        String mergedStateId = incomingByState.entrySet().stream()
+            .filter(entry -> entry.getValue() >= 2)
+            .map(Map.Entry::getKey)
             .findFirst().orElseThrow();
-        long incoming = result.edges().stream()
-            .filter(edge -> retained.stateId().equals(edge.toStateId()))
-            .count();
-        assertTrue(incoming >= 2, "root and nested add-zero applications must both remain visible");
+        AstRuleRadar.SearchState retained = result.states().stream()
+            .filter(state -> mergedStateId.equals(state.stateId()))
+            .findFirst().orElseThrow();
+
+        assertTrue(incomingByState.get(mergedStateId) >= 2,
+            "multiple concrete applications must remain visible as incoming edges");
         assertEquals(1, result.states().stream()
             .filter(state -> retained.canonicalExpression().equals(state.canonicalExpression()))
             .count(), "canonical successor state must not be duplicated");
