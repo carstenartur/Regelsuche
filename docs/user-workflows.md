@@ -29,14 +29,15 @@ Diese Seite beschreibt die wichtigsten Bedienabläufe der Regelsuche-Web-Workben
 1. Im Tab **Workbench** das Profil **Erkundung / Discovery** auswählen.
 2. Passende **Regel-Domänen** aktivieren und mehrere verwandte Ausdrücke nacheinander untersuchen.
 3. Im Tab **Graph** die semantische Erklärung öffnen. Alternative Pfade und Varianten in Clustern nur bei Bedarf einblenden.
-4. Im Tab **Regelkandidaten** Pattern, Beispielanzahl, Bewertung, Status, Proof-Status und Annahmen vergleichen.
-5. Im Tab **Identitäten** prüfen, ob eine wiederkehrende Struktur hinreichend belegt und zur Übernahme geeignet ist.
-6. Im Tab **Suchgedächtnis** unter den universellen Mustern kontrollieren, welche kanonischen Zustände in mehreren Läufen wiederkehren und welche Regeln dazu beitragen.
-7. Im Tab **Inventar** übernommene Regeln auffinden, aktivieren oder mit Tags ordnen.
+4. Im **AST-Regelradar** einzelne Baumpositionen untersuchen und prüfen, welche lokalen Grund-, Erweiterungs- oder Makroregeln dort konkret anwendbar waren.
+5. Im Tab **Regelkandidaten** Pattern, Beispielanzahl, Bewertung, Status, Proof-Status und Annahmen vergleichen.
+6. Im Tab **Identitäten** prüfen, ob eine wiederkehrende Struktur hinreichend belegt und zur Übernahme geeignet ist.
+7. Im Tab **Suchgedächtnis** unter den universellen Mustern kontrollieren, welche kanonischen Zustände in mehreren Läufen wiederkehren und welche Regeln dazu beitragen.
+8. Im Tab **Inventar** übernommene Regeln auffinden, aktivieren oder mit Tags ordnen.
 
-**Sichtbares Ergebnis:** Eine nachvollziehbare Kette von konkreten Suchbeobachtungen über Kandidaten und Identitäten bis zum kontrollierten Regelbestand.
+**Sichtbares Ergebnis:** Eine nachvollziehbare Kette von konkreten lokalen Zügen über Suchpfade, Kandidaten und Identitäten bis zum kontrollierten Regelbestand.
 
-**Technische Zuordnung:** Swagger-Bereiche *Search*, *Search Graph*, *Candidates*, *Identities*, *Memory* und *Inventory*.
+**Technische Zuordnung:** Swagger-Bereiche *Search*, *Search Graph*, *Rule Radar*, *Candidates*, *Identities*, *Memory* und *Inventory*.
 
 ---
 
@@ -90,20 +91,22 @@ Diese Seite beschreibt die wichtigsten Bedienabläufe der Regelsuche-Web-Workben
 
 ---
 
-## 6. Regeln bearbeiten — „Eine Regel kontrolliert entwickeln“
+## 6. Lokale Regelanwendungen untersuchen — „Welche Züge sind genau hier möglich?“
 
-**Ziel:** Eine Regel nicht als rohen REST-Aufruf, sondern über einen sichtbaren Erstellungs-, Prüf- und Übernahmeprozess bearbeiten.
+**Ziel:** Einen mathematischen Ausdruck als AST betrachten und an einer konkreten Baumposition nachvollziehen, welche Regelanwendungen wirklich verfügbar sind und was sie bewirken würden.
 
-1. Den Tab **Rule-IDE** öffnen.
-2. Regelname, linkes und rechtes Pattern, Domäne und erforderliche Annahmen in den vorgesehenen Feldern erfassen.
-3. Die Regel validieren und die Vorschau beziehungsweise Testfälle prüfen.
-4. Fehlerhinweise an den betroffenen Feldern korrigieren, statt eine rohe Serverantwort interpretieren zu müssen.
-5. Eine erfolgreiche Regel in den vorgesehenen kontrollierten Übernahmeprozess geben.
-6. Das Ergebnis anschließend im **Inventar** prüfen und bei Bedarf taggen oder deaktivieren.
+1. Im Tab **Workbench** einen Ausdruck eingeben oder eine Demo ausführen.
+2. Den Tab **AST-Regelradar** öffnen.
+3. Den Ausdruck als zoombaren Baum untersuchen und einen AST-Knoten auswählen.
+4. Die Punkte am Regelkreis des Knotens mit Maus oder Tastatur fokussieren. Regelname, Herkunft, Bindungen, Annahmen, lokaler Vorher-/Nachher-Teilbaum und vollständiger Folgeausdruck prüfen.
+5. Einen Kandidaten anklicken, um ihn zunächst nur auszuwählen und als Vorschau zu betrachten.
+6. Erst über die getrennte Ausführungsaktion den lokalen Zug anwenden oder als nächsten Suchschritt übernehmen.
+7. Statuskennzeichnungen vergleichen: verfügbar, ausgewählt, angewandt, verworfen, als Duplikat geprunt oder wegen Annahmen abgelehnt.
+8. Bei einer Makroregel die atomaren Teilschritte aufklappen und zwischen Regelradar, Suchgraph und Replay wechseln, ohne die gewählte Baumposition zu verlieren.
 
-**Sichtbares Ergebnis:** Ein nachvollziehbarer Autorenfluss mit Validierung, Testresultat, Übernahmestatus und auffindbarem Inventareintrag.
+**Sichtbares Ergebnis:** Ein positionsgebundener, endlicher Katalog konkreter Regelanwendungen mit nachvollziehbarer Vorschau und Suchstatus. Ein Punkt steht für eine ausführbare Anwendung an genau einem AST-Knoten, nicht nur für einen abstrakten Regelnamen.
 
-**Technische Zuordnung:** Swagger-Bereiche *Rules*, *Plugins* und *Inventory*.
+**Technische Zuordnung:** Swagger-Bereich *Rule Radar*. Fachliche Invarianten, Datenmodell und Grenzen beschreibt [AST-Regelradar](ast-rule-radar.md).
 
 ---
 
@@ -123,7 +126,7 @@ Bleibt das Feld auf **vom Profil**, verwendet die Workbench die zum gewählten P
 
 ## Einstieg für neue Nutzerinnen und Nutzer
 
-Vor der ersten Suche zeigt die Startseite bewusst nur den primären Einstieg und den Demo-Bereich. Weiterführende Tabs wie **Graph**, **Replay**, **Proof-Jobs**, **Benchmark** und **Exporte** werden nach dem ersten Suchlauf beziehungsweise nach dem Start einer Demo sichtbar. Dadurch beginnt der Ablauf mit einer mathematischen Aufgabe statt mit einer technischen Funktionsliste.
+Vor der ersten Suche zeigt die Startseite bewusst nur den primären Einstieg und den Demo-Bereich. Weiterführende Tabs wie **Graph**, **Replay**, **Proof-Jobs**, **Benchmark**, **AST-Regelradar** und **Exporte** werden nach dem ersten Suchlauf beziehungsweise nach dem Start einer Demo sichtbar. Dadurch beginnt der Ablauf mit einer mathematischen Aufgabe statt mit einer technischen Funktionsliste.
 
 ## REST-Nutzung
 
