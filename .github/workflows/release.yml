@@ -16,11 +16,6 @@ on:
         required: false
         type: string
         default: ''
-      skip_tests:
-        description: 'Skip ./gradlew test during the release build'
-        required: false
-        type: boolean
-        default: false
       dry_run:
         description: 'Dry run: build and validate but do not create a tag, release or follow-up PR'
         required: false
@@ -33,9 +28,12 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  packages: read
 
 env:
   GH_TOKEN: ${{ github.token }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -44,14 +42,14 @@ concurrency:
 jobs:
   preflight:
     name: Preflight Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       release_version: ${{ steps.resolve.outputs.release_version }}
       next_development_version: ${{ steps.resolve.outputs.next_development_version }}
       tag_name: ${{ steps.resolve.outputs.tag_name }}
       maintenance_branch: ${{ steps.resolve.outputs.maintenance_branch }}
       dry_run: ${{ steps.resolve.outputs.dry_run }}
-      skip_tests: ${{ steps.resolve.outputs.skip_tests }}
+      release_date: ${{ steps.resolve.outputs.release_date }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -66,13 +64,11 @@ jobs:
             TAG_NAME="${GITHUB_REF_NAME}"
             RELEASE_VERSION="${TAG_NAME#v}"
             DRY_RUN="false"
-            SKIP_TESTS="false"
             NEXT_VERSION=""
           else
             RELEASE_VERSION="${{ inputs.release_version }}"
             TAG_NAME="v${RELEASE_VERSION}"
             DRY_RUN="${{ inputs.dry_run }}"
-            SKIP_TESTS="${{ inputs.skip_tests }}"
             NEXT_VERSION="${{ inputs.next_development_version }}"
           fi
 
@@ -96,7 +92,17 @@ jobs:
           echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
           echo "maintenance_branch=maintenance/${MAJOR_MINOR}.x" >> "$GITHUB_OUTPUT"
           echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
-          echo "skip_tests=${SKIP_TESTS}" >> "$GITHUB_OUTPUT"
+          echo "release_date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release source branch
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          EXPECTED_MAINTENANCE="${{ steps.resolve.outputs.maintenance_branch }}"
+          if [[ "${GITHUB_REF_NAME}" != "main" && "${GITHUB_REF_NAME}" != "${EXPECTED_MAINTENANCE}" ]]; then
+            echo "::error::Release workflow must run from main or ${EXPECTED_MAINTENANCE}; found ${GITHUB_REF_NAME}"
+            exit 1
+          fi
 
       - name: Validate release metadata base version
         if: github.event_name == 'workflow_dispatch'
@@ -111,7 +117,7 @@ jobs:
             echo "::error::release.properties must contain a development SNAPSHOT version"
             exit 1
           fi
-          if [[ "${CURRENT%-SNAPSHOT}" != "${{ steps.resolve.outputs.release_version }}" && "${{ steps.resolve.outputs.dry_run }}" != "true" ]]; then
+          if [[ "${CURRENT%-SNAPSHOT}" != "${{ steps.resolve.outputs.release_version }}" ]]; then
             echo "::error::release_version must match release.properties base version (${CURRENT%-SNAPSHOT})"
             exit 1
           fi
@@ -121,15 +127,16 @@ jobs:
           grep -q "\"version\": \"${CURRENT}\"" .zenodo.json
           grep -q "\"version\": \"${CURRENT}\"" codemeta.json
 
-      - name: Reject if tag already exists (workflow_dispatch only)
+      - name: Inspect existing tag (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
         run: |
+          set -euo pipefail
           TAG="${{ steps.resolve.outputs.tag_name }}"
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "::error::Tag ${TAG} already exists on origin"
-            exit 1
+            echo "Tag ${TAG} already exists; the release job will require exact verified-tree parity before reuse"
+          else
+            echo "Tag ${TAG} is free"
           fi
-          echo "Tag ${TAG} is free"
 
       - name: Preflight summary
         run: |
@@ -139,20 +146,22 @@ jobs:
             echo "| Field | Value |";
             echo "|-------|-------|";
             echo "| Trigger | ${{ github.event_name }} |";
+            echo "| Source ref | ${GITHUB_REF_NAME} |";
             echo "| Release version | ${{ steps.resolve.outputs.release_version }} |";
             echo "| Next development version | ${{ steps.resolve.outputs.next_development_version }} |";
             echo "| Tag | ${{ steps.resolve.outputs.tag_name }} |";
             echo "| Maintenance branch | ${{ steps.resolve.outputs.maintenance_branch }} |";
             echo "| Dry run | ${{ steps.resolve.outputs.dry_run }} |";
-            echo "| Skip tests | ${{ steps.resolve.outputs.skip_tests }} |";
+            echo "| Release date | ${{ steps.resolve.outputs.release_date }} |";
           } >> "$GITHUB_STEP_SUMMARY"
 
   build:
-    name: Build & Verify
+    name: Full QA, Build & Verify
     needs: preflight
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       artifact_name: ${{ steps.collect.outputs.artifact_name }}
+      verified_tree: ${{ steps.record.outputs.verified_tree }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -167,14 +176,74 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.1.0
+        with:
+          gradle-home-cache-cleanup: true
 
-      - name: Gradle build
+      - name: Install checkout prerequisites
         run: |
-          if [[ "${{ needs.preflight.outputs.skip_tests }}" == "true" ]]; then
-            ./gradlew --no-daemon assemble
-          else
-            ./gradlew --no-daemon build
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-venv \
+            z3=4.8.12-1
+          ./gradlew --no-daemon \
+            :app:installPlaywrightHostDependencies \
+            --console=plain
+
+      - name: Prepare deterministic release metadata in the build worktree
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          python3 .github/scripts/update-release-metadata.py \
+            "${{ needs.preflight.outputs.release_version }}" \
+            --release \
+            --release-date "${{ needs.preflight.outputs.release_date }}"
+
+      - name: Run full checkout-owned QA and assemble distributions
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/logs
+          env -u GITHUB_SHA ./gradlew \
+            --no-daemon \
+            --no-configuration-cache \
+            ciCheck \
+            :app:assemble \
+            --console=plain \
+            --stacktrace \
+            2>&1 | tee build/logs/release-ci-check.log
+
+      - name: Ensure QA leaves no unexpected tracked changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t CHANGED < <(git diff --name-only)
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            for path in "${CHANGED[@]}"; do
+              case "${path}" in
+                CITATION.cff|CITATION.md|.zenodo.json|codemeta.json|release.properties) ;;
+                *)
+                  echo "::error::QA changed unexpected tracked file: ${path}"
+                  exit 1
+                  ;;
+              esac
+            done
+          elif (( ${#CHANGED[@]} != 0 )); then
+            echo "::error::QA changed tracked files on a tagged release" >&2
+            printf '  %s\n' "${CHANGED[@]}" >&2
+            exit 1
           fi
+
+      - name: Record verified release tree
+        id: record
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            git add CITATION.cff CITATION.md .zenodo.json codemeta.json release.properties
+          fi
+          VERIFIED_TREE=$(git write-tree)
+          git reset --quiet
+          echo "verified_tree=${VERIFIED_TREE}" >> "$GITHUB_OUTPUT"
+          echo "Verified release tree: ${VERIFIED_TREE}"
 
       - name: Collect distribution artifacts
         id: collect
@@ -200,11 +269,28 @@ jobs:
           name: ${{ steps.collect.outputs.artifact_name }}
           path: release-artifacts/**
 
+      - name: Retain release QA evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-qa-evidence
+          path: |
+            build/logs/**
+            build/reports/**
+            build/ai-knowledge/**
+            build/independent-reproduction/**
+            public/**
+            **/build/reports/**
+            **/build/test-results/**
+            **/build/discovery-artifacts/**
+          include-hidden-files: true
+          if-no-files-found: warn
+
   release:
     name: Tag & GitHub Release
     needs: [preflight, build]
     if: needs.preflight.outputs.dry_run != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -222,44 +308,77 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ needs.preflight.outputs.release_version }}"
-          git config user.name  'github-actions[bot]'
+          git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          python3 .github/scripts/update-release-metadata.py "${VERSION}" --release
+          python3 .github/scripts/update-release-metadata.py \
+            "${VERSION}" \
+            --release \
+            --release-date "${{ needs.preflight.outputs.release_date }}"
           git add CITATION.cff CITATION.md .zenodo.json codemeta.json release.properties
           git commit -m "Release version ${VERSION}"
+
+      - name: Verify release tree matches QA
+        run: |
+          set -euo pipefail
+          EXPECTED_TREE="${{ needs.build.outputs.verified_tree }}"
+          ACTUAL_TREE=$(git rev-parse 'HEAD^{tree}')
+          if [[ "${ACTUAL_TREE}" != "${EXPECTED_TREE}" ]]; then
+            echo "::error::Release tree ${ACTUAL_TREE} differs from QA-verified tree ${EXPECTED_TREE}"
+            exit 1
+          fi
+          echo "Release tree matches QA: ${ACTUAL_TREE}"
 
       - name: Create git tag (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           TAG="${{ needs.preflight.outputs.tag_name }}"
-          git tag -a "${TAG}" -m "Release ${{ needs.preflight.outputs.release_version }}"
-          git push origin "${TAG}"
-
-      - name: Create maintenance branch (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          BRANCH="${{ needs.preflight.outputs.maintenance_branch }}"
-          if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
-            echo "Maintenance branch ${BRANCH} already exists; skipping"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+            if [[ "${{ needs.build.outputs.verified_tree }}" != "$(git rev-parse "${TAG}^{tree}")" ]]; then
+              echo "::error::Existing tag ${TAG} does not match the QA-verified release tree"
+              exit 1
+            fi
+            echo "Tag ${TAG} already exists and matches the verified release tree"
           else
-            git push origin "HEAD:refs/heads/${BRANCH}"
+            git tag -a "${TAG}" -m "Release ${{ needs.preflight.outputs.release_version }}"
+            git push origin "${TAG}"
           fi
 
-      - name: Create GitHub Release
+      - name: Create or advance maintenance branch (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          BRANCH="${{ needs.preflight.outputs.maintenance_branch }}"
+          if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
+            git fetch origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
+            if ! git merge-base --is-ancestor "origin/${BRANCH}" HEAD; then
+              echo "::error::Maintenance branch ${BRANCH} cannot be advanced by fast-forward"
+              exit 1
+            fi
+          fi
+          git push origin "HEAD:refs/heads/${BRANCH}"
+
+      - name: Create or repair GitHub Release
         run: |
           set -euo pipefail
           TAG="${{ needs.preflight.outputs.tag_name }}"
           VERSION="${{ needs.preflight.outputs.release_version }}"
-          gh release create "${TAG}" \
-            --title  "Regelsuche ${VERSION}" \
-            --generate-notes \
-            release-artifacts/*
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release edit "${TAG}" --title "Regelsuche ${VERSION}"
+            gh release upload "${TAG}" release-artifacts/* --clobber
+          else
+            gh release create "${TAG}" \
+              --title "Regelsuche ${VERSION}" \
+              --generate-notes \
+              release-artifacts/*
+          fi
 
       - name: Prepare next development metadata
         if: github.event_name == 'workflow_dispatch'
         run: |
-          python3 .github/scripts/update-release-metadata.py "${{ needs.preflight.outputs.next_development_version }}"
+          python3 .github/scripts/update-release-metadata.py \
+            "${{ needs.preflight.outputs.next_development_version }}"
 
       - name: Open next development metadata PR
         if: github.event_name == 'workflow_dispatch'
@@ -290,15 +409,16 @@ jobs:
     name: Dry-run summary
     needs: [preflight, build]
     if: needs.preflight.outputs.dry_run == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Report dry run
         run: |
           {
             echo "## Dry run completed";
             echo "";
+            echo "Full checkout-owned QA completed for **${{ github.sha }}**.";
             echo "Would have created tag **${{ needs.preflight.outputs.tag_name }}** and a GitHub Release";
-            echo "with artifacts uploaded from job *Build & Verify* (artifact name:";
+            echo "with artifacts uploaded from job *Full QA, Build & Verify* (artifact name:";
             echo "`${{ needs.build.outputs.artifact_name }}`).";
             echo "Would have opened a follow-up PR for **${{ needs.preflight.outputs.next_development_version }}**.";
           } >> "$GITHUB_STEP_SUMMARY"
