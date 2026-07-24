@@ -1,6 +1,6 @@
 # Aktueller Discovery-Stand
 
-Stand: 18. Juli 2026
+Stand: 24. Juli 2026
 
 Diese Seite fasst den gemessenen Forschungsstand von Regelsuche zusammen. Sie trennt technische Suchverbesserungen, Rediscovery, projektinterne Open-Target-Hypothesen, den internen Autonomie-Claim und mögliche externe mathematische Neuheit.
 
@@ -43,7 +43,7 @@ Regelsuche besitzt inzwischen eine durch Tests und CI abgesicherte, targetfreie 
 12. unabhängige 12/12-Releasequalifikation und Paired Held-out Utility;
 13. drei semantisch identische Clean Runs sowie bytegleiche Gradle-/Docker-Evidence.
 
-Das maschinengeprüfte Profil `AUTONOMOUS_CAMPAIGN` ist damit für den algebraischen Regelsuche-0.2-Claim `READY`. Diese Aussage bedeutet, dass Regelsuche den retained Kandidaten targetfrei erzeugt, unabhängig qualifiziert und reproduzierbar gebunden hat. Sie bedeutet nicht, dass der Kandidat weltweit neue Mathematik darstellt.
+Das maschinengeprüfte Profil `AUTONOMOUS_CAMPAIGN` ist damit für den internen algebraischen Autonomie-Claim `READY`. Diese Aussage bedeutet, dass Regelsuche den retained Kandidaten targetfrei erzeugt, unabhängig qualifiziert und reproduzierbar gebunden hat. Sie bedeutet nicht, dass der Kandidat weltweit neue Mathematik darstellt.
 
 ## Gemessene Ergebnisse
 
@@ -130,11 +130,11 @@ Der strikte interne Autonomie-Gate-Lauf lautet:
 ./gradlew :regelsuche-release:verifyAutonomousCampaignRelease
 ```
 
-Die vollständigen Artefakte, JSON-Schemas und Docker-Schritte sind in [Release Readiness für Regelsuche 0.2](release-readiness.md) dokumentiert.
+Die vollständigen Artefakte, JSON-Schemas und Docker-Schritte sind in [Release Readiness und Claim-Grenzen](release-readiness.md) dokumentiert.
 
 ## Nächste Forschungs- und Architekturarbeit
 
-Das Discovery-Epic #102 ist für den internen algebraischen 0.2-Claim abgeschlossen. Die nächsten Arbeiten sind getrennte Folgeprogramme:
+Das Discovery-Epic #102 ist für den internen algebraischen Autonomie-Claim abgeschlossen. Die nächsten Arbeiten sind getrennte Folgeprogramme:
 
 1. **#385 – Claim-/Dokumentations-Synchronisation:** öffentliche Statusaussagen ausschließlich aus autoritativer Evidence erzeugen und widersprüchliche Formulierungen in CI blockieren.
 2. **#390 und #383 – Challenge-Portfolio und candidate-unabhängiger Benchmark:** Problemklassen, Splits, Budgets und Auswertung vor den betrachteten Campaigns einfrieren.
