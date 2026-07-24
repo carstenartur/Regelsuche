@@ -6,9 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.EvaluationTask;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationResult;
 import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationStatus;
 import de.regelsuche.benchmark.CandidateIndependentMacroReplayAdapter.ReplayTrace;
 import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.UtilityOutcome;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +48,45 @@ class CandidateIndependentReusableMacroAdapterTest {
             assertFalse(macro.atomicSteps().isEmpty());
             assertEquals(1.0, macro.rule().confidenceScore());
         });
+    }
+
+    @Test
+    void selectsExactlyOneCandidateFromTrainSupportOnly() {
+        var formation = adapter.form(trainTraces());
+        var selection = CandidateIndependentExactOneMacroSelector.select(formation);
+
+        assertEquals(
+            CandidateIndependentExactOneMacroSelector.POLICY,
+            selection.policy());
+        assertEquals(1, selection.exactOneFormation().macros().size());
+        assertEquals(selection.candidate(),
+            selection.exactOneFormation().macros().getFirst());
+        assertEquals(
+            List.of("case-13-trace-1", "case-13-trace-2"),
+            selection.candidate().supportingTraceIds());
+        assertEquals("(A + B) ^ 2",
+            selection.candidate().rule().leftPattern());
+    }
+
+    @Test
+    void exactOneSelectionDoesNotDependOnFormationListOrder() {
+        var formation = adapter.form(trainTraces());
+        var expected = CandidateIndependentExactOneMacroSelector
+            .select(formation).candidate();
+        var reversed = new ArrayList<>(formation.macros());
+        Collections.reverse(reversed);
+        var reordered = new FormationResult(
+            FormationStatus.SELECTED,
+            reversed,
+            formation.replayEvidence(),
+            formation.detail());
+
+        var actual = CandidateIndependentExactOneMacroSelector
+            .select(reordered).candidate();
+
+        assertEquals(expected.macroId(), actual.macroId());
+        assertEquals(expected.rule().canonicalHash(),
+            actual.rule().canonicalHash());
     }
 
     @Test
@@ -99,6 +141,35 @@ class CandidateIndependentReusableMacroAdapterTest {
         assertEquals(6, count(results, UtilityOutcome.NO_IMPROVEMENT));
         assertEquals(4, count(results, UtilityOutcome.NO_RESULT));
         assertEquals(0, count(results, UtilityOutcome.CORRECTNESS_REGRESSION));
+    }
+
+    @Test
+    void exactOneCandidateRetainsTheFrozenPairedUtilityFrontier() {
+        var selection = CandidateIndependentExactOneMacroSelector.select(
+            adapter.form(trainTraces()));
+        List<EvaluationTask> tasks = frozenTasks();
+
+        var results = tasks.stream()
+            .map(task -> adapter.evaluate(
+                task, selection.exactOneFormation()))
+            .toList();
+
+        assertEquals(12, results.size());
+        assertEquals(2, count(results, UtilityOutcome.IMPROVED));
+        assertEquals(0, count(results, UtilityOutcome.REACHABILITY_GAIN));
+        assertEquals(6, count(results, UtilityOutcome.NO_IMPROVEMENT));
+        assertEquals(4, count(results, UtilityOutcome.NO_RESULT));
+        assertEquals(0, count(results, UtilityOutcome.CORRECTNESS_REGRESSION));
+        assertTrue(results.stream()
+            .noneMatch(result -> result.correctnessRegression()));
+        assertTrue(results.stream()
+            .flatMap(result -> result.macroEnabled().ruleIds().stream())
+            .filter(ruleId -> ruleId.startsWith(
+                "macro_candidate_independent_"))
+            .allMatch(selection.candidate().macroId()::equals));
+        assertTrue(results.stream()
+            .flatMap(result -> result.macroEnabled().ruleIds().stream())
+            .anyMatch(selection.candidate().macroId()::equals));
     }
 
     private static long count(
