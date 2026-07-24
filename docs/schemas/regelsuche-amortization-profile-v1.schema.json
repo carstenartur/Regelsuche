@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-amortization-profile-v1.schema.json",
+  "title": "Vector-only amortization accounting profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "profileId", "mode", "resourceDimensions",
+    "conversionWeights", "scalarDecisionStatus", "authoritativeOrderingPolicy",
+    "orderingSensitivityPolicy", "freezeStatus", "claimPolicy",
+    "formalProofStatus", "externalNoveltyStatus", "publicationAuthorized",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.amortization-profile/v1"},
+    "profileId": {"const": "vector-only-no-conversion/v1"},
+    "mode": {"const": "VECTOR_ONLY"},
+    "resourceDimensions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dimension", "unit", "discoveryCostSource",
+            "downstreamSavingSource"
+          ],
+          "properties": {
+            "dimension": {"const": "EXPLORED_STATES"},
+            "unit": {"const": "state"},
+            "discoveryCostSource": {"const": "PAIRED_UTILITY_FORMATION_STATES"},
+            "downstreamSavingSource": {"const": "PAIRED_TASK_EXPANDED_STATE_SAVING"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dimension", "unit", "discoveryCostSource",
+            "downstreamSavingSource", "mappingPolicy"
+          ],
+          "properties": {
+            "dimension": {"const": "CANDIDATE_EVALUATIONS"},
+            "unit": {"const": "candidate"},
+            "discoveryCostSource": {"const": "PAIRED_UTILITY_FORMATION_CANDIDATE_EVALUATIONS"},
+            "downstreamSavingSource": {"const": "PAIRED_TASK_GENERATED_CANDIDATE_SAVING"},
+            "mappingPolicy": {"const": "BEST_FIRST_GENERATED_TRANSFORMATIONS_ACCOUNTED_AS_CANDIDATE_EVALUATIONS_PER_PHASE1_LEDGER"}
+          }
+        }
+      ],
+      "items": false
+    },
+    "conversionWeights": {"type": "array", "maxItems": 0},
+    "scalarDecisionStatus": {"const": "NOT_APPLICABLE_NO_SCALAR_CONVERSION"},
+    "authoritativeOrderingPolicy": {"const": "FROZEN_DOWNSTREAM_STREAM_ORDER"},
+    "orderingSensitivityPolicy": {"const": "BEST_AND_WORST_CASE_PERMUTATION_BOUNDS_WITHOUT_REPLACING_FROZEN_ORDER"},
+    "freezeStatus": {"const": "FROZEN_BEFORE_AMORTIZATION_REPORT_GENERATION"},
+    "claimPolicy": {"const": "VECTOR_DIMENSION_BREAK_EVEN_DOES_NOT_ESTABLISH_COMPLETE_LIFECYCLE_BREAK_EVEN"},
+    "formalProofStatus": {"const": "NOT_EVALUATED"},
+    "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+    "publicationAuthorized": {"const": false},
+    "contentHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
