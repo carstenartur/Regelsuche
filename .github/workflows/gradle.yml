@@ -147,11 +147,12 @@ jobs:
           -Pregelsuche.recordDocs=true
           -Pregelsuche.skipPlaywrightInstall=true
           --console=plain
-      - name: Create or update documentation-media PR
+      - name: Create documentation-media PR without reusing stale branches
         uses: peter-evans/create-pull-request@v8
         with:
           branch: chore/docs-screenshots-refresh
-          delete-branch: false
+          branch-suffix: short-commit-hash
+          delete-branch: true
           commit-message: 'chore(docs): refresh demo-gallery media'
           title: 'chore(docs): refresh demo-gallery media'
           body: Automated refresh from the central Gradle CI lifecycle.
