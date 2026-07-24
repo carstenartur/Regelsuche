@@ -3,7 +3,8 @@
 ## Einstieg
 
 - [Aktueller Discovery-Stand](discovery-status.md) — gemessene Ergebnisse, wissenschaftliche Grenzen und nächste Arbeitsschritte.
-- [Release Readiness für Regelsuche 0.2](release-readiness.md) — getrennte Evidence Profiles, qualifizierter Autonomie-Claim sowie Gradle-/Docker-Reproduktion.
+- [Release Readiness und Claim-Grenzen](release-readiness.md) — getrennte Evidence Profiles, qualifizierter Autonomie-Claim sowie Gradle-/Docker-Reproduktion.
+- [Release-Prozess](releasing.md) — Release Candidate, vollständige QA, Dry Run, Git-Tree-Bindung und Veröffentlichung.
 - [Capability- und Claim-Status](capability-status.md) — kontrolliertes Statusvokabular, Trust-Grenzen und lokaler Reproduktionsvertrag.
 - [Generierte Capability-Matrix](generated/capability-status.md) — aus kanonischer Release-, Domain- und Plugin-Contract-Evidence erzeugter Status.
 - [Solver-neutrale Obligation- und Proof-IR](solver-neutral-ir.md) — kanonische Problemverträge, strukturierte Annahmen, Backend-Capabilities und zwei unabhängige Adapter.
@@ -18,6 +19,7 @@
 - [Deterministische TRAIN-Populationen](evolution-population-engine.md) — begrenzte parallele Fitnessauswertung, Diversität, Lineage, harte Blocker und explizite Terminalzustände ohne VALIDATION-/FINAL-TEST-Zugriff.
 - [Reale TRAIN-Suchfitness](evolution-train-fitness.md) — gepaarte Produktionssuche mit kompilierten Genomen, rohen Messwerten und fehlersicher getrennten Claim-Grenzen.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
+- [Lernend geführte Regelsuche](learning-guided-search.md) — nachgelagertes Architekturkonzept für weiche Strategiepriorisierung, faire Exploration, Checkpoints und geprüfte Makrobildung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und der erste grafische Produktfluss.
 - [Web-Workbench](web-workbench.md) — Bedienbereiche, sichtbare Ergebnisse und fachliche Zuordnung zur API.
@@ -48,6 +50,7 @@
 - [Makros](macros.md) — vom Autor deklarierte Makros als Suchkanten.
 - [Knowledge Packs](knowledge-packs.md) — kuratierte Core-Pakete mit Provenance, Lizenz, Reviewstatus, Risiko und Validierungsbeispielen.
 - [Makroregeln und emergente Identitäten](macro-rules.md) — aus Suchpfaden gelernte und erst nach Evidenz-/Promotion-Gates aktivierte Regeln.
+- [Kanonisches Makro-Kandidatenpanel](macro-candidate-panel.md) — reproduzierbare All-Candidate-Evaluation mit gemeinsamen Baselines und unveränderter Produktionsauswahl.
 
 Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. Solver-/Proof-Backends, Discovery-Promotion und Public Evidence behalten ihre eigenen Verträge und Gates.
 
