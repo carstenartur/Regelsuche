@@ -42,7 +42,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             python3-venv \
-            z3
+            z3=4.8.12-3.1build1
           ./gradlew --no-daemon \
             :app:installPlaywrightHostDependencies \
             --console=plain
