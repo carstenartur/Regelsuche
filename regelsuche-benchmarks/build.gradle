@@ -27,6 +27,19 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+def verificationPython = rootProject.layout.buildDirectory.file(
+    System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+        ? 'verification-venv/Scripts/python.exe'
+        : 'verification-venv/bin/python')
+
+def configureComparativeEnvironment = { task ->
+    task.dependsOn ':prepareVerificationEnvironment'
+    task.doFirst {
+        environment 'REGELSUCHE_SYMPY_PYTHON',
+            verificationPython.get().asFile.absolutePath
+    }
+}
+
 def comparativeBenchmarkOutput = providers.gradleProperty(
     'comparativeBenchmarkOutput'
 ).orElse(
@@ -34,18 +47,40 @@ def comparativeBenchmarkOutput = providers.gradleProperty(
         .map { it.asFile.absolutePath }
 )
 
-tasks.register('writeComparativeBenchmark', JavaExec) {
-    group = 'verification'
-    description = 'Writes the canonical initial #235 comparative benchmark bundle.'
-    dependsOn tasks.named('classes')
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'de.regelsuche.benchmarks.ComparativeBenchmarkMain'
-    args comparativeBenchmarkOutput.get()
+def configureComparativeWriter = { task, Object output ->
+    task.group = 'verification'
+    task.description = 'Writes one canonical comparative benchmark bundle.'
+    task.dependsOn tasks.named('classes')
+    task.classpath = sourceSets.main.runtimeClasspath
+    task.mainClass = 'de.regelsuche.benchmarks.ComparativeBenchmarkMain'
+    task.args output
+    task.outputs.dir output
+    task.outputs.upToDateWhen { false }
+    configureComparativeEnvironment(task)
 }
 
-tasks.named('test') {
+tasks.register('writeComparativeBenchmark', JavaExec) { task ->
+    configureComparativeWriter(task, comparativeBenchmarkOutput.get())
+}
+
+tasks.register('writeComparativeBenchmarkRunA', JavaExec) { task ->
+    configureComparativeWriter(
+        task,
+        rootProject.layout.buildDirectory.dir(
+            'reports/comparative-ci/run-a').get().asFile.absolutePath)
+}
+
+tasks.register('writeComparativeBenchmarkRunB', JavaExec) { task ->
+    configureComparativeWriter(
+        task,
+        rootProject.layout.buildDirectory.dir(
+            'reports/comparative-ci/run-b').get().asFile.absolutePath)
+}
+
+tasks.named('test') { testTask ->
     useJUnitPlatform()
     finalizedBy tasks.named('jacocoTestReport')
+    configureComparativeEnvironment(testTask)
 }
 
 jacoco {

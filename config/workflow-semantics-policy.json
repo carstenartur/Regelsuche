@@ -1,19 +1,10 @@
 {
-  "schema": "regelsuche.workflow-semantics-policy/v1",
-  "repositoryOwnedWorkflows": [
-    "ai-knowledge.yml",
-    "benchmark.yml",
-    "comparative-benchmarks.yml",
-    "discovery-challenge-development-pilots.yml",
-    "gradle.yml",
-    "independent-reproduction-artifact.yml"
+  "schema": "regelsuche.workflow-semantics-policy/v2",
+  "maximumWorkflowCount": 2,
+  "verificationWorkflows": [
+    "gradle.yml"
   ],
-  "legacyWorkflowOwnedSemantics": [
-    "gradle-publish.yml",
-    "plugin-artifact-index.yml",
-    "plugin-artifact-trust.yml",
-    "plugin-trust-store-revision.yml",
-    "release.yml",
-    "static.yml"
+  "platformWorkflows": [
+    "release.yml"
   ]
 }

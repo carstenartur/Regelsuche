@@ -8,11 +8,9 @@ consumer version is pinned once in `gradle.properties`:
 aiKnowledgeExtractorVersion=0.1.7
 ```
 
-At the time this contract was introduced, `0.1.7` was the latest published
-release and `0.1.8-SNAPSHOT` was the development version on the extractor's
-`main` branch. Regelsuche never consumes a snapshot implicitly. Updating the
-released dependency requires one explicit version change followed by the normal
-AI Knowledge and repository verification lifecycles.
+Regelsuche never consumes a snapshot implicitly. Updating the released
+dependency requires one explicit version change followed by the normal
+AI-Knowledge and repository verification lifecycles.
 
 ## Released package mode
 
@@ -38,13 +36,14 @@ AI_KNOWLEDGE_EXTRACTOR_ENABLED=true \
 ```
 
 GitHub Packages is an authenticated Maven repository even for this public source
-repository. The credential requirement is therefore a package-registry boundary,
-not a reason to copy plugin verification semantics into GitHub Actions.
+repository. The credential requirement is a package-registry boundary, not a
+reason to copy plugin verification semantics into GitHub Actions.
 
 ## Explicit local plugin development
 
-A sibling checkout no longer overrides the released plugin merely because it
-exists. To test changes to the extractor before releasing them, opt in explicitly:
+A sibling checkout does not override the released plugin merely because it
+exists. To test changes to the extractor before releasing them, opt in
+explicitly:
 
 ```bash
 AI_KNOWLEDGE_EXTRACTOR_ENABLED=true \
@@ -128,12 +127,13 @@ extractor is deterministic and does not require external LLM or SaaS calls.
 
 ## CI boundary
 
-`.github/workflows/ai-knowledge.yml` remains separate only because GitHub
-Packages authentication is an execution boundary. The workflow provisions Java
-and Gradle, invokes the same root `aiKnowledgeCheck` alias, and uploads generated
-artifacts. It contains no artifact expectations, inline interpreters or
-alternative test graph.
+AI Knowledge no longer owns a separate workflow. The single verification
+workflow invokes the checkout entrypoint `ciCheck` with
+`AI_KNOWLEDGE_EXTRACTOR_ENABLED=true`. The Gradle task then includes
+`aiKnowledgeCheck` in the same graph as the rest of the repository verification.
+Generated files are retained by the generic repository-verification artifact.
 
-The implementation and this documentation share the following invariant:
-released package mode is the default, local composite mode is explicit, and the
-plugin version is defined in exactly one repository property.
+The exact GitHub execution can be reproduced locally with the released package
+command above, or without package credentials by selecting the explicit local
+composite build. Authentication changes how Gradle resolves the plugin; it does
+not change which tasks, assertions or artifact contracts are executed.

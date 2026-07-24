@@ -108,11 +108,17 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/vector-amortization-report-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/ci-verification.gradle')
     }
     if (candidate.path == ':app') {
         candidate.apply from: new File(
             settingsDir,
             'gradle/swagger-ui-assets.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/app-evidence-determinism.gradle')
     }
 }
 

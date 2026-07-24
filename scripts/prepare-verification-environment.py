@@ -11,7 +11,10 @@ import sys
 import venv
 from pathlib import Path
 
-REQUIRED = {"jsonschema": "4.25.1"}
+REQUIRED = {
+    "jsonschema": "4.25.1",
+    "sympy": "1.14.0",
+}
 
 
 def python_path(root: Path) -> Path:
@@ -53,7 +56,15 @@ def main() -> int:
     if versions != REQUIRED:
         requirements = [f"{name}=={version}" for name, version in REQUIRED.items()]
         subprocess.run(
-            [str(python), "-m", "pip", "install", "--disable-pip-version-check", "--quiet", *requirements],
+            [
+                str(python),
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "--quiet",
+                *requirements,
+            ],
             check=True,
         )
         versions = installed_versions(python)

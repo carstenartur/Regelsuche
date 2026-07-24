@@ -1,0 +1,77 @@
+/* Re-run evidence-producing tests and compare their retained JSON bytes. */
+
+pluginManager.withPlugin('java') {
+    def verificationPython = rootProject.layout.buildDirectory.file(
+        System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+            ? 'verification-venv/Scripts/python.exe'
+            : 'verification-venv/bin/python')
+
+    def registerDeterminismContract = { String label, String reportDirectory,
+            List<String> testPatterns ->
+        def title = label.substring(0, 1).toUpperCase(Locale.ROOT) + label.substring(1)
+        def currentEvidence = layout.buildDirectory.dir("reports/${reportDirectory}")
+        def baselineEvidence = layout.buildDirectory.dir(
+            "reports/evidence-baselines/${reportDirectory}")
+
+        def snapshot = tasks.register("snapshot${title}Evidence", Sync) {
+            dependsOn tasks.named('test')
+            from(currentEvidence) {
+                include '*.json'
+            }
+            into baselineEvidence
+            doFirst {
+                delete baselineEvidence.get().asFile
+            }
+        }
+
+        def rerun = tasks.register("rerun${title}EvidenceTests", Test) {
+            dependsOn snapshot, tasks.named('testClasses')
+            testClassesDirs = sourceSets.test.output.classesDirs
+            classpath = sourceSets.test.runtimeClasspath
+            useJUnitPlatform()
+            filter {
+                testPatterns.each { pattern -> includeTestsMatching pattern }
+            }
+            outputs.upToDateWhen { false }
+            onlyIf {
+                gradle.taskGraph.hasTask(
+                    ":app:verify${title}EvidenceDeterminism")
+            }
+        }
+
+        tasks.register("verify${title}EvidenceDeterminism", Exec) {
+            group = 'verification'
+            description = "Requires repeated ${reportDirectory} JSON evidence to be byte-identical."
+            dependsOn ':prepareVerificationEnvironment', rerun
+            workingDir rootProject.layout.projectDirectory
+            inputs.file rootProject.layout.projectDirectory.file(
+                'scripts/verify-byte-identical-directories.py')
+            inputs.dir baselineEvidence
+            inputs.dir currentEvidence
+            outputs.upToDateWhen { false }
+            doFirst {
+                commandLine verificationPython.get().asFile.absolutePath,
+                    'scripts/verify-byte-identical-directories.py',
+                    '--left', baselineEvidence.get().asFile.absolutePath,
+                    '--right', currentEvidence.get().asFile.absolutePath,
+                    '--include', '*.json'
+            }
+        }
+    }
+
+    registerDeterminismContract(
+        'pluginArtifactIndex',
+        'plugin-artifact-index',
+        [
+            'de.regelsuche.plugin.PluginArtifactIndexEvidenceTest',
+            'de.regelsuche.plugin.PluginArtifactIndexSignatureTest',
+        ])
+
+    registerDeterminismContract(
+        'pluginTrustStoreRevision',
+        'plugin-trust-store-revision',
+        [
+            'de.regelsuche.plugin.PluginTrustStoreRevisionTest',
+            'de.regelsuche.plugin.PluginTrustStoreRevisionStrictJsonTest',
+        ])
+}
