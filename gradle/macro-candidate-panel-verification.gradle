@@ -1,0 +1,178 @@
+def candidatePanelRoot = rootProject.layout.projectDirectory
+def candidatePanelAppProject = project(':app')
+def candidatePanelRuntimeClasspath = providers.provider {
+    candidatePanelAppProject.extensions
+        .getByType(org.gradle.api.tasks.SourceSetContainer)
+        .named('main').get().runtimeClasspath
+}
+
+def candidatePanelCorpus = candidatePanelRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def candidatePanelProfile = candidatePanelRoot.file(
+    'research/benchmarks/candidate-independent/macro-primitives.json')
+def candidatePanelDownstreamStream = layout.buildDirectory.file(
+    'reports/downstream-task-stream/first/downstream-task-stream.json')
+def candidatePanelPairedUtility = layout.buildDirectory.file(
+    'reports/paired-task-utility/first/paired-task-utility.json')
+def candidatePanelSchema = candidatePanelRoot.file(
+    'docs/schemas/regelsuche-macro-candidate-panel-v1.schema.json')
+def candidatePanelVerifier = candidatePanelRoot.file(
+    'scripts/verify-macro-candidate-panel.py')
+def candidatePanelCanonicalizer = candidatePanelRoot.file(
+    'scripts/canonicalize-json-file.py')
+def candidatePanelRunnerSource = candidatePanelRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentMacroCandidatePanelRunner.java')
+def candidatePanelAdapterSource = candidatePanelRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentReusableMacroAdapter.java')
+def candidatePanelFormationSource = candidatePanelRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentMacroFormation.java')
+def candidatePanelEvaluatorSource = candidatePanelRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentMacroUtilityEvaluator.java')
+def candidatePanelReplaySource = candidatePanelRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentMacroReplayAdapter.java')
+
+def candidatePanelBuildRoot = layout.buildDirectory.dir(
+    'reports/macro-candidate-panel')
+def candidatePanelFirstRaw = candidatePanelBuildRoot.map {
+    it.file('first/raw-panel.json')
+}
+def candidatePanelSecondRaw = candidatePanelBuildRoot.map {
+    it.file('second/raw-panel.json')
+}
+def candidatePanelFirst = candidatePanelBuildRoot.map {
+    it.file('first/macro-candidate-panel.json')
+}
+def candidatePanelSecond = candidatePanelBuildRoot.map {
+    it.file('second/macro-candidate-panel.json')
+}
+def candidatePanelVerification = candidatePanelBuildRoot.map {
+    it.dir('verification')
+}
+def candidatePanelPython = layout.buildDirectory.dir(
+    'verification-venv').map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureCandidatePanelExecution = { task, outputFile ->
+    task.group = 'verification'
+    task.description = 'Evaluates all three TRAIN-formed macros against the verified frozen baseline stream.'
+    task.dependsOn ':app:classes', 'verifyPairedTaskUtility'
+    task.classpath = files(candidatePanelRuntimeClasspath)
+    task.mainClass =
+        'de.regelsuche.benchmark.CandidateIndependentMacroCandidatePanelRunner'
+    task.inputs.file candidatePanelCorpus
+    task.inputs.file candidatePanelProfile
+    task.inputs.file candidatePanelDownstreamStream
+    task.inputs.file candidatePanelPairedUtility
+    task.inputs.file candidatePanelRunnerSource
+    task.inputs.file candidatePanelAdapterSource
+    task.inputs.file candidatePanelFormationSource
+    task.inputs.file candidatePanelEvaluatorSource
+    task.inputs.file candidatePanelReplaySource
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        args '--corpus', candidatePanelCorpus.asFile.absolutePath,
+            '--profile', candidatePanelProfile.asFile.absolutePath,
+            '--downstream-stream',
+            candidatePanelDownstreamStream.get().asFile.absolutePath,
+            '--paired-utility',
+            candidatePanelPairedUtility.get().asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def configureCandidatePanelCanonicalization = {
+    task, rawFile, outputFile, executionTask ->
+    task.group = 'verification'
+    task.description = 'Canonicalizes one reusable-macro candidate panel.'
+    task.dependsOn 'prepareVerificationEnvironment', executionTask
+    task.workingDir candidatePanelRoot
+    task.inputs.file candidatePanelCanonicalizer
+    task.inputs.file rawFile
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine candidatePanelPython.get().absolutePath,
+            candidatePanelCanonicalizer.asFile.absolutePath,
+            '--input', rawFile.get().asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath
+    }
+}
+
+def executeMacroCandidatePanelFirstRaw = tasks.register(
+    'executeMacroCandidatePanelFirstRaw', JavaExec
+) {
+    configureCandidatePanelExecution(delegate, candidatePanelFirstRaw)
+}
+
+def executeMacroCandidatePanelSecondRaw = tasks.register(
+    'executeMacroCandidatePanelSecondRaw', JavaExec
+) {
+    configureCandidatePanelExecution(delegate, candidatePanelSecondRaw)
+}
+
+def runMacroCandidatePanelFirst = tasks.register(
+    'runMacroCandidatePanelFirst', Exec
+) {
+    configureCandidatePanelCanonicalization(
+        delegate,
+        candidatePanelFirstRaw,
+        candidatePanelFirst,
+        executeMacroCandidatePanelFirstRaw)
+}
+
+def runMacroCandidatePanelSecond = tasks.register(
+    'runMacroCandidatePanelSecond', Exec
+) {
+    configureCandidatePanelCanonicalization(
+        delegate,
+        candidatePanelSecondRaw,
+        candidatePanelSecond,
+        executeMacroCandidatePanelSecondRaw)
+}
+
+def verifyMacroCandidatePanel = tasks.register(
+    'verifyMacroCandidatePanel', Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies all-candidate coverage, shared baselines, observed usage, outcomes, resources and production-selection parity.'
+    dependsOn runMacroCandidatePanelFirst, runMacroCandidatePanelSecond
+    workingDir candidatePanelRoot
+    inputs.files candidatePanelRunnerSource, candidatePanelVerifier,
+        candidatePanelSchema, candidatePanelCorpus, candidatePanelProfile,
+        candidatePanelDownstreamStream, candidatePanelPairedUtility,
+        candidatePanelFirstRaw, candidatePanelSecondRaw,
+        candidatePanelFirst, candidatePanelSecond
+    outputs.dir candidatePanelVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine candidatePanelPython.get().absolutePath,
+            candidatePanelVerifier.asFile.absolutePath,
+            '--runner-source', candidatePanelRunnerSource.asFile.absolutePath,
+            '--first', candidatePanelFirst.get().asFile.absolutePath,
+            '--second', candidatePanelSecond.get().asFile.absolutePath,
+            '--corpus', candidatePanelCorpus.asFile.absolutePath,
+            '--profile', candidatePanelProfile.asFile.absolutePath,
+            '--downstream-stream',
+            candidatePanelDownstreamStream.get().asFile.absolutePath,
+            '--paired-utility',
+            candidatePanelPairedUtility.get().asFile.absolutePath,
+            '--schema', candidatePanelSchema.asFile.absolutePath,
+            '--report-directory',
+            candidatePanelVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyMacroCandidatePanel
+}
