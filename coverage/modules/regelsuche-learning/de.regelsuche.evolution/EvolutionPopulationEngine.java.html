@@ -1,0 +1,1346 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionPopulationEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionPopulationEngine.java</span></div><h1>EvolutionPopulationEngine.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.DeterministicGenomeMutator.MutationAttempt;
+import de.regelsuche.evolution.DeterministicGenomeMutator.MutationBatch;
+import de.regelsuche.evolution.DeterministicGenomeMutator.MutationCatalog;
+import de.regelsuche.evolution.DeterministicGenomeMutator.MutationLimits;
+import de.regelsuche.evolution.DeterministicGenomeMutator.MutationStatus;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessWeight;
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+/**
+ * Deterministic, bounded TRAIN-only population orchestration.
+ *
+ * &lt;p&gt;Fitness is not proof, novelty or promotion. The engine never receives
+ * VALIDATION or FINAL TEST cases and retains hard blockers separately from the
+ * preregistered scalar selection profile.&lt;/p&gt;
+ */
+public final class EvolutionPopulationEngine {
+    public static final String RUN_SCHEMA =
+        &quot;regelsuche.evolution-population-run/v1&quot;;
+    public static final String GENERATION_SCHEMA =
+        &quot;regelsuche.evolution-generation-report/v1&quot;;
+    private static final int MAX_GENERATED_POOL_MULTIPLIER = 2;
+
+    private final DeterministicGenomeMutator mutator;
+
+    public EvolutionPopulationEngine() {
+<span class="fc" id="L45">        this(new DeterministicGenomeMutator());</span>
+<span class="fc" id="L46">    }</span>
+
+<span class="fc" id="L48">    public EvolutionPopulationEngine(DeterministicGenomeMutator mutator) {</span>
+<span class="fc" id="L49">        this.mutator = Objects.requireNonNull(mutator, &quot;mutator&quot;);</span>
+<span class="fc" id="L50">    }</span>
+
+    /** Executes the frozen number of TRAIN generations. */
+    public PopulationRun run(
+        EvolutionStudyPlan plan,
+        List&lt;EvolutionGenome&gt; seedGenomes,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator
+    ) {
+<span class="fc" id="L59">        validateInputs(plan, mutationCatalog, evaluator);</span>
+<span class="fc" id="L60">        ExecutionState state = initialState(plan, seedGenomes);</span>
+<span class="fc" id="L61">        executeGenerations(</span>
+            plan,
+            mutationCatalog,
+            evaluator,
+            state,
+            1,
+<span class="fc" id="L67">            plan.populationPolicy().generationCount());</span>
+<span class="fc" id="L68">        return completeRun(plan, seedGenomes, state);</span>
+    }
+
+    /**
+     * Executes an exact TRAIN prefix and returns a resumable, content-addressed
+     * checkpoint without evaluating VALIDATION or FINAL TEST data.
+     */
+    public EvolutionPopulationCheckpoint checkpoint(
+        EvolutionStudyPlan plan,
+        List&lt;EvolutionGenome&gt; seedGenomes,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator,
+        int completedGeneration
+    ) {
+<span class="fc" id="L82">        validateInputs(plan, mutationCatalog, evaluator);</span>
+<span class="fc" id="L83">        int generationCount = plan.populationPolicy().generationCount();</span>
+<span class="pc bpc" id="L84" title="2 of 4 branches missed.">        if (completedGeneration &lt; 1 || completedGeneration &gt;= generationCount) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(</span>
+                &quot;completedGeneration must be in [1,generationCount-1]&quot;);
+        }
+<span class="fc" id="L88">        ExecutionState state = initialState(plan, seedGenomes);</span>
+<span class="fc" id="L89">        executeGenerations(</span>
+            plan,
+            mutationCatalog,
+            evaluator,
+            state,
+            1,
+            completedGeneration);
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (state.terminal != null) {</span>
+<span class="nc" id="L97">            throw new IllegalStateException(</span>
+                &quot;terminal population run cannot produce a resumable checkpoint: &quot;
+                    + state.terminal);
+        }
+<span class="fc" id="L101">        return EvolutionPopulationCheckpoint.create(</span>
+            plan,
+            mutationCatalog,
+            seedGenomes,
+            completedGeneration,
+            state.population,
+<span class="fc" id="L107">            state.evaluations.values(),</span>
+            state.reports,
+            state.budget.mutationAttempts,
+            state.budget.trainEvaluations);
+    }
+
+    /** Resumes one previously verified TRAIN checkpoint. */
+    public PopulationRun resume(
+        EvolutionStudyPlan plan,
+        List&lt;EvolutionGenome&gt; seedGenomes,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator,
+        EvolutionPopulationCheckpoint checkpoint
+    ) {
+<span class="fc" id="L121">        validateInputs(plan, mutationCatalog, evaluator);</span>
+<span class="fc" id="L122">        Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc" id="L123">        checkpoint.requireCompatible(plan, mutationCatalog, seedGenomes);</span>
+<span class="fc" id="L124">        ExecutionState state = new ExecutionState(</span>
+<span class="fc" id="L125">            checkpoint.population(),</span>
+<span class="fc" id="L126">            checkpoint.evaluationsByGenomeHash(),</span>
+<span class="fc" id="L127">            checkpoint.mutationAttempts(),</span>
+<span class="fc" id="L128">            checkpoint.trainEvaluations(),</span>
+<span class="fc" id="L129">            checkpoint.generationReports());</span>
+<span class="fc" id="L130">        executeGenerations(</span>
+            plan,
+            mutationCatalog,
+            evaluator,
+            state,
+<span class="fc" id="L135">            checkpoint.nextGeneration(),</span>
+<span class="fc" id="L136">            plan.populationPolicy().generationCount());</span>
+<span class="fc" id="L137">        return completeRun(plan, seedGenomes, state);</span>
+    }
+
+    private static void validateInputs(
+        EvolutionStudyPlan plan,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator
+    ) {
+<span class="fc" id="L145">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L146">        Objects.requireNonNull(mutationCatalog, &quot;mutationCatalog&quot;);</span>
+<span class="fc" id="L147">        Objects.requireNonNull(evaluator, &quot;evaluator&quot;);</span>
+<span class="fc" id="L148">    }</span>
+
+    private static ExecutionState initialState(
+        EvolutionStudyPlan plan,
+        List&lt;EvolutionGenome&gt; seedGenomes
+    ) {
+<span class="fc" id="L154">        return new ExecutionState(</span>
+<span class="fc" id="L155">            validateSeeds(plan, seedGenomes),</span>
+<span class="fc" id="L156">            Map.of(),</span>
+            0,
+            0,
+<span class="fc" id="L159">            List.of());</span>
+    }
+
+    private void executeGenerations(
+        EvolutionStudyPlan plan,
+        MutationCatalog mutationCatalog,
+        TrainFitnessEvaluator evaluator,
+        ExecutionState state,
+        int firstGeneration,
+        int lastGeneration
+    ) {
+<span class="fc" id="L170">        for (int generation = firstGeneration;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                generation &lt;= lastGeneration;</span>
+<span class="fc" id="L172">                generation++) {</span>
+<span class="fc" id="L173">            evaluate(</span>
+                plan,
+                state.population,
+                evaluator,
+                state.evaluations,
+                state.budget);
+<span class="fc" id="L179">            List&lt;EvolutionGenome&gt; parents = eligible(</span>
+                state.population, state.evaluations);
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (parents.isEmpty()) {</span>
+<span class="nc" id="L182">                state.reports.add(GenerationReport.create(</span>
+                    generation,
+<span class="nc" id="L184">                    candidateEvaluations(state.population, state.evaluations),</span>
+<span class="nc" id="L185">                    List.of(),</span>
+<span class="nc" id="L186">                    List.of(),</span>
+<span class="nc" id="L187">                    List.of(),</span>
+                    0,
+                    state.budget.mutationAttempts,
+                    state.budget.trainEvaluations,
+                    GenerationOutcome.EXTINCT));
+<span class="nc" id="L192">                state.population = List.of();</span>
+<span class="nc" id="L193">                state.terminal = TerminalOutcome.EXTINCT;</span>
+<span class="nc" id="L194">                return;</span>
+            }
+
+<span class="fc" id="L197">            MutationRound mutations = mutate(</span>
+                plan,
+                generation,
+                parents,
+                state.population,
+                mutationCatalog,
+                state.budget);
+<span class="fc" id="L204">            evaluate(</span>
+                plan,
+<span class="fc" id="L206">                mutations.children(),</span>
+                evaluator,
+                state.evaluations,
+                state.budget);
+
+<span class="fc" id="L211">            List&lt;EvolutionGenome&gt; pool = merge(</span>
+<span class="fc" id="L212">                state.population, mutations.children());</span>
+<span class="fc" id="L213">            List&lt;EvolutionGenome&gt; selected = select(</span>
+                plan, state.population, pool, state.evaluations);
+<span class="fc" id="L215">            int distinctStructures = Math.toIntExact(selected.stream()</span>
+<span class="fc" id="L216">                .map(EvolutionGenome::alphaStructuralHash)</span>
+<span class="fc" id="L217">                .distinct()</span>
+<span class="fc" id="L218">                .count());</span>
+<span class="fc" id="L219">            GenerationOutcome outcome = outcome(</span>
+                plan,
+                generation,
+                state.population,
+                selected,
+                mutations,
+                distinctStructures,
+                state.budget);
+
+<span class="fc" id="L228">            state.reports.add(GenerationReport.create(</span>
+                generation,
+<span class="fc" id="L230">                candidateEvaluations(pool, state.evaluations),</span>
+<span class="fc" id="L231">                selected.stream().map(EvolutionGenome::contentHash).toList(),</span>
+<span class="fc" id="L232">                mutations.lineage(),</span>
+<span class="fc" id="L233">                mutations.rejections(),</span>
+                distinctStructures,
+                state.budget.mutationAttempts,
+                state.budget.trainEvaluations,
+                outcome));
+<span class="fc" id="L238">            state.population = selected;</span>
+
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (outcome != GenerationOutcome.CONTINUE) {</span>
+<span class="fc" id="L241">                state.terminal = outcome.terminal();</span>
+<span class="fc" id="L242">                return;</span>
+            }
+        }
+<span class="fc" id="L245">    }</span>
+
+    private static PopulationRun completeRun(
+        EvolutionStudyPlan plan,
+        List&lt;EvolutionGenome&gt; seedGenomes,
+        ExecutionState state
+    ) {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        TerminalOutcome terminal = state.terminal == null</span>
+<span class="nc" id="L253">            ? TerminalOutcome.COMPLETED</span>
+<span class="fc" id="L254">            : state.terminal;</span>
+<span class="fc" id="L255">        return PopulationRun.create(</span>
+            plan,
+            seedGenomes,
+            state.reports,
+            state.population,
+            terminal,
+            state.budget.mutationAttempts,
+            state.budget.trainEvaluations);
+    }
+
+    private MutationRound mutate(
+        EvolutionStudyPlan plan,
+        int generation,
+        List&lt;EvolutionGenome&gt; parents,
+        List&lt;EvolutionGenome&gt; population,
+        MutationCatalog catalog,
+        BudgetLedger budget
+    ) {
+<span class="fc" id="L273">        List&lt;EvolutionGenome&gt; children = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L274">        List&lt;LineageEdge&gt; lineage = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L275">        List&lt;MutationRejection&gt; rejections = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L276">        Set&lt;String&gt; genomeHashes = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L277">        Set&lt;String&gt; structureHashes = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L278">        population.forEach(genome -&gt; {</span>
+<span class="fc" id="L279">            genomeHashes.add(genome.contentHash());</span>
+<span class="fc" id="L280">            structureHashes.add(genome.alphaStructuralHash());</span>
+<span class="fc" id="L281">        });</span>
+
+<span class="fc" id="L283">        Set&lt;EvolutionMutationKind&gt; permitted = Set.copyOf(</span>
+<span class="fc" id="L284">            plan.mutationOperators());</span>
+<span class="fc" id="L285">        int poolLimit = Math.multiplyExact(</span>
+<span class="fc" id="L286">            plan.populationPolicy().populationSize(),</span>
+            MAX_GENERATED_POOL_MULTIPLIER);
+
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        for (EvolutionGenome parent : parents) {</span>
+<span class="fc" id="L290">            int remaining = plan.budget().maxMutationAttempts()</span>
+                - budget.mutationAttempts;
+<span class="pc bpc" id="L292" title="2 of 4 branches missed.">            if (remaining &lt;= 0 || children.size() &gt;= poolLimit) {</span>
+<span class="nc" id="L293">                break;</span>
+            }
+
+<span class="fc" id="L296">            int maxProposals = Math.min(128, remaining);</span>
+<span class="fc" id="L297">            int maxAccepted = Math.min(</span>
+<span class="fc" id="L298">                plan.populationPolicy().maxOffspringPerLineage(),</span>
+                maxProposals);
+<span class="fc" id="L300">            MutationBatch batch = mutator.mutate(</span>
+                parent,
+                catalog,
+<span class="fc" id="L303">                mutationSeed(plan.contentHash(), generation, parent.contentHash()),</span>
+                new MutationLimits(maxProposals, maxAccepted));
+<span class="fc" id="L305">            budget.mutationAttempts = Math.addExact(</span>
+                budget.mutationAttempts,
+<span class="fc" id="L307">                batch.attempts().size());</span>
+
+<span class="fc" id="L309">            int acceptedIndex = 0;</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            for (MutationAttempt attempt : batch.attempts()) {</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">                if (attempt.status() == MutationStatus.REJECTED) {</span>
+<span class="fc" id="L312">                    rejections.add(MutationRejection.from(</span>
+<span class="fc" id="L313">                        parent.contentHash(), attempt, attempt.blockers()));</span>
+<span class="fc" id="L314">                    continue;</span>
+                }
+
+<span class="fc" id="L317">                EvolutionGenome child = batch.acceptedChildren().get(acceptedIndex++);</span>
+<span class="fc" id="L318">                List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">                if (!permitted.contains(attempt.kind())) {</span>
+<span class="fc" id="L320">                    blockers.add(</span>
+<span class="fc" id="L321">                        &quot;MUTATION_KIND_NOT_PREREGISTERED:&quot; + attempt.kind());</span>
+                }
+<span class="fc bfc" id="L323" title="All 2 branches covered.">                if (genomeHashes.contains(child.contentHash())) {</span>
+<span class="fc" id="L324">                    blockers.add(&quot;DUPLICATE_GENOME:contentHash&quot;);</span>
+                }
+<span class="fc bfc" id="L326" title="All 2 branches covered.">                if (structureHashes.contains(child.alphaStructuralHash())) {</span>
+<span class="fc" id="L327">                    blockers.add(</span>
+                        &quot;STRUCTURAL_DIVERSITY_DUPLICATE:populationAlphaStructuralHash&quot;);
+                }
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                if (!blockers.isEmpty()) {</span>
+<span class="fc" id="L331">                    rejections.add(MutationRejection.from(</span>
+<span class="fc" id="L332">                        parent.contentHash(), attempt, blockers));</span>
+<span class="fc" id="L333">                    continue;</span>
+                }
+
+<span class="fc" id="L336">                genomeHashes.add(child.contentHash());</span>
+<span class="fc" id="L337">                structureHashes.add(child.alphaStructuralHash());</span>
+<span class="fc" id="L338">                children.add(child);</span>
+<span class="fc" id="L339">                lineage.add(new LineageEdge(</span>
+<span class="fc" id="L340">                    parent.contentHash(),</span>
+<span class="fc" id="L341">                    child.contentHash(),</span>
+<span class="fc" id="L342">                    child.alphaStructuralHash(),</span>
+<span class="fc" id="L343">                    attempt.kind(),</span>
+<span class="fc" id="L344">                    attempt.proposalKey()));</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">                if (children.size() &gt;= poolLimit) {</span>
+<span class="nc" id="L346">                    break;</span>
+                }
+<span class="fc" id="L348">            }</span>
+<span class="fc" id="L349">        }</span>
+<span class="fc" id="L350">        return MutationRound.create(children, lineage, rejections);</span>
+    }
+
+    private static void evaluate(
+        EvolutionStudyPlan plan,
+        Collection&lt;EvolutionGenome&gt; candidates,
+        TrainFitnessEvaluator evaluator,
+        Map&lt;String, CandidateEvaluation&gt; cache,
+        BudgetLedger budget
+    ) {
+<span class="fc" id="L360">        List&lt;EvolutionGenome&gt; pending = candidates.stream()</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">            .filter(candidate -&gt; !cache.containsKey(candidate.contentHash()))</span>
+<span class="fc" id="L362">            .sorted(Comparator.comparing(EvolutionGenome::contentHash))</span>
+<span class="fc" id="L363">            .toList();</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (pending.isEmpty()) {</span>
+<span class="fc" id="L365">            return;</span>
+        }
+
+<span class="fc" id="L368">        int remaining = Math.max(0,</span>
+<span class="fc" id="L369">            plan.budget().maxTrainEvaluations() - budget.trainEvaluations);</span>
+<span class="fc" id="L370">        int count = Math.min(remaining, pending.size());</span>
+<span class="fc" id="L371">        List&lt;EvolutionGenome&gt; executable = pending.subList(0, count);</span>
+<span class="fc" id="L372">        List&lt;CandidateEvaluation&gt; completed = evaluateParallel(</span>
+            plan, executable, evaluator);
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        for (int index = 0; index &lt; executable.size(); index++) {</span>
+<span class="fc" id="L375">            cache.put(executable.get(index).contentHash(), completed.get(index));</span>
+        }
+<span class="fc" id="L377">        budget.trainEvaluations = Math.addExact(budget.trainEvaluations, count);</span>
+
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        for (int index = count; index &lt; pending.size(); index++) {</span>
+<span class="fc" id="L380">            EvolutionGenome candidate = pending.get(index);</span>
+<span class="fc" id="L381">            cache.put(candidate.contentHash(), CandidateEvaluation.blocked(</span>
+                candidate,
+<span class="fc" id="L383">                Map.of(),</span>
+<span class="fc" id="L384">                List.of(&quot;TRAIN_EVALUATION_BUDGET_EXHAUSTED&quot;)));</span>
+        }
+<span class="fc" id="L386">    }</span>
+
+    private static List&lt;CandidateEvaluation&gt; evaluateParallel(
+        EvolutionStudyPlan plan,
+        List&lt;EvolutionGenome&gt; candidates,
+        TrainFitnessEvaluator evaluator
+    ) {
+<span class="fc bfc" id="L393" title="All 2 branches covered.">        if (candidates.isEmpty()) {</span>
+<span class="fc" id="L394">            return List.of();</span>
+        }
+<span class="fc" id="L396">        int parallelism = Math.min(</span>
+<span class="fc" id="L397">            plan.populationPolicy().parallelism(),</span>
+<span class="fc" id="L398">            candidates.size());</span>
+<span class="fc" id="L399">        ExecutorService executor = Executors.newFixedThreadPool(parallelism);</span>
+        try {
+<span class="fc" id="L401">            List&lt;Future&lt;TrainFitness&gt;&gt; futures = candidates.stream()</span>
+<span class="fc" id="L402">                .map(candidate -&gt; executor.submit(() -&gt; evaluator.evaluate(candidate)))</span>
+<span class="fc" id="L403">                .toList();</span>
+<span class="fc" id="L404">            List&lt;CandidateEvaluation&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">            for (int index = 0; index &lt; candidates.size(); index++) {</span>
+<span class="fc" id="L406">                EvolutionGenome candidate = candidates.get(index);</span>
+                try {
+<span class="fc" id="L408">                    result.add(toEvaluation(</span>
+<span class="fc" id="L409">                        plan, candidate, futures.get(index).get()));</span>
+<span class="nc" id="L410">                } catch (InterruptedException exception) {</span>
+<span class="nc" id="L411">                    Thread.currentThread().interrupt();</span>
+<span class="nc" id="L412">                    result.add(CandidateEvaluation.blocked(</span>
+                        candidate,
+<span class="nc" id="L414">                        Map.of(),</span>
+<span class="nc" id="L415">                        List.of(&quot;TRAIN_EVALUATION_INTERRUPTED&quot;)));</span>
+<span class="nc" id="L416">                } catch (ExecutionException exception) {</span>
+<span class="nc" id="L417">                    result.add(CandidateEvaluation.blocked(</span>
+                        candidate,
+<span class="nc" id="L419">                        Map.of(),</span>
+<span class="nc" id="L420">                        List.of(&quot;TRAIN_EVALUATION_FAILED:&quot;</span>
+<span class="nc" id="L421">                            + stableFailure(exception.getCause()))));</span>
+<span class="pc" id="L422">                }</span>
+            }
+<span class="fc" id="L424">            return List.copyOf(result);</span>
+        } finally {
+<span class="fc" id="L426">            executor.shutdownNow();</span>
+        }
+    }
+
+    private static CandidateEvaluation toEvaluation(
+        EvolutionStudyPlan plan,
+        EvolutionGenome candidate,
+        TrainFitness fitness
+    ) {
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">        if (fitness == null) {</span>
+<span class="nc" id="L436">            return CandidateEvaluation.blocked(</span>
+                candidate,
+<span class="nc" id="L438">                Map.of(),</span>
+<span class="nc" id="L439">                List.of(&quot;TRAIN_EVALUATOR_RETURNED_NULL&quot;));</span>
+        }
+
+<span class="fc" id="L442">        Map&lt;FitnessComponent, Integer&gt; components = fitness.components();</span>
+<span class="fc" id="L443">        List&lt;String&gt; rawBlockers = new ArrayList&lt;&gt;(fitness.blockers());</span>
+<span class="fc" id="L444">        Set&lt;FitnessComponent&gt; declared = plan.fitnessWeights().stream()</span>
+<span class="fc" id="L445">            .map(FitnessWeight::component)</span>
+<span class="fc" id="L446">            .collect(java.util.stream.Collectors.toSet());</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        for (FitnessComponent component : declared) {</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            if (!components.containsKey(component)) {</span>
+<span class="nc" id="L449">                rawBlockers.add(&quot;MISSING_FITNESS_COMPONENT:&quot; + component);</span>
+            }
+<span class="fc" id="L451">        }</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        for (FitnessComponent component : components.keySet()) {</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            if (!declared.contains(component)) {</span>
+<span class="nc" id="L454">                rawBlockers.add(&quot;UNDECLARED_FITNESS_COMPONENT:&quot; + component);</span>
+            }
+<span class="fc" id="L456">        }</span>
+<span class="fc" id="L457">        List&lt;String&gt; blockers = canonicalStrings(rawBlockers);</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        if (!blockers.isEmpty()) {</span>
+<span class="fc" id="L459">            return CandidateEvaluation.blocked(candidate, components, blockers);</span>
+        }
+
+<span class="fc" id="L462">        long weighted = 0L;</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        for (FitnessWeight weight : plan.fitnessWeights()) {</span>
+<span class="fc" id="L464">            weighted = Math.addExact(weighted, Math.multiplyExact(</span>
+<span class="fc" id="L465">                components.get(weight.component()).longValue(),</span>
+<span class="fc" id="L466">                weight.weightPermille()));</span>
+<span class="fc" id="L467">        }</span>
+<span class="fc" id="L468">        return CandidateEvaluation.accepted(</span>
+            candidate,
+            components,
+<span class="fc" id="L471">            Math.toIntExact(weighted / 1000L));</span>
+    }
+
+    private static List&lt;EvolutionGenome&gt; select(
+        EvolutionStudyPlan plan,
+        List&lt;EvolutionGenome&gt; current,
+        List&lt;EvolutionGenome&gt; pool,
+        Map&lt;String, CandidateEvaluation&gt; evaluations
+    ) {
+<span class="fc" id="L480">        Comparator&lt;EvolutionGenome&gt; ranking = ranking(evaluations);</span>
+<span class="fc" id="L481">        List&lt;EvolutionGenome&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L482">        Set&lt;String&gt; genomeHashes = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L483">        Set&lt;String&gt; structures = new HashSet&lt;&gt;();</span>
+
+<span class="fc" id="L485">        current.stream()</span>
+<span class="fc" id="L486">            .filter(genome -&gt; evaluations.get(genome.contentHash()).accepted())</span>
+<span class="fc" id="L487">            .sorted(ranking)</span>
+<span class="fc" id="L488">            .limit(plan.populationPolicy().eliteCount())</span>
+<span class="fc" id="L489">            .forEach(genome -&gt; addUnique(</span>
+                result, genomeHashes, structures, genome));
+<span class="fc" id="L491">        pool.stream()</span>
+<span class="fc" id="L492">            .filter(genome -&gt; evaluations.get(genome.contentHash()).accepted())</span>
+<span class="fc" id="L493">            .sorted(ranking)</span>
+<span class="fc" id="L494">            .forEach(genome -&gt; {</span>
+<span class="fc bfc" id="L495" title="All 2 branches covered.">                if (result.size() &lt; plan.populationPolicy().populationSize()) {</span>
+<span class="fc" id="L496">                    addUnique(result, genomeHashes, structures, genome);</span>
+                }
+<span class="fc" id="L498">            });</span>
+<span class="fc" id="L499">        return List.copyOf(result);</span>
+    }
+
+    private static void addUnique(
+        List&lt;EvolutionGenome&gt; result,
+        Set&lt;String&gt; genomeHashes,
+        Set&lt;String&gt; structures,
+        EvolutionGenome genome
+    ) {
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        if (genomeHashes.add(genome.contentHash())</span>
+<span class="pc bpc" id="L509" title="1 of 2 branches missed.">                &amp;&amp; structures.add(genome.alphaStructuralHash())) {</span>
+<span class="fc" id="L510">            result.add(genome);</span>
+        }
+<span class="fc" id="L512">    }</span>
+
+    private static List&lt;EvolutionGenome&gt; eligible(
+        List&lt;EvolutionGenome&gt; population,
+        Map&lt;String, CandidateEvaluation&gt; evaluations
+    ) {
+<span class="fc" id="L518">        return population.stream()</span>
+<span class="fc" id="L519">            .filter(genome -&gt; evaluations.get(genome.contentHash()).accepted())</span>
+<span class="fc" id="L520">            .sorted(ranking(evaluations))</span>
+<span class="fc" id="L521">            .toList();</span>
+    }
+
+    private static Comparator&lt;EvolutionGenome&gt; ranking(
+        Map&lt;String, CandidateEvaluation&gt; evaluations
+    ) {
+<span class="fc" id="L527">        return Comparator</span>
+<span class="fc" id="L528">            .comparingInt((EvolutionGenome genome) -&gt; evaluations</span>
+<span class="fc" id="L529">                .get(genome.contentHash()).weightedScorePermille())</span>
+<span class="fc" id="L530">            .reversed()</span>
+<span class="fc" id="L531">            .thenComparing(EvolutionGenome::contentHash);</span>
+    }
+
+    private static GenerationOutcome outcome(
+        EvolutionStudyPlan plan,
+        int generation,
+        List&lt;EvolutionGenome&gt; previous,
+        List&lt;EvolutionGenome&gt; selected,
+        MutationRound mutations,
+        int distinctStructures,
+        BudgetLedger budget
+    ) {
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">        if (selected.isEmpty()) {</span>
+<span class="nc" id="L544">            return GenerationOutcome.EXTINCT;</span>
+        }
+<span class="fc" id="L546">        if (distinctStructures</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">                &lt; plan.populationPolicy().minimumDistinctAlphaStructures()) {</span>
+<span class="fc" id="L548">            return GenerationOutcome.DIVERSITY_FLOOR_UNMET;</span>
+        }
+<span class="fc bfc" id="L550" title="All 2 branches covered.">        if (generation &gt;= plan.populationPolicy().generationCount()) {</span>
+<span class="fc" id="L551">            return GenerationOutcome.COMPLETED;</span>
+        }
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">        if (budget.trainEvaluations &gt;= plan.budget().maxTrainEvaluations()) {</span>
+<span class="nc" id="L554">            return GenerationOutcome.TRAIN_EVALUATION_BUDGET_EXHAUSTED;</span>
+        }
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">        if (budget.mutationAttempts &gt;= plan.budget().maxMutationAttempts()) {</span>
+<span class="nc" id="L557">            return GenerationOutcome.MUTATION_BUDGET_EXHAUSTED;</span>
+        }
+<span class="fc" id="L559">        List&lt;String&gt; oldHashes = previous.stream()</span>
+<span class="fc" id="L560">            .map(EvolutionGenome::contentHash)</span>
+<span class="fc" id="L561">            .toList();</span>
+<span class="fc" id="L562">        List&lt;String&gt; newHashes = selected.stream()</span>
+<span class="fc" id="L563">            .map(EvolutionGenome::contentHash)</span>
+<span class="fc" id="L564">            .toList();</span>
+<span class="pc bpc" id="L565" title="1 of 4 branches missed.">        if (mutations.children().isEmpty() || oldHashes.equals(newHashes)) {</span>
+<span class="fc" id="L566">            return GenerationOutcome.STAGNATED;</span>
+        }
+<span class="pc bpc" id="L568" title="1 of 2 branches missed.">        if (selected.size() &lt; plan.populationPolicy().populationSize()) {</span>
+<span class="nc" id="L569">            return GenerationOutcome.STAGNATED;</span>
+        }
+<span class="fc" id="L571">        return GenerationOutcome.CONTINUE;</span>
+    }
+
+    private static List&lt;EvolutionGenome&gt; merge(
+        List&lt;EvolutionGenome&gt; current,
+        List&lt;EvolutionGenome&gt; children
+    ) {
+<span class="fc" id="L578">        Map&lt;String, EvolutionGenome&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L579">        java.util.stream.Stream.concat(current.stream(), children.stream())</span>
+<span class="fc" id="L580">            .sorted(Comparator.comparing(EvolutionGenome::contentHash))</span>
+<span class="fc" id="L581">            .forEach(genome -&gt; result.putIfAbsent(genome.contentHash(), genome));</span>
+<span class="fc" id="L582">        return List.copyOf(result.values());</span>
+    }
+
+    private static List&lt;CandidateEvaluation&gt; candidateEvaluations(
+        Collection&lt;EvolutionGenome&gt; candidates,
+        Map&lt;String, CandidateEvaluation&gt; evaluations
+    ) {
+<span class="fc" id="L589">        return candidates.stream()</span>
+<span class="fc" id="L590">            .map(genome -&gt; evaluations.get(genome.contentHash()))</span>
+<span class="fc" id="L591">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L592">            .sorted(Comparator.comparing(CandidateEvaluation::genomeHash))</span>
+<span class="fc" id="L593">            .toList();</span>
+    }
+
+    private static List&lt;EvolutionGenome&gt; validateSeeds(
+        EvolutionStudyPlan plan,
+        List&lt;EvolutionGenome&gt; seeds
+    ) {
+<span class="fc" id="L600">        Objects.requireNonNull(seeds, &quot;seedGenomes&quot;);</span>
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">        if (seeds.isEmpty()) {</span>
+<span class="nc" id="L602">            throw new IllegalArgumentException(&quot;seedGenomes must not be empty&quot;);</span>
+        }
+<span class="fc" id="L604">        List&lt;EvolutionGenome&gt; result = seeds.stream()</span>
+<span class="fc" id="L605">            .map(seed -&gt; Objects.requireNonNull(seed, &quot;seed genome&quot;))</span>
+<span class="fc" id="L606">            .sorted(Comparator.comparing(EvolutionGenome::contentHash))</span>
+<span class="fc" id="L607">            .toList();</span>
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">        if (result.size() &gt; plan.populationPolicy().populationSize()) {</span>
+<span class="nc" id="L609">            throw new IllegalArgumentException(</span>
+                &quot;seed population exceeds populationSize&quot;);
+        }
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">        if (result.stream().anyMatch(seed -&gt;</span>
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">                seed.objective() != plan.objective())) {</span>
+<span class="nc" id="L614">            throw new IllegalArgumentException(</span>
+                &quot;seed objective differs from study plan&quot;);
+        }
+<span class="fc" id="L617">        List&lt;String&gt; hashes = result.stream()</span>
+<span class="fc" id="L618">            .map(EvolutionGenome::contentHash)</span>
+<span class="fc" id="L619">            .toList();</span>
+<span class="pc bpc" id="L620" title="1 of 2 branches missed.">        if (!hashes.equals(plan.seedGenomeHashes())) {</span>
+<span class="nc" id="L621">            throw new IllegalArgumentException(</span>
+                &quot;seed genomes do not match preregistered seedGenomeHashes&quot;);
+        }
+<span class="pc bpc" id="L624" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(hashes).size() != hashes.size()) {</span>
+<span class="nc" id="L625">            throw new IllegalArgumentException(&quot;seed genomes must be unique&quot;);</span>
+        }
+<span class="fc" id="L627">        if (result.stream().map(EvolutionGenome::alphaStructuralHash)</span>
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">                .distinct().count() != result.size()) {</span>
+<span class="nc" id="L629">            throw new IllegalArgumentException(</span>
+                &quot;seed genomes must be alpha-unique&quot;);
+        }
+<span class="fc" id="L632">        return List.copyOf(result);</span>
+    }
+
+    private static long mutationSeed(
+        String planHash,
+        int generation,
+        String parentHash
+    ) {
+<span class="fc" id="L640">        String hash = EvolutionGenome.hash(</span>
+            &quot;regelsuche.evolution-mutation-seed/v1\nplan=&quot; + planHash
+                + &quot;\ngeneration=&quot; + generation
+                + &quot;\nparent=&quot; + parentHash);
+<span class="fc" id="L644">        return Long.parseUnsignedLong(</span>
+<span class="fc" id="L645">            hash.substring(&quot;sha256:&quot;.length(), 23), 16);</span>
+    }
+
+    private static String stableFailure(Throwable failure) {
+<span class="nc bnc" id="L649" title="All 2 branches missed.">        if (failure == null) {</span>
+<span class="nc" id="L650">            return &quot;unknown&quot;;</span>
+        }
+<span class="nc" id="L652">        String message = failure.getMessage();</span>
+<span class="nc" id="L653">        return failure.getClass().getSimpleName()</span>
+<span class="nc bnc" id="L654" title="All 4 branches missed.">            + (message == null || message.isBlank()</span>
+<span class="nc" id="L655">                ? &quot;&quot;</span>
+<span class="nc" id="L656">                : &quot;:&quot; + message.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim());</span>
+    }
+
+    @FunctionalInterface
+    public interface TrainFitnessEvaluator {
+        TrainFitness evaluate(EvolutionGenome genome);
+    }
+
+    /** Raw named TRAIN components plus fail-closed blockers. */
+    public record TrainFitness(
+        Map&lt;FitnessComponent, Integer&gt; components,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L669">        public TrainFitness {</span>
+<span class="fc" id="L670">            components = canonicalComponents(components);</span>
+<span class="fc" id="L671">            blockers = canonicalStrings(blockers);</span>
+<span class="fc" id="L672">        }</span>
+
+        public static TrainFitness scored(
+            Map&lt;FitnessComponent, Integer&gt; components
+        ) {
+<span class="fc" id="L677">            return new TrainFitness(components, List.of());</span>
+        }
+
+        public static TrainFitness blocked(
+            Map&lt;FitnessComponent, Integer&gt; components,
+            String... blockers
+        ) {
+<span class="fc" id="L684">            return new TrainFitness(components, List.of(blockers));</span>
+        }
+    }
+
+<span class="fc" id="L688">    public enum EvaluationStatus {</span>
+<span class="fc" id="L689">        ACCEPTED,</span>
+<span class="fc" id="L690">        BLOCKED</span>
+    }
+
+    public record CandidateEvaluation(
+        String genomeHash,
+        String alphaStructuralHash,
+        Map&lt;FitnessComponent, Integer&gt; rawComponents,
+        int weightedScorePermille,
+        EvaluationStatus status,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L701">        public CandidateEvaluation {</span>
+<span class="fc" id="L702">            EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L703">            EvolutionGenome.requireSha256(</span>
+                alphaStructuralHash, &quot;alphaStructuralHash&quot;);
+<span class="fc" id="L705">            rawComponents = canonicalComponents(rawComponents);</span>
+<span class="pc bpc" id="L706" title="2 of 4 branches missed.">            if (weightedScorePermille &lt; -1000</span>
+                    || weightedScorePermille &gt; 1000) {
+<span class="nc" id="L708">                throw new IllegalArgumentException(</span>
+                    &quot;weightedScorePermille must be in [-1000,1000]&quot;);
+            }
+<span class="fc" id="L711">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L712">            blockers = canonicalStrings(blockers);</span>
+<span class="pc bpc" id="L713" title="1 of 4 branches missed.">            if (status == EvaluationStatus.ACCEPTED &amp;&amp; !blockers.isEmpty()) {</span>
+<span class="nc" id="L714">                throw new IllegalArgumentException(</span>
+                    &quot;accepted candidate cannot have blockers&quot;);
+            }
+<span class="pc bpc" id="L717" title="1 of 4 branches missed.">            if (status == EvaluationStatus.BLOCKED &amp;&amp; blockers.isEmpty()) {</span>
+<span class="nc" id="L718">                throw new IllegalArgumentException(</span>
+                    &quot;blocked candidate requires blockers&quot;);
+            }
+<span class="fc" id="L721">        }</span>
+
+        static CandidateEvaluation accepted(
+            EvolutionGenome genome,
+            Map&lt;FitnessComponent, Integer&gt; components,
+            int score
+        ) {
+<span class="fc" id="L728">            return new CandidateEvaluation(</span>
+<span class="fc" id="L729">                genome.contentHash(),</span>
+<span class="fc" id="L730">                genome.alphaStructuralHash(),</span>
+                components,
+                score,
+                EvaluationStatus.ACCEPTED,
+<span class="fc" id="L734">                List.of());</span>
+        }
+
+        static CandidateEvaluation blocked(
+            EvolutionGenome genome,
+            Map&lt;FitnessComponent, Integer&gt; components,
+            List&lt;String&gt; blockers
+        ) {
+<span class="fc" id="L742">            return new CandidateEvaluation(</span>
+<span class="fc" id="L743">                genome.contentHash(),</span>
+<span class="fc" id="L744">                genome.alphaStructuralHash(),</span>
+                components,
+                0,
+                EvaluationStatus.BLOCKED,
+                blockers);
+        }
+
+        public boolean accepted() {
+<span class="fc bfc" id="L752" title="All 2 branches covered.">            return status == EvaluationStatus.ACCEPTED;</span>
+        }
+    }
+
+    public record LineageEdge(
+        String parentGenomeHash,
+        String childGenomeHash,
+        String childAlphaStructuralHash,
+        EvolutionMutationKind mutationKind,
+        String proposalKey
+    ) {
+<span class="fc" id="L763">        public LineageEdge {</span>
+<span class="fc" id="L764">            EvolutionGenome.requireSha256(</span>
+                parentGenomeHash, &quot;parentGenomeHash&quot;);
+<span class="fc" id="L766">            EvolutionGenome.requireSha256(childGenomeHash, &quot;childGenomeHash&quot;);</span>
+<span class="fc" id="L767">            EvolutionGenome.requireSha256(</span>
+                childAlphaStructuralHash, &quot;childAlphaStructuralHash&quot;);
+<span class="fc" id="L769">            Objects.requireNonNull(mutationKind, &quot;mutationKind&quot;);</span>
+<span class="fc" id="L770">            requireText(proposalKey, &quot;proposalKey&quot;);</span>
+<span class="fc" id="L771">        }</span>
+    }
+
+    public record MutationRejection(
+        String parentGenomeHash,
+        int ordinal,
+        EvolutionMutationKind mutationKind,
+        String proposalKey,
+        String childGenomeHash,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L782">        public MutationRejection {</span>
+<span class="fc" id="L783">            EvolutionGenome.requireSha256(</span>
+                parentGenomeHash, &quot;parentGenomeHash&quot;);
+<span class="pc bpc" id="L785" title="1 of 2 branches missed.">            if (ordinal &lt; 1) {</span>
+<span class="nc" id="L786">                throw new IllegalArgumentException(&quot;ordinal must be positive&quot;);</span>
+            }
+<span class="fc" id="L788">            Objects.requireNonNull(mutationKind, &quot;mutationKind&quot;);</span>
+<span class="fc" id="L789">            requireText(proposalKey, &quot;proposalKey&quot;);</span>
+<span class="pc bpc" id="L790" title="1 of 2 branches missed.">            if (childGenomeHash != null) {</span>
+<span class="fc" id="L791">                EvolutionGenome.requireSha256(</span>
+                    childGenomeHash, &quot;childGenomeHash&quot;);
+            }
+<span class="fc" id="L794">            blockers = canonicalStrings(blockers);</span>
+<span class="pc bpc" id="L795" title="1 of 2 branches missed.">            if (blockers.isEmpty()) {</span>
+<span class="nc" id="L796">                throw new IllegalArgumentException(</span>
+                    &quot;mutation rejection requires blockers&quot;);
+            }
+<span class="fc" id="L799">        }</span>
+
+        static MutationRejection from(
+            String parentHash,
+            MutationAttempt attempt,
+            List&lt;String&gt; blockers
+        ) {
+<span class="fc" id="L806">            return new MutationRejection(</span>
+                parentHash,
+<span class="fc" id="L808">                attempt.ordinal(),</span>
+<span class="fc" id="L809">                attempt.kind(),</span>
+<span class="fc" id="L810">                attempt.proposalKey(),</span>
+<span class="fc" id="L811">                attempt.childGenomeHash(),</span>
+                blockers);
+        }
+    }
+
+<span class="fc" id="L816">    public enum GenerationOutcome {</span>
+<span class="fc" id="L817">        CONTINUE,</span>
+<span class="fc" id="L818">        COMPLETED,</span>
+<span class="fc" id="L819">        EXTINCT,</span>
+<span class="fc" id="L820">        STAGNATED,</span>
+<span class="fc" id="L821">        DIVERSITY_FLOOR_UNMET,</span>
+<span class="fc" id="L822">        MUTATION_BUDGET_EXHAUSTED,</span>
+<span class="fc" id="L823">        TRAIN_EVALUATION_BUDGET_EXHAUSTED;</span>
+
+        TerminalOutcome terminal() {
+<span class="pc bpc" id="L826" title="4 of 7 branches missed.">            return switch (this) {</span>
+<span class="nc" id="L827">                case CONTINUE -&gt; throw new IllegalStateException(</span>
+                    &quot;CONTINUE is not terminal&quot;);
+<span class="fc" id="L829">                case COMPLETED -&gt; TerminalOutcome.COMPLETED;</span>
+<span class="nc" id="L830">                case EXTINCT -&gt; TerminalOutcome.EXTINCT;</span>
+<span class="fc" id="L831">                case STAGNATED -&gt; TerminalOutcome.STAGNATED;</span>
+                case DIVERSITY_FLOOR_UNMET -&gt;
+<span class="fc" id="L833">                    TerminalOutcome.DIVERSITY_FLOOR_UNMET;</span>
+                case MUTATION_BUDGET_EXHAUSTED -&gt;
+<span class="nc" id="L835">                    TerminalOutcome.MUTATION_BUDGET_EXHAUSTED;</span>
+                case TRAIN_EVALUATION_BUDGET_EXHAUSTED -&gt;
+<span class="nc" id="L837">                    TerminalOutcome.TRAIN_EVALUATION_BUDGET_EXHAUSTED;</span>
+            };
+        }
+    }
+
+<span class="fc" id="L842">    public enum TerminalOutcome {</span>
+<span class="fc" id="L843">        COMPLETED,</span>
+<span class="fc" id="L844">        EXTINCT,</span>
+<span class="fc" id="L845">        STAGNATED,</span>
+<span class="fc" id="L846">        DIVERSITY_FLOOR_UNMET,</span>
+<span class="fc" id="L847">        MUTATION_BUDGET_EXHAUSTED,</span>
+<span class="fc" id="L848">        TRAIN_EVALUATION_BUDGET_EXHAUSTED</span>
+    }
+
+    /** Canonical evidence for one generation. */
+    public record GenerationReport(
+        String schema,
+        int generation,
+        List&lt;CandidateEvaluation&gt; candidates,
+        List&lt;String&gt; selectedGenomeHashes,
+        List&lt;LineageEdge&gt; acceptedLineage,
+        List&lt;MutationRejection&gt; rejectedMutations,
+        int distinctAlphaStructures,
+        int cumulativeMutationAttempts,
+        int cumulativeTrainEvaluations,
+        GenerationOutcome outcome,
+        String contentHash
+    ) {
+<span class="fc" id="L865">        public GenerationReport {</span>
+<span class="pc bpc" id="L866" title="1 of 2 branches missed.">            if (!GENERATION_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L867">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported generation-report schema&quot;);
+            }
+<span class="pc bpc" id="L870" title="1 of 2 branches missed.">            if (generation &lt; 1) {</span>
+<span class="nc" id="L871">                throw new IllegalArgumentException(</span>
+                    &quot;generation must be positive&quot;);
+            }
+<span class="fc" id="L874">            candidates = canonicalCandidates(candidates);</span>
+<span class="fc" id="L875">            selectedGenomeHashes = canonicalHashes(</span>
+                selectedGenomeHashes, false);
+<span class="fc" id="L877">            acceptedLineage = canonicalLineage(acceptedLineage);</span>
+<span class="fc" id="L878">            rejectedMutations = canonicalRejections(rejectedMutations);</span>
+<span class="pc bpc" id="L879" title="3 of 6 branches missed.">            if (distinctAlphaStructures &lt; 0</span>
+                    || cumulativeMutationAttempts &lt; 0
+                    || cumulativeTrainEvaluations &lt; 0) {
+<span class="nc" id="L882">                throw new IllegalArgumentException(</span>
+                    &quot;generation counts must be non-negative&quot;);
+            }
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">            if (distinctAlphaStructures != selectedGenomeHashes.size()) {</span>
+<span class="nc" id="L886">                throw new IllegalArgumentException(</span>
+                    &quot;selected population must be alpha-structurally unique&quot;);
+            }
+<span class="fc" id="L889">            Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L890">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L891">            String expected = EvolutionGenome.hash(renderGeneration(</span>
+                generation,
+                candidates,
+                selectedGenomeHashes,
+                acceptedLineage,
+                rejectedMutations,
+                distinctAlphaStructures,
+                cumulativeMutationAttempts,
+                cumulativeTrainEvaluations,
+                outcome,
+                null));
+<span class="pc bpc" id="L902" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L903">                throw new IllegalArgumentException(</span>
+                    &quot;generation report contentHash mismatch&quot;);
+            }
+<span class="fc" id="L906">        }</span>
+
+        static GenerationReport create(
+            int generation,
+            List&lt;CandidateEvaluation&gt; candidates,
+            List&lt;String&gt; selectedGenomeHashes,
+            List&lt;LineageEdge&gt; lineage,
+            List&lt;MutationRejection&gt; rejections,
+            int distinctStructures,
+            int mutationAttempts,
+            int trainEvaluations,
+            GenerationOutcome outcome
+        ) {
+<span class="fc" id="L919">            List&lt;CandidateEvaluation&gt; canonicalCandidates =</span>
+<span class="fc" id="L920">                canonicalCandidates(candidates);</span>
+<span class="fc" id="L921">            List&lt;String&gt; canonicalSelected = canonicalHashes(</span>
+                selectedGenomeHashes, false);
+<span class="fc" id="L923">            List&lt;LineageEdge&gt; canonicalLineage = canonicalLineage(lineage);</span>
+<span class="fc" id="L924">            List&lt;MutationRejection&gt; canonicalRejections =</span>
+<span class="fc" id="L925">                canonicalRejections(rejections);</span>
+<span class="fc" id="L926">            String hash = EvolutionGenome.hash(renderGeneration(</span>
+                generation,
+                canonicalCandidates,
+                canonicalSelected,
+                canonicalLineage,
+                canonicalRejections,
+                distinctStructures,
+                mutationAttempts,
+                trainEvaluations,
+                outcome,
+                null));
+<span class="fc" id="L937">            return new GenerationReport(</span>
+                GENERATION_SCHEMA,
+                generation,
+                canonicalCandidates,
+                canonicalSelected,
+                canonicalLineage,
+                canonicalRejections,
+                distinctStructures,
+                mutationAttempts,
+                trainEvaluations,
+                outcome,
+                hash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L952">            return renderGeneration(</span>
+                generation,
+                candidates,
+                selectedGenomeHashes,
+                acceptedLineage,
+                rejectedMutations,
+                distinctAlphaStructures,
+                cumulativeMutationAttempts,
+                cumulativeTrainEvaluations,
+                outcome,
+                contentHash);
+        }
+    }
+
+    /** Root identity for one TRAIN-only population execution. */
+    public record PopulationRun(
+        String schema,
+        String studyPlanHash,
+        List&lt;String&gt; seedGenomeHashes,
+        List&lt;GenerationReport&gt; generationReports,
+        List&lt;EvolutionGenome&gt; finalPopulation,
+        TerminalOutcome terminalOutcome,
+        int mutationAttempts,
+        int trainEvaluations,
+        String contentHash
+    ) {
+<span class="fc" id="L978">        public PopulationRun {</span>
+<span class="pc bpc" id="L979" title="1 of 2 branches missed.">            if (!RUN_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L980">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported population-run schema&quot;);
+            }
+<span class="fc" id="L983">            EvolutionGenome.requireSha256(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L984">            seedGenomeHashes = canonicalHashes(seedGenomeHashes, true);</span>
+<span class="fc" id="L985">            generationReports = canonicalReports(generationReports);</span>
+<span class="fc" id="L986">            finalPopulation = canonicalPopulation(finalPopulation);</span>
+<span class="pc bpc" id="L987" title="2 of 4 branches missed.">            if (mutationAttempts &lt; 0 || trainEvaluations &lt; 0) {</span>
+<span class="nc" id="L988">                throw new IllegalArgumentException(</span>
+                    &quot;run counts must be non-negative&quot;);
+            }
+<span class="fc" id="L991">            Objects.requireNonNull(terminalOutcome, &quot;terminalOutcome&quot;);</span>
+<span class="fc" id="L992">            if (finalPopulation.stream()</span>
+<span class="fc" id="L993">                    .map(EvolutionGenome::alphaStructuralHash)</span>
+<span class="pc bpc" id="L994" title="1 of 2 branches missed.">                    .distinct().count() != finalPopulation.size()) {</span>
+<span class="nc" id="L995">                throw new IllegalArgumentException(</span>
+                    &quot;final population must be alpha-structurally unique&quot;);
+            }
+<span class="fc" id="L998">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L999">            String expected = EvolutionGenome.hash(renderRun(</span>
+                studyPlanHash,
+                seedGenomeHashes,
+                generationReports,
+                finalPopulation,
+                terminalOutcome,
+                mutationAttempts,
+                trainEvaluations,
+                null));
+<span class="pc bpc" id="L1008" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L1009">                throw new IllegalArgumentException(</span>
+                    &quot;population run contentHash mismatch&quot;);
+            }
+<span class="fc" id="L1012">        }</span>
+
+        static PopulationRun create(
+            EvolutionStudyPlan plan,
+            List&lt;EvolutionGenome&gt; seeds,
+            List&lt;GenerationReport&gt; reports,
+            List&lt;EvolutionGenome&gt; finalPopulation,
+            TerminalOutcome outcome,
+            int mutationAttempts,
+            int trainEvaluations
+        ) {
+<span class="fc" id="L1023">            List&lt;String&gt; seedHashes = canonicalHashes(seeds.stream()</span>
+<span class="fc" id="L1024">                .map(EvolutionGenome::contentHash).toList(), true);</span>
+<span class="fc" id="L1025">            List&lt;GenerationReport&gt; canonicalReports = canonicalReports(reports);</span>
+<span class="fc" id="L1026">            List&lt;EvolutionGenome&gt; canonicalPopulation =</span>
+<span class="fc" id="L1027">                canonicalPopulation(finalPopulation);</span>
+<span class="fc" id="L1028">            String hash = EvolutionGenome.hash(renderRun(</span>
+<span class="fc" id="L1029">                plan.contentHash(),</span>
+                seedHashes,
+                canonicalReports,
+                canonicalPopulation,
+                outcome,
+                mutationAttempts,
+                trainEvaluations,
+                null));
+<span class="fc" id="L1037">            return new PopulationRun(</span>
+                RUN_SCHEMA,
+<span class="fc" id="L1039">                plan.contentHash(),</span>
+                seedHashes,
+                canonicalReports,
+                canonicalPopulation,
+                outcome,
+                mutationAttempts,
+                trainEvaluations,
+                hash);
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L1050">            return renderRun(</span>
+                studyPlanHash,
+                seedGenomeHashes,
+                generationReports,
+                finalPopulation,
+                terminalOutcome,
+                mutationAttempts,
+                trainEvaluations,
+                contentHash);
+        }
+    }
+
+    private static String renderGeneration(
+        int generation,
+        List&lt;CandidateEvaluation&gt; candidates,
+        List&lt;String&gt; selectedHashes,
+        List&lt;LineageEdge&gt; lineage,
+        List&lt;MutationRejection&gt; rejections,
+        int distinctStructures,
+        int mutationAttempts,
+        int trainEvaluations,
+        GenerationOutcome outcome,
+        String contentHash
+    ) {
+<span class="fc" id="L1074">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L1075">            .property(&quot;schema&quot;, GENERATION_SCHEMA)</span>
+<span class="fc" id="L1076">            .property(&quot;generation&quot;, generation)</span>
+<span class="fc" id="L1077">            .array(&quot;candidates&quot;, array -&gt; candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L1078">                array.objectValue(object -&gt; writeCandidate(object, candidate))))</span>
+<span class="fc" id="L1079">            .stringArray(&quot;selectedGenomeHashes&quot;, selectedHashes)</span>
+<span class="fc" id="L1080">            .array(&quot;acceptedLineage&quot;, array -&gt; lineage.forEach(edge -&gt;</span>
+<span class="fc" id="L1081">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L1082">                    .property(&quot;parentGenomeHash&quot;, edge.parentGenomeHash())</span>
+<span class="fc" id="L1083">                    .property(&quot;childGenomeHash&quot;, edge.childGenomeHash())</span>
+<span class="fc" id="L1084">                    .property(&quot;childAlphaStructuralHash&quot;,</span>
+<span class="fc" id="L1085">                        edge.childAlphaStructuralHash())</span>
+<span class="fc" id="L1086">                    .property(&quot;mutationKind&quot;, edge.mutationKind().name())</span>
+<span class="fc" id="L1087">                    .property(&quot;proposalKey&quot;, edge.proposalKey()))))</span>
+<span class="fc" id="L1088">            .array(&quot;rejectedMutations&quot;, array -&gt; rejections.forEach(rejection -&gt;</span>
+<span class="fc" id="L1089">                array.objectValue(object -&gt; writeRejection(object, rejection))))</span>
+<span class="fc" id="L1090">            .property(&quot;distinctAlphaStructures&quot;, distinctStructures)</span>
+<span class="fc" id="L1091">            .object(&quot;budgetCumulative&quot;, object -&gt; object</span>
+<span class="fc" id="L1092">                .property(&quot;mutationAttempts&quot;, mutationAttempts)</span>
+<span class="fc" id="L1093">                .property(&quot;trainEvaluations&quot;, trainEvaluations))</span>
+<span class="fc" id="L1094">            .property(&quot;outcome&quot;, outcome.name());</span>
+<span class="fc bfc" id="L1095" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L1096">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L1098">        return json.endObject().toString();</span>
+    }
+
+    private static void writeCandidate(
+        JsonWriter json,
+        CandidateEvaluation candidate
+    ) {
+<span class="fc" id="L1105">        json.property(&quot;genomeHash&quot;, candidate.genomeHash())</span>
+<span class="fc" id="L1106">            .property(&quot;alphaStructuralHash&quot;, candidate.alphaStructuralHash())</span>
+<span class="fc" id="L1107">            .object(&quot;rawComponents&quot;, object -&gt;</span>
+<span class="fc" id="L1108">                candidate.rawComponents().forEach((component, value) -&gt;</span>
+<span class="fc" id="L1109">                    object.property(component.name(), value)))</span>
+<span class="fc" id="L1110">            .property(&quot;weightedScorePermille&quot;,</span>
+<span class="fc" id="L1111">                candidate.weightedScorePermille())</span>
+<span class="fc" id="L1112">            .property(&quot;status&quot;, candidate.status().name())</span>
+<span class="fc" id="L1113">            .stringArray(&quot;blockers&quot;, candidate.blockers());</span>
+<span class="fc" id="L1114">    }</span>
+
+    private static void writeRejection(
+        JsonWriter json,
+        MutationRejection rejection
+    ) {
+<span class="fc" id="L1120">        json.property(&quot;parentGenomeHash&quot;, rejection.parentGenomeHash())</span>
+<span class="fc" id="L1121">            .property(&quot;ordinal&quot;, rejection.ordinal())</span>
+<span class="fc" id="L1122">            .property(&quot;mutationKind&quot;, rejection.mutationKind().name())</span>
+<span class="fc" id="L1123">            .property(&quot;proposalKey&quot;, rejection.proposalKey());</span>
+<span class="pc bpc" id="L1124" title="1 of 2 branches missed.">        if (rejection.childGenomeHash() == null) {</span>
+<span class="nc" id="L1125">            json.nullProperty(&quot;childGenomeHash&quot;);</span>
+        } else {
+<span class="fc" id="L1127">            json.property(&quot;childGenomeHash&quot;, rejection.childGenomeHash());</span>
+        }
+<span class="fc" id="L1129">        json.stringArray(&quot;blockers&quot;, rejection.blockers());</span>
+<span class="fc" id="L1130">    }</span>
+
+    private static String renderRun(
+        String studyPlanHash,
+        List&lt;String&gt; seedHashes,
+        List&lt;GenerationReport&gt; reports,
+        List&lt;EvolutionGenome&gt; finalPopulation,
+        TerminalOutcome outcome,
+        int mutationAttempts,
+        int trainEvaluations,
+        String contentHash
+    ) {
+<span class="fc" id="L1142">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L1143">            .property(&quot;schema&quot;, RUN_SCHEMA)</span>
+<span class="fc" id="L1144">            .property(&quot;studyPlanHash&quot;, studyPlanHash)</span>
+<span class="fc" id="L1145">            .stringArray(&quot;seedGenomeHashes&quot;, seedHashes)</span>
+<span class="fc" id="L1146">            .stringArray(&quot;generationReportHashes&quot;, reports.stream()</span>
+<span class="fc" id="L1147">                .map(GenerationReport::contentHash).toList())</span>
+<span class="fc" id="L1148">            .stringArray(&quot;finalPopulationGenomeHashes&quot;, finalPopulation.stream()</span>
+<span class="fc" id="L1149">                .map(EvolutionGenome::contentHash).toList())</span>
+<span class="fc" id="L1150">            .stringArray(&quot;finalPopulationAlphaStructuralHashes&quot;,</span>
+<span class="fc" id="L1151">                finalPopulation.stream()</span>
+<span class="fc" id="L1152">                    .map(EvolutionGenome::alphaStructuralHash).toList())</span>
+<span class="fc" id="L1153">            .property(&quot;terminalOutcome&quot;, outcome.name())</span>
+<span class="fc" id="L1154">            .object(&quot;budgetUsed&quot;, object -&gt; object</span>
+<span class="fc" id="L1155">                .property(&quot;mutationAttempts&quot;, mutationAttempts)</span>
+<span class="fc" id="L1156">                .property(&quot;trainEvaluations&quot;, trainEvaluations))</span>
+<span class="fc" id="L1157">            .property(&quot;validationStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L1158">            .property(&quot;finalTestStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L1159">            .property(&quot;proofStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L1160">            .property(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L1161">            .property(&quot;promotionStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L1162">            .property(&quot;publicEvidenceStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc bfc" id="L1163" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L1164">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L1166">        return json.endObject().toString();</span>
+    }
+
+    private static Map&lt;FitnessComponent, Integer&gt; canonicalComponents(
+        Map&lt;FitnessComponent, Integer&gt; components
+    ) {
+<span class="pc bpc" id="L1172" title="1 of 4 branches missed.">        if (components == null || components.isEmpty()) {</span>
+<span class="fc" id="L1173">            return Map.of();</span>
+        }
+<span class="fc" id="L1175">        LinkedHashMap&lt;FitnessComponent, Integer&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L1176">        components.entrySet().stream()</span>
+<span class="fc" id="L1177">            .sorted(Comparator.comparing(entry -&gt; entry.getKey().name()))</span>
+<span class="fc" id="L1178">            .forEach(entry -&gt; {</span>
+<span class="fc" id="L1179">                FitnessComponent component = Objects.requireNonNull(</span>
+<span class="fc" id="L1180">                    entry.getKey(), &quot;fitness component&quot;);</span>
+<span class="fc" id="L1181">                Integer value = Objects.requireNonNull(</span>
+<span class="fc" id="L1182">                    entry.getValue(), &quot;fitness component value&quot;);</span>
+<span class="pc bpc" id="L1183" title="2 of 4 branches missed.">                if (value &lt; -1000 || value &gt; 1000) {</span>
+<span class="nc" id="L1184">                    throw new IllegalArgumentException(</span>
+                        &quot;fitness component must be in [-1000,1000]: &quot;
+                            + component);
+                }
+<span class="fc" id="L1188">                result.put(component, value);</span>
+<span class="fc" id="L1189">            });</span>
+<span class="fc" id="L1190">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static List&lt;String&gt; canonicalStrings(List&lt;String&gt; values) {
+<span class="pc bpc" id="L1194" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L1195">            return List.of();</span>
+        }
+<span class="fc" id="L1197">        return values.stream()</span>
+<span class="fc" id="L1198">            .map(value -&gt; requireText(value, &quot;blocker&quot;))</span>
+<span class="fc" id="L1199">            .distinct()</span>
+<span class="fc" id="L1200">            .sorted()</span>
+<span class="fc" id="L1201">            .toList();</span>
+    }
+
+    private static List&lt;String&gt; canonicalHashes(
+        List&lt;String&gt; values,
+        boolean sort
+    ) {
+<span class="pc bpc" id="L1208" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L1209">            return List.of();</span>
+        }
+<span class="fc" id="L1211">        List&lt;String&gt; result = values.stream()</span>
+<span class="fc" id="L1212">            .map(value -&gt; {</span>
+<span class="fc" id="L1213">                EvolutionGenome.requireSha256(value, &quot;hash&quot;);</span>
+<span class="fc" id="L1214">                return value;</span>
+            })
+<span class="fc" id="L1216">            .toList();</span>
+<span class="pc bpc" id="L1217" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(result).size() != result.size()) {</span>
+<span class="nc" id="L1218">            throw new IllegalArgumentException(&quot;hashes must be unique&quot;);</span>
+        }
+<span class="fc bfc" id="L1220" title="All 2 branches covered.">        return sort ? result.stream().sorted().toList() : List.copyOf(result);</span>
+    }
+
+    private static List&lt;CandidateEvaluation&gt; canonicalCandidates(
+        List&lt;CandidateEvaluation&gt; values
+    ) {
+<span class="pc bpc" id="L1226" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L1227">            return List.of();</span>
+        }
+<span class="fc" id="L1229">        return values.stream()</span>
+<span class="fc" id="L1230">            .map(value -&gt; Objects.requireNonNull(value, &quot;candidate&quot;))</span>
+<span class="fc" id="L1231">            .sorted(Comparator.comparing(CandidateEvaluation::genomeHash))</span>
+<span class="fc" id="L1232">            .toList();</span>
+    }
+
+    private static List&lt;LineageEdge&gt; canonicalLineage(
+        List&lt;LineageEdge&gt; values
+    ) {
+<span class="pc bpc" id="L1238" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L1239">            return List.of();</span>
+        }
+<span class="fc" id="L1241">        return values.stream()</span>
+<span class="fc" id="L1242">            .map(value -&gt; Objects.requireNonNull(value, &quot;lineage edge&quot;))</span>
+<span class="fc" id="L1243">            .sorted(Comparator.comparing(LineageEdge::parentGenomeHash)</span>
+<span class="fc" id="L1244">                .thenComparing(LineageEdge::childGenomeHash))</span>
+<span class="fc" id="L1245">            .toList();</span>
+    }
+
+    private static List&lt;MutationRejection&gt; canonicalRejections(
+        List&lt;MutationRejection&gt; values
+    ) {
+<span class="pc bpc" id="L1251" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L1252">            return List.of();</span>
+        }
+<span class="fc" id="L1254">        return values.stream()</span>
+<span class="fc" id="L1255">            .map(value -&gt; Objects.requireNonNull(value, &quot;rejection&quot;))</span>
+<span class="fc" id="L1256">            .sorted(Comparator.comparing(MutationRejection::parentGenomeHash)</span>
+<span class="fc" id="L1257">                .thenComparingInt(MutationRejection::ordinal)</span>
+<span class="fc" id="L1258">                .thenComparing(MutationRejection::proposalKey))</span>
+<span class="fc" id="L1259">            .toList();</span>
+    }
+
+    private static List&lt;GenerationReport&gt; canonicalReports(
+        List&lt;GenerationReport&gt; values
+    ) {
+<span class="pc bpc" id="L1265" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L1266">            return List.of();</span>
+        }
+<span class="fc" id="L1268">        List&lt;GenerationReport&gt; result = values.stream()</span>
+<span class="fc" id="L1269">            .map(value -&gt; Objects.requireNonNull(value, &quot;generation report&quot;))</span>
+<span class="fc" id="L1270">            .sorted(Comparator.comparingInt(GenerationReport::generation))</span>
+<span class="fc" id="L1271">            .toList();</span>
+<span class="fc bfc" id="L1272" title="All 2 branches covered.">        for (int index = 0; index &lt; result.size(); index++) {</span>
+<span class="pc bpc" id="L1273" title="1 of 2 branches missed.">            if (result.get(index).generation() != index + 1) {</span>
+<span class="nc" id="L1274">                throw new IllegalArgumentException(</span>
+                    &quot;generation reports must be contiguous&quot;);
+            }
+        }
+<span class="fc" id="L1278">        return result;</span>
+    }
+
+    private static List&lt;EvolutionGenome&gt; canonicalPopulation(
+        List&lt;EvolutionGenome&gt; values
+    ) {
+<span class="pc bpc" id="L1284" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L1285">            return List.of();</span>
+        }
+<span class="fc" id="L1287">        return values.stream()</span>
+<span class="fc" id="L1288">            .map(value -&gt; Objects.requireNonNull(value, &quot;final genome&quot;))</span>
+<span class="fc" id="L1289">            .toList();</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L1293" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L1294">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L1296">        return value;</span>
+    }
+
+<span class="fc" id="L1299">    private record MutationRound(</span>
+        List&lt;EvolutionGenome&gt; children,
+        List&lt;LineageEdge&gt; lineage,
+        List&lt;MutationRejection&gt; rejections
+    ) {
+        static MutationRound create(
+            List&lt;EvolutionGenome&gt; children,
+            List&lt;LineageEdge&gt; lineage,
+            List&lt;MutationRejection&gt; rejections
+        ) {
+<span class="fc" id="L1309">            return new MutationRound(</span>
+<span class="fc" id="L1310">                children.stream()</span>
+<span class="fc" id="L1311">                    .sorted(Comparator.comparing(EvolutionGenome::contentHash))</span>
+<span class="fc" id="L1312">                    .toList(),</span>
+<span class="fc" id="L1313">                canonicalLineage(lineage),</span>
+<span class="fc" id="L1314">                canonicalRejections(rejections));</span>
+        }
+    }
+
+    private static final class ExecutionState {
+        private List&lt;EvolutionGenome&gt; population;
+        private final Map&lt;String, CandidateEvaluation&gt; evaluations;
+        private final BudgetLedger budget;
+        private final List&lt;GenerationReport&gt; reports;
+        private TerminalOutcome terminal;
+
+        private ExecutionState(
+            List&lt;EvolutionGenome&gt; population,
+            Map&lt;String, CandidateEvaluation&gt; evaluations,
+            int mutationAttempts,
+            int trainEvaluations,
+            List&lt;GenerationReport&gt; reports
+<span class="fc" id="L1331">        ) {</span>
+<span class="fc" id="L1332">            this.population = List.copyOf(population);</span>
+<span class="fc" id="L1333">            this.evaluations = new HashMap&lt;&gt;(evaluations);</span>
+<span class="fc" id="L1334">            this.budget = new BudgetLedger();</span>
+<span class="fc" id="L1335">            this.budget.mutationAttempts = mutationAttempts;</span>
+<span class="fc" id="L1336">            this.budget.trainEvaluations = trainEvaluations;</span>
+<span class="fc" id="L1337">            this.reports = new ArrayList&lt;&gt;(reports);</span>
+<span class="fc" id="L1338">        }</span>
+    }
+
+    private static final class BudgetLedger {
+        private int mutationAttempts;
+        private int trainEvaluations;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

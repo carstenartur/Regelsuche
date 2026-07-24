@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-open-target-mining-binding/v2",
+  "title": "Regelsuche autonomous open-target mining binding v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "campaignId",
+    "ruleInventoryHash",
+    "miningEvidenceHash",
+    "decisionHash",
+    "receiptHash",
+    "conjectureCount",
+    "rejectedClusterCount",
+    "targetProvided",
+    "bindingIsMathematicalEvidence",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "outputBranchIds",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.autonomous-open-target-mining-binding/v2"
+    },
+    "campaignId": { "$ref": "#/$defs/nonBlank" },
+    "ruleInventoryHash": { "$ref": "#/$defs/sha256" },
+    "miningEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "decisionHash": { "$ref": "#/$defs/sha256" },
+    "receiptHash": { "$ref": "#/$defs/sha256" },
+    "conjectureCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rejectedClusterCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "targetProvided": { "const": false },
+    "bindingIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "outputBranchIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

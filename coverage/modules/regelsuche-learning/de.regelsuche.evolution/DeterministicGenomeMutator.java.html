@@ -66,7 +66,7 @@ public final class DeterministicGenomeMutator {
                 proposal,
                 index + 1,
                 structuralHashes,
-<span class="pc bpc" id="L69" title="1 of 2 branches missed.">                accepted.size() &lt; limits.maxAccepted());</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                accepted.size() &lt; limits.maxAccepted());</span>
 <span class="fc" id="L70">            attempts.add(attempt);</span>
 <span class="fc bfc" id="L71" title="All 2 branches covered.">            if (attempt.status() == MutationStatus.ACCEPTED) {</span>
 <span class="fc" id="L72">                EvolutionGenome child = proposal.factory().get();</span>
@@ -105,8 +105,8 @@ public final class DeterministicGenomeMutator {
 <span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (structuralHashes.contains(child.alphaStructuralHash())) {</span>
 <span class="nc" id="L106">            blockers.add(&quot;STRUCTURAL_DIVERSITY_DUPLICATE:alphaStructuralHash&quot;);</span>
         }
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (!acceptanceCapacity) {</span>
-<span class="nc" id="L109">            blockers.add(&quot;ACCEPTED_BUDGET_EXHAUSTED:maxAccepted&quot;);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (!acceptanceCapacity) {</span>
+<span class="fc" id="L109">            blockers.add(&quot;ACCEPTED_BUDGET_EXHAUSTED:maxAccepted&quot;);</span>
         }
 <span class="fc" id="L111">        blockers = blockers.stream().distinct().sorted().toList();</span>
 <span class="fc bfc" id="L112" title="All 2 branches covered.">        MutationStatus status = blockers.isEmpty()</span>
@@ -328,7 +328,7 @@ public final class DeterministicGenomeMutator {
         String replacement
     ) {
 <span class="fc" id="L330">        java.util.function.UnaryOperator&lt;String&gt; replace = token -&gt;</span>
-<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            token.equals(placeholder) ? replacement : token;</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            token.equals(placeholder) ? replacement : token;</span>
 <span class="fc" id="L332">        List&lt;EvolutionGenome.AssumptionTemplate&gt; assumptions = gene.assumptions().stream()</span>
 <span class="fc" id="L333">            .map(item -&gt; new EvolutionGenome.AssumptionTemplate(</span>
 <span class="fc" id="L334">                item.kind(),</span>
@@ -516,7 +516,7 @@ public final class DeterministicGenomeMutator {
 <span class="fc" id="L516">            matcher.appendReplacement(</span>
                 output,
 <span class="fc" id="L518">                Matcher.quoteReplacement(</span>
-<span class="pc bpc" id="L519" title="1 of 2 branches missed.">                    matcher.group().equals(number) ? replacement : matcher.group()));</span>
+<span class="fc bfc" id="L519" title="All 2 branches covered.">                    matcher.group().equals(number) ? replacement : matcher.group()));</span>
         }
 <span class="fc" id="L521">        matcher.appendTail(output);</span>
 <span class="fc" id="L522">        return output.toString();</span>

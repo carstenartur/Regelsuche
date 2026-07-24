@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-population-checkpoint/v1",
+  "title": "Regelsuche evolution population checkpoint v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyPlanHash",
+    "mutationCatalogHash",
+    "seedGenomeHashes",
+    "completedGeneration",
+    "population",
+    "evaluations",
+    "generationReports",
+    "mutationAttempts",
+    "trainEvaluations",
+    "validationStatus",
+    "finalTestStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.evolution-population-checkpoint/v1"},
+    "studyPlanHash": {"$ref": "#/$defs/sha256"},
+    "mutationCatalogHash": {"$ref": "#/$defs/sha256"},
+    "seedGenomeHashes": {
+      "type": "array", "minItems": 1, "maxItems": 100000,
+      "uniqueItems": true, "items": {"$ref": "#/$defs/sha256"}
+    },
+    "completedGeneration": {"type": "integer", "minimum": 1, "maximum": 100000},
+    "population": {
+      "type": "array", "minItems": 1, "maxItems": 100000,
+      "items": {"$ref": "regelsuche-evolution-genome-v1.schema.json"}
+    },
+    "evaluations": {
+      "type": "array", "minItems": 1, "maxItems": 100000,
+      "items": {"$ref": "#/$defs/evaluation"}
+    },
+    "generationReports": {
+      "type": "array", "minItems": 1, "maxItems": 100000,
+      "items": {"$ref": "regelsuche-evolution-generation-report-v1.schema.json"}
+    },
+    "mutationAttempts": {"type": "integer", "minimum": 0},
+    "trainEvaluations": {"type": "integer", "minimum": 0},
+    "validationStatus": {"const": "NOT_EVALUATED"},
+    "finalTestStatus": {"const": "NOT_EVALUATED"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "genomeHash", "alphaStructuralHash", "rawComponents",
+        "weightedScorePermille", "status", "blockers"
+      ],
+      "properties": {
+        "genomeHash": {"$ref": "#/$defs/sha256"},
+        "alphaStructuralHash": {"$ref": "#/$defs/sha256"},
+        "rawComponents": {
+          "type": "object",
+          "additionalProperties": {"type": "integer", "minimum": -1000, "maximum": 1000}
+        },
+        "weightedScorePermille": {"type": "integer", "minimum": -1000, "maximum": 1000},
+        "status": {"enum": ["ACCEPTED", "BLOCKED"]},
+        "blockers": {"type": "array", "maxItems": 100000, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    }
+  }
+}

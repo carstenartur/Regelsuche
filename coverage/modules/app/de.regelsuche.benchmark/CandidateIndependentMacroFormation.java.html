@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CandidateIndependentMacroFormation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">CandidateIndependentMacroFormation.java</span></div><h1>CandidateIndependentMacroFormation.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.benchmark.CandidateIndependentMacroReplayAdapter.ReplayEvidence;
+import de.regelsuche.benchmark.CandidateIndependentMacroReplayAdapter.ReplayTrace;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationResult;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationStatus;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.MacroCandidate;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.inventory.ReusableRule;
+import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
+import de.regelsuche.mining.GeneralizedPattern;
+import de.regelsuche.mining.KnownRuleRepository;
+import de.regelsuche.mining.PatternGeneralizer;
+import de.regelsuche.mining.RulePatternCanonicalizer;
+import de.regelsuche.mining.SuccessfulTransformationPath;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.validation.CandidateProofStatus;
+import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Target-free macro formation from frozen, production-replayed TRAIN traces. */
+final class CandidateIndependentMacroFormation {
+<span class="fc" id="L47">    private static final Pattern PLACEHOLDER = Pattern.compile(&quot;\\b[A-Z]\\b&quot;);</span>
+    private static final int REPLAY_MAX_DEPTH = 12;
+    private static final int REPLAY_MAX_STATES = 2_000;
+
+    private final CandidateIndependentMacroReplayAdapter replayAdapter;
+    private final Map&lt;String, Set&lt;String&gt;&gt; operationsByRuleId;
+    private final TransformationEngine primitiveEngine;
+<span class="fc" id="L54">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L56">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L57">    private final PatternGeneralizer generalizer = new PatternGeneralizer();</span>
+<span class="fc" id="L58">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
+<span class="fc" id="L59">    private final PolynomialNormalFormEquivalenceService polynomialEquivalence =</span>
+        new PolynomialNormalFormEquivalenceService(
+            new DefaultMathematicalAlgorithmRegistry());
+
+    CandidateIndependentMacroFormation(
+        Map&lt;String, List&lt;String&gt;&gt; operationRuleIds
+<span class="fc" id="L65">    ) {</span>
+<span class="fc" id="L66">        replayAdapter = new CandidateIndependentMacroReplayAdapter(</span>
+            operationRuleIds);
+<span class="fc" id="L68">        Map&lt;String, List&lt;String&gt;&gt; normalized = replayAdapter.operationRuleIds();</span>
+<span class="fc" id="L69">        LinkedHashMap&lt;String, Set&lt;String&gt;&gt; reverse = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L70">        normalized.forEach((operation, rules) -&gt;</span>
+<span class="fc" id="L71">            rules.forEach(rule -&gt; reverse.computeIfAbsent(</span>
+<span class="fc" id="L72">                rule, ignored -&gt; new LinkedHashSet&lt;&gt;()).add(operation)));</span>
+<span class="fc" id="L73">        LinkedHashMap&lt;String, Set&lt;String&gt;&gt; immutableReverse =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L75">        reverse.forEach((rule, operations) -&gt;</span>
+<span class="fc" id="L76">            immutableReverse.put(rule, Set.copyOf(operations)));</span>
+<span class="fc" id="L77">        operationsByRuleId = Map.copyOf(immutableReverse);</span>
+<span class="fc" id="L78">        Set&lt;String&gt; allowed = reverse.keySet();</span>
+<span class="fc" id="L79">        List&lt;RewriteRule&gt; rules = AstRewriteTransformationEngine.defaultRules()</span>
+<span class="fc" id="L80">            .stream()</span>
+<span class="fc" id="L81">            .filter(rule -&gt; allowed.contains(rule.id()))</span>
+<span class="fc" id="L82">            .sorted(Comparator.comparing(RewriteRule::id))</span>
+<span class="fc" id="L83">            .toList();</span>
+<span class="fc" id="L84">        primitiveEngine = new AstRewriteTransformationEngine(rules, 16, 120);</span>
+<span class="fc" id="L85">    }</span>
+
+    FormationResult form(List&lt;ReplayTrace&gt; traces) {
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (traces == null || traces.isEmpty()) {</span>
+<span class="nc" id="L89">            throw new IllegalArgumentException(</span>
+                &quot;at least one TRAIN replay trace is required&quot;);
+        }
+<span class="fc" id="L92">        CandidateIndependentMacroReplayAdapter.BatchResult replayBatch =</span>
+<span class="fc" id="L93">            replayAdapter.replayAll(traces);</span>
+<span class="fc" id="L94">        List&lt;ReplayEvidence&gt; replayEvidence = replayBatch.results().stream()</span>
+<span class="fc" id="L95">            .map(CandidateIndependentMacroReplayAdapter.ReplayResult::evidence)</span>
+<span class="fc" id="L96">            .toList();</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (replayBatch.status()</span>
+                != CandidateIndependentMacroReplayAdapter.BatchStatus.REPRODUCED) {
+<span class="nc" id="L99">            return new FormationResult(</span>
+                FormationStatus.REPLAY_NOT_REPRODUCED,
+<span class="nc" id="L101">                List.of(), replayEvidence, replayBatch.detail());</span>
+        }
+<span class="fc" id="L103">        List&lt;SuccessfulTransformationPath&gt; paths = replayBatch.results().stream()</span>
+<span class="fc" id="L104">            .map(result -&gt; result.path().orElseThrow())</span>
+<span class="fc" id="L105">            .toList();</span>
+
+<span class="fc" id="L107">        LinkedHashMap&lt;List&lt;String&gt;, List&lt;SuccessfulTransformationPath&gt;&gt; clusters =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        for (int index = 0; index &lt; traces.size(); index++) {</span>
+<span class="fc" id="L110">            clusters.computeIfAbsent(traces.get(index).primitiveSteps(),</span>
+<span class="fc" id="L111">                ignored -&gt; new ArrayList&lt;&gt;()).add(paths.get(index));</span>
+        }
+
+<span class="fc" id="L114">        List&lt;MacroCandidate&gt; macros = new ArrayList&lt;&gt;();</span>
+        for (Map.Entry&lt;List&lt;String&gt;, List&lt;SuccessfulTransformationPath&gt;&gt; entry
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                : clusters.entrySet()) {</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            Optional&lt;GeneralizedPattern&gt; generalized = entry.getValue().size() &gt; 1</span>
+<span class="fc" id="L118">                ? generalizeByReplay(entry.getValue(), entry.getKey())</span>
+<span class="fc" id="L119">                : generalizer.generalizeSingleExampleSchema(</span>
+<span class="fc" id="L120">                    entry.getValue().getFirst());</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (generalized.isEmpty()) {</span>
+<span class="nc" id="L122">                return new FormationResult(</span>
+                    FormationStatus.GENERALIZATION_REJECTED,
+<span class="nc" id="L124">                    List.copyOf(macros), replayEvidence,</span>
+                    &quot;no reusable schema for operation sequence &quot;
+<span class="nc" id="L126">                        + entry.getKey());</span>
+            }
+<span class="fc" id="L128">            macros.add(candidate(</span>
+<span class="fc" id="L129">                generalized.orElseThrow(), entry.getKey(), entry.getValue()));</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">        macros.sort(Comparator.comparing(MacroCandidate::macroId));</span>
+<span class="fc" id="L132">        return new FormationResult(</span>
+            FormationStatus.SELECTED,
+<span class="fc" id="L134">            List.copyOf(macros), replayEvidence,</span>
+            &quot;all TRAIN replays reproduced and generalized into &quot;
+<span class="fc" id="L136">                + macros.size() + &quot; reusable macros&quot;);</span>
+    }
+
+    private Optional&lt;GeneralizedPattern&gt; generalizeByReplay(
+        List&lt;SuccessfulTransformationPath&gt; paths,
+        List&lt;String&gt; operationSequence
+    ) {
+<span class="fc" id="L143">        SourceGeneralization source = generalizeSources(paths);</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">        if (source == null || source.bindings().isEmpty()) {</span>
+<span class="nc" id="L145">            return Optional.empty();</span>
+        }
+<span class="fc" id="L147">        Optional&lt;String&gt; targetPattern = deriveTargetPattern(</span>
+<span class="fc" id="L148">            source.pattern(), source.bindings(), paths, operationSequence);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (targetPattern.isEmpty()) {</span>
+<span class="nc" id="L150">            return Optional.empty();</span>
+        }
+<span class="fc" id="L152">        Map&lt;String, List&lt;String&gt;&gt; expressionValues = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (String placeholder : source.placeholders()) {</span>
+<span class="fc" id="L154">            expressionValues.put(</span>
+                placeholder,
+<span class="fc" id="L156">                source.bindings().stream()</span>
+<span class="fc" id="L157">                    .map(binding -&gt; ExpressionFormatter.format(</span>
+<span class="fc" id="L158">                        binding.get(placeholder)))</span>
+<span class="fc" id="L159">                    .toList());</span>
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">        return Optional.of(new GeneralizedPattern(</span>
+<span class="fc" id="L162">            source.pattern(),</span>
+<span class="fc" id="L163">            targetPattern.orElseThrow(),</span>
+<span class="fc" id="L164">            Map.of(),</span>
+<span class="fc" id="L165">            expressionValues.entrySet().stream()</span>
+<span class="fc" id="L166">                .map(entry -&gt; entry.getKey() + &quot; ∈ {&quot;</span>
+<span class="fc" id="L167">                    + String.join(&quot;, &quot;, entry.getValue()) + &quot;}&quot;)</span>
+<span class="fc" id="L168">                .toList(),</span>
+            expressionValues));
+    }
+
+    private SourceGeneralization generalizeSources(
+        List&lt;SuccessfulTransformationPath&gt; paths
+    ) {
+        List&lt;Expr&gt; sources;
+        try {
+<span class="fc" id="L177">            sources = paths.stream()</span>
+<span class="fc" id="L178">                .map(path -&gt; expressionParser.parseTerm(</span>
+<span class="fc" id="L179">                    path.originalExpression()))</span>
+<span class="fc" id="L180">                .toList();</span>
+<span class="nc" id="L181">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L182">            return null;</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">        AntiUnificationState state = new AntiUnificationState(paths.size());</span>
+<span class="fc" id="L185">        Expr pattern = antiUnify(sources, state);</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">        if (state.placeholders().isEmpty()) {</span>
+<span class="nc" id="L187">            return null;</span>
+        }
+<span class="fc" id="L189">        return new SourceGeneralization(</span>
+<span class="fc" id="L190">            ExpressionFormatter.format(pattern),</span>
+<span class="fc" id="L191">            state.placeholders(),</span>
+<span class="fc" id="L192">            state.bindings());</span>
+    }
+
+    private Expr antiUnify(List&lt;Expr&gt; values, AntiUnificationState state) {
+<span class="fc" id="L196">        Expr first = values.getFirst();</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (values.stream().allMatch(first::equals)) {</span>
+<span class="fc" id="L198">            return first;</span>
+        }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (first instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                &amp;&amp; values.stream().allMatch(value -&gt;</span>
+<span class="fc" id="L202">                    value instanceof BinaryExpr candidate</span>
+<span class="pc bpc" id="L203" title="2 of 4 branches missed.">                        &amp;&amp; candidate.operator() == binary.operator())) {</span>
+<span class="fc" id="L204">            return new BinaryExpr(</span>
+<span class="fc" id="L205">                antiUnify(values.stream()</span>
+<span class="fc" id="L206">                    .map(value -&gt; ((BinaryExpr) value).left()).toList(), state),</span>
+<span class="fc" id="L207">                binary.operator(),</span>
+<span class="fc" id="L208">                antiUnify(values.stream()</span>
+<span class="fc" id="L209">                    .map(value -&gt; ((BinaryExpr) value).right()).toList(), state));</span>
+        }
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (first instanceof FunctionExpr function</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                &amp;&amp; values.stream().allMatch(value -&gt;</span>
+<span class="nc" id="L213">                    value instanceof FunctionExpr candidate</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                        &amp;&amp; candidate.name().equals(function.name())</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                        &amp;&amp; candidate.arguments().size()</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">                            == function.arguments().size())) {</span>
+<span class="nc" id="L217">            List&lt;Expr&gt; arguments = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            for (int index = 0; index &lt; function.arguments().size(); index++) {</span>
+<span class="nc" id="L219">                final int position = index;</span>
+<span class="nc" id="L220">                arguments.add(antiUnify(values.stream()</span>
+<span class="nc" id="L221">                    .map(value -&gt; ((FunctionExpr) value)</span>
+<span class="nc" id="L222">                        .arguments().get(position))</span>
+<span class="nc" id="L223">                    .toList(), state));</span>
+            }
+<span class="nc" id="L225">            return new FunctionExpr(function.name(), arguments);</span>
+        }
+<span class="fc" id="L227">        return new VariableExpr(state.placeholder(values));</span>
+    }
+
+    private Optional&lt;String&gt; deriveTargetPattern(
+        String sourcePattern,
+        List&lt;Map&lt;String, Expr&gt;&gt; bindings,
+        List&lt;SuccessfulTransformationPath&gt; paths,
+        List&lt;String&gt; operationSequence
+    ) {
+<span class="fc" id="L236">        ArrayDeque&lt;ReplayNode&gt; queue = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L237">        Set&lt;String&gt; visited = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L238">        queue.add(new ReplayNode(sourcePattern, 0, -1));</span>
+<span class="fc" id="L239">        visited.add(replayKey(sourcePattern, -1));</span>
+<span class="fc" id="L240">        int explored = 0;</span>
+<span class="fc" id="L241">        List&lt;String&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L242" title="1 of 4 branches missed.">        while (!queue.isEmpty() &amp;&amp; explored &lt; REPLAY_MAX_STATES) {</span>
+<span class="fc" id="L243">            ReplayNode node = queue.removeFirst();</span>
+<span class="fc" id="L244">            explored++;</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            if (node.operationIndex() == operationSequence.size() - 1</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                    &amp;&amp; validatesInstances(</span>
+<span class="fc" id="L247">                        node.expression(), bindings, paths)) {</span>
+<span class="fc" id="L248">                candidates.add(node.expression());</span>
+            }
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            if (node.depth() &gt;= REPLAY_MAX_DEPTH) {</span>
+<span class="nc" id="L251">                continue;</span>
+            }
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for (Transformation transformation : primitiveEngine</span>
+<span class="fc" id="L254">                    .transform(node.expression()).stream()</span>
+<span class="fc" id="L255">                    .sorted(transformationOrder()).toList()) {</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">                for (String operation : operationsByRuleId.getOrDefault(</span>
+<span class="fc" id="L257">                        transformation.rule(), Set.of()).stream()</span>
+<span class="fc" id="L258">                        .sorted().toList()) {</span>
+<span class="fc" id="L259">                    int nextIndex = compatibleOperationIndex(</span>
+<span class="fc" id="L260">                        operationSequence, node.operationIndex(), operation);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                    if (nextIndex &lt; 0) {</span>
+<span class="fc" id="L262">                        continue;</span>
+                    }
+<span class="fc" id="L264">                    String key = replayKey(</span>
+<span class="fc" id="L265">                        transformation.transformedExpression(), nextIndex);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">                    if (!visited.add(key)) {</span>
+<span class="fc" id="L267">                        continue;</span>
+                    }
+<span class="fc" id="L269">                    queue.addLast(new ReplayNode(</span>
+<span class="fc" id="L270">                        transformation.transformedExpression(),</span>
+<span class="fc" id="L271">                        node.depth() + 1,</span>
+                        nextIndex));
+<span class="fc" id="L273">                }</span>
+<span class="fc" id="L274">            }</span>
+<span class="fc" id="L275">        }</span>
+<span class="fc" id="L276">        return candidates.stream()</span>
+<span class="fc" id="L277">            .distinct()</span>
+<span class="fc" id="L278">            .sorted(Comparator</span>
+<span class="fc" id="L279">                .comparingInt(canonicalizer::astNodeCount)</span>
+<span class="pc" id="L280">                .thenComparing(value -&gt; scorer.score(value).weightedTotal())</span>
+<span class="fc" id="L281">                .thenComparing(String::compareTo))</span>
+<span class="fc" id="L282">            .findFirst();</span>
+    }
+
+    private boolean validatesInstances(
+        String targetPattern,
+        List&lt;Map&lt;String, Expr&gt;&gt; bindings,
+        List&lt;SuccessfulTransformationPath&gt; paths
+    ) {
+        Expr target;
+        try {
+<span class="fc" id="L292">            target = expressionParser.parseTerm(targetPattern);</span>
+<span class="nc" id="L293">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L294">            return false;</span>
+<span class="fc" id="L295">        }</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        for (int index = 0; index &lt; paths.size(); index++) {</span>
+<span class="fc" id="L297">            String concrete = ExpressionFormatter.format(</span>
+<span class="fc" id="L298">                substitute(target, bindings.get(index)));</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            if (!same(concrete, paths.get(index).targetExpression())) {</span>
+<span class="fc" id="L300">                return false;</span>
+            }
+        }
+<span class="fc" id="L303">        return true;</span>
+    }
+
+    private Expr substitute(Expr expression, Map&lt;String, Expr&gt; bindings) {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L308">            return bindings.getOrDefault(variable.name(), variable);</span>
+        }
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
+<span class="fc" id="L311">            return expression;</span>
+        }
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L314">            return new FunctionExpr(</span>
+<span class="nc" id="L315">                function.name(),</span>
+<span class="nc" id="L316">                function.arguments().stream()</span>
+<span class="nc" id="L317">                    .map(argument -&gt; substitute(argument, bindings))</span>
+<span class="nc" id="L318">                    .toList());</span>
+        }
+<span class="fc" id="L320">        BinaryExpr binary = (BinaryExpr) expression;</span>
+<span class="fc" id="L321">        return new BinaryExpr(</span>
+<span class="fc" id="L322">            substitute(binary.left(), bindings),</span>
+<span class="fc" id="L323">            binary.operator(),</span>
+<span class="fc" id="L324">            substitute(binary.right(), bindings));</span>
+    }
+
+    private MacroCandidate candidate(
+        GeneralizedPattern pattern,
+        List&lt;String&gt; operationSequence,
+        List&lt;SuccessfulTransformationPath&gt; paths
+    ) {
+<span class="fc" id="L332">        Set&lt;String&gt; leftPlaceholders = placeholders(pattern.leftPattern());</span>
+<span class="fc" id="L333">        Set&lt;String&gt; rightPlaceholders = placeholders(pattern.rightPattern());</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (leftPlaceholders.isEmpty()</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">                || !leftPlaceholders.containsAll(rightPlaceholders)) {</span>
+<span class="nc" id="L336">            throw new IllegalArgumentException(</span>
+                &quot;generalized macro exposes unbound target placeholders: &quot;
+                    + pattern);
+        }
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (!polynomialEquivalence.areEquivalent(</span>
+<span class="fc" id="L341">                pattern.leftPattern(), pattern.rightPattern())) {</span>
+<span class="nc" id="L342">            throw new IllegalArgumentException(</span>
+                &quot;generalized macro failed deterministic polynomial validation: &quot;
+<span class="nc" id="L344">                    + pattern.leftPattern() + &quot; -&gt; &quot; + pattern.rightPattern());</span>
+        }
+<span class="fc" id="L346">        String canonicalHash = RulePatternCanonicalizer.hash(</span>
+<span class="fc" id="L347">            pattern.leftPattern(), pattern.rightPattern());</span>
+<span class="fc" id="L348">        List&lt;String&gt; pathIds = paths.stream()</span>
+<span class="fc" id="L349">            .map(SuccessfulTransformationPath::id).sorted().toList();</span>
+<span class="fc" id="L350">        List&lt;String&gt; assumptions = paths.stream()</span>
+<span class="fc" id="L351">            .flatMap(path -&gt; path.assumptions().stream())</span>
+<span class="fc" id="L352">            .distinct().sorted().toList();</span>
+<span class="fc" id="L353">        double averageImprovement = paths.stream()</span>
+<span class="fc" id="L354">            .mapToInt(SuccessfulTransformationPath::scoreImprovement)</span>
+<span class="fc" id="L355">            .average().orElse(1.0);</span>
+<span class="fc" id="L356">        ReusableRule rule = new ReusableRule(</span>
+            &quot;macro_candidate_independent_&quot;
+<span class="fc" id="L358">                + Integer.toUnsignedString(canonicalHash.hashCode(), 16),</span>
+<span class="fc" id="L359">            pattern.leftPattern(),</span>
+<span class="fc" id="L360">            pattern.rightPattern(),</span>
+<span class="fc" id="L361">            pattern.parameterRelations(),</span>
+            CandidateProofStatus.SYMBOLICALLY_VERIFIED,
+<span class="fc" id="L363">            new KnownRuleRepository().statusFor(</span>
+<span class="fc" id="L364">                pattern.leftPattern(), pattern.rightPattern()),</span>
+<span class="fc" id="L365">            paths.size(),</span>
+<span class="fc" id="L366">            Math.max(1.0, averageImprovement),</span>
+            Instant.EPOCH,
+            canonicalHash,
+            null,
+            0,
+<span class="fc" id="L371">            paths.size(),</span>
+            pathIds,
+            1.0,
+            assumptions);
+<span class="fc" id="L375">        return new MacroCandidate(</span>
+<span class="fc" id="L376">            rule.id(), operationSequence, pathIds, rule,</span>
+<span class="fc" id="L377">            atomicSteps(paths.getFirst()),</span>
+            &quot;deterministic polynomial normal forms match&quot;);
+    }
+
+    private List&lt;TransformationStep&gt; atomicSteps(
+        SuccessfulTransformationPath path
+    ) {
+<span class="fc" id="L384">        List&lt;TransformationStep&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        for (int index = 0; index &lt; path.rules().size(); index++) {</span>
+<span class="fc" id="L386">            String before = path.expressionPath().get(index);</span>
+<span class="fc" id="L387">            String after = path.expressionPath().get(index + 1);</span>
+<span class="fc" id="L388">            result.add(new TransformationStep(</span>
+                index,
+                before,
+                after,
+<span class="fc" id="L392">                path.rules().get(index),</span>
+                RewriteKind.NORMALIZE,
+<span class="fc" id="L394">                scorer.score(before).weightedTotal(),</span>
+<span class="fc" id="L395">                scorer.score(after).weightedTotal(),</span>
+                true,
+<span class="fc" id="L397">                path.rules().get(index),</span>
+<span class="fc" id="L398">                path.assumptions()));</span>
+        }
+<span class="fc" id="L400">        return List.copyOf(result);</span>
+    }
+
+    private Comparator&lt;Transformation&gt; transformationOrder() {
+<span class="fc" id="L404">        return Comparator</span>
+<span class="fc" id="L405">            .comparingInt(Transformation::estimatedCostDelta)</span>
+<span class="fc" id="L406">            .thenComparing(transformation -&gt;</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                transformation.rule().contains(&quot;macro&quot;) ? 0 : 1)</span>
+<span class="fc" id="L408">            .thenComparing(Transformation::rule)</span>
+<span class="fc" id="L409">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L410">            .thenComparing(Transformation::applicationKey);</span>
+    }
+
+    private int compatibleOperationIndex(
+        List&lt;String&gt; expected,
+        int currentIndex,
+        String operation
+    ) {
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (currentIndex &lt; 0) {</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            return expected.getFirst().equals(operation) ? 0 : -1;</span>
+        }
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (expected.get(currentIndex).equals(operation)) {</span>
+<span class="fc" id="L422">            return currentIndex;</span>
+        }
+<span class="fc" id="L424">        int next = currentIndex + 1;</span>
+<span class="fc bfc" id="L425" title="All 4 branches covered.">        return next &lt; expected.size() &amp;&amp; expected.get(next).equals(operation)</span>
+<span class="fc" id="L426">            ? next : -1;</span>
+    }
+
+    private boolean same(String left, String right) {
+<span class="fc" id="L430">        return canonicalizer.canonicalize(left)</span>
+<span class="fc" id="L431">            .equals(canonicalizer.canonicalize(right));</span>
+    }
+
+    private String replayKey(String expression, int operationIndex) {
+<span class="fc" id="L435">        return canonicalizer.stableHash(expression) + ':' + operationIndex;</span>
+    }
+
+    private Set&lt;String&gt; placeholders(String pattern) {
+<span class="fc" id="L439">        LinkedHashSet&lt;String&gt; result = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L440">        Matcher matcher = PLACEHOLDER.matcher(pattern);</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L442">            result.add(matcher.group());</span>
+        }
+<span class="fc" id="L444">        return Set.copyOf(result);</span>
+    }
+
+    private static final class AntiUnificationState {
+        private final List&lt;Map&lt;String, Expr&gt;&gt; bindings;
+<span class="fc" id="L449">        private final LinkedHashMap&lt;String, String&gt; placeholderByVector =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L451">        private final List&lt;String&gt; placeholders = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L453">        private AntiUnificationState(int examples) {</span>
+<span class="fc" id="L454">            bindings = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            for (int index = 0; index &lt; examples; index++) {</span>
+<span class="fc" id="L456">                bindings.add(new LinkedHashMap&lt;&gt;());</span>
+            }
+<span class="fc" id="L458">        }</span>
+
+        private String placeholder(List&lt;Expr&gt; values) {
+<span class="fc" id="L461">            String key = values.stream()</span>
+<span class="fc" id="L462">                .map(ExpressionFormatter::format)</span>
+<span class="fc" id="L463">                .collect(java.util.stream.Collectors.joining(&quot;\u0001&quot;));</span>
+<span class="fc" id="L464">            String placeholder = placeholderByVector.get(key);</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">            if (placeholder == null) {</span>
+<span class="fc" id="L466">                placeholder = String.valueOf(</span>
+<span class="fc" id="L467">                    (char) ('A' + placeholderByVector.size()));</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">                if (placeholder.charAt(0) &gt; 'Z') {</span>
+<span class="nc" id="L469">                    throw new IllegalStateException(</span>
+                        &quot;macro source anti-unification exhausted placeholders&quot;);
+                }
+<span class="fc" id="L472">                placeholderByVector.put(key, placeholder);</span>
+<span class="fc" id="L473">                placeholders.add(placeholder);</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">                for (int index = 0; index &lt; values.size(); index++) {</span>
+<span class="fc" id="L475">                    bindings.get(index).put(placeholder, values.get(index));</span>
+                }
+            }
+<span class="fc" id="L478">            return placeholder;</span>
+        }
+
+        private List&lt;String&gt; placeholders() {
+<span class="fc" id="L482">            return List.copyOf(placeholders);</span>
+        }
+
+        private List&lt;Map&lt;String, Expr&gt;&gt; bindings() {
+<span class="fc" id="L486">            return bindings.stream().map(Map::copyOf).toList();</span>
+        }
+    }
+
+<span class="fc" id="L490">    private record SourceGeneralization(</span>
+        String pattern,
+        List&lt;String&gt; placeholders,
+        List&lt;Map&lt;String, Expr&gt;&gt; bindings
+    ) {
+    }
+
+<span class="fc" id="L497">    private record ReplayNode(</span>
+        String expression,
+        int depth,
+        int operationIndex
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

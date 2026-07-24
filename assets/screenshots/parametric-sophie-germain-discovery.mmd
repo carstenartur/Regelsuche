@@ -1,0 +1,9 @@
+graph TD
+  semantic_2b01c8990404["x^4 + 4*y^4"]
+  semantic_209f60df4a7e["(x ^ 2 + 2 * y ^ 2) ^ 2 - (2 * x * y) ^ 2"]
+  semantic_cf65cc1358a0["(x ^ 2 + 2 * y ^ 2 - 2 * x * y) * (x ^ 2 + 2 * y ^ 2 + 2 * x * y)"]
+  semantic_2b01c8990404 -->|replay step| semantic_209f60df4a7e
+  semantic_209f60df4a7e -->|replay step| semantic_cf65cc1358a0
+  semantic_4329357af97e["(x+1)^4 + 4*z^4"]
+  semantic_1ff225bf098f["((x + 1) ^ 2 + 2 * (x + 1) * z + 2 * z ^ 2) * ((x + 1) ^ 2 - 2 * (x + 1) * z + 2 * z ^ 2)"]
+  semantic_4329357af97e -->|replay step| semantic_1ff225bf098f

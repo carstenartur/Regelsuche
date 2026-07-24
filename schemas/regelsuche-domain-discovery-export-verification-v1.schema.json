@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.domain-discovery-export-verification/v1",
+  "title": "Regelsuche generic domain discovery export verification v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "manifestContentHash",
+    "manifestByteHash",
+    "campaignId",
+    "domainId",
+    "domainRevision",
+    "domainDescriptorHash",
+    "discoveryEvidenceHash",
+    "lifecycleHandoffHash",
+    "artifactSetHash",
+    "verifiedArtifactCount",
+    "identityBindingStatus",
+    "mathematicalValidationStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.domain-discovery-export-verification/v1"
+    },
+    "manifestContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "manifestByteHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "campaignId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainRevision": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainDescriptorHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "discoveryEvidenceHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "lifecycleHandoffHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artifactSetHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "verifiedArtifactCount": {
+      "const": 3
+    },
+    "identityBindingStatus": {
+      "const": "VERIFIED"
+    },
+    "mathematicalValidationStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

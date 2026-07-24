@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-branch-lineage/v2",
+  "title": "Regelsuche autonomous branch lineage v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "aggregateReceiptHash",
+    "decisionHash",
+    "miningEvidenceHash",
+    "candidates",
+    "lineageIsMathematicalEvidence",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-branch-lineage/v2" },
+    "aggregateReceiptHash": { "$ref": "#/$defs/sha256" },
+    "decisionHash": { "$ref": "#/$defs/sha256" },
+    "miningEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outputBranchId",
+          "candidateId",
+          "candidateEvidenceHash",
+          "sources",
+          "lineageHash"
+        ],
+        "properties": {
+          "outputBranchId": { "$ref": "#/$defs/nonBlank" },
+          "candidateId": { "$ref": "#/$defs/nonBlank" },
+          "candidateEvidenceHash": { "$ref": "#/$defs/sha256" },
+          "sources": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "observationId",
+                "sourceBranchId",
+                "familyId",
+                "snapshotHash",
+                "evidenceHash",
+                "observationBranchHash"
+              ],
+              "properties": {
+                "observationId": { "$ref": "#/$defs/nonBlank" },
+                "sourceBranchId": { "$ref": "#/$defs/nonBlank" },
+                "familyId": { "$ref": "#/$defs/nonBlank" },
+                "snapshotHash": { "$ref": "#/$defs/sha256" },
+                "evidenceHash": { "$ref": "#/$defs/sha256" },
+                "observationBranchHash": { "$ref": "#/$defs/sha256" }
+              }
+            }
+          },
+          "lineageHash": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "lineageIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

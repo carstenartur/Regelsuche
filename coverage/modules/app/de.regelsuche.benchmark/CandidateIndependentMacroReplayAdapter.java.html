@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CandidateIndependentMacroReplayAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">CandidateIndependentMacroReplayAdapter.java</span></div><h1>CandidateIndependentMacroReplayAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.mining.SuccessfulTransformationPath;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Reproduces frozen macro-learning traces through current production rewrite
+ * rules while preserving the versioned abstract operation vocabulary.
+ *
+ * &lt;p&gt;A trace is accepted only if its target is reached and every concrete rule
+ * application can be assigned to the declared abstract operation sequence.
+ * Consecutive concrete applications may belong to the same abstract phase;
+ * phases may advance only in the frozen order. This supports semantic phases
+ * such as distribution that require more than one local AST rewrite.&lt;/p&gt;
+ */
+public final class CandidateIndependentMacroReplayAdapter {
+    private static final int DEFAULT_MAX_DEPTH = 12;
+    private static final int DEFAULT_MAX_STATES = 2_000;
+
+    private final Map&lt;String, List&lt;String&gt;&gt; operationRuleIds;
+    private final Map&lt;String, Set&lt;String&gt;&gt; operationsByRuleId;
+    private final TransformationEngine engine;
+<span class="fc" id="L39">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L41">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+    private final int maxDepth;
+    private final int maxStates;
+
+    public CandidateIndependentMacroReplayAdapter(
+        Map&lt;String, List&lt;String&gt;&gt; operationRuleIds
+    ) {
+<span class="fc" id="L48">        this(operationRuleIds, DEFAULT_MAX_DEPTH, DEFAULT_MAX_STATES);</span>
+<span class="fc" id="L49">    }</span>
+
+    CandidateIndependentMacroReplayAdapter(
+        Map&lt;String, List&lt;String&gt;&gt; operationRuleIds,
+        int maxDepth,
+        int maxStates
+<span class="fc" id="L55">    ) {</span>
+<span class="fc" id="L56">        Objects.requireNonNull(operationRuleIds, &quot;operationRuleIds&quot;);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (operationRuleIds.isEmpty()) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(</span>
+                &quot;macro primitive profile must not be empty&quot;);
+        }
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if (maxDepth &lt; 1 || maxStates &lt; 1) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(</span>
+                &quot;replay bounds must be positive&quot;);
+        }
+<span class="fc" id="L65">        this.maxDepth = maxDepth;</span>
+<span class="fc" id="L66">        this.maxStates = maxStates;</span>
+
+<span class="fc" id="L68">        LinkedHashMap&lt;String, List&lt;String&gt;&gt; normalized = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L69">        LinkedHashMap&lt;String, Set&lt;String&gt;&gt; reverse = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L70">        operationRuleIds.entrySet().stream()</span>
+<span class="fc" id="L71">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L72">            .forEach(entry -&gt; {</span>
+<span class="fc" id="L73">                String operationId = requireText(</span>
+<span class="fc" id="L74">                    entry.getKey(), &quot;operationId&quot;);</span>
+<span class="fc" id="L75">                List&lt;String&gt; rules = immutableStrings(</span>
+<span class="fc" id="L76">                    entry.getValue(), &quot;implementationRuleIds&quot;).stream()</span>
+<span class="fc" id="L77">                    .distinct().sorted().toList();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">                if (rules.isEmpty()) {</span>
+<span class="nc" id="L79">                    throw new IllegalArgumentException(</span>
+                        &quot;operation has no implementation rules: &quot;
+                            + operationId);
+                }
+<span class="fc" id="L83">                normalized.put(operationId, rules);</span>
+<span class="fc" id="L84">                rules.forEach(rule -&gt; reverse.computeIfAbsent(</span>
+<span class="fc" id="L85">                    rule, ignored -&gt; new LinkedHashSet&lt;&gt;()).add(operationId));</span>
+<span class="fc" id="L86">            });</span>
+<span class="fc" id="L87">        this.operationRuleIds = Map.copyOf(normalized);</span>
+<span class="fc" id="L88">        LinkedHashMap&lt;String, Set&lt;String&gt;&gt; immutableReverse =</span>
+            new LinkedHashMap&lt;&gt;();
+<span class="fc" id="L90">        reverse.forEach((rule, operations) -&gt;</span>
+<span class="fc" id="L91">            immutableReverse.put(rule, Set.copyOf(operations)));</span>
+<span class="fc" id="L92">        this.operationsByRuleId = Map.copyOf(immutableReverse);</span>
+
+<span class="fc" id="L94">        Set&lt;String&gt; declaredRules = reverse.keySet();</span>
+<span class="fc" id="L95">        List&lt;RewriteRule&gt; rules = AstRewriteTransformationEngine.defaultRules()</span>
+<span class="fc" id="L96">            .stream()</span>
+<span class="fc" id="L97">            .filter(rule -&gt; declaredRules.contains(rule.id()))</span>
+<span class="fc" id="L98">            .sorted(Comparator.comparing(RewriteRule::id))</span>
+<span class="fc" id="L99">            .toList();</span>
+<span class="fc" id="L100">        Set&lt;String&gt; resolvedRules = rules.stream().map(RewriteRule::id)</span>
+<span class="fc" id="L101">            .collect(java.util.stream.Collectors.toCollection(</span>
+                LinkedHashSet::new));
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!resolvedRules.equals(new LinkedHashSet&lt;&gt;(declaredRules))) {</span>
+<span class="fc" id="L104">            LinkedHashSet&lt;String&gt; missing = new LinkedHashSet&lt;&gt;(declaredRules);</span>
+<span class="fc" id="L105">            missing.removeAll(resolvedRules);</span>
+<span class="fc" id="L106">            throw new IllegalArgumentException(</span>
+                &quot;macro profile references unavailable rules: &quot; + missing);
+        }
+<span class="fc" id="L109">        this.engine = new AstRewriteTransformationEngine(rules, 16, 120);</span>
+<span class="fc" id="L110">    }</span>
+
+    public BatchResult replayAll(List&lt;ReplayTrace&gt; traces) {
+<span class="fc" id="L113">        Objects.requireNonNull(traces, &quot;traces&quot;);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (traces.isEmpty()) {</span>
+<span class="nc" id="L115">            throw new IllegalArgumentException(</span>
+                &quot;at least one replay trace is required&quot;);
+        }
+<span class="fc" id="L118">        List&lt;ReplayResult&gt; results = traces.stream()</span>
+<span class="fc" id="L119">            .map(this::replay)</span>
+<span class="fc" id="L120">            .toList();</span>
+<span class="fc" id="L121">        boolean complete = results.stream().allMatch(ReplayResult::reproduced);</span>
+<span class="fc" id="L122">        return new BatchResult(</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            complete ? BatchStatus.REPRODUCED : BatchStatus.INCOMPLETE,</span>
+            results,
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            complete</span>
+<span class="fc" id="L126">                ? &quot;every frozen TRAIN replay was reproduced&quot;</span>
+<span class="pc" id="L127">                : &quot;one or more frozen TRAIN replays were not reproduced&quot;);</span>
+    }
+
+    public ReplayResult replay(ReplayTrace trace) {
+<span class="fc" id="L131">        Objects.requireNonNull(trace, &quot;trace&quot;);</span>
+<span class="fc" id="L132">        List&lt;String&gt; unknownOperations = trace.primitiveSteps().stream()</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            .filter(operation -&gt; !operationRuleIds.containsKey(operation))</span>
+<span class="fc" id="L134">            .distinct().sorted().toList();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (!unknownOperations.isEmpty()) {</span>
+<span class="fc" id="L136">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L137">                &quot;replay trace &quot; + trace.traceId()</span>
+                    + &quot; references unknown macro operations: &quot;
+                    + unknownOperations);
+        }
+<span class="fc" id="L141">        ArrayDeque&lt;Node&gt; queue = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L142">        Set&lt;String&gt; visited = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L143">        queue.add(new Node(trace.source(), List.of(), List.of(), 0, -1));</span>
+<span class="fc" id="L144">        visited.add(key(trace.source(), -1));</span>
+<span class="fc" id="L145">        int explored = 0;</span>
+
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        while (!queue.isEmpty() &amp;&amp; explored &lt; maxStates) {</span>
+<span class="fc" id="L148">            Node node = queue.removeFirst();</span>
+<span class="fc" id="L149">            explored++;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (same(node.expression(), trace.target())</span>
+<span class="fc" id="L151">                    &amp;&amp; node.operationIndex()</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                        == trace.primitiveSteps().size() - 1) {</span>
+<span class="fc" id="L153">                List&lt;String&gt; expressions = expressions(</span>
+<span class="fc" id="L154">                    trace.source(), node.steps());</span>
+<span class="fc" id="L155">                SuccessfulTransformationPath path =</span>
+                    new SuccessfulTransformationPath(
+<span class="fc" id="L157">                        trace.traceId(),</span>
+<span class="fc" id="L158">                        trace.source(),</span>
+<span class="fc" id="L159">                        trace.target(),</span>
+                        expressions,
+<span class="fc" id="L161">                        node.steps().stream()</span>
+<span class="fc" id="L162">                            .map(Transformation::rule).toList(),</span>
+<span class="fc" id="L163">                        scorer.score(trace.source()),</span>
+<span class="fc" id="L164">                        scorer.score(trace.target()),</span>
+                        true,
+                        &quot;replayed with frozen macro primitive profile&quot;,
+<span class="fc" id="L167">                        Map.of(</span>
+                            &quot;primitiveOperations&quot;,
+<span class="fc" id="L169">                            String.join(&quot;,&quot;, trace.primitiveSteps())),</span>
+<span class="fc" id="L170">                        trace.assumptions());</span>
+<span class="fc" id="L171">                ReplayEvidence evidence = new ReplayEvidence(</span>
+<span class="fc" id="L172">                    trace.traceId(),</span>
+                    true,
+                    explored,
+<span class="fc" id="L175">                    node.steps().stream()</span>
+<span class="fc" id="L176">                        .map(Transformation::rule).toList(),</span>
+<span class="fc" id="L177">                    node.assignedOperations(),</span>
+<span class="fc" id="L178">                    compressed(node.assignedOperations()),</span>
+                    expressions,
+                    &quot;target reached under the declared abstract operation order&quot;);
+<span class="fc" id="L181">                return new ReplayResult(</span>
+<span class="fc" id="L182">                    trace.traceId(), true, Optional.of(path), evidence);</span>
+            }
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            if (node.depth() &gt;= maxDepth) {</span>
+<span class="nc" id="L185">                continue;</span>
+            }
+<span class="fc" id="L187">            List&lt;Transformation&gt; transformations = engine</span>
+<span class="fc" id="L188">                .transform(node.expression()).stream()</span>
+<span class="fc" id="L189">                .sorted(Comparator</span>
+<span class="fc" id="L190">                    .comparing(Transformation::rule)</span>
+<span class="fc" id="L191">                    .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L192">                    .thenComparing(Transformation::applicationKey))</span>
+<span class="fc" id="L193">                .toList();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            for (Transformation transformation : transformations) {</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                if (!assumptionsCovered(</span>
+<span class="fc" id="L196">                        transformation.assumptions(), trace.assumptions())) {</span>
+<span class="nc" id="L197">                    continue;</span>
+                }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                for (String operation : operationsByRuleId.getOrDefault(</span>
+<span class="fc" id="L200">                        transformation.rule(), Set.of()).stream()</span>
+<span class="fc" id="L201">                        .sorted().toList()) {</span>
+<span class="fc" id="L202">                    int nextIndex = compatibleOperationIndex(</span>
+<span class="fc" id="L203">                        trace.primitiveSteps(),</span>
+<span class="fc" id="L204">                        node.operationIndex(),</span>
+                        operation);
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                    if (nextIndex &lt; 0) {</span>
+<span class="fc" id="L207">                        continue;</span>
+                    }
+<span class="fc" id="L209">                    String key = key(</span>
+<span class="fc" id="L210">                        transformation.transformedExpression(), nextIndex);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                    if (!visited.add(key)) {</span>
+<span class="fc" id="L212">                        continue;</span>
+                    }
+<span class="fc" id="L214">                    queue.addLast(new Node(</span>
+<span class="fc" id="L215">                        transformation.transformedExpression(),</span>
+<span class="fc" id="L216">                        append(node.steps(), transformation),</span>
+<span class="fc" id="L217">                        append(node.assignedOperations(), operation),</span>
+<span class="fc" id="L218">                        node.depth() + 1,</span>
+                        nextIndex));
+<span class="fc" id="L220">                }</span>
+<span class="fc" id="L221">            }</span>
+<span class="fc" id="L222">        }</span>
+
+<span class="fc" id="L224">        ReplayEvidence evidence = new ReplayEvidence(</span>
+<span class="fc" id="L225">            trace.traceId(),</span>
+            false,
+            explored,
+<span class="fc" id="L228">            List.of(),</span>
+<span class="fc" id="L229">            List.of(),</span>
+<span class="fc" id="L230">            List.of(),</span>
+<span class="fc" id="L231">            List.of(trace.source()),</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            queue.isEmpty()</span>
+<span class="fc" id="L233">                ? &quot;no compatible production replay reaches the target&quot;</span>
+<span class="pc" id="L234">                : &quot;replay state budget exhausted&quot;);</span>
+<span class="fc" id="L235">        return new ReplayResult(</span>
+<span class="fc" id="L236">            trace.traceId(), false, Optional.empty(), evidence);</span>
+    }
+
+    public Map&lt;String, List&lt;String&gt;&gt; operationRuleIds() {
+<span class="fc" id="L240">        return operationRuleIds;</span>
+    }
+
+    private int compatibleOperationIndex(
+        List&lt;String&gt; expected,
+        int currentIndex,
+        String operation
+    ) {
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (currentIndex &lt; 0) {</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">            return expected.getFirst().equals(operation) ? 0 : -1;</span>
+        }
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (expected.get(currentIndex).equals(operation)) {</span>
+<span class="fc" id="L252">            return currentIndex;</span>
+        }
+<span class="fc" id="L254">        int next = currentIndex + 1;</span>
+<span class="fc bfc" id="L255" title="All 4 branches covered.">        return next &lt; expected.size() &amp;&amp; expected.get(next).equals(operation)</span>
+<span class="fc" id="L256">            ? next : -1;</span>
+    }
+
+    private boolean assumptionsCovered(
+        List&lt;String&gt; required,
+        List&lt;String&gt; available
+    ) {
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">        if (required == null || required.isEmpty()) {</span>
+<span class="fc" id="L264">            return true;</span>
+        }
+<span class="nc bnc" id="L266" title="All 4 branches missed.">        if (available == null || available.isEmpty()) {</span>
+<span class="nc" id="L267">            return false;</span>
+        }
+<span class="nc" id="L269">        Set&lt;String&gt; normalizedAvailable = new LinkedHashSet&lt;&gt;(</span>
+<span class="nc" id="L270">            AssumptionSignature.ofExpressions(available)</span>
+<span class="nc" id="L271">                .normalizedAssumptions());</span>
+<span class="nc" id="L272">        return normalizedAvailable.containsAll(</span>
+<span class="nc" id="L273">            AssumptionSignature.ofExpressions(required)</span>
+<span class="nc" id="L274">                .normalizedAssumptions());</span>
+    }
+
+    private boolean same(String left, String right) {
+<span class="fc" id="L278">        return canonicalizer.canonicalize(left)</span>
+<span class="fc" id="L279">            .equals(canonicalizer.canonicalize(right));</span>
+    }
+
+    private String key(String expression, int operationIndex) {
+<span class="fc" id="L283">        return canonicalizer.stableHash(expression) + ':' + operationIndex;</span>
+    }
+
+    private List&lt;String&gt; expressions(
+        String source,
+        List&lt;Transformation&gt; steps
+    ) {
+<span class="fc" id="L290">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L291">        result.add(source);</span>
+<span class="fc" id="L292">        steps.forEach(step -&gt; result.add(step.transformedExpression()));</span>
+<span class="fc" id="L293">        return List.copyOf(result);</span>
+    }
+
+    private List&lt;String&gt; compressed(List&lt;String&gt; operations) {
+<span class="fc" id="L297">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        for (String operation : operations) {</span>
+<span class="fc bfc" id="L299" title="All 4 branches covered.">            if (result.isEmpty() || !result.getLast().equals(operation)) {</span>
+<span class="fc" id="L300">                result.add(operation);</span>
+            }
+<span class="fc" id="L302">        }</span>
+<span class="fc" id="L303">        return List.copyOf(result);</span>
+    }
+
+    private static &lt;T&gt; List&lt;T&gt; append(List&lt;T&gt; values, T value) {
+<span class="fc" id="L307">        List&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L308">        result.add(value);</span>
+<span class="fc" id="L309">        return List.copyOf(result);</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L313" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L314">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L316">        return value;</span>
+    }
+
+    private static List&lt;String&gt; immutableStrings(
+        List&lt;String&gt; values,
+        String name
+    ) {
+<span class="fc" id="L323">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (values.stream().anyMatch(</span>
+<span class="pc bpc" id="L325" title="2 of 4 branches missed.">                value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L326">            throw new IllegalArgumentException(</span>
+                name + &quot; must not contain blank values&quot;);
+        }
+<span class="fc" id="L329">        return List.copyOf(values);</span>
+    }
+
+<span class="fc" id="L332">    public enum BatchStatus {</span>
+<span class="fc" id="L333">        REPRODUCED,</span>
+<span class="fc" id="L334">        INCOMPLETE</span>
+    }
+
+    public record ReplayTrace(
+        String traceId,
+        String source,
+        String target,
+        List&lt;String&gt; primitiveSteps,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L344">        public ReplayTrace {</span>
+<span class="fc" id="L345">            traceId = requireText(traceId, &quot;traceId&quot;);</span>
+<span class="fc" id="L346">            source = requireText(source, &quot;source&quot;);</span>
+<span class="fc" id="L347">            target = requireText(target, &quot;target&quot;);</span>
+<span class="fc" id="L348">            primitiveSteps = immutableStrings(</span>
+                primitiveSteps, &quot;primitiveSteps&quot;);
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">            assumptions = assumptions == null</span>
+<span class="pc" id="L351">                ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            if (primitiveSteps.isEmpty()) {</span>
+<span class="nc" id="L353">                throw new IllegalArgumentException(</span>
+                    &quot;replay trace has no primitive steps&quot;);
+            }
+<span class="fc" id="L356">        }</span>
+    }
+
+    public record ReplayEvidence(
+        String traceId,
+        boolean reproduced,
+        int exploredStates,
+        List&lt;String&gt; actualRuleIds,
+        List&lt;String&gt; assignedOperationIds,
+        List&lt;String&gt; compressedOperationIds,
+        List&lt;String&gt; expressionPath,
+        String detail
+    ) {
+<span class="fc" id="L369">        public ReplayEvidence {</span>
+<span class="fc" id="L370">            traceId = requireText(traceId, &quot;traceId&quot;);</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">            if (exploredStates &lt; 0) {</span>
+<span class="nc" id="L372">                throw new IllegalArgumentException(</span>
+                    &quot;exploredStates must not be negative&quot;);
+            }
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">            actualRuleIds = actualRuleIds == null</span>
+<span class="pc" id="L376">                ? List.of() : List.copyOf(actualRuleIds);</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">            assignedOperationIds = assignedOperationIds == null</span>
+<span class="pc" id="L378">                ? List.of() : List.copyOf(assignedOperationIds);</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">            compressedOperationIds = compressedOperationIds == null</span>
+<span class="pc" id="L380">                ? List.of() : List.copyOf(compressedOperationIds);</span>
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">            expressionPath = expressionPath == null</span>
+<span class="pc" id="L382">                ? List.of() : List.copyOf(expressionPath);</span>
+<span class="fc" id="L383">            detail = requireText(detail, &quot;detail&quot;);</span>
+<span class="fc" id="L384">        }</span>
+    }
+
+    public record ReplayResult(
+        String traceId,
+        boolean reproduced,
+        Optional&lt;SuccessfulTransformationPath&gt; path,
+        ReplayEvidence evidence
+    ) {
+<span class="fc" id="L393">        public ReplayResult {</span>
+<span class="fc" id="L394">            traceId = requireText(traceId, &quot;traceId&quot;);</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">            path = path == null ? Optional.empty() : path;</span>
+<span class="fc" id="L396">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            if (reproduced != path.isPresent()</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">                    || reproduced != evidence.reproduced()) {</span>
+<span class="nc" id="L399">                throw new IllegalArgumentException(</span>
+                    &quot;replay result and evidence status disagree&quot;);
+            }
+<span class="fc" id="L402">        }</span>
+    }
+
+    public record BatchResult(
+        BatchStatus status,
+        List&lt;ReplayResult&gt; results,
+        String detail
+    ) {
+<span class="fc" id="L410">        public BatchResult {</span>
+<span class="fc" id="L411">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">            results = results == null ? List.of() : List.copyOf(results);</span>
+<span class="fc" id="L413">            detail = requireText(detail, &quot;detail&quot;);</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">            if (results.isEmpty()) {</span>
+<span class="nc" id="L415">                throw new IllegalArgumentException(</span>
+                    &quot;batch result must contain replay rows&quot;);
+            }
+<span class="fc" id="L418">        }</span>
+    }
+
+<span class="fc" id="L421">    private record Node(</span>
+        String expression,
+        List&lt;Transformation&gt; steps,
+        List&lt;String&gt; assignedOperations,
+        int depth,
+        int operationIndex
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

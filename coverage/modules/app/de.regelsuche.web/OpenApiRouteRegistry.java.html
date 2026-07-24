@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenApiRouteRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.web</a> &gt; <span class="el_source">OpenApiRouteRegistry.java</span></div><h1>OpenApiRouteRegistry.java</h1><pre class="source lang-java linenums">package de.regelsuche.web;
+
+import de.regelsuche.json.JsonReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+
+/**
+ * Executable route contract derived from the canonical packaged OpenAPI document.
+ *
+ * &lt;p&gt;The embedded JDK {@code HttpServer} registers broad prefix contexts. This
+ * registry adds the concrete path-template and HTTP-method layer that
+ * {@code HttpContext} does not provide. As a result, the same OpenAPI document
+ * that users and clients consume also defines which requests reach the
+ * workbench handlers.&lt;/p&gt;
+ */
+final class OpenApiRouteRegistry {
+    private static final String SPECIFICATION_RESOURCE = &quot;/web/openapi/openapi.json&quot;;
+<span class="fc" id="L27">    private static final Set&lt;String&gt; HTTP_METHODS =</span>
+<span class="fc" id="L28">        Set.of(&quot;get&quot;, &quot;post&quot;, &quot;put&quot;, &quot;patch&quot;, &quot;delete&quot;, &quot;options&quot;, &quot;head&quot;);</span>
+
+    private final List&lt;Route&gt; routes;
+    private final Set&lt;String&gt; contexts;
+
+<span class="fc" id="L33">    private OpenApiRouteRegistry(List&lt;Route&gt; routes) {</span>
+<span class="fc" id="L34">        this.routes = List.copyOf(routes);</span>
+<span class="fc" id="L35">        LinkedHashSet&lt;String&gt; discoveredContexts = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L36">        routes.forEach(route -&gt; discoveredContexts.add(route.context()));</span>
+<span class="fc" id="L37">        this.contexts = Set.copyOf(discoveredContexts);</span>
+<span class="fc" id="L38">    }</span>
+
+    static OpenApiRouteRegistry load() {
+<span class="fc" id="L41">        return Holder.INSTANCE;</span>
+    }
+
+    Set&lt;String&gt; contexts() {
+<span class="fc" id="L45">        return contexts;</span>
+    }
+
+    List&lt;Route&gt; routes() {
+<span class="fc" id="L49">        return routes;</span>
+    }
+
+    Match match(String context, String requestPath, String requestMethod) {
+<span class="fc" id="L53">        TreeSet&lt;String&gt; allowedMethods = new TreeSet&lt;&gt;();</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (Route route : routes) {</span>
+<span class="fc bfc" id="L55" title="All 4 branches covered.">            if (route.context().equals(context) &amp;&amp; route.matches(requestPath)) {</span>
+<span class="fc" id="L56">                allowedMethods.add(route.method());</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">                if (route.method().equalsIgnoreCase(requestMethod)) {</span>
+<span class="fc" id="L58">                    return new Match(MatchStatus.ALLOWED, Set.copyOf(allowedMethods), route.operationId());</span>
+                }
+            }
+<span class="fc" id="L61">        }</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (allowedMethods.isEmpty()) {</span>
+<span class="fc" id="L63">            return new Match(MatchStatus.NOT_FOUND, Set.of(), &quot;&quot;);</span>
+        }
+<span class="fc" id="L65">        return new Match(MatchStatus.METHOD_NOT_ALLOWED, Set.copyOf(allowedMethods), &quot;&quot;);</span>
+    }
+
+    private static OpenApiRouteRegistry readPackagedSpecification() {
+<span class="fc" id="L69">        try (InputStream stream = OpenApiRouteRegistry.class.getResourceAsStream(SPECIFICATION_RESOURCE)) {</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            if (stream == null) {</span>
+<span class="nc" id="L71">                throw new IllegalStateException(&quot;Missing packaged OpenAPI specification: &quot; + SPECIFICATION_RESOURCE);</span>
+            }
+<span class="fc" id="L73">            String source = new String(stream.readAllBytes(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L74">            return fromDocument(new JsonReader(source).readObject());</span>
+<span class="nc" id="L75">        } catch (IOException ex) {</span>
+<span class="nc" id="L76">            throw new IllegalStateException(&quot;Unable to read packaged OpenAPI specification&quot;, ex);</span>
+        }
+    }
+
+    private static OpenApiRouteRegistry fromDocument(Map&lt;String, Object&gt; document) {
+<span class="fc" id="L81">        Map&lt;String, Object&gt; paths = object(document.get(&quot;paths&quot;));</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (paths.isEmpty()) {</span>
+<span class="nc" id="L83">            throw new IllegalStateException(&quot;OpenAPI specification does not contain paths&quot;);</span>
+        }
+
+<span class="fc" id="L86">        List&lt;Route&gt; routes = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L87">        Set&lt;String&gt; operationIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L88">        Set&lt;String&gt; methodPaths = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; pathEntry : paths.entrySet()) {</span>
+<span class="fc" id="L90">            String pathTemplate = pathEntry.getKey();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; methodEntry : object(pathEntry.getValue()).entrySet()) {</span>
+<span class="fc" id="L92">                String method = methodEntry.getKey().toLowerCase(Locale.ROOT);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                if (!HTTP_METHODS.contains(method)) {</span>
+<span class="nc" id="L94">                    continue;</span>
+                }
+<span class="fc" id="L96">                Map&lt;String, Object&gt; operation = object(methodEntry.getValue());</span>
+<span class="fc" id="L97">                String operationId = requiredString(operation, &quot;operationId&quot;, method + &quot; &quot; + pathTemplate);</span>
+<span class="fc" id="L98">                String context = requiredString(operation, &quot;x-regelsuche-context&quot;, operationId);</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">                if (!pathTemplate.equals(context) &amp;&amp; !pathTemplate.startsWith(context + &quot;/&quot;)) {</span>
+<span class="nc" id="L100">                    throw new IllegalStateException(&quot;OpenAPI operation &quot; + operationId</span>
+                        + &quot; is outside declared context &quot; + context + &quot;: &quot; + pathTemplate);
+                }
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                if (!operationIds.add(operationId)) {</span>
+<span class="nc" id="L104">                    throw new IllegalStateException(&quot;Duplicate OpenAPI operationId: &quot; + operationId);</span>
+                }
+<span class="fc" id="L106">                String methodPath = method.toUpperCase(Locale.ROOT) + &quot; &quot; + pathTemplate;</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                if (!methodPaths.add(methodPath)) {</span>
+<span class="nc" id="L108">                    throw new IllegalStateException(&quot;Duplicate OpenAPI operation: &quot; + methodPath);</span>
+                }
+<span class="fc" id="L110">                routes.add(new Route(</span>
+<span class="fc" id="L111">                    method.toUpperCase(Locale.ROOT),</span>
+                    pathTemplate,
+                    operationId,
+                    context,
+<span class="fc" id="L115">                    compileTemplate(pathTemplate)</span>
+                ));
+<span class="fc" id="L117">            }</span>
+<span class="fc" id="L118">        }</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (routes.isEmpty()) {</span>
+<span class="nc" id="L120">            throw new IllegalStateException(&quot;OpenAPI specification does not define HTTP operations&quot;);</span>
+        }
+<span class="fc" id="L122">        return new OpenApiRouteRegistry(routes);</span>
+    }
+
+    private static Pattern compileTemplate(String template) {
+<span class="fc" id="L126">        StringBuilder regex = new StringBuilder(&quot;^&quot;);</span>
+<span class="fc" id="L127">        int literalStart = 0;</span>
+<span class="fc" id="L128">        int index = 0;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        while (index &lt; template.length()) {</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (template.charAt(index) != '{') {</span>
+<span class="fc" id="L131">                index++;</span>
+<span class="fc" id="L132">                continue;</span>
+            }
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            if (literalStart &lt; index) {</span>
+<span class="fc" id="L135">                regex.append(Pattern.quote(template.substring(literalStart, index)));</span>
+            }
+<span class="fc" id="L137">            int end = template.indexOf('}', index + 1);</span>
+<span class="pc bpc" id="L138" title="2 of 4 branches missed.">            if (end &lt; 0 || end == index + 1) {</span>
+<span class="nc" id="L139">                throw new IllegalStateException(&quot;Invalid OpenAPI path template: &quot; + template);</span>
+            }
+<span class="fc" id="L141">            regex.append(&quot;[^/]+&quot;);</span>
+<span class="fc" id="L142">            index = end + 1;</span>
+<span class="fc" id="L143">            literalStart = index;</span>
+<span class="fc" id="L144">        }</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (literalStart &lt; template.length()) {</span>
+<span class="fc" id="L146">            regex.append(Pattern.quote(template.substring(literalStart)));</span>
+        }
+<span class="fc" id="L148">        regex.append(&quot;/?$&quot;);</span>
+<span class="fc" id="L149">        return Pattern.compile(regex.toString());</span>
+    }
+
+    private static String requiredString(Map&lt;String, Object&gt; source, String key, String owner) {
+<span class="fc" id="L153">        String value = String.valueOf(source.getOrDefault(key, &quot;&quot;)).trim();</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (value.isEmpty()) {</span>
+<span class="nc" id="L155">            throw new IllegalStateException(&quot;Missing &quot; + key + &quot; for &quot; + owner);</span>
+        }
+<span class="fc" id="L157">        return value;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; object(Object value) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        return value instanceof Map&lt;?, ?&gt; map ? (Map&lt;String, Object&gt;) map : Map.of();</span>
+    }
+
+<span class="fc" id="L165">    enum MatchStatus {</span>
+<span class="fc" id="L166">        ALLOWED,</span>
+<span class="fc" id="L167">        METHOD_NOT_ALLOWED,</span>
+<span class="fc" id="L168">        NOT_FOUND</span>
+    }
+
+    record Match(MatchStatus status, Set&lt;String&gt; allowedMethods, String operationId) {
+<span class="fc" id="L172">        Match {</span>
+<span class="fc" id="L173">            allowedMethods = Set.copyOf(allowedMethods);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            operationId = operationId == null ? &quot;&quot; : operationId;</span>
+<span class="fc" id="L175">        }</span>
+    }
+
+    record Route(
+        String method,
+        String pathTemplate,
+        String operationId,
+        String context,
+        Pattern pathPattern
+    ) {
+<span class="fc" id="L185">        Route {</span>
+<span class="fc" id="L186">            method = method.toUpperCase(Locale.ROOT);</span>
+<span class="fc" id="L187">        }</span>
+
+        boolean matches(String requestPath) {
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">            return requestPath != null &amp;&amp; pathPattern.matcher(requestPath).matches();</span>
+        }
+    }
+
+    private static final class Holder {
+<span class="fc" id="L195">        private static final OpenApiRouteRegistry INSTANCE = readPackagedSpecification();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

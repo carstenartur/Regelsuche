@@ -1,0 +1,328 @@
+{
+  "schema": "regelsuche.semantic-graph-debug/v1",
+  "fileName": "binomial-graph.png",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-f983702c",
+  "requestParams": {
+    "mode": "semantic",
+    "showMacroSteps": "didactic",
+    "showLowSignal": false,
+    "showAlternatives": false,
+    "showVariants": false,
+    "pathId": "demo-f983702c"
+  },
+  "visibleNodeIds": [
+    "didactic-seed-1eyjz4b",
+    "didactic-1-185j5b4",
+    "didactic-2-syk3a8",
+    "didactic-3-1fop26w",
+    "didactic-4-mc4ifp",
+    "didactic-prepare-4-37goj0",
+    "didactic-goal-zu6u3z"
+  ],
+  "nodes": [
+    {
+      "id": "didactic-seed-1eyjz4b",
+      "canonicalHash": "didactic:didactic-seed-1eyjz4b",
+      "normalizedLabel": "(x+3)^2",
+      "label": "(x + 3) ^ 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "minDepth": 0,
+      "layout": {
+        "x": 0,
+        "y": 80
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 49.621301775147884
+      }
+    },
+    {
+      "id": "didactic-1-185j5b4",
+      "canonicalHash": "didactic:didactic-1-185j5b4",
+      "normalizedLabel": "(x+3)*(x+3)",
+      "label": "(x + 3) * (x + 3)",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 1,
+      "layout": {
+        "x": 0,
+        "y": 300
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 319.41420118343194
+      }
+    },
+    {
+      "id": "didactic-2-syk3a8",
+      "canonicalHash": "didactic:didactic-2-syk3a8",
+      "normalizedLabel": "(x+3)*x+(x+3)*3",
+      "label": "(x + 3) * x + (x + 3) * 3",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 2,
+      "layout": {
+        "x": 0,
+        "y": 520
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 589.207100591716
+      }
+    },
+    {
+      "id": "didactic-3-1fop26w",
+      "canonicalHash": "didactic:didactic-3-1fop26w",
+      "normalizedLabel": "(x+3)*x+x*3+3*3",
+      "label": "(x + 3) * x + x * 3 + 3 * 3",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 3,
+      "layout": {
+        "x": 0,
+        "y": 740
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 859
+      }
+    },
+    {
+      "id": "didactic-4-mc4ifp",
+      "canonicalHash": "didactic:didactic-4-mc4ifp",
+      "normalizedLabel": "x*x+3*x+x*3+3*3",
+      "label": "x * x + 3 * x + x * 3 + 3 * 3",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 4,
+      "layout": {
+        "x": 0,
+        "y": 960
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 1128.792899408284
+      }
+    },
+    {
+      "id": "didactic-prepare-4-37goj0",
+      "canonicalHash": "didactic:didactic-prepare-4-37goj0",
+      "normalizedLabel": "x^2+3*x+3*x+9",
+      "label": "x ^ 2 + 3 * x + 3 * x + 9",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 5,
+      "layout": {
+        "x": 0,
+        "y": 1180
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 1398.585798816568
+      }
+    },
+    {
+      "id": "didactic-goal-zu6u3z",
+      "canonicalHash": "didactic:didactic-goal-zu6u3z",
+      "normalizedLabel": "x^2+6*x+9",
+      "label": "x ^ 2 + 6 * x + 9",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "minDepth": 6,
+      "layout": {
+        "x": 0,
+        "y": 1400
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 1668.378698224852
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "didactic-seed-1eyjz4b->didactic-1-185j5b4:ast_power_two_to_product",
+      "from": "didactic-seed-1eyjz4b",
+      "to": "didactic-1-185j5b4",
+      "label": "ast_power_two_to_product",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 184.51775147928993
+      }
+    },
+    {
+      "id": "didactic-1-185j5b4->didactic-2-syk3a8:ast_distribute_left_add",
+      "from": "didactic-1-185j5b4",
+      "to": "didactic-2-syk3a8",
+      "label": "ast_distribute_left_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 454.31065088757396
+      }
+    },
+    {
+      "id": "didactic-2-syk3a8->didactic-3-1fop26w:ast_distribute_right_add",
+      "from": "didactic-2-syk3a8",
+      "to": "didactic-3-1fop26w",
+      "label": "ast_distribute_right_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 724.103550295858
+      }
+    },
+    {
+      "id": "didactic-3-1fop26w->didactic-4-mc4ifp:ast_distribute_right_add",
+      "from": "didactic-3-1fop26w",
+      "to": "didactic-4-mc4ifp",
+      "label": "ast_distribute_right_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 993.896449704142
+      }
+    },
+    {
+      "id": "didactic-4-mc4ifp->didactic-prepare-4-37goj0:polynomial_prepare_collect_like_terms",
+      "from": "didactic-4-mc4ifp",
+      "to": "didactic-prepare-4-37goj0",
+      "label": "polynomial_prepare_collect_like_terms",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 1263.689349112426
+      }
+    },
+    {
+      "id": "didactic-prepare-4-37goj0->didactic-goal-zu6u3z:polynomial_collect_like_terms",
+      "from": "didactic-prepare-4-37goj0",
+      "to": "didactic-goal-zu6u3z",
+      "label": "polynomial_collect_like_terms",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 1533.48224852071
+      }
+    }
+  ],
+  "nodeLabelRects": [
+    {
+      "id": "didactic-seed-1eyjz4b",
+      "x": 665.4375,
+      "y": 558.2462768554688,
+      "width": 69.125,
+      "height": 28.4375
+    },
+    {
+      "id": "didactic-1-185j5b4",
+      "x": 639.03125,
+      "y": 828.3907470703125,
+      "width": 121.9375,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-2-syk3a8",
+      "x": 615.21875,
+      "y": 1098.18359375,
+      "width": 169.5625,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-3-1fop26w",
+      "x": 611.5625,
+      "y": 1367.9765625,
+      "width": 176.875,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-4-mc4ifp",
+      "x": 607.40625,
+      "y": 1637.7694091796875,
+      "width": 185.1875,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-prepare-4-37goj0",
+      "x": 623.8125,
+      "y": 1907.5623779296875,
+      "width": 152.375,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-goal-zu6u3z",
+      "x": 647.625,
+      "y": 2177.355224609375,
+      "width": 104.75,
+      "height": 27.734375
+    }
+  ],
+  "edgeLabelRects": [
+    {
+      "id": "\\text{power two to product}",
+      "x": 576,
+      "y": 696.6583862304688,
+      "width": 152,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{distribute left add}",
+      "x": 588.5,
+      "y": 966.4512939453125,
+      "width": 127,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{distribute right add}",
+      "x": 583.5,
+      "y": 1236.244140625,
+      "width": 137,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{distribute right add}",
+      "x": 583.5,
+      "y": 1506.037109375,
+      "width": 137,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{multiply constants and product to power}",
+      "x": 562,
+      "y": 1775.8299560546875,
+      "width": 180,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{collect like terms}",
+      "x": 591,
+      "y": 2045.6229248046875,
+      "width": 122,
+      "height": 21.4063720703125
+    }
+  ],
+  "duplicateCanonicalHashCount": 0,
+  "duplicateNormalizedLabelCount": 0,
+  "nodeOverlapCount": 0,
+  "edgeLabelOverlapCount": 0,
+  "visibleMainPathMeaningfulNodeCount": 7,
+  "collapsedMainPathStepCount": 6,
+  "finalNormalizedLabel": "x^2+6*x+9",
+  "mainPathMeaningfulNodeCount": 7
+}

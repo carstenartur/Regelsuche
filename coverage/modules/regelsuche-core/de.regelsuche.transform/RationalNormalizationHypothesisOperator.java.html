@@ -38,122 +38,173 @@ import java.util.Map;
 <span class="fc" id="L38">            .toList();</span>
     }
 
-    private void addSameDenominatorCandidate(Expr root, Map&lt;String, Transformation&gt; candidates) {
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (!(root instanceof BinaryExpr binary)</span>
-<span class="pc bpc" id="L43" title="1 of 4 branches missed.">            || (binary.operator() != BinaryOperator.ADD &amp;&amp; binary.operator() != BinaryOperator.SUB)) {</span>
-<span class="fc" id="L44">            return;</span>
+    private void addSameDenominatorCandidate(
+        Expr root,
+        Map&lt;String, Transformation&gt; candidates
+    ) {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!(root instanceof BinaryExpr binary)</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">            || (binary.operator() != BinaryOperator.ADD</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">                &amp;&amp; binary.operator() != BinaryOperator.SUB)) {</span>
+<span class="fc" id="L48">            return;</span>
         }
-<span class="fc" id="L46">        DivisionParts left = division(binary.left());</span>
-<span class="fc" id="L47">        DivisionParts right = division(binary.right());</span>
-<span class="pc bpc" id="L48" title="2 of 6 branches missed.">        if (left == null || right == null || !same(left.denominator(), right.denominator())) {</span>
-<span class="fc" id="L49">            return;</span>
+<span class="fc" id="L50">        DivisionParts left = division(binary.left());</span>
+<span class="fc" id="L51">        DivisionParts right = division(binary.right());</span>
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        if (left == null || right == null</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">                || !same(left.denominator(), right.denominator())</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">                || isExplicitZero(left.denominator())) {</span>
+<span class="fc" id="L55">            return;</span>
         }
-<span class="fc" id="L51">        Expr numerator = new BinaryExpr(left.numerator(), binary.operator(), right.numerator());</span>
-<span class="fc" id="L52">        Expr combined = new BinaryExpr(numerator, BinaryOperator.DIV, left.denominator());</span>
-<span class="fc" id="L53">        addCandidate(root, combined, candidates);</span>
-<span class="fc" id="L54">    }</span>
+<span class="fc" id="L57">        Expr numerator = new BinaryExpr(</span>
+<span class="fc" id="L58">            left.numerator(), binary.operator(), right.numerator());</span>
+<span class="fc" id="L59">        Expr combined = new BinaryExpr(</span>
+<span class="fc" id="L60">            numerator, BinaryOperator.DIV, left.denominator());</span>
+<span class="fc" id="L61">        addCandidate(</span>
+            root,
+            combined,
+<span class="fc" id="L64">            nonZeroAssumptions(left.denominator()),</span>
+            candidates);
+<span class="fc" id="L66">    }</span>
 
-    private void addCancellationCandidate(Expr root, Map&lt;String, Transformation&gt; candidates) {
-<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (!(root instanceof BinaryExpr binary) || binary.operator() != BinaryOperator.DIV) {</span>
-<span class="fc" id="L58">            return;</span>
+    private void addCancellationCandidate(
+        Expr root,
+        Map&lt;String, Transformation&gt; candidates
+    ) {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!(root instanceof BinaryExpr binary)</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                || binary.operator() != BinaryOperator.DIV) {</span>
+<span class="fc" id="L74">            return;</span>
         }
-<span class="fc" id="L60">        List&lt;Expr&gt; numeratorFactors = flattenMultiplication(binary.left());</span>
-<span class="fc" id="L61">        List&lt;Expr&gt; denominatorFactors = flattenMultiplication(binary.right());</span>
-<span class="fc" id="L62">        Expr common = firstCommonNonNumericFactor(numeratorFactors, denominatorFactors);</span>
-<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (common == null) {</span>
-<span class="fc" id="L64">            return;</span>
+<span class="fc" id="L76">        List&lt;Expr&gt; numeratorFactors = flattenMultiplication(binary.left());</span>
+<span class="fc" id="L77">        List&lt;Expr&gt; denominatorFactors = flattenMultiplication(binary.right());</span>
+<span class="fc" id="L78">        Expr common = firstCommonNonNumericFactor(</span>
+            numeratorFactors, denominatorFactors);
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (common == null) {</span>
+<span class="fc" id="L81">            return;</span>
         }
-<span class="fc" id="L66">        Expr simplified = new BinaryExpr(</span>
-<span class="fc" id="L67">            buildProduct(removeFirstMatch(numeratorFactors, common)),</span>
+<span class="fc" id="L83">        Expr remainingNumerator = buildProduct(</span>
+<span class="fc" id="L84">            removeFirstMatch(numeratorFactors, common));</span>
+<span class="fc" id="L85">        Expr remainingDenominator = buildProduct(</span>
+<span class="fc" id="L86">            removeFirstMatch(denominatorFactors, common));</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (isExplicitZero(remainingDenominator)) {</span>
+<span class="fc" id="L88">            return;</span>
+        }
+<span class="fc" id="L90">        Expr simplified = new BinaryExpr(</span>
+            remainingNumerator,
             BinaryOperator.DIV,
-<span class="fc" id="L69">            buildProduct(removeFirstMatch(denominatorFactors, common))</span>
-        );
-<span class="fc" id="L71">        addCandidate(root, simplified, candidates);</span>
-<span class="fc" id="L72">    }</span>
+            remainingDenominator);
+<span class="fc" id="L94">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L95">        assumptions.addAll(nonZeroAssumptions(common));</span>
+<span class="fc" id="L96">        assumptions.addAll(nonZeroAssumptions(remainingDenominator));</span>
+<span class="fc" id="L97">        addCandidate(root, simplified, assumptions, candidates);</span>
+<span class="fc" id="L98">    }</span>
 
     private DivisionParts division(Expr expression) {
-<span class="pc bpc" id="L75" title="2 of 4 branches missed.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.DIV) {</span>
-<span class="fc" id="L76">            return new DivisionParts(binary.left(), binary.right());</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (expression instanceof BinaryExpr binary</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                &amp;&amp; binary.operator() == BinaryOperator.DIV) {</span>
+<span class="fc" id="L103">            return new DivisionParts(binary.left(), binary.right());</span>
         }
-<span class="nc" id="L78">        return null;</span>
+<span class="nc" id="L105">        return null;</span>
     }
 
     private Expr firstCommonNonNumericFactor(List&lt;Expr&gt; left, List&lt;Expr&gt; right) {
-<span class="fc" id="L82">        Map&lt;String, Expr&gt; rightByHash = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (Expr factor : right) {</span>
-<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (!(factor instanceof NumberExpr)) {</span>
-<span class="fc" id="L85">                rightByHash.putIfAbsent(hash(factor), factor);</span>
+<span class="fc" id="L109">        Map&lt;String, Expr&gt; rightByHash = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (Expr factor : right) {</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (!(factor instanceof NumberExpr)) {</span>
+<span class="fc" id="L112">                rightByHash.putIfAbsent(hash(factor), factor);</span>
             }
-<span class="fc" id="L87">        }</span>
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (Expr factor : left) {</span>
-<span class="fc bfc" id="L89" title="All 4 branches covered.">            if (!(factor instanceof NumberExpr) &amp;&amp; rightByHash.containsKey(hash(factor))) {</span>
-<span class="fc" id="L90">                return factor;</span>
+<span class="fc" id="L114">        }</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (Expr factor : left) {</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (!(factor instanceof NumberExpr)</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                    &amp;&amp; rightByHash.containsKey(hash(factor))) {</span>
+<span class="fc" id="L118">                return factor;</span>
             }
-<span class="fc" id="L92">        }</span>
-<span class="fc" id="L93">        return null;</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        return null;</span>
     }
 
-    private void addCandidate(Expr original, Expr candidate, Map&lt;String, Transformation&gt; candidates) {
-<span class="fc" id="L97">        String formattedInput = ExpressionFormatter.format(original);</span>
-<span class="fc" id="L98">        String formatted = ExpressionFormatter.format(candidate);</span>
-<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (formatted.equals(formattedInput)) {</span>
-<span class="nc" id="L100">            return;</span>
+    private void addCandidate(
+        Expr original,
+        Expr candidate,
+        List&lt;String&gt; assumptions,
+        Map&lt;String, Transformation&gt; candidates
+    ) {
+<span class="fc" id="L130">        String formattedInput = ExpressionFormatter.format(original);</span>
+<span class="fc" id="L131">        String formatted = ExpressionFormatter.format(candidate);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (formatted.equals(formattedInput)) {</span>
+<span class="nc" id="L133">            return;</span>
         }
-<span class="fc" id="L102">        candidates.putIfAbsent(canonicalizer.stableHash(formatted), new Transformation(</span>
-            RULE_ID,
-            formatted,
-            RewriteKind.NORMALIZE,
-            false,
-            -1,
-            true,
-<span class="fc" id="L109">            RULE_ID + &quot;:&quot; + canonicalizer.stableHash(formattedInput) + &quot;-&gt;&quot; + canonicalizer.stableHash(formatted)</span>
-        ));
-<span class="fc" id="L111">    }</span>
+<span class="fc" id="L135">        candidates.putIfAbsent(</span>
+<span class="fc" id="L136">            canonicalizer.stableHash(formatted),</span>
+            new Transformation(
+                RULE_ID,
+                formatted,
+                RewriteKind.NORMALIZE,
+                false,
+                -1,
+                true,
+<span class="fc" id="L144">                RULE_ID + &quot;:&quot; + canonicalizer.stableHash(formattedInput)</span>
+<span class="fc" id="L145">                    + &quot;-&gt;&quot; + canonicalizer.stableHash(formatted),</span>
+                assumptions));
+<span class="fc" id="L147">    }</span>
+
+    private List&lt;String&gt; nonZeroAssumptions(Expr expression) {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            return number.value() == 0</span>
+<span class="nc" id="L152">                ? List.of(&quot;0 != 0&quot;)</span>
+<span class="fc" id="L153">                : List.of();</span>
+        }
+<span class="fc" id="L155">        return List.of(ExpressionFormatter.format(expression) + &quot; != 0&quot;);</span>
+    }
+
+    private boolean isExplicitZero(Expr expression) {
+<span class="fc bfc" id="L159" title="All 4 branches covered.">        return expression instanceof NumberExpr number &amp;&amp; number.value() == 0;</span>
+    }
 
     private boolean same(Expr left, Expr right) {
-<span class="fc" id="L114">        return hash(left).equals(hash(right));</span>
+<span class="fc" id="L163">        return hash(left).equals(hash(right));</span>
     }
 
     private List&lt;Expr&gt; flattenMultiplication(Expr expression) {
-<span class="fc bfc" id="L118" title="All 4 branches covered.">        if (expression instanceof BinaryExpr binary &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
-<span class="fc" id="L119">            List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L120">            result.addAll(flattenMultiplication(binary.left()));</span>
-<span class="fc" id="L121">            result.addAll(flattenMultiplication(binary.right()));</span>
-<span class="fc" id="L122">            return result;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                &amp;&amp; binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L169">            List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L170">            result.addAll(flattenMultiplication(binary.left()));</span>
+<span class="fc" id="L171">            result.addAll(flattenMultiplication(binary.right()));</span>
+<span class="fc" id="L172">            return result;</span>
         }
-<span class="fc" id="L124">        return List.of(expression);</span>
+<span class="fc" id="L174">        return List.of(expression);</span>
     }
 
     private List&lt;Expr&gt; removeFirstMatch(List&lt;Expr&gt; factors, Expr target) {
-<span class="fc" id="L128">        List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L129">        boolean removed = false;</span>
-<span class="fc" id="L130">        String targetHash = hash(target);</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (Expr factor : factors) {</span>
-<span class="pc bpc" id="L132" title="1 of 4 branches missed.">            if (!removed &amp;&amp; hash(factor).equals(targetHash)) {</span>
-<span class="fc" id="L133">                removed = true;</span>
-<span class="fc" id="L134">                continue;</span>
+<span class="fc" id="L178">        List&lt;Expr&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L179">        boolean removed = false;</span>
+<span class="fc" id="L180">        String targetHash = hash(target);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        for (Expr factor : factors) {</span>
+<span class="pc bpc" id="L182" title="1 of 4 branches missed.">            if (!removed &amp;&amp; hash(factor).equals(targetHash)) {</span>
+<span class="fc" id="L183">                removed = true;</span>
+<span class="fc" id="L184">                continue;</span>
             }
-<span class="fc" id="L136">            result.add(factor);</span>
-<span class="fc" id="L137">        }</span>
-<span class="fc" id="L138">        return result;</span>
+<span class="fc" id="L186">            result.add(factor);</span>
+<span class="fc" id="L187">        }</span>
+<span class="fc" id="L188">        return result;</span>
     }
 
     private Expr buildProduct(List&lt;Expr&gt; factors) {
-<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (factors.isEmpty()) {</span>
-<span class="nc" id="L143">            return new NumberExpr(1);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (factors.isEmpty()) {</span>
+<span class="fc" id="L193">            return new NumberExpr(1);</span>
         }
-<span class="fc" id="L145">        Expr result = factors.getFirst();</span>
-<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        for (int index = 1; index &lt; factors.size(); index++) {</span>
-<span class="nc" id="L147">            result = new BinaryExpr(result, BinaryOperator.MUL, factors.get(index));</span>
+<span class="fc" id="L195">        Expr result = factors.getFirst();</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        for (int index = 1; index &lt; factors.size(); index++) {</span>
+<span class="nc" id="L197">            result = new BinaryExpr(</span>
+<span class="nc" id="L198">                result, BinaryOperator.MUL, factors.get(index));</span>
         }
-<span class="fc" id="L149">        return result;</span>
+<span class="fc" id="L200">        return result;</span>
     }
 
     private String hash(Expr expression) {
-<span class="fc" id="L153">        return canonicalizer.stableHash(ExpressionFormatter.format(expression));</span>
+<span class="fc" id="L204">        return canonicalizer.stableHash(ExpressionFormatter.format(expression));</span>
     }
 
-<span class="fc" id="L156">    private record DivisionParts(Expr numerator, Expr denominator) {</span>
+<span class="fc" id="L207">    private record DivisionParts(Expr numerator, Expr denominator) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

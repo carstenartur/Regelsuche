@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionStudyPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionStudyPlan.java</span></div><h1>EvolutionStudyPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionGenome.Objective;
+import de.regelsuche.json.JsonWriter;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/**
+ * Preregistered configuration for one bounded evolutionary study.
+ *
+ * &lt;p&gt;The plan is intentionally pre-execution only. It contains no VALIDATION or
+ * FINAL TEST case payloads, outcomes, selected configurations or promotion
+ * decisions. Those stages require separate versioned artifacts.&lt;/p&gt;
+ */
+public record EvolutionStudyPlan(
+    String schema,
+    String studyId,
+    Objective objective,
+    String splitManifestHash,
+    List&lt;String&gt; seedGenomeHashes,
+    List&lt;EvolutionMutationKind&gt; mutationOperators,
+    PopulationPolicy populationPolicy,
+    List&lt;FitnessWeight&gt; fitnessWeights,
+    StudyBudget budget,
+    StudyStatus status,
+    FinalTestPolicy finalTestPolicy,
+    GateStatus proofStatus,
+    GateStatus externalNoveltyStatus,
+    GateStatus promotionStatus,
+    GateStatus publicEvidenceStatus,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-study-plan/v1&quot;;
+<span class="fc" id="L37">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+<span class="fc" id="L38">    private static final Pattern SHA256 = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+
+<span class="fc" id="L40">    public EvolutionStudyPlan {</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(&quot;unsupported evolution study-plan schema&quot;);</span>
+        }
+<span class="fc" id="L44">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L45">        Objects.requireNonNull(objective, &quot;objective&quot;);</span>
+<span class="fc" id="L46">        requireHash(splitManifestHash, &quot;splitManifestHash&quot;);</span>
+<span class="fc" id="L47">        seedGenomeHashes = normalizeHashes(seedGenomeHashes, &quot;seedGenomeHashes&quot;);</span>
+<span class="fc" id="L48">        mutationOperators = normalizeMutations(mutationOperators);</span>
+<span class="fc" id="L49">        Objects.requireNonNull(populationPolicy, &quot;populationPolicy&quot;);</span>
+<span class="fc" id="L50">        fitnessWeights = normalizeFitnessWeights(fitnessWeights);</span>
+<span class="fc" id="L51">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (status != StudyStatus.NOT_STARTED) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;v1 study plan must remain NOT_STARTED&quot;);</span>
+        }
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (finalTestPolicy</span>
+                != FinalTestPolicy.ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION) {
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;unsupported final-test policy&quot;);</span>
+        }
+<span class="fc" id="L59">        requireNotEvaluated(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L60">        requireNotEvaluated(externalNoveltyStatus, &quot;externalNoveltyStatus&quot;);</span>
+<span class="fc" id="L61">        requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L62">        requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L63">        requireHash(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L64">        String expected = EvolutionGenome.hash(render(</span>
+            studyId,
+            objective,
+            splitManifestHash,
+            seedGenomeHashes,
+            mutationOperators,
+            populationPolicy,
+            fitnessWeights,
+            budget,
+            status,
+            finalTestPolicy,
+            proofStatus,
+            externalNoveltyStatus,
+            promotionStatus,
+            publicEvidenceStatus,
+            null));
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L81">            throw new IllegalArgumentException(&quot;contentHash does not match study plan&quot;);</span>
+        }
+<span class="fc" id="L83">    }</span>
+
+    public static EvolutionStudyPlan create(
+        String studyId,
+        Objective objective,
+        EvolutionSplitManifest splitManifest,
+        List&lt;EvolutionGenome&gt; seedGenomes,
+        List&lt;EvolutionMutationKind&gt; mutationOperators,
+        PopulationPolicy populationPolicy,
+        List&lt;FitnessWeight&gt; fitnessWeights,
+        StudyBudget budget
+    ) {
+<span class="fc" id="L95">        Objects.requireNonNull(splitManifest, &quot;splitManifest&quot;);</span>
+<span class="fc" id="L96">        Objects.requireNonNull(seedGenomes, &quot;seedGenomes&quot;);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (seedGenomes.isEmpty()) {</span>
+<span class="nc" id="L98">            throw new IllegalArgumentException(&quot;seedGenomes must not be empty&quot;);</span>
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (EvolutionGenome genome : seedGenomes) {</span>
+<span class="fc" id="L101">            Objects.requireNonNull(genome, &quot;seed genome&quot;);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (genome.objective() != objective) {</span>
+<span class="nc" id="L103">                throw new IllegalArgumentException(&quot;seed genome objective differs from study&quot;);</span>
+            }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (!genome.trainingScope().equals(splitManifest.trainingScope())) {</span>
+<span class="fc" id="L106">                throw new IllegalArgumentException(</span>
+                    &quot;seed genome is not bound to the manifest TRAIN scope&quot;);
+            }
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        List&lt;String&gt; seeds = normalizeHashes(</span>
+<span class="fc" id="L111">            seedGenomes.stream().map(EvolutionGenome::contentHash).toList(),</span>
+            &quot;seedGenomeHashes&quot;);
+<span class="fc" id="L113">        List&lt;EvolutionMutationKind&gt; mutations = normalizeMutations(mutationOperators);</span>
+<span class="fc" id="L114">        List&lt;FitnessWeight&gt; weights = normalizeFitnessWeights(fitnessWeights);</span>
+<span class="fc" id="L115">        String content = EvolutionGenome.hash(render(</span>
+            studyId,
+            objective,
+<span class="fc" id="L118">            splitManifest.contentHash(),</span>
+            seeds,
+            mutations,
+            populationPolicy,
+            weights,
+            budget,
+            StudyStatus.NOT_STARTED,
+            FinalTestPolicy.ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION,
+            GateStatus.NOT_EVALUATED,
+            GateStatus.NOT_EVALUATED,
+            GateStatus.NOT_EVALUATED,
+            GateStatus.NOT_EVALUATED,
+            null));
+<span class="fc" id="L131">        return new EvolutionStudyPlan(</span>
+            SCHEMA,
+            studyId,
+            objective,
+<span class="fc" id="L135">            splitManifest.contentHash(),</span>
+            seeds,
+            mutations,
+            populationPolicy,
+            weights,
+            budget,
+            StudyStatus.NOT_STARTED,
+            FinalTestPolicy.ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION,
+            GateStatus.NOT_EVALUATED,
+            GateStatus.NOT_EVALUATED,
+            GateStatus.NOT_EVALUATED,
+            GateStatus.NOT_EVALUATED,
+            content);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L151">        return render(</span>
+            studyId,
+            objective,
+            splitManifestHash,
+            seedGenomeHashes,
+            mutationOperators,
+            populationPolicy,
+            fitnessWeights,
+            budget,
+            status,
+            finalTestPolicy,
+            proofStatus,
+            externalNoveltyStatus,
+            promotionStatus,
+            publicEvidenceStatus,
+            contentHash);
+    }
+
+    private static List&lt;String&gt; normalizeHashes(List&lt;String&gt; values, String name) {
+<span class="fc" id="L170">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="fc" id="L174">        List&lt;String&gt; result = values.stream().peek(value -&gt; requireHash(value, name))</span>
+<span class="fc" id="L175">            .sorted()</span>
+<span class="fc" id="L176">            .toList();</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(result).size() != result.size()) {</span>
+<span class="nc" id="L178">            throw new IllegalArgumentException(name + &quot; must be unique&quot;);</span>
+        }
+<span class="fc" id="L180">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;EvolutionMutationKind&gt; normalizeMutations(
+        List&lt;EvolutionMutationKind&gt; values
+    ) {
+<span class="fc" id="L186">        Objects.requireNonNull(values, &quot;mutationOperators&quot;);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L188">            throw new IllegalArgumentException(&quot;mutationOperators must not be empty&quot;);</span>
+        }
+<span class="fc" id="L190">        List&lt;EvolutionMutationKind&gt; result = values.stream()</span>
+<span class="fc" id="L191">            .map(item -&gt; Objects.requireNonNull(item, &quot;mutation operator&quot;))</span>
+<span class="fc" id="L192">            .distinct()</span>
+<span class="fc" id="L193">            .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L194">            .toList();</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (result.size() != values.size()) {</span>
+<span class="nc" id="L196">            throw new IllegalArgumentException(&quot;mutationOperators must be unique&quot;);</span>
+        }
+<span class="fc" id="L198">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;FitnessWeight&gt; normalizeFitnessWeights(
+        List&lt;FitnessWeight&gt; values
+    ) {
+<span class="fc" id="L204">        Objects.requireNonNull(values, &quot;fitnessWeights&quot;);</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L206">            throw new IllegalArgumentException(&quot;fitnessWeights must not be empty&quot;);</span>
+        }
+<span class="fc" id="L208">        List&lt;FitnessWeight&gt; result = values.stream()</span>
+<span class="fc" id="L209">            .map(item -&gt; Objects.requireNonNull(item, &quot;fitness weight&quot;))</span>
+<span class="fc" id="L210">            .sorted(Comparator.comparing(item -&gt; item.component().name()))</span>
+<span class="fc" id="L211">            .toList();</span>
+<span class="fc" id="L212">        if (new HashSet&lt;&gt;(result.stream().map(FitnessWeight::component).toList()).size()</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L214">            throw new IllegalArgumentException(&quot;fitness components must be unique&quot;);</span>
+        }
+<span class="fc" id="L216">        int total = result.stream().mapToInt(FitnessWeight::weightPermille).sum();</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (total != 1000) {</span>
+<span class="nc" id="L218">            throw new IllegalArgumentException(&quot;fitness weights must sum to 1000 permille&quot;);</span>
+        }
+<span class="fc" id="L220">        return List.copyOf(result);</span>
+    }
+
+    private static void requireNotEvaluated(GateStatus value, String name) {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (value != GateStatus.NOT_EVALUATED) {</span>
+<span class="nc" id="L225">            throw new IllegalArgumentException(name + &quot; must remain NOT_EVALUATED&quot;);</span>
+        }
+<span class="fc" id="L227">    }</span>
+
+    private static String render(
+        String studyId,
+        Objective objective,
+        String splitManifestHash,
+        List&lt;String&gt; seedGenomeHashes,
+        List&lt;EvolutionMutationKind&gt; mutationOperators,
+        PopulationPolicy populationPolicy,
+        List&lt;FitnessWeight&gt; fitnessWeights,
+        StudyBudget budget,
+        StudyStatus status,
+        FinalTestPolicy finalTestPolicy,
+        GateStatus proofStatus,
+        GateStatus externalNoveltyStatus,
+        GateStatus promotionStatus,
+        GateStatus publicEvidenceStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L246">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L247">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L248">            .property(&quot;studyId&quot;, studyId)</span>
+<span class="fc" id="L249">            .property(&quot;objective&quot;, objective.name())</span>
+<span class="fc" id="L250">            .property(&quot;splitManifestHash&quot;, splitManifestHash)</span>
+<span class="fc" id="L251">            .stringArray(&quot;seedGenomeHashes&quot;, seedGenomeHashes)</span>
+<span class="fc" id="L252">            .stringArray(&quot;mutationOperators&quot;, mutationOperators.stream()</span>
+<span class="fc" id="L253">                .map(Enum::name)</span>
+<span class="fc" id="L254">                .toList())</span>
+<span class="fc" id="L255">            .object(&quot;populationPolicy&quot;, object -&gt; object</span>
+<span class="fc" id="L256">                .property(&quot;populationSize&quot;, populationPolicy.populationSize())</span>
+<span class="fc" id="L257">                .property(&quot;generationCount&quot;, populationPolicy.generationCount())</span>
+<span class="fc" id="L258">                .property(&quot;eliteCount&quot;, populationPolicy.eliteCount())</span>
+<span class="fc" id="L259">                .property(&quot;minimumDistinctAlphaStructures&quot;,</span>
+<span class="fc" id="L260">                    populationPolicy.minimumDistinctAlphaStructures())</span>
+<span class="fc" id="L261">                .property(&quot;maxOffspringPerLineage&quot;,</span>
+<span class="fc" id="L262">                    populationPolicy.maxOffspringPerLineage())</span>
+<span class="fc" id="L263">                .property(&quot;parallelism&quot;, populationPolicy.parallelism())</span>
+<span class="fc" id="L264">                .property(&quot;randomSeed&quot;, populationPolicy.randomSeed()))</span>
+<span class="fc" id="L265">            .array(&quot;fitnessWeights&quot;, array -&gt; fitnessWeights.forEach(weight -&gt;</span>
+<span class="fc" id="L266">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L267">                    .property(&quot;component&quot;, weight.component().name())</span>
+<span class="fc" id="L268">                    .property(&quot;weightPermille&quot;, weight.weightPermille()))))</span>
+<span class="fc" id="L269">            .object(&quot;budget&quot;, object -&gt; object</span>
+<span class="fc" id="L270">                .property(&quot;maxMutationAttempts&quot;, budget.maxMutationAttempts())</span>
+<span class="fc" id="L271">                .property(&quot;maxTrainEvaluations&quot;, budget.maxTrainEvaluations())</span>
+<span class="fc" id="L272">                .property(&quot;maxValidationEvaluations&quot;, budget.maxValidationEvaluations())</span>
+<span class="fc" id="L273">                .property(&quot;maxFinalTestEvaluations&quot;, budget.maxFinalTestEvaluations())</span>
+<span class="fc" id="L274">                .property(&quot;maxCheckpoints&quot;, budget.maxCheckpoints()))</span>
+<span class="fc" id="L275">            .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L276">            .property(&quot;finalTestPolicy&quot;, finalTestPolicy.name())</span>
+<span class="fc" id="L277">            .property(&quot;proofStatus&quot;, proofStatus.name())</span>
+<span class="fc" id="L278">            .property(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus.name())</span>
+<span class="fc" id="L279">            .property(&quot;promotionStatus&quot;, promotionStatus.name())</span>
+<span class="fc" id="L280">            .property(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus.name());</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L282">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L284">        return json.endObject().toString();</span>
+    }
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L288" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L289">            throw new IllegalArgumentException(name + &quot; has invalid identifier syntax&quot;);</span>
+        }
+<span class="fc" id="L291">    }</span>
+
+    private static void requireHash(String value, String name) {
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
+<span class="nc" id="L295">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L297">    }</span>
+
+    public record PopulationPolicy(
+        int populationSize,
+        int generationCount,
+        int eliteCount,
+        int minimumDistinctAlphaStructures,
+        int maxOffspringPerLineage,
+        int parallelism,
+        long randomSeed
+    ) {
+<span class="fc" id="L308">        public PopulationPolicy {</span>
+<span class="pc bpc" id="L309" title="2 of 4 branches missed.">            if (populationSize &lt; 2 || generationCount &lt; 1) {</span>
+<span class="nc" id="L310">                throw new IllegalArgumentException(&quot;population and generations must be positive&quot;);</span>
+            }
+<span class="pc bpc" id="L312" title="2 of 4 branches missed.">            if (eliteCount &lt; 1 || eliteCount &gt;= populationSize) {</span>
+<span class="nc" id="L313">                throw new IllegalArgumentException(&quot;eliteCount must be within population&quot;);</span>
+            }
+<span class="pc bpc" id="L315" title="2 of 4 branches missed.">            if (minimumDistinctAlphaStructures &lt; 2</span>
+                    || minimumDistinctAlphaStructures &gt; populationSize) {
+<span class="nc" id="L317">                throw new IllegalArgumentException(</span>
+                    &quot;minimum structural diversity must be within population&quot;);
+            }
+<span class="pc bpc" id="L320" title="2 of 4 branches missed.">            if (maxOffspringPerLineage &lt; 1 || parallelism &lt; 1) {</span>
+<span class="nc" id="L321">                throw new IllegalArgumentException(&quot;offspring and parallelism must be positive&quot;);</span>
+            }
+<span class="fc" id="L323">        }</span>
+    }
+
+    public record FitnessWeight(FitnessComponent component, int weightPermille) {
+<span class="fc" id="L327">        public FitnessWeight {</span>
+<span class="fc" id="L328">            Objects.requireNonNull(component, &quot;component&quot;);</span>
+<span class="pc bpc" id="L329" title="2 of 4 branches missed.">            if (weightPermille &lt; 0 || weightPermille &gt; 1000) {</span>
+<span class="nc" id="L330">                throw new IllegalArgumentException(&quot;weightPermille must be in [0,1000]&quot;);</span>
+            }
+<span class="fc" id="L332">        }</span>
+    }
+
+    public record StudyBudget(
+        int maxMutationAttempts,
+        int maxTrainEvaluations,
+        int maxValidationEvaluations,
+        int maxFinalTestEvaluations,
+        int maxCheckpoints
+    ) {
+<span class="fc" id="L342">        public StudyBudget {</span>
+<span class="pc bpc" id="L343" title="5 of 10 branches missed.">            if (maxMutationAttempts &lt; 1</span>
+                    || maxTrainEvaluations &lt; 1
+                    || maxValidationEvaluations &lt; 1
+                    || maxFinalTestEvaluations &lt; 1
+                    || maxCheckpoints &lt; 1) {
+<span class="nc" id="L348">                throw new IllegalArgumentException(&quot;study budgets must be positive&quot;);</span>
+            }
+<span class="fc" id="L350">        }</span>
+    }
+
+<span class="fc" id="L353">    public enum FitnessComponent {</span>
+<span class="fc" id="L354">        TRAIN_CASES_NEWLY_SOLVED,</span>
+<span class="fc" id="L355">        TRAIN_PATH_LENGTH_REDUCTION,</span>
+<span class="fc" id="L356">        TRAIN_EXPLORED_STATE_REDUCTION,</span>
+<span class="fc" id="L357">        SUPPORT,</span>
+<span class="fc" id="L358">        STRUCTURAL_DIVERSITY,</span>
+<span class="fc" id="L359">        PROJECT_NOVELTY,</span>
+<span class="fc" id="L360">        ASSUMPTION_SIMPLICITY,</span>
+<span class="fc" id="L361">        CANDIDATE_COMPLEXITY,</span>
+<span class="fc" id="L362">        COUNTEREXAMPLE_RISK,</span>
+<span class="fc" id="L363">        PROOF_COST_PROXY</span>
+    }
+
+<span class="fc" id="L366">    public enum StudyStatus {</span>
+<span class="fc" id="L367">        NOT_STARTED</span>
+    }
+
+<span class="fc" id="L370">    public enum FinalTestPolicy {</span>
+<span class="fc" id="L371">        ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION</span>
+    }
+
+<span class="fc" id="L374">    public enum GateStatus {</span>
+<span class="fc" id="L375">        NOT_EVALUATED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

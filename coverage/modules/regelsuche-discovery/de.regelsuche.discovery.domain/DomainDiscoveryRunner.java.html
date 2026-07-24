@@ -410,8 +410,8 @@ import java.util.Set;
                     || explorationBudgetReached) {
 <span class="nc" id="L411">                return Outcome.BUDGET_EXHAUSTED;</span>
             }
-<span class="pc bpc" id="L413" title="1 of 2 branches missed.">            if (candidateAttempts.isEmpty()) {</span>
-<span class="nc" id="L414">                return Outcome.INCONCLUSIVE;</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">            if (candidateAttempts.isEmpty()) {</span>
+<span class="fc" id="L414">                return Outcome.INCONCLUSIVE;</span>
             }
 <span class="fc bfc" id="L416" title="All 2 branches covered.">            if (candidateAttempts.stream().allMatch(Execution::isRefuted)) {</span>
 <span class="fc" id="L417">                return Outcome.REFUTED;</span>

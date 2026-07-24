@@ -90,11 +90,11 @@ import java.util.Set;
 <span class="fc bfc" id="L90" title="All 4 branches covered.">            if (left == null || right == null) {</span>
 <span class="fc" id="L91">                return null;</span>
             }
-<span class="pc bpc" id="L93" title="1 of 5 branches missed.">            return switch (binary.operator()) {</span>
+<span class="fc bfc" id="L93" title="All 5 branches covered.">            return switch (binary.operator()) {</span>
 <span class="fc" id="L94">                case ADD -&gt; add(left, right, 1.0);</span>
 <span class="fc" id="L95">                case SUB -&gt; add(left, right, -1.0);</span>
 <span class="fc" id="L96">                case MUL -&gt; multiply(left, right);</span>
-<span class="nc" id="L97">                case DIV -&gt; divide(left, right);</span>
+<span class="fc" id="L97">                case DIV -&gt; divide(left, right);</span>
 <span class="fc" id="L98">                case POW -&gt; power(left, right);</span>
             };
         }
@@ -122,8 +122,8 @@ import java.util.Set;
     }
 
     private Map&lt;Integer, Double&gt; divide(Map&lt;Integer, Double&gt; left, Map&lt;Integer, Double&gt; right) {
-<span class="nc bnc" id="L125" title="All 4 branches missed.">        if (right.size() != 1 || !right.containsKey(0)) {</span>
-<span class="nc" id="L126">            return null;</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">        if (right.size() != 1 || !right.containsKey(0)) {</span>
+<span class="fc" id="L126">            return null;</span>
         }
 <span class="nc" id="L128">        double divisor = right.get(0);</span>
 <span class="nc bnc" id="L129" title="All 2 branches missed.">        if (divisor == 0.0) {</span>

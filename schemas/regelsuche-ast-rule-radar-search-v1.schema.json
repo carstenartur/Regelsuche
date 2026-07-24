@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-ast-rule-radar-search-v1.schema.json",
+  "title": "Regelsuche AST Rule Radar Search v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "startExpression", "targetExpression", "targetReached", "terminalStateId", "exploredStateCount", "generatedCandidateCount", "states", "edges", "events", "finalOutcomeByCandidateId", "diagnostics"],
+  "properties": {
+    "schema": {"const": "regelsuche.ast-rule-radar-search/v1"},
+    "startExpression": {"type": "string"},
+    "targetExpression": {"type": "string"},
+    "targetReached": {"type": "boolean"},
+    "terminalStateId": {"type": "string"},
+    "exploredStateCount": {"type": "integer", "minimum": 0},
+    "generatedCandidateCount": {"type": "integer", "minimum": 0},
+    "states": {"type": "array", "items": {"$ref": "#/$defs/state"}},
+    "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/event"}},
+    "finalOutcomeByCandidateId": {
+      "type": "object",
+      "propertyNames": {"pattern": "^move:[0-9a-f]{64}$"},
+      "additionalProperties": {"$ref": "#/$defs/outcome"}
+    },
+    "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}}
+  },
+  "$defs": {
+    "origin": {"enum": ["CORE", "KNOWLEDGE_PACK", "RULE_FILE", "PLUGIN", "LEARNED_MACRO"]},
+    "outcome": {"enum": ["AVAILABLE", "SELECTED", "APPLIED", "PRUNED_BUDGET", "PRUNED_DUPLICATE", "PRUNED_KNOWN_BETTER", "REJECTED_ASSUMPTION", "REJECTED_VALIDATION", "FAILED_APPLICATION"]},
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stateId", "expression", "canonicalExpression", "depth", "target"],
+      "properties": {
+        "stateId": {"type": "string", "pattern": "^state:[0-9a-f]{20}$"},
+        "expression": {"type": "string"},
+        "canonicalExpression": {"type": "string"},
+        "depth": {"type": "integer", "minimum": 0},
+        "target": {"type": "boolean"}
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edgeId", "fromStateId", "toStateId", "fromExpression", "toExpression", "candidateId", "pathKey", "ruleId", "origin", "outcome"],
+      "properties": {
+        "edgeId": {"type": "string", "pattern": "^edge:[0-9a-f]{20}$"},
+        "fromStateId": {"type": "string"},
+        "toStateId": {"type": "string"},
+        "fromExpression": {"type": "string"},
+        "toExpression": {"type": "string"},
+        "candidateId": {"type": "string", "pattern": "^move:[0-9a-f]{64}$"},
+        "pathKey": {"type": "string"},
+        "ruleId": {"type": "string"},
+        "origin": {"$ref": "#/$defs/origin"},
+        "outcome": {"$ref": "#/$defs/outcome"}
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "stateId", "expression", "candidateId", "pathKey", "ruleId", "outcome", "detail"],
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 1},
+        "stateId": {"type": "string"},
+        "expression": {"type": "string"},
+        "candidateId": {"type": "string"},
+        "pathKey": {"type": "string"},
+        "ruleId": {"type": "string"},
+        "outcome": {"$ref": "#/$defs/outcome"},
+        "detail": {"type": "string"}
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "pathKey"],
+      "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "pathKey": {"type": "string"}}
+    }
+  }
+}

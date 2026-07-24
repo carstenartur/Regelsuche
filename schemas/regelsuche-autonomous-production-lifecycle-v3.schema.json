@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-production-lifecycle/v3",
+  "title": "Regelsuche autonomous production lifecycle manifest v3",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "miningRunHash", "candidateBranchId",
+    "conjectureId", "validationHash", "counterexampleHash",
+    "projectNoveltyHash", "projectNoveltyStatus",
+    "externalNoveltyStatus", "proofEvidenceHash",
+    "solverObligationHash", "solverResultHash", "proofStatus",
+    "backendStatus", "translationStatus", "formalProofStatus",
+    "lifecycleCandidateHash", "lifecycleDecisionHash",
+    "lifecycleOutcome", "stageResourceLedgerHash", "targetProvided",
+    "lifecycleRunIsMathematicalEvidence", "promotionStatus",
+    "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-production-lifecycle/v3" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "miningRunHash": { "$ref": "#/$defs/sha256" },
+    "candidateBranchId": { "$ref": "#/$defs/nonBlank" },
+    "conjectureId": { "$ref": "#/$defs/nonBlank" },
+    "validationHash": { "$ref": "#/$defs/sha256" },
+    "counterexampleHash": { "$ref": "#/$defs/sha256" },
+    "projectNoveltyHash": { "$ref": "#/$defs/sha256" },
+    "projectNoveltyStatus": { "const": "NOVEL_WITHIN_PROJECT" },
+    "externalNoveltyStatus": { "const": "NOT_EVALUATED" },
+    "proofEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "solverObligationHash": { "$ref": "#/$defs/sha256" },
+    "solverResultHash": { "$ref": "#/$defs/sha256" },
+    "proofStatus": { "const": "SYMBOLICALLY_VERIFIED" },
+    "backendStatus": { "const": "CONFIRMED" },
+    "translationStatus": { "const": "LOSSLESS" },
+    "formalProofStatus": { "const": "NOT_EVALUATED" },
+    "lifecycleCandidateHash": { "$ref": "#/$defs/sha256" },
+    "lifecycleDecisionHash": { "$ref": "#/$defs/sha256" },
+    "lifecycleOutcome": { "const": "COMPLETED" },
+    "stageResourceLedgerHash": { "$ref": "#/$defs/sha256" },
+    "targetProvided": { "const": false },
+    "lifecycleRunIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

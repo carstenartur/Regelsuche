@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.solver-result/v1",
+  "title": "Regelsuche solver-neutral backend result v1",
+  "type": "object",
+  "required": [
+    "schema", "obligationHash", "goalHash", "assumptionsHash",
+    "backendId", "backendVersion", "status", "translationStatus",
+    "usedCapabilities", "translationIssues", "invocationHash", "message",
+    "counterexample", "certificateHash", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.solver-result/v1" },
+    "obligationHash": { "$ref": "#/$defs/sha256" },
+    "goalHash": { "$ref": "#/$defs/sha256" },
+    "assumptionsHash": { "$ref": "#/$defs/sha256" },
+    "backendId": { "$ref": "#/$defs/nonBlank" },
+    "backendVersion": { "$ref": "#/$defs/nonBlank" },
+    "status": {
+      "enum": [
+        "CONFIRMED", "REFUTED", "UNKNOWN", "TIMEOUT",
+        "UNSUPPORTED", "ERROR"
+      ]
+    },
+    "translationStatus": {
+      "enum": ["LOSSLESS", "APPROXIMATED", "REJECTED"]
+    },
+    "usedCapabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "translationIssues": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "invocationHash": { "$ref": "#/$defs/sha256" },
+    "message": { "type": "string" },
+    "counterexample": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "certificateHash": {
+      "oneOf": [
+        { "const": "" },
+        { "$ref": "#/$defs/sha256" }
+      ]
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "UNSUPPORTED" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "translationStatus": { "const": "REJECTED" },
+          "translationIssues": { "minItems": 1 }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

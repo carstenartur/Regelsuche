@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-evidence-dag/v2",
+  "title": "Regelsuche autonomous evidence DAG v2",
+  "type": "object",
+  "required": [
+    "schema", "briefHash", "observations", "decisions", "receipts",
+    "dagIsMathematicalEvidence", "promotionStatus",
+    "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-evidence-dag/v2" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "observations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["decisionId", "contentHash"],
+        "properties": {
+          "decisionId": { "$ref": "#/$defs/nonBlank" },
+          "contentHash": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "decisionHash", "miningEvidenceHash", "disposition",
+          "outputBranchIds", "contentHash"
+        ],
+        "properties": {
+          "decisionHash": { "$ref": "#/$defs/sha256" },
+          "miningEvidenceHash": { "$ref": "#/$defs/sha256" },
+          "disposition": {
+            "enum": ["COMPLETED", "INCONCLUSIVE", "BACKEND_UNAVAILABLE"]
+          },
+          "outputBranchIds": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/nonBlank" }
+          },
+          "contentHash": { "$ref": "#/$defs/sha256" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "dagIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "observation": {
+      "type": "object",
+      "required": [
+        "branchId", "branchType", "familyId", "observationId",
+        "snapshotHash", "evidenceHash", "goalStatus", "contentHash"
+      ],
+      "properties": {
+        "branchId": { "$ref": "#/$defs/nonBlank" },
+        "branchType": { "const": "OBSERVATION" },
+        "familyId": { "$ref": "#/$defs/nonBlank" },
+        "observationId": { "$ref": "#/$defs/nonBlank" },
+        "snapshotHash": { "$ref": "#/$defs/sha256" },
+        "evidenceHash": { "$ref": "#/$defs/sha256" },
+        "goalStatus": { "const": "UNTARGETED" },
+        "contentHash": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

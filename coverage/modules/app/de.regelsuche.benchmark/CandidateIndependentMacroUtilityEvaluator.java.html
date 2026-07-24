@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CandidateIndependentMacroUtilityEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">CandidateIndependentMacroUtilityEvaluator.java</span></div><h1>CandidateIndependentMacroUtilityEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.BaselineEvaluation;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.EvaluationTask;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationResult;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationStatus;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.MacroCandidate;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.PairedEvaluation;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.SearchRun;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.UtilityOutcome;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.math.algorithms.equivalence.PolynomialNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.equivalence.RationalFunctionNormalFormEquivalenceService;
+import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalStatus;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/** Paired production best-first utility evaluation for formed TRAIN macros. */
+final class CandidateIndependentMacroUtilityEvaluator {
+    private final TransformationEngine primitiveEngine;
+<span class="fc" id="L49">    private final ExpressionCanonicalizer canonicalizer =</span>
+        new ExpressionCanonicalizer();
+<span class="fc" id="L51">    private final ExpressionScorer scorer = new ExpressionScorer();</span>
+<span class="fc" id="L52">    private final ExpressionParser expressionParser = new ExpressionParser();</span>
+<span class="fc" id="L53">    private final PolynomialNormalFormEquivalenceService polynomialEquivalence =</span>
+        new PolynomialNormalFormEquivalenceService(
+            new DefaultMathematicalAlgorithmRegistry());
+<span class="fc" id="L56">    private final RationalFunctionNormalFormEquivalenceService rationalEquivalence =</span>
+        new RationalFunctionNormalFormEquivalenceService();
+
+    CandidateIndependentMacroUtilityEvaluator(
+        Map&lt;String, List&lt;String&gt;&gt; operationRuleIds
+<span class="fc" id="L61">    ) {</span>
+<span class="fc" id="L62">        CandidateIndependentMacroReplayAdapter replay =</span>
+            new CandidateIndependentMacroReplayAdapter(operationRuleIds);
+<span class="fc" id="L64">        Set&lt;String&gt; allowed = replay.operationRuleIds().values().stream()</span>
+<span class="fc" id="L65">            .flatMap(List::stream)</span>
+<span class="fc" id="L66">            .collect(java.util.stream.Collectors.toCollection(</span>
+                LinkedHashSet::new));
+<span class="fc" id="L68">        List&lt;RewriteRule&gt; rules = AstRewriteTransformationEngine.defaultRules()</span>
+<span class="fc" id="L69">            .stream()</span>
+<span class="fc" id="L70">            .filter(rule -&gt; allowed.contains(rule.id()))</span>
+<span class="fc" id="L71">            .sorted(Comparator.comparing(RewriteRule::id))</span>
+<span class="fc" id="L72">            .toList();</span>
+<span class="fc" id="L73">        primitiveEngine = new AstRewriteTransformationEngine(rules, 16, 120);</span>
+<span class="fc" id="L74">    }</span>
+
+    BaselineEvaluation baseline(EvaluationTask task) {
+<span class="fc" id="L77">        Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L78">        return new BaselineEvaluation(task, search(task, primitiveEngine));</span>
+    }
+
+    PairedEvaluation evaluate(
+        EvaluationTask task,
+        FormationResult formation
+    ) {
+<span class="fc" id="L85">        requireEvaluationInputs(task, formation);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (formation.status() != FormationStatus.SELECTED) {</span>
+<span class="nc" id="L87">            return candidateNotFormed(task);</span>
+        }
+<span class="fc" id="L89">        return evaluateSelected(</span>
+<span class="fc" id="L90">            task, formation, baseline(task).run());</span>
+    }
+
+    PairedEvaluation evaluate(
+        EvaluationTask task,
+        FormationResult formation,
+        BaselineEvaluation baselineEvaluation
+    ) {
+<span class="fc" id="L98">        requireEvaluationInputs(task, formation);</span>
+<span class="fc" id="L99">        Objects.requireNonNull(baselineEvaluation, &quot;baselineEvaluation&quot;);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (formation.status() != FormationStatus.SELECTED) {</span>
+<span class="nc" id="L101">            return candidateNotFormed(task);</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!baselineEvaluation.task().equals(task)) {</span>
+<span class="fc" id="L104">            throw new IllegalArgumentException(</span>
+                &quot;baseline evaluation is bound to a different task&quot;);
+        }
+<span class="fc" id="L107">        if (baselineEvaluation.run().expandedStates()</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">                &gt; task.maxExpandedStates()) {</span>
+<span class="nc" id="L109">            throw new IllegalArgumentException(</span>
+                &quot;baseline evaluation exceeds the frozen task budget&quot;);
+        }
+<span class="fc" id="L112">        return evaluateSelected(</span>
+<span class="fc" id="L113">            task, formation, baselineEvaluation.run());</span>
+    }
+
+    private void requireEvaluationInputs(
+        EvaluationTask task,
+        FormationResult formation
+    ) {
+<span class="pc bpc" id="L120" title="2 of 4 branches missed.">        if (task == null || formation == null) {</span>
+<span class="nc" id="L121">            throw new NullPointerException(&quot;task and formation are required&quot;);</span>
+        }
+<span class="fc" id="L123">    }</span>
+
+    private PairedEvaluation candidateNotFormed(EvaluationTask task) {
+<span class="nc" id="L126">        SearchRun empty = SearchRun.notRun(</span>
+            task, &quot;candidate formation did not select macros&quot;);
+<span class="nc" id="L128">        return new PairedEvaluation(</span>
+<span class="nc" id="L129">            task.taskId(), UtilityOutcome.CANDIDATE_NOT_FORMED,</span>
+            empty, empty, false,
+            &quot;paired evaluation requires selected TRAIN macros&quot;);
+    }
+
+    private PairedEvaluation evaluateSelected(
+        EvaluationTask task,
+        FormationResult formation,
+        SearchRun baseline
+    ) {
+<span class="fc" id="L139">        TransformationEngine macroEngine = expression -&gt; {</span>
+<span class="fc" id="L140">            List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L141">                primitiveEngine.transform(expression));</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (MacroCandidate candidate : formation.macros()) {</span>
+<span class="fc" id="L143">                learnedPatternMacro(expression, candidate)</span>
+<span class="fc" id="L144">                    .ifPresent(transformations::add);</span>
+<span class="fc" id="L145">            }</span>
+<span class="fc" id="L146">            return List.copyOf(transformations);</span>
+        };
+<span class="fc" id="L148">        SearchRun withMacro = search(task, macroEngine);</span>
+<span class="fc" id="L149">        UtilityOutcome outcome = utility(baseline, withMacro);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        boolean correctnessRegression = baseline.success()</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            &amp;&amp; !withMacro.success();</span>
+<span class="fc" id="L152">        return new PairedEvaluation(</span>
+<span class="fc" id="L153">            task.taskId(), outcome, baseline, withMacro,</span>
+            correctnessRegression,
+<span class="fc" id="L155">            detail(outcome, baseline, withMacro));</span>
+    }
+
+    private Optional&lt;Transformation&gt; learnedPatternMacro(
+        String expression,
+        MacroCandidate candidate
+    ) {
+        Expr pattern;
+        Expr concrete;
+        Expr target;
+        try {
+<span class="fc" id="L166">            pattern = expressionParser.parseTerm(</span>
+<span class="fc" id="L167">                candidate.rule().leftPattern());</span>
+<span class="fc" id="L168">            concrete = expressionParser.parseTerm(expression);</span>
+<span class="fc" id="L169">            target = expressionParser.parseTerm(</span>
+<span class="fc" id="L170">                candidate.rule().rightPattern());</span>
+<span class="nc" id="L171">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L172">            return Optional.empty();</span>
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        LinkedHashMap&lt;String, Expr&gt; bindings = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (!matchMacroPattern(pattern, concrete, bindings)) {</span>
+<span class="fc" id="L176">            return Optional.empty();</span>
+        }
+<span class="fc" id="L178">        String transformed = ExpressionFormatter.format(</span>
+<span class="fc" id="L179">            substitute(target, bindings));</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (same(expression, transformed)) {</span>
+<span class="nc" id="L181">            return Optional.empty();</span>
+        }
+<span class="fc" id="L183">        return Optional.of(new Transformation(</span>
+<span class="fc" id="L184">            candidate.macroId(),</span>
+            transformed,
+            RewriteKind.NORMALIZE,
+            false,
+<span class="fc" id="L188">            scorer.score(transformed).weightedTotal()</span>
+<span class="fc" id="L189">                - scorer.score(expression).weightedTotal(),</span>
+            true,
+<span class="fc" id="L191">            candidate.macroId() + ':'</span>
+<span class="fc" id="L192">                + canonicalizer.stableHash(expression) + &quot;-&gt;&quot;</span>
+<span class="fc" id="L193">                + canonicalizer.stableHash(transformed),</span>
+<span class="fc" id="L194">            candidate.rule().assumptions()));</span>
+    }
+
+    private boolean matchMacroPattern(
+        Expr pattern,
+        Expr concrete,
+        Map&lt;String, Expr&gt; bindings
+    ) {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (pattern instanceof VariableExpr variable</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                &amp;&amp; variable.name().matches(&quot;[A-Z]&quot;)) {</span>
+<span class="fc" id="L204">            Expr retained = bindings.get(variable.name());</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">            if (retained == null) {</span>
+<span class="fc" id="L206">                bindings.put(variable.name(), concrete);</span>
+<span class="fc" id="L207">                return true;</span>
+            }
+<span class="nc" id="L209">            return same(</span>
+<span class="nc" id="L210">                ExpressionFormatter.format(retained),</span>
+<span class="nc" id="L211">                ExpressionFormatter.format(concrete));</span>
+        }
+<span class="fc bfc" id="L213" title="All 4 branches covered.">        if (pattern instanceof NumberExpr left</span>
+<span class="fc" id="L214">                &amp;&amp; concrete instanceof NumberExpr right) {</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            return Double.compare(left.value(), right.value()) == 0;</span>
+        }
+<span class="pc bpc" id="L217" title="3 of 4 branches missed.">        if (pattern instanceof VariableExpr left</span>
+<span class="nc" id="L218">                &amp;&amp; concrete instanceof VariableExpr right) {</span>
+<span class="nc" id="L219">            return left.name().equals(right.name());</span>
+        }
+<span class="pc bpc" id="L221" title="3 of 4 branches missed.">        if (pattern instanceof FunctionExpr left</span>
+<span class="nc" id="L222">                &amp;&amp; concrete instanceof FunctionExpr right) {</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            if (!left.name().equals(right.name())</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                    || left.arguments().size() != right.arguments().size()) {</span>
+<span class="nc" id="L225">                return false;</span>
+            }
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            for (int index = 0; index &lt; left.arguments().size(); index++) {</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                if (!matchMacroPattern(</span>
+<span class="nc" id="L229">                        left.arguments().get(index),</span>
+<span class="nc" id="L230">                        right.arguments().get(index), bindings)) {</span>
+<span class="nc" id="L231">                    return false;</span>
+                }
+            }
+<span class="nc" id="L234">            return true;</span>
+        }
+<span class="pc bpc" id="L236" title="1 of 4 branches missed.">        if (!(pattern instanceof BinaryExpr left)</span>
+<span class="fc" id="L237">                || !(concrete instanceof BinaryExpr right)) {</span>
+<span class="fc" id="L238">            return false;</span>
+        }
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (left.operator() == right.operator()) {</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            return matchMacroPattern(left.left(), right.left(), bindings)</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                &amp;&amp; matchMacroPattern(left.right(), right.right(), bindings);</span>
+        }
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (left.operator() == de.regelsuche.ast.BinaryOperator.ADD</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                &amp;&amp; right.operator() == de.regelsuche.ast.BinaryOperator.SUB) {</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            return matchMacroPattern(left.left(), right.left(), bindings)</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                &amp;&amp; matchMacroPattern(</span>
+<span class="fc" id="L248">                    left.right(), negate(right.right()), bindings);</span>
+        }
+<span class="fc" id="L250">        return false;</span>
+    }
+
+    private Expr negate(Expr expression) {
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L255">            return new NumberExpr(-number.value());</span>
+        }
+<span class="nc" id="L257">        return new BinaryExpr(</span>
+            new NumberExpr(0),
+            de.regelsuche.ast.BinaryOperator.SUB,
+            expression);
+    }
+
+    private Expr substitute(Expr expression, Map&lt;String, Expr&gt; bindings) {
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L265">            return bindings.getOrDefault(variable.name(), variable);</span>
+        }
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        if (expression instanceof NumberExpr) {</span>
+<span class="fc" id="L268">            return expression;</span>
+        }
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="nc" id="L271">            return new FunctionExpr(</span>
+<span class="nc" id="L272">                function.name(),</span>
+<span class="nc" id="L273">                function.arguments().stream()</span>
+<span class="nc" id="L274">                    .map(argument -&gt; substitute(argument, bindings))</span>
+<span class="nc" id="L275">                    .toList());</span>
+        }
+<span class="fc" id="L277">        BinaryExpr binary = (BinaryExpr) expression;</span>
+<span class="fc" id="L278">        return new BinaryExpr(</span>
+<span class="fc" id="L279">            substitute(binary.left(), bindings),</span>
+<span class="fc" id="L280">            binary.operator(),</span>
+<span class="fc" id="L281">            substitute(binary.right(), bindings));</span>
+    }
+
+    private SearchRun search(
+        EvaluationTask task,
+        TransformationEngine engine
+    ) {
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (sameUnderAssumptions(</span>
+<span class="fc" id="L289">                task.source(), task.target(), task.assumptions())) {</span>
+<span class="fc" id="L290">            return new SearchRun(</span>
+                true,
+<span class="fc" id="L292">                task.source(),</span>
+<span class="fc" id="L293">                List.of(task.source()),</span>
+<span class="fc" id="L294">                List.of(),</span>
+                1,
+                0,
+                false,
+                &quot;root already satisfies the target under frozen assumptions&quot;);
+        }
+<span class="fc" id="L300">        TransformationEngine validatedEngine = expression -&gt;</span>
+<span class="fc" id="L301">            engine.transform(expression).stream()</span>
+<span class="fc" id="L302">                .filter(candidate -&gt; assumptionsCovered(</span>
+<span class="fc" id="L303">                    candidate.assumptions(), task.assumptions()))</span>
+<span class="fc" id="L304">                .filter(candidate -&gt; stepEquivalent(</span>
+                    expression,
+<span class="fc" id="L306">                    candidate.transformedExpression(),</span>
+<span class="fc" id="L307">                    task.assumptions()))</span>
+<span class="fc" id="L308">                .toList();</span>
+<span class="fc" id="L309">        SearchHeuristic heuristic = new SearchHeuristic(</span>
+<span class="fc" id="L310">            task.maxDepth(),</span>
+<span class="fc" id="L311">            task.maxExpandedStates(),</span>
+            1,
+<span class="fc" id="L313">            task.maxDepth(),</span>
+            120,
+            120);
+<span class="fc" id="L316">        SearchProblem problem = new SearchProblem(</span>
+<span class="fc" id="L317">            task.source(),</span>
+            validatedEngine,
+            scorer,
+            canonicalizer,
+            heuristic)
+<span class="fc" id="L322">            .withTarget(task.target());</span>
+<span class="fc" id="L323">        BestFirstSearchStrategy.GoalSearchResult result =</span>
+<span class="fc" id="L324">            new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        SearchState retained = result.reached()</span>
+<span class="fc" id="L326">            ? result.reachedState()</span>
+<span class="fc" id="L327">            : result.bestState();</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        boolean exhausted = result.status() == GoalStatus.STATE_BUDGET</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">            || result.status() == GoalStatus.CANDIDATE_BUDGET</span>
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            || result.status() == GoalStatus.DEPTH_BUDGET;</span>
+<span class="fc" id="L331">        return new SearchRun(</span>
+<span class="fc" id="L332">            result.reached(),</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            result.reached() ? retained.expression() : &quot;&quot;,</span>
+<span class="fc" id="L334">            retained.path(),</span>
+<span class="fc" id="L335">            retained.appliedRuleIds(),</span>
+<span class="fc" id="L336">            result.metrics().exploredStates(),</span>
+<span class="fc" id="L337">            result.metrics().generatedTransformations(),</span>
+            exhausted,
+<span class="fc" id="L339">            &quot;production best-first terminal status: &quot; + result.status());</span>
+    }
+
+    private boolean stepEquivalent(
+        String left,
+        String right,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="pc bpc" id="L347" title="1 of 4 branches missed.">        if (left.contains(&quot;/&quot;) || right.contains(&quot;/&quot;)) {</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            return rationalEquivalence.evaluate(left, right, assumptions).status()</span>
+                == RationalFunctionNormalFormEquivalenceService.Status.CONFIRMED;
+        }
+<span class="fc" id="L351">        return polynomialEquivalence.areEquivalent(</span>
+<span class="fc" id="L352">            substituteEqualities(left, assumptions),</span>
+<span class="fc" id="L353">            substituteEqualities(right, assumptions));</span>
+    }
+
+    private boolean sameUnderAssumptions(
+        String left,
+        String right,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L361">        return same(</span>
+<span class="fc" id="L362">            substituteEqualities(left, assumptions),</span>
+<span class="fc" id="L363">            substituteEqualities(right, assumptions));</span>
+    }
+
+    private boolean same(String left, String right) {
+<span class="fc" id="L367">        return canonicalizer.canonicalize(left)</span>
+<span class="fc" id="L368">            .equals(canonicalizer.canonicalize(right));</span>
+    }
+
+    private String substituteEqualities(
+        String expression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L375">        String result = expression;</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        for (String assumption : assumptions) {</span>
+<span class="fc" id="L377">            int separator = assumption.indexOf('=');</span>
+<span class="pc bpc" id="L378" title="1 of 4 branches missed.">            if (separator &lt; 1 || assumption.contains(&quot;!=&quot;)</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">                    || assumption.indexOf('=', separator + 1) &gt;= 0) {</span>
+<span class="nc" id="L380">                continue;</span>
+            }
+<span class="fc" id="L382">            String left = assumption.substring(0, separator).trim();</span>
+<span class="fc" id="L383">            String right = assumption.substring(separator + 1).trim();</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">            if (left.matches(&quot;[A-Za-z][A-Za-z0-9_]*&quot;)) {</span>
+<span class="fc" id="L385">                result = result.replaceAll(</span>
+<span class="fc" id="L386">                    &quot;\\b&quot; + Pattern.quote(left) + &quot;\\b&quot;,</span>
+<span class="fc" id="L387">                    Matcher.quoteReplacement(&quot;(&quot; + right + &quot;)&quot;));</span>
+            }
+<span class="fc" id="L389">        }</span>
+<span class="fc" id="L390">        return result;</span>
+    }
+
+    private boolean assumptionsCovered(
+        List&lt;String&gt; required,
+        List&lt;String&gt; available
+    ) {
+<span class="pc bpc" id="L397" title="2 of 4 branches missed.">        if (required == null || required.isEmpty()) {</span>
+<span class="fc" id="L398">            return true;</span>
+        }
+<span class="nc bnc" id="L400" title="All 4 branches missed.">        if (available == null || available.isEmpty()) {</span>
+<span class="nc" id="L401">            return false;</span>
+        }
+<span class="nc" id="L403">        Set&lt;String&gt; normalized = new LinkedHashSet&lt;&gt;(</span>
+<span class="nc" id="L404">            AssumptionSignature.ofExpressions(available)</span>
+<span class="nc" id="L405">                .normalizedAssumptions());</span>
+<span class="nc" id="L406">        return normalized.containsAll(</span>
+<span class="nc" id="L407">            AssumptionSignature.ofExpressions(required)</span>
+<span class="nc" id="L408">                .normalizedAssumptions());</span>
+    }
+
+    private UtilityOutcome utility(SearchRun baseline, SearchRun macro) {
+<span class="pc bpc" id="L412" title="1 of 4 branches missed.">        if (baseline.success() &amp;&amp; !macro.success()) {</span>
+<span class="nc" id="L413">            return UtilityOutcome.CORRECTNESS_REGRESSION;</span>
+        }
+<span class="pc bpc" id="L415" title="1 of 4 branches missed.">        if (!baseline.success() &amp;&amp; macro.success()) {</span>
+<span class="nc" id="L416">            return UtilityOutcome.REACHABILITY_GAIN;</span>
+        }
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (!baseline.success()) {</span>
+<span class="fc" id="L419">            return UtilityOutcome.NO_RESULT;</span>
+        }
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (macro.expandedStates() &lt; baseline.expandedStates()</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">                || macro.ruleIds().size() &lt; baseline.ruleIds().size()) {</span>
+<span class="fc" id="L423">            return UtilityOutcome.IMPROVED;</span>
+        }
+<span class="fc" id="L425">        return UtilityOutcome.NO_IMPROVEMENT;</span>
+    }
+
+    private String detail(
+        UtilityOutcome outcome,
+        SearchRun baseline,
+        SearchRun macro
+    ) {
+<span class="pc bpc" id="L433" title="3 of 6 branches missed.">        String summary = switch (outcome) {</span>
+            case IMPROVED -&gt;
+<span class="fc" id="L435">                &quot;macro run reaches the target with lower paired search cost&quot;;</span>
+            case REACHABILITY_GAIN -&gt;
+<span class="nc" id="L437">                &quot;macro run reaches a target missed by the paired baseline&quot;;</span>
+            case NO_IMPROVEMENT -&gt;
+<span class="fc" id="L439">                &quot;both runs reach the target without measured macro improvement&quot;;</span>
+            case NO_RESULT -&gt;
+<span class="fc" id="L441">                &quot;neither paired run reaches the target&quot;;</span>
+            case CORRECTNESS_REGRESSION -&gt;
+<span class="nc" id="L443">                &quot;baseline reaches the target but macro-enabled run does not&quot;;</span>
+            case CANDIDATE_NOT_FORMED -&gt;
+<span class="pc" id="L445">                &quot;TRAIN formation did not produce reusable macros&quot;;</span>
+        };
+<span class="fc" id="L447">        return summary</span>
+<span class="fc" id="L448">            + &quot;; baselineExpanded=&quot; + baseline.expandedStates()</span>
+<span class="fc" id="L449">            + &quot;; macroExpanded=&quot; + macro.expandedStates();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

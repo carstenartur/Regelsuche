@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-campaign-execution/v2",
+  "title": "Regelsuche autonomous campaign execution v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "planHash",
+    "decisionHash",
+    "aggregateReceiptHash",
+    "miningEvidenceHash",
+    "disposition",
+    "outputBranchIds",
+    "rejectedClusterHashes",
+    "executedResources",
+    "skippedResources",
+    "executionIsMathematicalEvidence",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-campaign-execution/v2" },
+    "planHash": { "$ref": "#/$defs/sha256" },
+    "decisionHash": { "$ref": "#/$defs/sha256" },
+    "aggregateReceiptHash": { "$ref": "#/$defs/sha256" },
+    "miningEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "disposition": {
+      "enum": ["COMPLETED", "INCONCLUSIVE", "BACKEND_UNAVAILABLE"]
+    },
+    "outputBranchIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "rejectedClusterHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sha256" }
+    },
+    "executedResources": { "$ref": "#/$defs/resources" },
+    "skippedResources": { "$ref": "#/$defs/resources" },
+    "executionIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["resource", "amount"],
+        "properties": {
+          "resource": { "$ref": "#/$defs/nonBlank" },
+          "amount": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

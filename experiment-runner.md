@@ -1,0 +1,99 @@
+# Experiment Runner
+
+Für wissenschaftliche Discovery-Läufe nutzt Regelsuche den `DeterministicDiscoveryExperimentRunner`.
+
+Eigenschaften:
+
+- deterministische Seed-Reihenfolge über `SeedExpression.stableKey()`
+- globales Budget
+- optionale Parallelität ohne veränderte Report-Reihenfolge
+- stabile JSON-/Replay-Artefakte für CI und Reproduktionsanhänge
+
+Wichtige Klassen:
+
+- `ScientificSeedCorpora`
+- `SeedExpression`
+- `DeterministicDiscoveryExperimentRunner`
+- `ScientificDiscoveryWorkflow`
+
+Typische Kommandos:
+
+```bash
+./gradlew :app:test --tests de.regelsuche.discovery.ScientificDiscoveryReproductionTest
+./gradlew benchmarkReport
+./gradlew runDiscoveryCampaign1
+./gradlew runDiscoveryCampaign2
+./gradlew runDiscoveryCampaign3
+./gradlew runDiscoveryCampaign4
+./gradlew runDiscoveryCampaign5
+./gradlew runDiscoveryCampaign6
+./gradlew runDiscoveryPromotionPipeline
+```
+
+## Discovery Campaign 6: Countable Move Search Probe
+
+`DiscoveryCampaignSixRunner` kombiniert pro Fall drei Sichtweisen:
+
+1. **Depth-1 Candidate Probe**
+   - erwarteter Move vorhanden?
+   - Move-only / Classic-only / Overlap
+   - klassische vs. Move-Zählwerte
+2. **Multi-step Countable Move Search**
+   - bounded search (`maxDepth<=4`, `maxStates`)
+   - Zielerreichbarkeit, Pfadlänge, applied moves/rules, ordinal path
+   - explored/unique states und Failure Reason
+3. **Interpretation**
+   - Tauglichkeit des Falls
+   - fehlende Move-Familie
+   - Einordnung gegenüber klassischer Kandidatenerzeugung
+
+Die vier Kernfälle bleiben:
+
+- `x - 1 = 0` → Ziel `x = 1` (oder äquivalente Normalform), erwarteter `+1`-Move
+- `x^2 + 6*x + 5` → Ziel `(x + 3)^2 - 4`, erwarteter complete-square Move
+- `(x+1)^2 - (x+1)` → Ziel `(x+1)*x`, erwarteter repeated-subexpression/factor Move
+- `x*(y+1)+z*(y+1)` → Ziel `(y+1)*(x+z)`, erwarteter common-subexpression Move
+
+Der Report (`app/build/reports/discovery-campaign-6/`) enthält je Fall:
+
+- Input und Target
+- Depth-1 Candidate Summary
+- Multi-step Search Result
+- Successful Path Tabelle (`step`, `before`, `moveKind`, `ruleId`, `ordinal`, `parameters`, `after`)
+- Search Space Intelligence Tabelle (`exploredStateCount`, `uniqueCanonicalStateCount`, `generatedMoveCount`, `duplicateStateCount`, `prunedByDepthCount`, `prunedByStateBudgetCount`, `classicFallbackMoveCount`, `unknownMoveCount`, `unresolvedParameterMoveCount`) inkl. branchingFactor pro Tiefe, MoveKind-/Enumerator-Histogramm, successfulPathMoveKinds und Bewertung
+- Classic-vs-Move Vergleich
+- Interpretation und Architecture Note
+- Related follow-up issues
+
+Zusätzlich enthält der Report eine **Search Space Intelligence Summary** über alle Fälle (Gesamtzählungen, max. branching factor, aggregierte Histogramme) und pro Fall eine Bewertung des Suchraums:
+
+- `ausreichend klein`
+- `braucht stärkere Heuristik`
+- `braucht Normalizer`
+- `braucht Parameterbegrenzung`
+- `braucht neuen Realizer`
+
+Siehe auch:
+
+- [docs/rule-discovery.md](rule-discovery.md)
+- [docs/scientific-reproducibility.md](scientific-reproducibility.md)
+
+## Generated artifact ownership (Discovery Gallery)
+
+`generateDiscoveryGallery` muss reproduzierbar sein und der CI/CD-Check ist absichtlich strikt.
+
+Regel für dieses Repository:
+
+- Feature-PRs, die Discovery-Generatoren, Campaign-Runner, Report-Modelle oder die README/Gallery-Ausgabe ändern, committen die dadurch geänderten Artefakte im selben PR.
+- Der Reproducibility-Check in CI erwartet genau diese Konsistenz und bleibt hart.
+- Ein separater Gallery-Bot-PR ist nur für reine Artefakt-Aktualisierungen ohne Generatoränderung gedacht, nicht als Ersatz für fehlende Artefakte in Feature-PRs.
+
+Pflichtschritte vor Merge:
+
+```bash
+./gradlew build
+env -u GITHUB_SHA ./gradlew :app:generateDiscoveryGallery
+git diff --exit-code -- docs/generated/discovery docs/demo-gallery.md README.md
+```
+
+TODO: Clarify Gallery Bot ownership for feature branches.

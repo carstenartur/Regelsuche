@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleRadarJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.radar</a> &gt; <span class="el_source">RuleRadarJson.java</span></div><h1>RuleRadarJson.java</h1><pre class="source lang-java linenums">package de.regelsuche.radar;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Map;
+
+import static de.regelsuche.radar.AstRuleRadar.ApplicableMove;
+import static de.regelsuche.radar.AstRuleRadar.AstNode;
+import static de.regelsuche.radar.AstRuleRadar.AtomicStep;
+import static de.regelsuche.radar.AstRuleRadar.Binding;
+import static de.regelsuche.radar.AstRuleRadar.Context;
+import static de.regelsuche.radar.AstRuleRadar.Diagnostic;
+import static de.regelsuche.radar.AstRuleRadar.MacroEvidence;
+import static de.regelsuche.radar.AstRuleRadar.SearchEdge;
+import static de.regelsuche.radar.AstRuleRadar.SearchEvent;
+import static de.regelsuche.radar.AstRuleRadar.SearchResult;
+import static de.regelsuche.radar.AstRuleRadar.SearchState;
+import static de.regelsuche.radar.AstRuleRadar.Snapshot;
+
+/** Deterministic JSON rendering for the rule-radar HTTP surface. */
+public final class RuleRadarJson {
+    private RuleRadarJson() {
+    }
+
+    public static String snapshot(Snapshot snapshot) {
+<span class="fc" id="L25">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L26">        writeSnapshot(writer, snapshot);</span>
+<span class="fc" id="L27">        return writer.endObject().toString();</span>
+    }
+
+    public static String searchResult(SearchResult result) {
+<span class="fc" id="L31">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L32">        writer.property(&quot;schema&quot;, result.schema());</span>
+<span class="fc" id="L33">        writer.property(&quot;startExpression&quot;, result.startExpression());</span>
+<span class="fc" id="L34">        writer.property(&quot;targetExpression&quot;, result.targetExpression());</span>
+<span class="fc" id="L35">        writer.property(&quot;targetReached&quot;, result.targetReached());</span>
+<span class="fc" id="L36">        writer.property(&quot;terminalStateId&quot;, result.terminalStateId());</span>
+<span class="fc" id="L37">        writer.property(&quot;exploredStateCount&quot;, result.exploredStateCount());</span>
+<span class="fc" id="L38">        writer.property(&quot;generatedCandidateCount&quot;, result.generatedCandidateCount());</span>
+<span class="fc" id="L39">        writer.array(&quot;states&quot;, array -&gt; result.states().forEach(state -&gt; array.objectValue(item -&gt; writeState(item, state))));</span>
+<span class="fc" id="L40">        writer.array(&quot;edges&quot;, array -&gt; result.edges().forEach(edge -&gt; array.objectValue(item -&gt; writeEdge(item, edge))));</span>
+<span class="fc" id="L41">        writer.array(&quot;events&quot;, array -&gt; result.events().forEach(event -&gt; array.objectValue(item -&gt; writeEvent(item, event))));</span>
+<span class="fc" id="L42">        writer.object(&quot;finalOutcomeByCandidateId&quot;, object -&gt; result.finalOutcomeByCandidateId().entrySet().stream()</span>
+<span class="fc" id="L43">            .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L44">            .forEach(entry -&gt; object.property(entry.getKey(), entry.getValue().name())));</span>
+<span class="fc" id="L45">        writer.array(&quot;diagnostics&quot;, array -&gt; result.diagnostics().forEach(diagnostic -&gt;</span>
+<span class="nc" id="L46">            array.objectValue(item -&gt; writeDiagnostic(item, diagnostic))));</span>
+<span class="fc" id="L47">        return writer.endObject().toString();</span>
+    }
+
+    public static String applyResult(
+        ApplicableMove applied,
+        Snapshot refreshed,
+        boolean expressionChanged
+    ) {
+<span class="fc" id="L55">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L56">        writer.property(&quot;candidateId&quot;, applied.candidateId());</span>
+<span class="fc" id="L57">        writer.property(&quot;pathKey&quot;, applied.pathKey());</span>
+<span class="fc" id="L58">        writer.property(&quot;ruleId&quot;, applied.ruleId());</span>
+<span class="fc" id="L59">        writer.property(&quot;origin&quot;, applied.origin().name());</span>
+<span class="fc" id="L60">        writer.property(&quot;expressionBefore&quot;, applied.expressionBefore());</span>
+<span class="fc" id="L61">        writer.property(&quot;expressionAfter&quot;, applied.expressionAfter());</span>
+<span class="fc" id="L62">        writer.property(&quot;expressionChanged&quot;, expressionChanged);</span>
+<span class="fc" id="L63">        writer.object(&quot;candidate&quot;, object -&gt; writeCandidate(object, applied));</span>
+<span class="fc" id="L64">        writer.object(&quot;inspection&quot;, object -&gt; writeSnapshot(object, refreshed));</span>
+<span class="fc" id="L65">        return writer.endObject().toString();</span>
+    }
+
+    private static void writeSnapshot(JsonWriter writer, Snapshot snapshot) {
+<span class="fc" id="L69">        writer.property(&quot;schema&quot;, snapshot.schema());</span>
+<span class="fc" id="L70">        writer.property(&quot;expression&quot;, snapshot.expression());</span>
+<span class="fc" id="L71">        writer.property(&quot;canonicalExpression&quot;, snapshot.canonicalExpression());</span>
+<span class="fc" id="L72">        writer.property(&quot;valid&quot;, snapshot.valid());</span>
+<span class="fc" id="L73">        writer.object(&quot;context&quot;, object -&gt; writeContext(object, snapshot.context()));</span>
+<span class="fc" id="L74">        writer.array(&quot;nodes&quot;, array -&gt; snapshot.nodes().forEach(node -&gt; array.objectValue(item -&gt; writeNode(item, node))));</span>
+<span class="fc" id="L75">        writer.array(&quot;candidates&quot;, array -&gt; snapshot.candidates().forEach(candidate -&gt;</span>
+<span class="fc" id="L76">            array.objectValue(item -&gt; writeCandidate(item, candidate))));</span>
+<span class="fc" id="L77">        writer.object(&quot;truncation&quot;, object -&gt; {</span>
+<span class="fc" id="L78">            object.property(&quot;truncated&quot;, snapshot.truncation().truncated());</span>
+<span class="fc" id="L79">            object.property(&quot;generatedCandidateCount&quot;, snapshot.truncation().generatedCandidateCount());</span>
+<span class="fc" id="L80">            object.property(&quot;returnedCandidateCount&quot;, snapshot.truncation().returnedCandidateCount());</span>
+<span class="fc" id="L81">            object.property(&quot;omittedCandidateCount&quot;, snapshot.truncation().omittedCandidateCount());</span>
+<span class="fc" id="L82">            object.object(&quot;omittedByPath&quot;, omitted -&gt; snapshot.truncation().omittedByPath().entrySet().stream()</span>
+<span class="fc" id="L83">                .sorted(Map.Entry.comparingByKey())</span>
+<span class="fc" id="L84">                .forEach(entry -&gt; omitted.property(entry.getKey(), entry.getValue())));</span>
+<span class="fc" id="L85">        });</span>
+<span class="fc" id="L86">        writer.array(&quot;diagnostics&quot;, array -&gt; snapshot.diagnostics().forEach(diagnostic -&gt;</span>
+<span class="fc" id="L87">            array.objectValue(item -&gt; writeDiagnostic(item, diagnostic))));</span>
+<span class="fc" id="L88">    }</span>
+
+    private static void writeContext(JsonWriter writer, Context context) {
+<span class="fc" id="L91">        writer.property(&quot;knowledgeProfile&quot;, context.knowledgeProfile().name());</span>
+<span class="fc" id="L92">        writer.stringArray(&quot;enabledPacks&quot;, context.enabledPacks().stream().sorted().toList());</span>
+<span class="fc" id="L93">        writer.stringArray(&quot;disabledPacks&quot;, context.disabledPacks().stream().sorted().toList());</span>
+<span class="fc" id="L94">        writer.property(&quot;includePlugins&quot;, context.includePlugins());</span>
+<span class="fc" id="L95">        writer.property(&quot;includeLearnedMacros&quot;, context.includeLearnedMacros());</span>
+<span class="fc" id="L96">        writer.property(&quot;minMacroProofStatus&quot;, context.minMacroProofStatus().name());</span>
+<span class="fc" id="L97">        writer.property(&quot;searchProfile&quot;, context.searchProfile());</span>
+<span class="fc" id="L98">        writer.property(&quot;goalExpression&quot;, context.goalExpression());</span>
+<span class="fc" id="L99">        writer.property(&quot;maxCandidatesPerPosition&quot;, context.maxCandidatesPerPosition());</span>
+<span class="fc" id="L100">        writer.property(&quot;maxCandidatesTotal&quot;, context.maxCandidatesTotal());</span>
+<span class="fc" id="L101">        writer.stringArray(&quot;assumptions&quot;, context.assumptions());</span>
+<span class="fc" id="L102">        writer.property(&quot;includeRejectedCandidates&quot;, context.includeRejectedCandidates());</span>
+<span class="fc" id="L103">        writer.property(&quot;selectedCandidateId&quot;, context.selectedCandidateId());</span>
+<span class="fc" id="L104">    }</span>
+
+    private static void writeNode(JsonWriter writer, AstNode node) {
+<span class="fc" id="L107">        writer.property(&quot;pathKey&quot;, node.pathKey());</span>
+<span class="fc" id="L108">        writer.property(&quot;parentPathKey&quot;, node.parentPathKey());</span>
+<span class="fc" id="L109">        writer.stringArray(&quot;childPathKeys&quot;, node.childPathKeys());</span>
+<span class="fc" id="L110">        writer.property(&quot;nodeKind&quot;, node.nodeKind());</span>
+<span class="fc" id="L111">        writer.property(&quot;label&quot;, node.label());</span>
+<span class="fc" id="L112">        writer.property(&quot;subtree&quot;, node.subtree());</span>
+<span class="fc" id="L113">        writer.property(&quot;depth&quot;, node.depth());</span>
+<span class="fc" id="L114">        writer.property(&quot;preorderIndex&quot;, node.preorderIndex());</span>
+<span class="fc" id="L115">        writer.stringArray(&quot;candidateIds&quot;, node.candidateIds());</span>
+<span class="fc" id="L116">        writer.property(&quot;candidateCount&quot;, node.candidateCount());</span>
+<span class="fc" id="L117">        writer.property(&quot;omittedCandidateCount&quot;, node.omittedCandidateCount());</span>
+<span class="fc" id="L118">    }</span>
+
+    private static void writeCandidate(JsonWriter writer, ApplicableMove candidate) {
+<span class="fc" id="L121">        writer.property(&quot;candidateId&quot;, candidate.candidateId());</span>
+<span class="fc" id="L122">        writer.property(&quot;pathKey&quot;, candidate.pathKey());</span>
+<span class="fc" id="L123">        writer.property(&quot;ruleId&quot;, candidate.ruleId());</span>
+<span class="fc" id="L124">        writer.property(&quot;displayName&quot;, candidate.displayName());</span>
+<span class="fc" id="L125">        writer.property(&quot;origin&quot;, candidate.origin().name());</span>
+<span class="fc" id="L126">        writer.property(&quot;sourceReference&quot;, candidate.sourceReference());</span>
+<span class="fc" id="L127">        writer.property(&quot;license&quot;, candidate.license());</span>
+<span class="fc" id="L128">        writer.property(&quot;ruleKind&quot;, candidate.ruleKind());</span>
+<span class="fc" id="L129">        writer.array(&quot;bindings&quot;, array -&gt; candidate.bindings().forEach(binding -&gt;</span>
+<span class="fc" id="L130">            array.objectValue(item -&gt; writeBinding(item, binding))));</span>
+<span class="fc" id="L131">        writer.stringArray(&quot;assumptions&quot;, candidate.assumptions());</span>
+<span class="fc" id="L132">        writer.property(&quot;subtreeBefore&quot;, candidate.subtreeBefore());</span>
+<span class="fc" id="L133">        writer.property(&quot;subtreeAfter&quot;, candidate.subtreeAfter());</span>
+<span class="fc" id="L134">        writer.property(&quot;expressionBefore&quot;, candidate.expressionBefore());</span>
+<span class="fc" id="L135">        writer.property(&quot;expressionAfter&quot;, candidate.expressionAfter());</span>
+<span class="fc" id="L136">        writer.property(&quot;applicable&quot;, candidate.applicable());</span>
+<span class="fc" id="L137">        writer.property(&quot;validationStatus&quot;, candidate.validationStatus());</span>
+<span class="fc" id="L138">        writer.property(&quot;equivalencePreserving&quot;, candidate.equivalencePreserving());</span>
+<span class="fc" id="L139">        writer.property(&quot;mayIncreaseComplexity&quot;, candidate.mayIncreaseComplexity());</span>
+<span class="fc" id="L140">        writer.property(&quot;estimatedCostDelta&quot;, candidate.estimatedCostDelta());</span>
+<span class="fc" id="L141">        writer.property(&quot;outcome&quot;, candidate.outcome().name());</span>
+<span class="fc" id="L142">        writer.property(&quot;selected&quot;, candidate.selected());</span>
+<span class="fc" id="L143">        writer.property(&quot;orderingKey&quot;, candidate.orderingKey());</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (candidate.macroEvidence() == null) {</span>
+<span class="fc" id="L145">            writer.nullProperty(&quot;macroEvidence&quot;);</span>
+        } else {
+<span class="nc" id="L147">            writer.object(&quot;macroEvidence&quot;, object -&gt; writeMacroEvidence(object, candidate.macroEvidence()));</span>
+        }
+<span class="fc" id="L149">    }</span>
+
+    private static void writeBinding(JsonWriter writer, Binding binding) {
+<span class="fc" id="L152">        writer.property(&quot;name&quot;, binding.name());</span>
+<span class="fc" id="L153">        writer.property(&quot;value&quot;, binding.value());</span>
+<span class="fc" id="L154">        writer.property(&quot;kind&quot;, binding.kind());</span>
+<span class="fc" id="L155">    }</span>
+
+    private static void writeMacroEvidence(JsonWriter writer, MacroEvidence evidence) {
+<span class="nc" id="L158">        writer.property(&quot;reusableRuleId&quot;, evidence.reusableRuleId());</span>
+<span class="nc" id="L159">        writer.stringArray(&quot;supportingPathIds&quot;, evidence.supportingPathIds());</span>
+<span class="nc" id="L160">        writer.property(&quot;confidenceScore&quot;, evidence.confidenceScore());</span>
+<span class="nc" id="L161">        writer.property(&quot;occurrenceCount&quot;, evidence.occurrenceCount());</span>
+<span class="nc" id="L162">        writer.property(&quot;compressionRatio&quot;, evidence.compressionRatio());</span>
+<span class="nc" id="L163">        writer.array(&quot;atomicSteps&quot;, array -&gt; evidence.atomicSteps().forEach(step -&gt;</span>
+<span class="nc" id="L164">            array.objectValue(item -&gt; writeAtomicStep(item, step))));</span>
+<span class="nc" id="L165">    }</span>
+
+    private static void writeAtomicStep(JsonWriter writer, AtomicStep step) {
+<span class="nc" id="L168">        writer.property(&quot;index&quot;, step.index());</span>
+<span class="nc" id="L169">        writer.property(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="nc" id="L170">        writer.property(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="nc" id="L171">        writer.property(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="nc" id="L172">        writer.property(&quot;ruleKind&quot;, step.ruleKind());</span>
+<span class="nc" id="L173">        writer.stringArray(&quot;assumptions&quot;, step.assumptions());</span>
+<span class="nc" id="L174">    }</span>
+
+    private static void writeState(JsonWriter writer, SearchState state) {
+<span class="fc" id="L177">        writer.property(&quot;stateId&quot;, state.stateId());</span>
+<span class="fc" id="L178">        writer.property(&quot;expression&quot;, state.expression());</span>
+<span class="fc" id="L179">        writer.property(&quot;canonicalExpression&quot;, state.canonicalExpression());</span>
+<span class="fc" id="L180">        writer.property(&quot;depth&quot;, state.depth());</span>
+<span class="fc" id="L181">        writer.property(&quot;target&quot;, state.target());</span>
+<span class="fc" id="L182">    }</span>
+
+    private static void writeEdge(JsonWriter writer, SearchEdge edge) {
+<span class="fc" id="L185">        writer.property(&quot;edgeId&quot;, edge.edgeId());</span>
+<span class="fc" id="L186">        writer.property(&quot;fromStateId&quot;, edge.fromStateId());</span>
+<span class="fc" id="L187">        writer.property(&quot;toStateId&quot;, edge.toStateId());</span>
+<span class="fc" id="L188">        writer.property(&quot;fromExpression&quot;, edge.fromExpression());</span>
+<span class="fc" id="L189">        writer.property(&quot;toExpression&quot;, edge.toExpression());</span>
+<span class="fc" id="L190">        writer.property(&quot;candidateId&quot;, edge.candidateId());</span>
+<span class="fc" id="L191">        writer.property(&quot;pathKey&quot;, edge.pathKey());</span>
+<span class="fc" id="L192">        writer.property(&quot;ruleId&quot;, edge.ruleId());</span>
+<span class="fc" id="L193">        writer.property(&quot;origin&quot;, edge.origin().name());</span>
+<span class="fc" id="L194">        writer.property(&quot;outcome&quot;, edge.outcome().name());</span>
+<span class="fc" id="L195">    }</span>
+
+    private static void writeEvent(JsonWriter writer, SearchEvent event) {
+<span class="fc" id="L198">        writer.property(&quot;sequence&quot;, event.sequence());</span>
+<span class="fc" id="L199">        writer.property(&quot;stateId&quot;, event.stateId());</span>
+<span class="fc" id="L200">        writer.property(&quot;expression&quot;, event.expression());</span>
+<span class="fc" id="L201">        writer.property(&quot;candidateId&quot;, event.candidateId());</span>
+<span class="fc" id="L202">        writer.property(&quot;pathKey&quot;, event.pathKey());</span>
+<span class="fc" id="L203">        writer.property(&quot;ruleId&quot;, event.ruleId());</span>
+<span class="fc" id="L204">        writer.property(&quot;outcome&quot;, event.outcome().name());</span>
+<span class="fc" id="L205">        writer.property(&quot;detail&quot;, event.detail());</span>
+<span class="fc" id="L206">    }</span>
+
+    private static void writeDiagnostic(JsonWriter writer, Diagnostic diagnostic) {
+<span class="fc" id="L209">        writer.property(&quot;code&quot;, diagnostic.code());</span>
+<span class="fc" id="L210">        writer.property(&quot;message&quot;, diagnostic.message());</span>
+<span class="fc" id="L211">        writer.property(&quot;pathKey&quot;, diagnostic.pathKey());</span>
+<span class="fc" id="L212">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

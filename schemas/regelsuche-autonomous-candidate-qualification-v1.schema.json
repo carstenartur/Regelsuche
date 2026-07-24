@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-candidate-qualification/v1",
+  "title": "Regelsuche autonomous candidate qualification evidence v1",
+  "type": "object",
+  "required": [
+    "schema", "campaignManifestHash", "briefHash", "inventoryHash", "modelHash",
+    "conjectureId", "candidateBranchId", "miningEvidenceHash", "lineageHash",
+    "supportingObservationIds", "sourceObservationBranchHashes",
+    "leftPattern", "rightPattern", "parameterRelations", "assumptions",
+    "suiteRevision", "suiteHash", "splitAuditHash", "evaluationHash", "utilityHash",
+    "heldOutFamilyOrClusterCount", "configuredPositiveHoldouts",
+    "executedPositiveHoldouts", "configuredNegativeHoldouts",
+    "executedNegativeHoldouts", "mandatorySkippedWorkCount",
+    "refutingHoldouts", "counterexamplesFound", "pairedHeldOutUtilityEvaluated",
+    "pairedUtilityPermille", "correctnessRegressionCount", "qualified", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-candidate-qualification/v1" },
+    "campaignManifestHash": { "$ref": "#/$defs/sha256" },
+    "briefHash": { "$ref": "#/$defs/sha256" },
+    "inventoryHash": { "$ref": "#/$defs/sha256" },
+    "modelHash": { "$ref": "#/$defs/sha256" },
+    "conjectureId": { "type": "string", "minLength": 1 },
+    "candidateBranchId": { "type": "string", "minLength": 1 },
+    "miningEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "lineageHash": { "$ref": "#/$defs/sha256" },
+    "supportingObservationIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "sourceObservationBranchHashes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sha256" }
+    },
+    "leftPattern": { "type": "string", "minLength": 1 },
+    "rightPattern": { "type": "string", "minLength": 1 },
+    "parameterRelations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "assumptions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "suiteRevision": {
+      "const": "production-candidate-composite-factor-qualification/v1"
+    },
+    "suiteHash": { "$ref": "#/$defs/sha256" },
+    "splitAuditHash": { "$ref": "#/$defs/sha256" },
+    "evaluationHash": { "$ref": "#/$defs/sha256" },
+    "utilityHash": { "$ref": "#/$defs/sha256" },
+    "heldOutFamilyOrClusterCount": { "type": "integer", "minimum": 0 },
+    "configuredPositiveHoldouts": { "type": "integer", "minimum": 0 },
+    "executedPositiveHoldouts": { "type": "integer", "minimum": 0 },
+    "configuredNegativeHoldouts": { "type": "integer", "minimum": 0 },
+    "executedNegativeHoldouts": { "type": "integer", "minimum": 0 },
+    "mandatorySkippedWorkCount": { "type": "integer", "minimum": 0 },
+    "refutingHoldouts": { "type": "integer", "minimum": 0 },
+    "counterexamplesFound": { "type": "integer", "minimum": 0 },
+    "pairedHeldOutUtilityEvaluated": { "type": "boolean" },
+    "pairedUtilityPermille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "correctnessRegressionCount": { "type": "integer", "minimum": 0 },
+    "qualified": { "type": "boolean" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

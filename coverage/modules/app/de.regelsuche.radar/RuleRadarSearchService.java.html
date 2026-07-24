@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleRadarSearchService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.radar</a> &gt; <span class="el_source">RuleRadarSearchService.java</span></div><h1>RuleRadarSearchService.java</h1><pre class="source lang-java linenums">package de.regelsuche.radar;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import static de.regelsuche.radar.AstRuleRadar.ApplicableMove;
+import static de.regelsuche.radar.AstRuleRadar.CandidateOutcome;
+import static de.regelsuche.radar.AstRuleRadar.Context;
+import static de.regelsuche.radar.AstRuleRadar.SearchEdge;
+import static de.regelsuche.radar.AstRuleRadar.SearchEvent;
+import static de.regelsuche.radar.AstRuleRadar.SearchResult;
+import static de.regelsuche.radar.AstRuleRadar.SearchState;
+import static de.regelsuche.radar.AstRuleRadar.Snapshot;
+
+/**
+ * Deterministic bounded search driven exclusively by candidates from
+ * {@link AstRuleRadarService}. Manual application, preview and search therefore
+ * share candidate identity and successor expressions.
+ */
+public final class RuleRadarSearchService {
+    private static final String SCHEMA = &quot;regelsuche.ast-rule-radar-search/v1&quot;;
+    private final AstRuleRadarService radar;
+<span class="fc" id="L31">    private final ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();</span>
+
+<span class="fc" id="L33">    public RuleRadarSearchService(AstRuleRadarService radar) {</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (radar == null) {</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(&quot;radar is required&quot;);</span>
+        }
+<span class="fc" id="L37">        this.radar = radar;</span>
+<span class="fc" id="L38">    }</span>
+
+    public SearchResult search(SearchRequest requested) {
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        SearchRequest request = requested == null ? SearchRequest.defaults(&quot;&quot;) : requested;</span>
+<span class="fc" id="L42">        Snapshot initial = radar.inspect(request.expression(), request.context());</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (!initial.valid()) {</span>
+<span class="nc" id="L44">            return new SearchResult(</span>
+<span class="nc" id="L45">                SCHEMA, request.expression(), request.targetExpression(), false, &quot;&quot;, 0, 0,</span>
+<span class="nc" id="L46">                List.of(), List.of(), List.of(), Map.of(), initial.diagnostics());</span>
+        }
+
+<span class="fc" id="L49">        String targetCanonical = canonical(request.targetExpression());</span>
+<span class="fc" id="L50">        String initialCanonical = initial.canonicalExpression();</span>
+<span class="fc" id="L51">        String initialStateId = stateId(initialCanonical);</span>
+<span class="fc" id="L52">        SearchState initialState = new SearchState(</span>
+<span class="fc" id="L53">            initialStateId, initial.expression(), initialCanonical, 0,</span>
+<span class="pc bpc" id="L54" title="3 of 4 branches missed.">            !targetCanonical.isBlank() &amp;&amp; initialCanonical.equals(targetCanonical));</span>
+<span class="fc" id="L55">        List&lt;SearchState&gt; states = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L56">        states.add(initialState);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (initialState.target()) {</span>
+<span class="nc" id="L58">            return new SearchResult(</span>
+<span class="nc" id="L59">                SCHEMA, initial.expression(), request.targetExpression(), true, initialStateId,</span>
+<span class="nc" id="L60">                0, 0, states, List.of(), List.of(), Map.of(), List.of());</span>
+        }
+
+<span class="fc" id="L63">        ArrayDeque&lt;FrontierState&gt; frontier = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L64">        frontier.add(new FrontierState(initialState));</span>
+<span class="fc" id="L65">        Map&lt;String, Integer&gt; bestDepthByCanonical = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L66">        bestDepthByCanonical.put(initialCanonical, 0);</span>
+<span class="fc" id="L67">        Map&lt;String, SearchState&gt; stateByCanonical = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L68">        stateByCanonical.put(initialCanonical, initialState);</span>
+<span class="fc" id="L69">        List&lt;SearchEdge&gt; edges = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L70">        List&lt;SearchEvent&gt; events = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L71">        Map&lt;String, CandidateOutcome&gt; finalOutcomes = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L72">        long sequence = 0;</span>
+<span class="fc" id="L73">        int explored = 0;</span>
+<span class="fc" id="L74">        int generated = 0;</span>
+<span class="fc" id="L75">        boolean reached = false;</span>
+<span class="fc" id="L76">        String terminalStateId = &quot;&quot;;</span>
+
+        search:
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        while (!frontier.isEmpty()) {</span>
+<span class="fc" id="L80">            FrontierState current = frontier.removeFirst();</span>
+<span class="fc" id="L81">            explored++;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (current.state().depth() &gt;= request.maxDepth()) {</span>
+<span class="fc" id="L83">                continue;</span>
+            }
+<span class="fc" id="L85">            Snapshot snapshot = radar.inspect(current.state().expression(), request.context());</span>
+<span class="fc" id="L86">            List&lt;ApplicableMove&gt; candidates = snapshot.candidates();</span>
+<span class="fc" id="L87">            generated += candidates.size();</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            for (int index = 0; index &lt; candidates.size(); index++) {</span>
+<span class="fc" id="L89">                ApplicableMove candidate = candidates.get(index);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                if (index &gt;= request.maxMovesPerState()) {</span>
+<span class="fc" id="L91">                    sequence = event(events, finalOutcomes, sequence, current.state(), candidate,</span>
+                        CandidateOutcome.PRUNED_BUDGET, &quot;per-state move budget reached&quot;);
+<span class="fc" id="L93">                    continue;</span>
+                }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                if (!candidate.applicable()) {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                    CandidateOutcome rejected = candidate.outcome() == CandidateOutcome.REJECTED_VALIDATION</span>
+<span class="nc" id="L97">                        ? CandidateOutcome.REJECTED_VALIDATION</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                        : candidate.outcome() == CandidateOutcome.REJECTED_ASSUMPTION</span>
+<span class="nc" id="L99">                            ? CandidateOutcome.REJECTED_ASSUMPTION</span>
+<span class="nc" id="L100">                            : CandidateOutcome.FAILED_APPLICATION;</span>
+<span class="nc" id="L101">                    sequence = event(events, finalOutcomes, sequence, current.state(), candidate,</span>
+                        rejected, &quot;candidate is visible for audit but is not executable&quot;);
+<span class="nc" id="L103">                    continue;</span>
+                }
+<span class="fc" id="L105">                sequence = event(events, finalOutcomes, sequence, current.state(), candidate,</span>
+                    CandidateOutcome.SELECTED, &quot;candidate selected in deterministic order&quot;);
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                if (candidate.expressionAfter().isBlank()) {</span>
+<span class="nc" id="L108">                    sequence = event(events, finalOutcomes, sequence, current.state(), candidate,</span>
+                        CandidateOutcome.FAILED_APPLICATION, &quot;candidate advertised no successor expression&quot;);
+<span class="nc" id="L110">                    continue;</span>
+                }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                if (states.size() &gt;= request.maxStates()) {</span>
+<span class="fc" id="L113">                    sequence = event(events, finalOutcomes, sequence, current.state(), candidate,</span>
+                        CandidateOutcome.PRUNED_BUDGET, &quot;global state budget reached&quot;);
+<span class="fc" id="L115">                    continue;</span>
+                }
+
+<span class="fc" id="L118">                String nextCanonical = canonical(candidate.expressionAfter());</span>
+<span class="fc" id="L119">                int nextDepth = current.state().depth() + 1;</span>
+<span class="fc" id="L120">                Integer knownDepth = bestDepthByCanonical.get(nextCanonical);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                if (knownDepth != null) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                    CandidateOutcome pruning = knownDepth &lt; nextDepth</span>
+<span class="fc" id="L123">                        ? CandidateOutcome.PRUNED_KNOWN_BETTER</span>
+<span class="fc" id="L124">                        : CandidateOutcome.PRUNED_DUPLICATE;</span>
+<span class="fc" id="L125">                    SearchState retained = stateByCanonical.get(nextCanonical);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">                    if (retained != null) {</span>
+<span class="fc" id="L127">                        edges.add(edge(current.state(), retained, candidate, pruning));</span>
+                    }
+<span class="fc" id="L129">                    sequence = event(events, finalOutcomes, sequence, current.state(), candidate,</span>
+                        pruning, &quot;canonical successor already retained at depth &quot; + knownDepth);
+<span class="fc" id="L131">                    continue;</span>
+                }
+
+<span class="fc" id="L134">                String nextStateId = stateId(nextCanonical);</span>
+<span class="pc bpc" id="L135" title="3 of 4 branches missed.">                boolean isTarget = !targetCanonical.isBlank() &amp;&amp; nextCanonical.equals(targetCanonical);</span>
+<span class="fc" id="L136">                SearchState next = new SearchState(</span>
+                    nextStateId,
+<span class="fc" id="L138">                    candidate.expressionAfter(),</span>
+                    nextCanonical,
+                    nextDepth,
+                    isTarget
+                );
+<span class="fc" id="L143">                bestDepthByCanonical.put(nextCanonical, nextDepth);</span>
+<span class="fc" id="L144">                stateByCanonical.put(nextCanonical, next);</span>
+<span class="fc" id="L145">                states.add(next);</span>
+<span class="fc" id="L146">                edges.add(edge(current.state(), next, candidate, CandidateOutcome.APPLIED));</span>
+<span class="fc" id="L147">                sequence = event(events, finalOutcomes, sequence, current.state(), candidate,</span>
+                    CandidateOutcome.APPLIED, &quot;successor state &quot; + nextStateId + &quot; created&quot;);
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                if (isTarget) {</span>
+<span class="nc" id="L150">                    reached = true;</span>
+<span class="nc" id="L151">                    terminalStateId = nextStateId;</span>
+<span class="nc" id="L152">                    break search;</span>
+                }
+<span class="fc" id="L154">                frontier.addLast(new FrontierState(next));</span>
+            }
+<span class="fc" id="L156">        }</span>
+
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">        if (!reached &amp;&amp; !states.isEmpty()) {</span>
+<span class="fc" id="L159">            terminalStateId = states.getLast().stateId();</span>
+        }
+<span class="fc" id="L161">        return new SearchResult(</span>
+            SCHEMA,
+<span class="fc" id="L163">            initial.expression(),</span>
+<span class="fc" id="L164">            request.targetExpression(),</span>
+            reached,
+            terminalStateId,
+            explored,
+            generated,
+            states,
+            edges,
+            events,
+            finalOutcomes,
+<span class="fc" id="L173">            List.of()</span>
+        );
+    }
+
+    private SearchEdge edge(
+        SearchState from,
+        SearchState to,
+        ApplicableMove candidate,
+        CandidateOutcome outcome
+    ) {
+<span class="fc" id="L183">        return new SearchEdge(</span>
+<span class="fc" id="L184">            edgeId(from.stateId(), to.stateId(), candidate.candidateId()),</span>
+<span class="fc" id="L185">            from.stateId(),</span>
+<span class="fc" id="L186">            to.stateId(),</span>
+<span class="fc" id="L187">            from.expression(),</span>
+<span class="fc" id="L188">            to.expression(),</span>
+<span class="fc" id="L189">            candidate.candidateId(),</span>
+<span class="fc" id="L190">            candidate.pathKey(),</span>
+<span class="fc" id="L191">            candidate.ruleId(),</span>
+<span class="fc" id="L192">            candidate.origin(),</span>
+            outcome
+        );
+    }
+
+    private long event(
+        List&lt;SearchEvent&gt; events,
+        Map&lt;String, CandidateOutcome&gt; outcomes,
+        long sequence,
+        SearchState state,
+        ApplicableMove candidate,
+        CandidateOutcome outcome,
+        String detail
+    ) {
+<span class="fc" id="L206">        long next = sequence + 1;</span>
+<span class="fc" id="L207">        events.add(new SearchEvent(</span>
+            next,
+<span class="fc" id="L209">            state.stateId(),</span>
+<span class="fc" id="L210">            state.expression(),</span>
+<span class="fc" id="L211">            candidate.candidateId(),</span>
+<span class="fc" id="L212">            candidate.pathKey(),</span>
+<span class="fc" id="L213">            candidate.ruleId(),</span>
+            outcome,
+            detail
+        ));
+<span class="fc" id="L217">        outcomes.put(candidate.candidateId(), outcome);</span>
+<span class="fc" id="L218">        return next;</span>
+    }
+
+    private String canonical(String expression) {
+<span class="pc bpc" id="L222" title="1 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="fc" id="L223">            return &quot;&quot;;</span>
+        }
+        try {
+<span class="fc" id="L226">            return canonicalizer.canonicalize(expression);</span>
+<span class="nc" id="L227">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L228">            return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+        }
+    }
+
+    private String stateId(String canonicalExpression) {
+<span class="fc" id="L233">        return &quot;state:&quot; + sha256(canonicalExpression).substring(0, 20);</span>
+    }
+
+    private String edgeId(String from, String to, String candidateId) {
+<span class="fc" id="L237">        return &quot;edge:&quot; + sha256(from + &quot;\u001f&quot; + to + &quot;\u001f&quot; + candidateId).substring(0, 20);</span>
+    }
+
+    private String sha256(String value) {
+        try {
+<span class="fc" id="L242">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L243">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L244">            StringBuilder result = new StringBuilder(digest.length * 2);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            for (byte item : digest) {</span>
+<span class="fc" id="L246">                result.append(String.format(Locale.ROOT, &quot;%02x&quot;, item &amp; 0xff));</span>
+            }
+<span class="fc" id="L248">            return result.toString();</span>
+<span class="nc" id="L249">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L250">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+
+    public record SearchRequest(
+        String expression,
+        String targetExpression,
+        Context context,
+        int maxDepth,
+        int maxStates,
+        int maxMovesPerState
+    ) {
+        private static final int MAX_DEPTH_LIMIT = 12;
+        private static final int MAX_STATE_LIMIT = 2_000;
+        private static final int MAX_MOVE_LIMIT = 500;
+
+<span class="fc" id="L266">        public SearchRequest {</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            expression = expression == null ? &quot;&quot; : expression.trim();</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            targetExpression = targetExpression == null ? &quot;&quot; : targetExpression.trim();</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            context = context == null ? Context.defaults() : context;</span>
+<span class="fc" id="L270">            maxDepth = bounded(maxDepth, 4, MAX_DEPTH_LIMIT);</span>
+<span class="fc" id="L271">            maxStates = bounded(maxStates, 120, MAX_STATE_LIMIT);</span>
+<span class="fc" id="L272">            maxMovesPerState = bounded(maxMovesPerState, 60, MAX_MOVE_LIMIT);</span>
+<span class="fc" id="L273">        }</span>
+
+        public static SearchRequest defaults(String expression) {
+<span class="nc" id="L276">            return new SearchRequest(expression, &quot;&quot;, Context.defaults(), 4, 120, 60);</span>
+        }
+
+        private static int bounded(int value, int fallback, int maximum) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            int effective = value &lt;= 0 ? fallback : value;</span>
+<span class="fc" id="L281">            return Math.min(effective, maximum);</span>
+        }
+    }
+
+<span class="fc" id="L285">    private record FrontierState(SearchState state) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

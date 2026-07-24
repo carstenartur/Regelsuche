@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionStudyPlanExample.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionStudyPlanExample.java</span></div><h1>EvolutionStudyPlanExample.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionGenome.EvidenceObligation;
+import de.regelsuche.evolution.EvolutionGenome.FeatureWeight;
+import de.regelsuche.evolution.EvolutionGenome.FitnessSignal;
+import de.regelsuche.evolution.EvolutionGenome.GuardPolicy;
+import de.regelsuche.evolution.EvolutionGenome.Objective;
+import de.regelsuche.evolution.EvolutionGenome.ResourceBudget;
+import de.regelsuche.evolution.EvolutionGenome.RewriteGene;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessWeight;
+import de.regelsuche.evolution.EvolutionStudyPlan.PopulationPolicy;
+import de.regelsuche.evolution.EvolutionStudyPlan.StudyBudget;
+import de.regelsuche.transform.RewriteKind;
+import java.nio.file.Path;
+import java.util.List;
+
+/** Writes the preregistered, not-yet-executed v1 population-study contracts. */
+public final class EvolutionStudyPlanExample {
+    public static final String STUDY_ID = &quot;evolution_population_study_v1&quot;;
+
+    private EvolutionStudyPlanExample() {
+    }
+
+    public static void main(String[] arguments) {
+<span class="nc bnc" id="L26" title="All 2 branches missed.">        Path output = arguments.length == 0</span>
+<span class="nc" id="L27">            ? Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;evolution-study-plan&quot;)</span>
+<span class="nc" id="L28">            : Path.of(arguments[0]);</span>
+<span class="nc" id="L29">        write(output);</span>
+<span class="nc" id="L30">    }</span>
+
+    public static WrittenContracts write(Path output) {
+<span class="fc" id="L33">        EvolutionSplitManifest split = splitManifest();</span>
+<span class="fc" id="L34">        EvolutionStudyPlan plan = EvolutionStudyPlan.create(</span>
+            STUDY_ID,
+            Objective.OPEN_TARGET_OPERATOR,
+            split,
+<span class="fc" id="L38">            List.of(seedGenome(split)),</span>
+<span class="fc" id="L39">            List.of(</span>
+                EvolutionMutationKind.ADD_ASSUMPTION,
+                EvolutionMutationKind.ADD_RANKING_FEATURE,
+                EvolutionMutationKind.COMPOSE_REWRITES,
+                EvolutionMutationKind.GENERALIZE_PLACEHOLDER,
+                EvolutionMutationKind.REMOVE_ASSUMPTION,
+                EvolutionMutationKind.REMOVE_RANKING_FEATURE,
+                EvolutionMutationKind.REVERSE_REWRITE,
+                EvolutionMutationKind.SPECIALIZE_PLACEHOLDER),
+            new PopulationPolicy(
+                24,
+                8,
+                4,
+                8,
+                3,
+                4,
+                20260719L),
+<span class="fc" id="L56">            List.of(</span>
+                new FitnessWeight(FitnessComponent.TRAIN_CASES_NEWLY_SOLVED, 300),
+                new FitnessWeight(FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION, 150),
+                new FitnessWeight(FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION, 100),
+                new FitnessWeight(FitnessComponent.SUPPORT, 100),
+                new FitnessWeight(FitnessComponent.STRUCTURAL_DIVERSITY, 150),
+                new FitnessWeight(FitnessComponent.PROJECT_NOVELTY, 50),
+                new FitnessWeight(FitnessComponent.ASSUMPTION_SIMPLICITY, 50),
+                new FitnessWeight(FitnessComponent.CANDIDATE_COMPLEXITY, 50),
+                new FitnessWeight(FitnessComponent.COUNTEREXAMPLE_RISK, 25),
+                new FitnessWeight(FitnessComponent.PROOF_COST_PROXY, 25)),
+            new StudyBudget(
+                4096,
+                3072,
+                768,
+                3,
+                16));
+
+<span class="fc" id="L74">        EvolutionStudyContractCodec codec = new EvolutionStudyContractCodec();</span>
+<span class="fc" id="L75">        Path manifestPath = output.resolve(&quot;evolution-split-manifest.json&quot;);</span>
+<span class="fc" id="L76">        Path planPath = output.resolve(&quot;evolution-study-plan.json&quot;);</span>
+<span class="fc" id="L77">        codec.write(manifestPath, split);</span>
+<span class="fc" id="L78">        codec.write(planPath, plan);</span>
+<span class="fc" id="L79">        codec.readSplitManifest(manifestPath);</span>
+<span class="fc" id="L80">        codec.readStudyPlan(planPath);</span>
+<span class="fc" id="L81">        System.out.println(&quot;evolution-study-status=&quot; + plan.status());</span>
+<span class="fc" id="L82">        System.out.println(&quot;evolution-split-manifest=&quot; + manifestPath);</span>
+<span class="fc" id="L83">        System.out.println(&quot;evolution-study-plan=&quot; + planPath);</span>
+<span class="fc" id="L84">        return new WrittenContracts(split, plan, manifestPath, planPath);</span>
+    }
+
+    public static EvolutionSplitManifest splitManifest() {
+<span class="fc" id="L88">        return EvolutionSplitManifest.create(</span>
+            STUDY_ID,
+<span class="fc" id="L90">            hash(&quot;evolution-population-corpus-v1&quot;),</span>
+<span class="fc" id="L91">            hash(&quot;evolution-fitness-feature-schema-v1&quot;),</span>
+<span class="fc" id="L92">            List.of(</span>
+<span class="fc" id="L93">                caseRef(&quot;train_additive_identity&quot;, &quot;additive_identity&quot;, &quot;train-additive&quot;),</span>
+<span class="fc" id="L94">                caseRef(&quot;train_common_factor&quot;, &quot;common_factor&quot;, &quot;train-factor&quot;),</span>
+<span class="fc" id="L95">                caseRef(&quot;train_square_difference&quot;, &quot;square_difference&quot;, &quot;train-square&quot;)),</span>
+<span class="fc" id="L96">            List.of(</span>
+<span class="fc" id="L97">                caseRef(&quot;validation_complete_square&quot;, &quot;complete_square&quot;, &quot;validation-square&quot;),</span>
+<span class="fc" id="L98">                caseRef(&quot;validation_symmetric_factor&quot;, &quot;symmetric_factor&quot;, &quot;validation-symmetric&quot;)),</span>
+<span class="fc" id="L99">            List.of(</span>
+<span class="fc" id="L100">                caseRef(&quot;test_composite_gap&quot;, &quot;composite_gap&quot;, &quot;test-gap&quot;),</span>
+<span class="fc" id="L101">                caseRef(&quot;test_mixed_degree&quot;, &quot;mixed_degree&quot;, &quot;test-degree&quot;),</span>
+<span class="fc" id="L102">                caseRef(&quot;test_parameterized_identity&quot;, &quot;parameterized_identity&quot;, &quot;test-parameter&quot;)));</span>
+    }
+
+    private static EvolutionGenome seedGenome(EvolutionSplitManifest split) {
+<span class="fc" id="L106">        RewriteGene gene = new RewriteGene(</span>
+            &quot;remove_additive_zero&quot;,
+            &quot;?x+0&quot;,
+            &quot;?x&quot;,
+            RewriteKind.SIMPLIFY,
+            true,
+            -2,
+            4,
+            4,
+<span class="fc" id="L115">            List.of(),</span>
+<span class="fc" id="L116">            List.of(</span>
+                EvidenceObligation.SEMANTIC_VALIDATION,
+                EvidenceObligation.COUNTEREXAMPLE_SEARCH,
+                EvidenceObligation.PROOF_OR_CERTIFICATE,
+                EvidenceObligation.NOVELTY_REVIEW,
+                EvidenceObligation.HOLDOUT_EVALUATION));
+<span class="fc" id="L122">        return EvolutionGenome.create(</span>
+            Objective.OPEN_TARGET_OPERATOR,
+<span class="fc" id="L124">            split.trainingScope(),</span>
+<span class="fc" id="L125">            List.of(gene),</span>
+<span class="fc" id="L126">            List.of(</span>
+                new FeatureWeight(FitnessSignal.UNSEEN_TRAIN_CASES_SOLVED, 500),
+                new FeatureWeight(FitnessSignal.COUNTEREXAMPLE_RISK, -500)),
+<span class="fc" id="L129">            GuardPolicy.strictDefault(),</span>
+            new ResourceBudget(16, 128, 12, 32, 80),
+<span class="fc" id="L131">            List.of(&quot;core.ast-rewrite&quot;),</span>
+<span class="fc" id="L132">            List.of());</span>
+    }
+
+    private static EvolutionSplitManifest.CaseReference caseRef(
+        String caseId,
+        String familyId,
+        String identity
+    ) {
+<span class="fc" id="L140">        return new EvolutionSplitManifest.CaseReference(</span>
+            caseId,
+            familyId,
+<span class="fc" id="L143">            hash(identity + &quot;-exact-signature&quot;),</span>
+<span class="fc" id="L144">            hash(identity + &quot;-alpha-signature&quot;),</span>
+<span class="fc" id="L145">            hash(identity + &quot;-input&quot;),</span>
+<span class="fc" id="L146">            hash(identity + &quot;-hidden-target&quot;));</span>
+    }
+
+    private static String hash(String value) {
+<span class="fc" id="L150">        return EvolutionGenome.hash(value);</span>
+    }
+
+<span class="fc" id="L153">    public record WrittenContracts(</span>
+        EvolutionSplitManifest splitManifest,
+        EvolutionStudyPlan studyPlan,
+        Path splitManifestPath,
+        Path studyPlanPath
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

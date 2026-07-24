@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.plugin-trust-store-revision-verification/v1",
+  "title": "Regelsuche plugin trust-store revision verification v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "trustDomainId",
+    "sequence",
+    "revisionHash",
+    "previousRevisionHash",
+    "trustStoreContentHash",
+    "rootTrustStoreContentHash",
+    "previousCheckpointHash",
+    "status",
+    "signatureVerified",
+    "trusted",
+    "replaySafe",
+    "authorityId",
+    "keyId",
+    "warnings",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.plugin-trust-store-revision-verification/v1"
+    },
+    "trustDomainId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9223372036854775807
+    },
+    "revisionHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "previousRevisionHash": {
+      "$ref": "#/$defs/sha256OrEmpty"
+    },
+    "trustStoreContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "rootTrustStoreContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "previousCheckpointHash": {
+      "$ref": "#/$defs/sha256OrEmpty"
+    },
+    "status": {
+      "enum": [
+        "TRUST_STORE_HASH_MISMATCH",
+        "GENESIS_REQUIRED",
+        "TRUST_DOMAIN_MISMATCH",
+        "REPLAYED_REVISION",
+        "SEQUENCE_GAP",
+        "PREVIOUS_HASH_MISMATCH",
+        "UNKNOWN_AUTHORITY",
+        "UNKNOWN_KEY",
+        "REVOKED_KEY",
+        "KEY_ALGORITHM_MISMATCH",
+        "INVALID_SIGNATURE",
+        "VERIFIED_RETIRED_KEY",
+        "VERIFIED_TRUSTED"
+      ]
+    },
+    "signatureVerified": {
+      "type": "boolean"
+    },
+    "trusted": {
+      "type": "boolean"
+    },
+    "replaySafe": {
+      "type": "boolean"
+    },
+    "authorityId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "keyId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "warnings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "VERIFIED_RETIRED_KEY",
+              "VERIFIED_TRUSTED"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "signatureVerified": {
+            "const": true
+          },
+          "trusted": {
+            "const": true
+          },
+          "replaySafe": {
+            "const": true
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "signatureVerified": {
+            "const": false
+          },
+          "trusted": {
+            "const": false
+          },
+          "replaySafe": {
+            "const": false
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sha256OrEmpty": {
+      "oneOf": [
+        {
+          "const": ""
+        },
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ]
+    }
+  }
+}

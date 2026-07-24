@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-candidate-qualification-suite/v1",
+  "title": "Regelsuche autonomous candidate qualification suite v1",
+  "type": "object",
+  "required": ["schema", "revision", "heldOutClusterId", "positives", "negatives"],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.autonomous-candidate-qualification-suite/v1"
+    },
+    "revision": {
+      "const": "production-candidate-composite-factor-qualification/v1"
+    },
+    "heldOutClusterId": {
+      "const": "composite-common-factor-gap-two/v1"
+    },
+    "positives": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["id", "factorExpression", "inputExpression", "targetExpression"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "factorExpression": { "type": "string", "minLength": 1 },
+          "inputExpression": { "type": "string", "minLength": 1 },
+          "targetExpression": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "negatives": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["id", "inputExpression"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "inputExpression": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

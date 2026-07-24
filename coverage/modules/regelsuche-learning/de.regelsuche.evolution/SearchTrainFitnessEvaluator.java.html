@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchTrainFitnessEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">SearchTrainFitnessEvaluator.java</span></div><h1>SearchTrainFitnessEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.evolution.EvolutionPopulationEngine.TrainFitness;
+import de.regelsuche.evolution.EvolutionPopulationEngine.TrainFitnessEvaluator;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy;
+import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
+import de.regelsuche.search.strategy.SearchProblem;
+import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.RewriteRule;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/** Paired, deterministic TRAIN fitness measured by the real search engine. */
+public final class SearchTrainFitnessEvaluator implements TrainFitnessEvaluator {
+<span class="fc" id="L25">    private static final Set&lt;FitnessComponent&gt; SUPPORTED_COMPONENTS = Set.of(</span>
+        FitnessComponent.TRAIN_CASES_NEWLY_SOLVED,
+        FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION,
+        FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION,
+        FitnessComponent.SUPPORT,
+        FitnessComponent.ASSUMPTION_SIMPLICITY,
+        FitnessComponent.CANDIDATE_COMPLEXITY,
+        FitnessComponent.PROOF_COST_PROXY);
+
+    private final EvolutionTrainSearchSuite suite;
+    private final Set&lt;FitnessComponent&gt; requiredComponents;
+    private final EvolutionGenomeCompiler compiler;
+    private final GoalSearchRunner searchRunner;
+
+    public SearchTrainFitnessEvaluator(
+        EvolutionTrainSearchSuite suite,
+        Set&lt;FitnessComponent&gt; requiredComponents
+    ) {
+<span class="fc" id="L43">        this(</span>
+            suite,
+            requiredComponents,
+            new EvolutionGenomeCompiler(),
+            SearchTrainFitnessEvaluator::search);
+<span class="fc" id="L48">    }</span>
+
+    SearchTrainFitnessEvaluator(
+        EvolutionTrainSearchSuite suite,
+        Set&lt;FitnessComponent&gt; requiredComponents,
+        EvolutionGenomeCompiler compiler
+    ) {
+<span class="nc" id="L55">        this(</span>
+            suite,
+            requiredComponents,
+            compiler,
+            SearchTrainFitnessEvaluator::search);
+<span class="nc" id="L60">    }</span>
+
+    SearchTrainFitnessEvaluator(
+        EvolutionTrainSearchSuite suite,
+        Set&lt;FitnessComponent&gt; requiredComponents,
+        EvolutionGenomeCompiler compiler,
+        GoalSearchRunner searchRunner
+<span class="fc" id="L67">    ) {</span>
+<span class="fc" id="L68">        this.suite = Objects.requireNonNull(suite, &quot;suite&quot;);</span>
+<span class="fc" id="L69">        Objects.requireNonNull(requiredComponents, &quot;requiredComponents&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (requiredComponents.isEmpty()) {</span>
+<span class="nc" id="L71">            throw new IllegalArgumentException(&quot;requiredComponents must not be empty&quot;);</span>
+        }
+<span class="fc" id="L73">        this.requiredComponents = Set.copyOf(requiredComponents);</span>
+<span class="fc" id="L74">        this.compiler = Objects.requireNonNull(compiler, &quot;compiler&quot;);</span>
+<span class="fc" id="L75">        this.searchRunner = Objects.requireNonNull(searchRunner, &quot;searchRunner&quot;);</span>
+<span class="fc" id="L76">    }</span>
+
+    public static SearchTrainFitnessEvaluator forPlan(
+        EvolutionStudyPlan plan,
+        EvolutionTrainSearchSuite suite
+    ) {
+<span class="nc" id="L82">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="nc" id="L83">        Set&lt;FitnessComponent&gt; components = plan.fitnessWeights().stream()</span>
+<span class="nc" id="L84">            .map(EvolutionStudyPlan.FitnessWeight::component)</span>
+<span class="nc" id="L85">            .collect(java.util.stream.Collectors.toSet());</span>
+<span class="nc" id="L86">        return new SearchTrainFitnessEvaluator(suite, components);</span>
+    }
+
+    @Override
+    public TrainFitness evaluate(EvolutionGenome genome) {
+<span class="fc" id="L91">        EvolutionTrainFitnessEvidence evidence = evaluateWithEvidence(genome);</span>
+<span class="fc" id="L92">        return new TrainFitness(evidence.rawComponents(), evidence.blockers());</span>
+    }
+
+    /** Returns complete paired evidence before scalar population selection. */
+    public EvolutionTrainFitnessEvidence evaluateWithEvidence(
+        EvolutionGenome genome
+    ) {
+<span class="fc" id="L99">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L100">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (genome.trainingScope().sourceSplit()</span>
+                != EvolutionGenome.SourceSplit.TRAIN) {
+<span class="nc" id="L103">            blockers.add(&quot;FITNESS_SOURCE_IS_NOT_TRAIN&quot;);</span>
+        }
+
+        EvolutionGenomeCompiler.CompiledProgram program;
+        try {
+<span class="fc" id="L108">            program = compiler.compile(genome);</span>
+<span class="nc" id="L109">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L110">            blockers.add(&quot;GENOME_COMPILATION_FAILED:&quot; + stableFailure(exception));</span>
+<span class="nc" id="L111">            return EvolutionTrainFitnessEvidence.create(</span>
+<span class="nc" id="L112">                suite.contentHash(), genome, List.of(), zeroComponents(), blockers);</span>
+<span class="fc" id="L113">        }</span>
+
+<span class="fc" id="L115">        List&lt;EvolutionTrainFitnessEvidence.CaseMeasurement&gt; measurements =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        for (EvolutionTrainSearchSuite.TrainCase trainCase : suite.cases()) {</span>
+            try {
+<span class="fc" id="L119">                measurements.add(evaluateCase(</span>
+                    genome, program, trainCase, blockers));
+<span class="nc" id="L121">            } catch (RuntimeException exception) {</span>
+<span class="nc" id="L122">                blockers.add(&quot;TRAIN_CASE_EVALUATION_FAILED:&quot;</span>
+<span class="nc" id="L123">                    + trainCase.caseId() + &quot;:SETUP:&quot; + stableFailure(exception));</span>
+<span class="nc" id="L124">                measurements.add(failedMeasurement(</span>
+                    trainCase, &quot;EVALUATION_FAILED&quot;, &quot;NOT_RUN&quot;));
+<span class="fc" id="L126">            }</span>
+<span class="fc" id="L127">        }</span>
+
+<span class="fc" id="L129">        measurements.stream()</span>
+<span class="fc" id="L130">            .filter(EvolutionTrainFitnessEvidence.CaseMeasurement::correctnessRegression)</span>
+<span class="pc" id="L131">            .map(item -&gt; &quot;TRAIN_CORRECTNESS_REGRESSION:&quot; + item.caseId())</span>
+<span class="fc" id="L132">            .forEach(blockers::add);</span>
+
+<span class="fc" id="L134">        Map&lt;FitnessComponent, Integer&gt; components = components(genome, measurements);</span>
+<span class="fc" id="L135">        requiredComponents.stream()</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            .filter(component -&gt; !SUPPORTED_COMPONENTS.contains(component))</span>
+<span class="fc" id="L137">            .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L138">            .forEach(component -&gt; {</span>
+<span class="fc" id="L139">                components.put(component, 0);</span>
+<span class="fc" id="L140">                blockers.add(&quot;UNSUPPORTED_TRAIN_FITNESS_COMPONENT:&quot; + component);</span>
+<span class="fc" id="L141">            });</span>
+<span class="fc" id="L142">        components.keySet().removeIf(</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            component -&gt; !requiredComponents.contains(component));</span>
+
+<span class="fc" id="L145">        return EvolutionTrainFitnessEvidence.create(</span>
+<span class="fc" id="L146">            suite.contentHash(), genome, measurements, components, blockers);</span>
+    }
+
+    private EvolutionTrainFitnessEvidence.CaseMeasurement evaluateCase(
+        EvolutionGenome genome,
+        EvolutionGenomeCompiler.CompiledProgram program,
+        EvolutionTrainSearchSuite.TrainCase trainCase,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L155">        SearchHeuristic heuristic = effectiveHeuristic(genome);</span>
+<span class="fc" id="L156">        List&lt;RewriteRule&gt; baselineRules = AstRewriteTransformationEngine.defaultRules();</span>
+<span class="fc" id="L157">        List&lt;RewriteRule&gt; candidateRules = new ArrayList&lt;&gt;(baselineRules);</span>
+<span class="fc" id="L158">        candidateRules.addAll(program.rules());</span>
+
+<span class="fc" id="L160">        AstRewriteTransformationEngine baselineEngine =</span>
+            new AstRewriteTransformationEngine(
+                baselineRules,
+<span class="fc" id="L163">                genome.budget().maxAstGrowthPerStep(),</span>
+<span class="fc" id="L164">                heuristic.maxCandidatesPerState());</span>
+<span class="fc" id="L165">        AstRewriteTransformationEngine candidateEngine =</span>
+            new AstRewriteTransformationEngine(
+                candidateRules,
+<span class="fc" id="L168">                genome.budget().maxAstGrowthPerStep(),</span>
+<span class="fc" id="L169">                heuristic.maxCandidatesPerState());</span>
+
+        GoalSearchResult baseline;
+        try {
+<span class="fc" id="L173">            baseline = searchRunner.search(</span>
+                baselineEngine,
+<span class="fc" id="L175">                trainCase.inputExpression(),</span>
+<span class="fc" id="L176">                trainCase.targetExpression(),</span>
+                heuristic);
+<span class="fc" id="L178">        } catch (RuntimeException exception) {</span>
+<span class="fc" id="L179">            blockers.add(&quot;TRAIN_CASE_EVALUATION_FAILED:&quot;</span>
+<span class="fc" id="L180">                + trainCase.caseId() + &quot;:BASELINE:&quot; + stableFailure(exception));</span>
+<span class="fc" id="L181">            return failedMeasurement(</span>
+                trainCase, &quot;EVALUATION_FAILED&quot;, &quot;NOT_RUN&quot;);
+<span class="fc" id="L183">        }</span>
+
+        GoalSearchResult candidate;
+        try {
+<span class="fc" id="L187">            candidate = searchRunner.search(</span>
+                candidateEngine,
+<span class="fc" id="L189">                trainCase.inputExpression(),</span>
+<span class="fc" id="L190">                trainCase.targetExpression(),</span>
+                heuristic);
+<span class="nc" id="L192">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L193">            blockers.add(&quot;TRAIN_CASE_EVALUATION_FAILED:&quot;</span>
+<span class="nc" id="L194">                + trainCase.caseId() + &quot;:CANDIDATE:&quot; + stableFailure(exception));</span>
+<span class="nc" id="L195">            return new EvolutionTrainFitnessEvidence.CaseMeasurement(</span>
+<span class="nc" id="L196">                trainCase.caseId(),</span>
+<span class="nc" id="L197">                trainCase.familyId(),</span>
+<span class="nc" id="L198">                baseline.status().name(),</span>
+                &quot;EVALUATION_FAILED&quot;,
+<span class="nc" id="L200">                baseline.reached(),</span>
+                false,
+<span class="nc" id="L202">                depth(baseline),</span>
+                -1,
+<span class="nc" id="L204">                baseline.metrics().exploredStates(),</span>
+                0,
+                false,
+<span class="nc" id="L207">                baseline.reached());</span>
+<span class="fc" id="L208">        }</span>
+
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">        boolean newlySolved = !baseline.reached() &amp;&amp; candidate.reached();</span>
+<span class="pc bpc" id="L211" title="1 of 4 branches missed.">        boolean correctnessRegression = baseline.reached() &amp;&amp; !candidate.reached();</span>
+<span class="fc" id="L212">        return new EvolutionTrainFitnessEvidence.CaseMeasurement(</span>
+<span class="fc" id="L213">            trainCase.caseId(),</span>
+<span class="fc" id="L214">            trainCase.familyId(),</span>
+<span class="fc" id="L215">            baseline.status().name(),</span>
+<span class="fc" id="L216">            candidate.status().name(),</span>
+<span class="fc" id="L217">            baseline.reached(),</span>
+<span class="fc" id="L218">            candidate.reached(),</span>
+<span class="fc" id="L219">            depth(baseline),</span>
+<span class="fc" id="L220">            depth(candidate),</span>
+<span class="fc" id="L221">            baseline.metrics().exploredStates(),</span>
+<span class="fc" id="L222">            candidate.metrics().exploredStates(),</span>
+            newlySolved,
+            correctnessRegression);
+    }
+
+    private static EvolutionTrainFitnessEvidence.CaseMeasurement failedMeasurement(
+        EvolutionTrainSearchSuite.TrainCase trainCase,
+        String baselineStatus,
+        String candidateStatus
+    ) {
+<span class="fc" id="L232">        return new EvolutionTrainFitnessEvidence.CaseMeasurement(</span>
+<span class="fc" id="L233">            trainCase.caseId(),</span>
+<span class="fc" id="L234">            trainCase.familyId(),</span>
+            baselineStatus,
+            candidateStatus,
+            false,
+            false,
+            -1,
+            -1,
+            0,
+            0,
+            false,
+            false);
+    }
+
+    private EvolutionTrainSearchSuite.TrainCase requireTrainCase(
+        EvolutionTrainSearchSuite.TrainCase trainCase
+    ) {
+<span class="nc" id="L250">        return Objects.requireNonNull(trainCase, &quot;trainCase&quot;);</span>
+    }
+
+    private SearchHeuristic effectiveHeuristic(EvolutionGenome genome) {
+<span class="fc" id="L254">        SearchHeuristic configured = suite.heuristic();</span>
+<span class="fc" id="L255">        return new SearchHeuristic(</span>
+<span class="fc" id="L256">            Math.min(configured.maxDepth(),</span>
+<span class="fc" id="L257">                genome.budget().maxApplicationsPerPath()),</span>
+<span class="fc" id="L258">            configured.maxVisitedExpressions(),</span>
+<span class="fc" id="L259">            configured.significantImprovementThreshold(),</span>
+<span class="fc" id="L260">            Math.min(configured.maxExpandingSteps(),</span>
+<span class="fc" id="L261">                genome.budget().maxApplicationsPerPath()),</span>
+<span class="fc" id="L262">            Math.min(configured.maxCandidatesPerState(),</span>
+<span class="fc" id="L263">                genome.budget().maxCandidatesPerState()),</span>
+<span class="fc" id="L264">            configured.beamWidth());</span>
+    }
+
+    static GoalSearchResult search(
+        AstRewriteTransformationEngine engine,
+        String input,
+        String target,
+        SearchHeuristic heuristic
+    ) {
+<span class="fc" id="L273">        SearchProblem problem = new SearchProblem(</span>
+            input,
+            engine,
+            new ExpressionScorer(),
+            new ExpressionCanonicalizer(),
+            heuristic)
+<span class="fc" id="L279">            .withTarget(SearchTarget.syntaxExact(target));</span>
+<span class="fc" id="L280">        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+    }
+
+    private Map&lt;FitnessComponent, Integer&gt; components(
+        EvolutionGenome genome,
+        List&lt;EvolutionTrainFitnessEvidence.CaseMeasurement&gt; measurements
+    ) {
+<span class="fc" id="L287">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
+            new EnumMap&lt;&gt;(FitnessComponent.class);
+<span class="fc" id="L289">        int caseCount = suite.cases().size();</span>
+<span class="fc" id="L290">        int candidateReached = (int) measurements.stream()</span>
+<span class="fc" id="L291">            .filter(EvolutionTrainFitnessEvidence.CaseMeasurement::candidateReached)</span>
+<span class="fc" id="L292">            .count();</span>
+<span class="fc" id="L293">        int newlySolved = (int) measurements.stream()</span>
+<span class="fc" id="L294">            .filter(EvolutionTrainFitnessEvidence.CaseMeasurement::newlySolved)</span>
+<span class="fc" id="L295">            .count();</span>
+<span class="fc" id="L296">        result.put(FitnessComponent.SUPPORT, permille(candidateReached, caseCount));</span>
+<span class="fc" id="L297">        result.put(FitnessComponent.TRAIN_CASES_NEWLY_SOLVED,</span>
+<span class="fc" id="L298">            permille(newlySolved, caseCount));</span>
+<span class="fc" id="L299">        result.put(FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION,</span>
+<span class="fc" id="L300">            pairedDepthReduction(measurements));</span>
+<span class="fc" id="L301">        result.put(FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION,</span>
+<span class="fc" id="L302">            pairedStateReduction(measurements));</span>
+<span class="fc" id="L303">        result.put(FitnessComponent.ASSUMPTION_SIMPLICITY,</span>
+<span class="fc" id="L304">            assumptionSimplicity(genome));</span>
+<span class="fc" id="L305">        result.put(FitnessComponent.CANDIDATE_COMPLEXITY,</span>
+<span class="fc" id="L306">            candidateSimplicity(genome));</span>
+<span class="fc" id="L307">        result.put(FitnessComponent.PROOF_COST_PROXY,</span>
+<span class="fc" id="L308">            proofCostProxy(genome));</span>
+<span class="fc" id="L309">        return result;</span>
+    }
+
+    private Map&lt;FitnessComponent, Integer&gt; zeroComponents() {
+<span class="nc" id="L313">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
+            new EnumMap&lt;&gt;(FitnessComponent.class);
+<span class="nc" id="L315">        requiredComponents.forEach(component -&gt; result.put(component, 0));</span>
+<span class="nc" id="L316">        return result;</span>
+    }
+
+    private static int pairedDepthReduction(
+        List&lt;EvolutionTrainFitnessEvidence.CaseMeasurement&gt; measurements
+    ) {
+<span class="fc" id="L322">        long baseline = 0;</span>
+<span class="fc" id="L323">        long delta = 0;</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        for (EvolutionTrainFitnessEvidence.CaseMeasurement item : measurements) {</span>
+<span class="pc bpc" id="L325" title="1 of 4 branches missed.">            if (item.baselineReached() &amp;&amp; item.candidateReached()) {</span>
+<span class="fc" id="L326">                baseline += Math.max(1, item.baselinePathLength());</span>
+<span class="fc" id="L327">                delta += (long) item.baselinePathLength()</span>
+<span class="fc" id="L328">                    - item.candidatePathLength();</span>
+            }
+<span class="fc" id="L330">        }</span>
+<span class="fc" id="L331">        return normalizedDelta(delta, baseline);</span>
+    }
+
+    private static int pairedStateReduction(
+        List&lt;EvolutionTrainFitnessEvidence.CaseMeasurement&gt; measurements
+    ) {
+<span class="fc" id="L337">        long baseline = 0;</span>
+<span class="fc" id="L338">        long delta = 0;</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (EvolutionTrainFitnessEvidence.CaseMeasurement item : measurements) {</span>
+<span class="pc bpc" id="L340" title="1 of 4 branches missed.">            if (item.baselineReached() &amp;&amp; item.candidateReached()) {</span>
+<span class="fc" id="L341">                baseline += Math.max(1L, item.baselineExploredStates());</span>
+<span class="fc" id="L342">                delta += item.baselineExploredStates()</span>
+<span class="fc" id="L343">                    - item.candidateExploredStates();</span>
+            }
+<span class="fc" id="L345">        }</span>
+<span class="fc" id="L346">        return normalizedDelta(delta, baseline);</span>
+    }
+
+    private static int assumptionSimplicity(EvolutionGenome genome) {
+<span class="fc" id="L350">        int assumptions = genome.rewrites().stream()</span>
+<span class="fc" id="L351">            .mapToInt(gene -&gt; gene.assumptions().size())</span>
+<span class="fc" id="L352">            .sum();</span>
+<span class="fc" id="L353">        return inverseBudgetScore(</span>
+<span class="fc" id="L354">            assumptions, genome.budget().maxProgramLength());</span>
+    }
+
+    private static int candidateSimplicity(EvolutionGenome genome) {
+<span class="fc" id="L358">        int nodes = genome.rewrites().stream()</span>
+<span class="fc" id="L359">            .mapToInt(gene -&gt;</span>
+<span class="fc" id="L360">                EvolutionGenomeCompiler.nodeCount(</span>
+<span class="fc" id="L361">                    EvolutionGenomeCompiler.parsePattern(gene.sourcePattern()))</span>
+<span class="fc" id="L362">                + EvolutionGenomeCompiler.nodeCount(</span>
+<span class="fc" id="L363">                    EvolutionGenomeCompiler.parsePattern(gene.targetPattern())))</span>
+<span class="fc" id="L364">            .sum();</span>
+<span class="fc" id="L365">        return inverseBudgetScore(nodes, genome.budget().maxAstNodes());</span>
+    }
+
+    private static int proofCostProxy(EvolutionGenome genome) {
+<span class="fc" id="L369">        int obligations = genome.rewrites().stream()</span>
+<span class="fc" id="L370">            .mapToInt(gene -&gt; gene.evidenceObligations().size())</span>
+<span class="fc" id="L371">            .sum();</span>
+<span class="fc" id="L372">        int denominator = Math.max(1,</span>
+<span class="fc" id="L373">            genome.budget().maxProgramLength() * 5);</span>
+<span class="fc" id="L374">        return inverseBudgetScore(obligations, denominator);</span>
+    }
+
+    private static int inverseBudgetScore(long used, long budget) {
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">        if (budget &lt;= 0) {</span>
+<span class="nc" id="L379">            return 0;</span>
+        }
+<span class="fc" id="L381">        long penalty = Math.min(1000L, used * 1000L / budget);</span>
+<span class="fc" id="L382">        return Math.toIntExact(1000L - penalty);</span>
+    }
+
+    private static int permille(long numerator, long denominator) {
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        return denominator &lt;= 0</span>
+<span class="nc" id="L387">            ? 0</span>
+<span class="fc" id="L388">            : clamp(Math.toIntExact(numerator * 1000L / denominator));</span>
+    }
+
+    private static int normalizedDelta(long delta, long baseline) {
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        return baseline &lt;= 0</span>
+<span class="fc" id="L393">            ? 0</span>
+<span class="fc" id="L394">            : clamp(Math.toIntExact(delta * 1000L / baseline));</span>
+    }
+
+    private static int clamp(int value) {
+<span class="fc" id="L398">        return Math.max(-1000, Math.min(1000, value));</span>
+    }
+
+    private static int depth(GoalSearchResult result) {
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
+    }
+
+    private static String stableFailure(Throwable failure) {
+<span class="fc" id="L406">        String message = failure.getMessage();</span>
+<span class="fc" id="L407">        return failure.getClass().getSimpleName()</span>
+<span class="pc bpc" id="L408" title="2 of 4 branches missed.">            + (message == null || message.isBlank()</span>
+<span class="nc" id="L409">                ? &quot;&quot;</span>
+<span class="fc" id="L410">                : &quot;:&quot; + message.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim());</span>
+    }
+
+    @FunctionalInterface
+    interface GoalSearchRunner {
+        GoalSearchResult search(
+            AstRewriteTransformationEngine engine,
+            String input,
+            String target,
+            SearchHeuristic heuristic);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

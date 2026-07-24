@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionPopulationCheckpoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionPopulationCheckpoint.java</span></div><h1>EvolutionPopulationCheckpoint.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.evolution.DeterministicGenomeMutator.MutationCatalog;
+import de.regelsuche.evolution.EvolutionPopulationEngine.CandidateEvaluation;
+import de.regelsuche.evolution.EvolutionPopulationEngine.GenerationReport;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Canonical TRAIN-only checkpoint for deterministic population resume. */
+public record EvolutionPopulationCheckpoint(
+    String schema,
+    String studyPlanHash,
+    String mutationCatalogHash,
+    List&lt;String&gt; seedGenomeHashes,
+    int completedGeneration,
+    List&lt;EvolutionGenome&gt; population,
+    List&lt;CandidateEvaluation&gt; evaluations,
+    List&lt;GenerationReport&gt; generationReports,
+    int mutationAttempts,
+    int trainEvaluations,
+    String validationStatus,
+    String finalTestStatus,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-population-checkpoint/v1&quot;;
+<span class="fc" id="L39">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L40">        JsonFactory.builder()</span>
+<span class="fc" id="L41">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L42">            .build())</span>
+<span class="fc" id="L43">        .findAndRegisterModules()</span>
+<span class="fc" id="L44">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L45">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L46">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+<span class="fc" id="L48">    public EvolutionPopulationCheckpoint {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;unsupported checkpoint schema&quot;);</span>
+        }
+<span class="fc" id="L52">        EvolutionGenome.requireSha256(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L53">        EvolutionGenome.requireSha256(</span>
+            mutationCatalogHash, &quot;mutationCatalogHash&quot;);
+<span class="fc" id="L55">        seedGenomeHashes = canonicalHashes(seedGenomeHashes);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (completedGeneration &lt; 1) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;completedGeneration must be positive&quot;);
+        }
+<span class="fc" id="L60">        population = canonicalPopulation(population);</span>
+<span class="fc" id="L61">        evaluations = canonicalEvaluations(evaluations);</span>
+<span class="fc" id="L62">        generationReports = canonicalReports(generationReports);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (generationReports.size() != completedGeneration) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
+                &quot;generation report count must equal completedGeneration&quot;);
+        }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (int index = 0; index &lt; generationReports.size(); index++) {</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (generationReports.get(index).generation() != index + 1) {</span>
+<span class="nc" id="L69">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint generation sequence is not contiguous&quot;);
+            }
+        }
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">        if (mutationAttempts &lt; 0 || trainEvaluations &lt; 0) {</span>
+<span class="nc" id="L74">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint budgets must be non-negative&quot;);
+        }
+<span class="fc" id="L77">        GenerationReport last = generationReports.getLast();</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (last.cumulativeMutationAttempts() != mutationAttempts</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">                || last.cumulativeTrainEvaluations() != trainEvaluations) {</span>
+<span class="nc" id="L80">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint budget totals differ from final retained generation&quot;);
+        }
+<span class="fc" id="L83">        List&lt;String&gt; selected = last.selectedGenomeHashes().stream()</span>
+<span class="fc" id="L84">            .sorted().toList();</span>
+<span class="fc" id="L85">        List&lt;String&gt; retained = population.stream()</span>
+<span class="fc" id="L86">            .map(EvolutionGenome::contentHash).sorted().toList();</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!selected.equals(retained)) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint population differs from selected generation&quot;);
+        }
+<span class="fc" id="L91">        Map&lt;String, CandidateEvaluation&gt; byHash = evaluations.stream()</span>
+<span class="fc" id="L92">            .collect(java.util.stream.Collectors.toMap(</span>
+                CandidateEvaluation::genomeHash,
+<span class="fc" id="L94">                item -&gt; item,</span>
+                (left, right) -&gt; {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                    if (!left.equals(right)) {</span>
+<span class="nc" id="L97">                        throw new IllegalArgumentException(</span>
+                            &quot;conflicting cached evaluation for &quot;
+<span class="nc" id="L99">                                + left.genomeHash());</span>
+                    }
+<span class="nc" id="L101">                    return left;</span>
+                },
+                TreeMap::new));
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (EvolutionGenome genome : population) {</span>
+<span class="fc" id="L105">            CandidateEvaluation evaluation = byHash.get(genome.contentHash());</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            if (evaluation == null</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                    || !evaluation.alphaStructuralHash().equals(</span>
+<span class="fc" id="L108">                        genome.alphaStructuralHash())) {</span>
+<span class="nc" id="L109">                throw new IllegalArgumentException(</span>
+                    &quot;selected genome lacks its exact cached TRAIN evaluation&quot;);
+            }
+<span class="fc" id="L112">        }</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(validationStatus)</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(finalTestStatus)) {</span>
+<span class="nc" id="L115">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint must not contain VALIDATION or FINAL TEST results&quot;);
+        }
+<span class="fc" id="L118">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L119">        String expected = hash(payload(</span>
+            studyPlanHash,
+            mutationCatalogHash,
+            seedGenomeHashes,
+            completedGeneration,
+            population,
+            evaluations,
+            generationReports,
+            mutationAttempts,
+            trainEvaluations,
+            validationStatus,
+            finalTestStatus));
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L132">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint contentHash mismatch&quot;);
+        }
+<span class="fc" id="L135">    }</span>
+
+    static EvolutionPopulationCheckpoint create(
+        EvolutionStudyPlan plan,
+        MutationCatalog catalog,
+        List&lt;EvolutionGenome&gt; seeds,
+        int completedGeneration,
+        List&lt;EvolutionGenome&gt; population,
+        Collection&lt;CandidateEvaluation&gt; evaluations,
+        List&lt;GenerationReport&gt; reports,
+        int mutationAttempts,
+        int trainEvaluations
+    ) {
+<span class="fc" id="L148">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L149">        List&lt;String&gt; seedHashes = canonicalHashes(seeds.stream()</span>
+<span class="fc" id="L150">            .map(EvolutionGenome::contentHash).toList());</span>
+<span class="fc" id="L151">        List&lt;EvolutionGenome&gt; retainedPopulation =</span>
+<span class="fc" id="L152">            canonicalPopulation(population);</span>
+        List&lt;CandidateEvaluation&gt; retainedEvaluations =
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            canonicalEvaluations(evaluations == null</span>
+<span class="nc" id="L155">                ? List.of()</span>
+<span class="fc" id="L156">                : List.copyOf(evaluations));</span>
+<span class="fc" id="L157">        List&lt;GenerationReport&gt; retainedReports = canonicalReports(reports);</span>
+<span class="fc" id="L158">        String catalogHash = mutationCatalogHash(catalog);</span>
+<span class="fc" id="L159">        String contentHash = hash(payload(</span>
+<span class="fc" id="L160">            plan.contentHash(),</span>
+            catalogHash,
+            seedHashes,
+            completedGeneration,
+            retainedPopulation,
+            retainedEvaluations,
+            retainedReports,
+            mutationAttempts,
+            trainEvaluations,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;));
+<span class="fc" id="L171">        return new EvolutionPopulationCheckpoint(</span>
+            SCHEMA,
+<span class="fc" id="L173">            plan.contentHash(),</span>
+            catalogHash,
+            seedHashes,
+            completedGeneration,
+            retainedPopulation,
+            retainedEvaluations,
+            retainedReports,
+            mutationAttempts,
+            trainEvaluations,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            contentHash);
+    }
+
+    public static EvolutionPopulationCheckpoint fromCanonicalJson(
+        String json
+    ) {
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L191">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint JSON must not be blank&quot;);
+        }
+        try {
+<span class="fc" id="L195">            return JSON.readValue(json, EvolutionPopulationCheckpoint.class);</span>
+<span class="fc" id="L196">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L197">            throw new IllegalArgumentException(</span>
+                &quot;invalid population checkpoint JSON&quot;, exception);
+        }
+    }
+
+    public String toCanonicalJson() {
+        try {
+<span class="fc" id="L204">            Map&lt;String, Object&gt; value = payload(</span>
+                studyPlanHash,
+                mutationCatalogHash,
+                seedGenomeHashes,
+                completedGeneration,
+                population,
+                evaluations,
+                generationReports,
+                mutationAttempts,
+                trainEvaluations,
+                validationStatus,
+                finalTestStatus);
+<span class="fc" id="L216">            value.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L217">            value.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L218">            return JSON.writeValueAsString(value) + &quot;\n&quot;;</span>
+<span class="nc" id="L219">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L220">            throw new IllegalStateException(</span>
+                &quot;cannot serialize population checkpoint&quot;, exception);
+        }
+    }
+
+    public int nextGeneration() {
+<span class="fc" id="L226">        return completedGeneration + 1;</span>
+    }
+
+    Map&lt;String, CandidateEvaluation&gt; evaluationsByGenomeHash() {
+<span class="fc" id="L230">        Map&lt;String, CandidateEvaluation&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L231">        evaluations.forEach(item -&gt; result.put(item.genomeHash(), item));</span>
+<span class="fc" id="L232">        return Map.copyOf(result);</span>
+    }
+
+    void requireCompatible(
+        EvolutionStudyPlan plan,
+        MutationCatalog catalog,
+        List&lt;EvolutionGenome&gt; seeds
+    ) {
+<span class="fc" id="L240">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (!studyPlanHash.equals(plan.contentHash())) {</span>
+<span class="nc" id="L242">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint study-plan identity mismatch&quot;);
+        }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (!mutationCatalogHash.equals(mutationCatalogHash(catalog))) {</span>
+<span class="fc" id="L246">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint mutation-catalog identity mismatch&quot;);
+        }
+<span class="fc" id="L249">        List&lt;String&gt; actualSeeds = canonicalHashes(seeds.stream()</span>
+<span class="fc" id="L250">            .map(EvolutionGenome::contentHash).toList());</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (!seedGenomeHashes.equals(actualSeeds)) {</span>
+<span class="nc" id="L252">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint seed identity mismatch&quot;);
+        }
+<span class="fc" id="L255">    }</span>
+
+    static String mutationCatalogHash(MutationCatalog catalog) {
+<span class="fc" id="L258">        Objects.requireNonNull(catalog, &quot;catalog&quot;);</span>
+<span class="fc" id="L259">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L260">        value.put(&quot;schema&quot;, &quot;regelsuche.evolution-mutation-catalog/v1&quot;);</span>
+<span class="fc" id="L261">        value.put(&quot;assumptions&quot;, catalog.assumptions().stream()</span>
+<span class="fc" id="L262">            .map(EvolutionGenome.AssumptionTemplate::canonicalMaterial)</span>
+<span class="fc" id="L263">            .toList());</span>
+<span class="fc" id="L264">        value.put(&quot;rankingFeatures&quot;, catalog.rankingFeatures().stream()</span>
+<span class="fc" id="L265">            .map(item -&gt; Map.of(</span>
+<span class="fc" id="L266">                &quot;signal&quot;, item.signal().name(),</span>
+<span class="fc" id="L267">                &quot;weightPermille&quot;, item.weightPermille()))</span>
+<span class="fc" id="L268">            .toList());</span>
+<span class="fc" id="L269">        value.put(</span>
+<span class="fc" id="L270">            &quot;specializationConstants&quot;, catalog.specializationConstants());</span>
+<span class="fc" id="L271">        return hash(value);</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String studyPlanHash,
+        String mutationCatalogHash,
+        List&lt;String&gt; seedGenomeHashes,
+        int completedGeneration,
+        List&lt;EvolutionGenome&gt; population,
+        List&lt;CandidateEvaluation&gt; evaluations,
+        List&lt;GenerationReport&gt; generationReports,
+        int mutationAttempts,
+        int trainEvaluations,
+        String validationStatus,
+        String finalTestStatus
+    ) {
+<span class="fc" id="L287">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L288">        value.put(&quot;completedGeneration&quot;, completedGeneration);</span>
+<span class="fc" id="L289">        value.put(&quot;evaluations&quot;, evaluations);</span>
+<span class="fc" id="L290">        value.put(&quot;finalTestStatus&quot;, finalTestStatus);</span>
+<span class="fc" id="L291">        value.put(&quot;generationReports&quot;, generationReports);</span>
+<span class="fc" id="L292">        value.put(&quot;mutationAttempts&quot;, mutationAttempts);</span>
+<span class="fc" id="L293">        value.put(&quot;mutationCatalogHash&quot;, mutationCatalogHash);</span>
+<span class="fc" id="L294">        value.put(&quot;population&quot;, population);</span>
+<span class="fc" id="L295">        value.put(&quot;seedGenomeHashes&quot;, seedGenomeHashes);</span>
+<span class="fc" id="L296">        value.put(&quot;studyPlanHash&quot;, studyPlanHash);</span>
+<span class="fc" id="L297">        value.put(&quot;trainEvaluations&quot;, trainEvaluations);</span>
+<span class="fc" id="L298">        value.put(&quot;validationStatus&quot;, validationStatus);</span>
+<span class="fc" id="L299">        return value;</span>
+    }
+
+    private static String hash(Map&lt;String, Object&gt; value) {
+        try {
+<span class="fc" id="L304">            return EvolutionGenome.hash(</span>
+<span class="fc" id="L305">                JSON.writeValueAsString(value));</span>
+<span class="nc" id="L306">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L307">            throw new IllegalStateException(</span>
+                &quot;cannot hash population checkpoint&quot;, exception);
+        }
+    }
+
+    private static List&lt;String&gt; canonicalHashes(List&lt;String&gt; values) {
+<span class="pc bpc" id="L313" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L314">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint requires seed genome hashes&quot;);
+        }
+<span class="fc" id="L317">        List&lt;String&gt; result = values.stream()</span>
+<span class="fc" id="L318">            .map(value -&gt; {</span>
+<span class="fc" id="L319">                EvolutionGenome.requireSha256(value, &quot;seedGenomeHash&quot;);</span>
+<span class="fc" id="L320">                return value;</span>
+            })
+<span class="fc" id="L322">            .distinct().sorted().toList();</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">        if (result.size() != values.size()) {</span>
+<span class="nc" id="L324">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint contains duplicate seed genomes&quot;);
+        }
+<span class="fc" id="L327">        return result;</span>
+    }
+
+    private static List&lt;EvolutionGenome&gt; canonicalPopulation(
+        List&lt;EvolutionGenome&gt; values
+    ) {
+<span class="pc bpc" id="L333" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L334">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint population must not be empty&quot;);
+        }
+<span class="fc" id="L337">        List&lt;EvolutionGenome&gt; result = values.stream()</span>
+<span class="fc" id="L338">            .map(value -&gt; Objects.requireNonNull(value, &quot;population genome&quot;))</span>
+<span class="fc" id="L339">            .toList();</span>
+<span class="fc" id="L340">        if (result.stream().map(EvolutionGenome::contentHash)</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                .distinct().count() != result.size()</span>
+<span class="fc" id="L342">                || result.stream().map(EvolutionGenome::alphaStructuralHash)</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">                    .distinct().count() != result.size()) {</span>
+<span class="nc" id="L344">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint population is not content/structure unique&quot;);
+        }
+<span class="fc" id="L347">        return result;</span>
+    }
+
+    private static List&lt;CandidateEvaluation&gt; canonicalEvaluations(
+        List&lt;CandidateEvaluation&gt; values
+    ) {
+<span class="pc bpc" id="L353" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L354">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint evaluation cache must not be empty&quot;);
+        }
+<span class="fc" id="L357">        List&lt;CandidateEvaluation&gt; result = values.stream()</span>
+<span class="fc" id="L358">            .map(value -&gt; Objects.requireNonNull(value, &quot;cached evaluation&quot;))</span>
+<span class="fc" id="L359">            .sorted(Comparator.comparing(CandidateEvaluation::genomeHash))</span>
+<span class="fc" id="L360">            .toList();</span>
+<span class="fc" id="L361">        if (result.stream().map(CandidateEvaluation::genomeHash)</span>
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">                .distinct().count() != result.size()) {</span>
+<span class="nc" id="L363">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint contains duplicate cached evaluations&quot;);
+        }
+<span class="fc" id="L366">        return result;</span>
+    }
+
+    private static List&lt;GenerationReport&gt; canonicalReports(
+        List&lt;GenerationReport&gt; values
+    ) {
+<span class="pc bpc" id="L372" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L373">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint requires generation reports&quot;);
+        }
+<span class="fc" id="L376">        return values.stream()</span>
+<span class="fc" id="L377">            .map(value -&gt; Objects.requireNonNull(value, &quot;generation report&quot;))</span>
+<span class="fc" id="L378">            .sorted(Comparator.comparingInt(GenerationReport::generation))</span>
+<span class="fc" id="L379">            .toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

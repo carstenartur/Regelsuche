@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionTrainFitnessEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionTrainFitnessEvidence.java</span></div><h1>EvolutionTrainFitnessEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import de.regelsuche.json.JsonWriter;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/** Canonical paired search evidence for one genome on one frozen TRAIN suite. */
+public record EvolutionTrainFitnessEvidence(
+    String schema,
+    String suiteHash,
+    String genomeHash,
+    List&lt;CaseMeasurement&gt; cases,
+    Map&lt;FitnessComponent, Integer&gt; rawComponents,
+    List&lt;String&gt; blockers,
+    String validationStatus,
+    String finalTestStatus,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-train-fitness/v1&quot;;
+<span class="fc" id="L27">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+
+<span class="fc" id="L29">    public EvolutionTrainFitnessEvidence {</span>
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L31">            throw new IllegalArgumentException(&quot;unsupported TRAIN fitness schema&quot;);</span>
+        }
+<span class="fc" id="L33">        EvolutionGenome.requireSha256(suiteHash, &quot;suiteHash&quot;);</span>
+<span class="fc" id="L34">        EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L35">        cases = canonicalCases(cases);</span>
+<span class="fc" id="L36">        rawComponents = canonicalComponents(rawComponents);</span>
+<span class="fc" id="L37">        blockers = canonicalStrings(blockers);</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(validationStatus)</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(finalTestStatus)) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(</span>
+                &quot;TRAIN evidence cannot contain later-stage outcomes&quot;);
+        }
+<span class="fc" id="L43">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L44">        String expected = EvolutionGenome.hash(render(</span>
+            suiteHash, genomeHash, cases, rawComponents, blockers, null));
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;TRAIN fitness contentHash mismatch&quot;);</span>
+        }
+<span class="fc" id="L49">    }</span>
+
+    public static EvolutionTrainFitnessEvidence create(
+        String suiteHash,
+        EvolutionGenome genome,
+        List&lt;CaseMeasurement&gt; cases,
+        Map&lt;FitnessComponent, Integer&gt; rawComponents,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L58">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L59">        List&lt;CaseMeasurement&gt; canonicalCases = canonicalCases(cases);</span>
+<span class="fc" id="L60">        Map&lt;FitnessComponent, Integer&gt; canonicalComponents =</span>
+<span class="fc" id="L61">            canonicalComponents(rawComponents);</span>
+<span class="fc" id="L62">        List&lt;String&gt; canonicalBlockers = canonicalStrings(blockers);</span>
+<span class="fc" id="L63">        String hash = EvolutionGenome.hash(render(</span>
+            suiteHash,
+<span class="fc" id="L65">            genome.contentHash(),</span>
+            canonicalCases,
+            canonicalComponents,
+            canonicalBlockers,
+            null));
+<span class="fc" id="L70">        return new EvolutionTrainFitnessEvidence(</span>
+            SCHEMA,
+            suiteHash,
+<span class="fc" id="L73">            genome.contentHash(),</span>
+            canonicalCases,
+            canonicalComponents,
+            canonicalBlockers,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L83">        return render(</span>
+            suiteHash, genomeHash, cases, rawComponents, blockers, contentHash);
+    }
+
+    private static List&lt;CaseMeasurement&gt; canonicalCases(
+        List&lt;CaseMeasurement&gt; values
+    ) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        List&lt;CaseMeasurement&gt; result = values == null</span>
+<span class="nc" id="L91">            ? List.of()</span>
+<span class="fc" id="L92">            : values.stream()</span>
+<span class="fc" id="L93">                .map(item -&gt; Objects.requireNonNull(item, &quot;case measurement&quot;))</span>
+<span class="fc" id="L94">                .sorted(Comparator.comparing(CaseMeasurement::caseId))</span>
+<span class="fc" id="L95">                .toList();</span>
+<span class="fc" id="L96">        if (new HashSet&lt;&gt;(result.stream().map(CaseMeasurement::caseId).toList()).size()</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L98">            throw new IllegalArgumentException(&quot;case measurements must have unique IDs&quot;);</span>
+        }
+<span class="fc" id="L100">        return result;</span>
+    }
+
+    private static Map&lt;FitnessComponent, Integer&gt; canonicalComponents(
+        Map&lt;FitnessComponent, Integer&gt; values
+    ) {
+<span class="fc" id="L106">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
+            new EnumMap&lt;&gt;(FitnessComponent.class);
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (values != null) {</span>
+<span class="fc" id="L109">            values.forEach((component, value) -&gt; {</span>
+<span class="fc" id="L110">                Objects.requireNonNull(component, &quot;fitness component&quot;);</span>
+<span class="fc" id="L111">                Objects.requireNonNull(value, &quot;fitness component value&quot;);</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">                if (value &lt; -1000 || value &gt; 1000) {</span>
+<span class="nc" id="L113">                    throw new IllegalArgumentException(</span>
+                        &quot;fitness component must be in [-1000,1000]&quot;);
+                }
+<span class="fc" id="L116">                result.put(component, value);</span>
+<span class="fc" id="L117">            });</span>
+        }
+<span class="fc" id="L119">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static List&lt;String&gt; canonicalStrings(List&lt;String&gt; values) {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        return values == null</span>
+<span class="nc" id="L124">            ? List.of()</span>
+<span class="fc" id="L125">            : values.stream()</span>
+<span class="fc" id="L126">                .map(value -&gt; requireText(value, &quot;blocker&quot;))</span>
+<span class="fc" id="L127">                .distinct()</span>
+<span class="fc" id="L128">                .sorted()</span>
+<span class="fc" id="L129">                .toList();</span>
+    }
+
+    private static String render(
+        String suiteHash,
+        String genomeHash,
+        List&lt;CaseMeasurement&gt; cases,
+        Map&lt;FitnessComponent, Integer&gt; rawComponents,
+        List&lt;String&gt; blockers,
+        String contentHash
+    ) {
+<span class="fc" id="L140">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L141">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L142">            .property(&quot;suiteHash&quot;, suiteHash)</span>
+<span class="fc" id="L143">            .property(&quot;genomeHash&quot;, genomeHash)</span>
+<span class="fc" id="L144">            .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L145">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L146">                    .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L147">                    .property(&quot;familyId&quot;, item.familyId())</span>
+<span class="fc" id="L148">                    .property(&quot;baselineStatus&quot;, item.baselineStatus())</span>
+<span class="fc" id="L149">                    .property(&quot;candidateStatus&quot;, item.candidateStatus())</span>
+<span class="fc" id="L150">                    .property(&quot;baselineReached&quot;, item.baselineReached())</span>
+<span class="fc" id="L151">                    .property(&quot;candidateReached&quot;, item.candidateReached())</span>
+<span class="fc" id="L152">                    .property(&quot;baselinePathLength&quot;, item.baselinePathLength())</span>
+<span class="fc" id="L153">                    .property(&quot;candidatePathLength&quot;, item.candidatePathLength())</span>
+<span class="fc" id="L154">                    .property(&quot;baselineExploredStates&quot;,</span>
+<span class="fc" id="L155">                        item.baselineExploredStates())</span>
+<span class="fc" id="L156">                    .property(&quot;candidateExploredStates&quot;,</span>
+<span class="fc" id="L157">                        item.candidateExploredStates())</span>
+<span class="fc" id="L158">                    .property(&quot;newlySolved&quot;, item.newlySolved())</span>
+<span class="fc" id="L159">                    .property(&quot;correctnessRegression&quot;,</span>
+<span class="fc" id="L160">                        item.correctnessRegression()))))</span>
+<span class="fc" id="L161">            .object(&quot;rawComponents&quot;, object -&gt; {</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                for (FitnessComponent component : FitnessComponent.values()) {</span>
+<span class="fc" id="L163">                    Integer value = rawComponents.get(component);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                    if (value != null) {</span>
+<span class="fc" id="L165">                        object.property(component.name(), value);</span>
+                    }
+                }
+<span class="fc" id="L168">            })</span>
+<span class="fc" id="L169">            .stringArray(&quot;blockers&quot;, blockers)</span>
+<span class="fc" id="L170">            .property(&quot;validationStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L171">            .property(&quot;finalTestStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L173">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L175">        return json.endObject().toString();</span>
+    }
+
+    public record CaseMeasurement(
+        String caseId,
+        String familyId,
+        String baselineStatus,
+        String candidateStatus,
+        boolean baselineReached,
+        boolean candidateReached,
+        int baselinePathLength,
+        int candidatePathLength,
+        long baselineExploredStates,
+        long candidateExploredStates,
+        boolean newlySolved,
+        boolean correctnessRegression
+    ) {
+<span class="fc" id="L192">        public CaseMeasurement {</span>
+<span class="fc" id="L193">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L194">            requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L195">            requireText(baselineStatus, &quot;baselineStatus&quot;);</span>
+<span class="fc" id="L196">            requireText(candidateStatus, &quot;candidateStatus&quot;);</span>
+<span class="pc bpc" id="L197" title="4 of 8 branches missed.">            if (baselinePathLength &lt; -1 || candidatePathLength &lt; -1</span>
+                    || baselineExploredStates &lt; 0
+                    || candidateExploredStates &lt; 0) {
+<span class="nc" id="L200">                throw new IllegalArgumentException(&quot;invalid TRAIN case metrics&quot;);</span>
+            }
+<span class="pc bpc" id="L202" title="1 of 6 branches missed.">            if (newlySolved != (!baselineReached &amp;&amp; candidateReached)) {</span>
+<span class="nc" id="L203">                throw new IllegalArgumentException(&quot;newlySolved is inconsistent&quot;);</span>
+            }
+<span class="pc bpc" id="L205" title="2 of 6 branches missed.">            if (correctnessRegression != (baselineReached &amp;&amp; !candidateReached)) {</span>
+<span class="nc" id="L206">                throw new IllegalArgumentException(</span>
+                    &quot;correctnessRegression is inconsistent&quot;);
+            }
+<span class="fc" id="L209">        }</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L213" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L214">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L216">        return value;</span>
+    }
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L220" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L221">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L223">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

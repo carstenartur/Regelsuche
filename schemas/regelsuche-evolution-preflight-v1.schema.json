@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-preflight/v1",
+  "title": "Regelsuche evolution preflight report v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "genomeHash",
+    "alphaStructuralHash",
+    "status",
+    "blockers",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-preflight/v1"
+    },
+    "genomeHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "alphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "status": {
+      "enum": [
+        "ACCEPTED",
+        "REJECTED"
+      ]
+    },
+    "blockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "location",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "enum": [
+              "EMPTY_PROGRAM",
+              "PROGRAM_LENGTH_EXCEEDED",
+              "EMPTY_FITNESS",
+              "TARGET_SIGNAL_IN_OPEN_TARGET_GENOME",
+              "INVALID_FEATURE_DIRECTION",
+              "CYCLE_GUARD_DISABLED",
+              "GROWTH_GUARD_DISABLED",
+              "APPLICABILITY_GUARD_DISABLED",
+              "DUPLICATE_GUARD_DISABLED",
+              "NONDETERMINISTIC_TIE_BREAKING",
+              "UNPARSABLE_SOURCE",
+              "UNPARSABLE_TARGET",
+              "UNBOUND_TARGET_PLACEHOLDER",
+              "UNBOUND_ASSUMPTION_PLACEHOLDER",
+              "UNSUPPORTED_ASSUMPTION_KIND",
+              "IDENTITY_REWRITE",
+              "AST_NODE_BUDGET_EXCEEDED",
+              "GENE_GROWTH_EXCEEDED",
+              "PROGRAM_GROWTH_EXCEEDED",
+              "APPLICATION_BUDGET_EXCEEDED",
+              "MISSING_EVIDENCE_OBLIGATION",
+              "DUPLICATE_STRUCTURAL_REWRITE",
+              "REWRITE_CYCLE",
+              "IDENTITY_MUTATION",
+              "ALPHA_EQUIVALENT_MUTATION",
+              "MISSING_PARENT_LINEAGE",
+              "OBJECTIVE_CHANGED",
+              "TRAINING_SCOPE_CHANGED",
+              "GUARD_POLICY_CHANGED",
+              "BUDGET_CHANGED",
+              "CAPABILITY_SET_CHANGED",
+              "INVALID_MUTATION_SHAPE",
+              "GUARD_WEAKENING_REQUIRES_CERTIFICATE"
+            ]
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

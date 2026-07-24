@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.independent-review-study-plan/v1",
+  "title": "Regelsuche independently reviewed interestingness study plan v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "studyId",
+    "status",
+    "cases",
+    "reviewProtocol",
+    "acceptanceThresholds",
+    "thresholdLockHash",
+    "historicalExposures",
+    "predictiveCorpusHash",
+    "labelsStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.independent-review-study-plan/v1"
+    },
+    "studyId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "status": {
+      "const": "FROZEN_BEFORE_REVIEW"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "reviewProtocol": {
+      "$ref": "#/$defs/reviewProtocol"
+    },
+    "acceptanceThresholds": {
+      "$ref": "#/$defs/thresholds"
+    },
+    "thresholdLockHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "historicalExposures": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/exposure"
+      }
+    },
+    "predictiveCorpusHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "labelsStatus": {
+      "const": "NOT_COLLECTED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "case": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "candidateId",
+        "split",
+        "candidateFamily",
+        "structuralSignatureHash",
+        "assessmentContentHash",
+        "candidateArtifactHash",
+        "blindedPresentationHash"
+      ],
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "split": {
+          "enum": [
+            "CALIBRATION",
+            "TEST"
+          ]
+        },
+        "candidateFamily": {
+          "$ref": "#/$defs/identifier"
+        },
+        "structuralSignatureHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "assessmentContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "candidateArtifactHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "blindedPresentationHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    },
+    "reviewProtocol": {
+      "type": "object",
+      "required": [
+        "minimumIndependentExpertReviews",
+        "blindReviewRequired",
+        "oneReviewPerReviewerAndCandidate",
+        "reviewerIdentitiesStoredAsHashesOnly",
+        "testLabelsExcludedFromSelection",
+        "reviewerHashSaltCommitment",
+        "reviewerInstructionsHash",
+        "qualificationCriteria",
+        "relevanceScalePermille",
+        "confidenceScalePermille",
+        "rationaleCodes",
+        "profiles",
+        "correctionPolicy"
+      ],
+      "properties": {
+        "minimumIndependentExpertReviews": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "blindReviewRequired": {
+          "const": true
+        },
+        "oneReviewPerReviewerAndCandidate": {
+          "const": true
+        },
+        "reviewerIdentitiesStoredAsHashesOnly": {
+          "const": true
+        },
+        "testLabelsExcludedFromSelection": {
+          "const": true
+        },
+        "reviewerHashSaltCommitment": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reviewerInstructionsHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "qualificationCriteria": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "relevanceScalePermille": {
+          "$ref": "#/$defs/scale"
+        },
+        "confidenceScalePermille": {
+          "$ref": "#/$defs/scale"
+        },
+        "rationaleCodes": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "profiles": {
+          "const": [
+            "THEORY_DISCOVERY",
+            "SEARCH_REUSE"
+          ]
+        },
+        "correctionPolicy": {
+          "const": "NEW_LABELED_EVALUATION_IDENTITY"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scale": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "contains": {
+        "const": 0
+      },
+      "minContains": 1,
+      "items": {
+        "$ref": "#/$defs/permille"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "const": 1000
+          },
+          "minContains": 1
+        }
+      ]
+    },
+    "thresholds": {
+      "type": "object",
+      "required": [
+        "minimumTestCases",
+        "minimumCalibrationAgreementPermille",
+        "minimumTestAgreementPermille",
+        "minimumProfileOrderAgreementPermille",
+        "minimumLeaveOneOutStabilityPermille",
+        "requireStableTopCandidate",
+        "requireNonEmptyParetoFront"
+      ],
+      "properties": {
+        "minimumTestCases": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimumCalibrationAgreementPermille": {
+          "$ref": "#/$defs/permille"
+        },
+        "minimumTestAgreementPermille": {
+          "$ref": "#/$defs/permille"
+        },
+        "minimumProfileOrderAgreementPermille": {
+          "$ref": "#/$defs/permille"
+        },
+        "minimumLeaveOneOutStabilityPermille": {
+          "$ref": "#/$defs/permille"
+        },
+        "requireStableTopCandidate": {
+          "type": "boolean"
+        },
+        "requireNonEmptyParetoFront": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "exposure": {
+      "type": "object",
+      "required": [
+        "candidateArtifactHash",
+        "kind",
+        "sourceStudyHash"
+      ],
+      "properties": {
+        "candidateArtifactHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "kind": {
+          "enum": [
+            "PRIOR_EXPERT_REVIEW",
+            "PUBLIC_PRESENTATION",
+            "DEVELOPMENT_EVALUATION",
+            "PRIOR_HELD_OUT_USE"
+          ]
+        },
+        "sourceStudyHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

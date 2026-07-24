@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.interestingness-profile-calibration/v1",
+  "title": "Regelsuche held-out interestingness profile calibration v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "predictiveCorpusHash",
+    "labeledEvaluationHash",
+    "selectedProfile",
+    "profileMetrics",
+    "testRanking",
+    "paretoCandidateIds",
+    "sensitivity",
+    "selectionHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.interestingness-profile-calibration/v1" },
+    "predictiveCorpusHash": { "$ref": "#/$defs/sha256" },
+    "labeledEvaluationHash": { "$ref": "#/$defs/sha256" },
+    "selectedProfile": { "$ref": "#/$defs/profile" },
+    "profileMetrics": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/profileMetric" }
+    },
+    "testRanking": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rankedCase" }
+    },
+    "paretoCandidateIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "sensitivity": { "$ref": "#/$defs/sensitivity" },
+    "selectionHash": { "$ref": "#/$defs/sha256" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "profile": { "enum": ["THEORY_DISCOVERY", "SEARCH_REUSE"] },
+    "profileMetric": {
+      "type": "object",
+      "required": [
+        "profile",
+        "calibrationAgreementPermille",
+        "testAgreementPermille"
+      ],
+      "properties": {
+        "profile": { "$ref": "#/$defs/profile" },
+        "calibrationAgreementPermille": { "$ref": "#/$defs/permille" },
+        "testAgreementPermille": { "$ref": "#/$defs/permille" }
+      },
+      "additionalProperties": false
+    },
+    "rankedCase": {
+      "type": "object",
+      "required": [
+        "rank",
+        "caseId",
+        "candidateId",
+        "consensusRelevancePermille",
+        "eligibility",
+        "totalPermille",
+        "assessmentContentHash",
+        "rawComponents"
+      ],
+      "properties": {
+        "rank": { "type": "integer", "minimum": 1 },
+        "caseId": { "$ref": "#/$defs/nonBlank" },
+        "candidateId": { "$ref": "#/$defs/nonBlank" },
+        "consensusRelevancePermille": { "$ref": "#/$defs/permille" },
+        "eligibility": {
+          "enum": ["RANKABLE_COMPLETE", "RANKABLE_INCOMPLETE", "BLOCKED"]
+        },
+        "totalPermille": { "type": "integer", "minimum": -1000, "maximum": 1000 },
+        "assessmentContentHash": { "$ref": "#/$defs/sha256" },
+        "rawComponents": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/permille" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "sensitivity": {
+      "type": "object",
+      "required": [
+        "profileOrderAgreementPermille",
+        "leaveOneOutSelectionStabilityPermille",
+        "topCandidateStableAcrossProfiles"
+      ],
+      "properties": {
+        "profileOrderAgreementPermille": { "$ref": "#/$defs/permille" },
+        "leaveOneOutSelectionStabilityPermille": { "$ref": "#/$defs/permille" },
+        "topCandidateStableAcrossProfiles": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

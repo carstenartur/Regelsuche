@@ -465,10 +465,10 @@ import java.util.regex.Pattern;
 <span class="fc" id="L465">        }</span>
 
         public CandidateCase requireCase(String caseId) {
-<span class="nc" id="L468">            return cases.stream()</span>
-<span class="nc" id="L469">                .filter(item -&gt; item.caseId().equals(caseId))</span>
-<span class="nc" id="L470">                .findFirst()</span>
-<span class="nc" id="L471">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
+<span class="fc" id="L468">            return cases.stream()</span>
+<span class="fc" id="L469">                .filter(item -&gt; item.caseId().equals(caseId))</span>
+<span class="fc" id="L470">                .findFirst()</span>
+<span class="pc" id="L471">                .orElseThrow(() -&gt; new IllegalArgumentException(</span>
                     &quot;unknown review case: &quot; + caseId));
         }
 

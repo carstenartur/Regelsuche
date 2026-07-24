@@ -1,0 +1,633 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CandidateIndependentFiniteSequenceAdapterMain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">CandidateIndependentFiniteSequenceAdapterMain.java</span></div><h1>CandidateIndependentFiniteSequenceAdapterMain.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoveryBudget;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
+import de.regelsuche.discovery.domain.DomainDiscoveryEvidence;
+import de.regelsuche.discovery.domain.DomainDiscoveryRunner;
+import de.regelsuche.discovery.domain.FiniteDifferenceSequenceDomain;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeSet;
+
+/**
+ * Executes the available finite-difference slice of the frozen
+ * candidate-independent benchmark.
+ *
+ * &lt;p&gt;The runner consumes only TRAIN {@code formationInput} while forming the
+ * available candidate form. Frozen holdouts are read only by the evaluation
+ * stage. The unavailable linear-recurrence adapter remains an explicit
+ * coverage blocker, so a failed finite-difference fit is retained as
+ * incomplete rather than misreported as a refutation.&lt;/p&gt;
+ */
+public final class CandidateIndependentFiniteSequenceAdapterMain {
+    public static final String SCHEMA =
+        &quot;regelsuche.candidate-independent-finite-sequence-adapter-run/v1&quot;;
+    private static final String CHALLENGE = &quot;finite-difference-recurrences&quot;;
+    private static final String AVAILABLE_FORM = &quot;FINITE_DIFFERENCE_POLYNOMIAL&quot;;
+    private static final String MISSING_FORM = &quot;LINEAR_RECURRENCE&quot;;
+    private static final String PROFILE_ID = &quot;finite-sequence-candidate-forms/v1&quot;;
+    private static final String PARTIAL_STATUS =
+        &quot;PARTIAL_EXECUTION_WITH_INCOMPLETE_ADAPTER_COVERAGE&quot;;
+    private static final int CAMPAIGN_COUNT = 4;
+
+<span class="fc" id="L50">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L51">        JsonFactory.builder()</span>
+<span class="fc" id="L52">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L53">            .build())</span>
+<span class="fc" id="L54">        .enable(SerializationFeature.INDENT_OUTPUT)</span>
+<span class="fc" id="L55">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);</span>
+
+    private CandidateIndependentFiniteSequenceAdapterMain() {
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="fc" id="L61">        Arguments arguments = Arguments.parse(args);</span>
+<span class="fc" id="L62">        ObjectNode corpus = readObject(arguments.corpus());</span>
+<span class="fc" id="L63">        ObjectNode profile = readObject(arguments.profile());</span>
+<span class="fc" id="L64">        ObjectNode receipt = readObject(arguments.freezeReceipt());</span>
+<span class="fc" id="L65">        validateFrozenInputs(corpus, profile, receipt);</span>
+
+<span class="fc" id="L67">        List&lt;ObjectNode&gt; cases = finiteCases(corpus);</span>
+<span class="fc" id="L68">        List&lt;ObjectNode&gt; trainCases = cases.stream()</span>
+<span class="fc" id="L69">            .filter(item -&gt; &quot;TRAIN&quot;.equals(text(item, &quot;split&quot;)))</span>
+<span class="fc" id="L70">            .toList();</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        require(trainCases.size() == 2,</span>
+            &quot;finite-sequence adapter requires exactly two frozen TRAIN cases&quot;);
+
+<span class="fc" id="L74">        ArrayNode campaigns = JSON.createArrayNode();</span>
+<span class="fc" id="L75">        int confirmedEvaluations = 0;</span>
+<span class="fc" id="L76">        int incompleteEvaluations = 0;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (int index = 1; index &lt;= CAMPAIGN_COUNT; index++) {</span>
+<span class="fc" id="L78">            ObjectNode campaign = executeCampaign(</span>
+                corpus, profile, cases, trainCases, index);
+<span class="fc" id="L80">            campaigns.add(campaign);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for (JsonNode evaluation : requireArray(</span>
+                    campaign, &quot;evaluations&quot;, &quot;campaign evaluations&quot;)) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                if (&quot;CONFIRMED_FINITE_DIFFERENCE_FIT&quot;.equals(</span>
+<span class="fc" id="L84">                        text(evaluation, &quot;outcome&quot;))) {</span>
+<span class="fc" id="L85">                    confirmedEvaluations++;</span>
+                } else {
+<span class="fc" id="L87">                    incompleteEvaluations++;</span>
+                }
+<span class="fc" id="L89">            }</span>
+        }
+
+<span class="fc" id="L92">        ObjectNode run = JSON.createObjectNode();</span>
+<span class="fc" id="L93">        run.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L94">        run.put(&quot;benchmarkId&quot;, text(corpus, &quot;benchmarkId&quot;));</span>
+<span class="fc" id="L95">        run.put(&quot;challengeId&quot;, CHALLENGE);</span>
+<span class="fc" id="L96">        run.put(&quot;repositoryRevision&quot;, arguments.repositoryRevision());</span>
+<span class="fc" id="L97">        run.put(&quot;caseCorpusContentHash&quot;, text(corpus, &quot;contentHash&quot;));</span>
+<span class="fc" id="L98">        run.put(&quot;formationProfileId&quot;, PROFILE_ID);</span>
+<span class="fc" id="L99">        run.put(&quot;formationProfileContentHash&quot;, text(profile, &quot;contentHash&quot;));</span>
+<span class="fc" id="L100">        run.put(&quot;freezeReceiptContentHash&quot;, text(receipt, &quot;contentHash&quot;));</span>
+<span class="fc" id="L101">        run.put(&quot;combinedPreregistrationHash&quot;,</span>
+<span class="fc" id="L102">            text(receipt, &quot;combinedPreregistrationHash&quot;));</span>
+<span class="fc" id="L103">        run.put(&quot;adapterStatus&quot;, PARTIAL_STATUS);</span>
+<span class="fc" id="L104">        run.put(&quot;availableCandidateForm&quot;, AVAILABLE_FORM);</span>
+<span class="fc" id="L105">        run.put(&quot;recurrenceAdapterStatus&quot;, &quot;ADAPTER_REQUIRED&quot;);</span>
+<span class="fc" id="L106">        run.put(&quot;configuredCampaigns&quot;, CAMPAIGN_COUNT);</span>
+<span class="fc" id="L107">        run.put(&quot;executedCampaigns&quot;, CAMPAIGN_COUNT);</span>
+<span class="fc" id="L108">        run.put(&quot;configuredEvaluations&quot;, CAMPAIGN_COUNT * cases.size());</span>
+<span class="fc" id="L109">        run.put(&quot;executedEvaluations&quot;, CAMPAIGN_COUNT * cases.size());</span>
+<span class="fc" id="L110">        run.put(&quot;confirmedFiniteDifferenceEvaluations&quot;, confirmedEvaluations);</span>
+<span class="fc" id="L111">        run.put(&quot;incompleteAdapterCoverageEvaluations&quot;, incompleteEvaluations);</span>
+<span class="fc" id="L112">        run.put(&quot;uniqueInfiniteContinuationClaimAuthorized&quot;, false);</span>
+<span class="fc" id="L113">        run.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L114">        run.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L115">        run.put(&quot;publicationAuthorized&quot;, false);</span>
+<span class="fc" id="L116">        run.set(&quot;campaigns&quot;, campaigns);</span>
+<span class="fc" id="L117">        addContentHash(run);</span>
+
+<span class="fc" id="L119">        Path output = arguments.output().toAbsolutePath().normalize();</span>
+<span class="fc" id="L120">        Files.createDirectories(output.getParent());</span>
+<span class="fc" id="L121">        Files.writeString(output, JSON.writeValueAsString(run) + &quot;\n&quot;,</span>
+            StandardCharsets.UTF_8);
+<span class="fc" id="L123">        System.out.println(&quot;candidateIndependentFiniteSequenceAdapter=&quot; + output);</span>
+<span class="fc" id="L124">        System.out.println(&quot;contentHash=&quot; + text(run, &quot;contentHash&quot;));</span>
+<span class="fc" id="L125">        System.out.println(&quot;confirmedEvaluations=&quot; + confirmedEvaluations);</span>
+<span class="fc" id="L126">        System.out.println(&quot;incompleteEvaluations=&quot; + incompleteEvaluations);</span>
+<span class="fc" id="L127">    }</span>
+
+    private static ObjectNode executeCampaign(
+        ObjectNode corpus,
+        ObjectNode profile,
+        List&lt;ObjectNode&gt; cases,
+        List&lt;ObjectNode&gt; trainCases,
+        int index
+    ) {
+<span class="fc" id="L136">        String campaignId = CHALLENGE + &quot;-campaign-&quot; + String.format(&quot;%02d&quot;, index);</span>
+<span class="fc" id="L137">        String configuredSeed = semanticHash(object(Map.of(</span>
+<span class="fc" id="L138">            &quot;benchmarkId&quot;, text(corpus, &quot;benchmarkId&quot;),</span>
+            &quot;campaignId&quot;, campaignId,
+            &quot;challengeId&quot;, CHALLENGE,
+<span class="fc" id="L141">            &quot;index&quot;, index)));</span>
+
+<span class="fc" id="L143">        ArrayNode formationEvidence = JSON.createArrayNode();</span>
+<span class="fc" id="L144">        boolean availableFormSelected = false;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (ObjectNode trainCase : trainCases) {</span>
+<span class="fc" id="L146">            String trainCaseId = text(trainCase, &quot;caseId&quot;);</span>
+<span class="fc" id="L147">            ObjectNode formation = requireObjectField(</span>
+                trainCase,
+                &quot;formationInput&quot;,
+                &quot;TRAIN case &quot; + trainCaseId + &quot; formationInput&quot;);
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            require(!formation.has(&quot;holdoutContinuation&quot;),</span>
+                &quot;formationInput exposes a frozen holdout&quot;);
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            require(!formation.path(&quot;holdoutVisible&quot;).asBoolean(true),</span>
+                &quot;formationInput unexpectedly exposes a holdout&quot;);
+<span class="fc" id="L155">            ObjectNode evidence = executeFormation(</span>
+                campaignId, trainCase, formation);
+<span class="fc" id="L157">            formationEvidence.add(evidence);</span>
+<span class="fc" id="L158">            availableFormSelected |= &quot;SELECTED&quot;.equals(</span>
+<span class="fc" id="L159">                text(evidence, &quot;candidateFormStatus&quot;));</span>
+<span class="fc" id="L160">        }</span>
+<span class="fc" id="L161">        require(availableFormSelected,</span>
+            &quot;no TRAIN case selected the available finite-difference form&quot;);
+
+<span class="fc" id="L164">        ArrayNode evaluations = JSON.createArrayNode();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (ObjectNode benchmarkCase : cases) {</span>
+<span class="fc" id="L166">            evaluations.add(executeEvaluation(campaignId, benchmarkCase));</span>
+<span class="fc" id="L167">        }</span>
+
+<span class="fc" id="L169">        ObjectNode campaign = JSON.createObjectNode();</span>
+<span class="fc" id="L170">        campaign.put(&quot;campaignId&quot;, campaignId);</span>
+<span class="fc" id="L171">        campaign.put(&quot;challengeId&quot;, CHALLENGE);</span>
+<span class="fc" id="L172">        campaign.put(&quot;configuredSeed&quot;, configuredSeed);</span>
+<span class="fc" id="L173">        campaign.put(&quot;status&quot;, PARTIAL_STATUS);</span>
+<span class="fc" id="L174">        campaign.put(&quot;candidateForm&quot;, AVAILABLE_FORM);</span>
+<span class="fc" id="L175">        campaign.put(&quot;candidateFormImplementationClass&quot;,</span>
+<span class="fc" id="L176">            availableImplementationClass(profile));</span>
+<span class="fc" id="L177">        campaign.put(&quot;formationVisibility&quot;, &quot;TRAIN_ONLY&quot;);</span>
+<span class="fc" id="L178">        campaign.put(&quot;heldOutInputAccess&quot;, &quot;EVALUATION_ONLY&quot;);</span>
+<span class="fc" id="L179">        campaign.put(&quot;recurrenceAdapterStatus&quot;, &quot;ADAPTER_REQUIRED&quot;);</span>
+<span class="fc" id="L180">        campaign.put(&quot;publicationEligible&quot;, false);</span>
+<span class="fc" id="L181">        campaign.set(&quot;formationCaseIds&quot;, strings(trainCases.stream()</span>
+<span class="fc" id="L182">            .map(item -&gt; text(item, &quot;caseId&quot;))</span>
+<span class="fc" id="L183">            .toList()));</span>
+<span class="fc" id="L184">        campaign.set(&quot;formationEvidence&quot;, formationEvidence);</span>
+<span class="fc" id="L185">        campaign.set(&quot;evaluations&quot;, evaluations);</span>
+<span class="fc" id="L186">        addContentHash(campaign);</span>
+<span class="fc" id="L187">        return campaign;</span>
+    }
+
+    private static ObjectNode executeFormation(
+        String campaignId,
+        ObjectNode benchmarkCase,
+        ObjectNode formation
+    ) {
+<span class="fc" id="L195">        String caseId = text(benchmarkCase, &quot;caseId&quot;);</span>
+<span class="fc" id="L196">        List&lt;Long&gt; observed = numbers(requireArray(</span>
+            formation,
+            &quot;observedPrefix&quot;,
+            &quot;case &quot; + caseId + &quot; formation observedPrefix&quot;));
+<span class="fc" id="L200">        int maximumOrder = integer(</span>
+            formation,
+            &quot;maximumOrder&quot;,
+            &quot;case &quot; + caseId + &quot; formation maximumOrder&quot;);
+<span class="fc" id="L204">        long syntheticHoldout = extrapolateFromObservedPrefix(</span>
+            observed, maximumOrder);
+<span class="fc" id="L206">        DomainDiscoveryEvidence evidence = runProductionDomain(</span>
+            campaignId + &quot;-formation-&quot; + caseId,
+            caseId + &quot;-formation-seed&quot;,
+            observed,
+<span class="fc" id="L210">            List.of(syntheticHoldout),</span>
+            maximumOrder,
+            &quot;candidate-independent-frozen-formation/&quot; + caseId);
+
+<span class="fc" id="L214">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="fc" id="L215">        result.put(&quot;caseId&quot;, caseId);</span>
+<span class="fc" id="L216">        result.put(&quot;caseContentHash&quot;, text(benchmarkCase, &quot;contentHash&quot;));</span>
+<span class="fc" id="L217">        result.put(&quot;inputSurface&quot;, &quot;formationInput&quot;);</span>
+<span class="fc" id="L218">        result.put(&quot;evaluationInputRead&quot;, false);</span>
+<span class="fc" id="L219">        result.put(&quot;holdoutVisible&quot;, false);</span>
+<span class="fc" id="L220">        result.put(&quot;syntheticHoldoutSource&quot;,</span>
+            &quot;DERIVED_FROM_OBSERVED_PREFIX_ONLY&quot;);
+<span class="fc" id="L222">        result.put(&quot;syntheticHoldout&quot;, syntheticHoldout);</span>
+<span class="fc" id="L223">        result.put(&quot;maximumOrder&quot;, maximumOrder);</span>
+<span class="fc" id="L224">        result.put(&quot;productionOutcome&quot;, evidence.outcome().name());</span>
+<span class="fc" id="L225">        result.put(&quot;productionEvidenceContentHash&quot;, evidence.contentHash());</span>
+<span class="fc" id="L226">        result.put(&quot;candidateFormStatus&quot;,</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            evidence.outcome() == DomainDiscoveryEvidence.Outcome.CONFIRMED</span>
+<span class="fc" id="L228">                ? &quot;SELECTED&quot; : &quot;NO_FINITE_DIFFERENCE_CANDIDATE&quot;);</span>
+<span class="fc" id="L229">        result.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L230">        result.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L231">        addContentHash(result);</span>
+<span class="fc" id="L232">        return result;</span>
+    }
+
+    private static ObjectNode executeEvaluation(
+        String campaignId,
+        ObjectNode benchmarkCase
+    ) {
+<span class="fc" id="L239">        String caseId = text(benchmarkCase, &quot;caseId&quot;);</span>
+<span class="fc" id="L240">        ObjectNode evaluationInput = requireObjectField(</span>
+            benchmarkCase,
+            &quot;evaluationInput&quot;,
+            &quot;case &quot; + caseId + &quot; evaluationInput&quot;);
+<span class="fc" id="L244">        List&lt;Long&gt; observed = numbers(requireArray(</span>
+            evaluationInput,
+            &quot;observedPrefix&quot;,
+            &quot;case &quot; + caseId + &quot; observedPrefix&quot;));
+<span class="fc" id="L248">        List&lt;Long&gt; holdout = numbers(requireArray(</span>
+            evaluationInput,
+            &quot;holdoutContinuation&quot;,
+            &quot;case &quot; + caseId + &quot; holdoutContinuation&quot;));
+<span class="fc" id="L252">        int maximumOrder = integer(</span>
+            evaluationInput,
+            &quot;maximumOrder&quot;,
+            &quot;case &quot; + caseId + &quot; maximumOrder&quot;);
+<span class="fc" id="L256">        DomainDiscoveryEvidence evidence = runProductionDomain(</span>
+            campaignId + &quot;-evaluation-&quot; + caseId,
+            caseId + &quot;-evaluation-seed&quot;,
+            observed,
+            holdout,
+            maximumOrder,
+            &quot;candidate-independent-frozen-evaluation/&quot; + caseId);
+
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        boolean confirmed = evidence.outcome()</span>
+            == DomainDiscoveryEvidence.Outcome.CONFIRMED;
+<span class="fc" id="L266">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="fc" id="L267">        result.put(&quot;caseId&quot;, caseId);</span>
+<span class="fc" id="L268">        result.put(&quot;caseContentHash&quot;, text(benchmarkCase, &quot;contentHash&quot;));</span>
+<span class="fc" id="L269">        result.put(&quot;split&quot;, text(benchmarkCase, &quot;split&quot;));</span>
+<span class="fc" id="L270">        result.put(&quot;structuralCluster&quot;, text(benchmarkCase, &quot;structuralCluster&quot;));</span>
+<span class="fc" id="L271">        result.put(&quot;formationVisibility&quot;,</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            &quot;TRAIN&quot;.equals(text(benchmarkCase, &quot;split&quot;))</span>
+<span class="fc" id="L273">                ? &quot;ALLOWED&quot; : &quot;PROHIBITED&quot;);</span>
+<span class="fc" id="L274">        result.put(&quot;heldOutInputReadStage&quot;, &quot;EVALUATION_ONLY&quot;);</span>
+<span class="fc" id="L275">        result.put(&quot;candidateForm&quot;, AVAILABLE_FORM);</span>
+<span class="fc" id="L276">        result.put(&quot;productionOutcome&quot;, evidence.outcome().name());</span>
+<span class="fc" id="L277">        result.put(&quot;productionEvidenceContentHash&quot;, evidence.contentHash());</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        result.put(&quot;outcome&quot;, confirmed</span>
+<span class="fc" id="L279">            ? &quot;CONFIRMED_FINITE_DIFFERENCE_FIT&quot;</span>
+<span class="fc" id="L280">            : &quot;INCOMPLETE_ADAPTER_COVERAGE&quot;);</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        result.put(&quot;reasonCode&quot;, confirmed</span>
+<span class="fc" id="L282">            ? &quot;FINITE_DIFFERENCE_HOLDOUT_CONFIRMED&quot;</span>
+<span class="fc" id="L283">            : &quot;LINEAR_RECURRENCE_ADAPTER_REQUIRED&quot;);</span>
+<span class="fc" id="L284">        result.put(&quot;uniqueInfiniteContinuationClaimAuthorized&quot;, false);</span>
+<span class="fc" id="L285">        result.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L286">        result.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L287">        result.put(&quot;publicationEligible&quot;, false);</span>
+<span class="fc" id="L288">        ObjectNode resourceUse = result.putObject(&quot;resourceUse&quot;);</span>
+<span class="fc" id="L289">        resourceUse.put(&quot;exploredStates&quot;, evidence.states().size());</span>
+<span class="fc" id="L290">        resourceUse.put(&quot;generatedSuccessors&quot;, evidence.transitions().size());</span>
+<span class="fc" id="L291">        resourceUse.put(&quot;candidateAttempts&quot;, evidence.candidateAttempts().size());</span>
+<span class="fc" id="L292">        resourceUse.put(&quot;proofAttempts&quot;, 0);</span>
+<span class="fc" id="L293">        addContentHash(result);</span>
+<span class="fc" id="L294">        return result;</span>
+    }
+
+    private static DomainDiscoveryEvidence runProductionDomain(
+        String campaignId,
+        String seedId,
+        List&lt;Long&gt; observed,
+        List&lt;Long&gt; holdout,
+        int maximumOrder,
+        String sourceReference
+    ) {
+<span class="pc bpc" id="L305" title="2 of 4 branches missed.">        require(maximumOrder &gt;= 1 &amp;&amp; maximumOrder &lt;= 8,</span>
+            &quot;maximumOrder is outside the frozen profile boundary&quot;);
+<span class="fc" id="L307">        FiniteDifferenceSequenceDomain domain =</span>
+            new FiniteDifferenceSequenceDomain();
+<span class="fc" id="L309">        DiscoveryBudget budget = new DiscoveryBudget(</span>
+            maximumOrder,
+<span class="fc" id="L311">            Math.max(16, maximumOrder + 2),</span>
+<span class="fc" id="L312">            Math.max(16, maximumOrder + 2),</span>
+            4,
+<span class="fc" id="L314">            Math.max(4, maximumOrder + 1),</span>
+<span class="fc" id="L315">            Math.max(16, observed.size()));</span>
+<span class="fc" id="L316">        DiscoverySeed seed = DiscoverySeed.create(</span>
+            seedId,
+<span class="fc" id="L318">            domain.domainId(),</span>
+<span class="fc" id="L319">            &quot;observed=&quot; + csv(observed) + &quot;;holdout=&quot; + csv(holdout),</span>
+            sourceReference);
+<span class="fc" id="L321">        return new DomainDiscoveryRunner()</span>
+<span class="fc" id="L322">            .run(campaignId, domain, seed, budget)</span>
+<span class="fc" id="L323">            .evidence();</span>
+    }
+
+    private static void validateFrozenInputs(
+        ObjectNode corpus,
+        ObjectNode profile,
+        ObjectNode receipt
+    ) {
+<span class="fc" id="L331">        requireHash(corpus, &quot;case corpus&quot;);</span>
+<span class="fc" id="L332">        requireHash(profile, &quot;formation profile&quot;);</span>
+<span class="fc" id="L333">        requireHash(receipt, &quot;freeze receipt&quot;);</span>
+<span class="fc" id="L334">        require(CHALLENGE.equals(&quot;finite-difference-recurrences&quot;),</span>
+            &quot;unexpected challenge identity&quot;);
+<span class="fc" id="L336">        require(PROFILE_ID.equals(text(profile, &quot;profileId&quot;)),</span>
+            &quot;unexpected finite-sequence profile identity&quot;);
+<span class="fc" id="L338">        require(text(corpus, &quot;contentHash&quot;).equals(</span>
+<span class="fc" id="L339">                text(receipt, &quot;caseCorpusContentHash&quot;)),</span>
+            &quot;case corpus is not bound by the freeze receipt&quot;);
+<span class="fc" id="L341">        require(text(profile, &quot;contentHash&quot;).equals(</span>
+<span class="fc" id="L342">                receipt.path(&quot;formationInventoryContentHashes&quot;)</span>
+<span class="fc" id="L343">                    .path(PROFILE_ID).asText()),</span>
+            &quot;finite-sequence profile is not bound by the freeze receipt&quot;);
+<span class="fc" id="L345">        require(&quot;IMPLEMENT_EXECUTION_ADAPTERS_WITHOUT_MODIFYING_FROZEN_CASE_PAYLOADS&quot;</span>
+<span class="fc" id="L346">                .equals(text(receipt, &quot;allowedNextStep&quot;)),</span>
+            &quot;freeze receipt does not authorize adapter implementation&quot;);
+<span class="fc" id="L348">        require(&quot;NOT_STARTED&quot;.equals(</span>
+<span class="fc" id="L349">                text(receipt, &quot;executionStatusAtFreeze&quot;)),</span>
+            &quot;corpus was not frozen before execution&quot;);
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        require(!receipt.path(&quot;publicationAuthorized&quot;).asBoolean(true),</span>
+            &quot;freeze receipt unexpectedly authorizes publication&quot;);
+
+<span class="fc" id="L354">        Map&lt;String, JsonNode&gt; forms = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        for (JsonNode form : requireArray(</span>
+                profile, &quot;forms&quot;, &quot;formation profile forms&quot;)) {
+<span class="fc" id="L357">            forms.put(text(form, &quot;formId&quot;), form);</span>
+<span class="fc" id="L358">        }</span>
+<span class="fc" id="L359">        require(&quot;AVAILABLE&quot;.equals(text(</span>
+<span class="fc" id="L360">                forms.get(AVAILABLE_FORM), &quot;implementationStatus&quot;)),</span>
+            &quot;finite-difference form is not available in the frozen profile&quot;);
+<span class="fc" id="L362">        require(&quot;ADAPTER_REQUIRED&quot;.equals(text(</span>
+<span class="fc" id="L363">                forms.get(MISSING_FORM), &quot;implementationStatus&quot;)),</span>
+            &quot;linear recurrence limitation disappeared from the frozen profile&quot;);
+<span class="fc" id="L365">    }</span>
+
+    private static List&lt;ObjectNode&gt; finiteCases(ObjectNode corpus) {
+<span class="fc" id="L368">        List&lt;ObjectNode&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        for (JsonNode item : requireArray(</span>
+                corpus, &quot;cases&quot;, &quot;case corpus cases&quot;)) {
+<span class="fc" id="L371">            ObjectNode benchmarkCase = requireObject(item, &quot;benchmark case&quot;);</span>
+<span class="fc" id="L372">            requireHash(benchmarkCase,</span>
+<span class="fc" id="L373">                &quot;benchmark case &quot; + text(item, &quot;caseId&quot;));</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            if (CHALLENGE.equals(text(item, &quot;challengeId&quot;))) {</span>
+<span class="fc" id="L375">                result.add(benchmarkCase);</span>
+            }
+<span class="fc" id="L377">        }</span>
+<span class="fc" id="L378">        result.sort(Comparator.comparing(item -&gt; text(item, &quot;caseId&quot;)));</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        require(result.size() == 6,</span>
+            &quot;expected exactly six frozen finite-sequence cases&quot;);
+<span class="fc" id="L381">        Map&lt;String, Long&gt; splits = result.stream().collect(</span>
+<span class="fc" id="L382">            java.util.stream.Collectors.groupingBy(</span>
+<span class="fc" id="L383">                item -&gt; text(item, &quot;split&quot;),</span>
+                java.util.TreeMap::new,
+<span class="fc" id="L385">                java.util.stream.Collectors.counting()));</span>
+<span class="fc" id="L386">        require(splits.equals(Map.of(</span>
+<span class="fc" id="L387">                &quot;TRAIN&quot;, 2L,</span>
+<span class="fc" id="L388">                &quot;VALIDATION&quot;, 2L,</span>
+<span class="fc" id="L389">                &quot;TEST&quot;, 2L)),</span>
+            &quot;finite-sequence split counts changed: &quot; + splits);
+<span class="fc" id="L391">        return List.copyOf(result);</span>
+    }
+
+    private static String availableImplementationClass(ObjectNode profile) {
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        for (JsonNode form : requireArray(</span>
+                profile, &quot;forms&quot;, &quot;formation profile forms&quot;)) {
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            if (AVAILABLE_FORM.equals(text(form, &quot;formId&quot;))) {</span>
+<span class="fc" id="L398">                return text(form, &quot;implementationClass&quot;);</span>
+            }
+<span class="nc" id="L400">        }</span>
+<span class="nc" id="L401">        throw new IllegalArgumentException(</span>
+            &quot;available form missing from profile&quot;);
+    }
+
+    private static long extrapolateFromObservedPrefix(
+        List&lt;Long&gt; observed,
+        int maximumOrder
+    ) {
+<span class="fc" id="L409">        List&lt;List&lt;Long&gt;&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L410">        rows.add(new ArrayList&lt;&gt;(observed));</span>
+<span class="pc bpc" id="L411" title="1 of 4 branches missed.">        while (rows.size() &lt;= maximumOrder &amp;&amp; rows.getLast().size() &gt; 1) {</span>
+<span class="fc" id="L412">            List&lt;Long&gt; previous = rows.getLast();</span>
+<span class="fc" id="L413">            List&lt;Long&gt; next = new ArrayList&lt;&gt;(previous.size() - 1);</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">            for (int index = 0; index + 1 &lt; previous.size(); index++) {</span>
+<span class="fc" id="L415">                next.add(Math.subtractExact(</span>
+<span class="fc" id="L416">                    previous.get(index + 1), previous.get(index)));</span>
+            }
+<span class="fc" id="L418">            rows.add(next);</span>
+<span class="fc" id="L419">        }</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        for (int level = rows.size() - 2; level &gt;= 0; level--) {</span>
+<span class="fc" id="L421">            List&lt;Long&gt; row = rows.get(level);</span>
+<span class="fc" id="L422">            List&lt;Long&gt; lower = rows.get(level + 1);</span>
+<span class="fc" id="L423">            row.add(Math.addExact(row.getLast(), lower.getLast()));</span>
+        }
+<span class="fc" id="L425">        return rows.getFirst().getLast();</span>
+    }
+
+    private static ObjectNode readObject(Path path) throws IOException {
+<span class="fc" id="L429">        require(Files.isRegularFile(path),</span>
+            &quot;missing regular JSON file: &quot; + path);
+<span class="fc" id="L431">        return requireObject(JSON.readTree(path.toFile()), path.toString());</span>
+    }
+
+    private static ObjectNode requireObject(
+        JsonNode node,
+        String description
+    ) {
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        if (!(node instanceof ObjectNode object)) {</span>
+<span class="nc" id="L439">            throw new IllegalArgumentException(</span>
+                description + &quot; must be a JSON object&quot;);
+        }
+<span class="fc" id="L442">        return object;</span>
+    }
+
+    private static ObjectNode requireObjectField(
+        ObjectNode object,
+        String field,
+        String description
+    ) {
+<span class="fc" id="L450">        return requireObject(object.get(field), description);</span>
+    }
+
+    private static ArrayNode requireArray(
+        ObjectNode object,
+        String field,
+        String description
+    ) {
+<span class="fc" id="L458">        JsonNode value = object.get(field);</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        if (!(value instanceof ArrayNode array)) {</span>
+<span class="nc" id="L460">            throw new IllegalArgumentException(</span>
+                description + &quot; must be a JSON array&quot;);
+        }
+<span class="fc" id="L463">        return array;</span>
+    }
+
+    private static int integer(
+        ObjectNode object,
+        String field,
+        String description
+    ) {
+<span class="fc" id="L471">        JsonNode value = object.get(field);</span>
+<span class="pc bpc" id="L472" title="2 of 4 branches missed.">        require(value != null &amp;&amp; value.isIntegralNumber(),</span>
+            description + &quot; must be an integer&quot;);
+<span class="fc" id="L474">        return value.intValue();</span>
+    }
+
+    private static void requireHash(
+        ObjectNode value,
+        String description
+    ) {
+<span class="fc" id="L481">        String retained = text(value, &quot;contentHash&quot;);</span>
+<span class="fc" id="L482">        ObjectNode unhashed = value.deepCopy();</span>
+<span class="fc" id="L483">        unhashed.remove(&quot;contentHash&quot;);</span>
+<span class="fc" id="L484">        require(retained.matches(&quot;sha256:[0-9a-f]{64}&quot;),</span>
+            description + &quot; has no canonical contentHash&quot;);
+<span class="fc" id="L486">        require(retained.equals(semanticHash(unhashed)),</span>
+            description + &quot; contentHash mismatch&quot;);
+<span class="fc" id="L488">    }</span>
+
+    private static void addContentHash(ObjectNode value) {
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">        require(!value.has(&quot;contentHash&quot;),</span>
+            &quot;contentHash must be assigned exactly once&quot;);
+<span class="fc" id="L493">        value.put(&quot;contentHash&quot;, semanticHash(value));</span>
+<span class="fc" id="L494">    }</span>
+
+    private static String semanticHash(JsonNode value) {
+<span class="fc" id="L497">        return &quot;sha256:&quot; + hex(sha256(canonicalJson(value)</span>
+<span class="fc" id="L498">            .getBytes(StandardCharsets.UTF_8)));</span>
+    }
+
+    private static String canonicalJson(JsonNode value) {
+        try {
+<span class="fc bfc" id="L503" title="All 2 branches covered.">            if (value.isObject()) {</span>
+<span class="fc" id="L504">                List&lt;String&gt; fields = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L505">                value.fieldNames().forEachRemaining(fields::add);</span>
+<span class="fc" id="L506">                fields.sort(String::compareTo);</span>
+<span class="fc" id="L507">                StringBuilder result = new StringBuilder(&quot;{&quot;);</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">                for (int index = 0; index &lt; fields.size(); index++) {</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">                    if (index &gt; 0) {</span>
+<span class="fc" id="L510">                        result.append(',');</span>
+                    }
+<span class="fc" id="L512">                    String field = fields.get(index);</span>
+<span class="fc" id="L513">                    result.append(JSON.writeValueAsString(field))</span>
+<span class="fc" id="L514">                        .append(':')</span>
+<span class="fc" id="L515">                        .append(canonicalJson(value.get(field)));</span>
+                }
+<span class="fc" id="L517">                return result.append('}').toString();</span>
+            }
+<span class="fc bfc" id="L519" title="All 2 branches covered.">            if (value.isArray()) {</span>
+<span class="fc" id="L520">                StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">                for (int index = 0; index &lt; value.size(); index++) {</span>
+<span class="fc bfc" id="L522" title="All 2 branches covered.">                    if (index &gt; 0) {</span>
+<span class="fc" id="L523">                        result.append(',');</span>
+                    }
+<span class="fc" id="L525">                    result.append(canonicalJson(value.get(index)));</span>
+                }
+<span class="fc" id="L527">                return result.append(']').toString();</span>
+            }
+<span class="fc" id="L529">            return JSON.writeValueAsString(value);</span>
+<span class="nc" id="L530">        } catch (IOException exception) {</span>
+<span class="nc" id="L531">            throw new IllegalStateException(</span>
+                &quot;cannot canonicalize JSON&quot;, exception);
+        }
+    }
+
+    private static byte[] sha256(byte[] value) {
+        try {
+<span class="fc" id="L538">            return MessageDigest.getInstance(&quot;SHA-256&quot;).digest(value);</span>
+<span class="nc" id="L539">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L540">            throw new IllegalStateException(</span>
+                &quot;SHA-256 is unavailable&quot;, exception);
+        }
+    }
+
+    private static String hex(byte[] value) {
+<span class="fc" id="L546">        StringBuilder result = new StringBuilder(value.length * 2);</span>
+<span class="fc bfc" id="L547" title="All 2 branches covered.">        for (byte item : value) {</span>
+<span class="fc" id="L548">            result.append(String.format(&quot;%02x&quot;, item &amp; 0xff));</span>
+        }
+<span class="fc" id="L550">        return result.toString();</span>
+    }
+
+    private static List&lt;Long&gt; numbers(ArrayNode array) {
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">        require(!array.isEmpty(),</span>
+            &quot;numeric sequence must not be empty&quot;);
+<span class="fc" id="L556">        List&lt;Long&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L557" title="All 2 branches covered.">        for (JsonNode item : array) {</span>
+<span class="fc" id="L558">            require(item.isIntegralNumber(),</span>
+                &quot;sequence term must be an integer&quot;);
+<span class="fc" id="L560">            result.add(item.longValue());</span>
+<span class="fc" id="L561">        }</span>
+<span class="fc" id="L562">        return List.copyOf(result);</span>
+    }
+
+    private static ArrayNode strings(List&lt;String&gt; values) {
+<span class="fc" id="L566">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="fc" id="L567">        values.forEach(result::add);</span>
+<span class="fc" id="L568">        return result;</span>
+    }
+
+    private static ObjectNode object(Map&lt;String, ?&gt; values) {
+<span class="fc" id="L572">        return JSON.valueToTree(values);</span>
+    }
+
+    private static String csv(List&lt;Long&gt; values) {
+<span class="fc" id="L576">        return values.stream()</span>
+<span class="fc" id="L577">            .map(String::valueOf)</span>
+<span class="fc" id="L578">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;));</span>
+    }
+
+    private static String text(JsonNode node, String field) {
+<span class="fc" id="L582">        Objects.requireNonNull(node, &quot;node&quot;);</span>
+<span class="fc" id="L583">        JsonNode value = node.get(field);</span>
+<span class="pc bpc" id="L584" title="1 of 2 branches missed.">        require(value != null</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">                &amp;&amp; value.isTextual()</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">                &amp;&amp; !value.asText().isBlank(),</span>
+            &quot;missing textual field &quot; + field);
+<span class="fc" id="L588">        return value.asText();</span>
+    }
+
+    private static void require(boolean condition, String message) {
+<span class="fc bfc" id="L592" title="All 2 branches covered.">        if (!condition) {</span>
+<span class="fc" id="L593">            throw new IllegalArgumentException(message);</span>
+        }
+<span class="fc" id="L595">    }</span>
+
+<span class="fc" id="L597">    private record Arguments(</span>
+        Path corpus,
+        Path profile,
+        Path freezeReceipt,
+        Path output,
+        String repositoryRevision
+    ) {
+        private static Arguments parse(String[] args) {
+<span class="fc" id="L605">            Map&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L606" title="All 2 branches covered.">            for (int index = 0; index &lt; args.length; index += 2) {</span>
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">                require(index + 1 &lt; args.length,</span>
+                    &quot;arguments must be supplied as --name value pairs&quot;);
+<span class="fc" id="L609">                require(args[index].startsWith(&quot;--&quot;),</span>
+                    &quot;unexpected argument &quot; + args[index]);
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">                require(values.putIfAbsent(</span>
+                        args[index], args[index + 1]) == null,
+                    &quot;duplicate argument &quot; + args[index]);
+            }
+<span class="fc" id="L615">            TreeSet&lt;String&gt; expected = new TreeSet&lt;&gt;(List.of(</span>
+                &quot;--corpus&quot;,
+                &quot;--profile&quot;,
+                &quot;--freeze-receipt&quot;,
+                &quot;--output&quot;,
+                &quot;--repository-revision&quot;));
+<span class="fc" id="L621">            require(values.keySet().equals(expected),</span>
+                &quot;arguments differ: expected=&quot; + expected
+<span class="fc" id="L623">                    + &quot; actual=&quot; + values.keySet());</span>
+<span class="fc" id="L624">            return new Arguments(</span>
+<span class="fc" id="L625">                Path.of(values.get(&quot;--corpus&quot;)),</span>
+<span class="fc" id="L626">                Path.of(values.get(&quot;--profile&quot;)),</span>
+<span class="fc" id="L627">                Path.of(values.get(&quot;--freeze-receipt&quot;)),</span>
+<span class="fc" id="L628">                Path.of(values.get(&quot;--output&quot;)),</span>
+<span class="fc" id="L629">                values.get(&quot;--repository-revision&quot;));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

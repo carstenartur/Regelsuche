@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.domain-generic-discovery-qualification-run/v1",
+  "title": "Regelsuche domain-generic discovery qualification run v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "profileCatalogHash",
+    "qualificationReportHash",
+    "cleanRunFingerprints",
+    "cleanRunsIdentical",
+    "domainGenericQualificationStatus",
+    "domainGenericClaimAuthorized",
+    "autonomousCampaignClaimAuthorized",
+    "proofStatus",
+    "externalNoveltyStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.domain-generic-discovery-qualification-run/v1"
+    },
+    "profileCatalogHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "qualificationReportHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "cleanRunFingerprints": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "cleanRunsIdentical": {
+      "type": "boolean"
+    },
+    "domainGenericQualificationStatus": {
+      "enum": ["READY", "BLOCKED"]
+    },
+    "domainGenericClaimAuthorized": {
+      "type": "boolean"
+    },
+    "autonomousCampaignClaimAuthorized": {
+      "const": false
+    },
+    "proofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "domainGenericQualificationStatus": {
+            "const": "READY"
+          }
+        },
+        "required": ["domainGenericQualificationStatus"]
+      },
+      "then": {
+        "properties": {
+          "domainGenericClaimAuthorized": {"const": true},
+          "cleanRunsIdentical": {"const": true}
+        }
+      },
+      "else": {
+        "properties": {
+          "domainGenericClaimAuthorized": {"const": false}
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

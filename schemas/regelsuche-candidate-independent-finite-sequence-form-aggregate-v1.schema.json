@@ -1,0 +1,532 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-candidate-independent-finite-sequence-form-aggregate-v1.schema.json",
+  "title": "Regelsuche candidate-independent finite-sequence candidate-form aggregate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmarkId",
+    "challengeId",
+    "repositoryRevision",
+    "caseCorpusContentHash",
+    "formationProfileId",
+    "formationProfileContentHash",
+    "freezeReceiptContentHash",
+    "combinedPreregistrationHash",
+    "sourceRuns",
+    "expectedCandidateForms",
+    "executedCandidateForms",
+    "completeCandidateFormCoverage",
+    "configuredCampaigns",
+    "executedCampaigns",
+    "configuredCases",
+    "executedCases",
+    "casesConfirmedByAtLeastOneForm",
+    "casesWithRefutedAlternativeModel",
+    "casesUnresolved",
+    "challengeStatus",
+    "benchmarkStatus",
+    "uniqueInfiniteContinuationClaimAuthorized",
+    "formalProofStatus",
+    "externalNoveltyStatus",
+    "publicationAuthorized",
+    "campaigns",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.candidate-independent-finite-sequence-form-aggregate/v1"
+    },
+    "benchmarkId": {
+      "const": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1"
+    },
+    "challengeId": {
+      "const": "finite-difference-recurrences"
+    },
+    "repositoryRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "caseCorpusContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "formationProfileId": {
+      "const": "finite-sequence-candidate-forms/v1"
+    },
+    "formationProfileContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "freezeReceiptContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "combinedPreregistrationHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "sourceRuns": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/finiteSourceRun"
+        },
+        {
+          "$ref": "#/$defs/recurrenceSourceRun"
+        }
+      ],
+      "items": false
+    },
+    "expectedCandidateForms": {
+      "$ref": "#/$defs/candidateForms"
+    },
+    "executedCandidateForms": {
+      "$ref": "#/$defs/candidateForms"
+    },
+    "completeCandidateFormCoverage": {
+      "const": true
+    },
+    "configuredCampaigns": {
+      "const": 4
+    },
+    "executedCampaigns": {
+      "const": 4
+    },
+    "configuredCases": {
+      "const": 6
+    },
+    "executedCases": {
+      "const": 6
+    },
+    "casesConfirmedByAtLeastOneForm": {
+      "const": 6
+    },
+    "casesWithRefutedAlternativeModel": {
+      "const": 1
+    },
+    "casesUnresolved": {
+      "const": 0
+    },
+    "challengeStatus": {
+      "const": "COMPLETE_CANDIDATE_FORM_EXECUTION_WITH_RETAINED_MODEL_CONFLICTS"
+    },
+    "benchmarkStatus": {
+      "const": "PARTIAL_OTHER_CHALLENGES_NOT_AGGREGATED"
+    },
+    "uniqueInfiniteContinuationClaimAuthorized": {
+      "const": false
+    },
+    "formalProofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicationAuthorized": {
+      "const": false
+    },
+    "campaigns": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/campaign"
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "rational": {
+      "type": "string",
+      "pattern": "^-?[0-9]+(?:/[1-9][0-9]*)?$"
+    },
+    "candidateForms": {
+      "const": [
+        "FINITE_DIFFERENCE_POLYNOMIAL",
+        "LINEAR_RECURRENCE"
+      ]
+    },
+    "finiteSourceRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateForm",
+        "schema",
+        "contentHash"
+      ],
+      "properties": {
+        "candidateForm": {
+          "const": "FINITE_DIFFERENCE_POLYNOMIAL"
+        },
+        "schema": {
+          "const": "regelsuche.candidate-independent-finite-sequence-adapter-run/v1"
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "recurrenceSourceRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateForm",
+        "schema",
+        "contentHash"
+      ],
+      "properties": {
+        "candidateForm": {
+          "const": "LINEAR_RECURRENCE"
+        },
+        "schema": {
+          "const": "regelsuche.candidate-independent-linear-recurrence-adapter-run/v1"
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "campaignId",
+        "challengeId",
+        "sourceCampaignContentHashes",
+        "executedCandidateForms",
+        "casesConfirmedByAtLeastOneForm",
+        "casesWithRefutedAlternativeModel",
+        "casesUnresolved",
+        "caseEvaluations",
+        "uniqueInfiniteContinuationClaimAuthorized",
+        "formalProofStatus",
+        "externalNoveltyStatus",
+        "publicationEligible",
+        "contentHash"
+      ],
+      "properties": {
+        "campaignId": {
+          "type": "string",
+          "pattern": "^finite-difference-recurrences-campaign-0[1-4]$"
+        },
+        "challengeId": {
+          "const": "finite-difference-recurrences"
+        },
+        "sourceCampaignContentHashes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "FINITE_DIFFERENCE_POLYNOMIAL",
+            "LINEAR_RECURRENCE"
+          ],
+          "properties": {
+            "FINITE_DIFFERENCE_POLYNOMIAL": {
+              "$ref": "#/$defs/sha256"
+            },
+            "LINEAR_RECURRENCE": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "executedCandidateForms": {
+          "$ref": "#/$defs/candidateForms"
+        },
+        "casesConfirmedByAtLeastOneForm": {
+          "const": 6
+        },
+        "casesWithRefutedAlternativeModel": {
+          "const": 1
+        },
+        "casesUnresolved": {
+          "const": 0
+        },
+        "caseEvaluations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/caseEvaluation"
+          }
+        },
+        "uniqueInfiniteContinuationClaimAuthorized": {
+          "const": false
+        },
+        "formalProofStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "externalNoveltyStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "publicationEligible": {
+          "const": false
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "caseEvaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "caseContentHash",
+        "split",
+        "structuralCluster",
+        "formResults",
+        "supportingForms",
+        "refutedForms",
+        "inconclusiveForms",
+        "confirmedByAtLeastOneForm",
+        "modelOutcomeConflict",
+        "disposition",
+        "uniqueInfiniteContinuationClaimAuthorized",
+        "formalProofStatus",
+        "externalNoveltyStatus",
+        "publicationEligible",
+        "contentHash"
+      ],
+      "properties": {
+        "caseId": {
+          "type": "string",
+          "pattern": "^case-(0[7-9]|1[0-2])$"
+        },
+        "caseContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "split": {
+          "enum": [
+            "TRAIN",
+            "VALIDATION",
+            "TEST"
+          ]
+        },
+        "structuralCluster": {
+          "type": "string",
+          "minLength": 1
+        },
+        "formResults": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/finiteResult"
+            },
+            {
+              "$ref": "#/$defs/recurrenceResult"
+            }
+          ],
+          "items": false
+        },
+        "supportingForms": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "FINITE_DIFFERENCE_POLYNOMIAL",
+              "LINEAR_RECURRENCE"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "refutedForms": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "FINITE_DIFFERENCE_POLYNOMIAL",
+              "LINEAR_RECURRENCE"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "inconclusiveForms": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "FINITE_DIFFERENCE_POLYNOMIAL",
+              "LINEAR_RECURRENCE"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "confirmedByAtLeastOneForm": {
+          "const": true
+        },
+        "modelOutcomeConflict": {
+          "type": "boolean"
+        },
+        "disposition": {
+          "enum": [
+            "CONFIRMED_BY_FINITE_DIFFERENCE_ONLY",
+            "CONFIRMED_BY_LINEAR_RECURRENCE_ONLY",
+            "CONFIRMED_BY_BOTH_FORMS",
+            "CONFIRMED_WITH_REFUTED_ALTERNATIVE_MODEL",
+            "UNRESOLVED_BY_AVAILABLE_FORMS"
+          ]
+        },
+        "uniqueInfiniteContinuationClaimAuthorized": {
+          "const": false
+        },
+        "formalProofStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "externalNoveltyStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "publicationEligible": {
+          "const": false
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "finiteResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateForm",
+        "disposition",
+        "sourceOutcome",
+        "reasonCode",
+        "productionOutcome",
+        "sourceEvaluationContentHash",
+        "productionEvidenceContentHash"
+      ],
+      "properties": {
+        "candidateForm": {
+          "const": "FINITE_DIFFERENCE_POLYNOMIAL"
+        },
+        "disposition": {
+          "enum": [
+            "CONFIRMED",
+            "INCONCLUSIVE"
+          ]
+        },
+        "sourceOutcome": {
+          "enum": [
+            "CONFIRMED_FINITE_DIFFERENCE_FIT",
+            "INCOMPLETE_ADAPTER_COVERAGE"
+          ]
+        },
+        "reasonCode": {
+          "enum": [
+            "FINITE_DIFFERENCE_HOLDOUT_CONFIRMED",
+            "LINEAR_RECURRENCE_ADAPTER_REQUIRED"
+          ]
+        },
+        "productionOutcome": {
+          "enum": [
+            "CONFIRMED",
+            "REFUTED",
+            "INCONCLUSIVE",
+            "UNSUPPORTED",
+            "BUDGET_EXHAUSTED",
+            "INVALID_SEED"
+          ]
+        },
+        "sourceEvaluationContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "productionEvidenceContentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "recurrenceResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateForm",
+        "disposition",
+        "sourceOutcome",
+        "reasonCode",
+        "productionOutcome",
+        "formedModelStatus",
+        "recurrenceOrder",
+        "coefficients",
+        "expectedHoldout",
+        "predictedHoldout",
+        "sourceEvaluationContentHash",
+        "productionEvidenceContentHash"
+      ],
+      "properties": {
+        "candidateForm": {
+          "const": "LINEAR_RECURRENCE"
+        },
+        "disposition": {
+          "enum": [
+            "CONFIRMED",
+            "REFUTED",
+            "INCONCLUSIVE"
+          ]
+        },
+        "sourceOutcome": {
+          "enum": [
+            "CONFIRMED_LINEAR_RECURRENCE_FIT",
+            "REFUTED_LINEAR_RECURRENCE_FIT",
+            "NO_UNIQUE_LINEAR_RECURRENCE"
+          ]
+        },
+        "reasonCode": {
+          "enum": [
+            "LINEAR_RECURRENCE_HOLDOUT_CONFIRMED",
+            "OBSERVED_PREFIX_RECURRENCE_REFUTED_BY_HOLDOUT",
+            "NO_UNIQUE_MODEL_WITHIN_FROZEN_ORDER_BOUND"
+          ]
+        },
+        "productionOutcome": {
+          "enum": [
+            "CONFIRMED",
+            "REFUTED",
+            "INCONCLUSIVE"
+          ]
+        },
+        "formedModelStatus": {
+          "enum": [
+            "UNIQUE_MODEL",
+            "NO_UNIQUE_MODEL"
+          ]
+        },
+        "recurrenceOrder": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "coefficients": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/rational"
+          }
+        },
+        "expectedHoldout": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^-?[0-9]+$"
+          }
+        },
+        "predictedHoldout": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rational"
+          }
+        },
+        "sourceEvaluationContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "productionEvidenceContentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

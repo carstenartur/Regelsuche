@@ -76,8 +76,8 @@ final class DomainCanonical {
     }
 
     static &lt;T&gt; List&lt;T&gt; sortedCopy(List&lt;T&gt; values, Comparator&lt;? super T&gt; comparator) {
-<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
-<span class="nc" id="L80">            return List.of();</span>
+<span class="pc bpc" id="L79" title="1 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="fc" id="L80">            return List.of();</span>
         }
 <span class="fc" id="L82">        ArrayList&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
 <span class="fc" id="L83">        result.sort(comparator);</span>

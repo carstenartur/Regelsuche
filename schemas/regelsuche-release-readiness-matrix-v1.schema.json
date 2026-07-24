@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.release-readiness-matrix/v1",
+  "title": "Regelsuche 0.2 release readiness matrix v1",
+  "type": "object",
+  "required": [
+    "schema", "evidenceHash", "hiddenRuleEvidenceHash", "profiles",
+    "autonomousCampaignStatus", "autonomyClaimAuthorized",
+    "promotionStatus", "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.release-readiness-matrix/v1" },
+    "evidenceHash": { "$ref": "#/$defs/sha256" },
+    "hiddenRuleEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "profiles": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": [
+          "profile", "claim", "status", "authorizesAutonomyClaim",
+          "checks", "blockers"
+        ],
+        "properties": {
+          "profile": {
+            "enum": [
+              "SEARCH_REPRODUCIBILITY",
+              "HIDDEN_RULE_REDISCOVERY",
+              "OPEN_TARGET_DISCOVERY",
+              "AUTONOMOUS_CAMPAIGN",
+              "EXTERNAL_NOVELTY_REVIEW"
+            ]
+          },
+          "claim": { "$ref": "#/$defs/nonBlank" },
+          "status": { "enum": ["READY", "BLOCKED"] },
+          "authorizesAutonomyClaim": { "type": "boolean" },
+          "checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["code", "passed", "actual", "required"],
+              "properties": {
+                "code": { "$ref": "#/$defs/nonBlank" },
+                "passed": { "type": "boolean" },
+                "actual": { "$ref": "#/$defs/nonBlank" },
+                "required": { "$ref": "#/$defs/nonBlank" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "blockers": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/nonBlank" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "autonomousCampaignStatus": { "enum": ["READY", "BLOCKED"] },
+    "autonomyClaimAuthorized": { "type": "boolean" },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}

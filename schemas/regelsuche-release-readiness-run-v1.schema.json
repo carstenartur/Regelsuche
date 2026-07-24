@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.release-readiness-run/v1",
+  "title": "Regelsuche release readiness run v1",
+  "type": "object",
+  "required": [
+    "schema", "campaignManifestHash", "profileCatalogHash",
+    "evidenceHash", "hiddenRuleEvidenceStatus", "hiddenRuleEvidenceHash",
+    "qualificationEvidenceStatus", "qualificationEvidenceHash",
+    "matrixHash", "autonomousCampaignStatus", "autonomyClaimAuthorized",
+    "promotionStatus", "publicEvidenceStatus", "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.release-readiness-run/v1" },
+    "campaignManifestHash": { "$ref": "#/$defs/sha256" },
+    "profileCatalogHash": { "$ref": "#/$defs/sha256" },
+    "evidenceHash": { "$ref": "#/$defs/sha256" },
+    "hiddenRuleEvidenceStatus": { "enum": ["NOT_PROVIDED", "BOUND"] },
+    "hiddenRuleEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "qualificationEvidenceStatus": { "enum": ["NOT_PROVIDED", "BOUND"] },
+    "qualificationEvidenceHash": { "$ref": "#/$defs/sha256" },
+    "matrixHash": { "$ref": "#/$defs/sha256" },
+    "autonomousCampaignStatus": { "enum": ["READY", "BLOCKED"] },
+    "autonomyClaimAuthorized": { "type": "boolean" },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

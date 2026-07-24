@@ -1,0 +1,482 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RationalFunctionNormalFormEquivalenceService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">RationalFunctionNormalFormEquivalenceService.java</span></div><h1>RationalFunctionNormalFormEquivalenceService.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.FunctionExpr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.input.InputRequest;
+import de.regelsuche.input.InputType;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Deterministic equivalence and domain audit for bounded rational functions.
+ *
+ * &lt;p&gt;Supported expressions are converted exactly to numerator/denominator
+ * pairs over the project polynomial representation. Equality is decided by
+ * cross multiplication. Every non-constant denominator factor visible in the
+ * parsed AST must be covered by an explicit {@code !=} assumption. Factors and
+ * assumptions are compared through monic polynomial normal forms, so
+ * equivalent conditions such as {@code x != -3}, {@code x + 3 != 0} and
+ * {@code -3 != x} match.&lt;/p&gt;
+ *
+ * &lt;p&gt;The evaluator deliberately does not factor arbitrary polynomial sums and
+ * does not infer missing assumptions. Multiplicative factors that are already
+ * explicit in the AST are retained separately. Unsupported functions,
+ * negative or non-integral powers and identically zero divisors fail closed.&lt;/p&gt;
+ */
+<span class="fc" id="L36">public final class RationalFunctionNormalFormEquivalenceService {</span>
+    private static final int MAX_POWER = 12;
+<span class="fc" id="L38">    private static final GradedReverseLexOrder ORDER =</span>
+        new GradedReverseLexOrder();
+
+<span class="fc" id="L41">    private final ExpressionParser parser = new ExpressionParser();</span>
+
+    public Evaluation evaluate(
+        String leftExpression,
+        String rightExpression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L48">        Objects.requireNonNull(leftExpression, &quot;leftExpression&quot;);</span>
+<span class="fc" id="L49">        Objects.requireNonNull(rightExpression, &quot;rightExpression&quot;);</span>
+        try {
+<span class="fc" id="L51">            RationalFunction left = parse(leftExpression);</span>
+<span class="fc" id="L52">            RationalFunction right = parse(rightExpression);</span>
+<span class="fc" id="L53">            List&lt;String&gt; required = requiredFactorKeys(left, right);</span>
+<span class="fc" id="L54">            AssumptionAudit audit = auditAssumptions(assumptions, required);</span>
+<span class="fc" id="L55">            Polynomial crossLeft = left.crossLeft(right);</span>
+<span class="fc" id="L56">            Polynomial crossRight = left.crossRight(right);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (!audit.unsupportedAssumptions().isEmpty()) {</span>
+<span class="fc" id="L58">                return evaluation(</span>
+                    Status.UNSUPPORTED,
+                    false,
+                    crossLeft,
+                    crossRight,
+                    required,
+                    audit,
+                    &quot;unsupported assumption syntax or non-polynomial assumption&quot;);
+            }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (!audit.missingFactorKeys().isEmpty()) {</span>
+<span class="fc" id="L68">                return evaluation(</span>
+                    Status.MISSING_ASSUMPTION,
+                    false,
+                    crossLeft,
+                    crossRight,
+                    required,
+                    audit,
+                    &quot;one or more denominator factors are not declared non-zero&quot;);
+            }
+<span class="fc" id="L77">            boolean equivalent = crossLeft.equals(crossRight);</span>
+<span class="fc" id="L78">            return evaluation(</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                equivalent ? Status.CONFIRMED : Status.REFUTED,</span>
+                equivalent,
+                crossLeft,
+                crossRight,
+                required,
+                audit,
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                equivalent</span>
+<span class="fc" id="L86">                    ? &quot;matching cross-multiplied polynomial normal forms&quot;</span>
+<span class="fc" id="L87">                    : &quot;cross-multiplied polynomial normal forms differ&quot;);</span>
+<span class="fc" id="L88">        } catch (UnsupportedExpression exception) {</span>
+<span class="fc" id="L89">            return new Evaluation(</span>
+                Status.UNSUPPORTED,
+                false,
+                &quot;&quot;,
+                &quot;&quot;,
+<span class="fc" id="L94">                List.of(),</span>
+<span class="fc" id="L95">                List.of(),</span>
+<span class="fc" id="L96">                List.of(),</span>
+<span class="fc" id="L97">                List.of(),</span>
+<span class="fc" id="L98">                exception.getMessage());</span>
+        }
+    }
+
+    private Evaluation evaluation(
+        Status status,
+        boolean equivalent,
+        Polynomial crossLeft,
+        Polynomial crossRight,
+        List&lt;String&gt; required,
+        AssumptionAudit audit,
+        String detail
+    ) {
+<span class="fc" id="L111">        return new Evaluation(</span>
+            status,
+            equivalent,
+<span class="fc" id="L114">            crossLeft.toCanonicalString(),</span>
+<span class="fc" id="L115">            crossRight.toCanonicalString(),</span>
+            required,
+<span class="fc" id="L117">            audit.providedFactorKeys(),</span>
+<span class="fc" id="L118">            audit.missingFactorKeys(),</span>
+<span class="fc" id="L119">            audit.unsupportedAssumptions(),</span>
+            detail);
+    }
+
+    private RationalFunction parse(String expression) {
+        Expr parsed;
+        try {
+<span class="fc" id="L126">            parsed = parser.parse(new InputRequest(InputType.TERM, expression))</span>
+<span class="fc" id="L127">                .terms().getFirst();</span>
+<span class="nc" id="L128">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L129">            throw new UnsupportedExpression(</span>
+<span class="nc" id="L130">                &quot;cannot parse rational expression: &quot; + exception.getMessage());</span>
+<span class="fc" id="L131">        }</span>
+<span class="fc" id="L132">        return convert(parsed);</span>
+    }
+
+    private RationalFunction convert(Expr expression) {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L137">            return RationalFunction.polynomial(</span>
+<span class="fc" id="L138">                Polynomial.constant(Rational.fromDouble(number.value())));</span>
+        }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L141">            return RationalFunction.polynomial(</span>
+<span class="fc" id="L142">                Polynomial.variable(variable.name()));</span>
+        }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (expression instanceof FunctionExpr function) {</span>
+<span class="fc" id="L145">            throw new UnsupportedExpression(</span>
+                &quot;unsupported function in rational expression: &quot;
+<span class="fc" id="L147">                    + function.name());</span>
+        }
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="nc" id="L150">            throw new UnsupportedExpression(</span>
+                &quot;unsupported rational AST node: &quot; + expression);
+        }
+<span class="fc" id="L153">        RationalFunction left = convert(binary.left());</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L155">            return power(left, binary.right());</span>
+        }
+<span class="fc" id="L157">        RationalFunction right = convert(binary.right());</span>
+<span class="pc bpc" id="L158" title="1 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L159">            case ADD -&gt; left.add(right);</span>
+<span class="fc" id="L160">            case SUB -&gt; left.subtract(right);</span>
+<span class="fc" id="L161">            case MUL -&gt; left.multiply(right);</span>
+<span class="fc" id="L162">            case DIV -&gt; divide(left, right, binary.right());</span>
+<span class="nc" id="L163">            case POW -&gt; throw new IllegalStateException(</span>
+                &quot;power was handled before right-side conversion&quot;);
+        };
+    }
+
+    private RationalFunction divide(
+        RationalFunction left,
+        RationalFunction right,
+        Expr divisorExpression
+    ) {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (right.numerator().isZero()) {</span>
+<span class="fc" id="L174">            throw new UnsupportedExpression(</span>
+                &quot;division by an identically zero rational expression&quot;);
+        }
+<span class="fc" id="L177">        List&lt;Polynomial&gt; factors = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L178">            left.denominatorFactors());</span>
+<span class="fc" id="L179">        factors.addAll(right.denominatorFactors());</span>
+<span class="fc" id="L180">        factors.addAll(nonZeroValueFactors(divisorExpression));</span>
+<span class="fc" id="L181">        return new RationalFunction(</span>
+<span class="fc" id="L182">            left.numerator().multiply(right.denominator()),</span>
+<span class="fc" id="L183">            left.denominator().multiply(right.numerator()),</span>
+            factors);
+    }
+
+    /**
+     * Returns the already visible multiplicative factors whose product being
+     * non-zero makes {@code expression} non-zero. Domain factors needed merely
+     * to define a nested rational expression are retained by {@link #convert}
+     * and are therefore not duplicated here.
+     */
+    private List&lt;Polynomial&gt; nonZeroValueFactors(Expr expression) {
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L195">            Polynomial value = Polynomial.constant(</span>
+<span class="fc" id="L196">                Rational.fromDouble(number.value()));</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            return value.isZero() ? List.of(value) : List.of();</span>
+        }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binary) {</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L201">                List&lt;Polynomial&gt; factors = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L202">                    nonZeroValueFactors(binary.left()));</span>
+<span class="fc" id="L203">                factors.addAll(nonZeroValueFactors(binary.right()));</span>
+<span class="fc" id="L204">                return List.copyOf(factors);</span>
+            }
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            if (binary.operator() == BinaryOperator.DIV) {</span>
+<span class="fc" id="L207">                return nonZeroValueFactors(binary.left());</span>
+            }
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">            if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="nc" id="L210">                int exponent = integralExponent(binary.right());</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                return exponent == 0</span>
+<span class="nc" id="L212">                    ? List.of()</span>
+<span class="nc" id="L213">                    : nonZeroValueFactors(binary.left());</span>
+            }
+        }
+<span class="fc" id="L216">        RationalFunction value = convert(expression);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        return value.numerator().totalDegree() == 0</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            ? (value.numerator().isZero()</span>
+<span class="nc" id="L219">                ? List.of(value.numerator())</span>
+<span class="nc" id="L220">                : List.of())</span>
+<span class="fc" id="L221">            : List.of(value.numerator());</span>
+    }
+
+    private RationalFunction power(
+        RationalFunction base,
+        Expr exponentExpression
+    ) {
+<span class="fc" id="L228">        return base.pow(integralExponent(exponentExpression));</span>
+    }
+
+    private int integralExponent(Expr exponentExpression) {
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (!(exponentExpression instanceof NumberExpr exponentNumber)) {</span>
+<span class="nc" id="L233">            throw new UnsupportedExpression(</span>
+                &quot;rational powers require an explicit non-negative integer&quot;);
+        }
+<span class="fc" id="L236">        double raw = exponentNumber.value();</span>
+<span class="pc bpc" id="L237" title="3 of 6 branches missed.">        if (raw != Math.rint(raw) || raw &lt; 0 || raw &gt; MAX_POWER) {</span>
+<span class="nc" id="L238">            throw new UnsupportedExpression(</span>
+                &quot;rational power exponent is outside 0..&quot; + MAX_POWER);
+        }
+<span class="fc" id="L241">        return (int) raw;</span>
+    }
+
+    private List&lt;String&gt; requiredFactorKeys(
+        RationalFunction left,
+        RationalFunction right
+    ) {
+<span class="fc" id="L248">        LinkedHashMap&lt;String, String&gt; factors = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L249">        left.denominatorFactors().forEach(factor -&gt; addFactor(factors, factor));</span>
+<span class="fc" id="L250">        right.denominatorFactors().forEach(factor -&gt; addFactor(factors, factor));</span>
+<span class="fc" id="L251">        return factors.values().stream().sorted().toList();</span>
+    }
+
+    private void addFactor(
+        Map&lt;String, String&gt; factors,
+        Polynomial polynomial
+    ) {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (polynomial.isZero()) {</span>
+<span class="nc" id="L259">            throw new UnsupportedExpression(</span>
+                &quot;rational expression contains an identically zero divisor&quot;);
+        }
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (polynomial.totalDegree() == 0) {</span>
+<span class="nc" id="L263">            return;</span>
+        }
+<span class="fc" id="L265">        String key = factorKey(polynomial);</span>
+<span class="fc" id="L266">        factors.putIfAbsent(key, key);</span>
+<span class="fc" id="L267">    }</span>
+
+    private AssumptionAudit auditAssumptions(
+        List&lt;String&gt; assumptions,
+        List&lt;String&gt; requiredFactorKeys
+    ) {
+<span class="fc" id="L273">        LinkedHashMap&lt;String, String&gt; provided = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L274">        List&lt;String&gt; unsupported = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        if (assumptions != null) {</span>
+<span class="fc" id="L276">            assumptions.stream()</span>
+<span class="pc bpc" id="L277" title="2 of 4 branches missed.">                .filter(value -&gt; value != null &amp;&amp; !value.isBlank())</span>
+<span class="fc" id="L278">                .map(String::trim)</span>
+<span class="fc" id="L279">                .distinct()</span>
+<span class="fc" id="L280">                .sorted()</span>
+<span class="fc" id="L281">                .forEach(assumption -&gt; {</span>
+<span class="fc" id="L282">                    Optional&lt;Polynomial&gt; factor = parseNonZeroAssumption(</span>
+                        assumption);
+<span class="fc bfc" id="L284" title="All 2 branches covered.">                    if (factor.isEmpty()) {</span>
+<span class="fc" id="L285">                        unsupported.add(assumption);</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                    } else if (factor.orElseThrow().totalDegree() &gt; 0) {</span>
+<span class="fc" id="L287">                        String key = factorKey(factor.orElseThrow());</span>
+<span class="fc" id="L288">                        provided.putIfAbsent(key, key);</span>
+                    }
+<span class="fc" id="L290">                });</span>
+        }
+<span class="fc" id="L292">        List&lt;String&gt; missing = requiredFactorKeys.stream()</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            .filter(key -&gt; !provided.containsKey(key))</span>
+<span class="fc" id="L294">            .toList();</span>
+<span class="fc" id="L295">        return new AssumptionAudit(</span>
+<span class="fc" id="L296">            provided.values().stream().sorted().toList(),</span>
+            missing,
+<span class="fc" id="L298">            unsupported.stream().sorted().toList());</span>
+    }
+
+    private Optional&lt;Polynomial&gt; parseNonZeroAssumption(String assumption) {
+<span class="fc" id="L302">        int operator = assumption.indexOf(&quot;!=&quot;);</span>
+<span class="pc bpc" id="L303" title="1 of 4 branches missed.">        if (operator &lt;= 0 || operator + 2 &gt;= assumption.length()</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                || assumption.indexOf(&quot;!=&quot;, operator + 2) &gt;= 0) {</span>
+<span class="fc" id="L305">            return Optional.empty();</span>
+        }
+<span class="fc" id="L307">        String leftText = assumption.substring(0, operator).trim();</span>
+<span class="fc" id="L308">        String rightText = assumption.substring(operator + 2).trim();</span>
+<span class="pc bpc" id="L309" title="2 of 4 branches missed.">        if (leftText.isBlank() || rightText.isBlank()) {</span>
+<span class="nc" id="L310">            return Optional.empty();</span>
+        }
+        try {
+<span class="fc" id="L313">            RationalFunction left = parse(leftText);</span>
+<span class="fc" id="L314">            RationalFunction right = parse(rightText);</span>
+<span class="pc bpc" id="L315" title="2 of 4 branches missed.">            if (!left.isPolynomial() || !right.isPolynomial()) {</span>
+<span class="nc" id="L316">                return Optional.empty();</span>
+            }
+<span class="fc" id="L318">            Polynomial difference = left.numerator()</span>
+<span class="fc" id="L319">                .subtract(right.numerator());</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            return difference.isZero()</span>
+<span class="nc" id="L321">                ? Optional.empty()</span>
+<span class="fc" id="L322">                : Optional.of(difference);</span>
+<span class="nc" id="L323">        } catch (UnsupportedExpression exception) {</span>
+<span class="nc" id="L324">            return Optional.empty();</span>
+        }
+    }
+
+    private String factorKey(Polynomial polynomial) {
+<span class="fc" id="L329">        return polynomial.monic(ORDER).toCanonicalString(ORDER);</span>
+    }
+
+<span class="fc" id="L332">    public enum Status {</span>
+<span class="fc" id="L333">        CONFIRMED,</span>
+<span class="fc" id="L334">        REFUTED,</span>
+<span class="fc" id="L335">        MISSING_ASSUMPTION,</span>
+<span class="fc" id="L336">        UNSUPPORTED</span>
+    }
+
+    public record Evaluation(
+        Status status,
+        boolean equivalent,
+        String leftCrossNormalForm,
+        String rightCrossNormalForm,
+        List&lt;String&gt; requiredNonZeroFactors,
+        List&lt;String&gt; providedNonZeroFactors,
+        List&lt;String&gt; missingNonZeroFactors,
+        List&lt;String&gt; unsupportedAssumptions,
+        String detail
+    ) {
+<span class="fc" id="L350">        public Evaluation {</span>
+<span class="fc" id="L351">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            leftCrossNormalForm = leftCrossNormalForm == null</span>
+<span class="pc" id="L353">                ? &quot;&quot; : leftCrossNormalForm;</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            rightCrossNormalForm = rightCrossNormalForm == null</span>
+<span class="pc" id="L355">                ? &quot;&quot; : rightCrossNormalForm;</span>
+<span class="fc" id="L356">            requiredNonZeroFactors = immutable(</span>
+                requiredNonZeroFactors, &quot;requiredNonZeroFactors&quot;);
+<span class="fc" id="L358">            providedNonZeroFactors = immutable(</span>
+                providedNonZeroFactors, &quot;providedNonZeroFactors&quot;);
+<span class="fc" id="L360">            missingNonZeroFactors = immutable(</span>
+                missingNonZeroFactors, &quot;missingNonZeroFactors&quot;);
+<span class="fc" id="L362">            unsupportedAssumptions = immutable(</span>
+                unsupportedAssumptions, &quot;unsupportedAssumptions&quot;);
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            detail = detail == null ? &quot;&quot; : detail;</span>
+<span class="fc" id="L365">        }</span>
+
+        private static List&lt;String&gt; immutable(
+            List&lt;String&gt; values,
+            String name
+        ) {
+<span class="fc" id="L371">            Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">            if (values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L373">                throw new IllegalArgumentException(</span>
+                    name + &quot; must not contain null&quot;);
+            }
+<span class="fc" id="L376">            return List.copyOf(values);</span>
+        }
+    }
+
+<span class="fc" id="L380">    private record AssumptionAudit(</span>
+        List&lt;String&gt; providedFactorKeys,
+        List&lt;String&gt; missingFactorKeys,
+        List&lt;String&gt; unsupportedAssumptions
+    ) {
+    }
+
+    private record RationalFunction(
+        Polynomial numerator,
+        Polynomial denominator,
+        List&lt;Polynomial&gt; denominatorFactors
+    ) {
+<span class="fc" id="L392">        private RationalFunction {</span>
+<span class="fc" id="L393">            Objects.requireNonNull(numerator, &quot;numerator&quot;);</span>
+<span class="fc" id="L394">            Objects.requireNonNull(denominator, &quot;denominator&quot;);</span>
+<span class="fc" id="L395">            denominatorFactors = List.copyOf(denominatorFactors);</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">            if (denominator.isZero()) {</span>
+<span class="nc" id="L397">                throw new UnsupportedExpression(</span>
+                    &quot;rational expression has an identically zero denominator&quot;);
+            }
+<span class="fc" id="L400">        }</span>
+
+        private static RationalFunction polynomial(Polynomial value) {
+<span class="fc" id="L403">            return new RationalFunction(</span>
+                value,
+<span class="fc" id="L405">                Polynomial.constant(Rational.ONE),</span>
+<span class="fc" id="L406">                List.of());</span>
+        }
+
+        private boolean isPolynomial() {
+<span class="fc" id="L410">            return denominator.equals(Polynomial.constant(Rational.ONE));</span>
+        }
+
+        private RationalFunction add(RationalFunction other) {
+<span class="fc" id="L414">            return new RationalFunction(</span>
+<span class="fc" id="L415">                numerator.multiply(other.denominator)</span>
+<span class="fc" id="L416">                    .add(other.numerator.multiply(denominator)),</span>
+<span class="fc" id="L417">                denominator.multiply(other.denominator),</span>
+<span class="fc" id="L418">                joined(denominatorFactors, other.denominatorFactors));</span>
+        }
+
+        private RationalFunction subtract(RationalFunction other) {
+<span class="fc" id="L422">            return new RationalFunction(</span>
+<span class="fc" id="L423">                numerator.multiply(other.denominator)</span>
+<span class="fc" id="L424">                    .subtract(other.numerator.multiply(denominator)),</span>
+<span class="fc" id="L425">                denominator.multiply(other.denominator),</span>
+<span class="fc" id="L426">                joined(denominatorFactors, other.denominatorFactors));</span>
+        }
+
+        private RationalFunction multiply(RationalFunction other) {
+<span class="fc" id="L430">            return new RationalFunction(</span>
+<span class="fc" id="L431">                numerator.multiply(other.numerator),</span>
+<span class="fc" id="L432">                denominator.multiply(other.denominator),</span>
+<span class="fc" id="L433">                joined(denominatorFactors, other.denominatorFactors));</span>
+        }
+
+        private RationalFunction pow(int exponent) {
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            if (exponent == 0) {</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">                if (numerator.isZero()) {</span>
+<span class="fc" id="L439">                    throw new UnsupportedExpression(</span>
+                        &quot;zero to the zero power is outside the rational evaluator&quot;);
+                }
+<span class="fc" id="L442">                return new RationalFunction(</span>
+<span class="fc" id="L443">                    Polynomial.constant(Rational.ONE),</span>
+<span class="fc" id="L444">                    Polynomial.constant(Rational.ONE),</span>
+                    denominatorFactors);
+            }
+<span class="fc" id="L447">            List&lt;Polynomial&gt; factors = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">            for (int index = 0; index &lt; exponent; index++) {</span>
+<span class="fc" id="L449">                factors.addAll(denominatorFactors);</span>
+            }
+<span class="fc" id="L451">            return new RationalFunction(</span>
+<span class="fc" id="L452">                numerator.pow(exponent),</span>
+<span class="fc" id="L453">                denominator.pow(exponent),</span>
+                factors);
+        }
+
+        private Polynomial crossLeft(RationalFunction other) {
+<span class="fc" id="L458">            return numerator.multiply(other.denominator);</span>
+        }
+
+        private Polynomial crossRight(RationalFunction other) {
+<span class="fc" id="L462">            return other.numerator.multiply(denominator);</span>
+        }
+
+        private static List&lt;Polynomial&gt; joined(
+            List&lt;Polynomial&gt; left,
+            List&lt;Polynomial&gt; right
+        ) {
+<span class="fc" id="L469">            List&lt;Polynomial&gt; result = new ArrayList&lt;&gt;(left);</span>
+<span class="fc" id="L470">            result.addAll(right);</span>
+<span class="fc" id="L471">            result.sort(Comparator.comparing(Polynomial::toCanonicalString));</span>
+<span class="fc" id="L472">            return List.copyOf(result);</span>
+        }
+    }
+
+    private static final class UnsupportedExpression extends RuntimeException {
+        private UnsupportedExpression(String message) {
+<span class="fc" id="L478">            super(message);</span>
+<span class="fc" id="L479">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

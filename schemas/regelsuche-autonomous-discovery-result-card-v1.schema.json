@@ -1,0 +1,622 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.de/schemas/regelsuche-autonomous-discovery-result-card-v1.schema.json",
+  "title": "Regelsuche autonomous discovery result card v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "repositoryRevision",
+    "runIdentity",
+    "claimBanner",
+    "researchBrief",
+    "candidate",
+    "lifecycle",
+    "qualification",
+    "pairedUtility",
+    "reproducibility",
+    "claimBoundaries",
+    "artifacts",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.autonomous-discovery-result-card/v1"
+    },
+    "repositoryRevision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "runIdentity": {
+      "$ref": "#/$defs/hash"
+    },
+    "claimBanner": {
+      "const": "NO EXTERNAL NOVELTY CLAIM"
+    },
+    "researchBrief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "briefHash",
+        "inventoryHash",
+        "modelHash",
+        "targetOrExpectedAnswerAccess",
+        "targetProvided",
+        "seedFamilyCount",
+        "observationCount",
+        "sourceArtifact",
+        "countSourceArtifact"
+      ],
+      "properties": {
+        "briefHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "inventoryHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "modelHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "targetOrExpectedAnswerAccess": {
+          "const": "ABSENT"
+        },
+        "targetProvided": {
+          "const": false
+        },
+        "seedFamilyCount": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "observationCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sourceArtifact": {
+          "const": "researchBrief"
+        },
+        "countSourceArtifact": {
+          "const": "campaignManifest"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conjectureId",
+        "candidateBranchId",
+        "leftPattern",
+        "rightPattern",
+        "parameterRelations",
+        "assumptions",
+        "lineageRoot",
+        "miningEvidenceHash",
+        "supportingObservationCount",
+        "supportingObservationIds",
+        "sourceObservationBranchHashes",
+        "sourceArtifact",
+        "lineageSourceArtifact"
+      ],
+      "properties": {
+        "conjectureId": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "candidateBranchId": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "leftPattern": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "rightPattern": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "parameterRelations": {
+          "$ref": "#/$defs/textArray"
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonBlank"
+          },
+          "uniqueItems": true
+        },
+        "lineageRoot": {
+          "$ref": "#/$defs/hash"
+        },
+        "miningEvidenceHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "supportingObservationCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "supportingObservationIds": {
+          "$ref": "#/$defs/textArray"
+        },
+        "sourceObservationBranchHashes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/hash"
+          },
+          "uniqueItems": true
+        },
+        "sourceArtifact": {
+          "const": "qualificationEvidence"
+        },
+        "lineageSourceArtifact": {
+          "const": "candidateLineage"
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validationStatus",
+        "counterexampleStatus",
+        "counterexampleStrategyCount",
+        "projectNoveltyStatus",
+        "externalNoveltyStatus",
+        "proofEvidenceStatus",
+        "proofBackendStatus",
+        "proofTranslationStatus",
+        "formalProofStatus",
+        "lifecycleOutcome",
+        "validationSourceArtifact",
+        "counterexampleSourceArtifact",
+        "noveltySourceArtifact",
+        "proofSourceArtifact"
+      ],
+      "properties": {
+        "validationStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "counterexampleStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "counterexampleStrategyCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "projectNoveltyStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "externalNoveltyStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "proofEvidenceStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "proofBackendStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "proofTranslationStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "formalProofStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "lifecycleOutcome": {
+          "const": "COMPLETED"
+        },
+        "validationSourceArtifact": {
+          "const": "validationReport"
+        },
+        "counterexampleSourceArtifact": {
+          "const": "counterexampleReport"
+        },
+        "noveltySourceArtifact": {
+          "const": "projectNoveltyReport"
+        },
+        "proofSourceArtifact": {
+          "const": "proofReport"
+        }
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "qualified",
+        "heldOutFamilyOrClusterCount",
+        "configuredPositiveHoldouts",
+        "executedPositiveHoldouts",
+        "configuredNegativeHoldouts",
+        "executedNegativeHoldouts",
+        "mandatorySkippedWorkCount",
+        "refutingHoldouts",
+        "counterexamplesFound",
+        "correctnessRegressionCount",
+        "failureCount",
+        "evaluationStatus",
+        "counterexampleStatus",
+        "sourceArtifact",
+        "evaluationSourceArtifact"
+      ],
+      "properties": {
+        "qualified": {
+          "const": true
+        },
+        "heldOutFamilyOrClusterCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "configuredPositiveHoldouts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "executedPositiveHoldouts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "configuredNegativeHoldouts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "executedNegativeHoldouts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mandatorySkippedWorkCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "refutingHoldouts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "counterexamplesFound": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correctnessRegressionCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failureCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "evaluationStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "counterexampleStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "sourceArtifact": {
+          "const": "qualificationEvidence"
+        },
+        "evaluationSourceArtifact": {
+          "const": "qualificationEvaluation"
+        }
+      }
+    },
+    "pairedUtility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suiteRevision",
+        "pairedUtilityEvaluated",
+        "beneficial",
+        "gainPermille",
+        "representativeCaseId",
+        "summary",
+        "cases",
+        "sourceArtifact"
+      ],
+      "properties": {
+        "suiteRevision": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "pairedUtilityEvaluated": {
+          "const": true
+        },
+        "beneficial": {
+          "const": true
+        },
+        "gainPermille": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "representativeCaseId": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "summary": {
+          "$ref": "#/$defs/pairedSummary"
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/utilityCase"
+          }
+        },
+        "sourceArtifact": {
+          "const": "pairedUtility"
+        }
+      }
+    },
+    "reproducibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cleanRunCount",
+        "cleanRunsIdentical",
+        "cleanRunStatus",
+        "cleanRunManifestHashes",
+        "containerParityStatus",
+        "containerParityComparison",
+        "containerParityWorkflow",
+        "sourceArtifact"
+      ],
+      "properties": {
+        "cleanRunCount": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "cleanRunsIdentical": {
+          "const": true
+        },
+        "cleanRunStatus": {
+          "const": "VERIFIED_IDENTICAL"
+        },
+        "cleanRunManifestHashes": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/hash"
+          }
+        },
+        "containerParityStatus": {
+          "const": "ENFORCED_BY_CI"
+        },
+        "containerParityComparison": {
+          "const": "BYTE_FOR_BYTE"
+        },
+        "containerParityWorkflow": {
+          "const": ".github/workflows/autonomous-discovery-walkthrough.yml"
+        },
+        "sourceArtifact": {
+          "const": "releaseEvidence"
+        }
+      }
+    },
+    "claimBoundaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "autonomyClaimAuthorized",
+        "externalNoveltyStatus",
+        "externalNoveltyClaimAuthorized",
+        "promotionStatus",
+        "publicEvidenceStatus",
+        "releaseSourceArtifact",
+        "noveltySourceArtifact"
+      ],
+      "properties": {
+        "autonomyClaimAuthorized": {
+          "const": true
+        },
+        "externalNoveltyStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "externalNoveltyClaimAuthorized": {
+          "const": false
+        },
+        "promotionStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "publicEvidenceStatus": {
+          "const": "NOT_EVALUATED"
+        },
+        "releaseSourceArtifact": {
+          "const": "releaseReadinessRun"
+        },
+        "noveltySourceArtifact": {
+          "const": "projectNoveltyReport"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/hash"
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "textArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nonBlank"
+      },
+      "uniqueItems": true
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "relativePath",
+        "semanticHash",
+        "fileSha256"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "campaignManifest",
+            "candidateLineage",
+            "counterexampleReport",
+            "fullMiningEvidence",
+            "observationBundle",
+            "pairedUtility",
+            "projectNoveltyReport",
+            "proofReport",
+            "qualificationEvaluation",
+            "qualificationEvidence",
+            "releaseEvidence",
+            "releaseReadinessMatrix",
+            "releaseReadinessRun",
+            "researchBrief",
+            "validationReport"
+          ]
+        },
+        "relativePath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "semanticHash": {
+          "$ref": "#/$defs/hash"
+        },
+        "fileSha256": {
+          "$ref": "#/$defs/hash"
+        }
+      }
+    },
+    "utilityCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "baselineStatus",
+        "candidateStatus",
+        "baselineReached",
+        "candidateReached",
+        "baselinePathLength",
+        "candidatePathLength",
+        "baselineExploredStates",
+        "candidateExploredStates",
+        "materialGain",
+        "regression"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "baselineStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "candidateStatus": {
+          "$ref": "#/$defs/nonBlank"
+        },
+        "baselineReached": {
+          "type": "boolean"
+        },
+        "candidateReached": {
+          "type": "boolean"
+        },
+        "baselinePathLength": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "candidatePathLength": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "baselineExploredStates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidateExploredStates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "materialGain": {
+          "type": "boolean"
+        },
+        "regression": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pairedSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseCount",
+        "baselineReachedCount",
+        "candidateReachedCount",
+        "bothReachedCount",
+        "baselinePathLengthTotalForReachedCases",
+        "candidatePathLengthTotalForReachedCases",
+        "pairedPathLengthDeltaForBothReached",
+        "baselineExploredStatesTotal",
+        "candidateExploredStatesTotal",
+        "exploredStatesDelta",
+        "materialGainCount",
+        "correctnessRegressionCount",
+        "unsupportedCandidateCaseCount"
+      ],
+      "properties": {
+        "caseCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "baselineReachedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidateReachedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bothReachedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baselinePathLengthTotalForReachedCases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidatePathLengthTotalForReachedCases": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pairedPathLengthDeltaForBothReached": {
+          "type": "integer"
+        },
+        "baselineExploredStatesTotal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "candidateExploredStatesTotal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exploredStatesDelta": {
+          "type": "integer"
+        },
+        "materialGainCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correctnessRegressionCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsupportedCandidateCaseCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

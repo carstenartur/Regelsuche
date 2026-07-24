@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.open-target-conjecture-proof/v2",
+  "title": "Regelsuche open-target solver proof report v2",
+  "type": "object",
+  "required": [
+    "schema", "conjectureId", "eligibility", "proofStatus",
+    "proofObligationEmitted", "solverObligationHash",
+    "solverTranslationHash", "solverResultHash", "solverExecutionHash",
+    "backendId", "backendVersion", "backendStatus", "translationStatus",
+    "backendEvidence", "formalProofStatus", "blockers", "evidenceHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.open-target-conjecture-proof/v2" },
+    "conjectureId": { "$ref": "#/$defs/nonBlank" },
+    "eligibility": { "enum": ["ELIGIBLE", "NOT_ELIGIBLE"] },
+    "proofStatus": {
+      "enum": ["SYMBOLICALLY_VERIFIED", "REFUTED", "INCONCLUSIVE", "NOT_RUN"]
+    },
+    "proofObligationEmitted": { "type": "boolean" },
+    "solverObligationHash": {
+      "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
+    },
+    "solverTranslationHash": {
+      "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
+    },
+    "solverResultHash": {
+      "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
+    },
+    "solverExecutionHash": {
+      "oneOf": [{ "const": "" }, { "$ref": "#/$defs/sha256" }]
+    },
+    "backendId": { "type": "string" },
+    "backendVersion": { "type": "string" },
+    "backendStatus": {
+      "enum": [
+        "CONFIRMED", "REFUTED", "UNKNOWN", "TIMEOUT",
+        "UNSUPPORTED", "ERROR", "NOT_RUN"
+      ]
+    },
+    "translationStatus": {
+      "enum": ["LOSSLESS", "APPROXIMATED", "REJECTED", "NOT_EMITTED"]
+    },
+    "backendEvidence": { "type": "string" },
+    "formalProofStatus": { "const": "NOT_EVALUATED" },
+    "blockers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "evidenceHash": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "proofObligationEmitted": { "const": true } },
+        "required": ["proofObligationEmitted"]
+      },
+      "then": {
+        "properties": {
+          "solverObligationHash": { "$ref": "#/$defs/sha256" },
+          "solverTranslationHash": { "$ref": "#/$defs/sha256" },
+          "solverResultHash": { "$ref": "#/$defs/sha256" },
+          "solverExecutionHash": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "eligibility": { "const": "NOT_ELIGIBLE" } },
+        "required": ["eligibility"]
+      },
+      "then": {
+        "properties": {
+          "proofStatus": { "const": "NOT_RUN" },
+          "proofObligationEmitted": { "const": false },
+          "solverObligationHash": { "const": "" },
+          "solverTranslationHash": { "const": "" },
+          "solverResultHash": { "const": "" },
+          "solverExecutionHash": { "const": "" },
+          "backendStatus": { "const": "NOT_RUN" },
+          "translationStatus": { "const": "NOT_EMITTED" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

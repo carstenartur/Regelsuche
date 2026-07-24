@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.open-target-conjecture-evaluation/v1",
+  "title": "Regelsuche open-target conjecture evaluation v1",
+  "type": "object",
+  "required": [
+    "schema", "conjectureId", "status", "compilationStatus",
+    "dynamicRuleId", "provenanceHash",
+    "configuredPositiveHoldouts", "executedPositiveHoldouts",
+    "skippedPositiveHoldouts", "configuredNegativeHoldouts",
+    "executedNegativeHoldouts", "skippedNegativeHoldouts",
+    "positiveResults", "negativeResults", "counterexampleStatus",
+    "counterexampleAttemptedSources", "inferredAssumptions",
+    "counterexampleAssignments", "blockers", "proofStatus", "noveltyStatus"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.open-target-conjecture-evaluation/v1" },
+    "conjectureId": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": ["ACCEPTED_FOR_PROOF", "INCONCLUSIVE", "REJECTED", "COMPILATION_REJECTED"]
+    },
+    "compilationStatus": { "enum": ["COMPILED", "REJECTED"] },
+    "dynamicRuleId": { "type": "string" },
+    "provenanceHash": {
+      "anyOf": [
+        { "$ref": "#/$defs/provenanceFingerprint" },
+        { "const": "" }
+      ]
+    },
+    "configuredPositiveHoldouts": { "type": "integer", "minimum": 0 },
+    "executedPositiveHoldouts": { "type": "integer", "minimum": 0 },
+    "skippedPositiveHoldouts": { "type": "integer", "minimum": 0 },
+    "configuredNegativeHoldouts": { "type": "integer", "minimum": 0 },
+    "executedNegativeHoldouts": { "type": "integer", "minimum": 0 },
+    "skippedNegativeHoldouts": { "type": "integer", "minimum": 0 },
+    "positiveResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/result" }
+    },
+    "negativeResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/result" }
+    },
+    "counterexampleStatus": {
+      "enum": ["NO_COUNTEREXAMPLE_FOUND", "COUNTEREXAMPLE_FOUND", "INCONCLUSIVE", "NOT_RUN"]
+    },
+    "counterexampleAttemptedSources": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "inferredAssumptions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "counterexampleAssignments": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "proofStatus": { "type": "string", "minLength": 1 },
+    "noveltyStatus": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "provenanceFingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{16}$"
+    },
+    "result": {
+      "type": "object",
+      "required": ["id", "candidateCount", "passed", "candidateExpressions"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "candidateCount": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "boolean" },
+        "candidateExpressions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

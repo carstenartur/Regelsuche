@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-macro-candidate-panel-v1.schema.json",
+  "title": "Candidate-independent reusable-macro candidate panel",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "benchmarkId", "challengeId", "repositoryRevision",
+    "caseCorpusContentHash", "baselineInventoryProfileId",
+    "baselineInventoryContentHash", "downstreamTaskStreamContentHash",
+    "pairedTaskUtilityContentHash", "formationAccessPolicy",
+    "candidatePanelPolicy", "sharedBaselinePolicy", "decisionPolicy",
+    "formedCandidateCount", "evaluatedCandidateCount", "tasksPerCandidate",
+    "totalCandidateTaskEvaluations", "selectedCandidateId",
+    "selectedCandidateContentHash", "productionSelectionPreserved",
+    "exercisedCandidateCount", "unexercisedCandidateCount",
+    "formedCandidates", "aggregatePanelOutcomeCounts",
+    "candidatesWithCorrectnessRegression", "physicalResourceUse",
+    "candidates", "formalProofStatus", "externalNoveltyStatus",
+    "publicationAuthorized", "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.macro-candidate-panel/v1"},
+    "benchmarkId": {"const": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1"},
+    "challengeId": {"const": "reusable-search-macros"},
+    "repositoryRevision": {"type": "string", "minLength": 1},
+    "caseCorpusContentHash": {"$ref": "#/$defs/hash"},
+    "baselineInventoryProfileId": {"const": "macro-primitives/v1"},
+    "baselineInventoryContentHash": {"$ref": "#/$defs/hash"},
+    "downstreamTaskStreamContentHash": {"$ref": "#/$defs/hash"},
+    "pairedTaskUtilityContentHash": {"$ref": "#/$defs/hash"},
+    "formationAccessPolicy": {"const": "TRAIN_ONLY"},
+    "candidatePanelPolicy": {"const": "ALL_TRAIN_FORMED_CANDIDATES_BASELINE_PLUS_EXACTLY_ONE"},
+    "sharedBaselinePolicy": {"const": "REUSE_VERIFIED_PAIRED_UTILITY_BASELINE_PER_TASK"},
+    "decisionPolicy": {"const": "DESCRIPTIVE_PANEL_DOES_NOT_RESELECT_PRODUCTION_CANDIDATE"},
+    "formedCandidateCount": {"const": 3},
+    "evaluatedCandidateCount": {"const": 3},
+    "tasksPerCandidate": {"const": 12},
+    "totalCandidateTaskEvaluations": {"const": 36},
+    "selectedCandidateId": {"$ref": "#/$defs/candidateId"},
+    "selectedCandidateContentHash": {"$ref": "#/$defs/hash"},
+    "productionSelectionPreserved": {"const": true},
+    "exercisedCandidateCount": {
+      "type": "integer", "minimum": 1, "maximum": 3
+    },
+    "unexercisedCandidateCount": {
+      "type": "integer", "minimum": 0, "maximum": 2
+    },
+    "formedCandidates": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {"$ref": "#/$defs/formedCandidate"}
+    },
+    "aggregatePanelOutcomeCounts": {"$ref": "#/$defs/outcomeCounts"},
+    "candidatesWithCorrectnessRegression": {
+      "type": "integer", "minimum": 0, "maximum": 3
+    },
+    "physicalResourceUse": {"$ref": "#/$defs/physicalResourceUse"},
+    "candidates": {
+      "type": "array", "minItems": 3, "maxItems": 3,
+      "items": {"$ref": "#/$defs/candidateResult"}
+    },
+    "formalProofStatus": {"const": "NOT_EVALUATED"},
+    "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+    "publicationAuthorized": {"const": false},
+    "contentHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {
+      "type": "string", "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "candidateId": {
+      "type": "string",
+      "pattern": "^macro_candidate_independent_[0-9a-f]+$"
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "outcomeCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "IMPROVED", "REACHABILITY_GAIN", "NO_IMPROVEMENT", "NO_RESULT",
+        "CORRECTNESS_REGRESSION", "CANDIDATE_NOT_FORMED"
+      ],
+      "properties": {
+        "IMPROVED": {"type": "integer", "minimum": 0},
+        "REACHABILITY_GAIN": {"type": "integer", "minimum": 0},
+        "NO_IMPROVEMENT": {"type": "integer", "minimum": 0},
+        "NO_RESULT": {"type": "integer", "minimum": 0},
+        "CORRECTNESS_REGRESSION": {"type": "integer", "minimum": 0},
+        "CANDIDATE_NOT_FORMED": {"const": 0}
+      }
+    },
+    "formedCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "macroId", "operationSequence", "supportingTraceIds", "trainSupport",
+        "leftPattern", "rightPattern", "parameterRelations", "assumptions",
+        "proofStatus", "knownRuleStatus", "supportingExamples",
+        "occurrenceCount", "confidenceScore", "canonicalHash",
+        "validationEvidence", "atomicSteps", "contentHash"
+      ],
+      "properties": {
+        "macroId": {"$ref": "#/$defs/candidateId"},
+        "operationSequence": {"$ref": "#/$defs/stringArray"},
+        "supportingTraceIds": {"$ref": "#/$defs/stringArray"},
+        "trainSupport": {"type": "integer", "minimum": 1, "maximum": 4},
+        "leftPattern": {"type": "string", "minLength": 1},
+        "rightPattern": {"type": "string", "minLength": 1},
+        "parameterRelations": {"$ref": "#/$defs/stringArray"},
+        "assumptions": {"$ref": "#/$defs/stringArray"},
+        "proofStatus": {"const": "SYMBOLICALLY_VERIFIED"},
+        "knownRuleStatus": {"type": "string", "minLength": 1},
+        "supportingExamples": {"type": "integer", "minimum": 1},
+        "occurrenceCount": {"type": "integer", "minimum": 1},
+        "confidenceScore": {"const": 1.0},
+        "canonicalHash": {"type": "string", "minLength": 1},
+        "validationEvidence": {"type": "string", "minLength": 1},
+        "atomicSteps": {
+          "type": "array", "minItems": 1,
+          "items": {"$ref": "#/$defs/atomicStep"}
+        },
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "atomicStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index", "beforeExpression", "afterExpression", "ruleId",
+        "ruleKind", "scoreBefore", "scoreAfter", "equivalencePreserving",
+        "explanation", "assumptions", "contentHash"
+      ],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "beforeExpression": {"type": "string"},
+        "afterExpression": {"type": "string"},
+        "ruleId": {"type": "string", "minLength": 1},
+        "ruleKind": {
+          "enum": ["SIMPLIFY", "NORMALIZE", "EXPAND", "FACTOR"]
+        },
+        "scoreBefore": {"type": "integer"},
+        "scoreAfter": {"type": "integer"},
+        "equivalencePreserving": {"const": true},
+        "explanation": {"type": "string"},
+        "assumptions": {"$ref": "#/$defs/stringArray"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "candidateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateId", "candidateContentHash", "trainSupport",
+        "productionSelected", "exercised", "macroUsageCount",
+        "outcomeCounts", "correctnessRegressionCount", "resourceUse",
+        "tasks", "contentHash"
+      ],
+      "properties": {
+        "candidateId": {"$ref": "#/$defs/candidateId"},
+        "candidateContentHash": {"$ref": "#/$defs/hash"},
+        "trainSupport": {"type": "integer", "minimum": 1, "maximum": 4},
+        "productionSelected": {"type": "boolean"},
+        "exercised": {"type": "boolean"},
+        "macroUsageCount": {"type": "integer", "minimum": 0},
+        "outcomeCounts": {"$ref": "#/$defs/outcomeCounts"},
+        "correctnessRegressionCount": {
+          "type": "integer", "minimum": 0, "maximum": 12
+        },
+        "resourceUse": {"$ref": "#/$defs/candidateResourceUse"},
+        "tasks": {
+          "type": "array", "minItems": 12, "maxItems": 12,
+          "items": {"$ref": "#/$defs/taskResult"}
+        },
+        "contentHash": {"$ref": "#/$defs/hash"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"exercised": {"const": true}},
+            "required": ["exercised"]
+          },
+          "then": {
+            "properties": {"macroUsageCount": {"minimum": 1}}
+          },
+          "else": {
+            "properties": {"macroUsageCount": {"const": 0}}
+          }
+        },
+        {
+          "if": {
+            "properties": {"productionSelected": {"const": true}},
+            "required": ["productionSelected"]
+          },
+          "then": {
+            "properties": {"exercised": {"const": true}}
+          }
+        }
+      ]
+    },
+    "taskResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index", "taskId", "caseId", "split", "structuralCluster",
+        "streamTaskContentHash", "baselineContentHash", "enabledCandidateId",
+        "outcome", "correctnessRegression", "candidateEnabled",
+        "resourceDelta", "productionSelectedRunParity", "detail",
+        "contentHash"
+      ],
+      "properties": {
+        "index": {"type": "integer", "minimum": 1, "maximum": 12},
+        "taskId": {
+          "type": "string", "pattern": "^case-(1[3-8])-task-[12]$"
+        },
+        "caseId": {
+          "type": "string", "pattern": "^case-(1[3-8])$"
+        },
+        "split": {"enum": ["TRAIN", "VALIDATION", "TEST"]},
+        "structuralCluster": {"type": "string", "minLength": 1},
+        "streamTaskContentHash": {"$ref": "#/$defs/hash"},
+        "baselineContentHash": {"$ref": "#/$defs/hash"},
+        "enabledCandidateId": {"$ref": "#/$defs/candidateId"},
+        "outcome": {
+          "enum": [
+            "IMPROVED", "REACHABILITY_GAIN", "NO_IMPROVEMENT", "NO_RESULT",
+            "CORRECTNESS_REGRESSION"
+          ]
+        },
+        "correctnessRegression": {"type": "boolean"},
+        "candidateEnabled": {"$ref": "#/$defs/searchRun"},
+        "resourceDelta": {"$ref": "#/$defs/resourceDelta"},
+        "productionSelectedRunParity": {"type": "boolean"},
+        "detail": {"type": "string", "minLength": 1},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "searchRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "success", "reachedExpression", "path", "ruleIds",
+        "expandedStates", "generatedCandidates", "budgetExhausted",
+        "detail", "contentHash"
+      ],
+      "properties": {
+        "success": {"type": "boolean"},
+        "reachedExpression": {"type": "string"},
+        "path": {"$ref": "#/$defs/stringArray"},
+        "ruleIds": {"$ref": "#/$defs/stringArray"},
+        "expandedStates": {"type": "integer", "minimum": 0},
+        "generatedCandidates": {"type": "integer", "minimum": 0},
+        "budgetExhausted": {"type": "boolean"},
+        "detail": {"type": "string", "minLength": 1},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "resourceDelta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expandedStateSaving", "generatedCandidateSaving",
+        "pathStepSaving", "contentHash"
+      ],
+      "properties": {
+        "expandedStateSaving": {"type": "integer"},
+        "generatedCandidateSaving": {"type": "integer"},
+        "pathStepSaving": {"type": "integer"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "candidateResourceUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baselineExecutionPolicy", "sharedBaselineExpandedStates",
+        "sharedBaselineGeneratedCandidates", "sharedBaselinePathSteps",
+        "candidateExpandedStates", "candidateGeneratedCandidates",
+        "candidatePathSteps", "expandedStateSaving",
+        "generatedCandidateSaving", "pathStepSaving", "contentHash"
+      ],
+      "properties": {
+        "baselineExecutionPolicy": {"const": "REUSE_VERIFIED_PAIRED_UTILITY_BASELINE_PER_TASK"},
+        "sharedBaselineExpandedStates": {"type": "integer", "minimum": 0},
+        "sharedBaselineGeneratedCandidates": {"type": "integer", "minimum": 0},
+        "sharedBaselinePathSteps": {"type": "integer", "minimum": 0},
+        "candidateExpandedStates": {"type": "integer", "minimum": 0},
+        "candidateGeneratedCandidates": {"type": "integer", "minimum": 0},
+        "candidatePathSteps": {"type": "integer", "minimum": 0},
+        "expandedStateSaving": {"type": "integer"},
+        "generatedCandidateSaving": {"type": "integer"},
+        "pathStepSaving": {"type": "integer"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "physicalResourceUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy", "formationStates", "formationCandidateEvaluations",
+        "sharedBaselineExpandedStates", "sharedBaselineGeneratedCandidates",
+        "sharedBaselinePathSteps", "candidatePanelExpandedStates",
+        "candidatePanelGeneratedCandidates", "candidatePanelPathSteps",
+        "totalPhysicalStates", "totalPhysicalCandidateEvaluations",
+        "contentHash"
+      ],
+      "properties": {
+        "policy": {"const": "FORMATION_ONCE_SHARED_BASELINES_ONCE_EACH_CANDIDATE_RUN_ONCE"},
+        "formationStates": {"type": "integer", "minimum": 1},
+        "formationCandidateEvaluations": {"type": "integer", "minimum": 1},
+        "sharedBaselineExpandedStates": {"type": "integer", "minimum": 0},
+        "sharedBaselineGeneratedCandidates": {"type": "integer", "minimum": 0},
+        "sharedBaselinePathSteps": {"type": "integer", "minimum": 0},
+        "candidatePanelExpandedStates": {"type": "integer", "minimum": 0},
+        "candidatePanelGeneratedCandidates": {"type": "integer", "minimum": 0},
+        "candidatePanelPathSteps": {"type": "integer", "minimum": 0},
+        "totalPhysicalStates": {"type": "integer", "minimum": 1},
+        "totalPhysicalCandidateEvaluations": {"type": "integer", "minimum": 1},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    }
+  }
+}

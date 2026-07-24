@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.discovery-challenge-plan-source/v1",
+  "title": "Regelsuche discovery challenge plan source v1",
+  "type": "object",
+  "required": ["schema", "portfolioId", "claimPolicy", "selectionPolicy", "challenges"],
+  "properties": {
+    "schema": {"const": "regelsuche.discovery-challenge-plan-source/v1"},
+    "portfolioId": {"$ref": "#/$defs/identifier"},
+    "claimPolicy": {"const": "EVALUATOR_BACKED_DOES_NOT_IMPLY_EXTERNAL_NOVELTY"},
+    "selectionPolicy": {
+      "type": "object",
+      "required": [
+        "minimumAssessedClasses",
+        "minimumSelectedClasses",
+        "requireIndependentEvaluator",
+        "requireFrozenSplitUnit",
+        "requireInformationParityBaselines",
+        "externalSearchVisibility",
+        "pilotEvidenceStatus"
+      ],
+      "properties": {
+        "minimumAssessedClasses": {"type": "integer", "minimum": 5},
+        "minimumSelectedClasses": {"type": "integer", "minimum": 2},
+        "requireIndependentEvaluator": {"const": true},
+        "requireFrozenSplitUnit": {"const": true},
+        "requireInformationParityBaselines": {"const": true},
+        "externalSearchVisibility": {"const": "POST_FORMATION_ONLY"},
+        "pilotEvidenceStatus": {"const": "DEVELOPMENT_ONLY"}
+      },
+      "additionalProperties": false
+    },
+    "challenges": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/challenge"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{1,191}$"
+    },
+    "nonBlank": {"type": "string", "minLength": 1},
+    "textArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
+    "textArray2": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
+    "textArray3": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
+    "budget": {
+      "type": "object",
+      "required": [
+        "maximumCampaigns",
+        "maximumStatesPerCampaign",
+        "maximumCandidateEvaluations",
+        "maximumCounterexampleAttempts",
+        "maximumProofAttempts"
+      ],
+      "properties": {
+        "maximumCampaigns": {"type": "integer", "minimum": 1},
+        "maximumStatesPerCampaign": {"type": "integer", "minimum": 1},
+        "maximumCandidateEvaluations": {"type": "integer", "minimum": 1},
+        "maximumCounterexampleAttempts": {"type": "integer", "minimum": 0},
+        "maximumProofAttempts": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "evaluator": {
+      "type": "object",
+      "required": ["evaluatorId", "method", "resultStrength", "unsupportedBoundary"],
+      "properties": {
+        "evaluatorId": {"$ref": "#/$defs/identifier"},
+        "method": {"$ref": "#/$defs/nonBlank"},
+        "resultStrength": {"$ref": "#/$defs/identifier"},
+        "unsupportedBoundary": {"$ref": "#/$defs/nonBlank"}
+      },
+      "additionalProperties": false
+    },
+    "challenge": {
+      "type": "object",
+      "required": [
+        "challengeId",
+        "title",
+        "decision",
+        "complexityTier",
+        "mathematicalObject",
+        "candidateRepresentation",
+        "formationInformation",
+        "prohibitedFormationInformation",
+        "independentEvaluator",
+        "certificateRoute",
+        "splitUnit",
+        "leakageControls",
+        "baselineProfiles",
+        "multipleSolutionPolicy",
+        "nullResultPolicy",
+        "budget",
+        "externalReviewSources",
+        "pilotRequirement",
+        "selectionRationale"
+      ],
+      "properties": {
+        "challengeId": {"$ref": "#/$defs/identifier"},
+        "title": {"$ref": "#/$defs/nonBlank"},
+        "decision": {"enum": ["SELECTED_FOR_PREREGISTRATION", "DEFERRED_AFTER_PILOT"]},
+        "complexityTier": {"enum": ["INTERMEDIATE", "ADVANCED"]},
+        "mathematicalObject": {"$ref": "#/$defs/nonBlank"},
+        "candidateRepresentation": {"$ref": "#/$defs/nonBlank"},
+        "formationInformation": {"$ref": "#/$defs/textArray"},
+        "prohibitedFormationInformation": {"$ref": "#/$defs/textArray"},
+        "independentEvaluator": {"$ref": "#/$defs/evaluator"},
+        "certificateRoute": {"$ref": "#/$defs/nonBlank"},
+        "splitUnit": {"$ref": "#/$defs/nonBlank"},
+        "leakageControls": {"$ref": "#/$defs/textArray3"},
+        "baselineProfiles": {"$ref": "#/$defs/textArray2"},
+        "multipleSolutionPolicy": {"$ref": "#/$defs/nonBlank"},
+        "nullResultPolicy": {"$ref": "#/$defs/nonBlank"},
+        "budget": {"$ref": "#/$defs/budget"},
+        "externalReviewSources": {"$ref": "#/$defs/textArray"},
+        "pilotRequirement": {"$ref": "#/$defs/nonBlank"},
+        "selectionRationale": {"$ref": "#/$defs/nonBlank"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

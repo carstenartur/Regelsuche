@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.discovery-lifecycle-handoff/v1",
+  "title": "Regelsuche domain-neutral discovery lifecycle handoff v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "handoffId",
+    "sourceKind",
+    "campaignId",
+    "domainId",
+    "domainRevision",
+    "domainContractHash",
+    "inputHash",
+    "sourceEvidenceHash",
+    "stage",
+    "disposition",
+    "selectedCandidateHash",
+    "certificateHash",
+    "resources",
+    "metadata",
+    "proofStatus",
+    "externalNoveltyStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.discovery-lifecycle-handoff/v1"
+    },
+    "handoffId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "sourceKind": {
+      "enum": [
+        "DOMAIN_DISCOVERY_EVIDENCE",
+        "PRODUCTION_GENERATION_RUN"
+      ]
+    },
+    "campaignId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainId": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainRevision": {
+      "$ref": "#/$defs/identifier"
+    },
+    "domainContractHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "inputHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "sourceEvidenceHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "stage": {
+      "enum": [
+        "GENERATION",
+        "DISCOVERY_VALIDATION"
+      ]
+    },
+    "disposition": {
+      "enum": [
+        "COMPLETED",
+        "CONFIRMED",
+        "REFUTED",
+        "INCOMPLETE",
+        "UNSUPPORTED",
+        "BUDGET_EXHAUSTED",
+        "INVALID_INPUT"
+      ]
+    },
+    "selectedCandidateHash": {
+      "$ref": "#/$defs/optionalSha256"
+    },
+    "certificateHash": {
+      "$ref": "#/$defs/optionalSha256"
+    },
+    "resources": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/resource"
+      }
+    },
+    "metadata": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/keyValue"
+      }
+    },
+    "proofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "sourceKind": {
+            "const": "DOMAIN_DISCOVERY_EVIDENCE"
+          }
+        },
+        "required": [
+          "sourceKind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "DISCOVERY_VALIDATION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "sourceKind": {
+            "const": "PRODUCTION_GENERATION_RUN"
+          }
+        },
+        "required": [
+          "sourceKind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "GENERATION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "stage": {
+            "const": "GENERATION"
+          }
+        },
+        "required": [
+          "stage"
+        ]
+      },
+      "then": {
+        "properties": {
+          "disposition": {
+            "const": "COMPLETED"
+          },
+          "selectedCandidateHash": {
+            "const": ""
+          },
+          "certificateHash": {
+            "const": ""
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "COMPLETED"
+          }
+        },
+        "required": [
+          "disposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "GENERATION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposition": {
+            "const": "CONFIRMED"
+          }
+        },
+        "required": [
+          "disposition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "DISCOVERY_VALIDATION"
+          },
+          "selectedCandidateHash": {
+            "$ref": "#/$defs/sha256"
+          },
+          "certificateHash": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "selectedCandidateHash": {
+            "const": ""
+          },
+          "certificateHash": {
+            "const": ""
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "optionalSha256": {
+      "oneOf": [
+        {
+          "const": ""
+        },
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ]
+    },
+    "resource": {
+      "type": "object",
+      "required": [
+        "resource",
+        "configured",
+        "executed",
+        "skipped",
+        "remaining"
+      ],
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/identifier"
+        },
+        "configured": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "executed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remaining": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "keyValue": {
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -138,20 +138,20 @@ public class GoalAwareMacroMoveSelector {
 <span class="fc bfc" id="L138" title="All 4 branches covered.">        if (currentNamedOverlap &lt;= 0 &amp;&amp; hasNamedTokens(rule.leftPattern())) {</span>
 <span class="fc" id="L139">            return 0.0;</span>
         }
-<span class="pc bpc" id="L141" title="1 of 4 branches missed.">        int goalOverlap = goalExpression == null || goalExpression.isBlank()</span>
+<span class="fc bfc" id="L141" title="All 4 branches covered.">        int goalOverlap = goalExpression == null || goalExpression.isBlank()</span>
 <span class="fc" id="L142">            ? 0</span>
 <span class="fc" id="L143">            : Math.max(</span>
 <span class="fc" id="L144">                structuralOverlap(rule.rightPattern(), goalExpression),</span>
 <span class="fc" id="L145">                structuralOverlap(rule.leftPattern(), goalExpression)</span>
             );
-<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        int namedGoalOverlap = goalExpression == null || goalExpression.isBlank()</span>
+<span class="fc bfc" id="L147" title="All 4 branches covered.">        int namedGoalOverlap = goalExpression == null || goalExpression.isBlank()</span>
 <span class="fc" id="L148">            ? 0</span>
 <span class="fc" id="L149">            : Math.max(</span>
 <span class="fc" id="L150">                namedStructuralOverlap(rule.rightPattern(), goalExpression),</span>
 <span class="fc" id="L151">                namedStructuralOverlap(rule.leftPattern(), goalExpression)</span>
             );
 <span class="fc" id="L153">        boolean exposesNewApplicableRules = exposesNewApplicableRules(rule, currentExpression);</span>
-<span class="pc bpc" id="L154" title="1 of 8 branches missed.">        if (goalExpression != null &amp;&amp; !goalExpression.isBlank() &amp;&amp; namedGoalOverlap &lt;= 0 &amp;&amp; !exposesNewApplicableRules) {</span>
+<span class="fc bfc" id="L154" title="All 8 branches covered.">        if (goalExpression != null &amp;&amp; !goalExpression.isBlank() &amp;&amp; namedGoalOverlap &lt;= 0 &amp;&amp; !exposesNewApplicableRules) {</span>
 <span class="fc" id="L155">            return 0.0;</span>
         }
 <span class="fc bfc" id="L157" title="All 2 branches covered.">        double exposureBonus = exposesNewApplicableRules ? 1.0 : 0.0;</span>

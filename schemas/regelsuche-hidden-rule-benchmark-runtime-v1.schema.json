@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.hidden-rule-benchmark-runtime/v1",
+  "title": "Regelsuche hidden-rule benchmark runtime telemetry v1",
+  "description": "Non-canonical wall-clock telemetry. It must not enter evidence hashes or byte-stability assertions.",
+  "type": "object",
+  "required": [
+    "schema", "cases", "totalElapsedNanos", "generatedValidationExamples",
+    "counterexampleSearches", "caseRuntimes"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.hidden-rule-benchmark-runtime/v1" },
+    "cases": { "$ref": "#/$defs/nonNegativeInteger" },
+    "totalElapsedNanos": { "$ref": "#/$defs/nonNegativeInteger" },
+    "generatedValidationExamples": { "$ref": "#/$defs/nonNegativeInteger" },
+    "counterexampleSearches": { "$ref": "#/$defs/nonNegativeInteger" },
+    "caseRuntimes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "opaqueCaseId", "elapsedNanos", "exploredStates",
+          "generatedValidationExamples", "counterexampleSearches"
+        ],
+        "properties": {
+          "opaqueCaseId": { "type": "string", "minLength": 1 },
+          "elapsedNanos": { "$ref": "#/$defs/nonNegativeInteger" },
+          "exploredStates": { "$ref": "#/$defs/nonNegativeInteger" },
+          "generatedValidationExamples": { "$ref": "#/$defs/nonNegativeInteger" },
+          "counterexampleSearches": { "$ref": "#/$defs/nonNegativeInteger" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

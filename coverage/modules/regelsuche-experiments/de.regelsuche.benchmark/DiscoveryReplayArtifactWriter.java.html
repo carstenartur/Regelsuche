@@ -760,16 +760,16 @@ import javax.imageio.stream.ImageOutputStream;
         }
 <span class="fc" id="L761">        String fromEnvironment = System.getenv().getOrDefault(&quot;GITHUB_SHA&quot;, &quot;&quot;);</span>
 <span class="pc bpc" id="L762" title="1 of 2 branches missed.">        if (!fromEnvironment.isBlank()) {</span>
-<span class="fc" id="L763">            return fromEnvironment;</span>
+<span class="nc" id="L763">            return fromEnvironment;</span>
         }
         try {
-<span class="nc" id="L766">            Process process = new ProcessBuilder(&quot;git&quot;, &quot;rev-parse&quot;, &quot;HEAD&quot;)</span>
-<span class="nc" id="L767">                .redirectErrorStream(true)</span>
-<span class="nc" id="L768">                .start();</span>
-<span class="nc" id="L769">            String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)</span>
-<span class="nc" id="L770">                .trim();</span>
-<span class="nc bnc" id="L771" title="All 4 branches missed.">            if (process.waitFor() == 0 &amp;&amp; !output.isBlank()) {</span>
-<span class="nc" id="L772">                return output;</span>
+<span class="fc" id="L766">            Process process = new ProcessBuilder(&quot;git&quot;, &quot;rev-parse&quot;, &quot;HEAD&quot;)</span>
+<span class="fc" id="L767">                .redirectErrorStream(true)</span>
+<span class="fc" id="L768">                .start();</span>
+<span class="fc" id="L769">            String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)</span>
+<span class="fc" id="L770">                .trim();</span>
+<span class="pc bpc" id="L771" title="2 of 4 branches missed.">            if (process.waitFor() == 0 &amp;&amp; !output.isBlank()) {</span>
+<span class="fc" id="L772">                return output;</span>
             }
 <span class="nc" id="L774">        } catch (IOException exception) {</span>
 <span class="nc" id="L775">            return &quot;unknown&quot;;</span>

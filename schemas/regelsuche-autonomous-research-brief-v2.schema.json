@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-research-brief/v2",
+  "title": "Regelsuche autonomous target-free research brief v2",
+  "type": "object",
+  "required": [
+    "schema", "briefId", "allowedDomains", "seedGenerators",
+    "inventoryHash", "packHash", "modelHash", "deterministicSeed",
+    "minimumAggregateInputs", "minimumDistinctFamilies",
+    "minimumDistinctEvidence", "outputNamespace", "stageBudgets",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-research-brief/v2" },
+    "briefId": { "$ref": "#/$defs/nonBlank" },
+    "allowedDomains": { "$ref": "#/$defs/nonEmptyStrings" },
+    "seedGenerators": { "$ref": "#/$defs/nonEmptyStrings" },
+    "inventoryHash": { "$ref": "#/$defs/sha256" },
+    "packHash": { "$ref": "#/$defs/sha256" },
+    "modelHash": { "$ref": "#/$defs/sha256" },
+    "deterministicSeed": { "type": "integer" },
+    "minimumAggregateInputs": { "type": "integer", "minimum": 2 },
+    "minimumDistinctFamilies": { "type": "integer", "minimum": 2 },
+    "minimumDistinctEvidence": { "type": "integer", "minimum": 2 },
+    "outputNamespace": { "$ref": "#/$defs/nonBlank" },
+    "stageBudgets": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/stageBudget" },
+      "allOf": [
+        { "contains": { "properties": { "stage": { "const": "GENERATION" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "CANDIDATE_FORMATION" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "VALIDATION" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "COUNTEREXAMPLE_SEARCH" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "PROJECT_NOVELTY" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "PROOF" } }, "required": ["stage"] } },
+        { "contains": { "properties": { "stage": { "const": "LIFECYCLE_HANDOFF" } }, "required": ["stage"] } }
+      ]
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "stageBudget": {
+      "type": "object",
+      "required": ["stage", "resources"],
+      "properties": {
+        "stage": { "$ref": "#/$defs/stage" },
+        "resources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["resource", "configured"],
+            "properties": {
+              "resource": { "$ref": "#/$defs/resource" },
+              "configured": { "type": "integer", "minimum": 1 }
+            },
+            "additionalProperties": false
+          },
+          "contains": {
+            "properties": {
+              "resource": {
+                "not": { "const": "WALL_CLOCK_MILLIS" }
+              }
+            },
+            "required": ["resource"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "stage": {
+      "enum": [
+        "GENERATION", "CANDIDATE_FORMATION", "VALIDATION",
+        "COUNTEREXAMPLE_SEARCH", "PROJECT_NOVELTY", "PROOF",
+        "LIFECYCLE_HANDOFF"
+      ]
+    },
+    "resource": {
+      "enum": [
+        "WALL_CLOCK_MILLIS", "GENERATED_STATES", "EXPLORED_STATES",
+        "OBSERVATIONS", "MINING_BATCHES", "CANDIDATES",
+        "VALIDATION_CHECKS", "COUNTEREXAMPLE_ATTEMPTS",
+        "NOVELTY_COMPARISONS", "PROOF_ATTEMPTS", "LIFECYCLE_HANDOFFS"
+      ]
+    },
+    "nonBlank": { "type": "string", "minLength": 1 },
+    "nonEmptyStrings": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/nonBlank" }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

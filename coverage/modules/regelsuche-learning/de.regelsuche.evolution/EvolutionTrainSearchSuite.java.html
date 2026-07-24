@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionTrainSearchSuite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionTrainSearchSuite.java</span></div><h1>EvolutionTrainSearchSuite.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.SearchHeuristic;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/** Frozen TRAIN cases and search policy used by evolutionary fitness. */
+public record EvolutionTrainSearchSuite(
+    String schema,
+    String suiteId,
+    List&lt;TrainCase&gt; cases,
+    SearchHeuristic heuristic,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-train-search-suite/v1&quot;;
+<span class="fc" id="L23">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+
+<span class="fc" id="L25">    public EvolutionTrainSearchSuite {</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;unsupported TRAIN suite schema&quot;);</span>
+        }
+<span class="fc" id="L29">        requireId(suiteId, &quot;suiteId&quot;);</span>
+<span class="fc" id="L30">        Objects.requireNonNull(cases, &quot;cases&quot;);</span>
+<span class="fc" id="L31">        cases = cases.stream()</span>
+<span class="fc" id="L32">            .map(item -&gt; Objects.requireNonNull(item, &quot;TRAIN case&quot;))</span>
+<span class="fc" id="L33">            .sorted(Comparator.comparing(TrainCase::caseId))</span>
+<span class="fc" id="L34">            .toList();</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (cases.isEmpty()) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;TRAIN suite must not be empty&quot;);</span>
+        }
+<span class="fc" id="L38">        if (new HashSet&lt;&gt;(cases.stream().map(TrainCase::caseId).toList()).size()</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">                != cases.size()) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;TRAIN case IDs must be unique&quot;);</span>
+        }
+<span class="fc" id="L42">        Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L43">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L44">        String expected = EvolutionGenome.hash(render(</span>
+            suiteId, cases, heuristic, null));
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;TRAIN suite contentHash mismatch&quot;);</span>
+        }
+<span class="fc" id="L49">    }</span>
+
+    public static EvolutionTrainSearchSuite create(
+        String suiteId,
+        List&lt;TrainCase&gt; cases,
+        SearchHeuristic heuristic
+    ) {
+<span class="fc" id="L56">        Objects.requireNonNull(cases, &quot;cases&quot;);</span>
+<span class="fc" id="L57">        Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L58">        List&lt;TrainCase&gt; canonicalCases = cases.stream()</span>
+<span class="fc" id="L59">            .map(item -&gt; Objects.requireNonNull(item, &quot;TRAIN case&quot;))</span>
+<span class="fc" id="L60">            .sorted(Comparator.comparing(TrainCase::caseId))</span>
+<span class="fc" id="L61">            .toList();</span>
+<span class="fc" id="L62">        String hash = EvolutionGenome.hash(render(</span>
+            suiteId, canonicalCases, heuristic, null));
+<span class="fc" id="L64">        return new EvolutionTrainSearchSuite(</span>
+            SCHEMA, suiteId, canonicalCases, heuristic, hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L69">        return render(suiteId, cases, heuristic, contentHash);</span>
+    }
+
+    private static String render(
+        String suiteId,
+        List&lt;TrainCase&gt; cases,
+        SearchHeuristic heuristic,
+        String contentHash
+    ) {
+<span class="fc" id="L78">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L79">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L80">            .property(&quot;suiteId&quot;, suiteId)</span>
+<span class="fc" id="L81">            .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L82">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L83">                    .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L84">                    .property(&quot;familyId&quot;, item.familyId())</span>
+<span class="fc" id="L85">                    .property(&quot;inputExpression&quot;, item.inputExpression())</span>
+<span class="fc" id="L86">                    .property(&quot;targetExpression&quot;, item.targetExpression()))))</span>
+<span class="fc" id="L87">            .object(&quot;heuristic&quot;, object -&gt; object</span>
+<span class="fc" id="L88">                .property(&quot;maxDepth&quot;, heuristic.maxDepth())</span>
+<span class="fc" id="L89">                .property(&quot;maxVisitedExpressions&quot;,</span>
+<span class="fc" id="L90">                    heuristic.maxVisitedExpressions())</span>
+<span class="fc" id="L91">                .property(&quot;significantImprovementThreshold&quot;,</span>
+<span class="fc" id="L92">                    heuristic.significantImprovementThreshold())</span>
+<span class="fc" id="L93">                .property(&quot;maxExpandingSteps&quot;, heuristic.maxExpandingSteps())</span>
+<span class="fc" id="L94">                .property(&quot;maxCandidatesPerState&quot;,</span>
+<span class="fc" id="L95">                    heuristic.maxCandidatesPerState())</span>
+<span class="fc" id="L96">                .property(&quot;beamWidth&quot;, heuristic.beamWidth()));</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L98">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L100">        return json.endObject().toString();</span>
+    }
+
+    public record TrainCase(
+        String caseId,
+        String familyId,
+        String inputExpression,
+        String targetExpression
+    ) {
+<span class="fc" id="L109">        public TrainCase {</span>
+<span class="fc" id="L110">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L111">            requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L112">            inputExpression = normalizeExpression(inputExpression);</span>
+<span class="fc" id="L113">            targetExpression = normalizeExpression(targetExpression);</span>
+<span class="fc" id="L114">        }</span>
+    }
+
+    private static String normalizeExpression(String expression) {
+<span class="pc bpc" id="L118" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L119">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="fc" id="L121">        return ExpressionFormatter.format(</span>
+<span class="fc" id="L122">            new ExpressionParser().parseTerm(expression));</span>
+    }
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L126" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L129">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

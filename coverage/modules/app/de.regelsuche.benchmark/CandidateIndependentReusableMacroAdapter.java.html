@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CandidateIndependentReusableMacroAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">CandidateIndependentReusableMacroAdapter.java</span></div><h1>CandidateIndependentReusableMacroAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import de.regelsuche.benchmark.CandidateIndependentMacroReplayAdapter.ReplayEvidence;
+import de.regelsuche.benchmark.CandidateIndependentMacroReplayAdapter.ReplayTrace;
+import de.regelsuche.discovery.TransformationStep;
+import de.regelsuche.inventory.ReusableRule;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Forms reusable macros from frozen TRAIN replays and measures their paired
+ * held-out utility with the production best-first search.
+ *
+ * &lt;p&gt;The formation surface contains replay traces only. Held-out tasks are
+ * accepted solely by {@link #evaluate(EvaluationTask, FormationResult)} after
+ * formation has completed. Baseline and macro-enabled runs use identical
+ * source, target, assumptions, primitive inventory, search strategy and
+ * budgets; the macro run differs only by the formed macro inventory.&lt;/p&gt;
+ */
+public final class CandidateIndependentReusableMacroAdapter {
+    private final CandidateIndependentMacroFormation formation;
+    private final CandidateIndependentMacroUtilityEvaluator utility;
+
+    public CandidateIndependentReusableMacroAdapter(
+        Map&lt;String, List&lt;String&gt;&gt; operationRuleIds
+<span class="fc" id="L27">    ) {</span>
+<span class="fc" id="L28">        formation = new CandidateIndependentMacroFormation(operationRuleIds);</span>
+<span class="fc" id="L29">        utility = new CandidateIndependentMacroUtilityEvaluator(operationRuleIds);</span>
+<span class="fc" id="L30">    }</span>
+
+    public FormationResult form(List&lt;ReplayTrace&gt; traces) {
+<span class="fc" id="L33">        return formation.form(traces);</span>
+    }
+
+    public PairedEvaluation evaluate(
+        EvaluationTask task,
+        FormationResult formationResult
+    ) {
+<span class="fc" id="L40">        return utility.evaluate(task, formationResult);</span>
+    }
+
+    BaselineEvaluation baseline(EvaluationTask task) {
+<span class="fc" id="L44">        return utility.baseline(task);</span>
+    }
+
+    PairedEvaluation evaluate(
+        EvaluationTask task,
+        FormationResult formationResult,
+        BaselineEvaluation baselineEvaluation
+    ) {
+<span class="fc" id="L52">        return utility.evaluate(task, formationResult, baselineEvaluation);</span>
+    }
+
+<span class="fc" id="L55">    public enum FormationStatus {</span>
+<span class="fc" id="L56">        SELECTED,</span>
+<span class="fc" id="L57">        REPLAY_NOT_REPRODUCED,</span>
+<span class="fc" id="L58">        GENERALIZATION_REJECTED</span>
+    }
+
+<span class="fc" id="L61">    public enum UtilityOutcome {</span>
+<span class="fc" id="L62">        IMPROVED,</span>
+<span class="fc" id="L63">        REACHABILITY_GAIN,</span>
+<span class="fc" id="L64">        NO_IMPROVEMENT,</span>
+<span class="fc" id="L65">        NO_RESULT,</span>
+<span class="fc" id="L66">        CORRECTNESS_REGRESSION,</span>
+<span class="fc" id="L67">        CANDIDATE_NOT_FORMED</span>
+    }
+
+    public record MacroCandidate(
+        String macroId,
+        List&lt;String&gt; operationSequence,
+        List&lt;String&gt; supportingTraceIds,
+        ReusableRule rule,
+        List&lt;TransformationStep&gt; atomicSteps,
+        String validationEvidence
+    ) {
+<span class="fc" id="L78">        public MacroCandidate {</span>
+<span class="fc" id="L79">            macroId = requireText(macroId, &quot;macroId&quot;);</span>
+<span class="fc" id="L80">            operationSequence = immutableStrings(</span>
+                operationSequence, &quot;operationSequence&quot;);
+<span class="fc" id="L82">            supportingTraceIds = immutableStrings(</span>
+                supportingTraceIds, &quot;supportingTraceIds&quot;);
+<span class="fc" id="L84">            Objects.requireNonNull(rule, &quot;rule&quot;);</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            atomicSteps = atomicSteps == null</span>
+<span class="pc" id="L86">                ? List.of() : List.copyOf(atomicSteps);</span>
+<span class="fc" id="L87">            validationEvidence = requireText(</span>
+                validationEvidence, &quot;validationEvidence&quot;);
+<span class="fc" id="L89">        }</span>
+    }
+
+    public record FormationResult(
+        FormationStatus status,
+        List&lt;MacroCandidate&gt; macros,
+        List&lt;ReplayEvidence&gt; replayEvidence,
+        String detail
+    ) {
+<span class="fc" id="L98">        public FormationResult {</span>
+<span class="fc" id="L99">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            macros = macros == null ? List.of() : List.copyOf(macros);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            replayEvidence = replayEvidence == null</span>
+<span class="pc" id="L102">                ? List.of() : List.copyOf(replayEvidence);</span>
+<span class="fc" id="L103">            detail = requireText(detail, &quot;detail&quot;);</span>
+<span class="pc bpc" id="L104" title="2 of 4 branches missed.">            if (status == FormationStatus.SELECTED &amp;&amp; macros.isEmpty()) {</span>
+<span class="nc" id="L105">                throw new IllegalArgumentException(</span>
+                    &quot;selected formation requires macros&quot;);
+            }
+<span class="fc" id="L108">        }</span>
+    }
+
+    public record EvaluationTask(
+        String taskId,
+        String source,
+        String target,
+        List&lt;String&gt; assumptions,
+        int maxDepth,
+        int maxExpandedStates
+    ) {
+<span class="fc" id="L119">        public EvaluationTask {</span>
+<span class="fc" id="L120">            taskId = requireText(taskId, &quot;taskId&quot;);</span>
+<span class="fc" id="L121">            source = requireText(source, &quot;source&quot;);</span>
+<span class="fc" id="L122">            target = requireText(target, &quot;target&quot;);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            assumptions = assumptions == null</span>
+<span class="pc" id="L124">                ? List.of() : List.copyOf(assumptions);</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">            if (maxDepth &lt; 0 || maxExpandedStates &lt; 1) {</span>
+<span class="nc" id="L126">                throw new IllegalArgumentException(</span>
+                    &quot;paired search budgets are invalid&quot;);
+            }
+<span class="fc" id="L129">        }</span>
+    }
+
+    record BaselineEvaluation(
+        EvaluationTask task,
+        SearchRun run
+    ) {
+<span class="fc" id="L136">        BaselineEvaluation {</span>
+<span class="fc" id="L137">            Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L138">            Objects.requireNonNull(run, &quot;run&quot;);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">            if (run.ruleIds().stream().anyMatch(</span>
+<span class="fc" id="L140">                    ruleId -&gt; ruleId.startsWith(</span>
+                        &quot;macro_candidate_independent_&quot;))) {
+<span class="nc" id="L142">                throw new IllegalArgumentException(</span>
+                    &quot;baseline evaluation contains a learned candidate&quot;);
+            }
+<span class="fc" id="L145">        }</span>
+    }
+
+    public record SearchRun(
+        boolean success,
+        String reachedExpression,
+        List&lt;String&gt; path,
+        List&lt;String&gt; ruleIds,
+        int expandedStates,
+        int generatedCandidates,
+        boolean budgetExhausted,
+        String detail
+    ) {
+<span class="fc" id="L158">        public SearchRun {</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            reachedExpression = reachedExpression == null</span>
+<span class="pc" id="L160">                ? &quot;&quot; : reachedExpression;</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            path = path == null ? List.of() : List.copyOf(path);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            ruleIds = ruleIds == null ? List.of() : List.copyOf(ruleIds);</span>
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">            if (expandedStates &lt; 0 || generatedCandidates &lt; 0) {</span>
+<span class="nc" id="L164">                throw new IllegalArgumentException(</span>
+                    &quot;search resource values must not be negative&quot;);
+            }
+<span class="fc" id="L167">            detail = requireText(detail, &quot;detail&quot;);</span>
+<span class="fc" id="L168">        }</span>
+
+        static SearchRun notRun(EvaluationTask task, String detail) {
+<span class="nc" id="L171">            return new SearchRun(</span>
+<span class="nc" id="L172">                false, &quot;&quot;, List.of(task.source()), List.of(),</span>
+                0, 0, false, detail);
+        }
+    }
+
+    public record PairedEvaluation(
+        String taskId,
+        UtilityOutcome outcome,
+        SearchRun baseline,
+        SearchRun macroEnabled,
+        boolean correctnessRegression,
+        String detail
+    ) {
+<span class="fc" id="L185">        public PairedEvaluation {</span>
+<span class="fc" id="L186">            taskId = requireText(taskId, &quot;taskId&quot;);</span>
+<span class="fc" id="L187">            Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="fc" id="L188">            Objects.requireNonNull(baseline, &quot;baseline&quot;);</span>
+<span class="fc" id="L189">            Objects.requireNonNull(macroEnabled, &quot;macroEnabled&quot;);</span>
+<span class="fc" id="L190">            detail = requireText(detail, &quot;detail&quot;);</span>
+<span class="fc" id="L191">        }</span>
+    }
+
+    static String requireText(String value, String name) {
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L196">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L198">        return value;</span>
+    }
+
+    static List&lt;String&gt; immutableStrings(
+        List&lt;String&gt; values,
+        String name
+    ) {
+<span class="fc" id="L205">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L206" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L207">            throw new IllegalArgumentException(</span>
+                name + &quot; must not contain blank values&quot;);
+        }
+<span class="fc" id="L210">        return List.copyOf(values);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

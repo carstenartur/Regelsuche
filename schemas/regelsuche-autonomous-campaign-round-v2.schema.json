@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.autonomous-campaign-round/v2",
+  "title": "Regelsuche autonomous campaign round v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "planHash",
+    "executionHash",
+    "lineageHash",
+    "lifecycleDecisionHashes",
+    "nextPlanHash",
+    "roundDecisionIsMathematicalEvidence",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": { "const": "regelsuche.autonomous-campaign-round/v2" },
+    "planHash": { "$ref": "#/$defs/sha256" },
+    "executionHash": { "$ref": "#/$defs/sha256" },
+    "lineageHash": { "$ref": "#/$defs/sha256" },
+    "lifecycleDecisionHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/sha256" }
+    },
+    "nextPlanHash": { "$ref": "#/$defs/sha256" },
+    "roundDecisionIsMathematicalEvidence": { "const": false },
+    "promotionStatus": { "const": "NOT_EVALUATED" },
+    "publicEvidenceStatus": { "const": "NOT_EVALUATED" },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

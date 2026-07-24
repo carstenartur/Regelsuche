@@ -1,0 +1,322 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-genome/v1",
+  "title": "Regelsuche evolutionary genome v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "objective",
+    "trainingScope",
+    "rewrites",
+    "rankingFeatures",
+    "guardPolicy",
+    "budget",
+    "requiredCapabilities",
+    "seedGenomeHashes",
+    "alphaStructuralHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-genome/v1"
+    },
+    "objective": {
+      "enum": [
+        "OPEN_TARGET_OPERATOR",
+        "TARGET_DIRECTED_POLICY"
+      ]
+    },
+    "trainingScope": {
+      "type": "object",
+      "required": [
+        "sourceSplit",
+        "corpusHash",
+        "familyPartitionHash",
+        "signaturePartitionHash",
+        "featureSchemaHash"
+      ],
+      "properties": {
+        "sourceSplit": {
+          "const": "TRAIN"
+        },
+        "corpusHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "familyPartitionHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "signaturePartitionHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "featureSchemaHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rewrites": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/rewrite"
+      }
+    },
+    "rankingFeatures": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/feature"
+      }
+    },
+    "guardPolicy": {
+      "$ref": "#/$defs/guardPolicy"
+    },
+    "budget": {
+      "$ref": "#/$defs/budget"
+    },
+    "requiredCapabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9.-]{1,127}$"
+      }
+    },
+    "seedGenomeHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "alphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "rewrite": {
+      "type": "object",
+      "required": [
+        "geneId",
+        "sourcePattern",
+        "targetPattern",
+        "kind",
+        "reversible",
+        "estimatedCostDelta",
+        "maxApplicationsPerPath",
+        "maxAstGrowth",
+        "assumptions",
+        "evidenceObligations"
+      ],
+      "properties": {
+        "geneId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+        },
+        "sourcePattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetPattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "SIMPLIFY",
+            "EXPAND",
+            "FACTOR",
+            "NORMALIZE"
+          ]
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "estimatedCostDelta": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "maxApplicationsPerPath": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "maxAstGrowth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "assumptions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/assumption"
+          }
+        },
+        "evidenceObligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "SEMANTIC_VALIDATION",
+              "COUNTEREXAMPLE_SEARCH",
+              "PROOF_OR_CERTIFICATE",
+              "NOVELTY_REVIEW",
+              "HOLDOUT_EVALUATION"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "assumption": {
+      "type": "object",
+      "required": [
+        "kind",
+        "expression",
+        "symbols"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "NON_ZERO",
+            "POSITIVE",
+            "NON_NEGATIVE",
+            "INTEGER",
+            "NATURAL",
+            "INVERTIBLE",
+            "DOMAIN_MEMBERSHIP",
+            "CUSTOM_PREDICATE",
+            "REAL",
+            "RATIONAL"
+          ]
+        },
+        "expression": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symbols": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "feature": {
+      "type": "object",
+      "required": [
+        "signal",
+        "weightPermille"
+      ],
+      "properties": {
+        "signal": {
+          "enum": [
+            "UNSEEN_TRAIN_CASES_SOLVED",
+            "PROVISIONAL_PATH_REDUCTION",
+            "OPEN_TARGET_SUPPORT_DIVERSITY",
+            "STRUCTURAL_NOVELTY",
+            "ASSUMPTION_SIMPLICITY",
+            "PROOF_COST",
+            "RUNTIME_COST",
+            "CANDIDATE_COMPLEXITY",
+            "COUNTEREXAMPLE_RISK",
+            "REGRESSION_RISK",
+            "INCOMPLETE_EVIDENCE",
+            "DECLARED_TARGET_DISTANCE",
+            "DECLARED_GOAL_MATCH"
+          ]
+        },
+        "weightPermille": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000,
+          "not": {
+            "const": 0
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "guardPolicy": {
+      "type": "object",
+      "required": [
+        "rejectCycles",
+        "rejectUnboundedGrowth",
+        "requireApplicabilityChecks",
+        "enforceDuplicateSuppression",
+        "deterministicTieBreaking"
+      ],
+      "properties": {
+        "rejectCycles": {
+          "const": true
+        },
+        "rejectUnboundedGrowth": {
+          "const": true
+        },
+        "requireApplicabilityChecks": {
+          "const": true
+        },
+        "enforceDuplicateSuppression": {
+          "const": true
+        },
+        "deterministicTieBreaking": {
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "budget": {
+      "type": "object",
+      "required": [
+        "maxProgramLength",
+        "maxAstNodes",
+        "maxAstGrowthPerStep",
+        "maxApplicationsPerPath",
+        "maxCandidatesPerState"
+      ],
+      "properties": {
+        "maxProgramLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "maxAstNodes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "maxAstGrowthPerStep": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024
+        },
+        "maxApplicationsPerPath": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "maxCandidatesPerState": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<meta http-equiv="x-ua-compatible" content="IE=edge"/>
+<title>Test results - fullModeBootsWithPostgresWithoutNeo4j()</title>
+<link href="../css/base-style.css" rel="stylesheet" type="text/css"/>
+<link href="../css/style.css" rel="stylesheet" type="text/css"/>
+<script src="../js/report.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="content">
+<div class="breadcrumbs">
+<a class="breadcrumb" href="../index.html">all</a> &gt; 
+<a class="breadcrumb" href="index.html">de.regelsuche.dockere2e.HibernateFullModePersistenceTest</a> &gt; 
+<span class="breadcrumb">fullModeBootsWithPostgresWithoutNeo4j()</span>
+</div>
+<div class="tab-container">
+<ul class="tabLinks">
+<li>
+<a class="successGroup" href="#">Gradle Test Run :app:dockerE2eTest</a>
+</li>
+</ul>
+<div class="tab">
+<h2>Gradle Test Run :app:dockerE2eTest</h2>
+<h1>fullModeBootsWithPostgresWithoutNeo4j()</h1>
+<div class="tab-container">
+<ul class="tabLinks">
+<li>
+<a class="" href="#">summary</a>
+</li>
+<li>
+<a class="" href="#">error output</a>
+</li>
+</ul>
+<div class="tab">
+<h2>summary</h2>
+<div>
+<div class="summary">
+<table>
+<tr>
+<td>
+<div class="summaryGroup">
+<table>
+<tr>
+<td>
+<div class="infoBox">
+<div class="counter">1</div>
+<p>tests</p>
+</div>
+</td>
+<td>
+<div class="infoBox">
+<div class="counter">0</div>
+<p>failures</p>
+</div>
+</td>
+<td>
+<div class="infoBox">
+<div class="counter">0</div>
+<p>skipped</p>
+</div>
+</td>
+<td>
+<div class="infoBox duration">
+<div class="counter">5.978s</div>
+<p>duration</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</td>
+<td>
+<div class="infoBox success successRate">
+<div class="percent">100%</div>
+<p>successful</p>
+</div>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div class="tab">
+<h2>error output</h2>
+<span class="code">
+<pre id="root-0-test-stderr-fullModeBootsWithPostgresWithoutNeo4j()">Jul 24, 2026 6:19:04 PM org.hibernate.jpa.internal.util.LogHelper logPersistenceUnitInformation
+INFO: HHH008540: Processing PersistenceUnitInfo [name: regelsuche-postgresql]
+Jul 24, 2026 6:19:05 PM org.hibernate.Version logVersion
+INFO: HHH000001: Hibernate ORM core version 7.4.0.Final
+Jul 24, 2026 6:19:05 PM org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProvider configure
+WARN: HHH10001002: Using built-in connection pool (not intended for production use)
+Jul 24, 2026 6:19:05 PM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator logConnectionInfo
+INFO: HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://localhost:32769/regelsuche]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 16.14
+	Default catalog/schema: regelsuche/public
+	Autocommit mode: false
+	Isolation level: READ_COMMITTED
+	JDBC fetch size: none
+	Pool: DriverManagerConnectionProvider
+	Minimum pool size: 1
+	Maximum pool size: 20
+Jul 24, 2026 6:19:06 PM org.hibernate.search.mapper.orm.bootstrap.impl.HibernateSearchPreIntegrationService$Initiator initiateService
+INFO: HSEARCH000034: Hibernate Search version 8.4.0.Final
+Jul 24, 2026 6:19:06 PM org.hibernate.validator.internal.util.Version &lt;clinit&gt;
+INFO: HV000001: Hibernate Validator 9.1.0.Final
+Jul 24, 2026 6:19:08 PM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
+INFO: HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+Jul 24, 2026 6:19:08 PM org.hibernate.search.backend.lucene.impl.LuceneBackendFactory getLuceneVersion
+WARN: HSEARCH000075: Missing value for configuration property 'hibernate.search.backend.lucene_version': using LATEST (currently '9.12.3'). Context: default backend
+Jul 24, 2026 6:19:08 PM org.apache.lucene.internal.vectorization.VectorizationProvider lookup
+WARNING: Java vector incubator module is not readable. For optimal vector performance, pass '--add-modules jdk.incubator.vector' to enable Vector API.
+Jul 24, 2026 6:19:08 PM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9252417504027493023/hibernate-search/BenchmarkResultEntity'
+WARNING: A restricted method in java.lang.foreign.Linker has been called
+WARNING: java.lang.foreign.Linker::downcallHandle has been called by the unnamed module
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for this module
+
+Jul 24, 2026 6:19:09 PM org.apache.lucene.store.MemorySegmentIndexInputProvider &lt;init&gt;
+INFO: Using MemorySegmentIndexInput and native madvise support with Java 21 or later; to disable start with -Dorg.apache.lucene.store.MMapDirectory.enableMemorySegments=false
+Jul 24, 2026 6:19:09 PM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9252417504027493023/hibernate-search/ExportReportEntity'
+Jul 24, 2026 6:19:09 PM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9252417504027493023/hibernate-search/HypothesisCandidateEntity'
+Jul 24, 2026 6:19:09 PM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9252417504027493023/hibernate-search/SearchIndexDocument'
+Jul 24, 2026 6:19:09 PM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-9252417504027493023/hibernate-search/SeedExpressionEntity'
+</pre>
+<button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="root-0-test-stderr-fullModeBootsWithPostgresWithoutNeo4j()">Copy</button>
+</span>
+</div>
+</div>
+</div>
+</div>
+<div id="footer">
+<p>
+<div>
+<label class="hidden" id="label-for-line-wrapping-toggle" for="line-wrapping-toggle">Wrap lines
+<input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
+</label>
+</div>Generated by 
+<a href="https://www.gradle.org">Gradle 9.5.1</a> at Jul 24, 2026, 6:22:20 PM</p>
+</div>
+</div>
+</body>
+</html>

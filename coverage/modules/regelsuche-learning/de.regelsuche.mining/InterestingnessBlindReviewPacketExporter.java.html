@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterestingnessBlindReviewPacketExporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.mining</a> &gt; <span class="el_source">InterestingnessBlindReviewPacketExporter.java</span></div><h1>InterestingnessBlindReviewPacketExporter.java</h1><pre class="source lang-java linenums">package de.regelsuche.mining;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import de.regelsuche.mining.InterestingnessIndependentReviewStudy.CandidateCase;
+import de.regelsuche.mining.InterestingnessIndependentReviewStudy.StudyPlan;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/** Deterministic export of public blind-review packets and private assignments. */
+<span class="fc" id="L24">public final class InterestingnessBlindReviewPacketExporter {</span>
+    public static final String PACKET_SCHEMA =
+        &quot;regelsuche.independent-review-blinded-packet/v1&quot;;
+    public static final String PUBLIC_MANIFEST_SCHEMA =
+        &quot;regelsuche.independent-review-public-packet-manifest/v1&quot;;
+    public static final String PRIVATE_MANIFEST_SCHEMA =
+        &quot;regelsuche.independent-review-private-assignment-manifest/v1&quot;;
+
+<span class="fc" id="L32">    private static final Pattern IDENTIFIER = Pattern.compile(</span>
+        &quot;[A-Za-z0-9][A-Za-z0-9._:-]{1,127}&quot;);
+<span class="fc" id="L34">    private static final Pattern SHA256 = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L35">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L36">        .findAndRegisterModules()</span>
+<span class="fc" id="L37">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);</span>
+
+    public ExportBundle export(
+        StudyPlan plan,
+        List&lt;ReviewAssignment&gt; suppliedAssignments,
+        Map&lt;String, String&gt; blindedPresentationsByHash,
+        String reviewerInstructions
+    ) {
+<span class="fc" id="L45">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="fc" id="L46">        Objects.requireNonNull(suppliedAssignments, &quot;suppliedAssignments&quot;);</span>
+<span class="fc" id="L47">        Objects.requireNonNull(blindedPresentationsByHash,</span>
+            &quot;blindedPresentationsByHash&quot;);
+<span class="fc" id="L49">        Objects.requireNonNull(reviewerInstructions, &quot;reviewerInstructions&quot;);</span>
+<span class="fc" id="L50">        requireHash(reviewerInstructions,</span>
+<span class="fc" id="L51">            plan.reviewProtocol().reviewerInstructionsHash(),</span>
+            &quot;reviewer instructions&quot;);
+
+<span class="fc" id="L54">        List&lt;ReviewAssignment&gt; assignments = suppliedAssignments.stream()</span>
+<span class="fc" id="L55">            .map(item -&gt; Objects.requireNonNull(item, &quot;assignment&quot;))</span>
+<span class="fc" id="L56">            .sorted(Comparator.comparing(ReviewAssignment::assignmentId))</span>
+<span class="fc" id="L57">            .toList();</span>
+<span class="fc" id="L58">        validateAssignments(plan, assignments);</span>
+<span class="fc" id="L59">        Map&lt;String, String&gt; materials = validateMaterials(</span>
+            plan, blindedPresentationsByHash);
+
+<span class="fc" id="L62">        List&lt;Artifact&gt; packets = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L63">        List&lt;Map&lt;String, Object&gt;&gt; privateAssignments = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (ReviewAssignment assignment : assignments) {</span>
+<span class="fc" id="L65">            CandidateCase candidate = plan.requireCase(assignment.caseId());</span>
+<span class="fc" id="L66">            Artifact packet = packet(</span>
+                plan, assignment, candidate, reviewerInstructions,
+<span class="fc" id="L68">                materials.get(candidate.blindedPresentationHash()));</span>
+<span class="fc" id="L69">            packets.add(packet);</span>
+<span class="fc" id="L70">            privateAssignments.add(privateAssignment(</span>
+                assignment, candidate, packet));
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">        packets.sort(Comparator.comparing(Artifact::id));</span>
+<span class="fc" id="L74">        privateAssignments.sort(Comparator.comparing(</span>
+<span class="fc" id="L75">            item -&gt; (String) item.get(&quot;assignmentId&quot;)));</span>
+
+<span class="fc" id="L77">        Artifact publicManifest = publicManifest(plan, packets);</span>
+<span class="fc" id="L78">        Artifact privateManifest = privateManifest(</span>
+            plan, publicManifest, privateAssignments);
+<span class="fc" id="L80">        return new ExportBundle(</span>
+<span class="fc" id="L81">            List.copyOf(packets), publicManifest, privateManifest);</span>
+    }
+
+    public ExportReceipt exportToDirectory(
+        StudyPlan plan,
+        List&lt;ReviewAssignment&gt; assignments,
+        Map&lt;String, String&gt; blindedPresentationsByHash,
+        String reviewerInstructions,
+        Path outputRoot
+    ) throws IOException {
+<span class="fc" id="L91">        ExportBundle bundle = export(</span>
+            plan, assignments, blindedPresentationsByHash,
+            reviewerInstructions);
+<span class="fc" id="L94">        Path root = outputRoot.toAbsolutePath().normalize();</span>
+<span class="fc" id="L95">        Path parent = Objects.requireNonNull(root.getParent(),</span>
+            &quot;outputRoot parent&quot;);
+<span class="fc" id="L97">        Files.createDirectories(parent);</span>
+<span class="fc" id="L98">        Path staging = parent.resolve(root.getFileName() + &quot;.staging-&quot; +</span>
+<span class="fc" id="L99">            bundle.publicManifest().contentHash().substring(7, 19));</span>
+<span class="fc" id="L100">        deleteRecursively(staging);</span>
+<span class="fc" id="L101">        write(staging, bundle);</span>
+<span class="fc" id="L102">        Path previous = parent.resolve(root.getFileName() + &quot;.previous&quot;);</span>
+<span class="fc" id="L103">        deleteRecursively(previous);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (Files.exists(root)) {</span>
+<span class="fc" id="L105">            move(root, previous);</span>
+        }
+        try {
+<span class="fc" id="L108">            move(staging, root);</span>
+<span class="fc" id="L109">            deleteRecursively(previous);</span>
+<span class="nc" id="L110">        } catch (IOException failure) {</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">            if (Files.exists(previous) &amp;&amp; !Files.exists(root)) {</span>
+<span class="nc" id="L112">                move(previous, root);</span>
+            }
+<span class="nc" id="L114">            throw failure;</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">        return new ExportReceipt(</span>
+            root,
+<span class="fc" id="L118">            bundle.publicManifest().contentHash(),</span>
+<span class="fc" id="L119">            bundle.privateManifest().contentHash(),</span>
+<span class="fc" id="L120">            bundle.packets().size());</span>
+    }
+
+    private static Artifact packet(
+        StudyPlan plan,
+        ReviewAssignment assignment,
+        CandidateCase candidate,
+        String instructions,
+        String presentation
+    ) {
+<span class="fc" id="L130">        Map&lt;String, Object&gt; privateIdentity = map(</span>
+<span class="fc" id="L131">            &quot;studyPlanHash&quot;, plan.contentHash(),</span>
+<span class="fc" id="L132">            &quot;assignmentId&quot;, assignment.assignmentId(),</span>
+<span class="fc" id="L133">            &quot;reviewerHash&quot;, assignment.reviewerHash(),</span>
+<span class="fc" id="L134">            &quot;caseId&quot;, candidate.caseId());</span>
+<span class="fc" id="L135">        String packetId = &quot;packet-&quot; +</span>
+<span class="fc" id="L136">            hash(privateIdentity).substring(7, 31);</span>
+<span class="fc" id="L137">        Map&lt;String, Object&gt; value = map(</span>
+            &quot;schema&quot;, PACKET_SCHEMA,
+            &quot;packetId&quot;, packetId,
+<span class="fc" id="L140">            &quot;studyPlanHash&quot;, plan.contentHash(),</span>
+            &quot;reviewerInstructionsHash&quot;,
+<span class="fc" id="L142">                plan.reviewProtocol().reviewerInstructionsHash(),</span>
+            &quot;reviewerInstructions&quot;, instructions,
+            &quot;blindedPresentation&quot;, presentation,
+            &quot;relevanceScalePermille&quot;,
+<span class="fc" id="L146">                plan.reviewProtocol().relevanceScalePermille(),</span>
+            &quot;confidenceScalePermille&quot;,
+<span class="fc" id="L148">                plan.reviewProtocol().confidenceScalePermille(),</span>
+<span class="fc" id="L149">            &quot;rationaleCodes&quot;, plan.reviewProtocol().rationaleCodes(),</span>
+<span class="fc" id="L150">            &quot;blindReviewRequired&quot;, true,</span>
+            &quot;reviewCollectionStatus&quot;, &quot;NOT_COLLECTED&quot;);
+<span class="fc" id="L152">        return artifact(packetId, value);</span>
+    }
+
+    private static Map&lt;String, Object&gt; privateAssignment(
+        ReviewAssignment assignment,
+        CandidateCase candidate,
+        Artifact packet
+    ) {
+<span class="fc" id="L160">        Map&lt;String, Object&gt; value = map(</span>
+<span class="fc" id="L161">            &quot;assignmentId&quot;, assignment.assignmentId(),</span>
+<span class="fc" id="L162">            &quot;packetId&quot;, packet.id(),</span>
+<span class="fc" id="L163">            &quot;packetContentHash&quot;, packet.contentHash(),</span>
+<span class="fc" id="L164">            &quot;reviewerHash&quot;, assignment.reviewerHash(),</span>
+<span class="fc" id="L165">            &quot;caseId&quot;, candidate.caseId(),</span>
+<span class="fc" id="L166">            &quot;candidateId&quot;, candidate.candidateId(),</span>
+<span class="fc" id="L167">            &quot;split&quot;, candidate.split().name(),</span>
+<span class="fc" id="L168">            &quot;candidateFamily&quot;, candidate.candidateFamily(),</span>
+<span class="fc" id="L169">            &quot;candidateArtifactHash&quot;, candidate.candidateArtifactHash(),</span>
+<span class="fc" id="L170">            &quot;assessmentContentHash&quot;, candidate.assessmentContentHash(),</span>
+<span class="fc" id="L171">            &quot;blindedPresentationHash&quot;, candidate.blindedPresentationHash());</span>
+<span class="fc" id="L172">        value.put(&quot;contentHash&quot;, hash(value));</span>
+<span class="fc" id="L173">        return Map.copyOf(value);</span>
+    }
+
+    private static Artifact publicManifest(
+        StudyPlan plan,
+        List&lt;Artifact&gt; packets
+    ) {
+<span class="fc" id="L180">        List&lt;Map&lt;String, Object&gt;&gt; references = packets.stream()</span>
+<span class="fc" id="L181">            .map(packet -&gt; map(</span>
+<span class="fc" id="L182">                &quot;packetId&quot;, packet.id(),</span>
+<span class="fc" id="L183">                &quot;packetContentHash&quot;, packet.contentHash()))</span>
+<span class="fc" id="L184">            .toList();</span>
+<span class="fc" id="L185">        Map&lt;String, Object&gt; value = map(</span>
+            &quot;schema&quot;, PUBLIC_MANIFEST_SCHEMA,
+<span class="fc" id="L187">            &quot;studyPlanHash&quot;, plan.contentHash(),</span>
+            &quot;reviewerInstructionsHash&quot;,
+<span class="fc" id="L189">                plan.reviewProtocol().reviewerInstructionsHash(),</span>
+<span class="fc" id="L190">            &quot;packetCount&quot;, references.size(),</span>
+            &quot;packets&quot;, references,
+            &quot;reviewCollectionStatus&quot;, &quot;NOT_COLLECTED&quot;,
+            &quot;empiricalConsensusStatus&quot;, &quot;NOT_EVALUATED&quot;);
+<span class="fc" id="L194">        return artifact(&quot;public-manifest&quot;, value);</span>
+    }
+
+    private static Artifact privateManifest(
+        StudyPlan plan,
+        Artifact publicManifest,
+        List&lt;Map&lt;String, Object&gt;&gt; assignments
+    ) {
+<span class="fc" id="L202">        Map&lt;String, Object&gt; value = map(</span>
+            &quot;schema&quot;, PRIVATE_MANIFEST_SCHEMA,
+<span class="fc" id="L204">            &quot;studyPlanHash&quot;, plan.contentHash(),</span>
+<span class="fc" id="L205">            &quot;publicManifestHash&quot;, publicManifest.contentHash(),</span>
+            &quot;reviewerHashSaltCommitment&quot;,
+<span class="fc" id="L207">                plan.reviewProtocol().reviewerHashSaltCommitment(),</span>
+<span class="fc" id="L208">            &quot;assignmentCount&quot;, assignments.size(),</span>
+            &quot;assignments&quot;, assignments,
+            &quot;privacyClassification&quot;, &quot;PRIVATE_ACCESS_CONTROLLED&quot;,
+            &quot;reviewCollectionStatus&quot;, &quot;NOT_COLLECTED&quot;,
+            &quot;promotionStatus&quot;, &quot;NOT_EVALUATED&quot;,
+            &quot;publicEvidenceStatus&quot;, &quot;NOT_EVALUATED&quot;);
+<span class="fc" id="L214">        return artifact(&quot;private-assignment-manifest&quot;, value);</span>
+    }
+
+    private static void validateAssignments(
+        StudyPlan plan,
+        List&lt;ReviewAssignment&gt; assignments
+    ) {
+<span class="fc" id="L221">        Set&lt;String&gt; ids = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L222">        Set&lt;String&gt; reviewerCandidates = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L223">        Map&lt;String, Integer&gt; counts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        for (ReviewAssignment assignment : assignments) {</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (!ids.add(assignment.assignmentId())) {</span>
+<span class="nc" id="L226">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L227">                    &quot;duplicate assignmentId: &quot; + assignment.assignmentId());</span>
+            }
+<span class="fc" id="L229">            CandidateCase candidate = plan.requireCase(assignment.caseId());</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">            if (!reviewerCandidates.add(</span>
+<span class="fc" id="L231">                    assignment.reviewerHash() + &quot;\u0000&quot; +</span>
+<span class="fc" id="L232">                        candidate.candidateId())) {</span>
+<span class="fc" id="L233">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate reviewer/candidate assignment&quot;);
+            }
+<span class="fc" id="L236">            counts.merge(candidate.caseId(), 1, Integer::sum);</span>
+<span class="fc" id="L237">        }</span>
+<span class="fc" id="L238">        int minimum = plan.reviewProtocol()</span>
+<span class="fc" id="L239">            .minimumIndependentExpertReviews();</span>
+<span class="fc" id="L240">        List&lt;String&gt; incomplete = plan.cases().stream()</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            .filter(item -&gt; counts.getOrDefault(item.caseId(), 0) &lt; minimum)</span>
+<span class="fc" id="L242">            .map(CandidateCase::caseId).sorted().toList();</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (!incomplete.isEmpty()) {</span>
+<span class="fc" id="L244">            throw new IllegalArgumentException(</span>
+                &quot;insufficient reviewer assignments for cases: &quot; + incomplete);
+        }
+<span class="fc" id="L247">    }</span>
+
+    private static Map&lt;String, String&gt; validateMaterials(
+        StudyPlan plan,
+        Map&lt;String, String&gt; supplied
+    ) {
+<span class="fc" id="L253">        Map&lt;String, String&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        for (CandidateCase candidate : plan.cases()) {</span>
+<span class="fc" id="L255">            String expected = candidate.blindedPresentationHash();</span>
+<span class="fc" id="L256">            String material = supplied.get(expected);</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">            if (material == null) {</span>
+<span class="nc" id="L258">                throw new IllegalArgumentException(</span>
+                    &quot;missing blinded presentation: &quot; + expected);
+            }
+<span class="fc" id="L261">            requireHash(material, expected, &quot;blinded presentation&quot;);</span>
+<span class="fc" id="L262">            result.put(expected, material);</span>
+<span class="fc" id="L263">        }</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (!result.keySet().equals(supplied.keySet())) {</span>
+<span class="nc" id="L265">            throw new IllegalArgumentException(</span>
+                &quot;unexpected blinded presentation material&quot;);
+        }
+<span class="fc" id="L268">        return Map.copyOf(result);</span>
+    }
+
+    private static Artifact artifact(
+        String id,
+        Map&lt;String, Object&gt; value
+    ) {
+<span class="fc" id="L275">        Map&lt;String, Object&gt; complete = new LinkedHashMap&lt;&gt;(value);</span>
+<span class="fc" id="L276">        String contentHash = hash(value);</span>
+<span class="fc" id="L277">        complete.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L278">        return new Artifact(id, Map.copyOf(complete), contentHash);</span>
+    }
+
+    private static void write(Path root, ExportBundle bundle)
+            throws IOException {
+<span class="fc" id="L283">        Path publicPackets = root.resolve(&quot;public/packets&quot;);</span>
+<span class="fc" id="L284">        Path privateRoot = root.resolve(&quot;private&quot;);</span>
+<span class="fc" id="L285">        Files.createDirectories(publicPackets);</span>
+<span class="fc" id="L286">        Files.createDirectories(privateRoot);</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        for (Artifact packet : bundle.packets()) {</span>
+<span class="fc" id="L288">            Files.writeString(</span>
+<span class="fc" id="L289">                publicPackets.resolve(packet.id() + &quot;.json&quot;),</span>
+<span class="fc" id="L290">                packet.toCanonicalJson(), StandardCharsets.UTF_8);</span>
+<span class="fc" id="L291">        }</span>
+<span class="fc" id="L292">        Files.writeString(</span>
+<span class="fc" id="L293">            root.resolve(&quot;public/manifest.json&quot;),</span>
+<span class="fc" id="L294">            bundle.publicManifest().toCanonicalJson(),</span>
+            StandardCharsets.UTF_8);
+<span class="fc" id="L296">        Files.writeString(</span>
+<span class="fc" id="L297">            privateRoot.resolve(&quot;assignment-manifest.json&quot;),</span>
+<span class="fc" id="L298">            bundle.privateManifest().toCanonicalJson(),</span>
+            StandardCharsets.UTF_8);
+<span class="fc" id="L300">    }</span>
+
+    private static void move(Path source, Path target) throws IOException {
+        try {
+<span class="fc" id="L304">            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);</span>
+<span class="nc" id="L305">        } catch (java.nio.file.AtomicMoveNotSupportedException ignored) {</span>
+<span class="nc" id="L306">            Files.move(source, target);</span>
+<span class="fc" id="L307">        }</span>
+<span class="fc" id="L308">    }</span>
+
+    private static void deleteRecursively(Path path) throws IOException {
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        if (!Files.exists(path)) {</span>
+<span class="fc" id="L312">            return;</span>
+        }
+<span class="fc" id="L314">        try (var paths = Files.walk(path)) {</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) {</span>
+<span class="fc" id="L316">                Files.deleteIfExists(item);</span>
+<span class="fc" id="L317">            }</span>
+        }
+<span class="fc" id="L319">    }</span>
+
+    private static void requireHash(
+        String value,
+        String expected,
+        String context
+    ) {
+<span class="fc" id="L326">        String actual = InterestingnessIndependentReviewStudy.sha256(</span>
+<span class="fc" id="L327">            value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (!actual.equals(expected)) {</span>
+<span class="fc" id="L329">            throw new IllegalArgumentException(</span>
+                context + &quot; hash mismatch: &quot; + actual + &quot; != &quot; + expected);
+        }
+<span class="fc" id="L332">    }</span>
+
+    private static String hash(Map&lt;String, Object&gt; value) {
+        try {
+<span class="fc" id="L336">            return InterestingnessIndependentReviewStudy.sha256(</span>
+<span class="fc" id="L337">                JSON.writeValueAsBytes(value));</span>
+<span class="nc" id="L338">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L339">            throw new IllegalStateException(</span>
+                &quot;cannot hash blind-review packet&quot;, exception);
+        }
+    }
+
+    private static Map&lt;String, Object&gt; map(Object... values) {
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        if (values.length % 2 != 0) {</span>
+<span class="nc" id="L346">            throw new IllegalArgumentException(&quot;map requires key/value pairs&quot;);</span>
+        }
+<span class="fc" id="L348">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (int index = 0; index &lt; values.length; index += 2) {</span>
+<span class="fc" id="L350">            result.put((String) values[index], values[index + 1]);</span>
+        }
+<span class="fc" id="L352">        return result;</span>
+    }
+
+    private static String canonicalJson(Map&lt;String, Object&gt; value) {
+        try {
+<span class="fc" id="L357">            return JSON.writeValueAsString(value) + &quot;\n&quot;;</span>
+<span class="nc" id="L358">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L359">            throw new IllegalStateException(</span>
+                &quot;cannot serialize blind-review packet&quot;, exception);
+        }
+    }
+
+    private static String identifier(String value, String field) {
+<span class="pc bpc" id="L365" title="2 of 4 branches missed.">        if (value == null || !IDENTIFIER.matcher(value).matches()) {</span>
+<span class="nc" id="L366">            throw new IllegalArgumentException(</span>
+                field + &quot; is not a valid identifier&quot;);
+        }
+<span class="fc" id="L369">        return value;</span>
+    }
+
+    private static String sha256(String value, String field) {
+<span class="pc bpc" id="L373" title="2 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
+<span class="nc" id="L374">            throw new IllegalArgumentException(field + &quot; is not SHA-256&quot;);</span>
+        }
+<span class="fc" id="L376">        return value;</span>
+    }
+
+    public record ReviewAssignment(
+        String assignmentId,
+        String reviewerHash,
+        String caseId
+    ) {
+<span class="fc" id="L384">        public ReviewAssignment {</span>
+<span class="fc" id="L385">            assignmentId = identifier(assignmentId, &quot;assignmentId&quot;);</span>
+<span class="fc" id="L386">            reviewerHash = sha256(reviewerHash, &quot;reviewerHash&quot;);</span>
+<span class="fc" id="L387">            caseId = identifier(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L388">        }</span>
+    }
+
+    public record Artifact(
+        String id,
+        Map&lt;String, Object&gt; value,
+        String contentHash
+    ) {
+<span class="fc" id="L396">        public Artifact {</span>
+<span class="fc" id="L397">            id = identifier(id, &quot;artifact id&quot;);</span>
+<span class="fc" id="L398">            value = Map.copyOf(value);</span>
+<span class="fc" id="L399">            contentHash = sha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L400">            Map&lt;String, Object&gt; material = new LinkedHashMap&lt;&gt;(value);</span>
+<span class="fc" id="L401">            material.remove(&quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (!contentHash.equals(hash(material))) {</span>
+<span class="nc" id="L403">                throw new IllegalArgumentException(</span>
+                    &quot;artifact contentHash mismatch&quot;);
+            }
+<span class="fc" id="L406">        }</span>
+
+        public String toCanonicalJson() {
+<span class="fc" id="L409">            return canonicalJson(value);</span>
+        }
+    }
+
+    public record ExportBundle(
+        List&lt;Artifact&gt; packets,
+        Artifact publicManifest,
+        Artifact privateManifest
+    ) {
+<span class="fc" id="L418">        public ExportBundle {</span>
+<span class="fc" id="L419">            packets = List.copyOf(packets);</span>
+<span class="fc" id="L420">            Objects.requireNonNull(publicManifest, &quot;publicManifest&quot;);</span>
+<span class="fc" id="L421">            Objects.requireNonNull(privateManifest, &quot;privateManifest&quot;);</span>
+<span class="fc" id="L422">        }</span>
+    }
+
+    public record ExportReceipt(
+        Path outputRoot,
+        String publicManifestHash,
+        String privateManifestHash,
+        int packetCount
+    ) {
+<span class="fc" id="L431">        public ExportReceipt {</span>
+<span class="fc" id="L432">            Objects.requireNonNull(outputRoot, &quot;outputRoot&quot;);</span>
+<span class="fc" id="L433">            publicManifestHash = sha256(</span>
+                publicManifestHash, &quot;publicManifestHash&quot;);
+<span class="fc" id="L435">            privateManifestHash = sha256(</span>
+                privateManifestHash, &quot;privateManifestHash&quot;);
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">            if (packetCount &lt; 1) {</span>
+<span class="nc" id="L438">                throw new IllegalArgumentException(</span>
+                    &quot;packetCount must be positive&quot;);
+            }
+<span class="fc" id="L441">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

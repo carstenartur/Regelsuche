@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.independent-review-intake/v1",
+  "title": "Regelsuche independent interestingness review intake v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "studyPlanHash",
+    "predictiveCorpusHash",
+    "thresholdLockHash",
+    "minimumIndependentExpertReviews",
+    "revision",
+    "priorLabeledEvaluationHash",
+    "evidenceStatus",
+    "decisions",
+    "candidateStatuses",
+    "labeledEvaluationHash",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.independent-review-intake/v1"
+    },
+    "studyPlanHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "predictiveCorpusHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "thresholdLockHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "minimumIndependentExpertReviews": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "priorLabeledEvaluationHash": {
+      "oneOf": [
+        {
+          "const": ""
+        },
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ]
+    },
+    "evidenceStatus": {
+      "enum": [
+        "EXTERNAL_REVIEW_COLLECTION",
+        "DEVELOPMENT_ONLY",
+        "MIXED_WITH_DEVELOPMENT_FIXTURES"
+      ]
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
+    },
+    "candidateStatuses": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/$defs/candidateStatus"
+      }
+    },
+    "labeledEvaluationHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "revision": {
+            "const": 1
+          }
+        },
+        "required": [
+          "revision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "priorLabeledEvaluationHash": {
+            "const": ""
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "priorLabeledEvaluationHash": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "optionalSha256": {
+      "oneOf": [
+        {
+          "const": ""
+        },
+        {
+          "$ref": "#/$defs/sha256"
+        }
+      ]
+    },
+    "permille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "reviewId",
+        "studyPlanHash",
+        "caseId",
+        "candidateId",
+        "reviewerHash",
+        "origin",
+        "blindReview",
+        "relevancePermille",
+        "confidencePermille",
+        "rationaleCodes",
+        "qualificationEvidenceHash",
+        "independenceAttestationHash",
+        "outcome",
+        "blockers",
+        "contentHash"
+      ],
+      "properties": {
+        "reviewId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "studyPlanHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "caseId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "reviewerHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "origin": {
+          "enum": [
+            "EXTERNAL_EXPERT",
+            "DEVELOPMENT_FIXTURE"
+          ]
+        },
+        "blindReview": {
+          "type": "boolean"
+        },
+        "relevancePermille": {
+          "$ref": "#/$defs/permille"
+        },
+        "confidencePermille": {
+          "$ref": "#/$defs/permille"
+        },
+        "rationaleCodes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "qualificationEvidenceHash": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "independenceAttestationHash": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "outcome": {
+          "enum": [
+            "COUNTED_EXPERT_REVIEW",
+            "DEVELOPMENT_ONLY",
+            "REJECTED"
+          ]
+        },
+        "blockers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "COUNTED_EXPERT_REVIEW"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "origin": {
+                "const": "EXTERNAL_EXPERT"
+              },
+              "blindReview": {
+                "const": true
+              },
+              "qualificationEvidenceHash": {
+                "$ref": "#/$defs/sha256"
+              },
+              "independenceAttestationHash": {
+                "$ref": "#/$defs/sha256"
+              },
+              "blockers": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "DEVELOPMENT_ONLY"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "origin": {
+                "const": "DEVELOPMENT_FIXTURE"
+              },
+              "blockers": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "REJECTED"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "blockers": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "candidateStatus": {
+      "type": "object",
+      "required": [
+        "caseId",
+        "candidateId",
+        "split",
+        "countedExpertReviews",
+        "blindExpertReviews",
+        "developmentFixtureReviews",
+        "rejectedReviews",
+        "status"
+      ],
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "candidateId": {
+          "$ref": "#/$defs/identifier"
+        },
+        "split": {
+          "enum": [
+            "CALIBRATION",
+            "TEST"
+          ]
+        },
+        "countedExpertReviews": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blindExpertReviews": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "developmentFixtureReviews": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejectedReviews": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "READY_FOR_CONSENSUS",
+            "INSUFFICIENT_EXPERT_REVIEWS",
+            "DEVELOPMENT_ONLY",
+            "NO_ACCEPTED_REVIEWS"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

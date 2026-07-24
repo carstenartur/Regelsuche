@@ -1,0 +1,103 @@
+{
+  "schema": "regelsuche.semantic-graph-debug/v1",
+  "fileName": "trigonometry-graph.png",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-7e049d51",
+  "requestParams": {
+    "mode": "semantic",
+    "showMacroSteps": "didactic",
+    "showLowSignal": false,
+    "showAlternatives": false,
+    "showVariants": false,
+    "pathId": "demo-7e049d51"
+  },
+  "visibleNodeIds": [
+    "didactic-seed-1ynaq6c",
+    "didactic-goal-1d"
+  ],
+  "nodes": [
+    {
+      "id": "didactic-seed-1ynaq6c",
+      "canonicalHash": "didactic:didactic-seed-1ynaq6c",
+      "normalizedLabel": "cos(x)^2+sin(x)^2",
+      "label": "cos(x) ^ 2 + sin(x) ^ 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "minDepth": 0,
+      "layout": {
+        "x": 0,
+        "y": 80
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 83.20634920634916
+      }
+    },
+    {
+      "id": "didactic-goal-1d",
+      "canonicalHash": "didactic:didactic-goal-1d",
+      "normalizedLabel": "1",
+      "label": "1",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "minDepth": 2,
+      "layout": {
+        "x": 0,
+        "y": 300
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 814.7936507936508
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "didactic-seed-1ynaq6c->didactic-goal-1d:trig_pythagorean_cos_sin",
+      "from": "didactic-seed-1ynaq6c",
+      "to": "didactic-goal-1d",
+      "label": "trig_pythagorean_cos_sin",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 449
+      }
+    }
+  ],
+  "nodeLabelRects": [
+    {
+      "id": "didactic-seed-1ynaq6c",
+      "x": 632.796875,
+      "y": 591.8313598632812,
+      "width": 134.40625,
+      "height": 28.4375
+    },
+    {
+      "id": "didactic-goal-1d",
+      "x": 689,
+      "y": 1324.770263671875,
+      "width": 22,
+      "height": 25.734375
+    }
+  ],
+  "edgeLabelRects": [
+    {
+      "id": "\\text{trig pythagorean cos sin}",
+      "x": 568,
+      "y": 961.140625,
+      "width": 168,
+      "height": 21.40625
+    }
+  ],
+  "duplicateCanonicalHashCount": 0,
+  "duplicateNormalizedLabelCount": 0,
+  "nodeOverlapCount": 0,
+  "edgeLabelOverlapCount": 0,
+  "visibleMainPathMeaningfulNodeCount": 2,
+  "collapsedMainPathStepCount": 1,
+  "finalNormalizedLabel": "1",
+  "mainPathMeaningfulNodeCount": 3
+}

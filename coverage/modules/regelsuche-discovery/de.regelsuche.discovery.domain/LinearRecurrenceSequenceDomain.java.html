@@ -1,0 +1,868 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinearRecurrenceSequenceDomain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-discovery</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.discovery.domain</a> &gt; <span class="el_source">LinearRecurrenceSequenceDomain.java</span></div><h1>LinearRecurrenceSequenceDomain.java</h1><pre class="source lang-java linenums">package de.regelsuche.discovery.domain;
+
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateContext;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateEvaluator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CandidateExtractor;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CanonicalCodec;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CertificateRenderer;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CertificateRendering;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.CounterexampleResult;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DiscoverySeed;
+import de.regelsuche.discovery.domain.DiscoveryDomain.DomainPayload;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Evaluation;
+import de.regelsuche.discovery.domain.DiscoveryDomain.EvidenceAdapter;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Invariant;
+import de.regelsuche.discovery.domain.DiscoveryDomain.InvariantResult;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Objective;
+import de.regelsuche.discovery.domain.DiscoveryDomain.ObjectiveAssessment;
+import de.regelsuche.discovery.domain.DiscoveryDomain.StateGenerator;
+import de.regelsuche.discovery.domain.DiscoveryDomain.Successor;
+import de.regelsuche.discovery.domain.DiscoveryDomain.TransitionOperator;
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+
+/**
+ * Exact bounded discovery domain for homogeneous linear recurrences with
+ * constant rational coefficients.
+ *
+ * &lt;p&gt;The domain searches increasing recurrence orders and accepts only a
+ * uniquely determined coefficient vector that replays every observed term.
+ * It then evaluates the frozen holdout with exact rational arithmetic. A
+ * retained certificate establishes a fit for the finite observed and holdout
+ * data only; it is not a uniqueness theorem for an infinite continuation.&lt;/p&gt;
+ */
+<span class="fc" id="L40">public final class LinearRecurrenceSequenceDomain implements DiscoveryDomain&lt;</span>
+    LinearRecurrenceSequenceDomain.SequenceState,
+    LinearRecurrenceSequenceDomain.LinearRecurrenceCandidate,
+    LinearRecurrenceSequenceDomain.LinearRecurrenceCertificate
+&gt; {
+    public static final String DOMAIN_ID = &quot;integer-sequence-linear-recurrence&quot;;
+    public static final String REVISION = &quot;v1&quot;;
+
+<span class="fc" id="L48">    private final StateGenerator&lt;SequenceState&gt; generator = new StateGenerator&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L51">            return &quot;linear-recurrence-sequence-generator/v1&quot;;</span>
+        }
+
+        @Override
+        public List&lt;SequenceState&gt; generate(DiscoverySeed seed) {
+<span class="fc" id="L56">            ParsedSequence parsed = parsePayload(seed.payload());</span>
+<span class="fc" id="L57">            return List.of(stateForOrder(parsed, 1));</span>
+        }
+    };
+
+<span class="fc" id="L61">    private final CanonicalCodec&lt;SequenceState&gt; stateCodec = new CanonicalCodec&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L64">            return &quot;linear-recurrence-state-codec/v1&quot;;</span>
+        }
+
+        @Override
+        public String canonicalForm(SequenceState value) {
+<span class="fc" id="L69">            return &quot;observed=&quot; + canonicalLongs(value.observed())</span>
+<span class="fc" id="L70">                + &quot;\nholdout=&quot; + canonicalLongs(value.holdout())</span>
+<span class="fc" id="L71">                + &quot;\nmaximumOrder=&quot; + value.maximumOrder()</span>
+<span class="fc" id="L72">                + &quot;\ncurrentOrder=&quot; + value.currentOrder()</span>
+<span class="fc" id="L73">                + &quot;\nmodel=&quot; + value.model()</span>
+<span class="fc" id="L74">                    .map(RecurrenceModel::canonicalForm)</span>
+<span class="fc" id="L75">                    .orElse(&quot;NO_UNIQUE_MODEL&quot;);</span>
+        }
+    };
+
+<span class="fc" id="L79">    private final List&lt;Invariant&lt;SequenceState&gt;&gt; invariants = List.of(</span>
+<span class="fc" id="L80">        new Invariant&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L83">                return &quot;linear-recurrence-order-boundary/v1&quot;;</span>
+            }
+
+            @Override
+            public InvariantResult check(SequenceState state) {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (state.currentOrder() &lt; 1</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                        || state.currentOrder() &gt; state.maximumOrder()) {</span>
+<span class="nc" id="L90">                    return InvariantResult.fail(&quot;current-order-outside-maximum-order&quot;);</span>
+                }
+<span class="fc" id="L92">                return InvariantResult.pass();</span>
+            }
+        },
+<span class="fc" id="L95">        new Invariant&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L98">                return &quot;linear-recurrence-model-replay/v1&quot;;</span>
+            }
+
+            @Override
+            public InvariantResult check(SequenceState state) {
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (state.model().isEmpty()) {</span>
+<span class="fc" id="L104">                    return InvariantResult.pass();</span>
+                }
+<span class="fc" id="L106">                RecurrenceModel model = state.model().orElseThrow();</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                if (model.order() != state.currentOrder()) {</span>
+<span class="nc" id="L108">                    return InvariantResult.fail(&quot;model-order-does-not-match-state&quot;);</span>
+                }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">                return replaysObserved(model, state.observed())</span>
+<span class="fc" id="L111">                    ? InvariantResult.pass()</span>
+<span class="nc" id="L112">                    : InvariantResult.fail(&quot;model-does-not-replay-observed-prefix&quot;);</span>
+            }
+        }
+    );
+
+<span class="fc" id="L117">    private final List&lt;TransitionOperator&lt;SequenceState&gt;&gt; operators = List.of(</span>
+<span class="fc" id="L118">        new TransitionOperator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L121">                return &quot;increase-linear-recurrence-order/v1&quot;;</span>
+            }
+
+            @Override
+            public List&lt;Successor&lt;SequenceState&gt;&gt; apply(SequenceState state) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                if (state.currentOrder() &gt;= state.maximumOrder()) {</span>
+<span class="fc" id="L127">                    return List.of();</span>
+                }
+<span class="fc" id="L129">                int nextOrder = state.currentOrder() + 1;</span>
+<span class="fc" id="L130">                ParsedSequence parsed = new ParsedSequence(</span>
+<span class="fc" id="L131">                    state.observed(), state.holdout(), state.maximumOrder());</span>
+<span class="fc" id="L132">                SequenceState next = stateForOrder(parsed, nextOrder);</span>
+<span class="fc" id="L133">                return List.of(new Successor&lt;&gt;(</span>
+                    &quot;linear-recurrence-order-&quot; + nextOrder,
+                    next,
+                    1,
+                    true,
+<span class="fc" id="L138">                    List.of(),</span>
+<span class="fc" id="L139">                    Map.of(</span>
+<span class="fc" id="L140">                        &quot;recurrenceOrder&quot;, Integer.toString(nextOrder),</span>
+<span class="fc" id="L141">                        &quot;uniqueModel&quot;, Boolean.toString(next.model().isPresent()))));</span>
+            }
+        }
+    );
+
+<span class="fc" id="L146">    private final Objective&lt;SequenceState&gt; objective = new Objective&lt;&gt;() {</span>
+        @Override
+        public String id() {
+<span class="fc" id="L149">            return &quot;unique-linear-recurrence-objective/v1&quot;;</span>
+        }
+
+        @Override
+        public ObjectiveAssessment assess(SequenceState state) {
+<span class="fc" id="L154">            boolean ready = state.model().isPresent();</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            int score = ready</span>
+<span class="fc" id="L156">                ? 1_000_000 - state.currentOrder() * 1_000</span>
+<span class="fc" id="L157">                : state.currentOrder() * 100;</span>
+<span class="fc" id="L158">            LinkedHashMap&lt;String, String&gt; metrics = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L159">            metrics.put(&quot;recurrenceOrder&quot;, Integer.toString(state.currentOrder()));</span>
+<span class="fc" id="L160">            metrics.put(&quot;maximumOrder&quot;, Integer.toString(state.maximumOrder()));</span>
+<span class="fc" id="L161">            metrics.put(&quot;uniqueModel&quot;, Boolean.toString(ready));</span>
+<span class="fc" id="L162">            state.model().ifPresent(model -&gt;</span>
+<span class="fc" id="L163">                metrics.put(&quot;coefficients&quot;, canonicalCoefficients(model.coefficients())));</span>
+<span class="fc" id="L164">            return new ObjectiveAssessment(score, ready, metrics);</span>
+        }
+    };
+
+<span class="fc" id="L168">    private final CandidateExtractor&lt;SequenceState, LinearRecurrenceCandidate&gt;</span>
+<span class="fc" id="L169">        candidateExtractor = new CandidateExtractor&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L172">                return &quot;linear-recurrence-candidate-extractor/v1&quot;;</span>
+            }
+
+            @Override
+            public LinearRecurrenceCandidate extract(CandidateContext&lt;SequenceState&gt; context) {
+<span class="fc" id="L177">                SequenceState state = context.currentState();</span>
+<span class="fc" id="L178">                return new LinearRecurrenceCandidate(</span>
+<span class="fc" id="L179">                    state.model().orElseThrow(),</span>
+<span class="fc" id="L180">                    state.observed(),</span>
+<span class="fc" id="L181">                    state.holdout());</span>
+            }
+        };
+
+<span class="fc" id="L185">    private final CanonicalCodec&lt;LinearRecurrenceCandidate&gt; candidateCodec =</span>
+<span class="fc" id="L186">        new CanonicalCodec&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L189">                return &quot;linear-recurrence-candidate-codec/v1&quot;;</span>
+            }
+
+            @Override
+            public String canonicalForm(LinearRecurrenceCandidate value) {
+<span class="fc" id="L194">                return value.model().canonicalForm()</span>
+<span class="fc" id="L195">                    + &quot;\nobserved=&quot; + canonicalLongs(value.observed())</span>
+<span class="fc" id="L196">                    + &quot;\nholdout=&quot; + canonicalLongs(value.holdout());</span>
+            }
+        };
+
+<span class="fc" id="L200">    private final CounterexampleGenerator&lt;LinearRecurrenceCandidate&gt;</span>
+<span class="fc" id="L201">        counterexampleGenerator = new CounterexampleGenerator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L204">                return &quot;linear-recurrence-prefix-counterexample-search/v1&quot;;</span>
+            }
+
+            @Override
+            public CounterexampleResult search(
+                LinearRecurrenceCandidate candidate,
+                int attemptBudget
+            ) {
+<span class="fc" id="L212">                List&lt;Rational&gt; generated = generate(</span>
+<span class="fc" id="L213">                    candidate.model(),</span>
+<span class="fc" id="L214">                    candidate.observed(),</span>
+<span class="fc" id="L215">                    candidate.observed().size());</span>
+<span class="fc" id="L216">                int attempts = Math.min(attemptBudget, candidate.observed().size());</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                for (int index = 0; index &lt; attempts; index++) {</span>
+<span class="fc" id="L218">                    Rational expected = Rational.of(candidate.observed().get(index));</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                    if (!generated.get(index).equals(expected)) {</span>
+<span class="nc" id="L220">                        return CounterexampleResult.found(</span>
+                            index + 1,
+<span class="nc" id="L222">                            &quot;observed index &quot; + index + &quot; expected &quot; + expected.canonical()</span>
+<span class="nc" id="L223">                                + &quot; but generated &quot; + generated.get(index).canonical(),</span>
+<span class="nc" id="L224">                            Map.of(</span>
+<span class="nc" id="L225">                                &quot;index&quot;, Integer.toString(index),</span>
+<span class="nc" id="L226">                                &quot;expected&quot;, expected.canonical(),</span>
+<span class="nc" id="L227">                                &quot;generated&quot;, generated.get(index).canonical()));</span>
+                    }
+                }
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">                if (attempts &lt; candidate.observed().size()) {</span>
+<span class="nc" id="L231">                    return CounterexampleResult.inconclusive(</span>
+                        attempts,
+                        &quot;prefix audit budget did not cover every observed term&quot;,
+<span class="nc" id="L234">                        Map.of(</span>
+<span class="nc" id="L235">                            &quot;checkedTerms&quot;, Integer.toString(attempts),</span>
+<span class="nc" id="L236">                            &quot;requiredTerms&quot;, Integer.toString(candidate.observed().size())));</span>
+                }
+<span class="fc" id="L238">                return CounterexampleResult.noneFound(</span>
+                    attempts,
+<span class="fc" id="L240">                    Map.of(</span>
+<span class="fc" id="L241">                        &quot;checkedTerms&quot;, Integer.toString(attempts),</span>
+                        &quot;replay&quot;, &quot;exact-rational&quot;));
+            }
+        };
+
+<span class="fc" id="L246">    private final CandidateEvaluator&lt;LinearRecurrenceCandidate, LinearRecurrenceCertificate&gt;</span>
+<span class="fc" id="L247">        evaluator = new CandidateEvaluator&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L250">                return &quot;linear-recurrence-holdout-evaluator/v1&quot;;</span>
+            }
+
+            @Override
+            public Evaluation&lt;LinearRecurrenceCertificate&gt; evaluate(
+                LinearRecurrenceCandidate candidate
+            ) {
+<span class="fc" id="L257">                int total = candidate.observed().size() + candidate.holdout().size();</span>
+<span class="fc" id="L258">                List&lt;Rational&gt; generated = generate(</span>
+<span class="fc" id="L259">                    candidate.model(), candidate.observed(), total);</span>
+<span class="fc" id="L260">                List&lt;Rational&gt; predictedHoldout = generated.subList(</span>
+<span class="fc" id="L261">                    candidate.observed().size(), total);</span>
+<span class="fc" id="L262">                List&lt;Rational&gt; expectedHoldout = candidate.holdout().stream()</span>
+<span class="fc" id="L263">                    .map(Rational::of)</span>
+<span class="fc" id="L264">                    .toList();</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                if (!predictedHoldout.equals(expectedHoldout)) {</span>
+<span class="fc" id="L266">                    return Evaluation.refuted(</span>
+                        &quot;linear recurrence failed the retained holdout&quot;,
+<span class="fc" id="L268">                        Map.of(</span>
+<span class="fc" id="L269">                            &quot;expectedHoldout&quot;, canonicalRationals(expectedHoldout),</span>
+<span class="fc" id="L270">                            &quot;predictedHoldout&quot;, canonicalRationals(predictedHoldout)));</span>
+                }
+<span class="fc" id="L272">                LinearRecurrenceCertificate certificate =</span>
+                    new LinearRecurrenceCertificate(
+<span class="fc" id="L274">                        candidate.model(),</span>
+<span class="fc" id="L275">                        generated.stream().map(Rational::canonical).toList(),</span>
+<span class="fc" id="L276">                        candidate.observed().size(),</span>
+<span class="fc" id="L277">                        candidate.holdout().size(),</span>
+                        &quot;LINEAR_RECURRENCE_FINITE_DATA_VALIDATION_NOT_FORMAL_PROOF&quot;);
+<span class="fc" id="L279">                return Evaluation.confirmed(</span>
+                    certificate,
+                    &quot;constant-coefficient recurrence predicts every retained holdout term&quot;,
+<span class="fc" id="L282">                    Map.of(</span>
+<span class="fc" id="L283">                        &quot;recurrenceOrder&quot;, Integer.toString(candidate.model().order()),</span>
+<span class="fc" id="L284">                        &quot;coefficients&quot;, canonicalCoefficients(</span>
+<span class="fc" id="L285">                            candidate.model().coefficients()),</span>
+<span class="fc" id="L286">                        &quot;predictedHoldout&quot;, canonicalRationals(predictedHoldout)));</span>
+            }
+        };
+
+<span class="fc" id="L290">    private final CanonicalCodec&lt;LinearRecurrenceCertificate&gt; certificateCodec =</span>
+<span class="fc" id="L291">        new CanonicalCodec&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L294">                return &quot;linear-recurrence-certificate-codec/v1&quot;;</span>
+            }
+
+            @Override
+            public String canonicalForm(LinearRecurrenceCertificate value) {
+<span class="fc" id="L299">                return value.model().canonicalForm()</span>
+<span class="fc" id="L300">                    + &quot;\ngeneratedTerms=&quot; + canonicalStrings(value.generatedTerms())</span>
+<span class="fc" id="L301">                    + &quot;\nobservedCount=&quot; + value.observedCount()</span>
+<span class="fc" id="L302">                    + &quot;\nholdoutCount=&quot; + value.holdoutCount()</span>
+<span class="fc" id="L303">                    + &quot;\nstrength=&quot; + value.evidenceStrength();</span>
+            }
+        };
+
+<span class="fc" id="L307">    private final CertificateRenderer&lt;LinearRecurrenceCertificate&gt; certificateRenderer =</span>
+<span class="fc" id="L308">        new CertificateRenderer&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L311">                return &quot;linear-recurrence-certificate-renderer/v1&quot;;</span>
+            }
+
+            @Override
+            public CertificateRendering render(LinearRecurrenceCertificate certificate) {
+<span class="fc" id="L316">                String rendered = certificate.model().canonicalForm()</span>
+<span class="fc" id="L317">                    + &quot;\ngeneratedTerms=&quot; + canonicalStrings(certificate.generatedTerms())</span>
+<span class="fc" id="L318">                    + &quot;\nobservedCount=&quot; + certificate.observedCount()</span>
+<span class="fc" id="L319">                    + &quot;\nholdoutCount=&quot; + certificate.holdoutCount()</span>
+<span class="fc" id="L320">                    + &quot;\nstrength=&quot; + certificate.evidenceStrength();</span>
+<span class="fc" id="L321">                return new CertificateRendering(</span>
+                    &quot;LINEAR_RECURRENCE_WITNESS&quot;,
+                    &quot;text/plain&quot;,
+                    rendered);
+            }
+        };
+
+<span class="fc" id="L328">    private final EvidenceAdapter&lt;SequenceState, LinearRecurrenceCandidate,</span>
+<span class="fc" id="L329">        LinearRecurrenceCertificate&gt; evidenceAdapter = new EvidenceAdapter&lt;&gt;() {</span>
+            @Override
+            public String id() {
+<span class="fc" id="L332">                return &quot;linear-recurrence-evidence-adapter/v1&quot;;</span>
+            }
+
+            @Override
+            public DomainPayload adapt(
+                Optional&lt;SequenceState&gt; initialState,
+                Optional&lt;LinearRecurrenceCandidate&gt; candidate,
+                Optional&lt;LinearRecurrenceCertificate&gt; certificate
+            ) {
+<span class="fc" id="L341">                LinkedHashMap&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L342">                values.put(&quot;observedTerms&quot;, initialState</span>
+<span class="fc" id="L343">                    .map(state -&gt; canonicalLongs(state.observed()))</span>
+<span class="fc" id="L344">                    .orElse(&quot;NOT_AVAILABLE&quot;));</span>
+<span class="fc" id="L345">                values.put(&quot;holdoutTerms&quot;, initialState</span>
+<span class="fc" id="L346">                    .map(state -&gt; canonicalLongs(state.holdout()))</span>
+<span class="fc" id="L347">                    .orElse(&quot;NOT_AVAILABLE&quot;));</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                values.put(&quot;candidateStatus&quot;, candidate.isPresent()</span>
+<span class="fc" id="L349">                    ? &quot;SELECTED&quot; : &quot;NOT_SELECTED&quot;);</span>
+<span class="fc" id="L350">                values.put(&quot;recurrenceOrder&quot;, candidate</span>
+<span class="fc" id="L351">                    .map(value -&gt; Integer.toString(value.model().order()))</span>
+<span class="fc" id="L352">                    .orElse(&quot;NOT_EVALUATED&quot;));</span>
+<span class="fc" id="L353">                values.put(&quot;coefficients&quot;, candidate</span>
+<span class="fc" id="L354">                    .map(value -&gt; canonicalCoefficients(value.model().coefficients()))</span>
+<span class="fc" id="L355">                    .orElse(&quot;NOT_EVALUATED&quot;));</span>
+<span class="fc" id="L356">                values.put(&quot;certificateStrength&quot;, certificate</span>
+<span class="fc" id="L357">                    .map(LinearRecurrenceCertificate::evidenceStrength)</span>
+<span class="fc" id="L358">                    .orElse(&quot;NOT_EVALUATED&quot;));</span>
+<span class="fc" id="L359">                values.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L360">                values.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc" id="L361">                return new DomainPayload(&quot;linear-recurrence-sequence-evidence/v1&quot;, values);</span>
+            }
+        };
+
+    @Override
+    public String domainId() {
+<span class="fc" id="L367">        return DOMAIN_ID;</span>
+    }
+
+    @Override
+    public String revision() {
+<span class="fc" id="L372">        return REVISION;</span>
+    }
+
+    @Override
+    public String stateType() {
+<span class="fc" id="L377">        return &quot;linear-recurrence-sequence-state/v1&quot;;</span>
+    }
+
+    @Override
+    public String candidateType() {
+<span class="fc" id="L382">        return &quot;linear-recurrence-candidate/v1&quot;;</span>
+    }
+
+    @Override
+    public String certificateType() {
+<span class="fc" id="L387">        return &quot;linear-recurrence-certificate/v1&quot;;</span>
+    }
+
+    @Override
+    public StateGenerator&lt;SequenceState&gt; generator() {
+<span class="fc" id="L392">        return generator;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;SequenceState&gt; stateCodec() {
+<span class="fc" id="L397">        return stateCodec;</span>
+    }
+
+    @Override
+    public List&lt;Invariant&lt;SequenceState&gt;&gt; invariants() {
+<span class="fc" id="L402">        return invariants;</span>
+    }
+
+    @Override
+    public List&lt;TransitionOperator&lt;SequenceState&gt;&gt; operators() {
+<span class="fc" id="L407">        return operators;</span>
+    }
+
+    @Override
+    public Objective&lt;SequenceState&gt; objective() {
+<span class="fc" id="L412">        return objective;</span>
+    }
+
+    @Override
+    public CandidateExtractor&lt;SequenceState, LinearRecurrenceCandidate&gt; candidateExtractor() {
+<span class="fc" id="L417">        return candidateExtractor;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;LinearRecurrenceCandidate&gt; candidateCodec() {
+<span class="fc" id="L422">        return candidateCodec;</span>
+    }
+
+    @Override
+    public CounterexampleGenerator&lt;LinearRecurrenceCandidate&gt; counterexampleGenerator() {
+<span class="fc" id="L427">        return counterexampleGenerator;</span>
+    }
+
+    @Override
+    public CandidateEvaluator&lt;LinearRecurrenceCandidate, LinearRecurrenceCertificate&gt; evaluator() {
+<span class="fc" id="L432">        return evaluator;</span>
+    }
+
+    @Override
+    public CanonicalCodec&lt;LinearRecurrenceCertificate&gt; certificateCodec() {
+<span class="fc" id="L437">        return certificateCodec;</span>
+    }
+
+    @Override
+    public CertificateRenderer&lt;LinearRecurrenceCertificate&gt; certificateRenderer() {
+<span class="fc" id="L442">        return certificateRenderer;</span>
+    }
+
+    @Override
+    public EvidenceAdapter&lt;SequenceState, LinearRecurrenceCandidate,
+            LinearRecurrenceCertificate&gt; evidenceAdapter() {
+<span class="fc" id="L448">        return evidenceAdapter;</span>
+    }
+
+    /** Infer the lowest-order uniquely determined recurrence within the bound. */
+    public static Optional&lt;RecurrenceModel&gt; inferUniqueRecurrence(
+        List&lt;Long&gt; observed,
+        int maximumOrder
+    ) {
+<span class="fc" id="L456">        List&lt;Long&gt; immutable = immutableLongs(observed, &quot;observed&quot;);</span>
+<span class="pc bpc" id="L457" title="2 of 4 branches missed.">        if (maximumOrder &lt; 1 || maximumOrder &gt; 8) {</span>
+<span class="nc" id="L458">            throw new IllegalArgumentException(&quot;maximumOrder must be between 1 and 8&quot;);</span>
+        }
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        for (int order = 1; order &lt;= maximumOrder; order++) {</span>
+<span class="fc" id="L461">            Optional&lt;RecurrenceModel&gt; model = inferForOrder(immutable, order);</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            if (model.isPresent()) {</span>
+<span class="fc" id="L463">                return model;</span>
+            }
+        }
+<span class="nc" id="L466">        return Optional.empty();</span>
+    }
+
+    private static SequenceState stateForOrder(ParsedSequence parsed, int order) {
+<span class="fc" id="L470">        return new SequenceState(</span>
+<span class="fc" id="L471">            parsed.observed(),</span>
+<span class="fc" id="L472">            parsed.holdout(),</span>
+<span class="fc" id="L473">            parsed.maximumOrder(),</span>
+            order,
+<span class="fc" id="L475">            inferForOrder(parsed.observed(), order));</span>
+    }
+
+    private static Optional&lt;RecurrenceModel&gt; inferForOrder(
+        List&lt;Long&gt; observed,
+        int order
+    ) {
+<span class="pc bpc" id="L482" title="1 of 4 branches missed.">        if (order &lt; 1 || observed.size() &lt; 2 * order) {</span>
+<span class="fc" id="L483">            return Optional.empty();</span>
+        }
+<span class="fc" id="L485">        int equations = observed.size() - order;</span>
+<span class="fc" id="L486">        Rational[][] matrix = new Rational[equations][order + 1];</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        for (int row = 0; row &lt; equations; row++) {</span>
+<span class="fc" id="L488">            int sequenceIndex = order + row;</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">            for (int column = 0; column &lt; order; column++) {</span>
+<span class="fc" id="L490">                matrix[row][column] = Rational.of(</span>
+<span class="fc" id="L491">                    observed.get(sequenceIndex - column - 1));</span>
+            }
+<span class="fc" id="L493">            matrix[row][order] = Rational.of(observed.get(sequenceIndex));</span>
+        }
+<span class="fc" id="L495">        Optional&lt;List&lt;Rational&gt;&gt; solution = solveUnique(matrix, order);</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">        if (solution.isEmpty()) {</span>
+<span class="fc" id="L497">            return Optional.empty();</span>
+        }
+<span class="fc" id="L499">        RecurrenceModel model = new RecurrenceModel(order, solution.orElseThrow());</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        return replaysObserved(model, observed) ? Optional.of(model) : Optional.empty();</span>
+    }
+
+    private static Optional&lt;List&lt;Rational&gt;&gt; solveUnique(
+        Rational[][] source,
+        int variableCount
+    ) {
+<span class="fc" id="L507">        Rational[][] matrix = copyMatrix(source);</span>
+<span class="fc" id="L508">        int rowCount = matrix.length;</span>
+<span class="fc" id="L509">        int pivotRow = 0;</span>
+<span class="fc" id="L510">        int[] pivotRows = new int[variableCount];</span>
+<span class="fc" id="L511">        java.util.Arrays.fill(pivotRows, -1);</span>
+<span class="pc bpc" id="L512" title="1 of 4 branches missed.">        for (int column = 0; column &lt; variableCount &amp;&amp; pivotRow &lt; rowCount; column++) {</span>
+<span class="fc" id="L513">            int selected = pivotRow;</span>
+<span class="pc bpc" id="L514" title="2 of 4 branches missed.">            while (selected &lt; rowCount &amp;&amp; matrix[selected][column].isZero()) {</span>
+<span class="nc" id="L515">                selected++;</span>
+            }
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">            if (selected == rowCount) {</span>
+<span class="nc" id="L518">                continue;</span>
+            }
+<span class="fc" id="L520">            Rational[] swap = matrix[pivotRow];</span>
+<span class="fc" id="L521">            matrix[pivotRow] = matrix[selected];</span>
+<span class="fc" id="L522">            matrix[selected] = swap;</span>
+<span class="fc" id="L523">            Rational pivot = matrix[pivotRow][column];</span>
+<span class="fc bfc" id="L524" title="All 2 branches covered.">            for (int item = column; item &lt;= variableCount; item++) {</span>
+<span class="fc" id="L525">                matrix[pivotRow][item] = matrix[pivotRow][item].divide(pivot);</span>
+            }
+<span class="fc bfc" id="L527" title="All 2 branches covered.">            for (int row = 0; row &lt; rowCount; row++) {</span>
+<span class="pc bpc" id="L528" title="1 of 4 branches missed.">                if (row == pivotRow || matrix[row][column].isZero()) {</span>
+<span class="nc" id="L529">                    continue;</span>
+                }
+<span class="fc" id="L531">                Rational factor = matrix[row][column];</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">                for (int item = column; item &lt;= variableCount; item++) {</span>
+<span class="fc" id="L533">                    matrix[row][item] = matrix[row][item].subtract(</span>
+<span class="fc" id="L534">                        factor.multiply(matrix[pivotRow][item]));</span>
+                }
+            }
+<span class="fc" id="L537">            pivotRows[column] = pivotRow;</span>
+<span class="fc" id="L538">            pivotRow++;</span>
+        }
+<span class="fc bfc" id="L540" title="All 2 branches covered.">        for (Rational[] row : matrix) {</span>
+<span class="fc" id="L541">            boolean allZero = true;</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">            for (int column = 0; column &lt; variableCount; column++) {</span>
+<span class="fc" id="L543">                allZero &amp;= row[column].isZero();</span>
+            }
+<span class="fc bfc" id="L545" title="All 4 branches covered.">            if (allZero &amp;&amp; !row[variableCount].isZero()) {</span>
+<span class="fc" id="L546">                return Optional.empty();</span>
+            }
+        }
+<span class="fc bfc" id="L549" title="All 2 branches covered.">        for (int row : pivotRows) {</span>
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">            if (row &lt; 0) {</span>
+<span class="nc" id="L551">                return Optional.empty();</span>
+            }
+        }
+<span class="fc" id="L554">        List&lt;Rational&gt; solution = new ArrayList&lt;&gt;(variableCount);</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">        for (int column = 0; column &lt; variableCount; column++) {</span>
+<span class="fc" id="L556">            solution.add(matrix[pivotRows[column]][variableCount]);</span>
+        }
+<span class="fc" id="L558">        return Optional.of(List.copyOf(solution));</span>
+    }
+
+    private static Rational[][] copyMatrix(Rational[][] source) {
+<span class="fc" id="L562">        Rational[][] result = new Rational[source.length][];</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        for (int row = 0; row &lt; source.length; row++) {</span>
+<span class="fc" id="L564">            result[row] = source[row].clone();</span>
+        }
+<span class="fc" id="L566">        return result;</span>
+    }
+
+    private static boolean replaysObserved(RecurrenceModel model, List&lt;Long&gt; observed) {
+<span class="fc" id="L570">        List&lt;Rational&gt; generated = generate(model, observed, observed.size());</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        for (int index = 0; index &lt; observed.size(); index++) {</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">            if (!generated.get(index).equals(Rational.of(observed.get(index)))) {</span>
+<span class="nc" id="L573">                return false;</span>
+            }
+        }
+<span class="fc" id="L576">        return true;</span>
+    }
+
+    private static List&lt;Rational&gt; generate(
+        RecurrenceModel model,
+        List&lt;Long&gt; observed,
+        int count
+    ) {
+<span class="pc bpc" id="L584" title="1 of 2 branches missed.">        if (count &lt; model.order()) {</span>
+<span class="nc" id="L585">            throw new IllegalArgumentException(&quot;count must include the recurrence seed terms&quot;);</span>
+        }
+<span class="fc" id="L587">        List&lt;Rational&gt; generated = new ArrayList&lt;&gt;(count);</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">        for (int index = 0; index &lt; model.order(); index++) {</span>
+<span class="fc" id="L589">            generated.add(Rational.of(observed.get(index)));</span>
+        }
+<span class="fc bfc" id="L591" title="All 2 branches covered.">        while (generated.size() &lt; count) {</span>
+<span class="fc" id="L592">            int index = generated.size();</span>
+<span class="fc" id="L593">            Rational next = Rational.ZERO;</span>
+<span class="fc bfc" id="L594" title="All 2 branches covered.">            for (int coefficient = 0; coefficient &lt; model.order(); coefficient++) {</span>
+<span class="fc" id="L595">                next = next.add(model.coefficients().get(coefficient).multiply(</span>
+<span class="fc" id="L596">                    generated.get(index - coefficient - 1)));</span>
+            }
+<span class="fc" id="L598">            generated.add(next);</span>
+<span class="fc" id="L599">        }</span>
+<span class="fc" id="L600">        return List.copyOf(generated);</span>
+    }
+
+    private static ParsedSequence parsePayload(String payload) {
+<span class="fc" id="L604">        LinkedHashMap&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L605" title="All 2 branches covered.">        for (String part : payload.split(&quot;;&quot;)) {</span>
+<span class="fc" id="L606">            int separator = part.indexOf('=');</span>
+<span class="pc bpc" id="L607" title="2 of 4 branches missed.">            if (separator &lt; 1 || separator == part.length() - 1) {</span>
+<span class="nc" id="L608">                throw new IllegalArgumentException(</span>
+                    &quot;sequence payload entries must use key=value&quot;);
+            }
+<span class="fc" id="L611">            String key = part.substring(0, separator).trim();</span>
+<span class="fc" id="L612">            String value = part.substring(separator + 1).trim();</span>
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">            if (values.putIfAbsent(key, value) != null) {</span>
+<span class="nc" id="L614">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate sequence payload key: &quot; + key);
+            }
+        }
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">        if (!values.keySet().equals(java.util.Set.of(</span>
+                &quot;observed&quot;, &quot;holdout&quot;, &quot;maximumOrder&quot;))) {
+<span class="nc" id="L620">            throw new IllegalArgumentException(</span>
+                &quot;sequence payload requires exactly observed, holdout and maximumOrder&quot;);
+        }
+<span class="fc" id="L623">        List&lt;Long&gt; observed = parseLongs(values.get(&quot;observed&quot;));</span>
+<span class="fc" id="L624">        List&lt;Long&gt; holdout = parseLongs(values.get(&quot;holdout&quot;));</span>
+<span class="fc" id="L625">        int maximumOrder = Integer.parseInt(values.get(&quot;maximumOrder&quot;));</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">        if (observed.size() &lt; 3) {</span>
+<span class="nc" id="L627">            throw new IllegalArgumentException(</span>
+                &quot;at least three observed sequence terms are required&quot;);
+        }
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">        if (holdout.isEmpty()) {</span>
+<span class="nc" id="L631">            throw new IllegalArgumentException(</span>
+                &quot;at least one holdout sequence term is required&quot;);
+        }
+<span class="pc bpc" id="L634" title="2 of 4 branches missed.">        if (maximumOrder &lt; 1 || maximumOrder &gt; 8) {</span>
+<span class="nc" id="L635">            throw new IllegalArgumentException(&quot;maximumOrder must be between 1 and 8&quot;);</span>
+        }
+<span class="fc" id="L637">        return new ParsedSequence(observed, holdout, maximumOrder);</span>
+    }
+
+    private static List&lt;Long&gt; parseLongs(String value) {
+<span class="fc" id="L641">        List&lt;Long&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">        for (String token : value.split(&quot;,&quot;)) {</span>
+<span class="fc" id="L643">            String trimmed = token.trim();</span>
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">            if (trimmed.isEmpty()) {</span>
+<span class="nc" id="L645">                throw new IllegalArgumentException(&quot;empty sequence term&quot;);</span>
+            }
+<span class="fc" id="L647">            result.add(Long.parseLong(trimmed));</span>
+        }
+<span class="fc" id="L649">        return List.copyOf(result);</span>
+    }
+
+    private static String canonicalCoefficients(List&lt;Rational&gt; values) {
+<span class="fc" id="L653">        return values.stream()</span>
+<span class="fc" id="L654">            .map(Rational::canonical)</span>
+<span class="fc" id="L655">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    private static String canonicalRationals(List&lt;Rational&gt; values) {
+<span class="fc" id="L659">        return values.stream()</span>
+<span class="fc" id="L660">            .map(Rational::canonical)</span>
+<span class="fc" id="L661">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    private static String canonicalLongs(List&lt;Long&gt; values) {
+<span class="fc" id="L665">        return values.stream()</span>
+<span class="fc" id="L666">            .map(String::valueOf)</span>
+<span class="fc" id="L667">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    private static String canonicalStrings(List&lt;String&gt; values) {
+<span class="fc" id="L671">        return values.stream()</span>
+<span class="fc" id="L672">            .collect(java.util.stream.Collectors.joining(&quot;,&quot;, &quot;[&quot;, &quot;]&quot;));</span>
+    }
+
+    private record ParsedSequence(
+        List&lt;Long&gt; observed,
+        List&lt;Long&gt; holdout,
+        int maximumOrder
+    ) {
+<span class="fc" id="L680">        private ParsedSequence {</span>
+<span class="fc" id="L681">            observed = List.copyOf(observed);</span>
+<span class="fc" id="L682">            holdout = List.copyOf(holdout);</span>
+<span class="fc" id="L683">        }</span>
+    }
+
+    public record SequenceState(
+        List&lt;Long&gt; observed,
+        List&lt;Long&gt; holdout,
+        int maximumOrder,
+        int currentOrder,
+        Optional&lt;RecurrenceModel&gt; model
+    ) {
+<span class="fc" id="L693">        public SequenceState {</span>
+<span class="fc" id="L694">            observed = immutableLongs(observed, &quot;observed&quot;);</span>
+<span class="fc" id="L695">            holdout = immutableLongs(holdout, &quot;holdout&quot;);</span>
+<span class="pc bpc" id="L696" title="2 of 4 branches missed.">            if (maximumOrder &lt; 1 || maximumOrder &gt; 8) {</span>
+<span class="nc" id="L697">                throw new IllegalArgumentException(&quot;maximumOrder must be between 1 and 8&quot;);</span>
+            }
+<span class="pc bpc" id="L699" title="2 of 4 branches missed.">            if (currentOrder &lt; 1 || currentOrder &gt; maximumOrder) {</span>
+<span class="nc" id="L700">                throw new IllegalArgumentException(&quot;currentOrder is outside maximumOrder&quot;);</span>
+            }
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">            model = model == null ? Optional.empty() : model;</span>
+<span class="fc" id="L703">        }</span>
+    }
+
+    public record LinearRecurrenceCandidate(
+        RecurrenceModel model,
+        List&lt;Long&gt; observed,
+        List&lt;Long&gt; holdout
+    ) {
+<span class="fc" id="L711">        public LinearRecurrenceCandidate {</span>
+<span class="fc" id="L712">            Objects.requireNonNull(model, &quot;model&quot;);</span>
+<span class="fc" id="L713">            observed = immutableLongs(observed, &quot;observed&quot;);</span>
+<span class="fc" id="L714">            holdout = immutableLongs(holdout, &quot;holdout&quot;);</span>
+<span class="pc bpc" id="L715" title="1 of 2 branches missed.">            if (observed.size() &lt; model.order()) {</span>
+<span class="nc" id="L716">                throw new IllegalArgumentException(</span>
+                    &quot;observed terms must contain the recurrence seed terms&quot;);
+            }
+<span class="fc" id="L719">        }</span>
+    }
+
+    public record LinearRecurrenceCertificate(
+        RecurrenceModel model,
+        List&lt;String&gt; generatedTerms,
+        int observedCount,
+        int holdoutCount,
+        String evidenceStrength
+    ) {
+<span class="fc" id="L729">        public LinearRecurrenceCertificate {</span>
+<span class="fc" id="L730">            Objects.requireNonNull(model, &quot;model&quot;);</span>
+<span class="fc" id="L731">            generatedTerms = immutableStrings(generatedTerms, &quot;generatedTerms&quot;);</span>
+<span class="pc bpc" id="L732" title="2 of 4 branches missed.">            if (observedCount &lt; model.order() || holdoutCount &lt; 1) {</span>
+<span class="nc" id="L733">                throw new IllegalArgumentException(</span>
+                    &quot;certificate counts are inconsistent with the recurrence order&quot;);
+            }
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">            if (generatedTerms.size() != observedCount + holdoutCount) {</span>
+<span class="nc" id="L737">                throw new IllegalArgumentException(</span>
+                    &quot;certificate generated term count is inconsistent&quot;);
+            }
+<span class="fc" id="L740">            DomainCanonical.requireIdentifier(evidenceStrength, &quot;evidenceStrength&quot;);</span>
+<span class="fc" id="L741">        }</span>
+    }
+
+    public record RecurrenceModel(int order, List&lt;Rational&gt; coefficients) {
+<span class="fc" id="L745">        public RecurrenceModel {</span>
+<span class="pc bpc" id="L746" title="2 of 4 branches missed.">            if (order &lt; 1 || order &gt; 8) {</span>
+<span class="nc" id="L747">                throw new IllegalArgumentException(&quot;recurrence order must be between 1 and 8&quot;);</span>
+            }
+<span class="fc" id="L749">            Objects.requireNonNull(coefficients, &quot;coefficients&quot;);</span>
+<span class="fc" id="L750">            coefficients = List.copyOf(coefficients);</span>
+<span class="pc bpc" id="L751" title="2 of 4 branches missed.">            if (coefficients.size() != order || coefficients.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L752">                throw new IllegalArgumentException(</span>
+                    &quot;coefficient count must equal recurrence order&quot;);
+            }
+<span class="fc" id="L755">        }</span>
+
+        public Rational predictNext(List&lt;Long&gt; observed) {
+<span class="fc" id="L758">            List&lt;Long&gt; immutable = immutableLongs(observed, &quot;observed&quot;);</span>
+<span class="pc bpc" id="L759" title="1 of 2 branches missed.">            if (immutable.size() &lt; order) {</span>
+<span class="nc" id="L760">                throw new IllegalArgumentException(</span>
+                    &quot;observed terms must contain the recurrence seed terms&quot;);
+            }
+<span class="fc" id="L763">            List&lt;Rational&gt; generated = generate(this, immutable, immutable.size() + 1);</span>
+<span class="fc" id="L764">            return generated.getLast();</span>
+        }
+
+        public String canonicalForm() {
+<span class="fc" id="L768">            return &quot;order=&quot; + order</span>
+<span class="fc" id="L769">                + &quot;\ncoefficients=&quot; + canonicalCoefficients(coefficients);</span>
+        }
+    }
+
+    public record Rational(BigInteger numerator, BigInteger denominator) {
+<span class="fc" id="L774">        private static final Rational ZERO = new Rational(BigInteger.ZERO, BigInteger.ONE);</span>
+
+<span class="fc" id="L776">        public Rational {</span>
+<span class="fc" id="L777">            Objects.requireNonNull(numerator, &quot;numerator&quot;);</span>
+<span class="fc" id="L778">            Objects.requireNonNull(denominator, &quot;denominator&quot;);</span>
+<span class="pc bpc" id="L779" title="1 of 2 branches missed.">            if (denominator.signum() == 0) {</span>
+<span class="nc" id="L780">                throw new IllegalArgumentException(&quot;rational denominator must be non-zero&quot;);</span>
+            }
+<span class="fc bfc" id="L782" title="All 2 branches covered.">            if (denominator.signum() &lt; 0) {</span>
+<span class="fc" id="L783">                numerator = numerator.negate();</span>
+<span class="fc" id="L784">                denominator = denominator.negate();</span>
+            }
+<span class="fc" id="L786">            BigInteger divisor = numerator.gcd(denominator);</span>
+<span class="fc" id="L787">            numerator = numerator.divide(divisor);</span>
+<span class="fc" id="L788">            denominator = denominator.divide(divisor);</span>
+<span class="fc" id="L789">        }</span>
+
+        public static Rational of(long value) {
+<span class="fc" id="L792">            return new Rational(BigInteger.valueOf(value), BigInteger.ONE);</span>
+        }
+
+        public Rational add(Rational other) {
+<span class="fc" id="L796">            return new Rational(</span>
+<span class="fc" id="L797">                numerator.multiply(other.denominator)</span>
+<span class="fc" id="L798">                    .add(other.numerator.multiply(denominator)),</span>
+<span class="fc" id="L799">                denominator.multiply(other.denominator));</span>
+        }
+
+        public Rational subtract(Rational other) {
+<span class="fc" id="L803">            return new Rational(</span>
+<span class="fc" id="L804">                numerator.multiply(other.denominator)</span>
+<span class="fc" id="L805">                    .subtract(other.numerator.multiply(denominator)),</span>
+<span class="fc" id="L806">                denominator.multiply(other.denominator));</span>
+        }
+
+        public Rational multiply(Rational other) {
+<span class="fc" id="L810">            return new Rational(</span>
+<span class="fc" id="L811">                numerator.multiply(other.numerator),</span>
+<span class="fc" id="L812">                denominator.multiply(other.denominator));</span>
+        }
+
+        public Rational divide(Rational other) {
+<span class="pc bpc" id="L816" title="1 of 2 branches missed.">            if (other.isZero()) {</span>
+<span class="nc" id="L817">                throw new ArithmeticException(&quot;division by zero rational&quot;);</span>
+            }
+<span class="fc" id="L819">            return new Rational(</span>
+<span class="fc" id="L820">                numerator.multiply(other.denominator),</span>
+<span class="fc" id="L821">                denominator.multiply(other.numerator));</span>
+        }
+
+        public boolean isZero() {
+<span class="fc bfc" id="L825" title="All 2 branches covered.">            return numerator.signum() == 0;</span>
+        }
+
+        public boolean isInteger() {
+<span class="nc" id="L829">            return denominator.equals(BigInteger.ONE);</span>
+        }
+
+        public long longValueExact() {
+<span class="nc bnc" id="L833" title="All 2 branches missed.">            if (!isInteger()) {</span>
+<span class="nc" id="L834">                throw new ArithmeticException(&quot;rational is not an integer: &quot; + canonical());</span>
+            }
+<span class="nc" id="L836">            return numerator.longValueExact();</span>
+        }
+
+        public String canonical() {
+<span class="fc bfc" id="L840" title="All 2 branches covered.">            return denominator.equals(BigInteger.ONE)</span>
+<span class="fc" id="L841">                ? numerator.toString()</span>
+<span class="fc" id="L842">                : numerator + &quot;/&quot; + denominator;</span>
+        }
+    }
+
+    private static List&lt;Long&gt; immutableLongs(List&lt;Long&gt; values, String name) {
+<span class="fc" id="L847">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L848" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L849">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">        if (values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L852">            throw new IllegalArgumentException(name + &quot; must not contain null&quot;);</span>
+        }
+<span class="fc" id="L854">        return List.copyOf(values);</span>
+    }
+
+    private static List&lt;String&gt; immutableStrings(List&lt;String&gt; values, String name) {
+<span class="fc" id="L858">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L859" title="1 of 2 branches missed.">        if (values.isEmpty()) {</span>
+<span class="nc" id="L860">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="fc bfc" id="L862" title="All 2 branches covered.">        for (String value : values) {</span>
+<span class="fc" id="L863">            DomainCanonical.requireText(value, name + &quot; item&quot;);</span>
+<span class="fc" id="L864">        }</span>
+<span class="fc" id="L865">        return List.copyOf(values);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,808 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CandidateIndependentRationalAssumptionAdapterMain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-release</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.release</a> &gt; <span class="el_source">CandidateIndependentRationalAssumptionAdapterMain.java</span></div><h1>CandidateIndependentRationalAssumptionAdapterMain.java</h1><pre class="source lang-java linenums">package de.regelsuche.release;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.CandidateForm;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.EvaluationTask;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.FormationEvidence;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.FormationResult;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.FormationSeed;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.ResourceBudget;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.ResourceUse;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.SearchResult;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.SearchStatus;
+import de.regelsuche.math.algorithms.equivalence.RationalAssumptionRewriteAdapter.SearchStep;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeSet;
+
+/**
+ * Executes the frozen rational-assumption challenge through the production
+ * target-free formation and held-out search adapter.
+ */
+public final class CandidateIndependentRationalAssumptionAdapterMain {
+    public static final String SCHEMA =
+        &quot;regelsuche.candidate-independent-rational-assumption-adapter-run/v1&quot;;
+    private static final String CHALLENGE = &quot;rational-assumption-rewrites&quot;;
+    private static final String PROFILE_ID =
+        &quot;rational-assumption-primitives/v1&quot;;
+    private static final String ADAPTER_STATUS =
+        &quot;POST_FREEZE_ASSUMPTION_AWARE_CANCELLATION_EXECUTION&quot;;
+    private static final String FROZEN_STATUS = &quot;ADAPTER_REQUIRED&quot;;
+    private static final String RUNTIME_STATUS = &quot;AVAILABLE_AFTER_FREEZE&quot;;
+    private static final int CAMPAIGN_COUNT = 4;
+    private static final int TASKS_PER_CAMPAIGN = 12;
+    private static final int FORMATION_MAX_STATES = 60;
+    private static final int FORMATION_MAX_CANDIDATES = 60;
+    private static final int TASK_MAX_STATES = 245;
+    private static final int TASK_MAX_CANDIDATES = 45;
+    private static final int SEARCH_MAX_DEPTH = 5;
+
+<span class="nc" id="L56">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="nc" id="L57">        JsonFactory.builder()</span>
+<span class="nc" id="L58">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="nc" id="L59">            .build());</span>
+
+    private CandidateIndependentRationalAssumptionAdapterMain() {
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc" id="L65">        Arguments arguments = Arguments.parse(args);</span>
+<span class="nc" id="L66">        ObjectNode benchmark = readObject(arguments.benchmarkSource());</span>
+<span class="nc" id="L67">        ObjectNode corpus = readObject(arguments.corpus());</span>
+<span class="nc" id="L68">        ObjectNode profile = readObject(arguments.profile());</span>
+<span class="nc" id="L69">        ObjectNode receipt = readObject(arguments.freezeReceipt());</span>
+<span class="nc" id="L70">        validateFrozenInputs(benchmark, corpus, profile, receipt);</span>
+
+<span class="nc" id="L72">        FrozenBudget frozenBudget = frozenBudget(benchmark);</span>
+<span class="nc" id="L73">        List&lt;ObjectNode&gt; cases = rationalCases(corpus);</span>
+<span class="nc" id="L74">        List&lt;ObjectNode&gt; trainCases = cases.stream()</span>
+<span class="nc" id="L75">            .filter(item -&gt; &quot;TRAIN&quot;.equals(text(item, &quot;split&quot;)))</span>
+<span class="nc" id="L76">            .toList();</span>
+<span class="nc" id="L77">        List&lt;FormationSeed&gt; seeds = formationSeeds(trainCases);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        require(seeds.size() == 4,</span>
+            &quot;rational formation requires exactly four frozen TRAIN seeds&quot;);
+
+<span class="nc" id="L81">        ArrayNode campaigns = JSON.createArrayNode();</span>
+<span class="nc" id="L82">        int reached = 0;</span>
+<span class="nc" id="L83">        int noResult = 0;</span>
+<span class="nc" id="L84">        int budgetExhausted = 0;</span>
+<span class="nc" id="L85">        int candidateNotFormed = 0;</span>
+<span class="nc" id="L86">        int targetRefuted = 0;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        for (int index = 1; index &lt;= CAMPAIGN_COUNT; index++) {</span>
+<span class="nc" id="L88">            ObjectNode campaign = executeCampaign(</span>
+                benchmark,
+                cases,
+                trainCases,
+                seeds,
+                frozenBudget,
+                index);
+<span class="nc" id="L95">            campaigns.add(campaign);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            for (JsonNode evaluation : requireArray(</span>
+                    campaign, &quot;taskEvaluations&quot;, &quot;campaign task evaluations&quot;)) {
+<span class="nc bnc" id="L98" title="All 6 branches missed.">                switch (text(evaluation, &quot;outcome&quot;)) {</span>
+<span class="nc" id="L99">                    case &quot;REACHED_AND_CONFIRMED&quot; -&gt; reached++;</span>
+<span class="nc" id="L100">                    case &quot;NO_RESULT&quot; -&gt; noResult++;</span>
+<span class="nc" id="L101">                    case &quot;BUDGET_EXHAUSTED&quot; -&gt; budgetExhausted++;</span>
+<span class="nc" id="L102">                    case &quot;CANDIDATE_NOT_FORMED&quot; -&gt; candidateNotFormed++;</span>
+<span class="nc" id="L103">                    case &quot;TARGET_REFUTED&quot; -&gt; targetRefuted++;</span>
+<span class="nc" id="L104">                    default -&gt; throw new IllegalStateException(</span>
+                        &quot;unexpected rational evaluation outcome: &quot;
+<span class="nc" id="L106">                            + text(evaluation, &quot;outcome&quot;));</span>
+                }
+<span class="nc" id="L108">            }</span>
+        }
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        require(reached == 24,</span>
+            &quot;frozen rational reached-task count changed: &quot; + reached);
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        require(noResult == 24,</span>
+            &quot;frozen rational no-result count changed: &quot; + noResult);
+<span class="nc bnc" id="L114" title="All 6 branches missed.">        require(budgetExhausted == 0</span>
+                &amp;&amp; candidateNotFormed == 0
+                &amp;&amp; targetRefuted == 0,
+            &quot;unexpected terminal rational outcomes&quot;);
+
+<span class="nc" id="L119">        ObjectNode run = JSON.createObjectNode();</span>
+<span class="nc" id="L120">        run.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="nc" id="L121">        run.put(&quot;benchmarkId&quot;, text(benchmark, &quot;benchmarkId&quot;));</span>
+<span class="nc" id="L122">        run.put(&quot;challengeId&quot;, CHALLENGE);</span>
+<span class="nc" id="L123">        run.put(&quot;repositoryRevision&quot;, arguments.repositoryRevision());</span>
+<span class="nc" id="L124">        run.put(&quot;benchmarkSourceContentHash&quot;, text(benchmark, &quot;contentHash&quot;));</span>
+<span class="nc" id="L125">        run.put(&quot;caseCorpusContentHash&quot;, text(corpus, &quot;contentHash&quot;));</span>
+<span class="nc" id="L126">        run.put(&quot;formationProfileId&quot;, PROFILE_ID);</span>
+<span class="nc" id="L127">        run.put(&quot;formationProfileContentHash&quot;, text(profile, &quot;contentHash&quot;));</span>
+<span class="nc" id="L128">        run.put(&quot;freezeReceiptContentHash&quot;, text(receipt, &quot;contentHash&quot;));</span>
+<span class="nc" id="L129">        run.put(&quot;combinedPreregistrationHash&quot;,</span>
+<span class="nc" id="L130">            text(receipt, &quot;combinedPreregistrationHash&quot;));</span>
+<span class="nc" id="L131">        run.put(&quot;adapterStatus&quot;, ADAPTER_STATUS);</span>
+<span class="nc" id="L132">        run.put(&quot;candidateForm&quot;,</span>
+            RationalAssumptionRewriteAdapter.CANDIDATE_FORM_ID);
+<span class="nc" id="L134">        run.put(&quot;candidateFormImplementationClass&quot;,</span>
+<span class="nc" id="L135">            RationalAssumptionRewriteAdapter.class.getName());</span>
+<span class="nc" id="L136">        run.put(&quot;frozenImplementationStatus&quot;, FROZEN_STATUS);</span>
+<span class="nc" id="L137">        run.put(&quot;runtimeImplementationStatus&quot;, RUNTIME_STATUS);</span>
+<span class="nc" id="L138">        run.put(&quot;frozenProfileModified&quot;, false);</span>
+<span class="nc" id="L139">        run.put(&quot;configuredCampaigns&quot;, CAMPAIGN_COUNT);</span>
+<span class="nc" id="L140">        run.put(&quot;executedCampaigns&quot;, CAMPAIGN_COUNT);</span>
+<span class="nc" id="L141">        run.put(&quot;configuredTaskEvaluations&quot;,</span>
+            CAMPAIGN_COUNT * TASKS_PER_CAMPAIGN);
+<span class="nc" id="L143">        run.put(&quot;executedTaskEvaluations&quot;,</span>
+            CAMPAIGN_COUNT * TASKS_PER_CAMPAIGN);
+<span class="nc" id="L145">        run.put(&quot;reachedAndConfirmedTaskEvaluations&quot;, reached);</span>
+<span class="nc" id="L146">        run.put(&quot;noResultTaskEvaluations&quot;, noResult);</span>
+<span class="nc" id="L147">        run.put(&quot;budgetExhaustedTaskEvaluations&quot;, budgetExhausted);</span>
+<span class="nc" id="L148">        run.put(&quot;candidateNotFormedTaskEvaluations&quot;, candidateNotFormed);</span>
+<span class="nc" id="L149">        run.put(&quot;targetRefutedTaskEvaluations&quot;, targetRefuted);</span>
+<span class="nc" id="L150">        run.put(&quot;correctnessRegressions&quot;, targetRefuted);</span>
+<span class="nc" id="L151">        run.put(&quot;configuredStatesPerCampaign&quot;, frozenBudget.maxStates());</span>
+<span class="nc" id="L152">        run.put(&quot;configuredCandidateEvaluationsPerCampaign&quot;,</span>
+<span class="nc" id="L153">            frozenBudget.maxCandidateEvaluations());</span>
+<span class="nc" id="L154">        run.put(&quot;configuredProofAttemptsPerCampaign&quot;,</span>
+<span class="nc" id="L155">            frozenBudget.maxProofAttempts());</span>
+<span class="nc" id="L156">        run.put(&quot;executedProofAttempts&quot;, 0);</span>
+<span class="nc" id="L157">        run.put(&quot;uniqueGeneralRuleClaimAuthorized&quot;, false);</span>
+<span class="nc" id="L158">        run.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="nc" id="L159">        run.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="nc" id="L160">        run.put(&quot;publicationAuthorized&quot;, false);</span>
+<span class="nc" id="L161">        run.set(&quot;campaigns&quot;, campaigns);</span>
+<span class="nc" id="L162">        addContentHash(run);</span>
+
+<span class="nc" id="L164">        Path output = arguments.output().toAbsolutePath().normalize();</span>
+<span class="nc" id="L165">        Files.createDirectories(output.getParent());</span>
+<span class="nc" id="L166">        Files.writeString(</span>
+            output,
+<span class="nc" id="L168">            JSON.writerWithDefaultPrettyPrinter().writeValueAsString(run) + &quot;\n&quot;,</span>
+            StandardCharsets.UTF_8);
+<span class="nc" id="L170">        System.out.println(&quot;candidateIndependentRationalAssumptionAdapter=&quot;</span>
+            + output);
+<span class="nc" id="L172">        System.out.println(&quot;contentHash=&quot; + text(run, &quot;contentHash&quot;));</span>
+<span class="nc" id="L173">        System.out.println(&quot;reachedAndConfirmed=&quot; + reached);</span>
+<span class="nc" id="L174">        System.out.println(&quot;noResult=&quot; + noResult);</span>
+<span class="nc" id="L175">    }</span>
+
+    private static ObjectNode executeCampaign(
+        ObjectNode benchmark,
+        List&lt;ObjectNode&gt; cases,
+        List&lt;ObjectNode&gt; trainCases,
+        List&lt;FormationSeed&gt; seeds,
+        FrozenBudget frozenBudget,
+        int index
+    ) {
+<span class="nc" id="L185">        String campaignId = CHALLENGE + &quot;-campaign-&quot;</span>
+<span class="nc" id="L186">            + String.format(&quot;%02d&quot;, index);</span>
+<span class="nc" id="L187">        String configuredSeed = semanticHash(object(Map.of(</span>
+<span class="nc" id="L188">            &quot;benchmarkId&quot;, text(benchmark, &quot;benchmarkId&quot;),</span>
+            &quot;campaignId&quot;, campaignId,
+            &quot;challengeId&quot;, CHALLENGE,
+<span class="nc" id="L191">            &quot;index&quot;, index)));</span>
+<span class="nc" id="L192">        RationalAssumptionRewriteAdapter adapter =</span>
+            new RationalAssumptionRewriteAdapter();
+<span class="nc" id="L194">        FormationResult formation = adapter.formCandidate(</span>
+            seeds,
+            new ResourceBudget(
+                SEARCH_MAX_DEPTH,
+                FORMATION_MAX_STATES,
+                FORMATION_MAX_CANDIDATES));
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        require(formation.status()</span>
+                == RationalAssumptionRewriteAdapter.FormationStatus.SELECTED,
+            &quot;rational formation selected no candidate in &quot; + campaignId);
+
+<span class="nc" id="L204">        ArrayNode evaluations = JSON.createArrayNode();</span>
+<span class="nc" id="L205">        int reached = 0;</span>
+<span class="nc" id="L206">        int noResult = 0;</span>
+<span class="nc" id="L207">        int executedStates = formation.resourceUse().executedExploredStates();</span>
+<span class="nc" id="L208">        int executedCandidates =</span>
+<span class="nc" id="L209">            formation.resourceUse().executedCandidateEvaluations();</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        for (ObjectNode benchmarkCase : cases) {</span>
+<span class="nc" id="L211">            ObjectNode evaluationInput = requireObjectField(</span>
+                benchmarkCase,
+                &quot;evaluationInput&quot;,
+<span class="nc" id="L214">                &quot;case &quot; + text(benchmarkCase, &quot;caseId&quot;)</span>
+                    + &quot; evaluation input&quot;);
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            for (JsonNode item : requireArray(</span>
+                    evaluationInput, &quot;tasks&quot;, &quot;rational evaluation tasks&quot;)) {
+<span class="nc" id="L218">                ObjectNode task = requireObject(item, &quot;rational evaluation task&quot;);</span>
+<span class="nc" id="L219">                SearchResult result = adapter.evaluate(</span>
+<span class="nc" id="L220">                    evaluationTask(task),</span>
+                    formation,
+                    new ResourceBudget(
+                        SEARCH_MAX_DEPTH,
+                        TASK_MAX_STATES,
+                        TASK_MAX_CANDIDATES));
+<span class="nc" id="L226">                evaluations.add(renderEvaluation(</span>
+                    benchmarkCase,
+                    task,
+                    result));
+<span class="nc" id="L230">                executedStates += result.resourceUse().executedExploredStates();</span>
+<span class="nc" id="L231">                executedCandidates +=</span>
+<span class="nc" id="L232">                    result.resourceUse().executedCandidateEvaluations();</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                if (result.status() == SearchStatus.REACHED_AND_CONFIRMED) {</span>
+<span class="nc" id="L234">                    reached++;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                } else if (result.status() == SearchStatus.NO_RESULT) {</span>
+<span class="nc" id="L236">                    noResult++;</span>
+                }
+<span class="nc" id="L238">            }</span>
+<span class="nc" id="L239">        }</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        require(evaluations.size() == TASKS_PER_CAMPAIGN,</span>
+            &quot;rational task matrix changed in &quot; + campaignId);
+<span class="nc bnc" id="L242" title="All 4 branches missed.">        require(reached == 6 &amp;&amp; noResult == 6,</span>
+            &quot;rational campaign frontier changed in &quot; + campaignId
+                + &quot;: reached=&quot; + reached + &quot; noResult=&quot; + noResult);
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        require(executedStates &lt;= frozenBudget.maxStates(),</span>
+            &quot;rational campaign exceeded frozen state budget&quot;);
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        require(executedCandidates &lt;= frozenBudget.maxCandidateEvaluations(),</span>
+            &quot;rational campaign exceeded frozen candidate-evaluation budget&quot;);
+
+<span class="nc" id="L250">        ObjectNode campaign = JSON.createObjectNode();</span>
+<span class="nc" id="L251">        campaign.put(&quot;campaignId&quot;, campaignId);</span>
+<span class="nc" id="L252">        campaign.put(&quot;challengeId&quot;, CHALLENGE);</span>
+<span class="nc" id="L253">        campaign.put(&quot;configuredSeed&quot;, configuredSeed);</span>
+<span class="nc" id="L254">        campaign.put(&quot;status&quot;, ADAPTER_STATUS);</span>
+<span class="nc" id="L255">        campaign.put(&quot;candidateForm&quot;,</span>
+            RationalAssumptionRewriteAdapter.CANDIDATE_FORM_ID);
+<span class="nc" id="L257">        campaign.put(&quot;formationVisibility&quot;, &quot;TRAIN_ONLY&quot;);</span>
+<span class="nc" id="L258">        campaign.put(&quot;heldOutTargetAccess&quot;, &quot;EVALUATION_ONLY&quot;);</span>
+<span class="nc" id="L259">        campaign.put(&quot;publicationEligible&quot;, false);</span>
+<span class="nc" id="L260">        campaign.set(&quot;formationCaseIds&quot;, strings(trainCases.stream()</span>
+<span class="nc" id="L261">            .map(item -&gt; text(item, &quot;caseId&quot;))</span>
+<span class="nc" id="L262">            .toList()));</span>
+<span class="nc" id="L263">        campaign.set(&quot;formationSeedIds&quot;, strings(seeds.stream()</span>
+<span class="nc" id="L264">            .map(FormationSeed::seedId)</span>
+<span class="nc" id="L265">            .toList()));</span>
+<span class="nc" id="L266">        campaign.set(&quot;candidate&quot;, renderCandidate(</span>
+<span class="nc" id="L267">            formation.candidate().orElseThrow()));</span>
+<span class="nc" id="L268">        campaign.set(&quot;formationEvidence&quot;, renderFormationEvidence(</span>
+<span class="nc" id="L269">            formation.evidence()));</span>
+<span class="nc" id="L270">        campaign.set(&quot;taskEvaluations&quot;, evaluations);</span>
+<span class="nc" id="L271">        ObjectNode resourceUse = campaign.putObject(&quot;resourceUse&quot;);</span>
+<span class="nc" id="L272">        resourceUse.put(&quot;configuredStates&quot;, frozenBudget.maxStates());</span>
+<span class="nc" id="L273">        resourceUse.put(&quot;executedStates&quot;, executedStates);</span>
+<span class="nc" id="L274">        resourceUse.put(&quot;remainingStates&quot;,</span>
+<span class="nc" id="L275">            frozenBudget.maxStates() - executedStates);</span>
+<span class="nc" id="L276">        resourceUse.put(&quot;configuredCandidateEvaluations&quot;,</span>
+<span class="nc" id="L277">            frozenBudget.maxCandidateEvaluations());</span>
+<span class="nc" id="L278">        resourceUse.put(&quot;executedCandidateEvaluations&quot;,</span>
+            executedCandidates);
+<span class="nc" id="L280">        resourceUse.put(&quot;remainingCandidateEvaluations&quot;,</span>
+<span class="nc" id="L281">            frozenBudget.maxCandidateEvaluations() - executedCandidates);</span>
+<span class="nc" id="L282">        resourceUse.put(&quot;configuredProofAttempts&quot;,</span>
+<span class="nc" id="L283">            frozenBudget.maxProofAttempts());</span>
+<span class="nc" id="L284">        resourceUse.put(&quot;executedProofAttempts&quot;, 0);</span>
+<span class="nc" id="L285">        resourceUse.put(&quot;remainingProofAttempts&quot;,</span>
+<span class="nc" id="L286">            frozenBudget.maxProofAttempts());</span>
+<span class="nc" id="L287">        campaign.put(&quot;reachedAndConfirmedTasks&quot;, reached);</span>
+<span class="nc" id="L288">        campaign.put(&quot;noResultTasks&quot;, noResult);</span>
+<span class="nc" id="L289">        campaign.put(&quot;budgetExhaustedTasks&quot;, 0);</span>
+<span class="nc" id="L290">        campaign.put(&quot;correctnessRegressions&quot;, 0);</span>
+<span class="nc" id="L291">        campaign.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="nc" id="L292">        campaign.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="nc" id="L293">        addContentHash(campaign);</span>
+<span class="nc" id="L294">        return campaign;</span>
+    }
+
+    private static ObjectNode renderEvaluation(
+        ObjectNode benchmarkCase,
+        ObjectNode task,
+        SearchResult result
+    ) {
+<span class="nc" id="L302">        ObjectNode output = JSON.createObjectNode();</span>
+<span class="nc" id="L303">        String split = text(benchmarkCase, &quot;split&quot;);</span>
+<span class="nc" id="L304">        output.put(&quot;caseId&quot;, text(benchmarkCase, &quot;caseId&quot;));</span>
+<span class="nc" id="L305">        output.put(&quot;caseContentHash&quot;, text(benchmarkCase, &quot;contentHash&quot;));</span>
+<span class="nc" id="L306">        output.put(&quot;split&quot;, split);</span>
+<span class="nc" id="L307">        output.put(&quot;structuralCluster&quot;,</span>
+<span class="nc" id="L308">            text(benchmarkCase, &quot;structuralCluster&quot;));</span>
+<span class="nc" id="L309">        output.put(&quot;taskId&quot;, text(task, &quot;taskId&quot;));</span>
+<span class="nc" id="L310">        output.put(&quot;formationVisibility&quot;,</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            &quot;TRAIN&quot;.equals(split) ? &quot;ALLOWED&quot; : &quot;PROHIBITED&quot;);</span>
+<span class="nc" id="L312">        output.put(&quot;targetReadStage&quot;, &quot;EVALUATION_ONLY&quot;);</span>
+<span class="nc" id="L313">        output.put(&quot;source&quot;, text(task, &quot;source&quot;));</span>
+<span class="nc" id="L314">        output.put(&quot;target&quot;, text(task, &quot;target&quot;));</span>
+<span class="nc" id="L315">        output.set(&quot;assumptions&quot;, copyArray(requireArray(</span>
+            task, &quot;assumptions&quot;, &quot;task assumptions&quot;)));
+<span class="nc" id="L317">        output.put(&quot;outcome&quot;, result.status().name());</span>
+<span class="nc" id="L318">        output.put(&quot;reasonCode&quot;, reasonCode(result));</span>
+<span class="nc" id="L319">        output.put(&quot;detail&quot;, result.detail());</span>
+<span class="nc" id="L320">        output.set(&quot;steps&quot;, renderSteps(result.steps()));</span>
+<span class="nc" id="L321">        output.set(&quot;resourceUse&quot;, renderResourceUse(result.resourceUse()));</span>
+<span class="nc" id="L322">        output.put(&quot;correctnessRegression&quot;,</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            result.status() == SearchStatus.TARGET_REFUTED);</span>
+<span class="nc" id="L324">        output.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="nc" id="L325">        output.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="nc" id="L326">        output.put(&quot;publicationEligible&quot;, false);</span>
+<span class="nc" id="L327">        addContentHash(output);</span>
+<span class="nc" id="L328">        return output;</span>
+    }
+
+    private static String reasonCode(SearchResult result) {
+<span class="nc bnc" id="L332" title="All 5 branches missed.">        return switch (result.status()) {</span>
+            case REACHED_AND_CONFIRMED -&gt;
+<span class="nc" id="L334">                &quot;TARGET_REACHED_BY_SELECTED_FORM_AND_FROZEN_PRIMITIVES&quot;;</span>
+<span class="nc" id="L335">            case NO_RESULT -&gt; &quot;NO_PATH_WITH_SELECTED_FORM_AND_FROZEN_PRIMITIVES&quot;;</span>
+<span class="nc" id="L336">            case BUDGET_EXHAUSTED -&gt; &quot;FROZEN_BUDGET_EXHAUSTED&quot;;</span>
+<span class="nc" id="L337">            case CANDIDATE_NOT_FORMED -&gt; &quot;FORMATION_SELECTED_NO_CANDIDATE&quot;;</span>
+<span class="nc" id="L338">            case TARGET_REFUTED -&gt; &quot;REACHED_TARGET_FAILED_INDEPENDENT_VALIDATION&quot;;</span>
+        };
+    }
+
+    private static ArrayNode renderSteps(List&lt;SearchStep&gt; steps) {
+<span class="nc" id="L343">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">        for (SearchStep step : steps) {</span>
+<span class="nc" id="L345">            ObjectNode item = result.addObject();</span>
+<span class="nc" id="L346">            item.put(&quot;sequence&quot;, step.sequence());</span>
+<span class="nc" id="L347">            item.put(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="nc" id="L348">            item.put(&quot;source&quot;, step.source());</span>
+<span class="nc" id="L349">            item.put(&quot;target&quot;, step.target());</span>
+<span class="nc" id="L350">            item.set(&quot;generatedAssumptions&quot;, strings(</span>
+<span class="nc" id="L351">                step.generatedAssumptions()));</span>
+<span class="nc" id="L352">            item.set(&quot;requiredNonZeroFactors&quot;, strings(</span>
+<span class="nc" id="L353">                step.requiredNonZeroFactors()));</span>
+<span class="nc" id="L354">            item.set(&quot;providedNonZeroFactors&quot;, strings(</span>
+<span class="nc" id="L355">                step.providedNonZeroFactors()));</span>
+<span class="nc" id="L356">            item.put(&quot;leftCrossNormalForm&quot;, step.leftCrossNormalForm());</span>
+<span class="nc" id="L357">            item.put(&quot;rightCrossNormalForm&quot;, step.rightCrossNormalForm());</span>
+<span class="nc" id="L358">            addContentHash(item);</span>
+<span class="nc" id="L359">        }</span>
+<span class="nc" id="L360">        return result;</span>
+    }
+
+    private static ObjectNode renderCandidate(CandidateForm candidate) {
+<span class="nc" id="L364">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L365">        result.put(&quot;candidateFormId&quot;, candidate.candidateFormId());</span>
+<span class="nc" id="L366">        result.put(&quot;operatorId&quot;, candidate.operatorId());</span>
+<span class="nc" id="L367">        result.put(&quot;implementationClass&quot;, candidate.implementationClass());</span>
+<span class="nc" id="L368">        result.set(&quot;supportSeedIds&quot;, strings(candidate.supportSeedIds()));</span>
+<span class="nc" id="L369">        result.set(&quot;frozenPrimitiveRuleIds&quot;, strings(</span>
+<span class="nc" id="L370">            candidate.frozenPrimitiveRuleIds()));</span>
+<span class="nc" id="L371">        addContentHash(result);</span>
+<span class="nc" id="L372">        return result;</span>
+    }
+
+    private static ArrayNode renderFormationEvidence(
+        List&lt;FormationEvidence&gt; evidence
+    ) {
+<span class="nc" id="L378">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        for (FormationEvidence value : evidence) {</span>
+<span class="nc" id="L380">            ObjectNode item = result.addObject();</span>
+<span class="nc" id="L381">            item.put(&quot;seedId&quot;, value.seedId());</span>
+<span class="nc" id="L382">            item.put(&quot;sourceReference&quot;, value.sourceReference());</span>
+<span class="nc" id="L383">            item.put(&quot;inputExpression&quot;, value.inputExpression());</span>
+<span class="nc" id="L384">            item.set(&quot;declaredAssumptions&quot;, strings(</span>
+<span class="nc" id="L385">                value.declaredAssumptions()));</span>
+<span class="nc" id="L386">            item.put(&quot;selectedExpression&quot;, value.selectedExpression());</span>
+<span class="nc" id="L387">            item.set(&quot;candidateAssumptions&quot;, strings(</span>
+<span class="nc" id="L388">                value.candidateAssumptions()));</span>
+<span class="nc" id="L389">            item.put(&quot;inputAstNodes&quot;, value.inputAstNodes());</span>
+<span class="nc" id="L390">            item.put(&quot;selectedAstNodes&quot;, value.selectedAstNodes());</span>
+<span class="nc" id="L391">            item.set(&quot;requiredNonZeroFactors&quot;, strings(</span>
+<span class="nc" id="L392">                value.requiredNonZeroFactors()));</span>
+<span class="nc" id="L393">            item.set(&quot;providedNonZeroFactors&quot;, strings(</span>
+<span class="nc" id="L394">                value.providedNonZeroFactors()));</span>
+<span class="nc" id="L395">            item.put(&quot;leftCrossNormalForm&quot;, value.leftCrossNormalForm());</span>
+<span class="nc" id="L396">            item.put(&quot;rightCrossNormalForm&quot;, value.rightCrossNormalForm());</span>
+<span class="nc" id="L397">            item.put(&quot;evaluationInputRead&quot;, false);</span>
+<span class="nc" id="L398">            item.put(&quot;targetVisible&quot;, false);</span>
+<span class="nc" id="L399">            addContentHash(item);</span>
+<span class="nc" id="L400">        }</span>
+<span class="nc" id="L401">        return result;</span>
+    }
+
+    private static ObjectNode renderResourceUse(ResourceUse use) {
+<span class="nc" id="L405">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L406">        result.put(&quot;configuredStates&quot;, use.configuredExploredStates());</span>
+<span class="nc" id="L407">        result.put(&quot;executedStates&quot;, use.executedExploredStates());</span>
+<span class="nc" id="L408">        result.put(&quot;remainingStates&quot;, use.remainingExploredStates());</span>
+<span class="nc" id="L409">        result.put(&quot;configuredCandidateEvaluations&quot;,</span>
+<span class="nc" id="L410">            use.configuredCandidateEvaluations());</span>
+<span class="nc" id="L411">        result.put(&quot;executedCandidateEvaluations&quot;,</span>
+<span class="nc" id="L412">            use.executedCandidateEvaluations());</span>
+<span class="nc" id="L413">        result.put(&quot;remainingCandidateEvaluations&quot;,</span>
+<span class="nc" id="L414">            use.remainingCandidateEvaluations());</span>
+<span class="nc" id="L415">        return result;</span>
+    }
+
+    private static EvaluationTask evaluationTask(ObjectNode task) {
+<span class="nc" id="L419">        return new EvaluationTask(</span>
+<span class="nc" id="L420">            text(task, &quot;taskId&quot;),</span>
+<span class="nc" id="L421">            text(task, &quot;source&quot;),</span>
+<span class="nc" id="L422">            text(task, &quot;target&quot;),</span>
+<span class="nc" id="L423">            stringValues(requireArray(task, &quot;assumptions&quot;, &quot;task assumptions&quot;)));</span>
+    }
+
+    private static List&lt;FormationSeed&gt; formationSeeds(
+        List&lt;ObjectNode&gt; trainCases
+    ) {
+<span class="nc" id="L429">        List&lt;FormationSeed&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        for (ObjectNode benchmarkCase : trainCases) {</span>
+<span class="nc" id="L431">            String caseId = text(benchmarkCase, &quot;caseId&quot;);</span>
+<span class="nc" id="L432">            ObjectNode formation = requireObjectField(</span>
+                benchmarkCase,
+                &quot;formationInput&quot;,
+                &quot;TRAIN case &quot; + caseId + &quot; formation input&quot;);
+<span class="nc bnc" id="L436" title="All 2 branches missed.">            require(!formation.path(&quot;targetExpressionsVisible&quot;).asBoolean(true),</span>
+                &quot;TRAIN formation exposes target expressions&quot;);
+<span class="nc bnc" id="L438" title="All 2 branches missed.">            for (JsonNode item : requireArray(</span>
+                    formation, &quot;seedExpressions&quot;, &quot;formation seeds&quot;)) {
+<span class="nc" id="L440">                ObjectNode seed = requireObject(item, &quot;formation seed&quot;);</span>
+<span class="nc" id="L441">                result.add(new FormationSeed(</span>
+<span class="nc" id="L442">                    text(seed, &quot;seedId&quot;),</span>
+<span class="nc" id="L443">                    text(seed, &quot;expression&quot;),</span>
+<span class="nc" id="L444">                    stringValues(requireArray(</span>
+                        seed, &quot;assumptions&quot;, &quot;formation assumptions&quot;)),
+                    &quot;candidate-independent-frozen-formation/&quot;
+<span class="nc" id="L447">                        + caseId + &quot;/&quot; + text(seed, &quot;seedId&quot;)));</span>
+<span class="nc" id="L448">            }</span>
+<span class="nc" id="L449">        }</span>
+<span class="nc" id="L450">        result.sort(Comparator.comparing(FormationSeed::seedId));</span>
+<span class="nc" id="L451">        return List.copyOf(result);</span>
+    }
+
+    private static FrozenBudget frozenBudget(ObjectNode benchmark) {
+<span class="nc" id="L455">        ObjectNode budgets = requireObjectField(</span>
+            benchmark, &quot;budgets&quot;, &quot;benchmark budgets&quot;);
+<span class="nc" id="L457">        return new FrozenBudget(</span>
+<span class="nc" id="L458">            integer(budgets, &quot;maxStatesPerCampaign&quot;, &quot;benchmark budgets&quot;),</span>
+<span class="nc" id="L459">            integer(budgets, &quot;maxCandidateEvaluations&quot;, &quot;benchmark budgets&quot;),</span>
+<span class="nc" id="L460">            integer(budgets, &quot;maxProofAttempts&quot;, &quot;benchmark budgets&quot;));</span>
+    }
+
+    private static void validateFrozenInputs(
+        ObjectNode benchmark,
+        ObjectNode corpus,
+        ObjectNode profile,
+        ObjectNode receipt
+    ) {
+<span class="nc" id="L469">        requireContentHash(benchmark, &quot;benchmark source&quot;);</span>
+<span class="nc" id="L470">        requireContentHash(corpus, &quot;case corpus&quot;);</span>
+<span class="nc" id="L471">        requireContentHash(profile, &quot;rational primitive profile&quot;);</span>
+<span class="nc" id="L472">        requireContentHash(receipt, &quot;corpus-freeze receipt&quot;);</span>
+<span class="nc" id="L473">        require(text(benchmark, &quot;contentHash&quot;).equals(</span>
+<span class="nc" id="L474">                text(receipt, &quot;benchmarkSourceContentHash&quot;)),</span>
+            &quot;benchmark source is not bound by the freeze receipt&quot;);
+<span class="nc" id="L476">        require(text(corpus, &quot;contentHash&quot;).equals(</span>
+<span class="nc" id="L477">                text(receipt, &quot;caseCorpusContentHash&quot;)),</span>
+            &quot;case corpus is not bound by the freeze receipt&quot;);
+<span class="nc" id="L479">        ObjectNode inventoryRoots = requireObjectField(</span>
+            receipt,
+            &quot;formationInventoryContentHashes&quot;,
+            &quot;freeze receipt inventory roots&quot;);
+<span class="nc" id="L483">        require(text(profile, &quot;contentHash&quot;).equals(</span>
+<span class="nc" id="L484">                text(inventoryRoots, PROFILE_ID)),</span>
+            &quot;rational profile is not bound by the freeze receipt&quot;);
+<span class="nc" id="L486">        require(&quot;NOT_STARTED&quot;.equals(text(benchmark, &quot;executionStatus&quot;)),</span>
+            &quot;benchmark source was not NOT_STARTED at freeze time&quot;);
+<span class="nc" id="L488">        require(&quot;NOT_STARTED&quot;.equals(</span>
+<span class="nc" id="L489">                text(receipt, &quot;executionStatusAtFreeze&quot;)),</span>
+            &quot;corpus was not frozen before evaluated execution&quot;);
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        require(integer(receipt, &quot;executedCampaignsAtFreeze&quot;, &quot;receipt&quot;) == 0,</span>
+            &quot;freeze receipt already contains campaigns&quot;);
+<span class="nc bnc" id="L493" title="All 2 branches missed.">        require(integer(receipt, &quot;executedEvaluationsAtFreeze&quot;, &quot;receipt&quot;) == 0,</span>
+            &quot;freeze receipt already contains evaluations&quot;);
+<span class="nc bnc" id="L495" title="All 2 branches missed.">        require(!receipt.path(&quot;publicationAuthorized&quot;).asBoolean(true),</span>
+            &quot;freeze receipt unexpectedly authorizes publication&quot;);
+<span class="nc" id="L497">        require(&quot;IMPLEMENT_EXECUTION_ADAPTERS_WITHOUT_MODIFYING_FROZEN_CASE_PAYLOADS&quot;</span>
+<span class="nc" id="L498">                .equals(text(receipt, &quot;allowedNextStep&quot;)),</span>
+            &quot;freeze receipt does not authorize adapter implementation&quot;);
+<span class="nc" id="L500">        require(PROFILE_ID.equals(text(profile, &quot;profileId&quot;)),</span>
+            &quot;unexpected rational profile identity&quot;);
+<span class="nc" id="L502">        require(&quot;NO_EVALUATION_TARGETS_OR_HELD_OUT_ASSUMPTION_COMBINATIONS&quot;</span>
+<span class="nc" id="L503">                .equals(text(profile, &quot;formationPolicy&quot;)),</span>
+            &quot;rational formation policy changed&quot;);
+<span class="nc" id="L505">        validateFrozenOperations(profile);</span>
+<span class="nc" id="L506">        FrozenBudget budget = frozenBudget(benchmark);</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">        require(integer(requireObjectField(benchmark, &quot;budgets&quot;, &quot;budgets&quot;),</span>
+                &quot;campaignsPerChallenge&quot;, &quot;budgets&quot;) == CAMPAIGN_COUNT,
+            &quot;campaign count changed&quot;);
+<span class="nc" id="L510">        require(FORMATION_MAX_STATES</span>
+                + TASKS_PER_CAMPAIGN * TASK_MAX_STATES
+<span class="nc bnc" id="L512" title="All 2 branches missed.">                == budget.maxStates(),</span>
+            &quot;state-budget partition does not match frozen budget&quot;);
+<span class="nc" id="L514">        require(FORMATION_MAX_CANDIDATES</span>
+                + TASKS_PER_CAMPAIGN * TASK_MAX_CANDIDATES
+<span class="nc bnc" id="L516" title="All 2 branches missed.">                == budget.maxCandidateEvaluations(),</span>
+            &quot;candidate-budget partition does not match frozen budget&quot;);
+<span class="nc" id="L518">    }</span>
+
+    private static void validateFrozenOperations(ObjectNode profile) {
+<span class="nc" id="L521">        Map&lt;String, JsonNode&gt; operations = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">        for (JsonNode item : requireArray(</span>
+                profile, &quot;operations&quot;, &quot;rational operations&quot;)) {
+<span class="nc" id="L524">            operations.put(text(item, &quot;operationId&quot;), item);</span>
+<span class="nc" id="L525">        }</span>
+<span class="nc" id="L526">        require(&quot;AVAILABLE&quot;.equals(text(</span>
+<span class="nc" id="L527">                operations.get(&quot;DIFFERENCE_OF_SQUARES_FACTORING&quot;),</span>
+                &quot;implementationStatus&quot;)),
+            &quot;frozen difference-of-squares primitive is unavailable&quot;);
+<span class="nc bnc" id="L530" title="All 2 branches missed.">        for (String operationId : List.of(</span>
+                &quot;AFFINE_FACTOR_CANCELLATION&quot;,
+                &quot;COMMON_FACTOR_CANCELLATION&quot;,
+                &quot;NESTED_DIVISION_NORMALIZATION&quot;,
+                &quot;PARTIAL_FRACTION_DECOMPOSITION&quot;)) {
+<span class="nc" id="L535">            require(FROZEN_STATUS.equals(text(</span>
+<span class="nc" id="L536">                    operations.get(operationId), &quot;implementationStatus&quot;)),</span>
+                &quot;frozen operation status changed: &quot; + operationId);
+<span class="nc" id="L538">        }</span>
+<span class="nc" id="L539">    }</span>
+
+    private static List&lt;ObjectNode&gt; rationalCases(ObjectNode corpus) {
+<span class="nc" id="L542">        List&lt;ObjectNode&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        for (JsonNode item : requireArray(corpus, &quot;cases&quot;, &quot;case corpus cases&quot;)) {</span>
+<span class="nc bnc" id="L544" title="All 4 branches missed.">            if (!item.isObject() || !CHALLENGE.equals(text(item, &quot;challengeId&quot;))) {</span>
+<span class="nc" id="L545">                continue;</span>
+            }
+<span class="nc" id="L547">            ObjectNode benchmarkCase = (ObjectNode) item;</span>
+<span class="nc" id="L548">            requireContentHash(benchmarkCase,</span>
+<span class="nc" id="L549">                &quot;rational case &quot; + text(benchmarkCase, &quot;caseId&quot;));</span>
+<span class="nc" id="L550">            validateExposure(benchmarkCase);</span>
+<span class="nc" id="L551">            result.add(benchmarkCase);</span>
+<span class="nc" id="L552">        }</span>
+<span class="nc" id="L553">        result.sort(Comparator.comparing(item -&gt; text(item, &quot;caseId&quot;)));</span>
+<span class="nc" id="L554">        require(result.stream().map(item -&gt; text(item, &quot;caseId&quot;)).toList()</span>
+<span class="nc" id="L555">                .equals(List.of(</span>
+                    &quot;case-01&quot;, &quot;case-02&quot;, &quot;case-03&quot;,
+                    &quot;case-04&quot;, &quot;case-05&quot;, &quot;case-06&quot;)),
+            &quot;rational case identities changed&quot;);
+<span class="nc" id="L559">        Map&lt;String, Long&gt; splits = result.stream().collect(</span>
+<span class="nc" id="L560">            java.util.stream.Collectors.groupingBy(</span>
+<span class="nc" id="L561">                item -&gt; text(item, &quot;split&quot;),</span>
+                java.util.TreeMap::new,
+<span class="nc" id="L563">                java.util.stream.Collectors.counting()));</span>
+<span class="nc" id="L564">        require(splits.equals(Map.of(</span>
+<span class="nc" id="L565">                &quot;TRAIN&quot;, 2L,</span>
+<span class="nc" id="L566">                &quot;VALIDATION&quot;, 2L,</span>
+<span class="nc" id="L567">                &quot;TEST&quot;, 2L)),</span>
+            &quot;rational split counts changed: &quot; + splits);
+<span class="nc" id="L569">        int tasks = result.stream()</span>
+<span class="nc" id="L570">            .mapToInt(item -&gt; requireArray(</span>
+<span class="nc" id="L571">                requireObjectField(item, &quot;evaluationInput&quot;, &quot;evaluation input&quot;),</span>
+                &quot;tasks&quot;,
+<span class="nc" id="L573">                &quot;evaluation tasks&quot;).size())</span>
+<span class="nc" id="L574">            .sum();</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">        require(tasks == TASKS_PER_CAMPAIGN,</span>
+            &quot;rational task count changed: &quot; + tasks);
+<span class="nc" id="L577">        return List.copyOf(result);</span>
+    }
+
+    private static void validateExposure(ObjectNode benchmarkCase) {
+<span class="nc" id="L581">        String caseId = text(benchmarkCase, &quot;caseId&quot;);</span>
+<span class="nc" id="L582">        String split = text(benchmarkCase, &quot;split&quot;);</span>
+<span class="nc" id="L583">        ObjectNode policy = requireObjectField(</span>
+            benchmarkCase, &quot;exposurePolicy&quot;, &quot;case exposure policy&quot;);
+<span class="nc" id="L585">        ArrayNode mayRead = requireArray(</span>
+            policy, &quot;candidateFormationMayRead&quot;, &quot;formation readable inputs&quot;);
+<span class="nc" id="L587">        ArrayNode mustNotRead = requireArray(</span>
+            policy, &quot;candidateFormationMustNotRead&quot;, &quot;formation prohibited inputs&quot;);
+<span class="nc bnc" id="L589" title="All 2 branches missed.">        require(mustNotRead.size() == 1</span>
+<span class="nc bnc" id="L590" title="All 2 branches missed.">                &amp;&amp; &quot;evaluationInput&quot;.equals(mustNotRead.get(0).asText()),</span>
+            &quot;case &quot; + caseId + &quot; does not prohibit evaluation input&quot;);
+<span class="nc bnc" id="L592" title="All 2 branches missed.">        if (&quot;TRAIN&quot;.equals(split)) {</span>
+<span class="nc bnc" id="L593" title="All 2 branches missed.">            require(mayRead.size() == 1</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">                    &amp;&amp; &quot;formationInput&quot;.equals(mayRead.get(0).asText()),</span>
+                &quot;TRAIN case formation surface changed: &quot; + caseId);
+<span class="nc" id="L596">            require(benchmarkCase.path(&quot;formationInput&quot;).isObject(),</span>
+                &quot;TRAIN case has no formation input: &quot; + caseId);
+        } else {
+<span class="nc" id="L599">            require(mayRead.isEmpty(),</span>
+                &quot;held-out case exposes formation input: &quot; + caseId);
+<span class="nc" id="L601">            require(benchmarkCase.path(&quot;formationInput&quot;).isNull(),</span>
+                &quot;held-out case has formation payload: &quot; + caseId);
+        }
+<span class="nc" id="L604">        ObjectNode evaluation = requireObjectField(</span>
+            benchmarkCase, &quot;evaluationInput&quot;, &quot;case evaluation input&quot;);
+<span class="nc" id="L606">        require(!evaluation.path(&quot;expectedReferencesVisibleDuringFormation&quot;)</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">                .asBoolean(true),</span>
+            &quot;case exposes expected references during formation: &quot; + caseId);
+<span class="nc" id="L609">    }</span>
+
+    private static ObjectNode readObject(Path path) throws IOException {
+<span class="nc bnc" id="L612" title="All 4 branches missed.">        require(Files.isRegularFile(path) &amp;&amp; !Files.isSymbolicLink(path),</span>
+            &quot;expected regular non-symbolic JSON file: &quot; + path);
+<span class="nc" id="L614">        JsonNode value = JSON.readTree(Files.readString(</span>
+            path, StandardCharsets.UTF_8));
+<span class="nc" id="L616">        return requireObject(value, path.toString());</span>
+    }
+
+    private static void requireContentHash(ObjectNode value, String context) {
+<span class="nc" id="L620">        String retained = text(value, &quot;contentHash&quot;);</span>
+<span class="nc" id="L621">        ObjectNode material = value.deepCopy();</span>
+<span class="nc" id="L622">        material.remove(&quot;contentHash&quot;);</span>
+<span class="nc" id="L623">        String expected = semanticHash(material);</span>
+<span class="nc" id="L624">        require(retained.equals(expected),</span>
+            context + &quot; contentHash mismatch: &quot; + retained + &quot; != &quot; + expected);
+<span class="nc" id="L626">    }</span>
+
+    private static void addContentHash(ObjectNode value) {
+<span class="nc bnc" id="L629" title="All 2 branches missed.">        require(!value.has(&quot;contentHash&quot;), &quot;contentHash already present&quot;);</span>
+<span class="nc" id="L630">        value.put(&quot;contentHash&quot;, semanticHash(value));</span>
+<span class="nc" id="L631">    }</span>
+
+    private static String semanticHash(JsonNode value) {
+        try {
+<span class="nc" id="L635">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(</span>
+<span class="nc" id="L636">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="nc" id="L637">                    canonicalJson(value).getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L638">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L639">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static String canonicalJson(JsonNode value) {
+        try {
+<span class="nc bnc" id="L645" title="All 2 branches missed.">            if (value.isObject()) {</span>
+<span class="nc" id="L646">                TreeSet&lt;String&gt; fields = new TreeSet&lt;&gt;();</span>
+<span class="nc" id="L647">                value.fieldNames().forEachRemaining(fields::add);</span>
+<span class="nc" id="L648">                StringBuilder result = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L649">                int index = 0;</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">                for (String field : fields) {</span>
+<span class="nc bnc" id="L651" title="All 2 branches missed.">                    if (index++ &gt; 0) {</span>
+<span class="nc" id="L652">                        result.append(',');</span>
+                    }
+<span class="nc" id="L654">                    result.append(JSON.writeValueAsString(field))</span>
+<span class="nc" id="L655">                        .append(':')</span>
+<span class="nc" id="L656">                        .append(canonicalJson(value.get(field)));</span>
+<span class="nc" id="L657">                }</span>
+<span class="nc" id="L658">                return result.append('}').toString();</span>
+            }
+<span class="nc bnc" id="L660" title="All 2 branches missed.">            if (value.isArray()) {</span>
+<span class="nc" id="L661">                StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L662" title="All 2 branches missed.">                for (int index = 0; index &lt; value.size(); index++) {</span>
+<span class="nc bnc" id="L663" title="All 2 branches missed.">                    if (index &gt; 0) {</span>
+<span class="nc" id="L664">                        result.append(',');</span>
+                    }
+<span class="nc" id="L666">                    result.append(canonicalJson(value.get(index)));</span>
+                }
+<span class="nc" id="L668">                return result.append(']').toString();</span>
+            }
+<span class="nc" id="L670">            return JSON.writeValueAsString(value);</span>
+<span class="nc" id="L671">        } catch (IOException exception) {</span>
+<span class="nc" id="L672">            throw new IllegalStateException(&quot;cannot canonicalize JSON&quot;, exception);</span>
+        }
+    }
+
+    private static ObjectNode object(Map&lt;String, ?&gt; values) {
+<span class="nc" id="L677">        return JSON.valueToTree(new LinkedHashMap&lt;&gt;(values));</span>
+    }
+
+    private static ArrayNode strings(List&lt;String&gt; values) {
+<span class="nc" id="L681">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="nc" id="L682">        values.forEach(result::add);</span>
+<span class="nc" id="L683">        return result;</span>
+    }
+
+    private static ArrayNode copyArray(ArrayNode values) {
+<span class="nc" id="L687">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="nc" id="L688">        values.forEach(result::add);</span>
+<span class="nc" id="L689">        return result;</span>
+    }
+
+    private static List&lt;String&gt; stringValues(ArrayNode values) {
+<span class="nc" id="L693">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">        for (JsonNode value : values) {</span>
+<span class="nc bnc" id="L695" title="All 4 branches missed.">            require(value.isTextual() &amp;&amp; !value.asText().isBlank(),</span>
+                &quot;expected nonblank string array item&quot;);
+<span class="nc" id="L697">            result.add(value.asText());</span>
+<span class="nc" id="L698">        }</span>
+<span class="nc" id="L699">        return List.copyOf(result);</span>
+    }
+
+    private static ObjectNode requireObject(
+        JsonNode value,
+        String context
+    ) {
+<span class="nc bnc" id="L706" title="All 4 branches missed.">        require(value != null &amp;&amp; value.isObject(),</span>
+            context + &quot; is not an object&quot;);
+<span class="nc" id="L708">        return (ObjectNode) value;</span>
+    }
+
+    private static ObjectNode requireObjectField(
+        JsonNode value,
+        String field,
+        String context
+    ) {
+<span class="nc" id="L716">        return requireObject(value.get(field), context);</span>
+    }
+
+    private static ArrayNode requireArray(
+        JsonNode value,
+        String field,
+        String context
+    ) {
+<span class="nc" id="L724">        JsonNode child = value.get(field);</span>
+<span class="nc bnc" id="L725" title="All 4 branches missed.">        require(child != null &amp;&amp; child.isArray(),</span>
+            context + &quot; is not an array&quot;);
+<span class="nc" id="L727">        return (ArrayNode) child;</span>
+    }
+
+    private static String text(JsonNode value, String field) {
+<span class="nc" id="L731">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="nc" id="L732">        JsonNode child = value.get(field);</span>
+<span class="nc bnc" id="L733" title="All 4 branches missed.">        require(child != null &amp;&amp; child.isTextual()</span>
+<span class="nc bnc" id="L734" title="All 2 branches missed.">                &amp;&amp; !child.asText().isBlank(),</span>
+            &quot;missing textual field &quot; + field);
+<span class="nc" id="L736">        return child.asText();</span>
+    }
+
+    private static int integer(
+        JsonNode value,
+        String field,
+        String context
+    ) {
+<span class="nc" id="L744">        JsonNode child = value.get(field);</span>
+<span class="nc bnc" id="L745" title="All 4 branches missed.">        require(child != null &amp;&amp; child.canConvertToInt(),</span>
+            context + &quot; has no integer field &quot; + field);
+<span class="nc" id="L747">        return child.intValue();</span>
+    }
+
+    private static void require(boolean condition, String message) {
+<span class="nc bnc" id="L751" title="All 2 branches missed.">        if (!condition) {</span>
+<span class="nc" id="L752">            throw new IllegalStateException(message);</span>
+        }
+<span class="nc" id="L754">    }</span>
+
+    private record FrozenBudget(
+        int maxStates,
+        int maxCandidateEvaluations,
+        int maxProofAttempts
+    ) {
+<span class="nc" id="L761">        private FrozenBudget {</span>
+<span class="nc bnc" id="L762" title="All 6 branches missed.">            if (maxStates &lt; 1 || maxCandidateEvaluations &lt; 1</span>
+                    || maxProofAttempts &lt; 0) {
+<span class="nc" id="L764">                throw new IllegalArgumentException(</span>
+                    &quot;frozen budgets are invalid&quot;);
+            }
+<span class="nc" id="L767">        }</span>
+    }
+
+<span class="nc" id="L770">    private record Arguments(</span>
+        Path benchmarkSource,
+        Path corpus,
+        Path profile,
+        Path freezeReceipt,
+        Path output,
+        String repositoryRevision
+    ) {
+        private static Arguments parse(String[] args) {
+<span class="nc" id="L779">            Map&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L780" title="All 2 branches missed.">            for (int index = 0; index &lt; args.length; index += 2) {</span>
+<span class="nc bnc" id="L781" title="All 2 branches missed.">                require(index + 1 &lt; args.length,</span>
+                    &quot;arguments must use --name value pairs&quot;);
+<span class="nc" id="L783">                require(args[index].startsWith(&quot;--&quot;),</span>
+                    &quot;argument name must start with --&quot;);
+<span class="nc bnc" id="L785" title="All 2 branches missed.">                require(values.putIfAbsent(args[index], args[index + 1]) == null,</span>
+                    &quot;duplicate argument: &quot; + args[index]);
+            }
+<span class="nc" id="L788">            TreeSet&lt;String&gt; expected = new TreeSet&lt;&gt;(List.of(</span>
+                &quot;--benchmark-source&quot;,
+                &quot;--corpus&quot;,
+                &quot;--profile&quot;,
+                &quot;--freeze-receipt&quot;,
+                &quot;--output&quot;,
+                &quot;--repository-revision&quot;));
+<span class="nc" id="L795">            require(values.keySet().equals(expected),</span>
+                &quot;arguments differ: expected=&quot; + expected
+<span class="nc" id="L797">                    + &quot; actual=&quot; + values.keySet());</span>
+<span class="nc" id="L798">            return new Arguments(</span>
+<span class="nc" id="L799">                Path.of(values.get(&quot;--benchmark-source&quot;)),</span>
+<span class="nc" id="L800">                Path.of(values.get(&quot;--corpus&quot;)),</span>
+<span class="nc" id="L801">                Path.of(values.get(&quot;--profile&quot;)),</span>
+<span class="nc" id="L802">                Path.of(values.get(&quot;--freeze-receipt&quot;)),</span>
+<span class="nc" id="L803">                Path.of(values.get(&quot;--output&quot;)),</span>
+<span class="nc" id="L804">                values.get(&quot;--repository-revision&quot;));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

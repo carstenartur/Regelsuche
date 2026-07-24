@@ -1,0 +1,610 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RationalAssumptionRewriteAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">RationalAssumptionRewriteAdapter.java</span></div><h1>RationalAssumptionRewriteAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.HypothesisTransformationEngine;
+import de.regelsuche.transform.RationalNormalizationHypothesisOperator;
+import de.regelsuche.transform.RewriteRule;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationEngine;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
+/**
+ * Bounded candidate-formation and held-out search adapter for rational rewrites.
+ *
+ * &lt;p&gt;Formation receives expressions and assumptions only. It selects the
+ * generic assumption-aware rational-normalization operator when every supplied
+ * formation seed yields an independently confirmed simplification. No target
+ * expression is represented by the formation API.&lt;/p&gt;
+ *
+ * &lt;p&gt;Evaluation composes the selected operator with an explicit frozen
+ * primitive inventory. The default inventory contains only difference-of-
+ * squares factoring and division-by-one cleanup. Partial fractions, nested
+ * division normalization and the wider default rule graph are intentionally
+ * absent.&lt;/p&gt;
+ */
+public final class RationalAssumptionRewriteAdapter {
+    public static final String CANDIDATE_FORM_ID =
+        &quot;ASSUMPTION_SENSITIVE_FACTOR_CANCELLATION&quot;;
+    public static final String OPERATOR_ID =
+        RationalNormalizationHypothesisOperator.RULE_ID;
+<span class="fc" id="L40">    public static final List&lt;String&gt; FROZEN_PRIMITIVE_RULE_IDS = List.of(</span>
+        &quot;ast_divide_one&quot;,
+        &quot;ast_square_difference_factor&quot;);
+
+    private final RationalNormalizationHypothesisOperator formationOperator;
+    private final RationalFunctionNormalFormEquivalenceService equivalence;
+    private final ExpressionCanonicalizer canonicalizer;
+    private final TransformationEngine evaluationEngine;
+
+    public RationalAssumptionRewriteAdapter() {
+<span class="fc" id="L50">        this(</span>
+            new RationalNormalizationHypothesisOperator(),
+            new RationalFunctionNormalFormEquivalenceService(),
+            new ExpressionCanonicalizer());
+<span class="fc" id="L54">    }</span>
+
+    RationalAssumptionRewriteAdapter(
+        RationalNormalizationHypothesisOperator formationOperator,
+        RationalFunctionNormalFormEquivalenceService equivalence,
+        ExpressionCanonicalizer canonicalizer
+<span class="fc" id="L60">    ) {</span>
+<span class="fc" id="L61">        this.formationOperator = Objects.requireNonNull(</span>
+            formationOperator, &quot;formationOperator&quot;);
+<span class="fc" id="L63">        this.equivalence = Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
+<span class="fc" id="L64">        this.canonicalizer = Objects.requireNonNull(</span>
+            canonicalizer, &quot;canonicalizer&quot;);
+        List&lt;RewriteRule&gt; primitives = AstRewriteTransformationEngine
+<span class="fc" id="L67">            .defaultRules().stream()</span>
+<span class="fc" id="L68">            .filter(rule -&gt; FROZEN_PRIMITIVE_RULE_IDS.contains(rule.id()))</span>
+<span class="fc" id="L69">            .toList();</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (primitives.size() != FROZEN_PRIMITIVE_RULE_IDS.size()) {</span>
+<span class="nc" id="L71">            throw new IllegalStateException(</span>
+                &quot;frozen rational primitive inventory is incomplete: &quot;
+<span class="nc" id="L73">                    + primitives.stream().map(RewriteRule::id).toList());</span>
+        }
+<span class="fc" id="L75">        this.evaluationEngine = new HypothesisTransformationEngine(</span>
+            new AstRewriteTransformationEngine(primitives, 12, 24),
+<span class="fc" id="L77">            List.of(formationOperator),</span>
+            12);
+<span class="fc" id="L79">    }</span>
+
+    public FormationResult formCandidate(
+        List&lt;FormationSeed&gt; seeds,
+        ResourceBudget budget
+    ) {
+<span class="fc" id="L85">        Objects.requireNonNull(seeds, &quot;seeds&quot;);</span>
+<span class="fc" id="L86">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (seeds.isEmpty()) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(</span>
+                &quot;at least one formation seed is required&quot;);
+        }
+<span class="fc" id="L91">        BudgetLedger ledger = new BudgetLedger(budget);</span>
+<span class="fc" id="L92">        List&lt;FormationEvidence&gt; evidence = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (FormationSeed seed : seeds) {</span>
+            Optional&lt;FormationEvidence&gt; selected;
+            try {
+<span class="fc" id="L96">                selected = selectFormationCandidate(seed, ledger);</span>
+<span class="fc" id="L97">            } catch (BudgetExceededException exception) {</span>
+<span class="fc" id="L98">                return new FormationResult(</span>
+                    FormationStatus.NO_CANDIDATE,
+<span class="fc" id="L100">                    Optional.empty(),</span>
+<span class="fc" id="L101">                    List.copyOf(evidence),</span>
+<span class="fc" id="L102">                    ledger.snapshot(),</span>
+<span class="fc" id="L103">                    exception.getMessage());</span>
+<span class="fc" id="L104">            }</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (selected.isEmpty()) {</span>
+<span class="fc" id="L106">                return new FormationResult(</span>
+                    FormationStatus.NO_CANDIDATE,
+<span class="fc" id="L108">                    Optional.empty(),</span>
+<span class="fc" id="L109">                    List.copyOf(evidence),</span>
+<span class="fc" id="L110">                    ledger.snapshot(),</span>
+                    &quot;formation seed produced no confirmed simplifying &quot;
+<span class="fc" id="L112">                        + &quot;rational-normalization candidate: &quot; + seed.seedId());</span>
+            }
+<span class="fc" id="L114">            evidence.add(selected.orElseThrow());</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc" id="L116">        CandidateForm candidate = new CandidateForm(</span>
+            CANDIDATE_FORM_ID,
+            OPERATOR_ID,
+<span class="fc" id="L119">            formationOperator.getClass().getName(),</span>
+<span class="fc" id="L120">            evidence.stream().map(FormationEvidence::seedId).toList(),</span>
+            FROZEN_PRIMITIVE_RULE_IDS);
+<span class="fc" id="L122">        return new FormationResult(</span>
+            FormationStatus.SELECTED,
+<span class="fc" id="L124">            Optional.of(candidate),</span>
+<span class="fc" id="L125">            List.copyOf(evidence),</span>
+<span class="fc" id="L126">            ledger.snapshot(),</span>
+            &quot;every formation seed supports the same generic operator&quot;);
+    }
+
+    private Optional&lt;FormationEvidence&gt; selectFormationCandidate(
+        FormationSeed seed,
+        BudgetLedger ledger
+    ) {
+<span class="fc" id="L134">        ledger.exploreState();</span>
+<span class="fc" id="L135">        List&lt;Transformation&gt; candidates = formationOperator</span>
+<span class="fc" id="L136">            .generateCandidates(seed.expression()).stream()</span>
+<span class="fc" id="L137">            .sorted(Comparator</span>
+<span class="fc" id="L138">                .comparingInt((Transformation candidate) -&gt;</span>
+<span class="nc" id="L139">                    canonicalizer.astNodeCount(</span>
+<span class="nc" id="L140">                        candidate.transformedExpression()))</span>
+<span class="fc" id="L141">                .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L142">                .thenComparing(Transformation::applicationKey))</span>
+<span class="fc" id="L143">            .toList();</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        for (Transformation candidate : candidates) {</span>
+<span class="fc" id="L145">            ledger.evaluateCandidate();</span>
+<span class="fc" id="L146">            var validation = equivalence.evaluate(</span>
+<span class="fc" id="L147">                seed.expression(),</span>
+<span class="fc" id="L148">                candidate.transformedExpression(),</span>
+<span class="fc" id="L149">                seed.assumptions());</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            if (validation.status()</span>
+                    != RationalFunctionNormalFormEquivalenceService.Status.CONFIRMED) {
+<span class="nc" id="L152">                continue;</span>
+            }
+<span class="fc" id="L154">            int before = canonicalizer.astNodeCount(seed.expression());</span>
+<span class="fc" id="L155">            int after = canonicalizer.astNodeCount(</span>
+<span class="fc" id="L156">                candidate.transformedExpression());</span>
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">            if (after &gt;= before || candidate.assumptions().isEmpty()) {</span>
+<span class="nc" id="L158">                continue;</span>
+            }
+<span class="fc" id="L160">            return Optional.of(new FormationEvidence(</span>
+<span class="fc" id="L161">                seed.seedId(),</span>
+<span class="fc" id="L162">                seed.sourceReference(),</span>
+<span class="fc" id="L163">                seed.expression(),</span>
+<span class="fc" id="L164">                seed.assumptions(),</span>
+<span class="fc" id="L165">                candidate.transformedExpression(),</span>
+<span class="fc" id="L166">                candidate.assumptions(),</span>
+                before,
+                after,
+<span class="fc" id="L169">                validation.requiredNonZeroFactors(),</span>
+<span class="fc" id="L170">                validation.providedNonZeroFactors(),</span>
+<span class="fc" id="L171">                validation.leftCrossNormalForm(),</span>
+<span class="fc" id="L172">                validation.rightCrossNormalForm()));</span>
+        }
+<span class="fc" id="L174">        return Optional.empty();</span>
+    }
+
+    public SearchResult evaluate(
+        EvaluationTask task,
+        FormationResult formation,
+        ResourceBudget budget
+    ) {
+<span class="fc" id="L182">        Objects.requireNonNull(task, &quot;task&quot;);</span>
+<span class="fc" id="L183">        Objects.requireNonNull(formation, &quot;formation&quot;);</span>
+<span class="fc" id="L184">        Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (formation.status() != FormationStatus.SELECTED</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                || formation.candidate().isEmpty()) {</span>
+<span class="fc" id="L187">            return new SearchResult(</span>
+                SearchStatus.CANDIDATE_NOT_FORMED,
+<span class="fc" id="L189">                task.taskId(),</span>
+<span class="fc" id="L190">                task.source(),</span>
+<span class="fc" id="L191">                task.target(),</span>
+<span class="fc" id="L192">                List.of(),</span>
+                new ResourceUse(
+<span class="fc" id="L194">                    budget.maxExploredStates(),</span>
+                    0,
+<span class="fc" id="L196">                    budget.maxExploredStates(),</span>
+<span class="fc" id="L197">                    budget.maxCandidateEvaluations(),</span>
+                    0,
+<span class="fc" id="L199">                    budget.maxCandidateEvaluations()),</span>
+                &quot;held-out evaluation cannot run without a formed candidate&quot;);
+        }
+<span class="fc" id="L202">        BudgetLedger ledger = new BudgetLedger(budget);</span>
+<span class="fc" id="L203">        ArrayDeque&lt;SearchNode&gt; queue = new ArrayDeque&lt;&gt;();</span>
+<span class="fc" id="L204">        Set&lt;String&gt; visited = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L205">        queue.add(new SearchNode(task.source(), List.of(), 0));</span>
+<span class="fc" id="L206">        visited.add(canonicalizer.stableHash(task.source()));</span>
+<span class="fc" id="L207">        String target = canonicalizer.canonicalize(task.target());</span>
+
+<span class="pc bpc" id="L209" title="1 of 4 branches missed.">        while (!queue.isEmpty() &amp;&amp; ledger.canExplore()) {</span>
+<span class="fc" id="L210">            SearchNode node = queue.removeFirst();</span>
+<span class="fc" id="L211">            ledger.exploreState();</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (canonicalizer.canonicalize(node.expression()).equals(target)) {</span>
+<span class="fc" id="L213">                return success(task, node, ledger);</span>
+            }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (node.depth() &gt;= budget.maxDepth()) {</span>
+<span class="nc" id="L216">                continue;</span>
+            }
+<span class="fc" id="L218">            List&lt;Transformation&gt; candidates = evaluationEngine</span>
+<span class="fc" id="L219">                .transform(node.expression()).stream()</span>
+<span class="fc" id="L220">                .sorted(Comparator</span>
+<span class="fc" id="L221">                    .comparing(Transformation::rule)</span>
+<span class="fc" id="L222">                    .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L223">                    .thenComparing(Transformation::applicationKey))</span>
+<span class="fc" id="L224">                .toList();</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            for (Transformation candidate : candidates) {</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">                if (!ledger.canEvaluateCandidate()) {</span>
+<span class="nc" id="L227">                    return exhausted(task, ledger,</span>
+                        &quot;candidate-evaluation budget exhausted&quot;);
+                }
+<span class="fc" id="L230">                ledger.evaluateCandidate();</span>
+<span class="fc" id="L231">                var validation = equivalence.evaluate(</span>
+<span class="fc" id="L232">                    node.expression(),</span>
+<span class="fc" id="L233">                    candidate.transformedExpression(),</span>
+<span class="fc" id="L234">                    task.assumptions());</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                if (validation.status()</span>
+                        != RationalFunctionNormalFormEquivalenceService.Status.CONFIRMED) {
+<span class="nc" id="L237">                    continue;</span>
+                }
+<span class="fc" id="L239">                String hash = canonicalizer.stableHash(</span>
+<span class="fc" id="L240">                    candidate.transformedExpression());</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                if (!visited.add(hash)) {</span>
+<span class="nc" id="L242">                    continue;</span>
+                }
+<span class="fc" id="L244">                List&lt;SearchStep&gt; path = new ArrayList&lt;&gt;(node.steps());</span>
+<span class="fc" id="L245">                path.add(new SearchStep(</span>
+<span class="fc" id="L246">                    path.size() + 1,</span>
+<span class="fc" id="L247">                    candidate.rule(),</span>
+<span class="fc" id="L248">                    node.expression(),</span>
+<span class="fc" id="L249">                    candidate.transformedExpression(),</span>
+<span class="fc" id="L250">                    candidate.assumptions(),</span>
+<span class="fc" id="L251">                    validation.requiredNonZeroFactors(),</span>
+<span class="fc" id="L252">                    validation.providedNonZeroFactors(),</span>
+<span class="fc" id="L253">                    validation.leftCrossNormalForm(),</span>
+<span class="fc" id="L254">                    validation.rightCrossNormalForm()));</span>
+<span class="fc" id="L255">                queue.addLast(new SearchNode(</span>
+<span class="fc" id="L256">                    candidate.transformedExpression(),</span>
+<span class="fc" id="L257">                    List.copyOf(path),</span>
+<span class="fc" id="L258">                    node.depth() + 1));</span>
+<span class="fc" id="L259">            }</span>
+<span class="fc" id="L260">        }</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (!queue.isEmpty()) {</span>
+<span class="nc" id="L262">            return exhausted(task, ledger, &quot;explored-state budget exhausted&quot;);</span>
+        }
+<span class="fc" id="L264">        return new SearchResult(</span>
+            SearchStatus.NO_RESULT,
+<span class="fc" id="L266">            task.taskId(),</span>
+<span class="fc" id="L267">            task.source(),</span>
+<span class="fc" id="L268">            task.target(),</span>
+<span class="fc" id="L269">            List.of(),</span>
+<span class="fc" id="L270">            ledger.snapshot(),</span>
+            &quot;selected cancellation form and frozen primitives did not reach &quot;
+                + &quot;the held-out target&quot;);
+    }
+
+    private SearchResult success(
+        EvaluationTask task,
+        SearchNode node,
+        BudgetLedger ledger
+    ) {
+<span class="fc" id="L280">        var finalValidation = equivalence.evaluate(</span>
+<span class="fc" id="L281">            task.source(), task.target(), task.assumptions());</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (finalValidation.status()</span>
+                != RationalFunctionNormalFormEquivalenceService.Status.CONFIRMED) {
+<span class="nc" id="L284">            return new SearchResult(</span>
+                SearchStatus.TARGET_REFUTED,
+<span class="nc" id="L286">                task.taskId(),</span>
+<span class="nc" id="L287">                task.source(),</span>
+<span class="nc" id="L288">                task.target(),</span>
+<span class="nc" id="L289">                node.steps(),</span>
+<span class="nc" id="L290">                ledger.snapshot(),</span>
+                &quot;reached target failed independent rational-function validation&quot;);
+        }
+<span class="fc" id="L293">        return new SearchResult(</span>
+            SearchStatus.REACHED_AND_CONFIRMED,
+<span class="fc" id="L295">            task.taskId(),</span>
+<span class="fc" id="L296">            task.source(),</span>
+<span class="fc" id="L297">            task.target(),</span>
+<span class="fc" id="L298">            node.steps(),</span>
+<span class="fc" id="L299">            ledger.snapshot(),</span>
+            &quot;target reached through independently confirmed rewrite steps&quot;);
+    }
+
+    private SearchResult exhausted(
+        EvaluationTask task,
+        BudgetLedger ledger,
+        String detail
+    ) {
+<span class="nc" id="L308">        return new SearchResult(</span>
+            SearchStatus.BUDGET_EXHAUSTED,
+<span class="nc" id="L310">            task.taskId(),</span>
+<span class="nc" id="L311">            task.source(),</span>
+<span class="nc" id="L312">            task.target(),</span>
+<span class="nc" id="L313">            List.of(),</span>
+<span class="nc" id="L314">            ledger.snapshot(),</span>
+            detail);
+    }
+
+<span class="fc" id="L318">    public enum FormationStatus {</span>
+<span class="fc" id="L319">        SELECTED,</span>
+<span class="fc" id="L320">        NO_CANDIDATE</span>
+    }
+
+<span class="fc" id="L323">    public enum SearchStatus {</span>
+<span class="fc" id="L324">        REACHED_AND_CONFIRMED,</span>
+<span class="fc" id="L325">        NO_RESULT,</span>
+<span class="fc" id="L326">        BUDGET_EXHAUSTED,</span>
+<span class="fc" id="L327">        CANDIDATE_NOT_FORMED,</span>
+<span class="fc" id="L328">        TARGET_REFUTED</span>
+    }
+
+    public record FormationSeed(
+        String seedId,
+        String expression,
+        List&lt;String&gt; assumptions,
+        String sourceReference
+    ) {
+<span class="fc" id="L337">        public FormationSeed {</span>
+<span class="fc" id="L338">            seedId = requireText(seedId, &quot;seedId&quot;);</span>
+<span class="fc" id="L339">            expression = requireText(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L340">            assumptions = immutableStrings(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L341">            sourceReference = requireText(</span>
+                sourceReference, &quot;sourceReference&quot;);
+<span class="fc" id="L343">        }</span>
+    }
+
+    public record CandidateForm(
+        String candidateFormId,
+        String operatorId,
+        String implementationClass,
+        List&lt;String&gt; supportSeedIds,
+        List&lt;String&gt; frozenPrimitiveRuleIds
+    ) {
+<span class="fc" id="L353">        public CandidateForm {</span>
+<span class="fc" id="L354">            candidateFormId = requireText(</span>
+                candidateFormId, &quot;candidateFormId&quot;);
+<span class="fc" id="L356">            operatorId = requireText(operatorId, &quot;operatorId&quot;);</span>
+<span class="fc" id="L357">            implementationClass = requireText(</span>
+                implementationClass, &quot;implementationClass&quot;);
+<span class="fc" id="L359">            supportSeedIds = immutableStrings(</span>
+                supportSeedIds, &quot;supportSeedIds&quot;);
+<span class="fc" id="L361">            frozenPrimitiveRuleIds = immutableStrings(</span>
+                frozenPrimitiveRuleIds, &quot;frozenPrimitiveRuleIds&quot;);
+<span class="fc" id="L363">        }</span>
+    }
+
+    public record FormationEvidence(
+        String seedId,
+        String sourceReference,
+        String inputExpression,
+        List&lt;String&gt; declaredAssumptions,
+        String selectedExpression,
+        List&lt;String&gt; candidateAssumptions,
+        int inputAstNodes,
+        int selectedAstNodes,
+        List&lt;String&gt; requiredNonZeroFactors,
+        List&lt;String&gt; providedNonZeroFactors,
+        String leftCrossNormalForm,
+        String rightCrossNormalForm
+    ) {
+<span class="fc" id="L380">        public FormationEvidence {</span>
+<span class="fc" id="L381">            seedId = requireText(seedId, &quot;seedId&quot;);</span>
+<span class="fc" id="L382">            sourceReference = requireText(</span>
+                sourceReference, &quot;sourceReference&quot;);
+<span class="fc" id="L384">            inputExpression = requireText(</span>
+                inputExpression, &quot;inputExpression&quot;);
+<span class="fc" id="L386">            declaredAssumptions = immutableStrings(</span>
+                declaredAssumptions, &quot;declaredAssumptions&quot;);
+<span class="fc" id="L388">            selectedExpression = requireText(</span>
+                selectedExpression, &quot;selectedExpression&quot;);
+<span class="fc" id="L390">            candidateAssumptions = immutableStrings(</span>
+                candidateAssumptions, &quot;candidateAssumptions&quot;);
+<span class="pc bpc" id="L392" title="3 of 6 branches missed.">            if (inputAstNodes &lt; 1 || selectedAstNodes &lt; 1</span>
+                    || selectedAstNodes &gt;= inputAstNodes) {
+<span class="nc" id="L394">                throw new IllegalArgumentException(</span>
+                    &quot;formation candidate must strictly reduce AST size&quot;);
+            }
+<span class="fc" id="L397">            requiredNonZeroFactors = immutableStrings(</span>
+                requiredNonZeroFactors, &quot;requiredNonZeroFactors&quot;);
+<span class="fc" id="L399">            providedNonZeroFactors = immutableStrings(</span>
+                providedNonZeroFactors, &quot;providedNonZeroFactors&quot;);
+<span class="fc" id="L401">            leftCrossNormalForm = requireText(</span>
+                leftCrossNormalForm, &quot;leftCrossNormalForm&quot;);
+<span class="fc" id="L403">            rightCrossNormalForm = requireText(</span>
+                rightCrossNormalForm, &quot;rightCrossNormalForm&quot;);
+<span class="fc" id="L405">        }</span>
+    }
+
+    public record FormationResult(
+        FormationStatus status,
+        Optional&lt;CandidateForm&gt; candidate,
+        List&lt;FormationEvidence&gt; evidence,
+        ResourceUse resourceUse,
+        String detail
+    ) {
+<span class="fc" id="L415">        public FormationResult {</span>
+<span class="fc" id="L416">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">            candidate = candidate == null ? Optional.empty() : candidate;</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">            evidence = evidence == null ? List.of() : List.copyOf(evidence);</span>
+<span class="fc" id="L419">            Objects.requireNonNull(resourceUse, &quot;resourceUse&quot;);</span>
+<span class="fc" id="L420">            detail = requireText(detail, &quot;detail&quot;);</span>
+<span class="pc bpc" id="L421" title="1 of 4 branches missed.">            if (status == FormationStatus.SELECTED &amp;&amp; candidate.isEmpty()) {</span>
+<span class="nc" id="L422">                throw new IllegalArgumentException(</span>
+                    &quot;selected formation requires a candidate&quot;);
+            }
+<span class="fc" id="L425">        }</span>
+    }
+
+    public record EvaluationTask(
+        String taskId,
+        String source,
+        String target,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L434">        public EvaluationTask {</span>
+<span class="fc" id="L435">            taskId = requireText(taskId, &quot;taskId&quot;);</span>
+<span class="fc" id="L436">            source = requireText(source, &quot;source&quot;);</span>
+<span class="fc" id="L437">            target = requireText(target, &quot;target&quot;);</span>
+<span class="fc" id="L438">            assumptions = immutableStrings(assumptions, &quot;assumptions&quot;);</span>
+<span class="fc" id="L439">        }</span>
+    }
+
+    public record SearchStep(
+        int sequence,
+        String ruleId,
+        String source,
+        String target,
+        List&lt;String&gt; generatedAssumptions,
+        List&lt;String&gt; requiredNonZeroFactors,
+        List&lt;String&gt; providedNonZeroFactors,
+        String leftCrossNormalForm,
+        String rightCrossNormalForm
+    ) {
+<span class="fc" id="L453">        public SearchStep {</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            if (sequence &lt; 1) {</span>
+<span class="nc" id="L455">                throw new IllegalArgumentException(</span>
+                    &quot;search-step sequence must be positive&quot;);
+            }
+<span class="fc" id="L458">            ruleId = requireText(ruleId, &quot;ruleId&quot;);</span>
+<span class="fc" id="L459">            source = requireText(source, &quot;source&quot;);</span>
+<span class="fc" id="L460">            target = requireText(target, &quot;target&quot;);</span>
+<span class="fc" id="L461">            generatedAssumptions = immutableStrings(</span>
+                generatedAssumptions, &quot;generatedAssumptions&quot;);
+<span class="fc" id="L463">            requiredNonZeroFactors = immutableStrings(</span>
+                requiredNonZeroFactors, &quot;requiredNonZeroFactors&quot;);
+<span class="fc" id="L465">            providedNonZeroFactors = immutableStrings(</span>
+                providedNonZeroFactors, &quot;providedNonZeroFactors&quot;);
+<span class="fc" id="L467">            leftCrossNormalForm = requireText(</span>
+                leftCrossNormalForm, &quot;leftCrossNormalForm&quot;);
+<span class="fc" id="L469">            rightCrossNormalForm = requireText(</span>
+                rightCrossNormalForm, &quot;rightCrossNormalForm&quot;);
+<span class="fc" id="L471">        }</span>
+    }
+
+    public record SearchResult(
+        SearchStatus status,
+        String taskId,
+        String source,
+        String target,
+        List&lt;SearchStep&gt; steps,
+        ResourceUse resourceUse,
+        String detail
+    ) {
+<span class="fc" id="L483">        public SearchResult {</span>
+<span class="fc" id="L484">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L485">            taskId = requireText(taskId, &quot;taskId&quot;);</span>
+<span class="fc" id="L486">            source = requireText(source, &quot;source&quot;);</span>
+<span class="fc" id="L487">            target = requireText(target, &quot;target&quot;);</span>
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">            steps = steps == null ? List.of() : List.copyOf(steps);</span>
+<span class="fc" id="L489">            Objects.requireNonNull(resourceUse, &quot;resourceUse&quot;);</span>
+<span class="fc" id="L490">            detail = requireText(detail, &quot;detail&quot;);</span>
+<span class="fc" id="L491">        }</span>
+    }
+
+    public record ResourceBudget(
+        int maxDepth,
+        int maxExploredStates,
+        int maxCandidateEvaluations
+    ) {
+<span class="fc" id="L499">        public ResourceBudget {</span>
+<span class="pc bpc" id="L500" title="3 of 6 branches missed.">            if (maxDepth &lt; 0 || maxExploredStates &lt; 1</span>
+                    || maxCandidateEvaluations &lt; 1) {
+<span class="nc" id="L502">                throw new IllegalArgumentException(</span>
+                    &quot;resource budgets must be positive except maxDepth&quot;);
+            }
+<span class="fc" id="L505">        }</span>
+    }
+
+    public record ResourceUse(
+        int configuredExploredStates,
+        int executedExploredStates,
+        int remainingExploredStates,
+        int configuredCandidateEvaluations,
+        int executedCandidateEvaluations,
+        int remainingCandidateEvaluations
+    ) {
+<span class="fc" id="L516">        public ResourceUse {</span>
+<span class="pc bpc" id="L517" title="8 of 16 branches missed.">            if (configuredExploredStates &lt; 0 || executedExploredStates &lt; 0</span>
+                    || remainingExploredStates &lt; 0
+                    || configuredCandidateEvaluations &lt; 0
+                    || executedCandidateEvaluations &lt; 0
+                    || remainingCandidateEvaluations &lt; 0
+                    || executedExploredStates + remainingExploredStates
+                        != configuredExploredStates
+                    || executedCandidateEvaluations
+                        + remainingCandidateEvaluations
+                        != configuredCandidateEvaluations) {
+<span class="nc" id="L527">                throw new IllegalArgumentException(</span>
+                    &quot;resource accounting is not balanced&quot;);
+            }
+<span class="fc" id="L530">        }</span>
+    }
+
+<span class="fc" id="L533">    private record SearchNode(</span>
+        String expression,
+        List&lt;SearchStep&gt; steps,
+        int depth
+    ) {
+    }
+
+    private static final class BudgetLedger {
+        private final ResourceBudget budget;
+        private int exploredStates;
+        private int candidateEvaluations;
+
+<span class="fc" id="L545">        private BudgetLedger(ResourceBudget budget) {</span>
+<span class="fc" id="L546">            this.budget = budget;</span>
+<span class="fc" id="L547">        }</span>
+
+        private boolean canExplore() {
+<span class="fc bfc" id="L550" title="All 2 branches covered.">            return exploredStates &lt; budget.maxExploredStates();</span>
+        }
+
+        private void exploreState() {
+<span class="fc bfc" id="L554" title="All 2 branches covered.">            if (!canExplore()) {</span>
+<span class="fc" id="L555">                throw new BudgetExceededException(</span>
+                    &quot;formation explored-state budget exhausted&quot;);
+            }
+<span class="fc" id="L558">            exploredStates++;</span>
+<span class="fc" id="L559">        }</span>
+
+        private boolean canEvaluateCandidate() {
+<span class="fc" id="L562">            return candidateEvaluations</span>
+<span class="fc bfc" id="L563" title="All 2 branches covered.">                &lt; budget.maxCandidateEvaluations();</span>
+        }
+
+        private void evaluateCandidate() {
+<span class="fc bfc" id="L567" title="All 2 branches covered.">            if (!canEvaluateCandidate()) {</span>
+<span class="fc" id="L568">                throw new BudgetExceededException(</span>
+                    &quot;formation candidate-evaluation budget exhausted&quot;);
+            }
+<span class="fc" id="L571">            candidateEvaluations++;</span>
+<span class="fc" id="L572">        }</span>
+
+        private ResourceUse snapshot() {
+<span class="fc" id="L575">            return new ResourceUse(</span>
+<span class="fc" id="L576">                budget.maxExploredStates(),</span>
+                exploredStates,
+<span class="fc" id="L578">                budget.maxExploredStates() - exploredStates,</span>
+<span class="fc" id="L579">                budget.maxCandidateEvaluations(),</span>
+                candidateEvaluations,
+<span class="fc" id="L581">                budget.maxCandidateEvaluations() - candidateEvaluations);</span>
+        }
+    }
+
+    private static final class BudgetExceededException extends RuntimeException {
+        private BudgetExceededException(String message) {
+<span class="fc" id="L587">            super(message);</span>
+<span class="fc" id="L588">        }</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L592" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L593">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L595">        return value;</span>
+    }
+
+    private static List&lt;String&gt; immutableStrings(
+        List&lt;String&gt; values,
+        String name
+    ) {
+<span class="fc" id="L602">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L603" title="3 of 6 branches missed.">        if (values.stream().anyMatch(value -&gt; value == null || value.isBlank())) {</span>
+<span class="nc" id="L604">            throw new IllegalArgumentException(</span>
+                name + &quot; must not contain blank values&quot;);
+        }
+<span class="fc" id="L607">        return List.copyOf(values);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

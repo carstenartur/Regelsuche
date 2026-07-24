@@ -1,0 +1,831 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CandidateIndependentExactOneMacroEvaluationMain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmark</a> &gt; <span class="el_source">CandidateIndependentExactOneMacroEvaluationMain.java</span></div><h1>CandidateIndependentExactOneMacroEvaluationMain.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmark;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.benchmark.CandidateIndependentExactOneMacroSelector.Selection;
+import de.regelsuche.benchmark.CandidateIndependentMacroReplayAdapter.ReplayEvidence;
+import de.regelsuche.benchmark.CandidateIndependentMacroReplayAdapter.ReplayTrace;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.EvaluationTask;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationResult;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.MacroCandidate;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.PairedEvaluation;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.SearchRun;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.UtilityOutcome;
+import de.regelsuche.discovery.TransformationStep;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Executes the frozen downstream stream with the baseline inventory and exactly
+ * one candidate selected solely from TRAIN formation evidence.
+ */
+public final class CandidateIndependentExactOneMacroEvaluationMain {
+    public static final String SCHEMA = &quot;regelsuche.paired-task-utility/v1&quot;;
+    private static final String BENCHMARK =
+        &quot;regelsuche-candidate-independent-autonomous-discovery-2026-07/v1&quot;;
+    private static final String CHALLENGE = &quot;reusable-search-macros&quot;;
+    private static final String PROFILE_ID = &quot;macro-primitives/v1&quot;;
+    private static final String COMPARISON =
+        &quot;IDENTICAL_INPUT_TARGET_INVENTORY_STRATEGY_AND_BUDGET&quot;;
+    private static final String INVENTORY_POLICY =
+        &quot;BASELINE_PLUS_EXACTLY_ONE_SELECTED_CANDIDATE&quot;;
+    private static final int TASK_COUNT = 12;
+
+<span class="nc" id="L50">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="nc" id="L51">        JsonFactory.builder()</span>
+<span class="nc" id="L52">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="nc" id="L53">            .build());</span>
+
+    private CandidateIndependentExactOneMacroEvaluationMain() {
+    }
+
+    public static void main(String[] args) throws IOException {
+<span class="nc" id="L59">        Arguments arguments = Arguments.parse(args);</span>
+<span class="nc" id="L60">        ObjectNode benchmark = readObject(arguments.benchmarkSource());</span>
+<span class="nc" id="L61">        ObjectNode corpus = readObject(arguments.corpus());</span>
+<span class="nc" id="L62">        ObjectNode profile = readObject(arguments.profile());</span>
+<span class="nc" id="L63">        ObjectNode receipt = readObject(arguments.freezeReceipt());</span>
+<span class="nc" id="L64">        validateFrozenInputs(benchmark, corpus, profile, receipt);</span>
+
+<span class="nc" id="L66">        List&lt;ObjectNode&gt; cases = macroCases(corpus);</span>
+<span class="nc" id="L67">        List&lt;ReplayTrace&gt; traces = trainTraces(cases);</span>
+<span class="nc" id="L68">        CandidateIndependentReusableMacroAdapter adapter =</span>
+<span class="nc" id="L69">            new CandidateIndependentReusableMacroAdapter(operationRules(profile));</span>
+<span class="nc" id="L70">        FormationResult formation = adapter.form(traces);</span>
+<span class="nc" id="L71">        Selection selection = CandidateIndependentExactOneMacroSelector</span>
+<span class="nc" id="L72">            .select(formation);</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        require(selection.exactOneFormation().macros().size() == 1,</span>
+            &quot;candidate-enabled inventory is not exact-one&quot;);
+
+<span class="nc" id="L76">        ObjectNode stream = readObject(arguments.downstreamStream());</span>
+<span class="nc" id="L77">        validateStream(stream, corpus, profile, receipt);</span>
+<span class="nc" id="L78">        List&lt;TaskBinding&gt; tasks = streamTasks(stream);</span>
+
+<span class="nc" id="L80">        ArrayNode evaluations = JSON.createArrayNode();</span>
+<span class="nc" id="L81">        LinkedHashMap&lt;String, Integer&gt; outcomeCounts = emptyOutcomeCounts();</span>
+<span class="nc" id="L82">        ResourceAccumulator resources = new ResourceAccumulator(</span>
+<span class="nc" id="L83">            formation.replayEvidence());</span>
+<span class="nc" id="L84">        int correctnessRegressions = 0;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        for (TaskBinding binding : tasks) {</span>
+<span class="nc" id="L86">            PairedEvaluation evaluation = adapter.evaluate(</span>
+<span class="nc" id="L87">                binding.task(), selection.exactOneFormation());</span>
+<span class="nc" id="L88">            outcomeCounts.merge(</span>
+<span class="nc" id="L89">                evaluation.outcome().name(), 1, Integer::sum);</span>
+<span class="nc" id="L90">            resources.add(evaluation);</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (evaluation.correctnessRegression()) {</span>
+<span class="nc" id="L92">                correctnessRegressions++;</span>
+            }
+<span class="nc" id="L94">            evaluations.add(evaluation(</span>
+<span class="nc" id="L95">                binding, evaluation, selection.candidate().macroId()));</span>
+<span class="nc" id="L96">        }</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        require(outcomeCounts.values().stream().mapToInt(Integer::intValue).sum()</span>
+                == TASK_COUNT,
+            &quot;outcome accounting does not retain every frozen task&quot;);
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        require(correctnessRegressions == 0,</span>
+            &quot;exact-one candidate caused a correctness regression&quot;);
+
+<span class="nc" id="L103">        ObjectNode budgets = requireObjectField(</span>
+            benchmark, &quot;budgets&quot;, &quot;benchmark budgets&quot;);
+<span class="nc" id="L105">        ObjectNode resourceUse = resources.resourceUse(budgets);</span>
+<span class="nc" id="L106">        ArrayNode formedCandidates = JSON.createArrayNode();</span>
+<span class="nc" id="L107">        String selectedCandidateContentHash = null;</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        for (MacroCandidate candidate : formation.macros().stream()</span>
+<span class="nc" id="L109">                .sorted(Comparator.comparing(MacroCandidate::macroId)).toList()) {</span>
+<span class="nc" id="L110">            ObjectNode retained = candidate(candidate);</span>
+<span class="nc" id="L111">            formedCandidates.add(retained);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (candidate.macroId().equals(selection.candidate().macroId())) {</span>
+<span class="nc" id="L113">                selectedCandidateContentHash = text(retained, &quot;contentHash&quot;);</span>
+            }
+<span class="nc" id="L115">        }</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        require(selectedCandidateContentHash != null,</span>
+            &quot;selected candidate is absent from the formed-candidate ledger&quot;);
+
+<span class="nc" id="L119">        ObjectNode selectionNode = JSON.createObjectNode();</span>
+<span class="nc" id="L120">        selectionNode.put(&quot;policy&quot;, selection.policy());</span>
+<span class="nc" id="L121">        selectionNode.put(&quot;selectedCandidateId&quot;,</span>
+<span class="nc" id="L122">            selection.candidate().macroId());</span>
+<span class="nc" id="L123">        selectionNode.put(&quot;selectedCandidateContentHash&quot;,</span>
+            selectedCandidateContentHash);
+<span class="nc" id="L125">        selectionNode.put(&quot;selectedTrainSupport&quot;,</span>
+<span class="nc" id="L126">            selection.candidate().supportingTraceIds().size());</span>
+<span class="nc" id="L127">        selectionNode.put(&quot;formedCandidateCount&quot;, formation.macros().size());</span>
+<span class="nc" id="L128">        addContentHash(selectionNode);</span>
+
+<span class="nc" id="L130">        ArrayNode replayEvidence = JSON.createArrayNode();</span>
+<span class="nc" id="L131">        formation.replayEvidence().stream()</span>
+<span class="nc" id="L132">            .sorted(Comparator.comparing(ReplayEvidence::traceId))</span>
+<span class="nc" id="L133">            .map(CandidateIndependentExactOneMacroEvaluationMain::replayEvidence)</span>
+<span class="nc" id="L134">            .forEach(replayEvidence::add);</span>
+
+<span class="nc" id="L136">        ObjectNode run = JSON.createObjectNode();</span>
+<span class="nc" id="L137">        run.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="nc" id="L138">        run.put(&quot;benchmarkId&quot;, BENCHMARK);</span>
+<span class="nc" id="L139">        run.put(&quot;challengeId&quot;, CHALLENGE);</span>
+<span class="nc" id="L140">        run.put(&quot;repositoryRevision&quot;, arguments.repositoryRevision());</span>
+<span class="nc" id="L141">        run.put(&quot;caseCorpusContentHash&quot;, text(corpus, &quot;contentHash&quot;));</span>
+<span class="nc" id="L142">        run.put(&quot;freezeReceiptContentHash&quot;, text(receipt, &quot;contentHash&quot;));</span>
+<span class="nc" id="L143">        run.put(&quot;combinedPreregistrationHash&quot;,</span>
+<span class="nc" id="L144">            text(receipt, &quot;combinedPreregistrationHash&quot;));</span>
+<span class="nc" id="L145">        run.put(&quot;downstreamTaskStreamContentHash&quot;,</span>
+<span class="nc" id="L146">            text(stream, &quot;contentHash&quot;));</span>
+<span class="nc" id="L147">        run.put(&quot;baselineInventoryProfileId&quot;, PROFILE_ID);</span>
+<span class="nc" id="L148">        run.put(&quot;baselineInventoryContentHash&quot;, text(profile, &quot;contentHash&quot;));</span>
+<span class="nc" id="L149">        run.put(&quot;comparisonPolicy&quot;, COMPARISON);</span>
+<span class="nc" id="L150">        run.put(&quot;formationAccessPolicy&quot;, &quot;TRAIN_ONLY&quot;);</span>
+<span class="nc" id="L151">        run.put(&quot;candidateSelectionPolicy&quot;, selection.policy());</span>
+<span class="nc" id="L152">        run.put(&quot;candidateInventoryPolicy&quot;, INVENTORY_POLICY);</span>
+<span class="nc" id="L153">        run.put(&quot;formedCandidateCount&quot;, formation.macros().size());</span>
+<span class="nc" id="L154">        run.put(&quot;enabledCandidateCount&quot;, 1);</span>
+<span class="nc" id="L155">        run.set(&quot;formationReplayEvidence&quot;, replayEvidence);</span>
+<span class="nc" id="L156">        run.set(&quot;formedCandidates&quot;, formedCandidates);</span>
+<span class="nc" id="L157">        run.set(&quot;candidateSelection&quot;, selectionNode);</span>
+<span class="nc" id="L158">        run.put(&quot;configuredTasks&quot;, TASK_COUNT);</span>
+<span class="nc" id="L159">        run.put(&quot;executedTasks&quot;, evaluations.size());</span>
+<span class="nc" id="L160">        run.set(&quot;aggregateOutcomeCounts&quot;, object(outcomeCounts));</span>
+<span class="nc" id="L161">        run.put(&quot;correctnessRegressionCount&quot;, correctnessRegressions);</span>
+<span class="nc" id="L162">        run.set(&quot;resourceUse&quot;, resourceUse);</span>
+<span class="nc" id="L163">        run.put(&quot;formalProofStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="nc" id="L164">        run.put(&quot;externalNoveltyStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="nc" id="L165">        run.put(&quot;publicationAuthorized&quot;, false);</span>
+<span class="nc" id="L166">        run.set(&quot;tasks&quot;, evaluations);</span>
+<span class="nc" id="L167">        addContentHash(run);</span>
+
+<span class="nc" id="L169">        Path output = arguments.output().toAbsolutePath().normalize();</span>
+<span class="nc" id="L170">        Files.createDirectories(output.getParent());</span>
+<span class="nc" id="L171">        Files.writeString(</span>
+            output,
+<span class="nc" id="L173">            JSON.writerWithDefaultPrettyPrinter().writeValueAsString(run)</span>
+                + &quot;\n&quot;,
+            StandardCharsets.UTF_8);
+<span class="nc" id="L176">        System.out.println(&quot;pairedTaskUtility=&quot; + output);</span>
+<span class="nc" id="L177">        System.out.println(&quot;contentHash=&quot; + text(run, &quot;contentHash&quot;));</span>
+<span class="nc" id="L178">        System.out.println(&quot;selectedCandidate=&quot;</span>
+<span class="nc" id="L179">            + selection.candidate().macroId());</span>
+<span class="nc" id="L180">        System.out.println(&quot;aggregateOutcomeCounts=&quot; + outcomeCounts);</span>
+<span class="nc" id="L181">    }</span>
+
+    private static ObjectNode evaluation(
+        TaskBinding binding,
+        PairedEvaluation evaluation,
+        String candidateId
+    ) {
+<span class="nc" id="L188">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L189">        result.put(&quot;index&quot;, binding.index());</span>
+<span class="nc" id="L190">        result.put(&quot;taskId&quot;, evaluation.taskId());</span>
+<span class="nc" id="L191">        result.put(&quot;caseId&quot;, binding.caseId());</span>
+<span class="nc" id="L192">        result.put(&quot;split&quot;, binding.split());</span>
+<span class="nc" id="L193">        result.put(&quot;structuralCluster&quot;, binding.structuralCluster());</span>
+<span class="nc" id="L194">        result.put(&quot;streamTaskContentHash&quot;, binding.streamTaskContentHash());</span>
+<span class="nc" id="L195">        result.put(&quot;source&quot;, binding.task().source());</span>
+<span class="nc" id="L196">        result.put(&quot;target&quot;, binding.task().target());</span>
+<span class="nc" id="L197">        result.set(&quot;assumptions&quot;, strings(binding.task().assumptions()));</span>
+<span class="nc" id="L198">        result.set(&quot;searchBudget&quot;, object(Map.of(</span>
+<span class="nc" id="L199">            &quot;maxDepth&quot;, binding.task().maxDepth(),</span>
+<span class="nc" id="L200">            &quot;maxExpandedStates&quot;, binding.task().maxExpandedStates())));</span>
+<span class="nc" id="L201">        result.put(&quot;comparisonPolicy&quot;, COMPARISON);</span>
+<span class="nc" id="L202">        result.put(&quot;candidateInventoryPolicy&quot;, INVENTORY_POLICY);</span>
+<span class="nc" id="L203">        result.set(&quot;enabledCandidateIds&quot;, strings(List.of(candidateId)));</span>
+<span class="nc" id="L204">        result.put(&quot;outcome&quot;, evaluation.outcome().name());</span>
+<span class="nc" id="L205">        result.put(&quot;correctnessRegression&quot;,</span>
+<span class="nc" id="L206">            evaluation.correctnessRegression());</span>
+<span class="nc" id="L207">        result.set(&quot;baseline&quot;, searchRun(evaluation.baseline()));</span>
+<span class="nc" id="L208">        result.set(&quot;candidateEnabled&quot;,</span>
+<span class="nc" id="L209">            searchRun(evaluation.macroEnabled()));</span>
+<span class="nc" id="L210">        result.set(&quot;resourceDelta&quot;, resourceDelta(</span>
+<span class="nc" id="L211">            evaluation.baseline(), evaluation.macroEnabled()));</span>
+<span class="nc" id="L212">        result.put(&quot;detail&quot;, evaluation.detail());</span>
+<span class="nc" id="L213">        addContentHash(result);</span>
+<span class="nc" id="L214">        return result;</span>
+    }
+
+    private static ObjectNode searchRun(SearchRun run) {
+<span class="nc" id="L218">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L219">        result.put(&quot;success&quot;, run.success());</span>
+<span class="nc" id="L220">        result.put(&quot;reachedExpression&quot;, run.reachedExpression());</span>
+<span class="nc" id="L221">        result.set(&quot;path&quot;, strings(run.path()));</span>
+<span class="nc" id="L222">        result.set(&quot;ruleIds&quot;, strings(run.ruleIds()));</span>
+<span class="nc" id="L223">        result.put(&quot;expandedStates&quot;, run.expandedStates());</span>
+<span class="nc" id="L224">        result.put(&quot;generatedCandidates&quot;, run.generatedCandidates());</span>
+<span class="nc" id="L225">        result.put(&quot;budgetExhausted&quot;, run.budgetExhausted());</span>
+<span class="nc" id="L226">        result.put(&quot;detail&quot;, run.detail());</span>
+<span class="nc" id="L227">        addContentHash(result);</span>
+<span class="nc" id="L228">        return result;</span>
+    }
+
+    private static ObjectNode resourceDelta(
+        SearchRun baseline,
+        SearchRun candidate
+    ) {
+<span class="nc" id="L235">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L236">        result.put(&quot;expandedStateSaving&quot;,</span>
+<span class="nc" id="L237">            baseline.expandedStates() - candidate.expandedStates());</span>
+<span class="nc" id="L238">        result.put(&quot;generatedCandidateSaving&quot;,</span>
+<span class="nc" id="L239">            baseline.generatedCandidates() - candidate.generatedCandidates());</span>
+<span class="nc" id="L240">        result.put(&quot;pathStepSaving&quot;,</span>
+<span class="nc" id="L241">            baseline.ruleIds().size() - candidate.ruleIds().size());</span>
+<span class="nc" id="L242">        addContentHash(result);</span>
+<span class="nc" id="L243">        return result;</span>
+    }
+
+    private static ObjectNode candidate(MacroCandidate candidate) {
+<span class="nc" id="L247">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L248">        result.put(&quot;macroId&quot;, candidate.macroId());</span>
+<span class="nc" id="L249">        result.set(&quot;operationSequence&quot;,</span>
+<span class="nc" id="L250">            strings(candidate.operationSequence()));</span>
+<span class="nc" id="L251">        result.set(&quot;supportingTraceIds&quot;,</span>
+<span class="nc" id="L252">            strings(candidate.supportingTraceIds()));</span>
+<span class="nc" id="L253">        result.put(&quot;trainSupport&quot;, candidate.supportingTraceIds().size());</span>
+<span class="nc" id="L254">        result.put(&quot;leftPattern&quot;, candidate.rule().leftPattern());</span>
+<span class="nc" id="L255">        result.put(&quot;rightPattern&quot;, candidate.rule().rightPattern());</span>
+<span class="nc" id="L256">        result.set(&quot;parameterRelations&quot;,</span>
+<span class="nc" id="L257">            strings(candidate.rule().parameterRelations()));</span>
+<span class="nc" id="L258">        result.set(&quot;assumptions&quot;, strings(candidate.rule().assumptions()));</span>
+<span class="nc" id="L259">        result.put(&quot;proofStatus&quot;, candidate.rule().proofStatus().name());</span>
+<span class="nc" id="L260">        result.put(&quot;knownRuleStatus&quot;,</span>
+<span class="nc" id="L261">            candidate.rule().knownRuleStatus().name());</span>
+<span class="nc" id="L262">        result.put(&quot;supportingExamples&quot;,</span>
+<span class="nc" id="L263">            candidate.rule().supportingExamples());</span>
+<span class="nc" id="L264">        result.put(&quot;occurrenceCount&quot;, candidate.rule().occurrenceCount());</span>
+<span class="nc" id="L265">        result.put(&quot;confidenceScore&quot;, candidate.rule().confidenceScore());</span>
+<span class="nc" id="L266">        result.put(&quot;canonicalHash&quot;, candidate.rule().canonicalHash());</span>
+<span class="nc" id="L267">        result.put(&quot;validationEvidence&quot;, candidate.validationEvidence());</span>
+<span class="nc" id="L268">        ArrayNode steps = JSON.createArrayNode();</span>
+<span class="nc" id="L269">        candidate.atomicSteps().stream()</span>
+<span class="nc" id="L270">            .sorted(Comparator.comparingInt(TransformationStep::index))</span>
+<span class="nc" id="L271">            .map(CandidateIndependentExactOneMacroEvaluationMain::atomicStep)</span>
+<span class="nc" id="L272">            .forEach(steps::add);</span>
+<span class="nc" id="L273">        result.set(&quot;atomicSteps&quot;, steps);</span>
+<span class="nc" id="L274">        addContentHash(result);</span>
+<span class="nc" id="L275">        return result;</span>
+    }
+
+    private static ObjectNode atomicStep(TransformationStep step) {
+<span class="nc" id="L279">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L280">        result.put(&quot;index&quot;, step.index());</span>
+<span class="nc" id="L281">        result.put(&quot;beforeExpression&quot;, step.beforeExpression());</span>
+<span class="nc" id="L282">        result.put(&quot;afterExpression&quot;, step.afterExpression());</span>
+<span class="nc" id="L283">        result.put(&quot;ruleId&quot;, step.ruleId());</span>
+<span class="nc" id="L284">        result.put(&quot;ruleKind&quot;, step.ruleKind().name());</span>
+<span class="nc" id="L285">        result.put(&quot;scoreBefore&quot;, step.scoreBefore());</span>
+<span class="nc" id="L286">        result.put(&quot;scoreAfter&quot;, step.scoreAfter());</span>
+<span class="nc" id="L287">        result.put(&quot;equivalencePreserving&quot;, step.equivalencePreserving());</span>
+<span class="nc" id="L288">        result.put(&quot;explanation&quot;, step.explanation());</span>
+<span class="nc" id="L289">        result.set(&quot;assumptions&quot;, strings(step.assumptions()));</span>
+<span class="nc" id="L290">        addContentHash(result);</span>
+<span class="nc" id="L291">        return result;</span>
+    }
+
+    private static ObjectNode replayEvidence(ReplayEvidence evidence) {
+<span class="nc" id="L295">        ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L296">        result.put(&quot;traceId&quot;, evidence.traceId());</span>
+<span class="nc" id="L297">        result.put(&quot;reproduced&quot;, evidence.reproduced());</span>
+<span class="nc" id="L298">        result.put(&quot;exploredStates&quot;, evidence.exploredStates());</span>
+<span class="nc" id="L299">        result.set(&quot;actualRuleIds&quot;, strings(evidence.actualRuleIds()));</span>
+<span class="nc" id="L300">        result.set(&quot;assignedOperationIds&quot;,</span>
+<span class="nc" id="L301">            strings(evidence.assignedOperationIds()));</span>
+<span class="nc" id="L302">        result.set(&quot;compressedOperationIds&quot;,</span>
+<span class="nc" id="L303">            strings(evidence.compressedOperationIds()));</span>
+<span class="nc" id="L304">        result.set(&quot;expressionPath&quot;, strings(evidence.expressionPath()));</span>
+<span class="nc" id="L305">        result.put(&quot;detail&quot;, evidence.detail());</span>
+<span class="nc" id="L306">        addContentHash(result);</span>
+<span class="nc" id="L307">        return result;</span>
+    }
+
+    private static List&lt;ReplayTrace&gt; trainTraces(List&lt;ObjectNode&gt; cases) {
+<span class="nc" id="L311">        List&lt;ReplayTrace&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        for (ObjectNode benchmarkCase : cases) {</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">            if (!&quot;TRAIN&quot;.equals(text(benchmarkCase, &quot;split&quot;))) {</span>
+<span class="nc" id="L314">                continue;</span>
+            }
+<span class="nc" id="L316">            ObjectNode formation = requireObjectField(</span>
+                benchmarkCase, &quot;formationInput&quot;, &quot;macro TRAIN formationInput&quot;);
+<span class="nc bnc" id="L318" title="All 2 branches missed.">            require(!formation.path(&quot;heldOutTargetsVisible&quot;).asBoolean(true),</span>
+                &quot;macro TRAIN formation exposes held-out targets&quot;);
+<span class="nc" id="L320">            require(PROFILE_ID.equals(</span>
+<span class="nc" id="L321">                    text(formation, &quot;primitiveInventoryProfile&quot;)),</span>
+                &quot;macro TRAIN case uses an unexpected primitive profile&quot;);
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            for (JsonNode item : requireArray(</span>
+                    formation, &quot;replayTraces&quot;, &quot;macro replay traces&quot;)) {
+<span class="nc" id="L325">                ObjectNode trace = requireObject(item, &quot;macro replay trace&quot;);</span>
+<span class="nc" id="L326">                result.add(new ReplayTrace(</span>
+<span class="nc" id="L327">                    text(trace, &quot;traceId&quot;),</span>
+<span class="nc" id="L328">                    text(trace, &quot;source&quot;),</span>
+<span class="nc" id="L329">                    text(trace, &quot;target&quot;),</span>
+<span class="nc" id="L330">                    stringValues(requireArray(</span>
+                        trace, &quot;primitiveSteps&quot;, &quot;trace primitive steps&quot;)),
+<span class="nc" id="L332">                    stringValues(requireArray(</span>
+                        trace, &quot;assumptions&quot;, &quot;trace assumptions&quot;))));
+<span class="nc" id="L334">            }</span>
+<span class="nc" id="L335">        }</span>
+<span class="nc" id="L336">        result.sort(Comparator.comparing(ReplayTrace::traceId));</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        require(result.size() == 4,</span>
+<span class="nc" id="L338">            &quot;frozen macro TRAIN replay count changed: &quot; + result.size());</span>
+<span class="nc" id="L339">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;TaskBinding&gt; streamTasks(ObjectNode stream) {
+<span class="nc" id="L343">        List&lt;TaskBinding&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L344">        int expectedIndex = 1;</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        for (JsonNode item : requireArray(</span>
+                stream, &quot;tasks&quot;, &quot;downstream stream tasks&quot;)) {
+<span class="nc" id="L347">            ObjectNode task = requireObject(item, &quot;downstream stream task&quot;);</span>
+<span class="nc" id="L348">            requireContentHash(task,</span>
+<span class="nc" id="L349">                &quot;downstream stream task &quot; + text(task, &quot;taskId&quot;));</span>
+<span class="nc" id="L350">            int index = integer(task, &quot;index&quot;, &quot;downstream stream task&quot;);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">            require(index == expectedIndex,</span>
+                &quot;downstream task order changed at index &quot; + expectedIndex);
+<span class="nc" id="L353">            expectedIndex++;</span>
+<span class="nc" id="L354">            ObjectNode budget = requireObjectField(</span>
+                task, &quot;searchBudget&quot;, &quot;downstream task budget&quot;);
+<span class="nc" id="L356">            result.add(new TaskBinding(</span>
+                index,
+<span class="nc" id="L358">                text(task, &quot;taskId&quot;),</span>
+<span class="nc" id="L359">                text(task, &quot;caseId&quot;),</span>
+<span class="nc" id="L360">                text(task, &quot;split&quot;),</span>
+<span class="nc" id="L361">                text(task, &quot;structuralCluster&quot;),</span>
+<span class="nc" id="L362">                text(task, &quot;contentHash&quot;),</span>
+                new EvaluationTask(
+<span class="nc" id="L364">                    text(task, &quot;taskId&quot;),</span>
+<span class="nc" id="L365">                    text(task, &quot;source&quot;),</span>
+<span class="nc" id="L366">                    text(task, &quot;target&quot;),</span>
+<span class="nc" id="L367">                    stringValues(requireArray(</span>
+                        task, &quot;assumptions&quot;, &quot;downstream task assumptions&quot;)),
+<span class="nc" id="L369">                    integer(budget, &quot;maxDepth&quot;, &quot;downstream task budget&quot;),</span>
+<span class="nc" id="L370">                    integer(</span>
+                        budget,
+                        &quot;maxExpandedStates&quot;,
+                        &quot;downstream task budget&quot;))));
+<span class="nc" id="L374">        }</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">        require(result.size() == TASK_COUNT,</span>
+<span class="nc" id="L376">            &quot;frozen downstream task count changed: &quot; + result.size());</span>
+<span class="nc" id="L377">        return List.copyOf(result);</span>
+    }
+
+    private static Map&lt;String, List&lt;String&gt;&gt; operationRules(
+        ObjectNode profile
+    ) {
+<span class="nc" id="L383">        LinkedHashMap&lt;String, List&lt;String&gt;&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        for (JsonNode item : requireArray(</span>
+                profile, &quot;operations&quot;, &quot;macro profile operations&quot;)) {
+<span class="nc" id="L386">            ObjectNode operation = requireObject(item, &quot;macro operation&quot;);</span>
+<span class="nc" id="L387">            result.put(</span>
+<span class="nc" id="L388">                text(operation, &quot;operationId&quot;),</span>
+<span class="nc" id="L389">                stringValues(requireArray(</span>
+                    operation,
+                    &quot;implementationRuleIds&quot;,
+                    &quot;macro operation implementation rules&quot;)));
+<span class="nc" id="L393">        }</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">        require(result.size() == 6,</span>
+<span class="nc" id="L395">            &quot;macro primitive operation count changed: &quot; + result.size());</span>
+<span class="nc" id="L396">        return Map.copyOf(result);</span>
+    }
+
+    private static List&lt;ObjectNode&gt; macroCases(ObjectNode corpus) {
+<span class="nc" id="L400">        List&lt;ObjectNode&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        for (JsonNode item : requireArray(corpus, &quot;cases&quot;, &quot;case corpus&quot;)) {</span>
+<span class="nc" id="L402">            ObjectNode benchmarkCase = requireObject(item, &quot;benchmark case&quot;);</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">            if (!CHALLENGE.equals(text(benchmarkCase, &quot;challengeId&quot;))) {</span>
+<span class="nc" id="L404">                continue;</span>
+            }
+<span class="nc" id="L406">            requireContentHash(benchmarkCase,</span>
+<span class="nc" id="L407">                &quot;macro case &quot; + text(benchmarkCase, &quot;caseId&quot;));</span>
+<span class="nc" id="L408">            validateExposure(benchmarkCase);</span>
+<span class="nc" id="L409">            result.add(benchmarkCase);</span>
+<span class="nc" id="L410">        }</span>
+<span class="nc" id="L411">        result.sort(Comparator.comparing(item -&gt; text(item, &quot;caseId&quot;)));</span>
+<span class="nc" id="L412">        require(result.stream()</span>
+<span class="nc" id="L413">                .map(item -&gt; text(item, &quot;caseId&quot;))</span>
+<span class="nc" id="L414">                .toList()</span>
+<span class="nc" id="L415">                .equals(List.of(</span>
+                    &quot;case-13&quot;, &quot;case-14&quot;, &quot;case-15&quot;,
+                    &quot;case-16&quot;, &quot;case-17&quot;, &quot;case-18&quot;)),
+            &quot;macro case identities changed&quot;);
+<span class="nc" id="L419">        return List.copyOf(result);</span>
+    }
+
+    private static void validateExposure(ObjectNode benchmarkCase) {
+<span class="nc" id="L423">        String caseId = text(benchmarkCase, &quot;caseId&quot;);</span>
+<span class="nc" id="L424">        String split = text(benchmarkCase, &quot;split&quot;);</span>
+<span class="nc" id="L425">        ObjectNode policy = requireObjectField(</span>
+            benchmarkCase, &quot;exposurePolicy&quot;, &quot;macro exposure policy&quot;);
+<span class="nc" id="L427">        List&lt;String&gt; mayRead = stringValues(requireArray(</span>
+            policy, &quot;candidateFormationMayRead&quot;, &quot;formation readable inputs&quot;));
+<span class="nc" id="L429">        List&lt;String&gt; mustNotRead = stringValues(requireArray(</span>
+            policy,
+            &quot;candidateFormationMustNotRead&quot;,
+            &quot;formation prohibited inputs&quot;));
+<span class="nc" id="L433">        require(mustNotRead.equals(List.of(&quot;evaluationInput&quot;)),</span>
+            &quot;case &quot; + caseId + &quot; does not prohibit evaluation input&quot;);
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        if (&quot;TRAIN&quot;.equals(split)) {</span>
+<span class="nc" id="L436">            require(mayRead.equals(List.of(&quot;formationInput&quot;)),</span>
+                &quot;TRAIN macro formation surface changed: &quot; + caseId);
+<span class="nc" id="L438">            require(benchmarkCase.path(&quot;formationInput&quot;).isObject(),</span>
+                &quot;TRAIN macro case has no formation payload: &quot; + caseId);
+        } else {
+<span class="nc" id="L441">            require(mayRead.isEmpty(),</span>
+                &quot;held-out macro case exposes formation data: &quot; + caseId);
+<span class="nc" id="L443">            require(benchmarkCase.path(&quot;formationInput&quot;).isNull(),</span>
+                &quot;held-out macro case has formation payload: &quot; + caseId);
+        }
+<span class="nc" id="L446">    }</span>
+
+    private static void validateFrozenInputs(
+        ObjectNode benchmark,
+        ObjectNode corpus,
+        ObjectNode profile,
+        ObjectNode receipt
+    ) {
+<span class="nc" id="L454">        requireContentHash(corpus, &quot;case corpus&quot;);</span>
+<span class="nc" id="L455">        requireContentHash(profile, &quot;macro primitive profile&quot;);</span>
+<span class="nc" id="L456">        requireContentHash(receipt, &quot;corpus freeze receipt&quot;);</span>
+<span class="nc" id="L457">        require(semanticHash(benchmark).equals(</span>
+<span class="nc" id="L458">                text(receipt, &quot;benchmarkSourceContentHash&quot;)),</span>
+            &quot;benchmark source is not bound by the freeze receipt&quot;);
+<span class="nc" id="L460">        require(text(corpus, &quot;contentHash&quot;).equals(</span>
+<span class="nc" id="L461">                text(receipt, &quot;caseCorpusContentHash&quot;)),</span>
+            &quot;case corpus is not bound by the freeze receipt&quot;);
+<span class="nc" id="L463">        ObjectNode roots = requireObjectField(</span>
+            receipt,
+            &quot;formationInventoryContentHashes&quot;,
+            &quot;freeze receipt inventory roots&quot;);
+<span class="nc" id="L467">        require(text(profile, &quot;contentHash&quot;).equals(text(roots, PROFILE_ID)),</span>
+            &quot;macro profile is not bound by the freeze receipt&quot;);
+<span class="nc" id="L469">        require(&quot;NOT_STARTED&quot;.equals(text(benchmark, &quot;executionStatus&quot;)),</span>
+            &quot;benchmark source was modified after freeze&quot;);
+<span class="nc" id="L471">        require(&quot;NOT_STARTED&quot;.equals(</span>
+<span class="nc" id="L472">                text(receipt, &quot;executionStatusAtFreeze&quot;)),</span>
+            &quot;corpus was not frozen before execution&quot;);
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        require(integer(</span>
+                receipt, &quot;executedCampaignsAtFreeze&quot;, &quot;receipt&quot;) == 0,
+            &quot;freeze receipt already contains campaigns&quot;);
+<span class="nc bnc" id="L477" title="All 2 branches missed.">        require(integer(</span>
+                receipt, &quot;executedEvaluationsAtFreeze&quot;, &quot;receipt&quot;) == 0,
+            &quot;freeze receipt already contains evaluations&quot;);
+<span class="nc bnc" id="L480" title="All 2 branches missed.">        require(!receipt.path(&quot;publicationAuthorized&quot;).asBoolean(true),</span>
+            &quot;freeze receipt unexpectedly authorizes publication&quot;);
+<span class="nc" id="L482">    }</span>
+
+    private static void validateStream(
+        ObjectNode stream,
+        ObjectNode corpus,
+        ObjectNode profile,
+        ObjectNode receipt
+    ) {
+<span class="nc" id="L490">        requireContentHash(stream, &quot;downstream task stream&quot;);</span>
+<span class="nc" id="L491">        require(&quot;regelsuche.downstream-task-stream/v1&quot;.equals(</span>
+<span class="nc" id="L492">                text(stream, &quot;schema&quot;)),</span>
+            &quot;unexpected downstream stream schema&quot;);
+<span class="nc" id="L494">        require(BENCHMARK.equals(text(stream, &quot;benchmarkId&quot;)),</span>
+            &quot;downstream stream benchmark identity changed&quot;);
+<span class="nc" id="L496">        require(CHALLENGE.equals(text(stream, &quot;challengeId&quot;)),</span>
+            &quot;downstream stream challenge identity changed&quot;);
+<span class="nc" id="L498">        require(text(stream, &quot;sourceCaseCorpusContentHash&quot;).equals(</span>
+<span class="nc" id="L499">                text(corpus, &quot;contentHash&quot;)),</span>
+            &quot;downstream stream is not bound to the case corpus&quot;);
+<span class="nc" id="L501">        require(text(stream, &quot;freezeReceiptContentHash&quot;).equals(</span>
+<span class="nc" id="L502">                text(receipt, &quot;contentHash&quot;)),</span>
+            &quot;downstream stream is not bound to the freeze receipt&quot;);
+<span class="nc" id="L504">        require(text(stream, &quot;baselineInventoryContentHash&quot;).equals(</span>
+<span class="nc" id="L505">                text(profile, &quot;contentHash&quot;)),</span>
+            &quot;downstream stream is not bound to the baseline inventory&quot;);
+<span class="nc" id="L507">        require(text(stream, &quot;combinedPreregistrationHash&quot;).equals(</span>
+<span class="nc" id="L508">                text(receipt, &quot;combinedPreregistrationHash&quot;)),</span>
+            &quot;downstream stream preregistration binding changed&quot;);
+<span class="nc" id="L510">        require(COMPARISON.equals(text(stream, &quot;comparisonPolicy&quot;)),</span>
+            &quot;downstream stream comparison policy changed&quot;);
+<span class="nc" id="L512">        require(&quot;EVALUATION_INPUT_HIDDEN_DURING_CANDIDATE_FORMATION&quot;.equals(</span>
+<span class="nc" id="L513">                text(stream, &quot;formationAccessPolicy&quot;)),</span>
+            &quot;downstream stream formation access policy changed&quot;);
+<span class="nc bnc" id="L515" title="All 2 branches missed.">        require(integer(stream, &quot;configuredTasks&quot;, &quot;downstream stream&quot;)</span>
+                == TASK_COUNT,
+            &quot;downstream stream task count changed&quot;);
+<span class="nc" id="L518">        require(&quot;NOT_EXECUTED_BY_STREAM_CONSTRUCTION&quot;.equals(</span>
+<span class="nc" id="L519">                text(stream, &quot;evaluationStatus&quot;)),</span>
+            &quot;downstream stream already contains evaluated results&quot;);
+<span class="nc bnc" id="L521" title="All 2 branches missed.">        require(!stream.path(&quot;publicationAuthorized&quot;).asBoolean(true),</span>
+            &quot;downstream stream unexpectedly authorizes publication&quot;);
+<span class="nc" id="L523">    }</span>
+
+    private static LinkedHashMap&lt;String, Integer&gt; emptyOutcomeCounts() {
+<span class="nc" id="L526">        LinkedHashMap&lt;String, Integer&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        for (UtilityOutcome outcome : UtilityOutcome.values()) {</span>
+<span class="nc" id="L528">            result.put(outcome.name(), 0);</span>
+        }
+<span class="nc" id="L530">        return result;</span>
+    }
+
+    private static ObjectNode readObject(Path path) throws IOException {
+<span class="nc bnc" id="L534" title="All 4 branches missed.">        require(Files.isRegularFile(path) &amp;&amp; !Files.isSymbolicLink(path),</span>
+            &quot;expected regular non-symbolic JSON file: &quot; + path);
+<span class="nc" id="L536">        return requireObject(</span>
+<span class="nc" id="L537">            JSON.readTree(Files.readString(path, StandardCharsets.UTF_8)),</span>
+<span class="nc" id="L538">            path.toString());</span>
+    }
+
+    private static void requireContentHash(
+        ObjectNode value,
+        String context
+    ) {
+<span class="nc" id="L545">        String retained = text(value, &quot;contentHash&quot;);</span>
+<span class="nc" id="L546">        ObjectNode material = value.deepCopy();</span>
+<span class="nc" id="L547">        material.remove(&quot;contentHash&quot;);</span>
+<span class="nc" id="L548">        String expected = semanticHash(material);</span>
+<span class="nc" id="L549">        require(retained.equals(expected),</span>
+            context + &quot; contentHash mismatch: &quot; + retained + &quot; != &quot;
+                + expected);
+<span class="nc" id="L552">    }</span>
+
+    private static void addContentHash(ObjectNode value) {
+<span class="nc bnc" id="L555" title="All 2 branches missed.">        require(!value.has(&quot;contentHash&quot;), &quot;contentHash already present&quot;);</span>
+<span class="nc" id="L556">        value.put(&quot;contentHash&quot;, semanticHash(value));</span>
+<span class="nc" id="L557">    }</span>
+
+    private static String semanticHash(JsonNode value) {
+        try {
+<span class="nc" id="L561">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(</span>
+<span class="nc" id="L562">                MessageDigest.getInstance(&quot;SHA-256&quot;).digest(</span>
+<span class="nc" id="L563">                    canonicalJson(value).getBytes(StandardCharsets.UTF_8)));</span>
+<span class="nc" id="L564">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L565">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static String canonicalJson(JsonNode value) {
+        try {
+<span class="nc bnc" id="L571" title="All 2 branches missed.">            if (value.isObject()) {</span>
+<span class="nc" id="L572">                TreeSet&lt;String&gt; fields = new TreeSet&lt;&gt;();</span>
+<span class="nc" id="L573">                value.fieldNames().forEachRemaining(fields::add);</span>
+<span class="nc" id="L574">                StringBuilder result = new StringBuilder(&quot;{&quot;);</span>
+<span class="nc" id="L575">                int index = 0;</span>
+<span class="nc bnc" id="L576" title="All 2 branches missed.">                for (String field : fields) {</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                    if (index++ &gt; 0) {</span>
+<span class="nc" id="L578">                        result.append(',');</span>
+                    }
+<span class="nc" id="L580">                    result.append(JSON.writeValueAsString(field))</span>
+<span class="nc" id="L581">                        .append(':')</span>
+<span class="nc" id="L582">                        .append(canonicalJson(value.get(field)));</span>
+<span class="nc" id="L583">                }</span>
+<span class="nc" id="L584">                return result.append('}').toString();</span>
+            }
+<span class="nc bnc" id="L586" title="All 2 branches missed.">            if (value.isArray()) {</span>
+<span class="nc" id="L587">                StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L588" title="All 2 branches missed.">                for (int index = 0; index &lt; value.size(); index++) {</span>
+<span class="nc bnc" id="L589" title="All 2 branches missed.">                    if (index &gt; 0) {</span>
+<span class="nc" id="L590">                        result.append(',');</span>
+                    }
+<span class="nc" id="L592">                    result.append(canonicalJson(value.get(index)));</span>
+                }
+<span class="nc" id="L594">                return result.append(']').toString();</span>
+            }
+<span class="nc" id="L596">            return JSON.writeValueAsString(value);</span>
+<span class="nc" id="L597">        } catch (IOException exception) {</span>
+<span class="nc" id="L598">            throw new IllegalStateException(</span>
+                &quot;cannot canonicalize JSON&quot;, exception);
+        }
+    }
+
+    private static ObjectNode object(Map&lt;String, ?&gt; values) {
+<span class="nc" id="L604">        return JSON.valueToTree(new LinkedHashMap&lt;&gt;(values));</span>
+    }
+
+    private static ArrayNode strings(List&lt;String&gt; values) {
+<span class="nc" id="L608">        ArrayNode result = JSON.createArrayNode();</span>
+<span class="nc" id="L609">        values.forEach(result::add);</span>
+<span class="nc" id="L610">        return result;</span>
+    }
+
+    private static List&lt;String&gt; stringValues(ArrayNode values) {
+<span class="nc" id="L614">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">        for (JsonNode value : values) {</span>
+<span class="nc bnc" id="L616" title="All 4 branches missed.">            require(value.isTextual() &amp;&amp; !value.asText().isBlank(),</span>
+                &quot;expected nonblank string array item&quot;);
+<span class="nc" id="L618">            result.add(value.asText());</span>
+<span class="nc" id="L619">        }</span>
+<span class="nc" id="L620">        return List.copyOf(result);</span>
+    }
+
+    private static ObjectNode requireObject(
+        JsonNode value,
+        String context
+    ) {
+<span class="nc bnc" id="L627" title="All 4 branches missed.">        require(value != null &amp;&amp; value.isObject(),</span>
+            context + &quot; is not an object&quot;);
+<span class="nc" id="L629">        return (ObjectNode) value;</span>
+    }
+
+    private static ObjectNode requireObjectField(
+        JsonNode value,
+        String field,
+        String context
+    ) {
+<span class="nc" id="L637">        return requireObject(value.get(field), context);</span>
+    }
+
+    private static ArrayNode requireArray(
+        JsonNode value,
+        String field,
+        String context
+    ) {
+<span class="nc" id="L645">        JsonNode child = value.get(field);</span>
+<span class="nc bnc" id="L646" title="All 4 branches missed.">        require(child != null &amp;&amp; child.isArray(),</span>
+            context + &quot; is not an array&quot;);
+<span class="nc" id="L648">        return (ArrayNode) child;</span>
+    }
+
+    private static String text(JsonNode value, String field) {
+<span class="nc" id="L652">        Objects.requireNonNull(value, &quot;value&quot;);</span>
+<span class="nc" id="L653">        JsonNode child = value.get(field);</span>
+<span class="nc bnc" id="L654" title="All 4 branches missed.">        require(child != null &amp;&amp; child.isTextual()</span>
+<span class="nc bnc" id="L655" title="All 2 branches missed.">                &amp;&amp; !child.asText().isBlank(),</span>
+            &quot;missing textual field &quot; + field);
+<span class="nc" id="L657">        return child.asText();</span>
+    }
+
+    private static int integer(
+        JsonNode value,
+        String field,
+        String context
+    ) {
+<span class="nc" id="L665">        JsonNode child = value.get(field);</span>
+<span class="nc bnc" id="L666" title="All 4 branches missed.">        require(child != null &amp;&amp; child.canConvertToInt(),</span>
+            context + &quot; has no integer field &quot; + field);
+<span class="nc" id="L668">        return child.intValue();</span>
+    }
+
+    private static void require(boolean condition, String message) {
+<span class="nc bnc" id="L672" title="All 2 branches missed.">        if (!condition) {</span>
+<span class="nc" id="L673">            throw new IllegalStateException(message);</span>
+        }
+<span class="nc" id="L675">    }</span>
+
+    private record TaskBinding(
+        int index,
+        String taskId,
+        String caseId,
+        String split,
+        String structuralCluster,
+        String streamTaskContentHash,
+        EvaluationTask task
+    ) {
+<span class="nc" id="L686">        private TaskBinding {</span>
+<span class="nc" id="L687">            require(taskId.equals(task.taskId()),</span>
+                &quot;task binding identity mismatch&quot;);
+<span class="nc" id="L689">        }</span>
+    }
+
+    private static final class ResourceAccumulator {
+        private final int formationStates;
+        private final int formationCandidateEvaluations;
+        private int baselineStates;
+        private int candidateStates;
+        private int baselineCandidates;
+        private int candidateCandidates;
+        private int baselinePathSteps;
+        private int candidatePathSteps;
+
+<span class="nc" id="L702">        private ResourceAccumulator(List&lt;ReplayEvidence&gt; evidence) {</span>
+<span class="nc" id="L703">            formationStates = evidence.stream()</span>
+<span class="nc" id="L704">                .mapToInt(ReplayEvidence::exploredStates)</span>
+<span class="nc" id="L705">                .sum();</span>
+<span class="nc" id="L706">            formationCandidateEvaluations = evidence.stream()</span>
+<span class="nc" id="L707">                .mapToInt(item -&gt; item.actualRuleIds().size())</span>
+<span class="nc" id="L708">                .sum();</span>
+<span class="nc" id="L709">        }</span>
+
+        private void add(PairedEvaluation evaluation) {
+<span class="nc" id="L712">            baselineStates += evaluation.baseline().expandedStates();</span>
+<span class="nc" id="L713">            candidateStates += evaluation.macroEnabled().expandedStates();</span>
+<span class="nc" id="L714">            baselineCandidates += evaluation.baseline().generatedCandidates();</span>
+<span class="nc" id="L715">            candidateCandidates +=</span>
+<span class="nc" id="L716">                evaluation.macroEnabled().generatedCandidates();</span>
+<span class="nc" id="L717">            baselinePathSteps += evaluation.baseline().ruleIds().size();</span>
+<span class="nc" id="L718">            candidatePathSteps += evaluation.macroEnabled().ruleIds().size();</span>
+<span class="nc" id="L719">        }</span>
+
+        private ObjectNode resourceUse(ObjectNode budgets) {
+<span class="nc" id="L722">            int configuredStates = integer(</span>
+                budgets, &quot;maxStatesPerCampaign&quot;, &quot;benchmark budgets&quot;);
+<span class="nc" id="L724">            int configuredCandidates = integer(</span>
+                budgets, &quot;maxCandidateEvaluations&quot;, &quot;benchmark budgets&quot;);
+<span class="nc" id="L726">            int configuredProofs = integer(</span>
+                budgets, &quot;maxProofAttempts&quot;, &quot;benchmark budgets&quot;);
+<span class="nc" id="L728">            int executedStates = formationStates + baselineStates</span>
+                + candidateStates;
+<span class="nc" id="L730">            int executedCandidates = formationCandidateEvaluations</span>
+                + baselineCandidates + candidateCandidates;
+<span class="nc bnc" id="L732" title="All 2 branches missed.">            require(executedStates &lt;= configuredStates,</span>
+                &quot;exact-one evaluation exceeds frozen state budget&quot;);
+<span class="nc bnc" id="L734" title="All 2 branches missed.">            require(executedCandidates &lt;= configuredCandidates,</span>
+                &quot;exact-one evaluation exceeds candidate-evaluation budget&quot;);
+
+<span class="nc" id="L737">            ObjectNode result = JSON.createObjectNode();</span>
+<span class="nc" id="L738">            result.put(&quot;configuredStates&quot;, configuredStates);</span>
+<span class="nc" id="L739">            result.put(&quot;executedStates&quot;, executedStates);</span>
+<span class="nc" id="L740">            result.put(&quot;remainingStates&quot;, configuredStates - executedStates);</span>
+<span class="nc" id="L741">            result.put(&quot;configuredCandidateEvaluations&quot;,</span>
+                configuredCandidates);
+<span class="nc" id="L743">            result.put(&quot;executedCandidateEvaluations&quot;, executedCandidates);</span>
+<span class="nc" id="L744">            result.put(&quot;remainingCandidateEvaluations&quot;,</span>
+                configuredCandidates - executedCandidates);
+<span class="nc" id="L746">            result.put(&quot;configuredProofAttempts&quot;, configuredProofs);</span>
+<span class="nc" id="L747">            result.put(&quot;executedProofAttempts&quot;, 0);</span>
+<span class="nc" id="L748">            result.put(&quot;remainingProofAttempts&quot;, configuredProofs);</span>
+<span class="nc" id="L749">            result.put(&quot;formationStates&quot;, formationStates);</span>
+<span class="nc" id="L750">            result.put(&quot;formationCandidateEvaluations&quot;,</span>
+                formationCandidateEvaluations);
+<span class="nc" id="L752">            result.put(&quot;baselineExpandedStates&quot;, baselineStates);</span>
+<span class="nc" id="L753">            result.put(&quot;candidateExpandedStates&quot;, candidateStates);</span>
+<span class="nc" id="L754">            result.put(&quot;expandedStateSaving&quot;,</span>
+                baselineStates - candidateStates);
+<span class="nc" id="L756">            result.put(&quot;baselineGeneratedCandidates&quot;, baselineCandidates);</span>
+<span class="nc" id="L757">            result.put(&quot;candidateGeneratedCandidates&quot;, candidateCandidates);</span>
+<span class="nc" id="L758">            result.put(&quot;generatedCandidateSaving&quot;,</span>
+                baselineCandidates - candidateCandidates);
+<span class="nc" id="L760">            result.put(&quot;baselinePathSteps&quot;, baselinePathSteps);</span>
+<span class="nc" id="L761">            result.put(&quot;candidatePathSteps&quot;, candidatePathSteps);</span>
+<span class="nc" id="L762">            result.put(&quot;pathStepSaving&quot;,</span>
+                baselinePathSteps - candidatePathSteps);
+<span class="nc" id="L764">            addContentHash(result);</span>
+<span class="nc" id="L765">            return result;</span>
+        }
+    }
+
+<span class="nc" id="L769">    private record Arguments(</span>
+        Path benchmarkSource,
+        Path corpus,
+        Path profile,
+        Path freezeReceipt,
+        Path downstreamStream,
+        Path output,
+        String repositoryRevision
+    ) {
+<span class="nc" id="L778">        private static final Set&lt;String&gt; EXPECTED = Set.of(</span>
+            &quot;--benchmark-source&quot;,
+            &quot;--corpus&quot;,
+            &quot;--profile&quot;,
+            &quot;--freeze-receipt&quot;,
+            &quot;--downstream-stream&quot;,
+            &quot;--output&quot;,
+            &quot;--repository-revision&quot;);
+
+        private static Arguments parse(String[] args) {
+<span class="nc bnc" id="L788" title="All 2 branches missed.">            if (args.length % 2 != 0) {</span>
+<span class="nc" id="L789">                throw new IllegalArgumentException(</span>
+                    &quot;expected --key value arguments&quot;);
+            }
+<span class="nc" id="L792">            LinkedHashMap&lt;String, String&gt; values = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">            for (int index = 0; index &lt; args.length; index += 2) {</span>
+<span class="nc" id="L794">                String key = args[index];</span>
+<span class="nc bnc" id="L795" title="All 2 branches missed.">                if (!key.startsWith(&quot;--&quot;)) {</span>
+<span class="nc" id="L796">                    throw new IllegalArgumentException(</span>
+                        &quot;expected --key value arguments&quot;);
+                }
+<span class="nc bnc" id="L799" title="All 2 branches missed.">                if (values.put(key, args[index + 1]) != null) {</span>
+<span class="nc" id="L800">                    throw new IllegalArgumentException(</span>
+                        &quot;duplicate argument &quot; + key);
+                }
+            }
+<span class="nc bnc" id="L804" title="All 2 branches missed.">            if (!values.keySet().equals(EXPECTED)) {</span>
+<span class="nc" id="L805">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L806">                    &quot;argument allowlist drift: &quot; + values.keySet());</span>
+            }
+<span class="nc" id="L808">            return new Arguments(</span>
+<span class="nc" id="L809">                Path.of(required(values, &quot;--benchmark-source&quot;)),</span>
+<span class="nc" id="L810">                Path.of(required(values, &quot;--corpus&quot;)),</span>
+<span class="nc" id="L811">                Path.of(required(values, &quot;--profile&quot;)),</span>
+<span class="nc" id="L812">                Path.of(required(values, &quot;--freeze-receipt&quot;)),</span>
+<span class="nc" id="L813">                Path.of(required(values, &quot;--downstream-stream&quot;)),</span>
+<span class="nc" id="L814">                Path.of(required(values, &quot;--output&quot;)),</span>
+<span class="nc" id="L815">                required(values, &quot;--repository-revision&quot;));</span>
+        }
+
+        private static String required(
+            Map&lt;String, String&gt; values,
+            String key
+        ) {
+<span class="nc" id="L822">            String value = values.get(key);</span>
+<span class="nc bnc" id="L823" title="All 4 branches missed.">            if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L824">                throw new IllegalArgumentException(</span>
+                    &quot;missing required argument &quot; + key);
+            }
+<span class="nc" id="L827">            return value;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

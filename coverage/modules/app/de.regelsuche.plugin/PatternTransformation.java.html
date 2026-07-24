@@ -35,12 +35,12 @@ public interface PatternTransformation extends RewriteRule {
 
     @Override
     default boolean matches(Expr subtree) {
-<span class="nc" id="L38">        return matches(subtree, new TransformationMatchContext(subtree, java.util.Map.of()));</span>
+<span class="fc" id="L38">        return matches(subtree, new TransformationMatchContext(subtree, java.util.Map.of()));</span>
     }
 
     @Override
     default Expr apply(Expr subtree) {
-<span class="nc" id="L43">        return transform(subtree, new TransformationContext(subtree, java.util.Map.of()));</span>
+<span class="fc" id="L43">        return transform(subtree, new TransformationContext(subtree, java.util.Map.of()));</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

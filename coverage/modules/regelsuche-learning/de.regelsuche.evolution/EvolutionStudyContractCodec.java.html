@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionStudyContractCodec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionStudyContractCodec.java</span></div><h1>EvolutionStudyContractCodec.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
+
+/** Strict JSON codec for preregistered evolution study and split contracts. */
+<span class="fc" id="L13">public final class EvolutionStudyContractCodec {</span>
+<span class="fc" id="L14">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L15">        .findAndRegisterModules()</span>
+<span class="fc" id="L16">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+    public String write(EvolutionSplitManifest manifest) {
+<span class="fc" id="L19">        return Objects.requireNonNull(manifest, &quot;manifest&quot;).toCanonicalJson();</span>
+    }
+
+    public String write(EvolutionStudyPlan plan) {
+<span class="fc" id="L23">        return Objects.requireNonNull(plan, &quot;plan&quot;).toCanonicalJson();</span>
+    }
+
+    public Path write(Path output, EvolutionSplitManifest manifest) {
+<span class="fc" id="L27">        return writeFile(output, write(manifest));</span>
+    }
+
+    public Path write(Path output, EvolutionStudyPlan plan) {
+<span class="fc" id="L31">        return writeFile(output, write(plan));</span>
+    }
+
+    public EvolutionSplitManifest readSplitManifest(String json) {
+<span class="fc" id="L35">        return read(json, EvolutionSplitManifest.class, &quot;split manifest&quot;);</span>
+    }
+
+    public EvolutionStudyPlan readStudyPlan(String json) {
+<span class="fc" id="L39">        return read(json, EvolutionStudyPlan.class, &quot;study plan&quot;);</span>
+    }
+
+    public EvolutionSplitManifest readSplitManifest(Path input) {
+<span class="fc" id="L43">        return readFile(input, this::readSplitManifest, &quot;split manifest&quot;);</span>
+    }
+
+    public EvolutionStudyPlan readStudyPlan(Path input) {
+<span class="fc" id="L47">        return readFile(input, this::readStudyPlan, &quot;study plan&quot;);</span>
+    }
+
+    private static Path writeFile(Path output, String json) {
+<span class="fc" id="L51">        Objects.requireNonNull(output, &quot;output&quot;);</span>
+        try {
+<span class="fc" id="L53">            Path absolute = output.toAbsolutePath().normalize();</span>
+<span class="fc" id="L54">            Path parent = absolute.getParent();</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L56">                Files.createDirectories(parent);</span>
+            }
+<span class="fc" id="L58">            Files.writeString(absolute, json, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L59">            return output;</span>
+<span class="nc" id="L60">        } catch (IOException exception) {</span>
+<span class="nc" id="L61">            throw new IllegalStateException(&quot;Unable to write evolution study contract&quot;, exception);</span>
+        }
+    }
+
+    private static &lt;T&gt; T read(String json, Class&lt;T&gt; type, String name) {
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(name + &quot; JSON must not be blank&quot;);</span>
+        }
+        try {
+<span class="fc" id="L70">            return JSON.readValue(json, type);</span>
+<span class="fc" id="L71">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L72">            throw new IllegalArgumentException(&quot;Invalid evolution &quot; + name + &quot; JSON&quot;, exception);</span>
+        }
+    }
+
+    private static &lt;T&gt; T readFile(
+        Path input,
+        java.util.function.Function&lt;String, T&gt; parser,
+        String name
+    ) {
+<span class="fc" id="L81">        Objects.requireNonNull(input, &quot;input&quot;);</span>
+        try {
+<span class="fc" id="L83">            return parser.apply(Files.readString(input, StandardCharsets.UTF_8));</span>
+<span class="nc" id="L84">        } catch (IOException exception) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;Unable to read evolution &quot; + name, exception);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.domain-generic-evidence-profile-catalog/v1",
+  "title": "Regelsuche domain-generic discovery evidence profile catalog v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "profiles",
+    "existingAutonomousCampaignProfileUnaffected"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.domain-generic-evidence-profile-catalog/v1"
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "profile",
+          "claim",
+          "authorizesDomainGenericClaim",
+          "authorizesAutonomousCampaignClaim",
+          "requirements"
+        ],
+        "properties": {
+          "profile": {
+            "const": "DOMAIN_GENERIC_DISCOVERY"
+          },
+          "claim": {
+            "$ref": "#/$defs/nonBlank"
+          },
+          "authorizesDomainGenericClaim": {
+            "const": true
+          },
+          "authorizesAutonomousCampaignClaim": {
+            "const": false
+          },
+          "requirements": {
+            "type": "array",
+            "minItems": 14,
+            "maxItems": 14,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/identifier"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "existingAutonomousCampaignProfileUnaffected": {
+      "const": true
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$"
+    },
+    "nonBlank": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

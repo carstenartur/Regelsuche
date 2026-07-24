@@ -84,12 +84,12 @@ public final class EvolutionGenomeCompiler {
     }
 
     private static String operatorSymbol(BinaryOperator operator) {
-<span class="pc bpc" id="L87" title="2 of 5 branches missed.">        return switch (operator) {</span>
+<span class="pc bpc" id="L87" title="1 of 5 branches missed.">        return switch (operator) {</span>
 <span class="fc" id="L88">            case ADD -&gt; &quot;+&quot;;</span>
 <span class="nc" id="L89">            case SUB -&gt; &quot;-&quot;;</span>
 <span class="fc" id="L90">            case MUL -&gt; &quot;*&quot;;</span>
 <span class="fc" id="L91">            case DIV -&gt; &quot;/&quot;;</span>
-<span class="nc" id="L92">            case POW -&gt; &quot;^&quot;;</span>
+<span class="fc" id="L92">            case POW -&gt; &quot;^&quot;;</span>
         };
     }
 
@@ -132,22 +132,22 @@ public final class EvolutionGenomeCompiler {
 
         @Override
         public String id() {
-<span class="nc" id="L135">            return id;</span>
+<span class="fc" id="L135">            return id;</span>
         }
 
         @Override
         public RewriteKind kind() {
-<span class="nc" id="L140">            return gene.kind();</span>
+<span class="fc" id="L140">            return gene.kind();</span>
         }
 
         @Override
         public boolean mayIncreaseComplexity() {
-<span class="nc bnc" id="L145" title="All 2 branches missed.">            return gene.maxAstGrowth() &gt; 0;</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            return gene.maxAstGrowth() &gt; 0;</span>
         }
 
         @Override
         public int estimatedCostDelta() {
-<span class="nc" id="L150">            return gene.estimatedCostDelta();</span>
+<span class="fc" id="L150">            return gene.estimatedCostDelta();</span>
         }
 
         @Override
@@ -171,8 +171,8 @@ public final class EvolutionGenomeCompiler {
 
         @Override
         public List&lt;Assumption&gt; assumptions(Expr subtree) {
-<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (gene.assumptions().isEmpty()) {</span>
-<span class="nc" id="L175">                return List.of();</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            if (gene.assumptions().isEmpty()) {</span>
+<span class="fc" id="L175">                return List.of();</span>
             }
 <span class="fc" id="L177">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
 <span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (!source.match(subtree, bindings)) {</span>
@@ -261,9 +261,9 @@ public final class EvolutionGenomeCompiler {
 
         private PatternExpr parsePower() {
 <span class="fc" id="L263">            PatternExpr expression = parsePrimary();</span>
-<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            if (peek('^')) {</span>
-<span class="nc" id="L265">                consume();</span>
-<span class="nc" id="L266">                return PatternExpr.op(BinaryOperator.POW, expression, parseUnary());</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (peek('^')) {</span>
+<span class="fc" id="L265">                consume();</span>
+<span class="fc" id="L266">                return PatternExpr.op(BinaryOperator.POW, expression, parseUnary());</span>
             }
 <span class="fc" id="L268">            return expression;</span>
         }

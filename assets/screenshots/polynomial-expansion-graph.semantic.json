@@ -1,0 +1,238 @@
+{
+  "schema": "regelsuche.semantic-graph-debug/v1",
+  "fileName": "polynomial-expansion-graph.png",
+  "requestUrl": "/api/search-graph/semantic?mode=semantic&showMacroSteps=didactic&showLowSignal=false&showAlternatives=false&showVariants=false&pathId=demo-658be8ce",
+  "requestParams": {
+    "mode": "semantic",
+    "showMacroSteps": "didactic",
+    "showLowSignal": false,
+    "showAlternatives": false,
+    "showVariants": false,
+    "pathId": "demo-658be8ce"
+  },
+  "visibleNodeIds": [
+    "didactic-seed-13vtrk3",
+    "didactic-1-1u0zexs",
+    "didactic-3-lgh6e1",
+    "didactic-prepare-3-oit6kn",
+    "didactic-goal-1iheuhx"
+  ],
+  "nodes": [
+    {
+      "id": "didactic-seed-13vtrk3",
+      "canonicalHash": "didactic:didactic-seed-13vtrk3",
+      "normalizedLabel": "(x+1)*(x+2)",
+      "label": "(x + 1) * (x + 2)",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "minDepth": 0,
+      "layout": {
+        "x": 0,
+        "y": 80
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 51.36842105263153
+      }
+    },
+    {
+      "id": "didactic-1-1u0zexs",
+      "canonicalHash": "didactic:didactic-1-1u0zexs",
+      "normalizedLabel": "x*(x+2)+1*(x+2)",
+      "label": "x * (x + 2) + 1 * (x + 2)",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 1,
+      "layout": {
+        "x": 0,
+        "y": 300
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 345.1842105263157
+      }
+    },
+    {
+      "id": "didactic-3-lgh6e1",
+      "canonicalHash": "didactic:didactic-3-lgh6e1",
+      "normalizedLabel": "x*x+x*2+x+2",
+      "label": "x * x + x * 2 + x + 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 3,
+      "layout": {
+        "x": 0,
+        "y": 520
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 639
+      }
+    },
+    {
+      "id": "didactic-prepare-3-oit6kn",
+      "canonicalHash": "didactic:didactic-prepare-3-oit6kn",
+      "normalizedLabel": "x^2+2*x+x+2",
+      "label": "x ^ 2 + 2 * x + x + 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": false,
+      "minDepth": 4,
+      "layout": {
+        "x": 0,
+        "y": 740
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 932.8157894736842
+      }
+    },
+    {
+      "id": "didactic-goal-1iheuhx",
+      "canonicalHash": "didactic:didactic-goal-1iheuhx",
+      "normalizedLabel": "x^2+3*x+2",
+      "label": "x ^ 2 + 3 * x + 2",
+      "revisit": false,
+      "cycle": false,
+      "onMainPath": true,
+      "explicitEndpoint": true,
+      "minDepth": 5,
+      "layout": {
+        "x": 0,
+        "y": 960
+      },
+      "renderedLayout": {
+        "x": 319,
+        "y": 1226.6315789473683
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "didactic-seed-13vtrk3->didactic-1-1u0zexs:ast_distribute_right_add",
+      "from": "didactic-seed-13vtrk3",
+      "to": "didactic-1-1u0zexs",
+      "label": "ast_distribute_right_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 198.27631578947364
+      }
+    },
+    {
+      "id": "didactic-1-1u0zexs->didactic-3-lgh6e1:ast_distribute_left_add",
+      "from": "didactic-1-1u0zexs",
+      "to": "didactic-3-lgh6e1",
+      "label": "ast_distribute_left_add",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 492.09210526315786
+      }
+    },
+    {
+      "id": "didactic-3-lgh6e1->didactic-prepare-3-oit6kn:polynomial_prepare_collect_like_terms",
+      "from": "didactic-3-lgh6e1",
+      "to": "didactic-prepare-3-oit6kn",
+      "label": "polynomial_prepare_collect_like_terms",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 785.9078947368421
+      }
+    },
+    {
+      "id": "didactic-prepare-3-oit6kn->didactic-goal-1iheuhx:polynomial_collect_like_terms",
+      "from": "didactic-prepare-3-oit6kn",
+      "to": "didactic-goal-1iheuhx",
+      "label": "polynomial_collect_like_terms",
+      "kind": "MAIN_STEP",
+      "layout": {
+        "x": 319,
+        "y": 1079.7236842105262
+      }
+    }
+  ],
+  "nodeLabelRects": [
+    {
+      "id": "didactic-seed-13vtrk3",
+      "x": 639.03125,
+      "y": 560.610595703125,
+      "width": 121.9375,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-1-1u0zexs",
+      "x": 615.21875,
+      "y": 854.4263916015625,
+      "width": 169.5625,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-3-lgh6e1",
+      "x": 626.71875,
+      "y": 1148.2421875,
+      "width": 146.5625,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-prepare-3-oit6kn",
+      "x": 633.46875,
+      "y": 1442.0579833984375,
+      "width": 133.0625,
+      "height": 27.734375
+    },
+    {
+      "id": "didactic-goal-1iheuhx",
+      "x": 647.625,
+      "y": 1735.873779296875,
+      "width": 104.75,
+      "height": 27.734375
+    }
+  ],
+  "edgeLabelRects": [
+    {
+      "id": "\\text{distribute right add}",
+      "x": 583.5,
+      "y": 710.6825561523438,
+      "width": 137,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{distribute left add}",
+      "x": 588.5,
+      "y": 1004.4983520507812,
+      "width": 127,
+      "height": 21.40618896484375
+    },
+    {
+      "id": "\\text{multiply constants and product to power}",
+      "x": 562,
+      "y": 1298.314208984375,
+      "width": 180,
+      "height": 21.40625
+    },
+    {
+      "id": "\\text{collect like terms}",
+      "x": 591,
+      "y": 1592.1298828125,
+      "width": 122,
+      "height": 21.40625
+    }
+  ],
+  "duplicateCanonicalHashCount": 0,
+  "duplicateNormalizedLabelCount": 0,
+  "nodeOverlapCount": 0,
+  "edgeLabelOverlapCount": 0,
+  "visibleMainPathMeaningfulNodeCount": 5,
+  "collapsedMainPathStepCount": 4,
+  "finalNormalizedLabel": "x^2+3*x+2",
+  "mainPathMeaningfulNodeCount": 5
+}
