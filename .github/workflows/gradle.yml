@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
   packages: read
 
 jobs:
@@ -27,7 +27,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - uses: actions/setup-java@v5
         with:
@@ -47,21 +46,6 @@ jobs:
           ./gradlew --no-daemon \
             :app:installPlaywrightHostDependencies \
             --console=plain
-
-      - name: Prepare workflow-free capability contracts
-        run: python3 scripts/finalize-ci-consolidation.py prepare
-
-      - name: Regenerate capability status from checkout contracts
-        run: |
-          ./gradlew \
-            --no-daemon \
-            --no-configuration-cache \
-            generateCapabilityStatusForVerification \
-            --console=plain \
-            --stacktrace
-
-      - name: Commit the finalized migration
-        run: python3 scripts/finalize-ci-consolidation.py finalize
 
       - name: Run the checkout-owned CI lifecycle
         shell: bash
