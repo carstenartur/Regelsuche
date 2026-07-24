@@ -78,6 +78,7 @@ jobs:
     name: Publish quality reports
     needs: verification
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    continue-on-error: true
     runs-on: ubuntu-latest
     concurrency:
       group: pages-publish-${{ github.repository }}-main
@@ -126,6 +127,7 @@ jobs:
     name: Refresh documentation media
     needs: verification
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    continue-on-error: true
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -162,6 +164,7 @@ jobs:
 
   dependency-submission:
     name: Submit dependency graph
+    continue-on-error: true
     runs-on: ubuntu-latest
     permissions:
       contents: write
