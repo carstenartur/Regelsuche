@@ -73,9 +73,13 @@ def verify_generator_input_allowlist(path: Path) -> list[str]:
             continue
         if node.func.attr != "add_argument" or not node.args:
             continue
-        first = node.args[0]
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            arguments.append(first.value)
+        for argument in node.args:
+            if not (
+                isinstance(argument, ast.Constant)
+                and isinstance(argument.value, str)
+            ):
+                fail("generator CLI argument names must be string literals")
+            arguments.append(argument.value)
 
     counts = Counter(arguments)
     duplicates = sorted(argument for argument, count in counts.items() if count > 1)
@@ -163,7 +167,7 @@ def verify_one(
         fail("case corpus is not pre-execution frozen")
     if corpus["executionStatusAtFreeze"] != "NOT_STARTED":
         fail("case corpus execution status drift")
-    if receipt["executionStatusAtFreeze"] != "NOT_STARTED":
+    if receipt.get("executionStatusAtFreeze") != "NOT_STARTED":
         fail("receipt execution status drift")
     if receipt["caseCorpusContentHash"] != corpus["contentHash"]:
         fail("receipt/corpus binding drift")
@@ -267,6 +271,26 @@ def main() -> int:
         "receipt execution status",
     )
 
+    receipt_status_missing = copy.deepcopy(receipt)
+    receipt_status_missing.pop("executionStatusAtFreeze")
+    receipt_status_missing.pop("contentHash", None)
+    receipt_status_missing["contentHash"] = semantic_hash(
+        receipt_status_missing
+    )
+    receipt_missing_stream = copy.deepcopy(first)
+    receipt_missing_stream["freezeReceiptContentHash"] = receipt_status_missing[
+        "contentHash"
+    ]
+    receipt_missing_stream.pop("contentHash", None)
+    receipt_missing_stream["contentHash"] = semantic_hash(receipt_missing_stream)
+    expect_verification_failure(
+        receipt_missing_stream,
+        corpus,
+        receipt_status_missing,
+        profile,
+        "missing receipt execution status",
+    )
+
     leaked = copy.deepcopy(first)
     leaked["tasks"][0]["outcome"] = "IMPROVED"
     try:
@@ -288,6 +312,7 @@ def main() -> int:
             "task-order",
             "baseline-inventory",
             "receipt-execution-status",
+            "missing-receipt-execution-status",
             "evaluation-outcome-leak",
         ],
         "evaluationStatus": "NOT_EXECUTED_BY_STREAM_CONSTRUCTION",
