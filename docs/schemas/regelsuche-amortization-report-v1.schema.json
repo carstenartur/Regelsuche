@@ -9,7 +9,7 @@
     "discoveryCostLedgerContentHash", "pairedTaskUtilityContentHash",
     "downstreamTaskStreamContentHash", "amortizationProfileContentHash",
     "profileId", "accountingMode", "candidateId", "candidateContentHash",
-    "configuredTasks", "executedTasks", "correctnessRegressionBlocking",
+    "configuredTasks", "executedTasks", "correctnessRegressionCount",
     "lifecycleCoverage", "incompleteLifecycleStages", "dimensions",
     "pathStepDiagnostic", "scalarDecisionStatus", "overallDecision",
     "overallDecisionReason", "formalProofStatus", "externalNoveltyStatus",
@@ -30,17 +30,21 @@
     "candidateContentHash": {"$ref": "#/$defs/hash"},
     "configuredTasks": {"const": 12},
     "executedTasks": {"const": 12},
-    "correctnessRegressionBlocking": {"const": false},
+    "correctnessRegressionCount": {"const": 0},
     "lifecycleCoverage": {
       "type": "array", "minItems": 5, "maxItems": 5,
       "items": {"$ref": "#/$defs/coverage"}
     },
     "incompleteLifecycleStages": {
-      "type": "array", "minItems": 1,
-      "items": {"enum": [
-        "VALIDATION", "COUNTEREXAMPLE", "PROJECT_NOVELTY",
-        "FORMAL_PROOF", "QUALIFICATION"
-      ]},
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "prefixItems": [
+        {"const": "VALIDATION"},
+        {"const": "COUNTEREXAMPLE"},
+        {"const": "PROJECT_NOVELTY"},
+        {"const": "FORMAL_PROOF"},
+        {"const": "QUALIFICATION"}
+      ],
+      "items": false,
       "uniqueItems": true
     },
     "dimensions": {
