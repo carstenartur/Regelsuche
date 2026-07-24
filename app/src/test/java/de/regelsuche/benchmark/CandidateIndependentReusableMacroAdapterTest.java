@@ -185,6 +185,7 @@ class CandidateIndependentReusableMacroAdapterTest {
             baselines.put(task.taskId(), adapter.baseline(task));
         }
         List<String> evaluatedCandidateIds = new ArrayList<>();
+        List<String> exercisedCandidateIds = new ArrayList<>();
 
         for (var candidate : formation.macros()) {
             var exactOneFormation = new FormationResult(
@@ -214,15 +215,23 @@ class CandidateIndependentReusableMacroAdapterTest {
                 .filter(ruleId -> ruleId.startsWith(
                     "macro_candidate_independent_"))
                 .allMatch(candidate.macroId()::equals));
-            assertTrue(results.stream()
+            boolean exercised = results.stream()
                 .flatMap(result -> result.macroEnabled().ruleIds().stream())
-                .anyMatch(candidate.macroId()::equals));
+                .anyMatch(candidate.macroId()::equals);
+            if (exercised) {
+                exercisedCandidateIds.add(candidate.macroId());
+            }
+            if (candidate.equals(selected)) {
+                assertTrue(exercised,
+                    "the production-selected candidate must be exercised");
+            }
             evaluatedCandidateIds.add(candidate.macroId());
         }
 
         assertEquals(3, evaluatedCandidateIds.size());
         assertEquals(3, evaluatedCandidateIds.stream().distinct().count());
         assertTrue(evaluatedCandidateIds.contains(selected.macroId()));
+        assertTrue(exercisedCandidateIds.contains(selected.macroId()));
         assertEquals(2, evaluatedCandidateIds.stream()
             .filter(candidateId -> !candidateId.equals(selected.macroId()))
             .count());
