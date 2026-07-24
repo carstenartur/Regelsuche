@@ -172,6 +172,50 @@ class CandidateIndependentReusableMacroAdapterTest {
             .anyMatch(selection.candidate().macroId()::equals));
     }
 
+    @Test
+    void evaluatesEveryFormedCandidateIndividuallyAcrossTheFrozenStream() {
+        var formation = adapter.form(trainTraces());
+        var selected = CandidateIndependentExactOneMacroSelector
+            .select(formation).candidate();
+        List<EvaluationTask> tasks = frozenTasks();
+        List<String> evaluatedCandidateIds = new ArrayList<>();
+
+        for (var candidate : formation.macros()) {
+            var exactOneFormation = new FormationResult(
+                FormationStatus.SELECTED,
+                List.of(candidate),
+                formation.replayEvidence(),
+                "candidate-panel exact-one evaluation");
+            var results = tasks.stream()
+                .map(task -> adapter.evaluate(task, exactOneFormation))
+                .toList();
+
+            assertEquals(12, results.size());
+            assertTrue(results.stream().noneMatch(result ->
+                result.outcome() == UtilityOutcome.CANDIDATE_NOT_FORMED));
+            assertTrue(results.stream().allMatch(result ->
+                result.correctnessRegression()
+                    == (result.outcome()
+                        == UtilityOutcome.CORRECTNESS_REGRESSION)));
+            assertTrue(results.stream()
+                .flatMap(result -> result.macroEnabled().ruleIds().stream())
+                .filter(ruleId -> ruleId.startsWith(
+                    "macro_candidate_independent_"))
+                .allMatch(candidate.macroId()::equals));
+            assertTrue(results.stream()
+                .flatMap(result -> result.macroEnabled().ruleIds().stream())
+                .anyMatch(candidate.macroId()::equals));
+            evaluatedCandidateIds.add(candidate.macroId());
+        }
+
+        assertEquals(3, evaluatedCandidateIds.size());
+        assertEquals(3, evaluatedCandidateIds.stream().distinct().count());
+        assertTrue(evaluatedCandidateIds.contains(selected.macroId()));
+        assertEquals(2, evaluatedCandidateIds.stream()
+            .filter(candidateId -> !candidateId.equals(selected.macroId()))
+            .count());
+    }
+
     private static long count(
         List<CandidateIndependentReusableMacroAdapter.PairedEvaluation> results,
         UtilityOutcome outcome
