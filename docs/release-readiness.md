@@ -1,4 +1,4 @@
-# Release Readiness für Regelsuche 0.2
+# Release Readiness und Claim-Grenzen
 
 Regelsuche verwendet getrennte, versionierte Evidence Profiles. Ein Profil autorisiert genau den Claim, den es beschreibt. Ein erfolgreiches niedrigeres Profil darf keinen stärkeren Claim freigeben.
 
@@ -14,7 +14,7 @@ Die verwendeten Begriffe sind im zentralen [Glossar](glossary.md) definiert.
 | `AUTONOMOUS_CAMPAIGN` | autonome Generation, unabhängige Qualifikation und Retention mathematischer Kandidaten | ja |
 | `EXTERNAL_NOVELTY_REVIEW` | extern geprüfte mathematische Novelty | nein |
 
-Nur `AUTONOMOUS_CAMPAIGN` kann den Release-0.2-Autonomie-Claim autorisieren. Externe Novelty, Promotion und Public Evidence bleiben separate Entscheidungen.
+Nur `AUTONOMOUS_CAMPAIGN` kann den qualifizierten Autonomie-Claim autorisieren. Externe Novelty, Promotion und Public Evidence bleiben separate Entscheidungen. Die technische Veröffentlichung eines Software-Releases erweitert keinen dieser Claims.
 
 ## Referenzläufe
 
@@ -170,7 +170,7 @@ Damit ist der interne, algebraische Autonomie-Claim technisch autorisiert. Das i
 
 ## CI-Vertrag
 
-Der Workflow `Release Readiness`:
+Der checkout-lokale `ciCheck`-Pfad:
 
 1. erzeugt den bestehenden Hidden-Rule-Benchmarkbericht;
 2. führt drei reale Production Campaigns und drei Kandidatenqualifikationen aus;
@@ -180,5 +180,7 @@ Der Workflow `Release Readiness`:
 6. baut `Dockerfile.release-readiness` und führt denselben qualifizierten Gate-Lauf aus;
 7. vergleicht Gradle- und Docker-Evidence byteweise;
 8. archiviert beide Evidence-Sets und Diagnosen.
+
+Der technische Veröffentlichungsablauf ist in [Release-Prozess](releasing.md) dokumentiert.
 
 Promotion, Public Evidence, externe Novelty und unabhängig bewertete Interestingness bleiben außerhalb dieses Release-Gates.
