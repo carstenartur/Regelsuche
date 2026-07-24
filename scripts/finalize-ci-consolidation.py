@@ -4,8 +4,9 @@
 The temporary CI workflow runs this helper in two phases. ``prepare`` updates
 checkout-owned capability contracts and switches the existing generator task to
 write mode. After Gradle has regenerated the derived files, ``finalize``
-restores strict check mode, restores the final thin workflow, deletes this
-helper, commits the migration result and pushes the feature branch.
+restores strict check mode, deletes this helper, commits the migration result
+and pushes the feature branch. The final workflow is restored separately via
+the repository API because the Actions token must not rewrite workflow files.
 """
 
 from __future__ import annotations
@@ -16,131 +17,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BRANCH = "chore/consolidate-ci-workflows"
-
-FINAL_WORKFLOW = """name: CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-
-concurrency:
-  group: ci-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-  packages: read
-
-jobs:
-  verification:
-    name: Checkout-local ciCheck
-    runs-on: ubuntu-22.04
-    timeout-minutes: 300
-    env:
-      AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - uses: gradle/actions/setup-gradle@v6.1.0
-        with:
-          gradle-home-cache-cleanup: true
-
-      - name: Install checkout prerequisites
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \\
-            python3-venv \\
-            z3
-          ./gradlew --no-daemon \\
-            :app:installPlaywrightHostDependencies \\
-            --console=plain
-
-      - name: Run the checkout-owned CI lifecycle
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p build/logs
-          env -u GITHUB_SHA ./gradlew \\
-            --no-daemon \\
-            --no-configuration-cache \\
-            ciCheck \\
-            --console=plain \\
-            --stacktrace \\
-            2>&1 | tee build/logs/ci-check.log
-
-      - name: Retain verification evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: repository-verification
-          path: |
-            build/logs/**
-            build/reports/**
-            build/ai-knowledge/**
-            build/independent-reproduction/**
-            public/**
-            **/build/reports/**
-            **/build/test-results/**
-            **/build/discovery-artifacts/**
-            docs/benchmark-report.md
-            docs/assets/benchmark-summary.json
-            docs/generated/**
-          include-hidden-files: true
-          if-no-files-found: warn
-
-  publish-pages:
-    name: Publish generated reports
-    needs: verification
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    concurrency:
-      group: pages-${{ github.repository }}-main
-      cancel-in-progress: false
-    permissions:
-      actions: read
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/download-artifact@v8.0.1
-        with:
-          name: repository-verification
-          path: .
-
-      - name: Assemble the static site
-        run: |
-          rm -rf build/pages-site
-          mkdir -p build/pages-site
-          cp -R docs/. build/pages-site/
-          cp -R public/. build/pages-site/
-          touch build/pages-site/.nojekyll
-
-      - uses: actions/configure-pages@v6
-
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: build/pages-site
-
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-"""
 
 
 def replace_once(path: Path, old: str, new: str) -> None:
@@ -187,10 +63,6 @@ def finalize() -> None:
         ROOT / "build.gradle",
         "'--rewrite-docs'",
         "'--check', '--check-docs'",
-    )
-    (ROOT / ".github" / "workflows" / "gradle.yml").write_text(
-        FINAL_WORKFLOW,
-        encoding="utf-8",
     )
     Path(__file__).unlink()
 
