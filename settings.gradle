@@ -102,6 +102,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/downstream-task-stream-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/paired-task-utility-verification.gradle')
     }
     if (candidate.path == ':app') {
         candidate.apply from: new File(

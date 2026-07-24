@@ -1,0 +1,188 @@
+def pairedUtilityRoot = rootProject.layout.projectDirectory
+def pairedUtilityAppProject = project(':app')
+def pairedUtilityRuntimeClasspath = providers.provider {
+    pairedUtilityAppProject.extensions
+        .getByType(org.gradle.api.tasks.SourceSetContainer)
+        .named('main').get().runtimeClasspath
+}
+
+def pairedUtilityBenchmarkSource = pairedUtilityRoot.file(
+    'research/benchmarks/candidate-independent/benchmark-source.json')
+def pairedUtilityCorpus = pairedUtilityRoot.file(
+    'research/benchmarks/candidate-independent/case-corpus.json')
+def pairedUtilityProfile = pairedUtilityRoot.file(
+    'research/benchmarks/candidate-independent/macro-primitives.json')
+def pairedUtilityFreezeReceipt = pairedUtilityRoot.file(
+    'research/benchmarks/candidate-independent/corpus-freeze-receipt.json')
+def pairedUtilityDownstreamStream = layout.buildDirectory.file(
+    'reports/downstream-task-stream/first/downstream-task-stream.json')
+def pairedUtilitySchema = pairedUtilityRoot.file(
+    'docs/schemas/regelsuche-paired-task-utility-v1.schema.json')
+def pairedUtilityVerifier = pairedUtilityRoot.file(
+    'scripts/verify-paired-task-utility.py')
+def pairedUtilityCanonicalizer = pairedUtilityRoot.file(
+    'scripts/canonicalize-json-file.py')
+def pairedUtilityRunnerSource = pairedUtilityRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentExactOneMacroEvaluationMain.java')
+def pairedUtilitySelectorSource = pairedUtilityRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentExactOneMacroSelector.java')
+def pairedUtilityAdapterSource = pairedUtilityRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentReusableMacroAdapter.java')
+def pairedUtilityFormationSource = pairedUtilityRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentMacroFormation.java')
+def pairedUtilityEvaluatorSource = pairedUtilityRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentMacroUtilityEvaluator.java')
+def pairedUtilityReplaySource = pairedUtilityRoot.file(
+    'app/src/main/java/de/regelsuche/benchmark/'
+        + 'CandidateIndependentMacroReplayAdapter.java')
+
+def pairedUtilityBuildRoot = layout.buildDirectory.dir(
+    'reports/paired-task-utility')
+def pairedUtilityFirstRaw = pairedUtilityBuildRoot.map {
+    it.file('first/raw-run.json')
+}
+def pairedUtilitySecondRaw = pairedUtilityBuildRoot.map {
+    it.file('second/raw-run.json')
+}
+def pairedUtilityFirst = pairedUtilityBuildRoot.map {
+    it.file('first/paired-task-utility.json')
+}
+def pairedUtilitySecond = pairedUtilityBuildRoot.map {
+    it.file('second/paired-task-utility.json')
+}
+def pairedUtilityVerification = pairedUtilityBuildRoot.map {
+    it.dir('verification')
+}
+def pairedUtilityPython = layout.buildDirectory.dir(
+    'verification-venv').map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configurePairedUtilityExecution = { task, outputFile ->
+    task.group = 'verification'
+    task.description = 'Executes the frozen stream with baseline plus exactly one TRAIN-selected candidate.'
+    task.dependsOn ':app:classes', 'verifyDownstreamTaskStream'
+    task.classpath = files(pairedUtilityRuntimeClasspath)
+    task.mainClass =
+        'de.regelsuche.benchmark.CandidateIndependentExactOneMacroEvaluationMain'
+    task.inputs.file pairedUtilityBenchmarkSource
+    task.inputs.file pairedUtilityCorpus
+    task.inputs.file pairedUtilityProfile
+    task.inputs.file pairedUtilityFreezeReceipt
+    task.inputs.file pairedUtilityDownstreamStream
+    task.inputs.file pairedUtilityRunnerSource
+    task.inputs.file pairedUtilitySelectorSource
+    task.inputs.file pairedUtilityAdapterSource
+    task.inputs.file pairedUtilityFormationSource
+    task.inputs.file pairedUtilityEvaluatorSource
+    task.inputs.file pairedUtilityReplaySource
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        args '--benchmark-source',
+            pairedUtilityBenchmarkSource.asFile.absolutePath,
+            '--corpus', pairedUtilityCorpus.asFile.absolutePath,
+            '--profile', pairedUtilityProfile.asFile.absolutePath,
+            '--freeze-receipt', pairedUtilityFreezeReceipt.asFile.absolutePath,
+            '--downstream-stream',
+            pairedUtilityDownstreamStream.get().asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath,
+            '--repository-revision', 'WORKTREE'
+    }
+}
+
+def configurePairedUtilityCanonicalization = {
+    task, rawFile, outputFile, executionTask ->
+    task.group = 'verification'
+    task.description = 'Canonicalizes one exact-one paired utility run.'
+    task.dependsOn 'prepareVerificationEnvironment', executionTask
+    task.workingDir pairedUtilityRoot
+    task.inputs.file pairedUtilityCanonicalizer
+    task.inputs.file rawFile
+    task.outputs.file outputFile
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine pairedUtilityPython.get().absolutePath,
+            pairedUtilityCanonicalizer.asFile.absolutePath,
+            '--input', rawFile.get().asFile.absolutePath,
+            '--output', outputFile.get().asFile.absolutePath
+    }
+}
+
+def executePairedTaskUtilityFirstRaw = tasks.register(
+    'executePairedTaskUtilityFirstRaw', JavaExec
+) {
+    configurePairedUtilityExecution(delegate, pairedUtilityFirstRaw)
+}
+
+def executePairedTaskUtilitySecondRaw = tasks.register(
+    'executePairedTaskUtilitySecondRaw', JavaExec
+) {
+    configurePairedUtilityExecution(delegate, pairedUtilitySecondRaw)
+}
+
+def runPairedTaskUtilityFirst = tasks.register(
+    'runPairedTaskUtilityFirst', Exec
+) {
+    configurePairedUtilityCanonicalization(
+        delegate,
+        pairedUtilityFirstRaw,
+        pairedUtilityFirst,
+        executePairedTaskUtilityFirstRaw)
+}
+
+def runPairedTaskUtilitySecond = tasks.register(
+    'runPairedTaskUtilitySecond', Exec
+) {
+    configurePairedUtilityCanonicalization(
+        delegate,
+        pairedUtilitySecondRaw,
+        pairedUtilitySecond,
+        executePairedTaskUtilitySecondRaw)
+}
+
+def verifyPairedTaskUtility = tasks.register(
+    'verifyPairedTaskUtility', Exec
+) {
+    group = 'verification'
+    description = 'Independently verifies exact-one selection, paired outcomes and resource deltas.'
+    dependsOn runPairedTaskUtilityFirst, runPairedTaskUtilitySecond
+    workingDir pairedUtilityRoot
+    inputs.files pairedUtilityRunnerSource, pairedUtilitySelectorSource,
+        pairedUtilityVerifier, pairedUtilitySchema, pairedUtilityBenchmarkSource,
+        pairedUtilityCorpus, pairedUtilityProfile, pairedUtilityFreezeReceipt,
+        pairedUtilityDownstreamStream, pairedUtilityFirstRaw,
+        pairedUtilitySecondRaw, pairedUtilityFirst, pairedUtilitySecond
+    outputs.dir pairedUtilityVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine pairedUtilityPython.get().absolutePath,
+            pairedUtilityVerifier.asFile.absolutePath,
+            '--runner-source', pairedUtilityRunnerSource.asFile.absolutePath,
+            '--selector-source', pairedUtilitySelectorSource.asFile.absolutePath,
+            '--first', pairedUtilityFirst.get().asFile.absolutePath,
+            '--second', pairedUtilitySecond.get().asFile.absolutePath,
+            '--benchmark-source',
+            pairedUtilityBenchmarkSource.asFile.absolutePath,
+            '--corpus', pairedUtilityCorpus.asFile.absolutePath,
+            '--profile', pairedUtilityProfile.asFile.absolutePath,
+            '--freeze-receipt', pairedUtilityFreezeReceipt.asFile.absolutePath,
+            '--downstream-stream',
+            pairedUtilityDownstreamStream.get().asFile.absolutePath,
+            '--schema', pairedUtilitySchema.asFile.absolutePath,
+            '--report-directory',
+            pairedUtilityVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyPairedTaskUtility
+}
