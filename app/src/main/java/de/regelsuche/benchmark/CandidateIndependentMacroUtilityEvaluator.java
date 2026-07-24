@@ -6,6 +6,7 @@ import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.BaselineEvaluation;
 import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.EvaluationTask;
 import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationResult;
 import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.FormationStatus;
@@ -36,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -71,23 +73,69 @@ final class CandidateIndependentMacroUtilityEvaluator {
         primitiveEngine = new AstRewriteTransformationEngine(rules, 16, 120);
     }
 
+    BaselineEvaluation baseline(EvaluationTask task) {
+        Objects.requireNonNull(task, "task");
+        return new BaselineEvaluation(task, search(task, primitiveEngine));
+    }
+
     PairedEvaluation evaluate(
+        EvaluationTask task,
+        FormationResult formation
+    ) {
+        requireEvaluationInputs(task, formation);
+        if (formation.status() != FormationStatus.SELECTED) {
+            return candidateNotFormed(task);
+        }
+        return evaluateSelected(
+            task, formation, baseline(task).run());
+    }
+
+    PairedEvaluation evaluate(
+        EvaluationTask task,
+        FormationResult formation,
+        BaselineEvaluation baselineEvaluation
+    ) {
+        requireEvaluationInputs(task, formation);
+        Objects.requireNonNull(baselineEvaluation, "baselineEvaluation");
+        if (formation.status() != FormationStatus.SELECTED) {
+            return candidateNotFormed(task);
+        }
+        if (!baselineEvaluation.task().equals(task)) {
+            throw new IllegalArgumentException(
+                "baseline evaluation is bound to a different task");
+        }
+        if (baselineEvaluation.run().expandedStates()
+                > task.maxExpandedStates()) {
+            throw new IllegalArgumentException(
+                "baseline evaluation exceeds the frozen task budget");
+        }
+        return evaluateSelected(
+            task, formation, baselineEvaluation.run());
+    }
+
+    private void requireEvaluationInputs(
         EvaluationTask task,
         FormationResult formation
     ) {
         if (task == null || formation == null) {
             throw new NullPointerException("task and formation are required");
         }
-        if (formation.status() != FormationStatus.SELECTED) {
-            SearchRun empty = SearchRun.notRun(
-                task, "candidate formation did not select macros");
-            return new PairedEvaluation(
-                task.taskId(), UtilityOutcome.CANDIDATE_NOT_FORMED,
-                empty, empty, false,
-                "paired evaluation requires selected TRAIN macros");
-        }
+    }
 
-        SearchRun baseline = search(task, primitiveEngine);
+    private PairedEvaluation candidateNotFormed(EvaluationTask task) {
+        SearchRun empty = SearchRun.notRun(
+            task, "candidate formation did not select macros");
+        return new PairedEvaluation(
+            task.taskId(), UtilityOutcome.CANDIDATE_NOT_FORMED,
+            empty, empty, false,
+            "paired evaluation requires selected TRAIN macros");
+    }
+
+    private PairedEvaluation evaluateSelected(
+        EvaluationTask task,
+        FormationResult formation,
+        SearchRun baseline
+    ) {
         TransformationEngine macroEngine = expression -> {
             List<Transformation> transformations = new ArrayList<>(
                 primitiveEngine.transform(expression));
