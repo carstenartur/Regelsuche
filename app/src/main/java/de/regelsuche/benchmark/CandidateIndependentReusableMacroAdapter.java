@@ -40,6 +40,18 @@ public final class CandidateIndependentReusableMacroAdapter {
         return utility.evaluate(task, formationResult);
     }
 
+    BaselineEvaluation baseline(EvaluationTask task) {
+        return utility.baseline(task);
+    }
+
+    PairedEvaluation evaluate(
+        EvaluationTask task,
+        FormationResult formationResult,
+        BaselineEvaluation baselineEvaluation
+    ) {
+        return utility.evaluate(task, formationResult, baselineEvaluation);
+    }
+
     public enum FormationStatus {
         SELECTED,
         REPLAY_NOT_REPRODUCED,
@@ -113,6 +125,22 @@ public final class CandidateIndependentReusableMacroAdapter {
             if (maxDepth < 0 || maxExpandedStates < 1) {
                 throw new IllegalArgumentException(
                     "paired search budgets are invalid");
+            }
+        }
+    }
+
+    record BaselineEvaluation(
+        EvaluationTask task,
+        SearchRun run
+    ) {
+        BaselineEvaluation {
+            Objects.requireNonNull(task, "task");
+            Objects.requireNonNull(run, "run");
+            if (run.ruleIds().stream().anyMatch(
+                    ruleId -> ruleId.startsWith(
+                        "macro_candidate_independent_"))) {
+                throw new IllegalArgumentException(
+                    "baseline evaluation contains a learned candidate");
             }
         }
     }
