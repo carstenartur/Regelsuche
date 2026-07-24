@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-amortization-run-v1.schema.json",
+  "title": "Vector amortization run receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "repositoryRevision", "amortizationReportContentHash",
+    "discoveryCostLedgerContentHash", "pairedTaskUtilityContentHash",
+    "downstreamTaskStreamContentHash", "amortizationProfileContentHash",
+    "candidateId", "executionMode", "containerReproductionStatus",
+    "runtimeTelemetryStatus", "overallDecision", "publicationAuthorized",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.amortization-run/v1"},
+    "repositoryRevision": {"type": "string", "minLength": 1},
+    "amortizationReportContentHash": {"$ref": "#/$defs/hash"},
+    "discoveryCostLedgerContentHash": {"$ref": "#/$defs/hash"},
+    "pairedTaskUtilityContentHash": {"$ref": "#/$defs/hash"},
+    "downstreamTaskStreamContentHash": {"$ref": "#/$defs/hash"},
+    "amortizationProfileContentHash": {"$ref": "#/$defs/hash"},
+    "candidateId": {"type": "string", "pattern": "^macro_candidate_independent_[0-9a-f]+$"},
+    "executionMode": {"const": "CHECKOUT_LOCAL_DETERMINISTIC_DOUBLE_RUN"},
+    "containerReproductionStatus": {"const": "NOT_YET_EXECUTED_FOR_COMBINED_AMORTIZATION_REPORT"},
+    "runtimeTelemetryStatus": {"const": "NON_CANONICAL_NOT_RETAINED_IN_REPORT"},
+    "overallDecision": {"const": "NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST"},
+    "publicationAuthorized": {"const": false},
+    "contentHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

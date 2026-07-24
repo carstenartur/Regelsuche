@@ -1,0 +1,120 @@
+def amortizationRoot = rootProject.layout.projectDirectory
+def amortizationGenerator = amortizationRoot.file(
+    'scripts/generate-vector-amortization-report.py')
+def amortizationVerifier = amortizationRoot.file(
+    'scripts/verify-vector-amortization-report.py')
+def amortizationProfile = amortizationRoot.file(
+    'research/benchmarks/candidate-independent/amortization-profile.json')
+def amortizationProfileSchema = amortizationRoot.file(
+    'docs/schemas/regelsuche-amortization-profile-v1.schema.json')
+def amortizationReportSchema = amortizationRoot.file(
+    'docs/schemas/regelsuche-amortization-report-v1.schema.json')
+def amortizationRunSchema = amortizationRoot.file(
+    'docs/schemas/regelsuche-amortization-run-v1.schema.json')
+def amortizationLedger = layout.buildDirectory.file(
+    'reports/discovery-cost-ledger/first/discovery-cost-ledger.json')
+def amortizationUtility = layout.buildDirectory.file(
+    'reports/paired-task-utility/first/paired-task-utility.json')
+def amortizationBuildRoot = layout.buildDirectory.dir(
+    'reports/vector-amortization')
+def amortizationFirstReport = amortizationBuildRoot.map {
+    it.file('first/amortization-report.json')
+}
+def amortizationFirstRun = amortizationBuildRoot.map {
+    it.file('first/amortization-run.json')
+}
+def amortizationSecondReport = amortizationBuildRoot.map {
+    it.file('second/amortization-report.json')
+}
+def amortizationSecondRun = amortizationBuildRoot.map {
+    it.file('second/amortization-run.json')
+}
+def amortizationVerification = amortizationBuildRoot.map {
+    it.dir('verification')
+}
+def amortizationPython = layout.buildDirectory.dir(
+    'verification-venv').map { directory ->
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(directory.asFile, executable)
+}
+
+def configureAmortizationGeneration = {
+    task, reportOutput, runOutput ->
+    task.group = 'verification'
+    task.description = 'Generates one authoritative vector-only amortization report and run receipt.'
+    task.dependsOn 'prepareVerificationEnvironment',
+        'verifyDiscoveryCostLedger', 'verifyPairedTaskUtility'
+    task.workingDir amortizationRoot
+    task.inputs.files amortizationGenerator, amortizationProfile,
+        amortizationLedger, amortizationUtility
+    task.inputs.property 'repositoryRevision', 'WORKTREE'
+    task.outputs.files reportOutput, runOutput
+    task.outputs.upToDateWhen { false }
+    task.doFirst {
+        commandLine amortizationPython.get().absolutePath,
+            amortizationGenerator.asFile.absolutePath,
+            '--ledger', amortizationLedger.get().asFile.absolutePath,
+            '--paired-utility', amortizationUtility.get().asFile.absolutePath,
+            '--profile', amortizationProfile.asFile.absolutePath,
+            '--repository-revision', 'WORKTREE',
+            '--report-output', reportOutput.get().asFile.absolutePath,
+            '--run-output', runOutput.get().asFile.absolutePath
+    }
+}
+
+def generateVectorAmortizationFirst = tasks.register(
+    'generateVectorAmortizationFirst', Exec
+) {
+    configureAmortizationGeneration(
+        delegate, amortizationFirstReport, amortizationFirstRun)
+}
+
+def generateVectorAmortizationSecond = tasks.register(
+    'generateVectorAmortizationSecond', Exec
+) {
+    configureAmortizationGeneration(
+        delegate, amortizationSecondReport, amortizationSecondRun)
+}
+
+def verifyVectorAmortizationReport = tasks.register(
+    'verifyVectorAmortizationReport', Exec
+) {
+    group = 'verification'
+    description = 'Independently recomputes cumulative vector savings, ordering sensitivity and break-even decisions.'
+    dependsOn generateVectorAmortizationFirst,
+        generateVectorAmortizationSecond
+    workingDir amortizationRoot
+    inputs.files amortizationGenerator, amortizationVerifier,
+        amortizationProfile, amortizationProfileSchema,
+        amortizationReportSchema, amortizationRunSchema,
+        amortizationLedger, amortizationUtility,
+        amortizationFirstReport, amortizationFirstRun,
+        amortizationSecondReport, amortizationSecondRun
+    outputs.dir amortizationVerification
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine amortizationPython.get().absolutePath,
+            amortizationVerifier.asFile.absolutePath,
+            '--generator', amortizationGenerator.asFile.absolutePath,
+            '--first-report',
+            amortizationFirstReport.get().asFile.absolutePath,
+            '--second-report',
+            amortizationSecondReport.get().asFile.absolutePath,
+            '--first-run', amortizationFirstRun.get().asFile.absolutePath,
+            '--second-run', amortizationSecondRun.get().asFile.absolutePath,
+            '--ledger', amortizationLedger.get().asFile.absolutePath,
+            '--paired-utility', amortizationUtility.get().asFile.absolutePath,
+            '--profile', amortizationProfile.asFile.absolutePath,
+            '--profile-schema', amortizationProfileSchema.asFile.absolutePath,
+            '--report-schema', amortizationReportSchema.asFile.absolutePath,
+            '--run-schema', amortizationRunSchema.asFile.absolutePath,
+            '--repository-revision', 'WORKTREE',
+            '--report-directory',
+            amortizationVerification.get().asFile.absolutePath
+    }
+}
+
+tasks.matching { task -> task.name == 'check' }.configureEach {
+    dependsOn verifyVectorAmortizationReport
+}
