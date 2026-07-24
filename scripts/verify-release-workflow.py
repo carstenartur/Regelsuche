@@ -53,6 +53,8 @@ def verify_workflow() -> None:
         "verified_tree: ${{ steps.record.outputs.verified_tree }}",
         "git write-tree",
         "git rev-parse 'HEAD^{tree}'",
+        "git checkout --detach \"${TAG}^{commit}\"",
+        "git merge-base --is-ancestor HEAD \"origin/${BRANCH}\"",
         "gh release view",
         "gh release upload",
         "--clobber",
