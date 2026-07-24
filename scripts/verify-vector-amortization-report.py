@@ -4,10 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import copy
 import hashlib
 import json
-import re
+from collections import Counter
 from pathlib import Path
 from typing import Any, Callable
 
@@ -22,6 +23,11 @@ OVERALL = "NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST"
 LEDGER_BOUNDARY = (
     "NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST_AND_SINGLE_CANDIDATE_STREAM"
 )
+INCOMPLETE_LIFECYCLE_STATUSES = {
+    "EMBEDDED_NOT_SEPARATELY_METERED",
+    "NOT_EXECUTED_IN_BENCHMARK",
+    "CONFIGURED_NOT_EXECUTED",
+}
 EXPECTED_GENERATOR_ARGUMENTS = {
     "--ledger",
     "--paired-utility",
@@ -85,12 +91,31 @@ def rehash(value: dict[str, Any]) -> None:
 
 def verify_generator_source(path: Path) -> list[str]:
     source = path.read_text(encoding="utf-8")
-    flags = set(re.findall(r'"(--[a-z-]+)"', source))
-    if flags != EXPECTED_GENERATOR_ARGUMENTS:
+    tree = ast.parse(source, filename=str(path))
+    arguments: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+            continue
+        if node.func.attr != "add_argument" or not node.args:
+            continue
+        for argument in node.args:
+            if not (
+                isinstance(argument, ast.Constant)
+                and isinstance(argument.value, str)
+            ):
+                fail("amortization generator CLI names must be string literals")
+            arguments.append(argument.value)
+
+    counts = Counter(arguments)
+    duplicates = sorted(argument for argument, count in counts.items() if count > 1)
+    if duplicates:
+        fail(f"amortization generator CLI contains duplicates: {duplicates}")
+    actual = set(arguments)
+    if actual != EXPECTED_GENERATOR_ARGUMENTS:
         fail(
             "amortization generator CLI allowlist drift: "
-            f"missing={sorted(EXPECTED_GENERATOR_ARGUMENTS - flags)}, "
-            f"unexpected={sorted(flags - EXPECTED_GENERATOR_ARGUMENTS)}"
+            f"missing={sorted(EXPECTED_GENERATOR_ARGUMENTS - actual)}, "
+            f"unexpected={sorted(actual - EXPECTED_GENERATOR_ARGUMENTS)}"
         )
     required_fragments = [
         'OVERALL = "NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST"',
@@ -98,13 +123,14 @@ def verify_generator_source(path: Path) -> list[str]:
         '"lifecycleCostStatus": "PARTIAL_FORMATION_COST_ONLY"',
         'profile.get("conversionWeights") != []',
         '"publicationAuthorized": False',
+        "INCOMPLETE_LIFECYCLE_STATUSES",
     ]
     missing = [fragment for fragment in required_fragments if fragment not in source]
     if missing:
         fail(f"amortization generator claim boundary drift: {missing}")
     if "verify-vector-amortization-report" in source:
         fail("generator imports or invokes its independent verifier")
-    return sorted(flags)
+    return sorted(actual)
 
 
 def decision(cost: int, pairs: list[tuple[str, int]]) -> dict[str, Any]:
@@ -250,6 +276,18 @@ def validate_inputs(
             fail(f"paired utility task order drift at {index}")
 
 
+def incomplete_lifecycle_stages(
+    coverage: list[dict[str, Any]],
+) -> list[str]:
+    stages: list[str] = []
+    for item in coverage:
+        status = item.get("status")
+        if status not in INCOMPLETE_LIFECYCLE_STATUSES:
+            fail(f"unexpected lifecycle coverage status: {status}")
+        stages.append(item["stage"])
+    return stages
+
+
 def expected(
     ledger: dict[str, Any],
     utility: dict[str, Any],
@@ -288,11 +326,7 @@ def expected(
         lambda task: task["resourceDelta"]["generatedCandidateSaving"],
     )
     coverage = ledger["lifecycleCoverage"]
-    incomplete = [
-        item["stage"]
-        for item in coverage
-        if item["status"] != "EMBEDDED_NOT_SEPARATELY_METERED"
-    ]
+    incomplete = incomplete_lifecycle_stages(coverage)
     selection = utility["candidateSelection"]
     report = add_hash({
         "schema": REPORT_SCHEMA,
@@ -311,7 +345,7 @@ def expected(
         "candidateContentHash": selection["selectedCandidateContentHash"],
         "configuredTasks": 12,
         "executedTasks": len(tasks),
-        "correctnessRegressionBlocking": False,
+        "correctnessRegressionCount": utility["correctnessRegressionCount"],
         "lifecycleCoverage": coverage,
         "incompleteLifecycleStages": incomplete,
         "dimensions": [explored, candidate],
@@ -430,11 +464,15 @@ def main() -> int:
     expect_mismatch(reordered, expected_report, "frozen task order")
 
     lifecycle_drift = copy.deepcopy(first_report)
-    lifecycle_drift["lifecycleCoverage"][1]["status"] = (
-        "EMBEDDED_NOT_SEPARATELY_METERED"
-    )
+    lifecycle_drift["incompleteLifecycleStages"].remove("VALIDATION")
     rehash(lifecycle_drift)
     expect_mismatch(lifecycle_drift, expected_report, "lifecycle coverage")
+    try:
+        report_validator.validate(lifecycle_drift)
+    except jsonschema.ValidationError:
+        pass
+    else:
+        fail("schema accepted omission of an incomplete lifecycle stage")
 
     inflated = copy.deepcopy(first_report)
     inflated["overallDecision"] = "BREAK_EVEN_OBSERVED"
@@ -479,6 +517,9 @@ def main() -> int:
         "verifiedAccountingMode": "VECTOR_ONLY_NO_IMPLICIT_CONVERSION",
         "verifiedDimensions": [
             item["dimension"] for item in first_report["dimensions"]
+        ],
+        "verifiedIncompleteLifecycleStages": first_report[
+            "incompleteLifecycleStages"
         ],
         "verifiedOverallDecision": OVERALL,
         "verifiedMutations": [
