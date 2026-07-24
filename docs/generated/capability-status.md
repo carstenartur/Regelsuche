@@ -5,7 +5,7 @@
 
 - Policy: `EVIDENCE_DERIVED_FAIL_CLOSED`
 - Repository revision mode: `WORKTREE`
-- Status content hash: `sha256:66052c479ea87469c470543daf31de2e93242b9e2469ab21533985905916d9ed`
+- Status content hash: `sha256:2dc55930d206f97af17b653fa65a5bca82b3f51e02fbebc20368a8a56e732eb5`
 - Release run: `sha256:46e5061d26e05f4d4960ad52eb5594a3fab7ca8d6dc7b732fa8b97656c464364`
 - Domain-generic run: `sha256:7ed14645710b106744376191f8a6426a6ed53bcb813f68a92c92810d799f3282`
 
@@ -27,7 +27,7 @@
 
 ## Interpretation
 
-- `IMPLEMENTED` means that the named software contracts, schemas and dedicated workflow are present and hash-bound; it is not a qualification of a wider service.
+- `IMPLEMENTED` means that the named software contracts, schemas and checkout-local validators are present and hash-bound; it is not a qualification of a wider service.
 - `QUALIFIED` means that the named evidence profile is ready for exactly its recorded claim.
 - `BLOCKED` and `NOT_EVALUATED` remain visible and must not be paraphrased as success.
 - Project novelty, external novelty, symbolic validation, formal proof, promotion and Public Evidence remain distinct.
