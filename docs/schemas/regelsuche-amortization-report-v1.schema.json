@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-amortization-report-v1.schema.json",
+  "title": "Authoritative vector-only amortization report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "benchmarkId", "challengeId", "repositoryRevision",
+    "discoveryCostLedgerContentHash", "pairedTaskUtilityContentHash",
+    "downstreamTaskStreamContentHash", "amortizationProfileContentHash",
+    "profileId", "accountingMode", "candidateId", "candidateContentHash",
+    "configuredTasks", "executedTasks", "correctnessRegressionBlocking",
+    "lifecycleCoverage", "incompleteLifecycleStages", "dimensions",
+    "pathStepDiagnostic", "scalarDecisionStatus", "overallDecision",
+    "overallDecisionReason", "formalProofStatus", "externalNoveltyStatus",
+    "publicationAuthorized", "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.amortization-report/v1"},
+    "benchmarkId": {"const": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1"},
+    "challengeId": {"const": "reusable-search-macros"},
+    "repositoryRevision": {"type": "string", "minLength": 1},
+    "discoveryCostLedgerContentHash": {"$ref": "#/$defs/hash"},
+    "pairedTaskUtilityContentHash": {"$ref": "#/$defs/hash"},
+    "downstreamTaskStreamContentHash": {"$ref": "#/$defs/hash"},
+    "amortizationProfileContentHash": {"$ref": "#/$defs/hash"},
+    "profileId": {"const": "vector-only-no-conversion/v1"},
+    "accountingMode": {"const": "VECTOR_ONLY_NO_IMPLICIT_CONVERSION"},
+    "candidateId": {"type": "string", "pattern": "^macro_candidate_independent_[0-9a-f]+$"},
+    "candidateContentHash": {"$ref": "#/$defs/hash"},
+    "configuredTasks": {"const": 12},
+    "executedTasks": {"const": 12},
+    "correctnessRegressionBlocking": {"const": false},
+    "lifecycleCoverage": {
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "items": {"$ref": "#/$defs/coverage"}
+    },
+    "incompleteLifecycleStages": {
+      "type": "array", "minItems": 1,
+      "items": {"enum": [
+        "VALIDATION", "COUNTEREXAMPLE", "PROJECT_NOVELTY",
+        "FORMAL_PROOF", "QUALIFICATION"
+      ]},
+      "uniqueItems": true
+    },
+    "dimensions": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "prefixItems": [
+        {"$ref": "#/$defs/exploredStatesDimension"},
+        {"$ref": "#/$defs/candidateEvaluationsDimension"}
+      ],
+      "items": false
+    },
+    "pathStepDiagnostic": {"$ref": "#/$defs/pathStepDiagnostic"},
+    "scalarDecisionStatus": {"const": "NOT_APPLICABLE_NO_SCALAR_CONVERSION"},
+    "overallDecision": {"const": "NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST"},
+    "overallDecisionReason": {"const": "VALIDATION_COUNTEREXAMPLE_PROJECT_NOVELTY_FORMAL_PROOF_AND_QUALIFICATION_COSTS_NOT_ALL_SEPARATELY_EXECUTED"},
+    "formalProofStatus": {"const": "NOT_EVALUATED"},
+    "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+    "publicationAuthorized": {"const": false},
+    "contentHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "nullableTaskIndex": {"type": ["integer", "null"], "minimum": 1, "maximum": 12},
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "status"],
+      "properties": {
+        "stage": {"enum": [
+          "VALIDATION", "COUNTEREXAMPLE", "PROJECT_NOVELTY",
+          "FORMAL_PROOF", "QUALIFICATION"
+        ]},
+        "status": {"enum": [
+          "EMBEDDED_NOT_SEPARATELY_METERED", "NOT_EXECUTED_IN_BENCHMARK",
+          "CONFIGURED_NOT_EXECUTED"
+        ]}
+      }
+    },
+    "taskRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index", "taskId", "split", "saving", "cumulativeSaving",
+        "netSavingAfterDiscoveryCost", "breakEvenReached", "contentHash"
+      ],
+      "properties": {
+        "index": {"type": "integer", "minimum": 1, "maximum": 12},
+        "taskId": {"type": "string", "pattern": "^case-(1[3-8])-task-[12]$"},
+        "split": {"enum": ["TRAIN", "VALIDATION", "TEST"]},
+        "saving": {"type": "integer"},
+        "cumulativeSaving": {"type": "integer"},
+        "netSavingAfterDiscoveryCost": {"type": "integer"},
+        "breakEvenReached": {"type": "boolean"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision", "firstTaskIndex", "discoveryCost",
+        "finalCumulativeSaving", "finalNetSaving", "contentHash"
+      ],
+      "properties": {
+        "decision": {"enum": ["BREAK_EVEN_OBSERVED", "NO_BREAK_EVEN_OBSERVED"]},
+        "firstTaskIndex": {"$ref": "#/$defs/nullableTaskIndex"},
+        "discoveryCost": {"type": "integer", "minimum": 0},
+        "finalCumulativeSaving": {"type": "integer"},
+        "finalNetSaving": {"type": "integer"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "permutationDecision": {
+      "allOf": [
+        {"$ref": "#/$defs/decision"},
+        {
+          "type": "object",
+          "required": ["taskOrder"],
+          "properties": {
+            "taskOrder": {
+              "type": "array", "minItems": 12, "maxItems": 12,
+              "items": {"type": "string", "pattern": "^case-(1[3-8])-task-[12]$"},
+              "uniqueItems": true
+            }
+          }
+        }
+      ]
+    },
+    "orderingSensitivity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy", "bestCase", "worstCase", "finalSavingOrderInvariant",
+        "contentHash"
+      ],
+      "properties": {
+        "policy": {"const": "BEST_AND_WORST_CASE_PERMUTATION_BOUNDS_WITHOUT_REPLACING_FROZEN_ORDER"},
+        "bestCase": {"$ref": "#/$defs/permutationDecision"},
+        "worstCase": {"$ref": "#/$defs/permutationDecision"},
+        "finalSavingOrderInvariant": {"type": "integer"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "dimensionBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimension", "unit", "sourcePolicy", "discoveryCost",
+        "lifecycleCostStatus", "tasks", "observedOrderDecision",
+        "orderingSensitivity", "finalCumulativeSaving", "finalNetSaving",
+        "contentHash"
+      ],
+      "properties": {
+        "dimension": {"enum": ["EXPLORED_STATES", "CANDIDATE_EVALUATIONS"]},
+        "unit": {"enum": ["state", "candidate"]},
+        "sourcePolicy": {"type": "string", "minLength": 1},
+        "discoveryCost": {"type": "integer", "minimum": 1},
+        "lifecycleCostStatus": {"const": "PARTIAL_FORMATION_COST_ONLY"},
+        "tasks": {
+          "type": "array", "minItems": 12, "maxItems": 12,
+          "items": {"$ref": "#/$defs/taskRow"}
+        },
+        "observedOrderDecision": {"$ref": "#/$defs/decision"},
+        "orderingSensitivity": {"$ref": "#/$defs/orderingSensitivity"},
+        "finalCumulativeSaving": {"type": "integer"},
+        "finalNetSaving": {"type": "integer"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "exploredStatesDimension": {
+      "allOf": [
+        {"$ref": "#/$defs/dimensionBase"},
+        {
+          "properties": {
+            "dimension": {"const": "EXPLORED_STATES"},
+            "unit": {"const": "state"},
+            "sourcePolicy": {"const": "FORMATION_STATES_VERSUS_PAIRED_EXPANDED_STATE_SAVING"}
+          }
+        }
+      ]
+    },
+    "candidateEvaluationsDimension": {
+      "allOf": [
+        {"$ref": "#/$defs/dimensionBase"},
+        {
+          "properties": {
+            "dimension": {"const": "CANDIDATE_EVALUATIONS"},
+            "unit": {"const": "candidate"},
+            "sourcePolicy": {"const": "FORMATION_CANDIDATE_EVALUATIONS_VERSUS_BEST_FIRST_GENERATED_TRANSFORMATIONS_PER_PHASE1_LEDGER"}
+          }
+        }
+      ]
+    },
+    "pathStepDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "finalCumulativeSaving", "contentHash"],
+      "properties": {
+        "status": {"const": "DIAGNOSTIC_NOT_USED_FOR_DISCOVERY_BREAK_EVEN"},
+        "finalCumulativeSaving": {"type": "integer"},
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    }
+  }
+}
