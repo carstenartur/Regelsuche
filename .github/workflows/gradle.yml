@@ -84,18 +84,13 @@ jobs:
     name: Publish generated reports
     needs: verification
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     concurrency:
       group: pages-${{ github.repository }}-main
       cancel-in-progress: false
     permissions:
       actions: read
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: write
     steps:
       - uses: actions/checkout@v7
 
@@ -112,12 +107,12 @@ jobs:
           cp -R public/. build/pages-site/
           touch build/pages-site/.nojekyll
 
-      - uses: actions/configure-pages@v6
-
-      - uses: actions/upload-pages-artifact@v5
+      - name: Publish generated reports to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: build/pages-site
-
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: build/pages-site
+          keep_files: false
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+          commit_message: Publish generated reports (${{ github.sha }})
