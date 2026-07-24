@@ -1,0 +1,24 @@
+def releaseWorkflowPython = providers.gradleProperty('pythonExecutable')
+    .getOrElse('python3')
+
+def verifyReleaseWorkflowContract = tasks.register(
+    'verifyReleaseWorkflowContract', Exec
+) {
+    group = 'verification'
+    description = 'Verifies that releases run full QA and produce deterministic metadata.'
+    workingDir rootDir
+    commandLine releaseWorkflowPython, 'scripts/verify-release-workflow.py'
+    inputs.file('.github/workflows/release.yml')
+    inputs.file('.github/scripts/update-release-metadata.py')
+    inputs.file('scripts/verify-release-workflow.py')
+    inputs.files(
+        'CITATION.cff',
+        'CITATION.md',
+        '.zenodo.json',
+        'codemeta.json',
+        'release.properties')
+}
+
+tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
+    dependsOn verifyReleaseWorkflowContract
+}
