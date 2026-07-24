@@ -20,6 +20,7 @@
 - [Reale TRAIN-Suchfitness](evolution-train-fitness.md) — gepaarte Produktionssuche mit kompilierten Genomen, rohen Messwerten und fehlersicher getrennten Claim-Grenzen.
 - [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md) — geschlossene Zielkette von Search über Mining und Falsifikation bis Promotion und Wiederverwendung.
 - [Lernend geführte Regelsuche](learning-guided-search.md) — nachgelagertes Architekturkonzept für weiche Strategiepriorisierung, faire Exploration, Checkpoints und geprüfte Makrobildung.
+- [Strategie-DSL, Tracing und visualisierte Regelausführung](strategy-language-debugging.md) — inspizierbare Strategy-IR, strukturierte Matcher-Erklärungen, Source-Level-Debugger und AST-Visualisierung.
 - [Discovery Engine](discovery-engine.md) — technische Komponenten und Einstiegspunkte.
 - [Getting Started](getting-started.md) — Docker, Gradle und der erste grafische Produktfluss.
 - [Web-Workbench](web-workbench.md) — Bedienbereiche, sichtbare Ergebnisse und fachliche Zuordnung zur API.
@@ -122,6 +123,7 @@ Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. So
 ## Architektur und Entwicklung
 
 - [Architektur](architecture.md)
+- [Strategie-DSL, Tracing und visualisierte Regelausführung](strategy-language-debugging.md) — Zielarchitektur für Strategy-IR, Debugger, Trace-Protokolle und Matcher-Visualisierung.
 - [AST-Regelradar](ast-rule-radar.md) — implementierte positionsgebundene Grund-, Erweiterungs- und Makroregel-Kandidaten, Subtree-Rewrite und korrelierter Suchgraph.
 - [AST-Regelradar-Schema v1](schemas/regelsuche-ast-rule-radar-v1.schema.json) und [Search-Schema v1](schemas/regelsuche-ast-rule-radar-search-v1.schema.json).
 - [Modulstruktur](module-structure.md)
