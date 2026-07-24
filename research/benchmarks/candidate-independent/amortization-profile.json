@@ -1,0 +1,30 @@
+{
+  "schema": "regelsuche.amortization-profile/v1",
+  "profileId": "vector-only-no-conversion/v1",
+  "mode": "VECTOR_ONLY",
+  "resourceDimensions": [
+    {
+      "dimension": "EXPLORED_STATES",
+      "unit": "state",
+      "discoveryCostSource": "PAIRED_UTILITY_FORMATION_STATES",
+      "downstreamSavingSource": "PAIRED_TASK_EXPANDED_STATE_SAVING"
+    },
+    {
+      "dimension": "CANDIDATE_EVALUATIONS",
+      "unit": "candidate",
+      "discoveryCostSource": "PAIRED_UTILITY_FORMATION_CANDIDATE_EVALUATIONS",
+      "downstreamSavingSource": "PAIRED_TASK_GENERATED_CANDIDATE_SAVING",
+      "mappingPolicy": "BEST_FIRST_GENERATED_TRANSFORMATIONS_ACCOUNTED_AS_CANDIDATE_EVALUATIONS_PER_PHASE1_LEDGER"
+    }
+  ],
+  "conversionWeights": [],
+  "scalarDecisionStatus": "NOT_APPLICABLE_NO_SCALAR_CONVERSION",
+  "authoritativeOrderingPolicy": "FROZEN_DOWNSTREAM_STREAM_ORDER",
+  "orderingSensitivityPolicy": "BEST_AND_WORST_CASE_PERMUTATION_BOUNDS_WITHOUT_REPLACING_FROZEN_ORDER",
+  "freezeStatus": "FROZEN_BEFORE_AMORTIZATION_REPORT_GENERATION",
+  "claimPolicy": "VECTOR_DIMENSION_BREAK_EVEN_DOES_NOT_ESTABLISH_COMPLETE_LIFECYCLE_BREAK_EVEN",
+  "formalProofStatus": "NOT_EVALUATED",
+  "externalNoveltyStatus": "NOT_EVALUATED",
+  "publicationAuthorized": false,
+  "contentHash": "sha256:05d1757a018c27269b1a32567483990b463a0ca4832a0ec41bae6dee8a06ecbc"
+}
