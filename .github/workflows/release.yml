@@ -350,7 +350,7 @@ jobs:
           fi
           echo "Release tree matches QA: ${ACTUAL_TREE}"
 
-      - name: Create git tag (workflow_dispatch only)
+      - name: Create or reuse git tag (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
@@ -361,7 +361,8 @@ jobs:
               echo "::error::Existing tag ${TAG} does not match the QA-verified release tree"
               exit 1
             fi
-            echo "Tag ${TAG} already exists and matches the verified release tree"
+            git checkout --detach "${TAG}^{commit}"
+            echo "Tag ${TAG} already exists and its release commit has been restored"
           else
             git tag -a "${TAG}" -m "Release ${{ needs.preflight.outputs.release_version }}"
             git push origin "${TAG}"
@@ -374,12 +375,17 @@ jobs:
           BRANCH="${{ needs.preflight.outputs.maintenance_branch }}"
           if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
             git fetch origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}"
-            if ! git merge-base --is-ancestor "origin/${BRANCH}" HEAD; then
-              echo "::error::Maintenance branch ${BRANCH} cannot be advanced by fast-forward"
+            if git merge-base --is-ancestor "origin/${BRANCH}" HEAD; then
+              git push origin "HEAD:refs/heads/${BRANCH}"
+            elif git merge-base --is-ancestor HEAD "origin/${BRANCH}"; then
+              echo "Maintenance branch ${BRANCH} already contains the release commit"
+            else
+              echo "::error::Maintenance branch ${BRANCH} has diverged from the release commit"
               exit 1
             fi
+          else
+            git push origin "HEAD:refs/heads/${BRANCH}"
           fi
-          git push origin "HEAD:refs/heads/${BRANCH}"
 
       - name: Create or repair GitHub Release
         run: |
