@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-downstream-task-stream-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "benchmarkId", "streamId", "challengeId", "repositoryRevision",
+    "freezeStatus", "sourceCaseCorpusContentHash", "freezeReceiptContentHash",
+    "formationProfileId", "baselineInventoryContentHash", "combinedPreregistrationHash",
+    "orderingPolicy", "comparisonPolicy", "formationAccessPolicy", "configuredTasks",
+    "splitCounts", "retainedOutcomeClasses", "evaluationStatus", "publicationAuthorized",
+    "tasks", "contentHash"
+  ],
+  "properties": {
+    "schema": {"const": "regelsuche.downstream-task-stream/v1"},
+    "benchmarkId": {"const": "regelsuche-candidate-independent-autonomous-discovery-2026-07/v1"},
+    "streamId": {"const": "reusable-search-macros-held-out-task-stream/v1"},
+    "challengeId": {"const": "reusable-search-macros"},
+    "repositoryRevision": {"type": "string", "minLength": 1},
+    "freezeStatus": {"const": "DERIVED_ONLY_FROM_PRE_EXECUTION_FROZEN_INPUTS"},
+    "sourceCaseCorpusContentHash": {"$ref": "#/$defs/hash"},
+    "freezeReceiptContentHash": {"$ref": "#/$defs/hash"},
+    "formationProfileId": {"const": "macro-primitives/v1"},
+    "baselineInventoryContentHash": {"$ref": "#/$defs/hash"},
+    "combinedPreregistrationHash": {"$ref": "#/$defs/hash"},
+    "orderingPolicy": {"const": "CASE_CORPUS_ORDER_THEN_TASK_ORDER"},
+    "comparisonPolicy": {"const": "IDENTICAL_INPUT_TARGET_INVENTORY_STRATEGY_AND_BUDGET"},
+    "formationAccessPolicy": {"const": "EVALUATION_INPUT_HIDDEN_DURING_CANDIDATE_FORMATION"},
+    "configuredTasks": {"const": 12},
+    "splitCounts": {"const": {"TRAIN": 4, "VALIDATION": 4, "TEST": 4}},
+    "retainedOutcomeClasses": {
+      "const": [
+        "IMPROVED", "REACHABILITY_GAIN", "NO_IMPROVEMENT", "NO_RESULT",
+        "CORRECTNESS_REGRESSION", "CANDIDATE_NOT_FORMED"
+      ]
+    },
+    "evaluationStatus": {"const": "NOT_EXECUTED_BY_STREAM_CONSTRUCTION"},
+    "publicationAuthorized": {"const": false},
+    "tasks": {
+      "type": "array", "minItems": 12, "maxItems": 12,
+      "items": {"$ref": "#/$defs/task"}
+    },
+    "contentHash": {"$ref": "#/$defs/hash"}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "stringArray": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "budget": {
+      "type": "object", "additionalProperties": false,
+      "required": ["maxDepth", "maxExpandedStates"],
+      "properties": {
+        "maxDepth": {"type": "integer", "minimum": 0},
+        "maxExpandedStates": {"type": "integer", "minimum": 1}
+      }
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "index", "taskId", "caseId", "split", "structuralCluster", "caseContentHash",
+        "source", "target", "assumptions", "searchBudget", "comparisonPolicy",
+        "requiredEvidence", "contentHash"
+      ],
+      "properties": {
+        "index": {"type": "integer", "minimum": 1, "maximum": 12},
+        "taskId": {"type": "string", "pattern": "^case-(1[3-8])-task-[12]$"},
+        "caseId": {"type": "string", "pattern": "^case-(1[3-8])$"},
+        "split": {"enum": ["TRAIN", "VALIDATION", "TEST"]},
+        "structuralCluster": {"type": "string", "minLength": 1},
+        "caseContentHash": {"$ref": "#/$defs/hash"},
+        "source": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "assumptions": {"$ref": "#/$defs/stringArray"},
+        "searchBudget": {"$ref": "#/$defs/budget"},
+        "comparisonPolicy": {"const": "IDENTICAL_INPUT_TARGET_INVENTORY_STRATEGY_AND_BUDGET"},
+        "requiredEvidence": {
+          "const": [
+            "primitive-step-semantics", "baseline-search", "macro-enabled-search",
+            "correctness-regression"
+          ]
+        },
+        "contentHash": {"$ref": "#/$defs/hash"}
+      }
+    }
+  }
+}
