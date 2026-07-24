@@ -53,6 +53,7 @@ def verifyPluginTrustStoreRevisionEvidence = registerEvidenceValidator(
     'verifyPluginTrustStoreRevisionEvidence',
     'Validates signed trust-store revision chains and replay checkpoints.',
     'verify-plugin-trust-store-revision-evidence.py',
+    'verify-plugin-trust-store-revision-evidence.py',
     'plugin-trust-store-revision')
 
 verifyPluginTrustStoreRevisionEvidence.configure {
@@ -111,6 +112,9 @@ def verifyComparativeZ3Toolchain = tasks.register(
     standardOutput = z3VersionOutput
     errorOutput = z3VersionOutput
     outputs.upToDateWhen { false }
+    doFirst {
+        z3VersionOutput.reset()
+    }
     doLast {
         def version = z3VersionOutput.toString('UTF-8').trim()
         println version
