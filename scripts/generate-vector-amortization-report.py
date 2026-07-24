@@ -18,6 +18,11 @@ OVERALL = "NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST"
 INCOMPLETE_LEDGER = (
     "NOT_ESTABLISHED_INCOMPLETE_LIFECYCLE_COST_AND_SINGLE_CANDIDATE_STREAM"
 )
+INCOMPLETE_LIFECYCLE_STATUSES = {
+    "EMBEDDED_NOT_SEPARATELY_METERED",
+    "NOT_EXECUTED_IN_BENCHMARK",
+    "CONFIGURED_NOT_EXECUTED",
+}
 
 
 def fail(message: str) -> None:
@@ -214,6 +219,18 @@ def validate_sources(
         require_hash(task["resourceDelta"], "paired utility task delta")
 
 
+def incomplete_lifecycle_stages(
+    lifecycle_coverage: list[dict[str, Any]],
+) -> list[str]:
+    stages: list[str] = []
+    for item in lifecycle_coverage:
+        status = item.get("status")
+        if status not in INCOMPLETE_LIFECYCLE_STATUSES:
+            fail(f"unexpected lifecycle coverage status: {status}")
+        stages.append(item["stage"])
+    return stages
+
+
 def generate(
     ledger: dict[str, Any],
     utility: dict[str, Any],
@@ -259,11 +276,7 @@ def generate(
     selected = utility["candidateSelection"]
     require_hash(selected, "paired utility candidate selection")
     lifecycle_coverage = ledger["lifecycleCoverage"]
-    incomplete_stages = [
-        item["stage"]
-        for item in lifecycle_coverage
-        if item["status"] != "EMBEDDED_NOT_SEPARATELY_METERED"
-    ]
+    incomplete_stages = incomplete_lifecycle_stages(lifecycle_coverage)
 
     report = add_hash({
         "schema": REPORT_SCHEMA,
@@ -282,7 +295,7 @@ def generate(
         "candidateContentHash": selected["selectedCandidateContentHash"],
         "configuredTasks": 12,
         "executedTasks": len(tasks),
-        "correctnessRegressionBlocking": False,
+        "correctnessRegressionCount": utility["correctnessRegressionCount"],
         "lifecycleCoverage": lifecycle_coverage,
         "incompleteLifecycleStages": incomplete_stages,
         "dimensions": [explored, candidates],
