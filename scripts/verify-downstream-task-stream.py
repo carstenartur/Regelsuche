@@ -8,6 +8,7 @@ import ast
 import copy
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -72,18 +73,33 @@ def verify_generator_input_allowlist(path: Path) -> list[str]:
             continue
         if node.func.attr != "add_argument" or not node.args:
             continue
-        first = node.args[0]
-        if isinstance(first, ast.Constant) and isinstance(first.value, str):
-            arguments.append(first.value)
-    expected = [
+        for argument in node.args:
+            if not (
+                isinstance(argument, ast.Constant)
+                and isinstance(argument.value, str)
+            ):
+                fail("generator CLI argument names must be string literals")
+            arguments.append(argument.value)
+
+    counts = Counter(arguments)
+    duplicates = sorted(argument for argument, count in counts.items() if count > 1)
+    if duplicates:
+        fail(f"generator CLI input allowlist contains duplicates: {duplicates}")
+
+    expected = {
         "--corpus",
         "--receipt",
         "--profile",
         "--repository-revision",
         "--output",
-    ]
-    if arguments != expected:
-        fail(f"generator CLI input allowlist drift: {arguments}")
+    }
+    actual = set(arguments)
+    if actual != expected:
+        fail(
+            "generator CLI input allowlist drift: "
+            f"missing={sorted(expected - actual)}, "
+            f"unexpected={sorted(actual - expected)}"
+        )
     forbidden_literals = [
         "pairedEvaluations",
         "macroEnabled",
@@ -95,7 +111,7 @@ def verify_generator_input_allowlist(path: Path) -> list[str]:
     leaked = [value for value in forbidden_literals if value in source]
     if leaked:
         fail(f"generator references post-execution or candidate data: {leaked}")
-    return arguments
+    return sorted(actual)
 
 
 def expected_tasks(corpus: dict[str, Any]) -> list[dict[str, Any]]:
@@ -151,6 +167,8 @@ def verify_one(
         fail("case corpus is not pre-execution frozen")
     if corpus["executionStatusAtFreeze"] != "NOT_STARTED":
         fail("case corpus execution status drift")
+    if receipt.get("executionStatusAtFreeze") != "NOT_STARTED":
+        fail("receipt execution status drift")
     if receipt["caseCorpusContentHash"] != corpus["contentHash"]:
         fail("receipt/corpus binding drift")
     if receipt["resultInspectionStatus"] != "NO_EVALUATED_RESULTS_EXIST":
@@ -208,13 +226,14 @@ def main() -> int:
     verified_generator_arguments = verify_generator_input_allowlist(arguments.generator)
     schema = load(arguments.schema)
     jsonschema.Draft202012Validator.check_schema(schema)
+    validator = jsonschema.Draft202012Validator(schema)
     first = load(arguments.first_stream)
     second = load(arguments.second_stream)
     corpus = load(arguments.corpus)
     receipt = load(arguments.receipt)
     profile = load(arguments.profile)
     for stream in (first, second):
-        jsonschema.validate(stream, schema)
+        validator.validate(stream)
         verify_one(stream, corpus, receipt, profile)
     if arguments.first_stream.read_bytes() != arguments.second_stream.read_bytes():
         fail("clean downstream streams are not byte-identical")
@@ -234,10 +253,48 @@ def main() -> int:
     inventory_drift["contentHash"] = semantic_hash(inventory_drift)
     expect_verification_failure(inventory_drift, corpus, receipt, profile, "inventory binding")
 
+    receipt_status_drift = copy.deepcopy(receipt)
+    receipt_status_drift["executionStatusAtFreeze"] = "STARTED"
+    receipt_status_drift.pop("contentHash", None)
+    receipt_status_drift["contentHash"] = semantic_hash(receipt_status_drift)
+    receipt_status_stream = copy.deepcopy(first)
+    receipt_status_stream["freezeReceiptContentHash"] = receipt_status_drift[
+        "contentHash"
+    ]
+    receipt_status_stream.pop("contentHash", None)
+    receipt_status_stream["contentHash"] = semantic_hash(receipt_status_stream)
+    expect_verification_failure(
+        receipt_status_stream,
+        corpus,
+        receipt_status_drift,
+        profile,
+        "receipt execution status",
+    )
+
+    receipt_status_missing = copy.deepcopy(receipt)
+    receipt_status_missing.pop("executionStatusAtFreeze")
+    receipt_status_missing.pop("contentHash", None)
+    receipt_status_missing["contentHash"] = semantic_hash(
+        receipt_status_missing
+    )
+    receipt_missing_stream = copy.deepcopy(first)
+    receipt_missing_stream["freezeReceiptContentHash"] = receipt_status_missing[
+        "contentHash"
+    ]
+    receipt_missing_stream.pop("contentHash", None)
+    receipt_missing_stream["contentHash"] = semantic_hash(receipt_missing_stream)
+    expect_verification_failure(
+        receipt_missing_stream,
+        corpus,
+        receipt_status_missing,
+        profile,
+        "missing receipt execution status",
+    )
+
     leaked = copy.deepcopy(first)
     leaked["tasks"][0]["outcome"] = "IMPROVED"
     try:
-        jsonschema.validate(leaked, schema)
+        validator.validate(leaked)
     except jsonschema.ValidationError:
         pass
     else:
@@ -254,6 +311,8 @@ def main() -> int:
         "verifiedMutations": [
             "task-order",
             "baseline-inventory",
+            "receipt-execution-status",
+            "missing-receipt-execution-status",
             "evaluation-outcome-leak",
         ],
         "evaluationStatus": "NOT_EXECUTED_BY_STREAM_CONSTRUCTION",
