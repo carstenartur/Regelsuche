@@ -121,11 +121,11 @@ jobs:
             echo "::error::release_version must match release.properties base version (${CURRENT%-SNAPSHOT})"
             exit 1
           fi
-          grep -q "version: \"${CURRENT}\"" CITATION.cff
-          grep -q "Version ${CURRENT}." CITATION.md
-          grep -q "version      = {${CURRENT}}," CITATION.md
-          grep -q "\"version\": \"${CURRENT}\"" .zenodo.json
-          grep -q "\"version\": \"${CURRENT}\"" codemeta.json
+          grep -Fq "version: \"${CURRENT}\"" CITATION.cff
+          grep -Fq "Version ${CURRENT}." CITATION.md
+          grep -Fq "version      = {${CURRENT}}," CITATION.md
+          grep -Fq "\"version\": \"${CURRENT}\"" .zenodo.json
+          grep -Fq "\"version\": \"${CURRENT}\"" codemeta.json
 
       - name: Inspect existing tag (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
@@ -215,7 +215,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t CHANGED < <(git diff --name-only)
+          mapfile -t CHANGED < <(git diff HEAD --name-only)
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             for path in "${CHANGED[@]}"; do
               case "${path}" in
@@ -244,6 +244,28 @@ jobs:
           git reset --quiet
           echo "verified_tree=${VERIFIED_TREE}" >> "$GITHUB_OUTPUT"
           echo "Verified release tree: ${VERIFIED_TREE}"
+
+      - name: Smoke-test assembled distribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf build/release-smoke
+          mkdir -p build/release-smoke
+          ARCHIVE=$(find app/build/distributions -maxdepth 1 -type f -name '*.tar' -print | sort | head -n 1)
+          if [[ -z "${ARCHIVE}" ]]; then
+            echo "::error::No TAR distribution was produced for the release smoke test"
+            exit 1
+          fi
+          tar -xf "${ARCHIVE}" -C build/release-smoke
+          LAUNCHER=$(find build/release-smoke -type f -path '*/bin/app' -print | sort | head -n 1)
+          if [[ -z "${LAUNCHER}" ]]; then
+            echo "::error::The assembled distribution contains no bin/app launcher"
+            exit 1
+          fi
+          chmod +x "${LAUNCHER}"
+          OUTPUT=$("${LAUNCHER}")
+          grep -Fq 'Usage:' <<< "${OUTPUT}"
+          grep -Fq 'discover' <<< "${OUTPUT}"
 
       - name: Collect distribution artifacts
         id: collect
