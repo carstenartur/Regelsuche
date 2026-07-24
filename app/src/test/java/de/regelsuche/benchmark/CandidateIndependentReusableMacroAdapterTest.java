@@ -3,6 +3,7 @@ package de.regelsuche.benchmark;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.EvaluationTask;
@@ -178,6 +179,11 @@ class CandidateIndependentReusableMacroAdapterTest {
         var selected = CandidateIndependentExactOneMacroSelector
             .select(formation).candidate();
         List<EvaluationTask> tasks = frozenTasks();
+        var baselines = new LinkedHashMap<String,
+            CandidateIndependentReusableMacroAdapter.BaselineEvaluation>();
+        for (EvaluationTask task : tasks) {
+            baselines.put(task.taskId(), adapter.baseline(task));
+        }
         List<String> evaluatedCandidateIds = new ArrayList<>();
 
         for (var candidate : formation.macros()) {
@@ -185,12 +191,18 @@ class CandidateIndependentReusableMacroAdapterTest {
                 FormationStatus.SELECTED,
                 List.of(candidate),
                 formation.replayEvidence(),
-                "candidate-panel exact-one evaluation");
+                "candidate-panel exact-one evaluation for "
+                    + candidate.macroId());
             var results = tasks.stream()
-                .map(task -> adapter.evaluate(task, exactOneFormation))
+                .map(task -> adapter.evaluate(
+                    task,
+                    exactOneFormation,
+                    baselines.get(task.taskId())))
                 .toList();
 
             assertEquals(12, results.size());
+            results.forEach(result -> assertEquals(
+                baselines.get(result.taskId()).run(), result.baseline()));
             assertTrue(results.stream().noneMatch(result ->
                 result.outcome() == UtilityOutcome.CANDIDATE_NOT_FORMED));
             assertTrue(results.stream().allMatch(result ->
@@ -214,6 +226,20 @@ class CandidateIndependentReusableMacroAdapterTest {
         assertEquals(2, evaluatedCandidateIds.stream()
             .filter(candidateId -> !candidateId.equals(selected.macroId()))
             .count());
+    }
+
+    @Test
+    void reusableBaselineRemainsBoundToItsFrozenTask() {
+        var formation = CandidateIndependentExactOneMacroSelector.select(
+            adapter.form(trainTraces())).exactOneFormation();
+        List<EvaluationTask> tasks = frozenTasks();
+        var firstTaskBaseline = adapter.baseline(tasks.getFirst());
+
+        var exception = assertThrows(IllegalArgumentException.class,
+            () -> adapter.evaluate(
+                tasks.get(1), formation, firstTaskBaseline));
+
+        assertTrue(exception.getMessage().contains("different task"));
     }
 
     private static long count(
