@@ -3,6 +3,7 @@ package de.regelsuche.benchmark;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmark.CandidateIndependentReusableMacroAdapter.EvaluationTask;
@@ -170,6 +171,84 @@ class CandidateIndependentReusableMacroAdapterTest {
         assertTrue(results.stream()
             .flatMap(result -> result.macroEnabled().ruleIds().stream())
             .anyMatch(selection.candidate().macroId()::equals));
+    }
+
+    @Test
+    void evaluatesEveryFormedCandidateIndividuallyAcrossTheFrozenStream() {
+        var formation = adapter.form(trainTraces());
+        var selected = CandidateIndependentExactOneMacroSelector
+            .select(formation).candidate();
+        List<EvaluationTask> tasks = frozenTasks();
+        var baselines = new LinkedHashMap<String,
+            CandidateIndependentReusableMacroAdapter.BaselineEvaluation>();
+        for (EvaluationTask task : tasks) {
+            baselines.put(task.taskId(), adapter.baseline(task));
+        }
+        List<String> evaluatedCandidateIds = new ArrayList<>();
+        List<String> exercisedCandidateIds = new ArrayList<>();
+
+        for (var candidate : formation.macros()) {
+            var exactOneFormation = new FormationResult(
+                FormationStatus.SELECTED,
+                List.of(candidate),
+                formation.replayEvidence(),
+                "candidate-panel exact-one evaluation for "
+                    + candidate.macroId());
+            var results = tasks.stream()
+                .map(task -> adapter.evaluate(
+                    task,
+                    exactOneFormation,
+                    baselines.get(task.taskId())))
+                .toList();
+
+            assertEquals(12, results.size());
+            results.forEach(result -> assertEquals(
+                baselines.get(result.taskId()).run(), result.baseline()));
+            assertTrue(results.stream().noneMatch(result ->
+                result.outcome() == UtilityOutcome.CANDIDATE_NOT_FORMED));
+            assertTrue(results.stream().allMatch(result ->
+                result.correctnessRegression()
+                    == (result.outcome()
+                        == UtilityOutcome.CORRECTNESS_REGRESSION)));
+            assertTrue(results.stream()
+                .flatMap(result -> result.macroEnabled().ruleIds().stream())
+                .filter(ruleId -> ruleId.startsWith(
+                    "macro_candidate_independent_"))
+                .allMatch(candidate.macroId()::equals));
+            boolean exercised = results.stream()
+                .flatMap(result -> result.macroEnabled().ruleIds().stream())
+                .anyMatch(candidate.macroId()::equals);
+            if (exercised) {
+                exercisedCandidateIds.add(candidate.macroId());
+            }
+            if (candidate.equals(selected)) {
+                assertTrue(exercised,
+                    "the production-selected candidate must be exercised");
+            }
+            evaluatedCandidateIds.add(candidate.macroId());
+        }
+
+        assertEquals(3, evaluatedCandidateIds.size());
+        assertEquals(3, evaluatedCandidateIds.stream().distinct().count());
+        assertTrue(evaluatedCandidateIds.contains(selected.macroId()));
+        assertTrue(exercisedCandidateIds.contains(selected.macroId()));
+        assertEquals(2, evaluatedCandidateIds.stream()
+            .filter(candidateId -> !candidateId.equals(selected.macroId()))
+            .count());
+    }
+
+    @Test
+    void reusableBaselineRemainsBoundToItsFrozenTask() {
+        var formation = CandidateIndependentExactOneMacroSelector.select(
+            adapter.form(trainTraces())).exactOneFormation();
+        List<EvaluationTask> tasks = frozenTasks();
+        var firstTaskBaseline = adapter.baseline(tasks.getFirst());
+
+        var exception = assertThrows(IllegalArgumentException.class,
+            () -> adapter.evaluate(
+                tasks.get(1), formation, firstTaskBaseline));
+
+        assertTrue(exception.getMessage().contains("different task"));
     }
 
     private static long count(
