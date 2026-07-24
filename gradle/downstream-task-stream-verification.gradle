@@ -1,4 +1,4 @@
-def downstreamStreamRoot = layout.projectDirectory
+def downstreamStreamRoot = rootProject.layout.projectDirectory
 def downstreamStreamGenerator = downstreamStreamRoot.file(
     'scripts/generate-downstream-task-stream.py')
 def downstreamStreamVerifier = downstreamStreamRoot.file(
