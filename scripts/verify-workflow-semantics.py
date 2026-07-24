@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prevent new verification semantics from being implemented only in Actions YAML."""
+"""Keep Actions thin, few in number and reproducible from a checkout."""
 
 from __future__ import annotations
 
@@ -11,7 +11,14 @@ from pathlib import Path
 
 WORKFLOW_DIR = Path(".github/workflows")
 POLICY_FILE = Path("config/workflow-semantics-policy.json")
-EXPECTED_SCHEMA = "regelsuche.workflow-semantics-policy/v1"
+EXPECTED_SCHEMA = "regelsuche.workflow-semantics-policy/v2"
+
+
+@dataclass(frozen=True)
+class Policy:
+    maximum_workflow_count: int
+    verification_workflows: tuple[str, ...]
+    platform_workflows: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -39,6 +46,10 @@ TEXT_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "github-service-fixture",
         re.compile(r"^\s+services:\s*$"),
     ),
+    (
+        "direct-repository-script",
+        re.compile(r"\b(?:python3?|bash)\s+(?:scripts/|reproduction/)"),
+    ),
 )
 
 ASSERTION_PREFIXES = (
@@ -52,12 +63,11 @@ ASSERTION_PREFIXES = (
     "[[ ",
 )
 
-REPOSITORY_COMMAND = re.compile(
-    r"(?:\./gradlew\b|python3\s+scripts/|bash\s+(?:scripts/|reproduction/)|\./(?:scripts/|reproduction/))"
-)
+GRADLE_INVOCATION = re.compile(r"\./gradlew\b")
+CI_ENTRYPOINT = re.compile(r"\bciCheck\b")
 
 
-def load_policy() -> tuple[list[str], list[str]]:
+def load_policy() -> Policy:
     try:
         document = json.loads(POLICY_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
@@ -65,27 +75,37 @@ def load_policy() -> tuple[list[str], list[str]]:
 
     if set(document) != {
         "schema",
-        "repositoryOwnedWorkflows",
-        "legacyWorkflowOwnedSemantics",
+        "maximumWorkflowCount",
+        "verificationWorkflows",
+        "platformWorkflows",
     }:
         raise ValueError("workflow policy has unknown or missing top-level fields")
     if document["schema"] != EXPECTED_SCHEMA:
         raise ValueError(f"unsupported workflow policy schema: {document['schema']!r}")
 
-    repository_owned = document["repositoryOwnedWorkflows"]
-    legacy = document["legacyWorkflowOwnedSemantics"]
-    if not isinstance(repository_owned, list) or not isinstance(legacy, list):
-        raise ValueError("workflow policy classifications must be arrays")
-    if not all(isinstance(item, str) and item for item in repository_owned + legacy):
+    maximum = document["maximumWorkflowCount"]
+    verification = document["verificationWorkflows"]
+    platform = document["platformWorkflows"]
+    if not isinstance(maximum, int) or isinstance(maximum, bool) or maximum < 1:
+        raise ValueError("maximumWorkflowCount must be a positive integer")
+    if not isinstance(verification, list) or not isinstance(platform, list):
+        raise ValueError("workflow classifications must be arrays")
+    if not all(isinstance(item, str) and item for item in verification + platform):
         raise ValueError("workflow policy entries must be non-empty strings")
-    if repository_owned != sorted(set(repository_owned)):
-        raise ValueError("repositoryOwnedWorkflows must be sorted and unique")
-    if legacy != sorted(set(legacy)):
-        raise ValueError("legacyWorkflowOwnedSemantics must be sorted and unique")
-    overlap = set(repository_owned) & set(legacy)
+    if verification != sorted(set(verification)):
+        raise ValueError("verificationWorkflows must be sorted and unique")
+    if platform != sorted(set(platform)):
+        raise ValueError("platformWorkflows must be sorted and unique")
+    overlap = set(verification) & set(platform)
     if overlap:
-        raise ValueError(f"workflows have two ownership classifications: {sorted(overlap)}")
-    return repository_owned, legacy
+        raise ValueError(
+            f"workflows have two ownership classifications: {sorted(overlap)}"
+        )
+    if len(verification) + len(platform) > maximum:
+        raise ValueError("classified workflows exceed maximumWorkflowCount")
+    if not verification:
+        raise ValueError("at least one verification workflow is required")
+    return Policy(maximum, tuple(verification), tuple(platform))
 
 
 def workflow_names() -> list[str]:
@@ -98,7 +118,7 @@ def workflow_names() -> list[str]:
     )
 
 
-def scan_repository_owned(workflow: str) -> list[Violation]:
+def scan_verification_workflow(workflow: str) -> list[Violation]:
     path = WORKFLOW_DIR / workflow
     text = path.read_text(encoding="utf-8")
     violations: list[Violation] = []
@@ -106,20 +126,41 @@ def scan_repository_owned(workflow: str) -> list[Violation]:
     for line_number, line in enumerate(text.splitlines(), start=1):
         for category, pattern in TEXT_PATTERNS:
             if pattern.search(line):
-                violations.append(Violation(workflow, line_number, category, line.strip()))
+                violations.append(
+                    Violation(workflow, line_number, category, line.strip())
+                )
         stripped = line.strip()
         if stripped.startswith(ASSERTION_PREFIXES):
             violations.append(
                 Violation(workflow, line_number, "workflow-owned-assertion", stripped)
             )
 
-    if not REPOSITORY_COMMAND.search(text):
+    invocations = list(GRADLE_INVOCATION.finditer(text))
+    if not invocations:
         violations.append(
             Violation(
                 workflow,
                 1,
-                "missing-repository-command",
-                "no Gradle task or checked-in script invocation found",
+                "missing-gradle-entrypoint",
+                "no checkout-local Gradle invocation found",
+            )
+        )
+    if len(invocations) > 2:
+        violations.append(
+            Violation(
+                workflow,
+                1,
+                "too-many-gradle-entrypoints",
+                f"found {len(invocations)} Gradle invocations; expected at most two",
+            )
+        )
+    if not CI_ENTRYPOINT.search(text):
+        violations.append(
+            Violation(
+                workflow,
+                1,
+                "missing-ci-entrypoint",
+                "verification workflow does not invoke ciCheck",
             )
         )
     return violations
@@ -131,6 +172,7 @@ def self_test() -> None:
         "manual-docker-lifecycle": "docker run --rm image",
         "fixed-host-port": "docker run -p 18080:8080 image",
         "github-service-fixture": "    services:",
+        "direct-repository-script": "bash scripts/check.sh",
     }
     for expected, sample in samples.items():
         matched = {name for name, pattern in TEXT_PATTERNS if pattern.search(sample)}
@@ -138,20 +180,29 @@ def self_test() -> None:
             raise AssertionError(f"guard self-test did not detect {expected}")
     if not any("test value".startswith(prefix) for prefix in ASSERTION_PREFIXES):
         raise AssertionError("guard self-test did not detect shell assertion")
-    if not REPOSITORY_COMMAND.search("run: ./gradlew verifySomething"):
-        raise AssertionError("guard self-test did not detect repository command")
+    if not CI_ENTRYPOINT.search("run: ./gradlew ciCheck"):
+        raise AssertionError("guard self-test did not detect ciCheck")
 
 
 def main() -> int:
     try:
         self_test()
-        repository_owned, legacy = load_policy()
+        policy = load_policy()
         actual = workflow_names()
     except (AssertionError, ValueError) as error:
         print(f"Workflow semantics guard configuration failed: {error}", file=sys.stderr)
         return 2
 
-    classified = sorted(repository_owned + legacy)
+    classified = sorted(
+        policy.verification_workflows + policy.platform_workflows
+    )
+    if len(actual) > policy.maximum_workflow_count:
+        print(
+            f"Too many workflows: {len(actual)} present, "
+            f"maximum is {policy.maximum_workflow_count}",
+            file=sys.stderr,
+        )
+        return 1
     if classified != actual:
         missing = sorted(set(actual) - set(classified))
         stale = sorted(set(classified) - set(actual))
@@ -167,11 +218,11 @@ def main() -> int:
 
     violations = [
         violation
-        for workflow in repository_owned
-        for violation in scan_repository_owned(workflow)
+        for workflow in policy.verification_workflows
+        for violation in scan_verification_workflow(workflow)
     ]
     if violations:
-        print("Repository-owned workflows contain forbidden semantics:", file=sys.stderr)
+        print("Verification workflows contain checkout-owned semantics:", file=sys.stderr)
         for violation in violations:
             print(
                 f"  {violation.workflow}:{violation.line}: "
@@ -182,8 +233,9 @@ def main() -> int:
 
     print(
         "OK: "
-        f"{len(repository_owned)} repository-owned workflow(s) are thin; "
-        f"{len(legacy)} legacy workflow(s) remain explicitly tracked"
+        f"{len(actual)}/{policy.maximum_workflow_count} workflow slots used; "
+        f"{len(policy.verification_workflows)} verification workflow(s) invoke ciCheck; "
+        f"{len(policy.platform_workflows)} platform workflow(s) remain"
     )
     return 0
 

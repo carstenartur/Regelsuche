@@ -98,15 +98,15 @@
       "status": "IMPLEMENTED",
       "claim": "Local detached-signature verification, publisher trust policy and verified-byte staging are implemented.",
       "evidenceRoots": [
-        "sha256:46a5f9fce2dd01cb99288bb1e31b6c88ac8b9ac0a22ad750f79dd1dc0b9fadb6",
         "sha256:513128693b36a71172b3608752989478cd2465a8479ef0f0ced5a2f0cd5685e6",
+        "sha256:57e9e1f4d1d4a1bd168596117d201c7ef4085b1210174607491415141d4f7ab4",
         "sha256:94b7240608ad8655b62496d13b97c5ff0547023a94993c307ae47e6f52df1655",
         "sha256:fd1bffe151c49a44bdf1c847dbf9c30057a0e42007fff52f6d54755983fa533e"
       ],
       "blockers": [],
       "notes": [
         "IMPLEMENTED is a source-contract claim, not a public distribution or installation qualification.",
-        "Required source, schema and dedicated workflow files are hash-bound by this status artifact."
+        "Required source, schema and checkout-local validator files are hash-bound by this status artifact."
       ]
     },
     {
@@ -115,14 +115,14 @@
       "claim": "Immutable local index revisions can be authenticated through curator Ed25519 signatures.",
       "evidenceRoots": [
         "sha256:26822da5c0044cbf731de66549ab8c4c9883b48bd3a8828044fc55aa271abbbf",
-        "sha256:43b662afcffd02579d360858a4e9285ae97ed4d187cda9cc1996985ddf41aa57",
         "sha256:4809f379e96e6477ff45553b6e724ffae251859858a4f8d2decd134059b40e9f",
-        "sha256:4fca027b52f3b67458417052e4fcc08d5d9f475ad86617bf64227bc63749704f"
+        "sha256:4fca027b52f3b67458417052e4fcc08d5d9f475ad86617bf64227bc63749704f",
+        "sha256:78897f95fb75918aa0839dd9ce0ac2a0a4aed565c7e7e948216ca2ab927a2175"
       ],
       "blockers": [],
       "notes": [
         "IMPLEMENTED is a source-contract claim, not a public distribution or installation qualification.",
-        "Required source, schema and dedicated workflow files are hash-bound by this status artifact."
+        "Required source, schema and checkout-local validator files are hash-bound by this status artifact."
       ]
     },
     {
@@ -131,7 +131,7 @@
       "claim": "Hash-chained trust-state revisions implement pinned-authority, replay, gap and fork checks.",
       "evidenceRoots": [
         "sha256:02b81e9218b8c5492dbdd1510af0eff0a3807ddc469f6548fbf693aab1abfbeb",
-        "sha256:3e3ddb897f0302afd49814cffa1fc05b429451c6cb30c25c0a5ce3847687537e",
+        "sha256:93d56fcf00155ce6862515538c03ed65ccefa2dd5db59802b2ff2e31c3d3d4c3",
         "sha256:c5642239068b97d83026b1136442e57d88bec0210b4c5929e3b017c940dd0d5a",
         "sha256:ee533fe4fef94e9c4f5ec33f7d1c16401b2c637428ff254487225801e9db9849",
         "sha256:f383b2d8d5bd0440bce62f3d364dd31a24c64234a3ea9a2a8652e0179bf07971"
@@ -139,7 +139,7 @@
       "blockers": [],
       "notes": [
         "IMPLEMENTED is a source-contract claim, not a public distribution or installation qualification.",
-        "Required source, schema and dedicated workflow files are hash-bound by this status artifact."
+        "Required source, schema and checkout-local validator files are hash-bound by this status artifact."
       ]
     },
     {
@@ -200,5 +200,5 @@
       ]
     }
   ],
-  "contentHash": "sha256:66052c479ea87469c470543daf31de2e93242b9e2469ab21533985905916d9ed"
+  "contentHash": "sha256:2dc55930d206f97af17b653fa65a5bca82b3f51e02fbebc20368a8a56e732eb5"
 }

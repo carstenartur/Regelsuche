@@ -142,27 +142,28 @@ def load_portfolio(root: Path) -> dict:
     return portfolio
 
 
-def run_pilot(root: Path, pilot: Pilot) -> dict:
+def run_pilot(root: Path, pilot: Pilot, reuse_test_results: bool) -> dict:
     command = pilot.command()
-    completed = subprocess.run(command, cwd=root, check=False)
-    if completed.returncode != 0:
-        raise RuntimeError(
-            f"pilot {pilot.challenge_id} failed with exit code "
-            f"{completed.returncode}: {' '.join(command)}"
-        )
+    if not reuse_test_results:
+        completed = subprocess.run(command, cwd=root, check=False)
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"pilot {pilot.challenge_id} failed with exit code "
+                f"{completed.returncode}: {' '.join(command)}"
+            )
 
     report_path = root / pilot.report
     if not report_path.is_file():
+        mode = "reused" if reuse_test_results else "executed"
         raise RuntimeError(
-            f"pilot {pilot.challenge_id} produced no JUnit XML: {pilot.report}"
+            f"pilot {pilot.challenge_id} produced no JUnit XML after {mode} test run: "
+            f"{pilot.report}"
         )
     suite = ET.parse(report_path).getroot()
     failures = int(suite.get("failures", "0"))
     errors = int(suite.get("errors", "0"))
     skipped = int(suite.get("skipped", "0"))
-    methods = sorted(
-        testcase.get("name", "") for testcase in suite.findall("testcase")
-    )
+    methods = sorted(testcase.get("name", "") for testcase in suite.findall("testcase"))
     missing = sorted(set(pilot.expected_methods) - set(methods))
     if failures or errors or skipped or missing:
         raise RuntimeError(
@@ -219,14 +220,24 @@ def main() -> int:
         type=Path,
         default=Path("build/reports/discovery-challenge-pilots/report.json"),
     )
+    parser.add_argument(
+        "--reuse-test-results",
+        action="store_true",
+        help=(
+            "Validate JUnit XML from an already scheduled repository test graph "
+            "instead of starting nested Gradle processes."
+        ),
+    )
     args = parser.parse_args()
     root = args.root.resolve()
 
     try:
         portfolio = load_portfolio(root)
-        results = [run_pilot(root, pilot) for pilot in PILOTS]
+        results = [
+            run_pilot(root, pilot, args.reuse_test_results) for pilot in PILOTS
+        ]
         write_report(root, args.output, portfolio, results)
-    except RuntimeError as exc:
+    except (RuntimeError, ET.ParseError) as exc:
         print(f"development challenge pilots failed: {exc}", file=sys.stderr)
         return 1
     return 0

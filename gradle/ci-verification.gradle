@@ -1,0 +1,232 @@
+/*
+ * Checkout-owned CI lifecycle.
+ *
+ * GitHub Actions is deliberately limited to provisioning a runner, invoking
+ * `./gradlew ciCheck`, retaining outputs and deploying the generated site.
+ * Every pass/fail decision belongs to a Gradle task or a versioned script here.
+ */
+
+def repositoryRoot = layout.projectDirectory
+def verificationVenv = layout.buildDirectory.dir('verification-venv')
+def verificationPython = providers.provider {
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(verificationVenv.get().asFile, executable)
+}
+
+def registerEvidenceValidator = { String taskName, String description,
+        String scriptName, String reportDirectory ->
+    tasks.register(taskName, Exec) {
+        group = 'verification'
+        description = description
+        dependsOn 'prepareVerificationEnvironment', ':app:test'
+        workingDir repositoryRoot
+        inputs.file repositoryRoot.file("scripts/${scriptName}")
+        inputs.dir repositoryRoot.dir('docs/schemas')
+        inputs.dir project(':app').layout.buildDirectory.dir(
+            "reports/${reportDirectory}")
+        outputs.upToDateWhen { false }
+        doFirst {
+            commandLine verificationPython.get().absolutePath,
+                "scripts/${scriptName}", '--root', repositoryRoot.asFile.absolutePath
+        }
+    }
+}
+
+def verifyPluginArtifactIndexEvidence = registerEvidenceValidator(
+    'verifyPluginArtifactIndexEvidence',
+    'Validates signed plugin-index and deterministic resolution evidence.',
+    'verify-plugin-artifact-index-evidence.py',
+    'plugin-artifact-index')
+
+verifyPluginArtifactIndexEvidence.configure {
+    dependsOn ':app:verifyPluginArtifactIndexEvidenceDeterminism'
+}
+
+def verifyPluginArtifactTrustEvidence = registerEvidenceValidator(
+    'verifyPluginArtifactTrustEvidence',
+    'Validates plugin signature, trust-store and admission-gate evidence.',
+    'verify-plugin-artifact-trust-evidence.py',
+    'plugin-artifact-trust')
+
+def verifyPluginTrustStoreRevisionEvidence = registerEvidenceValidator(
+    'verifyPluginTrustStoreRevisionEvidence',
+    'Validates signed trust-store revision chains and replay checkpoints.',
+    'verify-plugin-trust-store-revision-evidence.py',
+    'plugin-trust-store-revision')
+
+verifyPluginTrustStoreRevisionEvidence.configure {
+    dependsOn ':app:verifyPluginTrustStoreRevisionEvidenceDeterminism'
+}
+
+def verifyDiscoveryChallengeDevelopmentPilots = tasks.register(
+    'verifyDiscoveryChallengeDevelopmentPilots', Exec) {
+    group = 'verification'
+    description = 'Builds the development-pilot receipt from the repository test graph.'
+    dependsOn 'prepareVerificationEnvironment',
+        ':app:test',
+        ':regelsuche-discovery:test',
+        ':regelsuche-solver-portfolio:test'
+    workingDir repositoryRoot
+    inputs.file repositoryRoot.file(
+        'scripts/run-discovery-challenge-development-pilots.py')
+    inputs.file repositoryRoot.file(
+        'research/challenges/generated/challenge-portfolio.json')
+    outputs.file layout.buildDirectory.file(
+        'reports/discovery-challenge-pilots/report.json')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            'scripts/run-discovery-challenge-development-pilots.py',
+            '--root', repositoryRoot.asFile.absolutePath,
+            '--reuse-test-results'
+    }
+}
+
+def verifyJmhBenchmark = tasks.register('verifyJmhBenchmark', Exec) {
+    group = 'verification'
+    description = 'Runs JMH, validates its canonical JSON and renders a local report.'
+    dependsOn 'prepareVerificationEnvironment', ':app:jmh'
+    workingDir repositoryRoot
+    inputs.file repositoryRoot.file('scripts/verify-jmh-benchmark.py')
+    inputs.file project(':app').layout.buildDirectory.file('reports/jmh/result.json')
+    outputs.file repositoryRoot.file('public/dev/bench/badge.json')
+    outputs.file repositoryRoot.file('public/dev/bench/index.html')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            'scripts/verify-jmh-benchmark.py',
+            '--result', 'app/build/reports/jmh/result.json',
+            '--badge-output', 'public/dev/bench/badge.json',
+            '--report-output', 'public/dev/bench/index.html'
+    }
+}
+
+def z3VersionOutput = new ByteArrayOutputStream()
+def verifyComparativeZ3Toolchain = tasks.register(
+    'verifyComparativeZ3Toolchain', Exec) {
+    group = 'verification'
+    description = 'Requires the pinned Z3 4.8.12 comparative-benchmark toolchain.'
+    commandLine 'z3', '-version'
+    standardOutput = z3VersionOutput
+    errorOutput = z3VersionOutput
+    outputs.upToDateWhen { false }
+    doFirst {
+        z3VersionOutput.reset()
+    }
+    doLast {
+        def version = z3VersionOutput.toString('UTF-8').trim()
+        println version
+        if (!version.contains('Z3 version 4.8.12')) {
+            throw new GradleException(
+                "Expected Z3 4.8.12 for comparative reproduction, found: ${version}")
+        }
+    }
+}
+
+def comparativeImage = 'regelsuche-comparative-benchmarks:verification'
+def buildComparativeBenchmarkImage = tasks.register(
+    'buildComparativeBenchmarkImage', Exec) {
+    group = 'verification'
+    description = 'Builds the pinned comparative-benchmark reproduction image.'
+    workingDir repositoryRoot
+    inputs.file repositoryRoot.file('Dockerfile.comparative-benchmarks')
+    inputs.files files(
+        'gradlew', 'gradlew.bat', 'settings.gradle', 'build.gradle',
+        'gradle.properties')
+    outputs.upToDateWhen { false }
+    commandLine 'docker', 'build',
+        '-f', 'Dockerfile.comparative-benchmarks',
+        '-t', comparativeImage, '.'
+}
+
+def comparativeDockerOutput = layout.buildDirectory.dir(
+    'reports/comparative-ci/run-docker')
+def runComparativeBenchmarkImage = tasks.register(
+    'runComparativeBenchmarkImage', Exec) {
+    group = 'verification'
+    description = 'Runs the pinned comparative-benchmark reproduction image.'
+    dependsOn buildComparativeBenchmarkImage
+    workingDir repositoryRoot
+    outputs.dir comparativeDockerOutput
+    outputs.upToDateWhen { false }
+    doFirst {
+        def output = comparativeDockerOutput.get().asFile
+        delete output
+        output.mkdirs()
+        output.setReadable(true, false)
+        output.setWritable(true, false)
+        output.setExecutable(true, false)
+        commandLine 'docker', 'run', '--rm',
+            '-v', "${output.absolutePath}:/output",
+            comparativeImage, '/output'
+    }
+}
+
+def verifyComparativeBenchmarks = tasks.register(
+    'verifyComparativeBenchmarks', Exec) {
+    group = 'verification'
+    description = 'Validates repeated Gradle and pinned-container benchmark evidence.'
+    dependsOn 'prepareVerificationEnvironment',
+        verifyComparativeZ3Toolchain,
+        ':regelsuche-benchmarks:test',
+        ':regelsuche-benchmarks:writeComparativeBenchmarkRunA',
+        ':regelsuche-benchmarks:writeComparativeBenchmarkRunB',
+        runComparativeBenchmarkImage
+    workingDir repositoryRoot
+    inputs.file repositoryRoot.file(
+        'scripts/verify-comparative-benchmark-reproducibility.py')
+    inputs.file repositoryRoot.file('scripts/verify-comparative-benchmark.py')
+    inputs.dir layout.buildDirectory.dir('reports/comparative-ci/run-a')
+    inputs.dir layout.buildDirectory.dir('reports/comparative-ci/run-b')
+    inputs.dir comparativeDockerOutput
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            'scripts/verify-comparative-benchmark-reproducibility.py',
+            '--root', repositoryRoot.asFile.absolutePath,
+            '--run-a', 'build/reports/comparative-ci/run-a',
+            '--run-b', 'build/reports/comparative-ci/run-b',
+            '--container-run', 'build/reports/comparative-ci/run-docker'
+    }
+}
+
+project(':app') {
+    tasks.matching { candidate -> candidate.name == 'test' }.configureEach {
+        outputs.dir layout.buildDirectory.dir('reports/plugin-artifact-index')
+        outputs.dir layout.buildDirectory.dir('reports/plugin-artifact-trust')
+        outputs.dir layout.buildDirectory.dir('reports/plugin-trust-store-revision')
+    }
+    tasks.matching { candidate -> candidate.name == 'jmh' }.configureEach {
+        outputs.upToDateWhen { false }
+    }
+}
+
+tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
+    dependsOn verifyPluginArtifactIndexEvidence,
+        verifyPluginArtifactTrustEvidence,
+        verifyPluginTrustStoreRevisionEvidence,
+        verifyDiscoveryChallengeDevelopmentPilots
+}
+
+tasks.matching { candidate -> candidate.name == 'fullCheck' }.configureEach {
+    dependsOn verifyJmhBenchmark, verifyComparativeBenchmarks
+}
+
+tasks.matching { candidate -> candidate.name == 'generateCiPages' }.configureEach {
+    mustRunAfter 'fullCheck', verifyJmhBenchmark
+    outputs.upToDateWhen { false }
+}
+
+def aiKnowledgeEnabled =
+    System.getenv('AI_KNOWLEDGE_EXTRACTOR_ENABLED') == 'true' ||
+    providers.gradleProperty('enableAiKnowledgeExtractor').orNull == 'true'
+
+tasks.register('ciCheck') {
+    group = 'verification'
+    description = 'Exact checkout-local verification and report lifecycle executed by CI.'
+    dependsOn 'fullCheck', ':app:benchmarkReport', 'generateCiPages'
+    if (aiKnowledgeEnabled) {
+        dependsOn 'aiKnowledgeCheck'
+    }
+}

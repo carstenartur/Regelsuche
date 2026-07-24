@@ -49,7 +49,7 @@ PLUGIN_CONTRACTS: dict[str, tuple[str, tuple[str, ...]]] = {
             "app/src/main/java/de/regelsuche/plugin/PluginArtifactVerifier.java",
             "app/src/main/java/de/regelsuche/plugin/TrustedPluginRuntime.java",
             "docs/schemas/regelsuche-plugin-artifact-verification-v1.schema.json",
-            ".github/workflows/plugin-artifact-trust.yml",
+            "scripts/verify-plugin-artifact-trust-evidence.py",
         ),
     ),
     "PLUGIN_INDEX_AUTHENTICATION": (
@@ -58,7 +58,7 @@ PLUGIN_CONTRACTS: dict[str, tuple[str, tuple[str, ...]]] = {
             "app/src/main/java/de/regelsuche/plugin/PluginArtifactIndexVerifier.java",
             "docs/schemas/regelsuche-plugin-artifact-index-signature-v1.schema.json",
             "docs/schemas/regelsuche-plugin-artifact-index-verification-v1.schema.json",
-            ".github/workflows/plugin-artifact-index.yml",
+            "scripts/verify-plugin-artifact-index-evidence.py",
         ),
     ),
     "PLUGIN_TRUST_STATE_REVISIONS": (
@@ -68,7 +68,7 @@ PLUGIN_CONTRACTS: dict[str, tuple[str, tuple[str, ...]]] = {
             "docs/schemas/regelsuche-plugin-trust-store-revision-v1.schema.json",
             "docs/schemas/regelsuche-plugin-trust-store-chain-checkpoint-v1.schema.json",
             "docs/schemas/regelsuche-plugin-trust-store-revision-verification-v1.schema.json",
-            ".github/workflows/plugin-trust-store-revision.yml",
+            "scripts/verify-plugin-trust-store-revision-evidence.py",
         ),
     ),
 }
@@ -190,7 +190,7 @@ def implementation_capabilities(root: Path) -> list[dict[str, Any]]:
                 "blockers": [],
                 "notes": [
                     "IMPLEMENTED is a source-contract claim, not a public distribution or installation qualification.",
-                    "Required source, schema and dedicated workflow files are hash-bound by this status artifact.",
+                    "Required source, schema and checkout-local validator files are hash-bound by this status artifact.",
                 ],
             }
         )
@@ -373,7 +373,7 @@ def render_markdown(status: dict[str, Any]) -> str:
             "",
             "## Interpretation",
             "",
-            "- `IMPLEMENTED` means that the named software contracts, schemas and dedicated workflow are present and hash-bound; it is not a qualification of a wider service.",
+            "- `IMPLEMENTED` means that the named software contracts, schemas and checkout-local validators are present and hash-bound; it is not a qualification of a wider service.",
             "- `QUALIFIED` means that the named evidence profile is ready for exactly its recorded claim.",
             "- `BLOCKED` and `NOT_EVALUATED` remain visible and must not be paraphrased as success.",
             "- Project novelty, external novelty, symbolic validation, formal proof, promotion and Public Evidence remain distinct.",

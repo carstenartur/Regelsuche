@@ -1,75 +1,132 @@
 # Testing
 
-Regelsuche besitzt einen repositoryweiten, von GitHub unabhängigen Testvertrag. Aus einem normalen Checkout startet der übliche Gradle-Testaufruf sämtliche als `Test` modellierten Testschichten:
+Regelsuche besitzt einen repositoryweiten, von GitHub unabhängigen
+Verifikationsvertrag. GitHub Actions stellt lediglich Betriebssystem, JDK und
+externe Werkzeuge bereit. Testauswahl, Fixtures, Assertions, Evidence-Prüfung
+und die Entscheidung über Erfolg oder Fehlschlag liegen im Checkout.
+
+## Testgraph
+
+Der übliche Root-Aufruf startet alle als Gradle-`Test` modellierten Schichten:
 
 ```bash
 ./gradlew test
 ```
 
-Der Root-Task aggregiert die `Test`-Tasks aller Module. `./gradlew allTests` bleibt als expliziter Alias für denselben vollständigen Lauf verfügbar.
+`./gradlew allTests` ist ein expliziter Alias für denselben vollständigen Lauf.
 
 | Schicht | Enthaltener Task | Inhalt |
 | --- | --- | --- |
 | Modul- und Komponententests | alle Modul-`test`-Tasks | JUnit-5-Tests aller Java-Module |
 | Browser-Integration | `:app:e2eTest` | Playwright gegen eine echte lokale `WebWorkbenchServer`-Instanz |
 | Container-Integration | `:app:dockerE2eTest` | reale Anwendungs-, PostgreSQL- und Proof-Images über Testcontainers |
-| Externer Solver | `:regelsuche-solver-portfolio:test` | echter Z3-Lauf, sofern Z3 auf dem Rechner verfügbar ist |
+| Externer Solver | `:regelsuche-solver-portfolio:test` | echter Z3-Lauf, sofern Z3 erreichbar ist |
 
-Die GitHub-Workflows sind nicht Bestandteil der Testimplementierung. Sie dürfen denselben Gradle-Aufruf ausführen und Reports veröffentlichen, definieren aber weder Fixtures noch Assertions noch die Entscheidung über Erfolg und Fehlschlag.
+## Verifikations-Lifecycles
 
-## Standardisierte Verifikations-Lifecycles
-
-Der normale Gradle-Lifecycle ergänzt die JUnit-Tests um checkout-lokale Vertragsprüfungen:
+Der normale Vertragslauf ergänzt JUnit um checkout-lokale Evidence- und
+Konsistenzprüfungen:
 
 ```bash
 ./gradlew check
 ```
 
-`check` führt zuerst den vollständigen `test`-Graphen aus und prüft danach unter anderem:
+`check` umfasst unter anderem:
 
-- Dokumentations-Mathematik und deterministisch generierte Seiten;
+- Dokumentations-Mathematik und deterministisch erzeugte Seiten;
 - die kandidatenunabhängige Benchmark-Präregistrierung;
 - Solver-IR-Schemas, Hashbindungen und kanonische Beispiele;
-- generische Discovery-Domain- und Lifecycle-Handoff-Evidence;
-- Domain-Generic Qualification und Release Readiness;
-- die daraus abgeleitete Capability- und Claim-Matrix.
+- Discovery-Domain-, Lifecycle-Handoff- und Release-Readiness-Evidence;
+- Capability- und Claim-Matrix;
+- Plugin-Index-, Plugin-Trust- und Trust-Store-Revision-Evidence;
+- den Development-Pilot-Receipt aus den bereits erzeugten JUnit-Reports;
+- die Begrenzung und semantische Schlankheit der GitHub-Workflows.
 
-Die Python-Verifier laufen in einer automatisch erzeugten, gepinnten Umgebung unter `build/verification-venv`. Sie rufen Gradle nicht rekursiv auf. Tests und Evidence-Generatoren sind stattdessen normale Gradle-Abhängigkeiten im selben Taskgraphen.
+Die Python-Verifier laufen in der gepinnten Umgebung
+`build/verification-venv`. Sie starten Gradle nicht rekursiv. Tests und
+Evidence-Generatoren sind normale Abhängigkeiten desselben Gradle-Taskgraphen.
 
-Der strikte Reproduktionslauf benötigt zusätzlich einen erreichbaren Docker-Daemon und Z3:
+Der strikte Reproduktionslauf benötigt zusätzlich Docker und Z3 4.8.12:
 
 ```bash
 ./gradlew fullCheck
 ```
 
-`fullCheck` ergänzt `check` um den realen Solver-Portfolio-Pfad und den byteidentischen Vergleich zwischen Gradle- und Release-Readiness-Runtime-Image-Evidence. Die zentrale CI ruft genau diesen Gradle-Lifecycle auf. Eigene Solver-, Domain-, Docker-, Capability- oder Release-Readiness-Workflows sind dafür nicht erforderlich.
+`fullCheck` ergänzt `check` um:
+
+- den realen Solver-Portfolio-Pfad;
+- den byteidentischen Vergleich zwischen Gradle- und Runtime-Image-Evidence;
+- das Independent-Reproduction-Artefakt einschließlich Container-Test;
+- JMH-Ausführung und Validierung;
+- zwei lokale sowie eine gepinnte Container-Ausführung des vergleichenden
+  Benchmarks mit byteidentischem Evidence-Vergleich.
+
+## Exakter CI-Einstiegspunkt
+
+Der verbindliche Einstiegspunkt für die zentrale CI ist:
+
+```bash
+./gradlew ciCheck
+```
+
+`ciCheck` führt `fullCheck` aus und erzeugt zusätzlich die lokal
+veröffentlichbaren Benchmark-, Coverage-, Test- und Dokumentationsreports.
+Der AI-Knowledge-Vertrag wird in denselben Taskgraphen aufgenommen, sobald er
+explizit aktiviert ist:
+
+```bash
+GITHUB_ACTOR=<github-user> \
+GITHUB_TOKEN=<package-read-token> \
+AI_KNOWLEDGE_EXTRACTOR_ENABLED=true \
+  ./gradlew --no-configuration-cache ciCheck
+```
+
+Für die Entwicklung des Extractors kann statt GitHub Packages ein benachbarter
+Checkout verwendet werden:
+
+```bash
+AI_KNOWLEDGE_EXTRACTOR_ENABLED=true \
+  ./gradlew --no-configuration-cache \
+  -PuseLocalAiKnowledgeExtractor=true \
+  -PaiKnowledgeExtractorCheckout=../ai-knowledge-extractor \
+  ciCheck
+```
+
+Auf Linux kann Playwright einmalig zusätzliche Systembibliotheken benötigen:
+
+```bash
+./gradlew :app:installPlaywrightHostDependencies
+```
+
+Das ist Runner-Provisionierung, keine alternative Testlogik.
 
 ## Bedingte Infrastruktur über JUnit
 
 Nicht überall verfügbare Infrastruktur wird innerhalb der Tests behandelt:
 
-- Docker-basierte Klassen verwenden `@Testcontainers(disabledWithoutDocker = true)`. Ohne erreichbaren Docker-Daemon markiert JUnit sie als übersprungen.
-- Der echte Z3-Test trägt `@Tag("external-prover")` und verwendet eine JUnit-Annahme. Fehlt Z3, wird nur dieser Integrationstest übersprungen; die Solver-Unit-Tests laufen weiter.
-- Playwright-Chromium wird vor den Browser- und Docker-Browser-Tests durch den repositoryeigenen Gradle-Task `installPlaywrightBrowsers` bereitgestellt.
+- Docker-basierte Klassen verwenden
+  `@Testcontainers(disabledWithoutDocker = true)`.
+- Der echte Z3-Test trägt `@Tag("external-prover")` und verwendet eine
+  JUnit-Annahme.
+- Playwright-Chromium wird durch den repositoryeigenen Task
+  `installPlaywrightBrowsers` bereitgestellt.
 
-Ein fehlendes optionales Werkzeug wird damit nicht über eine GitHub-Variable simuliert und führt auch nicht dazu, dass eine komplette Testklasse aus einem Workflow entfernt werden muss.
+`fullCheck` und `ciCheck` sind absichtlich strenger: Für ihre
+Reproduktionsverträge müssen Docker und die dokumentierte Z3-Version vorhanden
+sein.
 
 ## JUnit-Tags auswählen
 
-Tags können repositoryweit für jeden Gradle-`Test`-Task gefiltert werden:
+Tags können repositoryweit gefiltert werden:
 
 ```bash
-# Nur Tests mit dem angegebenen JUnit-Tag
 ./gradlew test -PincludeTestTags=external-prover
-
-# Alles außer bestimmten JUnit-Tags
 ./gradlew test -PexcludeTestTags=external-prover
-
-# Mehrere Tags, kommasepariert
 ./gradlew test -PexcludeTestTags=external-prover,slow
 ```
 
-Für einzelne Klassen und Methoden bleibt der normale Gradle/JUnit-Filter verfügbar:
+Für einzelne Klassen und Methoden bleibt der normale Gradle/JUnit-Filter
+verfügbar:
 
 ```bash
 ./gradlew :app:dockerE2eTest \
@@ -78,52 +135,63 @@ Für einzelne Klassen und Methoden bleibt der normale Gradle/JUnit-Filter verfü
   --tests de.regelsuche.solver.portfolio.Z3SmtSolverBackendTest.systemZ3ReturnsRealProofObject
 ```
 
-## Einzelne Testschichten
+## Einzelne Schichten und Verträge
 
-Für schnelle Entwicklungszyklen können die Schichten weiterhin separat ausgeführt werden:
+Für schnelle Entwicklungszyklen können alle Teilverträge separat ausgeführt
+werden:
 
 ```bash
 ./gradlew :app:test
 ./gradlew :app:e2eTest
 ./gradlew :app:dockerE2eTest
-./gradlew :regelsuche-solver-portfolio:test
+./gradlew verifyPluginArtifactIndexEvidence
+./gradlew verifyPluginArtifactTrustEvidence
+./gradlew verifyPluginTrustStoreRevisionEvidence
+./gradlew verifyDiscoveryChallengeDevelopmentPilots
+./gradlew verifyJmhBenchmark
+./gradlew verifyComparativeBenchmarks
 ```
 
-Der unqualifizierte Root-Aufruf `./gradlew test` ist dagegen der vollständige verbindliche Testlauf. Er umfasst ausdrücklich auch die zusätzlich benannten Browser- und Container-`Test`-Tasks.
+Die Convenience-Skripte
+`scripts/run-jmh-benchmark-verification.sh` und
+`scripts/run-comparative-benchmarks-verification.sh` delegieren lediglich an
+diese Gradle-Tasks.
 
-## Browser-Integration
+## GitHub-Grenze
 
-`e2eTest` startet die Web Workbench in-process auf einem zufälligen Port und steuert Chromium headless. Die Tests prüfen unter anderem Navigation, Such- und Demo-Flows, Graph- und Replay-Panels, Regelautorisierung, Proof-Jobs sowie mathematische Darstellung.
+Unter `.github/workflows/` liegen nur noch:
 
-Der Browserdownload ist idempotent. Auf Linux-Systemen, denen native Chromium-Bibliotheken fehlen, können diese einmalig über Playwright installiert werden:
+- `gradle.yml`: Push-, Pull-Request- und manuelle CI; der einzige
+  Verifikationsaufruf ist `ciCheck`. Danach werden Artefakte aufbewahrt und die
+  bereits lokal erzeugte Site deployt.
+- `release.yml`: GitHub-spezifische Tag-, Release- und Pull-Request-Operationen.
 
-```bash
-./gradlew :app:installPlaywrightHostDependencies
-```
+`verifyWorkflowSemantics` begrenzt die Zahl der Workflows auf zwei und weist
+Inline-Interpreter, Workflow-Assertions, Docker-Lebenszyklen und direkte
+Repository-Skriptaufrufe im Verifikationsworkflow zurück.
 
-Dieser Betriebssystem-Schritt benötigt je nach Distribution erhöhte Rechte; er ist keine GitHub-Abhängigkeit.
+## Browser-, Docker- und Datenbankintegration
 
-## Docker- und Datenbankintegration
+`e2eTest` startet die Web Workbench in-process auf einem zufälligen Port und
+steuert Chromium headless. `dockerE2eTest` besitzt den vollständigen
+Container-Lebenszyklus. Testcontainers baut die wirklichen Projekt-Dockerfiles,
+vergibt zufällige Host-Ports, wartet auf Dienstbereitschaft, stellt Logs in den
+JUnit-/Gradle-Reports bereit und räumt Container wieder auf.
 
-`dockerE2eTest` besitzt den vollständigen Container-Lebenszyklus. Testcontainers:
-
-- baut die wirklichen Projekt-Dockerfiles;
-- vergibt zufällige Host-Ports;
-- startet PostgreSQL und weitere benötigte Dienste;
-- wartet auf die tatsächliche Dienstbereitschaft;
-- stellt Logs in den JUnit-/Gradle-Reports bereit;
-- entfernt Container nach dem Lauf.
-
-Das normale `Dockerfile` erzeugt bewusst das schlanke Web-Workbench-Runtime-Image und installiert keine externen Beweiser. Der Proof-Integrationstest baut separat `Dockerfile.proof`; dieses Image installiert Z3 und cvc5. Der JUnit-Test führt im gestarteten Container sowohl `z3 --version` als auch `cvc5 --version` aus. Anschließend reicht er die Sophie-Germain-Identität über die echte Proof-Job-REST-Schnittstelle ein, wartet auf `DONE / FORMALLY_PROVED` und prüft das erzeugte `proof.smt2` sowie das vollständige Job-Artefakt-Bundle. Testcontainers stellt die Solver also nicht selbst bereit, sondern startet das versionierte Projektimage, in dem sie installiert sind.
-
-Es sind keine fest verdrahteten GitHub-Service-Container, Host-Ports oder Workflow-Credentials erforderlich. PostgreSQL-Discovery-Tests erzeugen ihre wissenschaftlichen Diagnoseartefakte unter `app/build/discovery-artifacts/`; diese Dateien können von jeder CI-Umgebung optional veröffentlicht werden.
+Es sind keine fest verdrahteten GitHub-Service-Container, Host-Ports oder
+Workflow-Credentials erforderlich. Diagnoseartefakte liegen unter den
+jeweiligen `build/`-Verzeichnissen und können von jeder CI-Umgebung optional
+veröffentlicht werden.
 
 ## Dokumentationsaufnahmen
 
-Screenshots und Videos sind ein zusätzlicher Ausgabemodus derselben Browser-Tests:
+Screenshots und Videos sind ein zusätzlicher Ausgabemodus derselben
+Browser-Tests:
 
 ```bash
 ./gradlew :app:e2eTest -Pregelsuche.recordDocs=true
 ```
 
-Das Ändern von Dokumentationsartefakten ist bewusst nicht Teil von `test`, damit ein normaler Verifikationslauf den Checkout nicht verändert.
+Das Ändern von Dokumentationsmedien ist bewusst kein automatischer Nebeneffekt
+von `ciCheck`; ein normaler Verifikationslauf verändert den Checkout nicht durch
+einen Bot-PR.
