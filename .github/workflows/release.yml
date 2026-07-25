@@ -35,7 +35,6 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
-  actions: write
   contents: write
   pull-requests: write
 
@@ -47,63 +46,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  dispatch-requested-release:
-    name: Dispatch requested release
-    if: >-
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      contains(github.event.head_commit.message, '[release]')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Resolve and dispatch release request
-        env:
-          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-        run: |
-          set -euo pipefail
-
-          CURRENT=$(grep -E '^version=' release.properties | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
-          if [[ -z "${CURRENT}" || "${CURRENT}" != *-SNAPSHOT ]]; then
-            echo "::error::release.properties must contain a development SNAPSHOT version"
-            exit 1
-          fi
-          RELEASE_VERSION="${CURRENT%-SNAPSHOT}"
-
-          if [[ "${HEAD_COMMIT_MESSAGE}" =~ \[next=([0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT)\] ]]; then
-            NEXT_VERSION="${BASH_REMATCH[1]}"
-          else
-            IFS='.' read -r MAJOR MINOR PATCH <<< "${RELEASE_VERSION}"
-            NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
-          fi
-
-          TAG="v${RELEASE_VERSION}"
-          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "::error::Tag ${TAG} already exists on origin"
-            exit 1
-          fi
-
-          gh workflow run release.yml \
-            --repo "${GITHUB_REPOSITORY}" \
-            --ref main \
-            -f release_version="${RELEASE_VERSION}" \
-            -f next_development_version="${NEXT_VERSION}" \
-            -f skip_tests=false \
-            -f dry_run=false
-
-          {
-            echo "## Release dispatched";
-            echo "";
-            echo "Requested **${TAG}** from the current main branch.";
-            echo "The next development version will be **${NEXT_VERSION}**.";
-          } >> "$GITHUB_STEP_SUMMARY"
-
   preflight:
     name: Preflight Checks
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.ref, 'refs/tags/') ||
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/main' &&
+       contains(github.event.head_commit.message, '[release]'))
     runs-on: ubuntu-latest
     outputs:
       release_version: ${{ steps.resolve.outputs.release_version }}
@@ -112,6 +62,8 @@ jobs:
       maintenance_branch: ${{ steps.resolve.outputs.maintenance_branch }}
       dry_run: ${{ steps.resolve.outputs.dry_run }}
       skip_tests: ${{ steps.resolve.outputs.skip_tests }}
+      managed_release: ${{ steps.resolve.outputs.managed_release }}
+      release_exists: ${{ steps.tag-check.outputs.release_exists }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -125,6 +77,7 @@ jobs:
           INPUT_NEXT_VERSION: ${{ inputs.next_development_version }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
           INPUT_SKIP_TESTS: ${{ inputs.skip_tests }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
 
@@ -135,18 +88,38 @@ jobs:
             printf '%s' "${value}"
           }
 
-          if [[ "${{ github.event_name }}" == "push" ]]; then
+          MANAGED_RELEASE="false"
+          IDEMPOTENT_REQUEST="false"
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
             RELEASE_VERSION="${TAG_NAME#v}"
             DRY_RUN="false"
             SKIP_TESTS="false"
             NEXT_VERSION=""
-          else
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             RELEASE_VERSION="$(trim "${INPUT_RELEASE_VERSION}")"
             DRY_RUN="${INPUT_DRY_RUN}"
             SKIP_TESTS="${INPUT_SKIP_TESTS}"
             NEXT_VERSION="$(trim "${INPUT_NEXT_VERSION}")"
             TAG_NAME="v${RELEASE_VERSION}"
+            MANAGED_RELEASE="true"
+          else
+            CURRENT=$(grep -E '^version=' release.properties | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
+            if [[ -z "${CURRENT}" || "${CURRENT}" != *-SNAPSHOT ]]; then
+              echo "::error::release.properties must contain a development SNAPSHOT version"
+              exit 1
+            fi
+            RELEASE_VERSION="${CURRENT%-SNAPSHOT}"
+            if [[ "${HEAD_COMMIT_MESSAGE}" =~ \[next=([0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT)\] ]]; then
+              NEXT_VERSION="${BASH_REMATCH[1]}"
+            else
+              NEXT_VERSION=""
+            fi
+            TAG_NAME="v${RELEASE_VERSION}"
+            DRY_RUN="false"
+            SKIP_TESTS="false"
+            MANAGED_RELEASE="true"
+            IDEMPOTENT_REQUEST="true"
           fi
 
           if ! [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -170,9 +143,11 @@ jobs:
           echo "maintenance_branch=maintenance/${MAJOR_MINOR}.x" >> "$GITHUB_OUTPUT"
           echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
           echo "skip_tests=${SKIP_TESTS}" >> "$GITHUB_OUTPUT"
+          echo "managed_release=${MANAGED_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "idempotent_request=${IDEMPOTENT_REQUEST}" >> "$GITHUB_OUTPUT"
 
       - name: Validate release metadata base version
-        if: github.event_name == 'workflow_dispatch'
+        if: steps.resolve.outputs.managed_release == 'true'
         run: |
           set -euo pipefail
           CURRENT=$(grep -E '^version=' release.properties | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
@@ -194,15 +169,25 @@ jobs:
           grep -q "\"version\": \"${CURRENT}\"" .zenodo.json
           grep -q "\"version\": \"${CURRENT}\"" codemeta.json
 
-      - name: Reject if tag already exists (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Check release tag
+        id: tag-check
         run: |
+          set -euo pipefail
           TAG="${{ steps.resolve.outputs.tag_name }}"
-          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "::error::Tag ${TAG} already exists on origin"
-            exit 1
+          if [[ "${{ steps.resolve.outputs.managed_release }}" != "true" ]]; then
+            echo "release_exists=false" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            if [[ "${{ steps.resolve.outputs.idempotent_request }}" == "true" ]]; then
+              echo "Release ${TAG} already exists; treating the request as completed"
+              echo "release_exists=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "::error::Tag ${TAG} already exists on origin"
+              exit 1
+            fi
+          else
+            echo "Tag ${TAG} is free"
+            echo "release_exists=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "Tag ${TAG} is free"
 
       - name: Preflight summary
         run: |
@@ -223,6 +208,7 @@ jobs:
   build:
     name: Build & Verify
     needs: preflight
+    if: needs.preflight.outputs.release_exists != 'true'
     runs-on: ubuntu-latest
     outputs:
       artifact_name: ${{ steps.collect.outputs.artifact_name }}
@@ -276,7 +262,7 @@ jobs:
   release:
     name: Tag & GitHub Release
     needs: [preflight, build]
-    if: needs.preflight.outputs.dry_run != 'true'
+    if: needs.preflight.outputs.release_exists != 'true' && needs.preflight.outputs.dry_run != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -290,8 +276,8 @@ jobs:
           name: ${{ needs.build.outputs.artifact_name }}
           path: release-artifacts
 
-      - name: Create release metadata commit (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Create release metadata commit (managed release only)
+        if: needs.preflight.outputs.managed_release == 'true'
         run: |
           set -euo pipefail
           VERSION="${{ needs.preflight.outputs.release_version }}"
@@ -301,16 +287,16 @@ jobs:
           git add CITATION.cff CITATION.md .zenodo.json codemeta.json release.properties
           git commit -m "Release version ${VERSION}"
 
-      - name: Create git tag (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Create git tag (managed release only)
+        if: needs.preflight.outputs.managed_release == 'true'
         run: |
           set -euo pipefail
           TAG="${{ needs.preflight.outputs.tag_name }}"
           git tag -a "${TAG}" -m "Release ${{ needs.preflight.outputs.release_version }}"
           git push origin "${TAG}"
 
-      - name: Update maintenance branch (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Update maintenance branch (managed release only)
+        if: needs.preflight.outputs.managed_release == 'true'
         run: |
           set -euo pipefail
           BRANCH="${{ needs.preflight.outputs.maintenance_branch }}"
@@ -334,12 +320,12 @@ jobs:
             release-artifacts/*
 
       - name: Prepare next development metadata
-        if: github.event_name == 'workflow_dispatch'
+        if: needs.preflight.outputs.managed_release == 'true'
         run: |
           python3 .github/scripts/update-release-metadata.py "${{ needs.preflight.outputs.next_development_version }}"
 
       - name: Open next development metadata PR
-        if: github.event_name == 'workflow_dispatch'
+        if: needs.preflight.outputs.managed_release == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
           branch: release/prepare-next-${{ needs.preflight.outputs.next_development_version }}
@@ -363,6 +349,21 @@ jobs:
             .zenodo.json
             codemeta.json
             release.properties
+
+  already-released-summary:
+    name: Release already exists
+    needs: preflight
+    if: needs.preflight.outputs.release_exists == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report idempotent completion
+        run: |
+          {
+            echo "## Release already exists";
+            echo "";
+            echo "Tag **${{ needs.preflight.outputs.tag_name }}** already exists.";
+            echo "The release request is therefore already satisfied.";
+          } >> "$GITHUB_STEP_SUMMARY"
 
   dry-run-summary:
     name: Dry-run summary
