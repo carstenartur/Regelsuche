@@ -60,8 +60,21 @@ jobs:
 
       - name: Resolve release version
         id: resolve
+        env:
+          INPUT_RELEASE_VERSION: ${{ inputs.release_version }}
+          INPUT_NEXT_VERSION: ${{ inputs.next_development_version }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_SKIP_TESTS: ${{ inputs.skip_tests }}
         run: |
           set -euo pipefail
+
+          trim() {
+            local value="$1"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            printf '%s' "${value}"
+          }
+
           if [[ "${{ github.event_name }}" == "push" ]]; then
             TAG_NAME="${GITHUB_REF_NAME}"
             RELEASE_VERSION="${TAG_NAME#v}"
@@ -69,11 +82,11 @@ jobs:
             SKIP_TESTS="false"
             NEXT_VERSION=""
           else
-            RELEASE_VERSION="${{ inputs.release_version }}"
+            RELEASE_VERSION="$(trim "${INPUT_RELEASE_VERSION}")"
+            DRY_RUN="${INPUT_DRY_RUN}"
+            SKIP_TESTS="${INPUT_SKIP_TESTS}"
+            NEXT_VERSION="$(trim "${INPUT_NEXT_VERSION}")"
             TAG_NAME="v${RELEASE_VERSION}"
-            DRY_RUN="${{ inputs.dry_run }}"
-            SKIP_TESTS="${{ inputs.skip_tests }}"
-            NEXT_VERSION="${{ inputs.next_development_version }}"
           fi
 
           if ! [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
