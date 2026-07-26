@@ -39,6 +39,27 @@ def find_indented_display_math(lines: Iterable[str]) -> list[int]:
     return failures
 
 
+def mask_fenced_code(text: str) -> str:
+    """Replace fenced code with blank lines while retaining line numbers."""
+    fence_marker: str | None = None
+    visible: list[str] = []
+    for line in text.splitlines(keepends=True):
+        fence = FENCE.match(line)
+        if fence:
+            marker = fence.group(1)
+            if fence_marker is None:
+                fence_marker = marker
+            elif marker == fence_marker:
+                fence_marker = None
+            visible.append("\n" if line.endswith("\n") else "")
+            continue
+        if fence_marker is None:
+            visible.append(line)
+        else:
+            visible.append("\n" if line.endswith("\n") else "")
+    return "".join(visible)
+
+
 def normalize_local_target(raw: str) -> str | None:
     target = raw.strip()
     if target.startswith("<") and ">" in target:
@@ -58,7 +79,7 @@ def normalize_local_target(raw: str) -> str | None:
 def find_broken_local_links(markdown: Path, repository_root: Path) -> list[str]:
     if markdown.name in EXCLUDED_LINK_FILES:
         return []
-    text = markdown.read_text(encoding="utf-8")
+    text = mask_fenced_code(markdown.read_text(encoding="utf-8"))
     repository_root = repository_root.resolve()
     failures: list[str] = []
     for pattern in (MARKDOWN_TARGET, HTML_TARGET):
@@ -108,14 +129,23 @@ def self_test() -> None:
         raise RuntimeError("external URL must not be treated as a local link")
     if normalize_local_target("guide.md#section") != "guide.md":
         raise RuntimeError("local link normalization self-test failed")
+    fenced_example = "before\n```md\n[fake](missing.md)\n```\nafter\n"
+    masked = mask_fenced_code(fenced_example)
+    if "missing.md" in masked or masked.count("\n") != fenced_example.count("\n"):
+        raise RuntimeError("fenced-code masking self-test failed")
 
 
 def check(root: Path, repository_root: Path) -> list[str]:
     failures: list[str] = []
-    markdown_files = sorted(root.rglob("*.md"))
+    markdown_by_resolved_path = {
+        markdown.resolve(): markdown for markdown in root.rglob("*.md")
+    }
     repository_readme = repository_root / "README.md"
     if repository_readme.is_file():
-        markdown_files.insert(0, repository_readme)
+        markdown_by_resolved_path[repository_readme.resolve()] = repository_readme
+    markdown_files = sorted(
+        markdown_by_resolved_path.values(), key=lambda path: str(path.resolve())
+    )
     for markdown in markdown_files:
         lines = markdown.read_text(encoding="utf-8").splitlines()
         for line_number in find_indented_display_math(lines):
