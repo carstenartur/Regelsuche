@@ -42,7 +42,7 @@ Sichtbar wird das in der Demo-Hero-Sektion der Landing-Page:
 
 Beim Mining werden Makroregeln automatisch mit dem zugehörigen
 Domain-Tag versehen. Siehe
-[`RuleCandidateMiner`](../app/src/main/java/de/regelsuche/mining/RuleCandidateMiner.java)
+[`RuleCandidateMiner`](../regelsuche-learning/src/main/java/de/regelsuche/mining/RuleCandidateMiner.java)
 und das Feld `domain` in den exportierten Regeln. Erlaubte Werte:
 
 * `equations`
