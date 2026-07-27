@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check Markdown display-math blocks without depending on GitHub Actions."""
+"""Check repository Markdown structure without GitHub-specific tooling."""
 
 from __future__ import annotations
 
@@ -7,9 +7,16 @@ import argparse
 import re
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import unquote, urlsplit
 
 FENCE = re.compile(r"^\s*(```|~~~)")
 INDENTED_DISPLAY_MATH = re.compile(r"^[ \t]+\$\$")
+MARKDOWN_TARGET = re.compile(r"]\(([^)\n]+)\)")
+HTML_TARGET = re.compile(
+    r"(?:href|src)\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE
+)
+IGNORED_SCHEMES = {"http", "https", "mailto", "data", "javascript"}
+EXCLUDED_LINK_FILES = {"README.legacy.md"}
 
 
 def find_indented_display_math(lines: Iterable[str]) -> list[int]:
@@ -32,6 +39,70 @@ def find_indented_display_math(lines: Iterable[str]) -> list[int]:
     return failures
 
 
+def mask_fenced_code(text: str) -> str:
+    """Replace fenced code with blank lines while retaining line numbers."""
+    fence_marker: str | None = None
+    visible: list[str] = []
+    for line in text.splitlines(keepends=True):
+        fence = FENCE.match(line)
+        if fence:
+            marker = fence.group(1)
+            if fence_marker is None:
+                fence_marker = marker
+            elif marker == fence_marker:
+                fence_marker = None
+            visible.append("\n" if line.endswith("\n") else "")
+            continue
+        if fence_marker is None:
+            visible.append(line)
+        else:
+            visible.append("\n" if line.endswith("\n") else "")
+    return "".join(visible)
+
+
+def normalize_local_target(raw: str) -> str | None:
+    target = raw.strip()
+    if target.startswith("<") and ">" in target:
+        target = target[1 : target.index(">")]
+    else:
+        # Markdown permits an optional whitespace-separated title.
+        target = target.split(maxsplit=1)[0]
+    target = unquote(target)
+    if not target or target.startswith("#"):
+        return None
+    parsed = urlsplit(target)
+    if parsed.scheme.lower() in IGNORED_SCHEMES or parsed.netloc:
+        return None
+    return parsed.path or None
+
+
+def find_broken_local_links(markdown: Path, repository_root: Path) -> list[str]:
+    if markdown.name in EXCLUDED_LINK_FILES:
+        return []
+    text = mask_fenced_code(markdown.read_text(encoding="utf-8"))
+    repository_root = repository_root.resolve()
+    failures: list[str] = []
+    for pattern in (MARKDOWN_TARGET, HTML_TARGET):
+        for match in pattern.finditer(text):
+            relative = normalize_local_target(match.group(1))
+            if relative is None:
+                continue
+            target = (markdown.parent / relative).resolve()
+            line = text.count("\n", 0, match.start()) + 1
+            try:
+                target.relative_to(repository_root)
+            except ValueError:
+                failures.append(
+                    f"{markdown}:{line}: link escapes repository: {match.group(1)}"
+                )
+                continue
+            if not target.exists():
+                failures.append(
+                    f"{markdown}:{line}: missing local target: {match.group(1)}"
+                )
+    return failures
+
+
 def self_test() -> None:
     sample = [
         "```md",
@@ -51,19 +122,37 @@ def self_test() -> None:
     expected = [7, 9]
     if actual != expected:
         raise RuntimeError(
-            f"internal documentation-math lint self-test failed: "
+            "internal documentation-math lint self-test failed: "
             f"expected {expected}, found {actual}"
         )
+    if normalize_local_target("https://example.org/docs") is not None:
+        raise RuntimeError("external URL must not be treated as a local link")
+    if normalize_local_target("guide.md#section") != "guide.md":
+        raise RuntimeError("local link normalization self-test failed")
+    fenced_example = "before\n```md\n[fake](missing.md)\n```\nafter\n"
+    masked = mask_fenced_code(fenced_example)
+    if "missing.md" in masked or masked.count("\n") != fenced_example.count("\n"):
+        raise RuntimeError("fenced-code masking self-test failed")
 
 
-def check(root: Path) -> list[str]:
+def check(root: Path, repository_root: Path) -> list[str]:
     failures: list[str] = []
-    for markdown in sorted(root.rglob("*.md")):
+    markdown_by_resolved_path = {
+        markdown.resolve(): markdown for markdown in root.rglob("*.md")
+    }
+    repository_readme = repository_root / "README.md"
+    if repository_readme.is_file():
+        markdown_by_resolved_path[repository_readme.resolve()] = repository_readme
+    markdown_files = sorted(
+        markdown_by_resolved_path.values(), key=lambda path: str(path.resolve())
+    )
+    for markdown in markdown_files:
         lines = markdown.read_text(encoding="utf-8").splitlines()
         for line_number in find_indented_display_math(lines):
             failures.append(
                 f"{markdown}:{line_number}: indented display math `$$`"
             )
+        failures.extend(find_broken_local_links(markdown, repository_root))
     return failures
 
 
@@ -79,14 +168,18 @@ def main() -> int:
     args = parser.parse_args()
 
     self_test()
-    failures = check(args.root)
+    repository_root = Path(__file__).resolve().parents[1]
+    failures = check(args.root, repository_root)
     if failures:
-        print("Found indented display-math blocks:")
+        print("Found documentation problems:")
         for failure in failures:
             print(failure)
         return 1
 
-    print(f"OK: no indented display-math blocks in {args.root}/**/*.md")
+    print(
+        f"OK: documentation math and local links are valid in "
+        f"{args.root}/**/*.md and README.md"
+    )
     return 0
 
 

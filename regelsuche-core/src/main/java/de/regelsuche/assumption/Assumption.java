@@ -53,8 +53,10 @@ public record Assumption(Kind kind, String expression, List<String> symbols) {
         /** Explicitly unknown / inconclusive domain information. */
         UNKNOWN,
         /** @deprecated Use {@link #DOMAIN_MEMBERSHIP}. */
+        @Deprecated
         DOMAIN,
         /** @deprecated Use {@link #CUSTOM_PREDICATE}. */
+        @Deprecated
         CUSTOM
     }
 

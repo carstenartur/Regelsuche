@@ -3,7 +3,7 @@
 Eine Gleichung `a = b` ist *kein* normaler Term, sondern hat eigene
 gültige Umformungsregeln. Das Paket `de.regelsuche.equation`
 implementiert diese Semantik als eigenständige Engine — analog zu
-[`AstRewriteTransformationEngine`](../app/src/main/java/de/regelsuche/transform/AstRewriteTransformationEngine.java)
+[`AstRewriteTransformationEngine`](../regelsuche-core/src/main/java/de/regelsuche/transform/AstRewriteTransformationEngine.java)
 für Terme.
 
 ## Modellklassen
