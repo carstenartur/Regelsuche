@@ -4,7 +4,7 @@
 
 ```bash
 docker build -t regelsuche .
-docker run --rm -p 8080:8080 regelsuche
+docker run --rm -p 127.0.0.1:8080:8080 regelsuche
 ```
 
 Anschließend [http://localhost:8080/](http://localhost:8080/) öffnen. Im
@@ -12,6 +12,12 @@ Demo-Bereich stehen neun geführte Einstiege bereit — von der **Binomischen
 Formel** über **Bruchkürzung**, **Trigonometrie**, **Polynom-Expansion** und
 **Makroregel-Lernen** bis zu den vier mathematischen Domänen **Gleichung**,
 **Ungleichung**, **Ableitung** und **Matrix**.
+
+> **Sicherheitsgrenze des Schnellstarts:** Die Standardinstanz verwendet HTTP
+> ohne Anmeldung und ist ausschließlich für die lokale Demonstration gedacht.
+> Die explizite Bindung an `127.0.0.1` verhindert eine unbeabsichtigte
+> Veröffentlichung im lokalen Netz. Eine extern erreichbare Installation muss
+> authentifiziertes TLS verwenden und darf keine Demo-Zugangsdaten übernehmen.
 
 Ein Klick führt den vollständigen Produktfluss aus: Die Workbench übernimmt die
 Eingabe, startet die Suche, öffnet die relevanten Ergebnisbereiche und stellt
@@ -68,9 +74,9 @@ Nach dem Start sind beide technischen Zugänge lokal und ohne CDN verfügbar:
 - **Swagger UI:** `http://127.0.0.1:8080/static/openapi/index.html`
 - **OpenAPI 3.1 JSON:** `http://127.0.0.1:8080/static/openapi/openapi.json`
 
-Bei einem Docker-Start mit `-p 8080:8080` können entsprechend auch die URLs mit
-`localhost` verwendet werden. Der Tab **Hilfe** der Workbench verlinkt beide
-Zugänge direkt.
+Bei einem Docker-Start mit `-p 127.0.0.1:8080:8080` können entsprechend auch die
+URLs mit `localhost` verwendet werden. Der Tab **Hilfe** der Workbench verlinkt
+beide Zugänge direkt.
 
 Die verbindliche Trennung ist in der
 [Dokumentationskonvention](documentation-conventions.md) festgehalten.
@@ -82,8 +88,13 @@ docker compose up --build
 ```
 
 Der Compose-Start ergänzt den lokalen Demo-Modus um PostgreSQL, Hibernate ORM,
-Hibernate Search und ein persistentes Volume. Neo4j bleibt ein optionales Profil
-für mathematische Graph-Provenance:
+Hibernate Search und ein persistentes Volume. Anwendung und PostgreSQL werden
+standardmäßig nur an `127.0.0.1` veröffentlicht. Die in `docker-compose.yml`
+hinterlegten Fallback-Passwörter sind ausschließlich Demo-Zugangsdaten; für
+einen anderen Einsatz müssen mindestens `POSTGRES_PASSWORD` und bei Neo4j
+`NEO4J_PASSWORD` gesetzt werden.
+
+Neo4j bleibt ein optionales Profil für mathematische Graph-Provenance:
 
 ```bash
 docker compose --profile neo4j up --build
