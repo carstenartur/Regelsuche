@@ -9,6 +9,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.web.BoundedRequestBody;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -26,283 +27,310 @@ import static de.regelsuche.radar.AstRuleRadar.Snapshot;
 /** HTTP adapter for the AST rule radar. Mathematical logic remains in the service. */
 public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
     private static final String PREFIX = &quot;/api/rule-radar&quot;;
+    private static final int DEFAULT_MAX_REQUEST_BYTES = 1 &lt;&lt; 20;
     private final AstRuleRadarService radar;
     private final RuleRadarSearchService search;
+    private final int maxRequestBytes;
 
     public RuleRadarHttpHandler(
         RuleInventoryRepository inventory,
         ExpressionGraphStore graphStore,
         PluginRuntimeConfig pluginRuntimeConfig
-<span class="fc" id="L36">    ) {</span>
-<span class="fc" id="L37">        this.radar = new AstRuleRadarService(inventory, graphStore, pluginRuntimeConfig);</span>
-<span class="fc" id="L38">        this.search = new RuleRadarSearchService(radar);</span>
-<span class="fc" id="L39">    }</span>
+    ) {
+<span class="fc" id="L40">        this(inventory, graphStore, pluginRuntimeConfig, DEFAULT_MAX_REQUEST_BYTES);</span>
+<span class="fc" id="L41">    }</span>
+
+    public RuleRadarHttpHandler(
+        RuleInventoryRepository inventory,
+        ExpressionGraphStore graphStore,
+        PluginRuntimeConfig pluginRuntimeConfig,
+        int maxRequestBytes
+<span class="fc" id="L48">    ) {</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (maxRequestBytes &lt;= 0) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;maxRequestBytes must be positive&quot;);</span>
+        }
+<span class="fc" id="L52">        this.radar = new AstRuleRadarService(inventory, graphStore, pluginRuntimeConfig);</span>
+<span class="fc" id="L53">        this.search = new RuleRadarSearchService(radar);</span>
+<span class="fc" id="L54">        this.maxRequestBytes = maxRequestBytes;</span>
+<span class="fc" id="L55">    }</span>
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-<span class="fc" id="L43">        String path = exchange.getRequestURI().getPath();</span>
-<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        String suffix = path.length() &lt;= PREFIX.length() ? &quot;&quot; : path.substring(PREFIX.length());</span>
+<span class="fc" id="L59">        String path = exchange.getRequestURI().getPath();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        String suffix = path.length() &lt;= PREFIX.length() ? &quot;&quot; : path.substring(PREFIX.length());</span>
         try {
-<span class="pc bpc" id="L46" title="2 of 5 branches missed.">            switch (suffix) {</span>
-<span class="fc" id="L47">                case &quot;/inspect&quot; -&gt; handleInspect(exchange);</span>
-<span class="fc" id="L48">                case &quot;/apply&quot; -&gt; handleApply(exchange);</span>
-<span class="fc" id="L49">                case &quot;/search&quot; -&gt; handleSearch(exchange);</span>
-<span class="nc" id="L50">                case &quot;&quot;, &quot;/&quot; -&gt; sendJson(exchange, 200, capabilityDocument());</span>
-<span class="nc" id="L51">                default -&gt; sendError(exchange, 404, &quot;NOT_FOUND&quot;, &quot;unknown rule-radar endpoint&quot;);</span>
+<span class="pc bpc" id="L62" title="1 of 5 branches missed.">            switch (suffix) {</span>
+<span class="fc" id="L63">                case &quot;/inspect&quot; -&gt; handleInspect(exchange);</span>
+<span class="fc" id="L64">                case &quot;/apply&quot; -&gt; handleApply(exchange);</span>
+<span class="fc" id="L65">                case &quot;/search&quot; -&gt; handleSearch(exchange);</span>
+<span class="fc" id="L66">                case &quot;&quot;, &quot;/&quot; -&gt; sendJson(exchange, 200, capabilityDocument());</span>
+<span class="nc" id="L67">                default -&gt; sendError(exchange, 404, &quot;NOT_FOUND&quot;, &quot;unknown rule-radar endpoint&quot;);</span>
             }
-<span class="nc" id="L53">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L54">            sendError(exchange, 400, &quot;INVALID_REQUEST&quot;, safeMessage(exception));</span>
-<span class="nc" id="L55">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L56">            sendError(exchange, 500, &quot;RADAR_FAILURE&quot;, safeMessage(exception));</span>
-<span class="pc" id="L57">        }</span>
-<span class="fc" id="L58">    }</span>
+<span class="fc" id="L69">        } catch (BoundedRequestBody.PayloadTooLargeException exception) {</span>
+<span class="fc" id="L70">            sendPayloadTooLarge(exchange, exception.limitBytes());</span>
+<span class="nc" id="L71">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L72">            sendError(exchange, 400, &quot;INVALID_REQUEST&quot;, safeMessage(exception));</span>
+<span class="nc" id="L73">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L74">            sendError(exchange, 500, &quot;RADAR_FAILURE&quot;, safeMessage(exception));</span>
+<span class="pc" id="L75">        }</span>
+<span class="fc" id="L76">    }</span>
 
     private void handleInspect(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L62">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
-<span class="nc" id="L63">            return;</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L80">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
+<span class="nc" id="L81">            return;</span>
         }
-<span class="fc" id="L65">        Map&lt;String, Object&gt; body = readObject(exchange);</span>
-<span class="fc" id="L66">        String expression = string(body, &quot;expression&quot;, &quot;&quot;);</span>
-<span class="fc" id="L67">        Context context = context(body);</span>
-<span class="fc" id="L68">        Snapshot snapshot = radar.inspect(expression, context);</span>
+<span class="fc" id="L83">        Map&lt;String, Object&gt; body = readObject(exchange);</span>
+<span class="fc" id="L84">        String expression = string(body, &quot;expression&quot;, &quot;&quot;);</span>
+<span class="fc" id="L85">        Context context = context(body);</span>
+<span class="fc" id="L86">        Snapshot snapshot = radar.inspect(expression, context);</span>
         // Invalid expressions are a normal, structured inspection result rather
         // than an uncaught server error.
-<span class="fc" id="L71">        sendJson(exchange, 200, RuleRadarJson.snapshot(snapshot));</span>
-<span class="fc" id="L72">    }</span>
+<span class="fc" id="L89">        sendJson(exchange, 200, RuleRadarJson.snapshot(snapshot));</span>
+<span class="fc" id="L90">    }</span>
 
     private void handleApply(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L76">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
-<span class="nc" id="L77">            return;</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L94">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
+<span class="nc" id="L95">            return;</span>
         }
-<span class="fc" id="L79">        Map&lt;String, Object&gt; body = readObject(exchange);</span>
-<span class="fc" id="L80">        String expression = string(body, &quot;expression&quot;, &quot;&quot;);</span>
-<span class="fc" id="L81">        String candidateId = string(body, &quot;candidateId&quot;, &quot;&quot;);</span>
-<span class="pc bpc" id="L82" title="2 of 4 branches missed.">        if (expression.isBlank() || candidateId.isBlank()) {</span>
-<span class="nc" id="L83">            sendError(exchange, 400, &quot;MISSING_FIELD&quot;, &quot;expression and candidateId are required&quot;);</span>
-<span class="nc" id="L84">            return;</span>
+<span class="fc" id="L97">        Map&lt;String, Object&gt; body = readObject(exchange);</span>
+<span class="fc" id="L98">        String expression = string(body, &quot;expression&quot;, &quot;&quot;);</span>
+<span class="fc" id="L99">        String candidateId = string(body, &quot;candidateId&quot;, &quot;&quot;);</span>
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">        if (expression.isBlank() || candidateId.isBlank()) {</span>
+<span class="nc" id="L101">            sendError(exchange, 400, &quot;MISSING_FIELD&quot;, &quot;expression and candidateId are required&quot;);</span>
+<span class="nc" id="L102">            return;</span>
         }
-<span class="fc" id="L86">        Context context = context(body);</span>
-<span class="fc" id="L87">        ApplicableMove candidate = radar.resolve(expression, candidateId, context).orElse(null);</span>
-<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (candidate == null) {</span>
-<span class="nc" id="L89">            sendError(exchange, 409, &quot;STALE_CANDIDATE&quot;,</span>
+<span class="fc" id="L104">        Context context = context(body);</span>
+<span class="fc" id="L105">        ApplicableMove candidate = radar.resolve(expression, candidateId, context).orElse(null);</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (candidate == null) {</span>
+<span class="nc" id="L107">            sendError(exchange, 409, &quot;STALE_CANDIDATE&quot;,</span>
                 &quot;candidate is no longer present for the frozen expression and context&quot;);
-<span class="nc" id="L91">            return;</span>
-        }
-<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (!candidate.applicable()) {</span>
-<span class="nc" id="L94">            sendError(exchange, 422, candidate.outcome().name(),</span>
-                &quot;candidate is visible for audit but is not executable in the current context&quot;);
-<span class="nc" id="L96">            return;</span>
-        }
-<span class="fc" id="L98">        Snapshot refreshed = radar.inspect(candidate.expressionAfter(), withoutSelectionAndOutcomes(context));</span>
-<span class="fc" id="L99">        sendJson(exchange, 200, RuleRadarJson.applyResult(</span>
-            candidate,
-            refreshed,
-<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            !candidate.expressionBefore().equals(candidate.expressionAfter())</span>
-        ));
-<span class="fc" id="L104">    }</span>
-
-    private void handleSearch(HttpExchange exchange) throws IOException {
-<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
-<span class="nc" id="L108">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
 <span class="nc" id="L109">            return;</span>
         }
-<span class="fc" id="L111">        Map&lt;String, Object&gt; body = readObject(exchange);</span>
-<span class="fc" id="L112">        RuleRadarSearchService.SearchRequest request = new RuleRadarSearchService.SearchRequest(</span>
-<span class="fc" id="L113">            string(body, &quot;expression&quot;, &quot;&quot;),</span>
-<span class="fc" id="L114">            string(body, &quot;targetExpression&quot;, &quot;&quot;),</span>
-<span class="fc" id="L115">            context(body),</span>
-<span class="fc" id="L116">            integer(body, &quot;maxDepth&quot;, 4),</span>
-<span class="fc" id="L117">            integer(body, &quot;maxStates&quot;, 120),</span>
-<span class="fc" id="L118">            integer(body, &quot;maxMovesPerState&quot;, 60)</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (!candidate.applicable()) {</span>
+<span class="nc" id="L112">            sendError(exchange, 422, candidate.outcome().name(),</span>
+                &quot;candidate is visible for audit but is not executable in the current context&quot;);
+<span class="nc" id="L114">            return;</span>
+        }
+<span class="fc" id="L116">        Snapshot refreshed = radar.inspect(candidate.expressionAfter(), withoutSelectionAndOutcomes(context));</span>
+<span class="fc" id="L117">        sendJson(exchange, 200, RuleRadarJson.applyResult(</span>
+            candidate,
+            refreshed,
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            !candidate.expressionBefore().equals(candidate.expressionAfter())</span>
+        ));
+<span class="fc" id="L122">    }</span>
+
+    private void handleSearch(HttpExchange exchange) throws IOException {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (!&quot;POST&quot;.equalsIgnoreCase(exchange.getRequestMethod())) {</span>
+<span class="nc" id="L126">            sendError(exchange, 405, &quot;METHOD_NOT_ALLOWED&quot;, &quot;POST required&quot;);</span>
+<span class="nc" id="L127">            return;</span>
+        }
+<span class="fc" id="L129">        Map&lt;String, Object&gt; body = readObject(exchange);</span>
+<span class="fc" id="L130">        RuleRadarSearchService.SearchRequest request = new RuleRadarSearchService.SearchRequest(</span>
+<span class="fc" id="L131">            string(body, &quot;expression&quot;, &quot;&quot;),</span>
+<span class="fc" id="L132">            string(body, &quot;targetExpression&quot;, &quot;&quot;),</span>
+<span class="fc" id="L133">            context(body),</span>
+<span class="fc" id="L134">            integer(body, &quot;maxDepth&quot;, 4),</span>
+<span class="fc" id="L135">            integer(body, &quot;maxStates&quot;, 120),</span>
+<span class="fc" id="L136">            integer(body, &quot;maxMovesPerState&quot;, 60)</span>
         );
-<span class="fc" id="L120">        sendJson(exchange, 200, RuleRadarJson.searchResult(search.search(request)));</span>
-<span class="fc" id="L121">    }</span>
+<span class="fc" id="L138">        sendJson(exchange, 200, RuleRadarJson.searchResult(search.search(request)));</span>
+<span class="fc" id="L139">    }</span>
 
     private Context context(Map&lt;String, Object&gt; body) {
-<span class="fc" id="L124">        Map&lt;String, Object&gt; source = map(body.get(&quot;context&quot;));</span>
-<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (source.isEmpty()) {</span>
-<span class="fc" id="L126">            source = body;</span>
+<span class="fc" id="L142">        Map&lt;String, Object&gt; source = map(body.get(&quot;context&quot;));</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if (source.isEmpty()) {</span>
+<span class="fc" id="L144">            source = body;</span>
         }
-<span class="fc" id="L128">        RuleProfile knowledgeProfile = enumValue(</span>
+<span class="fc" id="L146">        RuleProfile knowledgeProfile = enumValue(</span>
             RuleProfile.class,
-<span class="fc" id="L130">            string(source, &quot;knowledgeProfile&quot;, RuleProfile.CORE.name()),</span>
+<span class="fc" id="L148">            string(source, &quot;knowledgeProfile&quot;, RuleProfile.CORE.name()),</span>
             RuleProfile.CORE
         );
-<span class="fc" id="L133">        CandidateProofStatus minStatus = enumValue(</span>
+<span class="fc" id="L151">        CandidateProofStatus minStatus = enumValue(</span>
             CandidateProofStatus.class,
-<span class="fc" id="L135">            string(source, &quot;minMacroProofStatus&quot;, CandidateProofStatus.VALIDATED_BY_EXAMPLES.name()),</span>
+<span class="fc" id="L153">            string(source, &quot;minMacroProofStatus&quot;, CandidateProofStatus.VALIDATED_BY_EXAMPLES.name()),</span>
             CandidateProofStatus.VALIDATED_BY_EXAMPLES
         );
-<span class="fc" id="L138">        Map&lt;String, CandidateOutcome&gt; outcomes = new LinkedHashMap&lt;&gt;();</span>
-<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        for (Map.Entry&lt;String, Object&gt; entry : map(source.get(&quot;outcomeByCandidateId&quot;)).entrySet()) {</span>
-<span class="nc" id="L140">            CandidateOutcome parsed = enumValue(CandidateOutcome.class, String.valueOf(entry.getValue()), null);</span>
-<span class="nc bnc" id="L141" title="All 6 branches missed.">            if (parsed != null &amp;&amp; entry.getKey() != null &amp;&amp; !entry.getKey().isBlank()) {</span>
-<span class="nc" id="L142">                outcomes.put(entry.getKey(), parsed);</span>
+<span class="fc" id="L156">        Map&lt;String, CandidateOutcome&gt; outcomes = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        for (Map.Entry&lt;String, Object&gt; entry : map(source.get(&quot;outcomeByCandidateId&quot;)).entrySet()) {</span>
+<span class="nc" id="L158">            CandidateOutcome parsed = enumValue(CandidateOutcome.class, String.valueOf(entry.getValue()), null);</span>
+<span class="nc bnc" id="L159" title="All 6 branches missed.">            if (parsed != null &amp;&amp; entry.getKey() != null &amp;&amp; !entry.getKey().isBlank()) {</span>
+<span class="nc" id="L160">                outcomes.put(entry.getKey(), parsed);</span>
             }
-<span class="nc" id="L144">        }</span>
-<span class="fc" id="L145">        return new Context(</span>
+<span class="nc" id="L162">        }</span>
+<span class="fc" id="L163">        return new Context(</span>
             knowledgeProfile,
-<span class="fc" id="L147">            stringSet(source.get(&quot;enabledPacks&quot;)),</span>
-<span class="fc" id="L148">            stringSet(source.get(&quot;disabledPacks&quot;)),</span>
-<span class="fc" id="L149">            bool(source, &quot;includePlugins&quot;, true),</span>
-<span class="fc" id="L150">            bool(source, &quot;includeLearnedMacros&quot;, true),</span>
+<span class="fc" id="L165">            stringSet(source.get(&quot;enabledPacks&quot;)),</span>
+<span class="fc" id="L166">            stringSet(source.get(&quot;disabledPacks&quot;)),</span>
+<span class="fc" id="L167">            bool(source, &quot;includePlugins&quot;, true),</span>
+<span class="fc" id="L168">            bool(source, &quot;includeLearnedMacros&quot;, true),</span>
             minStatus,
-<span class="fc" id="L152">            string(source, &quot;searchProfile&quot;, &quot;DISCOVERY&quot;),</span>
-<span class="fc" id="L153">            string(source, &quot;goalExpression&quot;, &quot;&quot;),</span>
-<span class="fc" id="L154">            integer(source, &quot;maxCandidatesPerPosition&quot;, 24),</span>
-<span class="fc" id="L155">            integer(source, &quot;maxCandidatesTotal&quot;, 240),</span>
-<span class="fc" id="L156">            stringList(source.get(&quot;assumptions&quot;)),</span>
-<span class="fc" id="L157">            bool(source, &quot;includeRejectedCandidates&quot;, true),</span>
-<span class="fc" id="L158">            string(source, &quot;selectedCandidateId&quot;, &quot;&quot;),</span>
+<span class="fc" id="L170">            string(source, &quot;searchProfile&quot;, &quot;DISCOVERY&quot;),</span>
+<span class="fc" id="L171">            string(source, &quot;goalExpression&quot;, &quot;&quot;),</span>
+<span class="fc" id="L172">            integer(source, &quot;maxCandidatesPerPosition&quot;, 24),</span>
+<span class="fc" id="L173">            integer(source, &quot;maxCandidatesTotal&quot;, 240),</span>
+<span class="fc" id="L174">            stringList(source.get(&quot;assumptions&quot;)),</span>
+<span class="fc" id="L175">            bool(source, &quot;includeRejectedCandidates&quot;, true),</span>
+<span class="fc" id="L176">            string(source, &quot;selectedCandidateId&quot;, &quot;&quot;),</span>
             outcomes
         );
     }
 
     private Context withoutSelectionAndOutcomes(Context context) {
-<span class="fc" id="L164">        return new Context(</span>
-<span class="fc" id="L165">            context.knowledgeProfile(),</span>
-<span class="fc" id="L166">            context.enabledPacks(),</span>
-<span class="fc" id="L167">            context.disabledPacks(),</span>
-<span class="fc" id="L168">            context.includePlugins(),</span>
-<span class="fc" id="L169">            context.includeLearnedMacros(),</span>
-<span class="fc" id="L170">            context.minMacroProofStatus(),</span>
-<span class="fc" id="L171">            context.searchProfile(),</span>
-<span class="fc" id="L172">            context.goalExpression(),</span>
-<span class="fc" id="L173">            context.maxCandidatesPerPosition(),</span>
-<span class="fc" id="L174">            context.maxCandidatesTotal(),</span>
-<span class="fc" id="L175">            context.assumptions(),</span>
-<span class="fc" id="L176">            context.includeRejectedCandidates(),</span>
+<span class="fc" id="L182">        return new Context(</span>
+<span class="fc" id="L183">            context.knowledgeProfile(),</span>
+<span class="fc" id="L184">            context.enabledPacks(),</span>
+<span class="fc" id="L185">            context.disabledPacks(),</span>
+<span class="fc" id="L186">            context.includePlugins(),</span>
+<span class="fc" id="L187">            context.includeLearnedMacros(),</span>
+<span class="fc" id="L188">            context.minMacroProofStatus(),</span>
+<span class="fc" id="L189">            context.searchProfile(),</span>
+<span class="fc" id="L190">            context.goalExpression(),</span>
+<span class="fc" id="L191">            context.maxCandidatesPerPosition(),</span>
+<span class="fc" id="L192">            context.maxCandidatesTotal(),</span>
+<span class="fc" id="L193">            context.assumptions(),</span>
+<span class="fc" id="L194">            context.includeRejectedCandidates(),</span>
             &quot;&quot;,
-<span class="fc" id="L178">            Map.of()</span>
+<span class="fc" id="L196">            Map.of()</span>
         );
     }
 
     private String capabilityDocument() {
-<span class="nc" id="L183">        JsonWriter writer = new JsonWriter().beginObject();</span>
-<span class="nc" id="L184">        writer.property(&quot;schema&quot;, &quot;regelsuche.ast-rule-radar-http/v1&quot;);</span>
-<span class="nc" id="L185">        writer.stringArray(&quot;endpoints&quot;, List.of(</span>
+<span class="fc" id="L201">        JsonWriter writer = new JsonWriter().beginObject();</span>
+<span class="fc" id="L202">        writer.property(&quot;schema&quot;, &quot;regelsuche.ast-rule-radar-http/v1&quot;);</span>
+<span class="fc" id="L203">        writer.stringArray(&quot;endpoints&quot;, List.of(</span>
             &quot;POST /api/rule-radar/inspect&quot;,
             &quot;POST /api/rule-radar/apply&quot;,
             &quot;POST /api/rule-radar/search&quot;
         ));
-<span class="nc" id="L190">        writer.stringArray(&quot;candidateOutcomes&quot;, java.util.Arrays.stream(CandidateOutcome.values())</span>
-<span class="nc" id="L191">            .map(Enum::name).toList());</span>
-<span class="nc" id="L192">        writer.stringArray(&quot;ruleOrigins&quot;, java.util.Arrays.stream(AstRuleRadar.RuleOrigin.values())</span>
-<span class="nc" id="L193">            .map(Enum::name).toList());</span>
-<span class="nc" id="L194">        writer.property(&quot;claimBoundary&quot;,</span>
+<span class="fc" id="L208">        writer.stringArray(&quot;candidateOutcomes&quot;, java.util.Arrays.stream(CandidateOutcome.values())</span>
+<span class="fc" id="L209">            .map(Enum::name).toList());</span>
+<span class="fc" id="L210">        writer.stringArray(&quot;ruleOrigins&quot;, java.util.Arrays.stream(AstRuleRadar.RuleOrigin.values())</span>
+<span class="fc" id="L211">            .map(Enum::name).toList());</span>
+<span class="fc" id="L212">        writer.property(&quot;claimBoundary&quot;,</span>
             &quot;Candidate visibility and rewrite success are not formal proof; validation and proof metadata remain authoritative.&quot;);
-<span class="nc" id="L196">        return writer.endObject().toString();</span>
+<span class="fc" id="L214">        return writer.endObject().toString();</span>
     }
 
     private Map&lt;String, Object&gt; readObject(HttpExchange exchange) throws IOException {
-<span class="fc" id="L200">        byte[] bytes = exchange.getRequestBody().readAllBytes();</span>
-<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (bytes.length == 0) {</span>
-<span class="nc" id="L202">            return Map.of();</span>
+<span class="fc" id="L218">        byte[] bytes = BoundedRequestBody.read(exchange, maxRequestBytes);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (bytes.length == 0) {</span>
+<span class="nc" id="L220">            return Map.of();</span>
         }
-<span class="fc" id="L204">        return new JsonReader(new String(bytes, StandardCharsets.UTF_8)).readObject();</span>
+<span class="fc" id="L222">        return new JsonReader(new String(bytes, StandardCharsets.UTF_8)).readObject();</span>
     }
 
+    private void sendPayloadTooLarge(HttpExchange exchange, int limitBytes) throws IOException {
+<span class="fc" id="L226">        JsonWriter writer = new JsonWriter().beginObject()</span>
+<span class="fc" id="L227">            .property(&quot;error&quot;, true)</span>
+<span class="fc" id="L228">            .property(&quot;code&quot;, &quot;PAYLOAD_TOO_LARGE&quot;)</span>
+<span class="fc" id="L229">            .property(&quot;message&quot;, &quot;request body exceeds configured limit&quot;)</span>
+<span class="fc" id="L230">            .property(&quot;limitBytes&quot;, limitBytes)</span>
+<span class="fc" id="L231">            .endObject();</span>
+<span class="fc" id="L232">        sendJson(exchange, 413, writer.toString());</span>
+<span class="fc" id="L233">    }</span>
+
     private void sendError(HttpExchange exchange, int status, String code, String message) throws IOException {
-<span class="nc" id="L208">        JsonWriter writer = new JsonWriter().beginObject()</span>
-<span class="nc" id="L209">            .property(&quot;error&quot;, true)</span>
-<span class="nc" id="L210">            .property(&quot;code&quot;, code)</span>
-<span class="nc" id="L211">            .property(&quot;message&quot;, message)</span>
-<span class="nc" id="L212">            .endObject();</span>
-<span class="nc" id="L213">        sendJson(exchange, status, writer.toString());</span>
-<span class="nc" id="L214">    }</span>
+<span class="nc" id="L236">        JsonWriter writer = new JsonWriter().beginObject()</span>
+<span class="nc" id="L237">            .property(&quot;error&quot;, true)</span>
+<span class="nc" id="L238">            .property(&quot;code&quot;, code)</span>
+<span class="nc" id="L239">            .property(&quot;message&quot;, message)</span>
+<span class="nc" id="L240">            .endObject();</span>
+<span class="nc" id="L241">        sendJson(exchange, status, writer.toString());</span>
+<span class="nc" id="L242">    }</span>
 
     private void sendJson(HttpExchange exchange, int status, String json) throws IOException {
-<span class="fc" id="L217">        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);</span>
-<span class="fc" id="L218">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
-<span class="fc" id="L219">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
-<span class="fc" id="L220">        exchange.sendResponseHeaders(status, bytes.length);</span>
-<span class="fc" id="L221">        try (var output = exchange.getResponseBody()) {</span>
-<span class="fc" id="L222">            output.write(bytes);</span>
+<span class="fc" id="L245">        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L246">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;application/json; charset=utf-8&quot;);</span>
+<span class="fc" id="L247">        exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L248">        exchange.sendResponseHeaders(status, bytes.length);</span>
+<span class="fc" id="L249">        try (var output = exchange.getResponseBody()) {</span>
+<span class="fc" id="L250">            output.write(bytes);</span>
         }
-<span class="fc" id="L224">    }</span>
+<span class="fc" id="L252">    }</span>
 
     private String string(Map&lt;String, Object&gt; source, String key, String fallback) {
-<span class="fc" id="L227">        Object value = source.get(key);</span>
-<span class="fc bfc" id="L228" title="All 2 branches covered.">        return value == null ? fallback : String.valueOf(value).trim();</span>
+<span class="fc" id="L255">        Object value = source.get(key);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        return value == null ? fallback : String.valueOf(value).trim();</span>
     }
 
     private int integer(Map&lt;String, Object&gt; source, String key, int fallback) {
-<span class="fc" id="L232">        Object value = source.get(key);</span>
-<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (value instanceof Number number) {</span>
-<span class="fc" id="L234">            return number.intValue();</span>
+<span class="fc" id="L260">        Object value = source.get(key);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (value instanceof Number number) {</span>
+<span class="fc" id="L262">            return number.intValue();</span>
         }
-<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (value == null) {</span>
-<span class="fc" id="L237">            return fallback;</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="fc" id="L265">            return fallback;</span>
         }
         try {
-<span class="nc" id="L240">            return Integer.parseInt(String.valueOf(value).trim());</span>
-<span class="nc" id="L241">        } catch (NumberFormatException exception) {</span>
-<span class="nc" id="L242">            return fallback;</span>
+<span class="nc" id="L268">            return Integer.parseInt(String.valueOf(value).trim());</span>
+<span class="nc" id="L269">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L270">            return fallback;</span>
         }
     }
 
     private boolean bool(Map&lt;String, Object&gt; source, String key, boolean fallback) {
-<span class="fc" id="L247">        Object value = source.get(key);</span>
-<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (value instanceof Boolean bool) {</span>
-<span class="fc" id="L249">            return bool;</span>
+<span class="fc" id="L275">        Object value = source.get(key);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (value instanceof Boolean bool) {</span>
+<span class="fc" id="L277">            return bool;</span>
         }
-<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (value == null) {</span>
-<span class="fc" id="L252">            return fallback;</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="fc" id="L280">            return fallback;</span>
         }
-<span class="nc" id="L254">        String text = String.valueOf(value).trim().toLowerCase(Locale.ROOT);</span>
-<span class="nc bnc" id="L255" title="All 3 branches missed.">        return switch (text) {</span>
-<span class="nc" id="L256">            case &quot;true&quot;, &quot;1&quot;, &quot;yes&quot;, &quot;on&quot; -&gt; true;</span>
-<span class="nc" id="L257">            case &quot;false&quot;, &quot;0&quot;, &quot;no&quot;, &quot;off&quot; -&gt; false;</span>
-<span class="nc" id="L258">            default -&gt; fallback;</span>
+<span class="nc" id="L282">        String text = String.valueOf(value).trim().toLowerCase(Locale.ROOT);</span>
+<span class="nc bnc" id="L283" title="All 3 branches missed.">        return switch (text) {</span>
+<span class="nc" id="L284">            case &quot;true&quot;, &quot;1&quot;, &quot;yes&quot;, &quot;on&quot; -&gt; true;</span>
+<span class="nc" id="L285">            case &quot;false&quot;, &quot;0&quot;, &quot;no&quot;, &quot;off&quot; -&gt; false;</span>
+<span class="nc" id="L286">            default -&gt; fallback;</span>
         };
     }
 
     @SuppressWarnings(&quot;unchecked&quot;)
     private Map&lt;String, Object&gt; map(Object value) {
-<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (!(value instanceof Map&lt;?, ?&gt; raw)) {</span>
-<span class="fc" id="L265">            return Map.of();</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (!(value instanceof Map&lt;?, ?&gt; raw)) {</span>
+<span class="fc" id="L293">            return Map.of();</span>
         }
-<span class="fc" id="L267">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L268">        raw.forEach((key, item) -&gt; result.put(String.valueOf(key), item));</span>
-<span class="fc" id="L269">        return result;</span>
+<span class="fc" id="L295">        Map&lt;String, Object&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L296">        raw.forEach((key, item) -&gt; result.put(String.valueOf(key), item));</span>
+<span class="fc" id="L297">        return result;</span>
     }
 
     private List&lt;String&gt; stringList(Object value) {
-<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (!(value instanceof List&lt;?&gt; list)) {</span>
-<span class="fc" id="L274">            return List.of();</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (!(value instanceof List&lt;?&gt; list)) {</span>
+<span class="fc" id="L302">            return List.of();</span>
         }
-<span class="nc" id="L276">        return list.stream()</span>
-<span class="nc bnc" id="L277" title="All 4 branches missed.">            .filter(item -&gt; item != null &amp;&amp; !String.valueOf(item).isBlank())</span>
-<span class="nc" id="L278">            .map(item -&gt; String.valueOf(item).trim())</span>
-<span class="nc" id="L279">            .distinct()</span>
-<span class="nc" id="L280">            .sorted()</span>
-<span class="nc" id="L281">            .toList();</span>
+<span class="nc" id="L304">        return list.stream()</span>
+<span class="nc bnc" id="L305" title="All 4 branches missed.">            .filter(item -&gt; item != null &amp;&amp; !String.valueOf(item).isBlank())</span>
+<span class="nc" id="L306">            .map(item -&gt; String.valueOf(item).trim())</span>
+<span class="nc" id="L307">            .distinct()</span>
+<span class="nc" id="L308">            .sorted()</span>
+<span class="nc" id="L309">            .toList();</span>
     }
 
     private Set&lt;String&gt; stringSet(Object value) {
-<span class="fc" id="L285">        return Set.copyOf(new LinkedHashSet&lt;&gt;(stringList(value)));</span>
+<span class="fc" id="L313">        return Set.copyOf(new LinkedHashSet&lt;&gt;(stringList(value)));</span>
     }
 
     private &lt;E extends Enum&lt;E&gt;&gt; E enumValue(Class&lt;E&gt; type, String value, E fallback) {
-<span class="pc bpc" id="L289" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L290">            return fallback;</span>
+<span class="pc bpc" id="L317" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L318">            return fallback;</span>
         }
         try {
-<span class="fc" id="L293">            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT).replace('-', '_'));</span>
-<span class="nc" id="L294">        } catch (IllegalArgumentException exception) {</span>
-<span class="nc" id="L295">            return fallback;</span>
+<span class="fc" id="L321">            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT).replace('-', '_'));</span>
+<span class="nc" id="L322">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L323">            return fallback;</span>
         }
     }
 
     private String safeMessage(RuntimeException exception) {
-<span class="nc bnc" id="L300" title="All 2 branches missed.">        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        return exception.getMessage() == null ? exception.getClass().getSimpleName() : exception.getMessage();</span>
     }
 
     @Override
     public void close() {
-<span class="fc" id="L305">        radar.close();</span>
-<span class="fc" id="L306">    }</span>
+<span class="fc" id="L333">        radar.close();</span>
+<span class="fc" id="L334">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
