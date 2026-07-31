@@ -48,33 +48,60 @@ class RuleRadarHttpHandlerRequestLimitTest {
     }
 
     @Test
-    void acceptsExactBoundaryRejectsOneByteOverAndRemainsResponsive() throws IOException {
-        HttpURLConnection exact = post("/api/rule-radar/inspect", jsonBody(REQUEST_LIMIT));
+    void acceptsExactBoundaryRejectsOversizedFixedAndChunkedBodiesAndRemainsResponsive()
+        throws IOException {
+        HttpURLConnection exact = postFixed("/api/rule-radar/inspect", jsonBody(REQUEST_LIMIT));
         assertEquals(200, exact.getResponseCode());
         assertTrue(readBody(exact).contains("\"schema\":\"regelsuche.ast-rule-radar/v1\""));
 
-        HttpURLConnection oversized = post("/api/rule-radar/inspect", jsonBody(REQUEST_LIMIT + 1));
-        assertEquals(413, oversized.getResponseCode());
-        assertTrue(oversized.getHeaderField("Content-Type").startsWith("application/json"));
-        String error = readBody(oversized);
-        assertTrue(error.contains("\"code\":\"PAYLOAD_TOO_LARGE\""), error);
-        assertTrue(error.contains("\"limitBytes\":1024"), error);
+        assertPayloadTooLarge(postFixed(
+            "/api/rule-radar/inspect",
+            jsonBody(REQUEST_LIMIT + 1)
+        ));
+        assertPayloadTooLarge(postChunked(
+            "/api/rule-radar/inspect",
+            jsonBody(REQUEST_LIMIT + 1)
+        ));
 
         HttpURLConnection followUp = open("/api/rule-radar");
         assertEquals(200, followUp.getResponseCode());
         assertTrue(readBody(followUp).contains("\"schema\":\"regelsuche.ast-rule-radar-http/v1\""));
     }
 
-    private HttpURLConnection post(String path, byte[] body) throws IOException {
+    private void assertPayloadTooLarge(HttpURLConnection connection) throws IOException {
+        assertEquals(413, connection.getResponseCode());
+        assertTrue(connection.getHeaderField("Content-Type").startsWith("application/json"));
+        String error = readBody(connection);
+        assertTrue(error.contains("\"code\":\"PAYLOAD_TOO_LARGE\""), error);
+        assertTrue(error.contains("\"limitBytes\":1024"), error);
+    }
+
+    private HttpURLConnection postFixed(String path, byte[] body) throws IOException {
+        HttpURLConnection connection = preparePost(path);
+        connection.setFixedLengthStreamingMode(body.length);
+        writeBody(connection, body);
+        return connection;
+    }
+
+    private HttpURLConnection postChunked(String path, byte[] body) throws IOException {
+        HttpURLConnection connection = preparePost(path);
+        connection.setChunkedStreamingMode(128);
+        writeBody(connection, body);
+        return connection;
+    }
+
+    private HttpURLConnection preparePost(String path) throws IOException {
         HttpURLConnection connection = open(path);
         connection.setRequestMethod("POST");
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "application/json");
-        connection.setFixedLengthStreamingMode(body.length);
+        return connection;
+    }
+
+    private void writeBody(HttpURLConnection connection, byte[] body) throws IOException {
         try (OutputStream output = connection.getOutputStream()) {
             output.write(body);
         }
-        return connection;
     }
 
     private HttpURLConnection open(String path) throws IOException {
