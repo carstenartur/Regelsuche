@@ -38,7 +38,7 @@ REGELSUCHE_PERSISTENCE_MODE=POSTGRESQL_WITH_JSON_FALLBACK
 REGELSUCHE_PERSISTENCE_PATH=/opt/regelsuche/data
 POSTGRES_URL=jdbc:postgresql://postgres:5432/regelsuche
 POSTGRES_USER=regelsuche
-POSTGRES_PASSWORD=regelsuche-demo
+POSTGRES_PASSWORD=replace-with-a-secret
 ```
 
 Optional Neo4j graph provenance uses the existing variables:
@@ -46,8 +46,13 @@ Optional Neo4j graph provenance uses the existing variables:
 ```bash
 NEO4J_URI=bolt://neo4j:7687
 NEO4J_USER=neo4j
-NEO4J_PASSWORD=regelsuche-demo
+NEO4J_PASSWORD=replace-with-a-secret
 ```
+
+The values `regelsuche-demo` in `docker-compose.yml` are deliberate local-demo
+fallbacks, not production credentials. Set `POSTGRES_PASSWORD` and, when the
+Neo4j profile is enabled, `NEO4J_PASSWORD` before any non-local deployment.
+Keep database ports unexposed whenever direct host access is unnecessary.
 
 When `Neo4jSearchGraphRepository` stores a `SearchGraphRecord`, it now writes
 both the round-trippable JSON snapshot and a typed provenance graph. The
@@ -67,11 +72,22 @@ Start the standard Full Mode:
 docker compose up --build
 ```
 
-This starts `regelsuche-app` and `postgres` with healthchecks and persistent volumes. Neo4j is optional:
+This starts the application and PostgreSQL with healthchecks and persistent
+volumes. Published application and database ports bind to `127.0.0.1` by
+default. The application itself still uses unauthenticated HTTP unless a
+`WebSecurityConfig` with authentication and TLS is supplied; therefore the
+Compose defaults are a local workstation profile, not an internet-facing
+production deployment.
+
+Neo4j is optional:
 
 ```bash
 docker compose --profile neo4j up --build
 ```
+
+Its browser and Bolt ports also bind to `127.0.0.1`. In production, prefer not
+to publish PostgreSQL or Neo4j ports at all and let only the application reach
+them on the container network.
 
 The proof-worker image is a placeholder profile for deployments that want a separate prover container:
 
