@@ -328,8 +328,9 @@ public record EvolutionValidationSelection(
                 searchConfiguration, "searchConfiguration");
             EvolutionGenome.requireSha256(
                 configurationHash, "configurationHash");
-            String expectedConfigurationHash = configurationHash(
-                genomeHash, alphaStructuralHash, searchConfiguration);
+            String expectedConfigurationHash =
+                EvolutionValidationSelection.configurationHash(
+                    genomeHash, alphaStructuralHash, searchConfiguration);
             if (!expectedConfigurationHash.equals(configurationHash)) {
                 throw new IllegalArgumentException(
                     "candidate configurationHash mismatch");
@@ -377,7 +378,7 @@ public record EvolutionValidationSelection(
                 genomeHash,
                 alphaStructuralHash,
                 searchConfiguration,
-                configurationHash(
+                EvolutionValidationSelection.configurationHash(
                     genomeHash,
                     alphaStructuralHash,
                     searchConfiguration),
