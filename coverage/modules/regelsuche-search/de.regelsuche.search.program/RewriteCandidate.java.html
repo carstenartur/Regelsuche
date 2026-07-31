@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RewriteCandidate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">RewriteCandidate.java</span></div><h1>RewriteCandidate.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
+
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * One lazily composed rewrite candidate produced while interpreting a
+ * {@link RewriteProgram}.
+ */
+public record RewriteCandidate(
+    String originNodeId,
+    String inputExpression,
+    String outputExpression,
+    List&lt;Transformation&gt; steps
+) {
+<span class="fc" id="L21">    public RewriteCandidate {</span>
+<span class="fc" id="L22">        originNodeId = requireText(originNodeId, &quot;originNodeId&quot;);</span>
+<span class="fc" id="L23">        inputExpression = requireText(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L24">        outputExpression = requireText(outputExpression, &quot;outputExpression&quot;);</span>
+<span class="fc" id="L25">        steps = List.copyOf(Objects.requireNonNull(steps, &quot;steps&quot;));</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (steps.isEmpty()) {</span>
+<span class="nc" id="L27">            throw new IllegalArgumentException(&quot;steps must not be empty&quot;);</span>
+        }
+<span class="fc" id="L29">    }</span>
+
+    public List&lt;String&gt; ruleIds() {
+<span class="fc" id="L32">        return steps.stream().map(Transformation::rule).toList();</span>
+    }
+
+    public Transformation lastStep() {
+<span class="nc" id="L36">        return steps.get(steps.size() - 1);</span>
+    }
+
+    public RewriteCandidate append(RewriteCandidate suffix, String newOriginNodeId) {
+<span class="fc" id="L40">        Objects.requireNonNull(suffix, &quot;suffix&quot;);</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (!outputExpression.equals(suffix.inputExpression())) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(</span>
+                &quot;candidate chain is discontinuous: &quot; + outputExpression
+<span class="nc" id="L44">                    + &quot; != &quot; + suffix.inputExpression());</span>
+        }
+<span class="fc" id="L46">        List&lt;Transformation&gt; combined = new ArrayList&lt;&gt;(steps);</span>
+<span class="fc" id="L47">        combined.addAll(suffix.steps());</span>
+<span class="fc" id="L48">        return new RewriteCandidate(</span>
+<span class="fc" id="L49">            requireText(newOriginNodeId, &quot;newOriginNodeId&quot;),</span>
+            inputExpression,
+<span class="fc" id="L51">            suffix.outputExpression(),</span>
+            combined
+        );
+    }
+
+    public RewriteCandidate withOriginNodeId(String newOriginNodeId) {
+<span class="fc" id="L57">        return new RewriteCandidate(newOriginNodeId, inputExpression, outputExpression, steps);</span>
+    }
+
+    /**
+     * Converts the path into the ordinary transformation model consumed by all
+     * existing search strategies. Primitive candidates are preserved exactly;
+     * multi-step candidates become explicit macro-like transformations.
+     */
+    public Transformation toTransformation() {
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (steps.size() == 1) {</span>
+<span class="fc" id="L67">            return steps.get(0);</span>
+        }
+
+<span class="fc" id="L70">        RewriteKind kind = combinedKind();</span>
+<span class="fc" id="L71">        boolean mayIncreaseComplexity = steps.stream()</span>
+<span class="fc" id="L72">            .anyMatch(Transformation::mayIncreaseComplexity);</span>
+<span class="fc" id="L73">        boolean equivalencePreserving = steps.stream()</span>
+<span class="fc" id="L74">            .allMatch(Transformation::equivalencePreservingByConstruction);</span>
+<span class="fc" id="L75">        int estimatedCostDelta = steps.stream()</span>
+<span class="fc" id="L76">            .mapToInt(Transformation::estimatedCostDelta)</span>
+<span class="fc" id="L77">            .reduce(0, RewriteCandidate::saturatedAdd);</span>
+<span class="fc" id="L78">        List&lt;String&gt; assumptions = steps.stream()</span>
+<span class="fc" id="L79">            .flatMap(step -&gt; step.assumptions().stream())</span>
+<span class="fc" id="L80">            .toList();</span>
+
+<span class="fc" id="L82">        String rule = &quot;program:&quot; + originNodeId + &quot;[&quot;</span>
+<span class="fc" id="L83">            + String.join(&quot; -&gt; &quot;, ruleIds()) + &quot;]&quot;;</span>
+<span class="fc" id="L84">        String applicationKey = &quot;program:&quot; + originNodeId + &quot;:&quot;</span>
+<span class="fc" id="L85">            + steps.stream().map(Transformation::applicationKey)</span>
+<span class="fc" id="L86">                .reduce((left, right) -&gt; left + &quot;-&gt;&quot; + right)</span>
+<span class="fc" id="L87">                .orElseThrow();</span>
+
+<span class="fc" id="L89">        return new Transformation(</span>
+            rule,
+            outputExpression,
+            kind,
+            mayIncreaseComplexity,
+            estimatedCostDelta,
+            equivalencePreserving,
+            applicationKey,
+            assumptions,
+<span class="fc" id="L98">            combinedValue(steps.stream().map(Transformation::packId).toList()),</span>
+<span class="fc" id="L99">            combinedValue(steps.stream().map(Transformation::license).toList())</span>
+        );
+    }
+
+    String fingerprint() {
+<span class="fc" id="L104">        return outputExpression + &quot;\u0000&quot;</span>
+<span class="fc" id="L105">            + steps.stream().map(Transformation::applicationKey)</span>
+<span class="fc" id="L106">                .reduce((left, right) -&gt; left + &quot;\u0001&quot; + right)</span>
+<span class="fc" id="L107">                .orElse(&quot;&quot;);</span>
+    }
+
+    private RewriteKind combinedKind() {
+<span class="fc" id="L111">        RewriteKind first = steps.get(0).kind();</span>
+<span class="pc bpc" id="L112" title="2 of 4 branches missed.">        return steps.stream().allMatch(step -&gt; step.kind() == first)</span>
+<span class="fc" id="L113">            ? first</span>
+<span class="nc" id="L114">            : RewriteKind.NORMALIZE;</span>
+    }
+
+    private static int saturatedAdd(int left, int right) {
+<span class="fc" id="L118">        long sum = (long) left + right;</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (sum &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L120">            return Integer.MAX_VALUE;</span>
+        }
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (sum &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L123">            return Integer.MIN_VALUE;</span>
+        }
+<span class="fc" id="L125">        return (int) sum;</span>
+    }
+
+    private static String combinedValue(List&lt;String&gt; values) {
+<span class="fc" id="L129">        Set&lt;String&gt; distinct = new LinkedHashSet&lt;&gt;(values);</span>
+<span class="fc" id="L130">        return String.join(&quot;+&quot;, distinct);</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L135">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L137">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
