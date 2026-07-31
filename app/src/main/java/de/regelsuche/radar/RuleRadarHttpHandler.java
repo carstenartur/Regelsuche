@@ -9,6 +9,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.plugin.PluginRuntimeConfig;
 import de.regelsuche.validation.CandidateProofStatus;
+import de.regelsuche.web.BoundedRequestBody;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -26,16 +27,31 @@ import static de.regelsuche.radar.AstRuleRadar.Snapshot;
 /** HTTP adapter for the AST rule radar. Mathematical logic remains in the service. */
 public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
     private static final String PREFIX = "/api/rule-radar";
+    private static final int DEFAULT_MAX_REQUEST_BYTES = 1 << 20;
     private final AstRuleRadarService radar;
     private final RuleRadarSearchService search;
+    private final int maxRequestBytes;
 
     public RuleRadarHttpHandler(
         RuleInventoryRepository inventory,
         ExpressionGraphStore graphStore,
         PluginRuntimeConfig pluginRuntimeConfig
     ) {
+        this(inventory, graphStore, pluginRuntimeConfig, DEFAULT_MAX_REQUEST_BYTES);
+    }
+
+    public RuleRadarHttpHandler(
+        RuleInventoryRepository inventory,
+        ExpressionGraphStore graphStore,
+        PluginRuntimeConfig pluginRuntimeConfig,
+        int maxRequestBytes
+    ) {
+        if (maxRequestBytes <= 0) {
+            throw new IllegalArgumentException("maxRequestBytes must be positive");
+        }
         this.radar = new AstRuleRadarService(inventory, graphStore, pluginRuntimeConfig);
         this.search = new RuleRadarSearchService(radar);
+        this.maxRequestBytes = maxRequestBytes;
     }
 
     @Override
@@ -197,7 +213,7 @@ public final class RuleRadarHttpHandler implements HttpHandler, AutoCloseable {
     }
 
     private Map<String, Object> readObject(HttpExchange exchange) throws IOException {
-        byte[] bytes = exchange.getRequestBody().readAllBytes();
+        byte[] bytes = BoundedRequestBody.read(exchange, maxRequestBytes);
         if (bytes.length == 0) {
             return Map.of();
         }
