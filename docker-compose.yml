@@ -3,7 +3,7 @@
 # The killer-demo's STANDARD mode is the single-image flow:
 #
 #     docker build -t regelsuche .
-#     docker run --rm -p 8080:8080 regelsuche
+#     docker run --rm -p 127.0.0.1:8080:8080 regelsuche
 #
 # That single image is enough to click through every demo, see the search
 # graph, replays, identities and download the report bundle — no external
@@ -14,10 +14,15 @@
 #
 #     docker compose up --build
 #
-# and open http://localhost:8080. PostgreSQL is reachable on localhost:5432.
+# and open http://localhost:8080. Published demo ports bind to 127.0.0.1 only.
 # Optional services:
 #     docker compose --profile neo4j up --build
 #     docker compose --profile proof-worker up --build
+#
+# SECURITY: the application defaults to HTTP without authentication and the
+# fallback credentials below are development-only. Keep the localhost binds,
+# or put the deployment behind authenticated TLS, and replace every demo
+# password before exposing any service beyond the local machine.
 #
 # To stop and keep the database volumes:
 #     docker compose down
@@ -29,14 +34,14 @@ services:
     build: .
     image: regelsuche
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       # Full Mode: compact Discovery metadata in PostgreSQL, mathematical
       # provenance graph optionally in Neo4j, and JSON files as demo fallback.
       REGELSUCHE_PERSISTENCE_MODE: POSTGRESQL_WITH_JSON_FALLBACK
       POSTGRES_URL: jdbc:postgresql://postgres:5432/regelsuche
-      POSTGRES_USER: regelsuche
-      POSTGRES_PASSWORD: regelsuche-demo
+      POSTGRES_USER: ${POSTGRES_USER:-regelsuche}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-regelsuche-demo}
       # Optional Neo4j graph provenance can be enabled by running the neo4j
       # profile and setting NEO4J_URI/NEO4J_USER/NEO4J_PASSWORD here.
     depends_on:
@@ -47,15 +52,15 @@ services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_DB: regelsuche
-      POSTGRES_USER: regelsuche
-      POSTGRES_PASSWORD: regelsuche-demo
+      POSTGRES_DB: ${POSTGRES_DB:-regelsuche}
+      POSTGRES_USER: ${POSTGRES_USER:-regelsuche}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-regelsuche-demo}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U regelsuche -d regelsuche"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-regelsuche} -d $${POSTGRES_DB:-regelsuche}"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -65,16 +70,18 @@ services:
     profiles: ["neo4j"]
     image: neo4j:5-community
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
     environment:
-      NEO4J_AUTH: neo4j/regelsuche-demo
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-regelsuche-demo}
+      REGELSUCHE_HEALTHCHECK_USER: ${NEO4J_USER:-neo4j}
+      REGELSUCHE_HEALTHCHECK_PASSWORD: ${NEO4J_PASSWORD:-regelsuche-demo}
       NEO4J_server_default__listen__address: 0.0.0.0
     volumes:
       - neo4j-data:/data
       - neo4j-logs:/logs
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p regelsuche-demo 'RETURN 1' || exit 1"]
+      test: ["CMD-SHELL", "cypher-shell -u $${REGELSUCHE_HEALTHCHECK_USER} -p $${REGELSUCHE_HEALTHCHECK_PASSWORD} 'RETURN 1' || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 12
