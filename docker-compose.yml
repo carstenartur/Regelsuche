@@ -74,12 +74,14 @@ services:
       - "127.0.0.1:7687:7687"
     environment:
       NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-regelsuche-demo}
+      REGELSUCHE_HEALTHCHECK_USER: ${NEO4J_USER:-neo4j}
+      REGELSUCHE_HEALTHCHECK_PASSWORD: ${NEO4J_PASSWORD:-regelsuche-demo}
       NEO4J_server_default__listen__address: 0.0.0.0
     volumes:
       - neo4j-data:/data
       - neo4j-logs:/logs
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u $${NEO4J_USER:-neo4j} -p $${NEO4J_PASSWORD:-regelsuche-demo} 'RETURN 1' || exit 1"]
+      test: ["CMD-SHELL", "cypher-shell -u $${REGELSUCHE_HEALTHCHECK_USER} -p $${REGELSUCHE_HEALTHCHECK_PASSWORD} 'RETURN 1' || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 12
