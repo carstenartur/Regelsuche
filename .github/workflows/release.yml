@@ -7,20 +7,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
+      release_version:
+        description: 'Release version in semver, e.g. 0.1.0 (no leading "v")'
+        required: true
+        type: string
       next_development_version:
-        description: 'Optional exact next version (X.Y.Z-SNAPSHOT); leave empty to use the increment choice'
+        description: 'Next development version, e.g. 0.1.1-SNAPSHOT. Leave empty to increment patch.'
         required: false
         type: string
         default: ''
-      next_version_increment:
-        description: 'Select the conventional next version when no exact version is supplied'
-        required: true
-        type: choice
-        default: patch
-        options:
-          - patch
-          - minor
-          - major
       skip_tests:
         description: 'Skip ./gradlew test during the release build'
         required: false
@@ -73,37 +68,27 @@ jobs:
       build_ref: ${{ steps.state.outputs.build_ref }}
       needs_next_pr: ${{ steps.metadata.outputs.needs_next_pr }}
     steps:
-      - name: Checkout authoritative main or immutable tag
-        uses: actions/checkout@v7
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'main' }}
 
-      - name: Resolve release version from repository state
+      - name: Resolve release version
         id: resolve
         env:
-          INPUT_EXACT_NEXT: ${{ inputs.next_development_version }}
-          INPUT_NEXT_INCREMENT: ${{ inputs.next_version_increment }}
+          INPUT_RELEASE_VERSION: ${{ inputs.release_version }}
+          INPUT_NEXT_VERSION: ${{ inputs.next_development_version }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
           INPUT_SKIP_TESTS: ${{ inputs.skip_tests }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
 
-          next_from_increment() {
-            local release="$1"
-            local increment="$2"
-            local major minor patch
-            IFS='.' read -r major minor patch <<< "$release"
-            case "$increment" in
-              patch) printf '%s.%s.%s-SNAPSHOT' "$major" "$minor" "$((patch + 1))" ;;
-              minor) printf '%s.%s.0-SNAPSHOT' "$major" "$((minor + 1))" ;;
-              major) printf '%s.0.0-SNAPSHOT' "$((major + 1))" ;;
-              *)
-                echo "::error::Unsupported next_version_increment '$increment'" >&2
-                return 1
-                ;;
-            esac
+          trim() {
+            local value="$1"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            printf '%s' "${value}"
           }
 
           MANAGED_RELEASE="false"
@@ -113,6 +98,13 @@ jobs:
             DRY_RUN="false"
             SKIP_TESTS="false"
             NEXT_VERSION=""
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            RELEASE_VERSION="$(trim "${INPUT_RELEASE_VERSION}")"
+            DRY_RUN="${INPUT_DRY_RUN}"
+            SKIP_TESTS="${INPUT_SKIP_TESTS}"
+            NEXT_VERSION="$(trim "${INPUT_NEXT_VERSION}")"
+            TAG_NAME="v${RELEASE_VERSION}"
+            MANAGED_RELEASE="true"
           else
             CURRENT=$(grep -E '^version=' release.properties | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
             if [[ -z "${CURRENT}" || "${CURRENT}" != *-SNAPSHOT ]]; then
@@ -120,57 +112,30 @@ jobs:
               exit 1
             fi
             RELEASE_VERSION="${CURRENT%-SNAPSHOT}"
-            TAG_NAME="v${RELEASE_VERSION}"
-            MANAGED_RELEASE="true"
-
-            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-              EXACT_NEXT=$(python3 - <<'PY'
-          import os
-          print(os.environ.get('INPUT_EXACT_NEXT', '').strip())
-          PY
-              )
-              if [[ -n "$EXACT_NEXT" ]]; then
-                NEXT_VERSION="$EXACT_NEXT"
-              else
-                NEXT_VERSION=$(next_from_increment "${RELEASE_VERSION}" "${INPUT_NEXT_INCREMENT}")
-              fi
-              DRY_RUN="${INPUT_DRY_RUN}"
-              SKIP_TESTS="${INPUT_SKIP_TESTS}"
+            if [[ "${HEAD_COMMIT_MESSAGE}" =~ \[next=([0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT)\] ]]; then
+              NEXT_VERSION="${BASH_REMATCH[1]}"
             else
-              if [[ "${HEAD_COMMIT_MESSAGE}" =~ \[next=([0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT)\] ]]; then
-                NEXT_VERSION="${BASH_REMATCH[1]}"
-              else
-                NEXT_VERSION=""
-              fi
-              DRY_RUN="false"
-              SKIP_TESTS="false"
+              NEXT_VERSION=""
             fi
+            TAG_NAME="v${RELEASE_VERSION}"
+            DRY_RUN="false"
+            SKIP_TESTS="false"
+            MANAGED_RELEASE="true"
           fi
 
           if ! [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid repository release version: '${RELEASE_VERSION}' (expected X.Y.Z)"
+            echo "::error::Invalid version format: '${RELEASE_VERSION}' (expected X.Y.Z)"
             exit 1
           fi
 
           if [[ -z "${NEXT_VERSION}" ]]; then
-            NEXT_VERSION=$(next_from_increment "${RELEASE_VERSION}" patch)
+            IFS='.' read -r MAJOR MINOR PATCH <<< "${RELEASE_VERSION}"
+            NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
           fi
           if ! [[ "${NEXT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
             echo "::error::Invalid next development version: '${NEXT_VERSION}'"
             exit 1
           fi
-          RELEASE_VERSION="$RELEASE_VERSION" NEXT_VERSION="$NEXT_VERSION" python3 - <<'PY'
-          import os
-          release = tuple(map(int, os.environ['RELEASE_VERSION'].split('.')))
-          next_version = tuple(
-              map(int, os.environ['NEXT_VERSION'].removesuffix('-SNAPSHOT').split('.'))
-          )
-          if next_version <= release:
-              raise SystemExit(
-                  f"::error::Next development version {os.environ['NEXT_VERSION']} "
-                  f"must be newer than release {os.environ['RELEASE_VERSION']}"
-              )
-          PY
 
           MAJOR_MINOR="${RELEASE_VERSION%.*}"
           echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
@@ -180,19 +145,17 @@ jobs:
           echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
           echo "skip_tests=${SKIP_TESTS}" >> "$GITHUB_OUTPUT"
           echo "managed_release=${MANAGED_RELEASE}" >> "$GITHUB_OUTPUT"
-          echo "build_ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Inspect remote release state
         id: state
         env:
           TAG: ${{ steps.resolve.outputs.tag_name }}
-          RESOLVED_HEAD: ${{ steps.resolve.outputs.build_ref }}
         run: |
           set -euo pipefail
 
           TAG_EXISTS="false"
           GITHUB_RELEASE_EXISTS="false"
-          BUILD_REF="${RESOLVED_HEAD}"
+          BUILD_REF="${GITHUB_SHA}"
 
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
             TAG_EXISTS="true"
@@ -254,7 +217,7 @@ jobs:
             exit 1
           fi
           if [[ "${CURRENT%-SNAPSHOT}" != "${RELEASE_VERSION}" && "${DRY_RUN}" != "true" ]]; then
-            echo "::error::Derived release version does not match release.properties base version (${CURRENT%-SNAPSHOT})"
+            echo "::error::release_version must match release.properties base version (${CURRENT%-SNAPSHOT})"
             exit 1
           fi
 
@@ -296,19 +259,19 @@ jobs:
       artifact_name: ${{ steps.collect.outputs.artifact_name }}
     steps:
       - name: Checkout release source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ needs.preflight.outputs.build_ref }}
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
           java-version: '21'
           distribution: 'temurin'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.1.0
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
       - name: Gradle build
         run: |
@@ -337,7 +300,7 @@ jobs:
           echo "artifact_name=regelsuche-${{ needs.preflight.outputs.release_version }}-artifacts" >> "$GITHUB_OUTPUT"
 
       - name: Upload release artifacts (workflow run)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ steps.collect.outputs.artifact_name }}
           path: release-artifacts/**
@@ -353,14 +316,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main release controller
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: main
 
       - name: Download release artifacts
         if: needs.preflight.outputs.github_release_exists != 'true'
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ needs.build.outputs.artifact_name }}
           path: release-artifacts
@@ -452,7 +415,7 @@ jobs:
         if: >-
           needs.preflight.outputs.managed_release == 'true' &&
           needs.preflight.outputs.needs_next_pr == 'true'
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           branch: release/prepare-next-${{ needs.preflight.outputs.next_development_version }}
           base: main
