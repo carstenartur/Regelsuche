@@ -180,17 +180,19 @@ jobs:
           echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
           echo "skip_tests=${SKIP_TESTS}" >> "$GITHUB_OUTPUT"
           echo "managed_release=${MANAGED_RELEASE}" >> "$GITHUB_OUTPUT"
+          echo "build_ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Inspect remote release state
         id: state
         env:
           TAG: ${{ steps.resolve.outputs.tag_name }}
+          RESOLVED_HEAD: ${{ steps.resolve.outputs.build_ref }}
         run: |
           set -euo pipefail
 
           TAG_EXISTS="false"
           GITHUB_RELEASE_EXISTS="false"
-          BUILD_REF="${GITHUB_SHA}"
+          BUILD_REF="${RESOLVED_HEAD}"
 
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
             TAG_EXISTS="true"
