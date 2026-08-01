@@ -28,7 +28,7 @@
     "status": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
     "pathCorrectness": {"enum": ["CONFIRMED","REFUTED","MISSING_ASSUMPTION","UNSUPPORTED","NOT_EVALUATED"]},
     "nonNegative": {"type": "integer", "minimum": 0},
-    "work": {
+    "transformationWork": {
       "type": "object",
       "additionalProperties": false,
       "required": ["engineInvocations","programNodeVisits","sourceInvocations","sourceCandidates","composedCandidates","requirementEvaluations","requirementRejections","priorityCandidatesOrdered","prunedCandidates","repeatIterations","repeatEndpoints","alternativeSelections","alternativesSkipped","duplicateCandidatesDropped","totalWorkUnits"],
@@ -50,10 +50,30 @@
         "totalWorkUnits": {"$ref": "#/$defs/nonNegative"}
       }
     },
+    "searchWork": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exploredStates","expandedStates","generatedTransformations","enqueuedStates","duplicatePrunes","repeatedApplicationPrunes","sameExpressionPrunes","expansionBudgetPrunes","primitiveBudgetPrunes","candidateBudgetPrunes","statesWithoutTransformations","engineBatches","totalWorkUnits"],
+      "properties": {
+        "exploredStates": {"$ref": "#/$defs/nonNegative"},
+        "expandedStates": {"$ref": "#/$defs/nonNegative"},
+        "generatedTransformations": {"$ref": "#/$defs/nonNegative"},
+        "enqueuedStates": {"$ref": "#/$defs/nonNegative"},
+        "duplicatePrunes": {"$ref": "#/$defs/nonNegative"},
+        "repeatedApplicationPrunes": {"$ref": "#/$defs/nonNegative"},
+        "sameExpressionPrunes": {"$ref": "#/$defs/nonNegative"},
+        "expansionBudgetPrunes": {"$ref": "#/$defs/nonNegative"},
+        "primitiveBudgetPrunes": {"$ref": "#/$defs/nonNegative"},
+        "candidateBudgetPrunes": {"$ref": "#/$defs/nonNegative"},
+        "statesWithoutTransformations": {"$ref": "#/$defs/nonNegative"},
+        "engineBatches": {"$ref": "#/$defs/nonNegative"},
+        "totalWorkUnits": {"$ref": "#/$defs/nonNegative"}
+      }
+    },
     "case": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["caseId","familyId","baselineStatus","candidateStatus","baselineReached","candidateReached","baselinePathCorrectness","candidatePathCorrectness","baselinePathLength","candidatePathLength","baselinePrimitiveSteps","candidatePrimitiveSteps","baselineExploredStates","candidateExploredStates","baselineGeneratedTransformations","candidateGeneratedTransformations","baselineOuterSearchWorkUnits","candidateOuterSearchWorkUnits","baselinePathAuditCalls","candidatePathAuditCalls","baselineTotalWorkUnits","candidateTotalWorkUnits","baselineTransformationWork","candidateTransformationWork","programUsed","newlySolved","reachabilityRegression","correctnessFailure","correctnessRegression"],
+      "required": ["caseId","familyId","baselineStatus","candidateStatus","baselineReached","candidateReached","baselinePathCorrectness","candidatePathCorrectness","baselinePathLength","candidatePathLength","baselinePrimitiveSteps","candidatePrimitiveSteps","baselineExploredStates","candidateExploredStates","baselineGeneratedTransformations","candidateGeneratedTransformations","baselineOuterSearchWorkUnits","candidateOuterSearchWorkUnits","baselineOuterSearchWork","candidateOuterSearchWork","baselinePathAuditCalls","candidatePathAuditCalls","baselineTotalWorkUnits","candidateTotalWorkUnits","baselineTransformationWork","candidateTransformationWork","programUsed","newlySolved","reachabilityRegression","correctnessFailure","correctnessRegression"],
       "properties": {
         "caseId": {"$ref": "#/$defs/id"},
         "familyId": {"$ref": "#/$defs/id"},
@@ -73,12 +93,14 @@
         "candidateGeneratedTransformations": {"$ref": "#/$defs/nonNegative"},
         "baselineOuterSearchWorkUnits": {"$ref": "#/$defs/nonNegative"},
         "candidateOuterSearchWorkUnits": {"$ref": "#/$defs/nonNegative"},
+        "baselineOuterSearchWork": {"$ref": "#/$defs/searchWork"},
+        "candidateOuterSearchWork": {"$ref": "#/$defs/searchWork"},
         "baselinePathAuditCalls": {"$ref": "#/$defs/nonNegative"},
         "candidatePathAuditCalls": {"$ref": "#/$defs/nonNegative"},
         "baselineTotalWorkUnits": {"$ref": "#/$defs/nonNegative"},
         "candidateTotalWorkUnits": {"$ref": "#/$defs/nonNegative"},
-        "baselineTransformationWork": {"$ref": "#/$defs/work"},
-        "candidateTransformationWork": {"$ref": "#/$defs/work"},
+        "baselineTransformationWork": {"$ref": "#/$defs/transformationWork"},
+        "candidateTransformationWork": {"$ref": "#/$defs/transformationWork"},
         "programUsed": {"type": "boolean"},
         "newlySolved": {"type": "boolean"},
         "reachabilityRegression": {"type": "boolean"},
