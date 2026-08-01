@@ -114,6 +114,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
         String implementationClass
     ) {
         requireId(protocolId, "protocolId");
+        implementationClass = requireText(implementationClass, "implementationClass");
         String hash = EvolutionGenome.hash(render(
             protocolId,
             evaluatorProfile,
