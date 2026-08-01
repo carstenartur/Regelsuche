@@ -12,6 +12,7 @@ import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Budget
 import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Problem;
 import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Result;
 import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.State;
+import de.regelsuche.search.strategy.SearchWorkMetrics;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.MeasuredTransformationEngine;
 import de.regelsuche.transform.MeasuredTransformationEngines;
@@ -95,6 +96,40 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
         Objects.requireNonNull(candidate, "candidate");
         EvolutionGenome genome = candidate.genome();
         List<String> blockers = new ArrayList<>();
+        addStaticBlockers(genome, blockers);
+
+        EvolutionGenomeCompiler.CompiledProgram flatGenome;
+        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiledProgram;
+        try {
+            flatGenome = genomeCompiler.compile(genome);
+            compiledProgram = programCompiler.compile(genome, candidate.plan());
+        } catch (RuntimeException exception) {
+            blockers.add("CANDIDATE_COMPILATION_FAILED:"
+                + stableFailure(exception));
+            return EvolutionRewriteProgramTrainFitnessEvidence.create(
+                suite, candidate, List.of(), zeroComponents(), blockers);
+        }
+
+        EnginePair engines = engines(genome, flatGenome, compiledProgram);
+        Budget budget = effectiveBudget(genome);
+        List<CaseMeasurement> measurements = evaluateCases(
+            suite.cases(), budget, engines, blockers);
+        addCaseBlockers(measurements, blockers);
+
+        Map<FitnessComponent, Integer> components = components(
+            candidate, measurements);
+        addUnsupportedComponentBlockers(components, blockers);
+        components.keySet().removeIf(
+            component -> !requiredComponents.contains(component));
+
+        return EvolutionRewriteProgramTrainFitnessEvidence.create(
+            suite, candidate, measurements, components, blockers);
+    }
+
+    private void addStaticBlockers(
+        EvolutionGenome genome,
+        List<String> blockers
+    ) {
         if (genome.trainingScope().sourceSplit()
                 != EvolutionGenome.SourceSplit.TRAIN) {
             blockers.add("FITNESS_SOURCE_IS_NOT_TRAIN");
@@ -110,19 +145,13 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             blockers.add(
                 "SUITE_CANDIDATE_BOUND_NARROWER_THAN_GENOME_AND_PROGRAM_SOURCES");
         }
+    }
 
-        EvolutionGenomeCompiler.CompiledProgram flatGenome;
-        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiledProgram;
-        try {
-            flatGenome = genomeCompiler.compile(genome);
-            compiledProgram = programCompiler.compile(genome, candidate.plan());
-        } catch (RuntimeException exception) {
-            blockers.add("CANDIDATE_COMPILATION_FAILED:"
-                + stableFailure(exception));
-            return EvolutionRewriteProgramTrainFitnessEvidence.create(
-                suite, candidate, List.of(), zeroComponents(), blockers);
-        }
-
+    private EnginePair engines(
+        EvolutionGenome genome,
+        EvolutionGenomeCompiler.CompiledProgram flatGenome,
+        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiledProgram
+    ) {
         int sourceCandidateLimit = Math.min(
             suite.primitiveWorkBudget().maxCandidatesPerState(),
             genome.budget().maxCandidatesPerState());
@@ -138,33 +167,43 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
                     flatGenome.rules(),
                     genome.budget().maxAstGrowthPerStep(),
                     sourceCandidateLimit));
-        MeasuredTransformationEngine baseline =
+        return new EnginePair(
             MeasuredTransformationEngines.union(
                 ordinary,
-                flatGenomeRules);
-        MeasuredTransformationEngine candidateEngine =
+                flatGenomeRules),
             MeasuredTransformationEngines.union(
                 ordinary,
                 flatGenomeRules,
-                compiledProgram.engine());
-        Budget budget = effectiveBudget(genome);
+                compiledProgram.engine()));
+    }
 
+    private List<CaseMeasurement> evaluateCases(
+        List<EvolutionRewriteProgramTrainSuite.TrainCase> cases,
+        Budget budget,
+        EnginePair engines,
+        List<String> blockers
+    ) {
         List<CaseMeasurement> measurements = new ArrayList<>();
-        for (EvolutionRewriteProgramTrainSuite.TrainCase trainCase
-                : suite.cases()) {
+        for (EvolutionRewriteProgramTrainSuite.TrainCase trainCase : cases) {
             try {
                 measurements.add(evaluateCase(
-                    trainCase, budget, baseline, candidateEngine));
+                    trainCase,
+                    budget,
+                    engines.baseline(),
+                    engines.candidate()));
             } catch (RuntimeException exception) {
                 blockers.add("TRAIN_CASE_EVALUATION_FAILED:"
                     + trainCase.caseId() + ":" + stableFailure(exception));
                 measurements.add(failedMeasurement(trainCase));
             }
         }
-        addCaseBlockers(measurements, blockers);
+        return List.copyOf(measurements);
+    }
 
-        Map<FitnessComponent, Integer> components = components(
-            candidate, measurements);
+    private void addUnsupportedComponentBlockers(
+        Map<FitnessComponent, Integer> components,
+        List<String> blockers
+    ) {
         requiredComponents.stream()
             .filter(component -> !SUPPORTED_COMPONENTS.contains(component))
             .sorted(Comparator.comparing(Enum::name))
@@ -173,11 +212,6 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
                 blockers.add("UNSUPPORTED_PROGRAM_TRAIN_FITNESS_COMPONENT:"
                     + component);
             });
-        components.keySet().removeIf(
-            component -> !requiredComponents.contains(component));
-
-        return EvolutionRewriteProgramTrainFitnessEvidence.create(
-            suite, candidate, measurements, components, blockers);
     }
 
     private CaseMeasurement evaluateCase(
@@ -198,6 +232,8 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             budget);
         PathAudit baselineAudit = auditPath(baseline, trainCase.assumptions());
         PathAudit candidateAudit = auditPath(candidate, trainCase.assumptions());
+        SearchWorkMetrics baselineSearchWork = searchWork(baseline);
+        SearchWorkMetrics candidateSearchWork = searchWork(candidate);
         boolean programUsed = candidate.reached()
             && candidate.reachedState().programUsed();
         boolean newlySolved = !baseline.reached()
@@ -229,8 +265,10 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             candidate.metrics().exploredStates(),
             baseline.metrics().generatedTransformations(),
             candidate.metrics().generatedTransformations(),
-            outerSearchWorkUnits(baseline),
-            outerSearchWorkUnits(candidate),
+            baselineSearchWork.totalWorkUnits(),
+            candidateSearchWork.totalWorkUnits(),
+            baselineSearchWork,
+            candidateSearchWork,
             baselineAudit.auditCalls(),
             candidateAudit.auditCalls(),
             baseline.metrics().transformationWork(),
@@ -269,12 +307,7 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             AssumptionAwareEquivalenceService.Evaluation evaluation =
                 equivalence.evaluate(
                     path.get(index), path.get(index + 1), declaredAssumptions);
-            PathCorrectness correctness = switch (evaluation.status()) {
-                case CONFIRMED -> PathCorrectness.CONFIRMED;
-                case REFUTED -> PathCorrectness.REFUTED;
-                case MISSING_ASSUMPTION -> PathCorrectness.MISSING_ASSUMPTION;
-                case UNSUPPORTED -> PathCorrectness.UNSUPPORTED;
-            };
+            PathCorrectness correctness = pathCorrectness(evaluation.status());
             if (correctness != PathCorrectness.CONFIRMED) {
                 return new PathAudit(
                     correctness,
@@ -286,6 +319,34 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             PathCorrectness.CONFIRMED,
             reached.primitiveDepth(),
             auditCalls);
+    }
+
+    private static PathCorrectness pathCorrectness(
+        AssumptionAwareEquivalenceService.Status status
+    ) {
+        return switch (status) {
+            case CONFIRMED -> PathCorrectness.CONFIRMED;
+            case REFUTED -> PathCorrectness.REFUTED;
+            case MISSING_ASSUMPTION -> PathCorrectness.MISSING_ASSUMPTION;
+            case UNSUPPORTED -> PathCorrectness.UNSUPPORTED;
+        };
+    }
+
+    private static SearchWorkMetrics searchWork(Result result) {
+        var metrics = result.metrics();
+        return new SearchWorkMetrics(
+            metrics.exploredStates(),
+            metrics.expandedStates(),
+            metrics.generatedTransformations(),
+            metrics.enqueuedStates(),
+            metrics.duplicatePrunes(),
+            metrics.repeatedApplicationPrunes(),
+            metrics.sameExpressionPrunes(),
+            metrics.expansionBudgetPrunes(),
+            metrics.primitiveBudgetPrunes(),
+            metrics.candidateBudgetPrunes(),
+            metrics.statesWithoutTransformations(),
+            metrics.engineBatches());
     }
 
     private static void addCaseBlockers(
@@ -463,6 +524,8 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             0,
             0,
             0,
+            SearchWorkMetrics.ZERO,
+            SearchWorkMetrics.ZERO,
             0,
             0,
             TransformationWorkMetrics.ZERO,
@@ -494,23 +557,6 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
         return result.reachedState() == null
             ? -1
             : result.reachedState().edgeDepth();
-    }
-
-    private static long outerSearchWorkUnits(Result result) {
-        var metrics = result.metrics();
-        long total = 0;
-        total = add(total, metrics.exploredStates());
-        total = add(total, metrics.expandedStates());
-        total = add(total, metrics.generatedTransformations());
-        total = add(total, metrics.enqueuedStates());
-        total = add(total, metrics.duplicatePrunes());
-        total = add(total, metrics.repeatedApplicationPrunes());
-        total = add(total, metrics.sameExpressionPrunes());
-        total = add(total, metrics.expansionBudgetPrunes());
-        total = add(total, metrics.primitiveBudgetPrunes());
-        total = add(total, metrics.candidateBudgetPrunes());
-        total = add(total, metrics.statesWithoutTransformations());
-        return add(total, metrics.engineBatches());
     }
 
     private static int inverseBudgetScore(long used, long budget) {
@@ -551,6 +597,12 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             + (message == null || message.isBlank()
                 ? ""
                 : ":" + message.replaceAll("\\s+", " ").trim());
+    }
+
+    private record EnginePair(
+        MeasuredTransformationEngine baseline,
+        MeasuredTransformationEngine candidate
+    ) {
     }
 
     private record PathAudit(
