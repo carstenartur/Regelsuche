@@ -123,12 +123,59 @@ def verifyIndependentInterestingnessReview = tasks.register(
     }
 }
 
+def rewriteProgramWorkOutput = layout.buildDirectory.dir(
+    'reports/rewrite-program-work-evidence')
+def rewriteProgramWorkVerifier = rootProject.file(
+    'scripts/verify-rewrite-program-work-evidence.py')
+def rewriteProgramWorkSchemas = [
+    'regelsuche-evolution-rewrite-program-candidate-v1.schema.json',
+    'regelsuche-evolution-rewrite-program-evaluation-protocol-v1.schema.json',
+    'regelsuche-evolution-rewrite-program-train-fitness-v1.schema.json',
+    'regelsuche-evolution-rewrite-program-train-suite-v1.schema.json'
+].collect { name -> rootProject.file("docs/schemas/${name}") }
+
+def writeRewriteProgramWorkEvidence = tasks.register(
+    'writeRewriteProgramWorkEvidence',
+    JavaExec
+) {
+    group = 'verification'
+    description = 'Writes deterministic runtime evidence for independent work-ledger verification.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'de.regelsuche.evolution.RewriteProgramWorkEvidenceFixtureWriter'
+    args rewriteProgramWorkOutput.get().asFile.absolutePath
+    outputs.dir rewriteProgramWorkOutput
+}
+
+def verifyRewriteProgramWorkEvidence = tasks.register(
+    'verifyRewriteProgramWorkEvidence',
+    Exec
+) {
+    group = 'verification'
+    description = 'Independently validates hashes, schemas and all rewrite-program work aggregates.'
+    dependsOn rootProject.tasks.named('prepareVerificationEnvironment'),
+        writeRewriteProgramWorkEvidence
+    workingDir rootProject.rootDir
+    inputs.file(rewriteProgramWorkVerifier)
+    inputs.files(rewriteProgramWorkSchemas)
+    inputs.dir(rewriteProgramWorkOutput)
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            rewriteProgramWorkVerifier.absolutePath,
+            '--root', rewriteProgramWorkOutput.get().asFile.absolutePath,
+            '--schemas', independentReviewSchemasPath
+    }
+}
+
 tasks.named('check') {
     dependsOn verifyEvolutionStudyContracts,
-        verifyIndependentInterestingnessReview
+        verifyIndependentInterestingnessReview,
+        verifyRewriteProgramWorkEvidence
 }
 
 rootProject.tasks.named('check') {
     dependsOn verifyEvolutionStudyContracts,
-        verifyIndependentInterestingnessReview
+        verifyIndependentInterestingnessReview,
+        verifyRewriteProgramWorkEvidence
 }
