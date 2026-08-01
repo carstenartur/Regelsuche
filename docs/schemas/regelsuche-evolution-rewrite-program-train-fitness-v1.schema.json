@@ -53,7 +53,7 @@
     "case": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["caseId","familyId","baselineStatus","candidateStatus","baselineReached","candidateReached","baselinePathCorrectness","candidatePathCorrectness","baselinePathLength","candidatePathLength","baselinePrimitiveSteps","candidatePrimitiveSteps","baselineExploredStates","candidateExploredStates","baselineGeneratedTransformations","candidateGeneratedTransformations","baselineTotalWorkUnits","candidateTotalWorkUnits","baselineTransformationWork","candidateTransformationWork","programUsed","newlySolved","reachabilityRegression","correctnessFailure","correctnessRegression"],
+      "required": ["caseId","familyId","baselineStatus","candidateStatus","baselineReached","candidateReached","baselinePathCorrectness","candidatePathCorrectness","baselinePathLength","candidatePathLength","baselinePrimitiveSteps","candidatePrimitiveSteps","baselineExploredStates","candidateExploredStates","baselineGeneratedTransformations","candidateGeneratedTransformations","baselineOuterSearchWorkUnits","candidateOuterSearchWorkUnits","baselinePathAuditCalls","candidatePathAuditCalls","baselineTotalWorkUnits","candidateTotalWorkUnits","baselineTransformationWork","candidateTransformationWork","programUsed","newlySolved","reachabilityRegression","correctnessFailure","correctnessRegression"],
       "properties": {
         "caseId": {"$ref": "#/$defs/id"},
         "familyId": {"$ref": "#/$defs/id"},
@@ -71,6 +71,10 @@
         "candidateExploredStates": {"$ref": "#/$defs/nonNegative"},
         "baselineGeneratedTransformations": {"$ref": "#/$defs/nonNegative"},
         "candidateGeneratedTransformations": {"$ref": "#/$defs/nonNegative"},
+        "baselineOuterSearchWorkUnits": {"$ref": "#/$defs/nonNegative"},
+        "candidateOuterSearchWorkUnits": {"$ref": "#/$defs/nonNegative"},
+        "baselinePathAuditCalls": {"$ref": "#/$defs/nonNegative"},
+        "candidatePathAuditCalls": {"$ref": "#/$defs/nonNegative"},
         "baselineTotalWorkUnits": {"$ref": "#/$defs/nonNegative"},
         "candidateTotalWorkUnits": {"$ref": "#/$defs/nonNegative"},
         "baselineTransformationWork": {"$ref": "#/$defs/work"},
