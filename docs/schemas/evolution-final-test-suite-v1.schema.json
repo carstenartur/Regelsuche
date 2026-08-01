@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/evolution-final-test-suite-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyPlanHash",
+    "splitManifestHash",
+    "baselineProfileHash",
+    "evaluationSplit",
+    "cases",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-final-test-suite/v1"
+    },
+    "studyPlanHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "splitManifestHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "baselineProfileHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluationSplit": {
+      "const": "FINAL_TEST"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "family",
+        "caseMaterialHash"
+      ],
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/text"
+        },
+        "family": {
+          "$ref": "#/$defs/text"
+        },
+        "caseMaterialHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
