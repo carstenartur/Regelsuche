@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TransformationWorkMetrics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">TransformationWorkMetrics.java</span></div><h1>TransformationWorkMetrics.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+/**
+ * Deterministic work ledger for producing one batch of transformations.
+ *
+ * &lt;p&gt;The fields are deliberately mechanical rather than wall-clock based. They
+ * can be summed across engines and search states and are therefore suitable for
+ * information-parity evaluation and reproducible budget enforcement.&lt;/p&gt;
+ */
+public record TransformationWorkMetrics(
+    long engineInvocations,
+    long programNodeVisits,
+    long sourceInvocations,
+    long sourceCandidates,
+    long composedCandidates,
+    long requirementEvaluations,
+    long requirementRejections,
+    long priorityCandidatesOrdered,
+    long prunedCandidates,
+    long repeatIterations,
+    long repeatEndpoints,
+    long alternativeSelections,
+    long alternativesSkipped,
+    long duplicateCandidatesDropped
+) {
+<span class="nc" id="L26">    public static final TransformationWorkMetrics ZERO =</span>
+        new TransformationWorkMetrics(
+            0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0);
+
+<span class="nc" id="L31">    public TransformationWorkMetrics {</span>
+<span class="nc" id="L32">        requireNonNegative(engineInvocations, &quot;engineInvocations&quot;);</span>
+<span class="nc" id="L33">        requireNonNegative(programNodeVisits, &quot;programNodeVisits&quot;);</span>
+<span class="nc" id="L34">        requireNonNegative(sourceInvocations, &quot;sourceInvocations&quot;);</span>
+<span class="nc" id="L35">        requireNonNegative(sourceCandidates, &quot;sourceCandidates&quot;);</span>
+<span class="nc" id="L36">        requireNonNegative(composedCandidates, &quot;composedCandidates&quot;);</span>
+<span class="nc" id="L37">        requireNonNegative(requirementEvaluations, &quot;requirementEvaluations&quot;);</span>
+<span class="nc" id="L38">        requireNonNegative(requirementRejections, &quot;requirementRejections&quot;);</span>
+<span class="nc" id="L39">        requireNonNegative(</span>
+            priorityCandidatesOrdered, &quot;priorityCandidatesOrdered&quot;);
+<span class="nc" id="L41">        requireNonNegative(prunedCandidates, &quot;prunedCandidates&quot;);</span>
+<span class="nc" id="L42">        requireNonNegative(repeatIterations, &quot;repeatIterations&quot;);</span>
+<span class="nc" id="L43">        requireNonNegative(repeatEndpoints, &quot;repeatEndpoints&quot;);</span>
+<span class="nc" id="L44">        requireNonNegative(alternativeSelections, &quot;alternativeSelections&quot;);</span>
+<span class="nc" id="L45">        requireNonNegative(alternativesSkipped, &quot;alternativesSkipped&quot;);</span>
+<span class="nc" id="L46">        requireNonNegative(</span>
+            duplicateCandidatesDropped, &quot;duplicateCandidatesDropped&quot;);
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (requirementRejections &gt; requirementEvaluations) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(</span>
+                &quot;requirementRejections must not exceed requirementEvaluations&quot;);
+        }
+<span class="nc" id="L52">    }</span>
+
+    /** Work accounting for one ordinary, non-program engine invocation. */
+    public static TransformationWorkMetrics flatEngine(int candidates) {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (candidates &lt; 0) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;candidates must not be negative&quot;);</span>
+        }
+<span class="nc" id="L59">        return new TransformationWorkMetrics(</span>
+            1,
+            0,
+            1,
+            candidates,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0);
+    }
+
+    public TransformationWorkMetrics plus(TransformationWorkMetrics other) {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (other == null) {</span>
+<span class="nc" id="L78">            return this;</span>
+        }
+<span class="nc" id="L80">        return new TransformationWorkMetrics(</span>
+<span class="nc" id="L81">            add(engineInvocations, other.engineInvocations),</span>
+<span class="nc" id="L82">            add(programNodeVisits, other.programNodeVisits),</span>
+<span class="nc" id="L83">            add(sourceInvocations, other.sourceInvocations),</span>
+<span class="nc" id="L84">            add(sourceCandidates, other.sourceCandidates),</span>
+<span class="nc" id="L85">            add(composedCandidates, other.composedCandidates),</span>
+<span class="nc" id="L86">            add(requirementEvaluations, other.requirementEvaluations),</span>
+<span class="nc" id="L87">            add(requirementRejections, other.requirementRejections),</span>
+<span class="nc" id="L88">            add(priorityCandidatesOrdered, other.priorityCandidatesOrdered),</span>
+<span class="nc" id="L89">            add(prunedCandidates, other.prunedCandidates),</span>
+<span class="nc" id="L90">            add(repeatIterations, other.repeatIterations),</span>
+<span class="nc" id="L91">            add(repeatEndpoints, other.repeatEndpoints),</span>
+<span class="nc" id="L92">            add(alternativeSelections, other.alternativeSelections),</span>
+<span class="nc" id="L93">            add(alternativesSkipped, other.alternativesSkipped),</span>
+<span class="nc" id="L94">            add(duplicateCandidatesDropped, other.duplicateCandidatesDropped));</span>
+    }
+
+    public TransformationWorkMetrics withDuplicateCandidatesDropped(
+        long additional
+    ) {
+<span class="nc" id="L100">        requireNonNegative(additional, &quot;additional&quot;);</span>
+<span class="nc" id="L101">        return new TransformationWorkMetrics(</span>
+            engineInvocations,
+            programNodeVisits,
+            sourceInvocations,
+            sourceCandidates,
+            composedCandidates,
+            requirementEvaluations,
+            requirementRejections,
+            priorityCandidatesOrdered,
+            prunedCandidates,
+            repeatIterations,
+            repeatEndpoints,
+            alternativeSelections,
+            alternativesSkipped,
+<span class="nc" id="L115">            add(duplicateCandidatesDropped, additional));</span>
+    }
+
+    /**
+     * Frozen v1 scalar work formula. Every retained mechanical event contributes
+     * one unit. Individual fields remain authoritative for later analysis.
+     */
+    public long totalWorkUnits() {
+<span class="nc" id="L123">        long total = 0;</span>
+<span class="nc" id="L124">        total = add(total, engineInvocations);</span>
+<span class="nc" id="L125">        total = add(total, programNodeVisits);</span>
+<span class="nc" id="L126">        total = add(total, sourceInvocations);</span>
+<span class="nc" id="L127">        total = add(total, sourceCandidates);</span>
+<span class="nc" id="L128">        total = add(total, composedCandidates);</span>
+<span class="nc" id="L129">        total = add(total, requirementEvaluations);</span>
+<span class="nc" id="L130">        total = add(total, requirementRejections);</span>
+<span class="nc" id="L131">        total = add(total, priorityCandidatesOrdered);</span>
+<span class="nc" id="L132">        total = add(total, prunedCandidates);</span>
+<span class="nc" id="L133">        total = add(total, repeatIterations);</span>
+<span class="nc" id="L134">        total = add(total, repeatEndpoints);</span>
+<span class="nc" id="L135">        total = add(total, alternativeSelections);</span>
+<span class="nc" id="L136">        total = add(total, alternativesSkipped);</span>
+<span class="nc" id="L137">        return add(total, duplicateCandidatesDropped);</span>
+    }
+
+    private static long add(long left, long right) {
+        try {
+<span class="nc" id="L142">            return Math.addExact(left, right);</span>
+<span class="nc" id="L143">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L144">            return Long.MAX_VALUE;</span>
+        }
+    }
+
+    private static void requireNonNegative(long value, String name) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (value &lt; 0) {</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(name + &quot; must not be negative&quot;);</span>
+        }
+<span class="nc" id="L152">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -13,11 +13,19 @@ public record Transformation(
     String applicationKey,
     List&lt;String&gt; assumptions,
     String packId,
-    String license
+    String license,
+    List&lt;String&gt; primitiveRuleIds
 ) {
     public Transformation(String rule, String transformedExpression) {
-<span class="nc" id="L19">        this(rule, transformedExpression, RewriteKind.NORMALIZE, false, 0, true, rule + &quot;:&quot; + transformedExpression);</span>
-<span class="nc" id="L20">    }</span>
+<span class="nc" id="L20">        this(</span>
+            rule,
+            transformedExpression,
+            RewriteKind.NORMALIZE,
+            false,
+            0,
+            true,
+            rule + &quot;:&quot; + transformedExpression);
+<span class="nc" id="L28">    }</span>
 
     public Transformation(
         String rule,
@@ -28,9 +36,16 @@ public record Transformation(
         boolean equivalencePreservingByConstruction,
         String applicationKey
     ) {
-<span class="fc" id="L31">        this(rule, transformedExpression, kind, mayIncreaseComplexity, estimatedCostDelta,</span>
-<span class="fc" id="L32">            equivalencePreservingByConstruction, applicationKey, List.of());</span>
-<span class="fc" id="L33">    }</span>
+<span class="fc" id="L39">        this(</span>
+            rule,
+            transformedExpression,
+            kind,
+            mayIncreaseComplexity,
+            estimatedCostDelta,
+            equivalencePreservingByConstruction,
+            applicationKey,
+<span class="fc" id="L47">            List.of());</span>
+<span class="fc" id="L48">    }</span>
 
     public Transformation(
         String rule,
@@ -42,18 +57,79 @@ public record Transformation(
         String applicationKey,
         List&lt;String&gt; assumptions
     ) {
-<span class="fc" id="L45">        this(rule, transformedExpression, kind, mayIncreaseComplexity, estimatedCostDelta,</span>
-            equivalencePreservingByConstruction, applicationKey, assumptions, &quot;core&quot;, &quot;PROJECT&quot;);
-<span class="fc" id="L47">    }</span>
+<span class="fc" id="L60">        this(</span>
+            rule,
+            transformedExpression,
+            kind,
+            mayIncreaseComplexity,
+            estimatedCostDelta,
+            equivalencePreservingByConstruction,
+            applicationKey,
+            assumptions,
+            &quot;core&quot;,
+            &quot;PROJECT&quot;);
+<span class="fc" id="L71">    }</span>
 
-<span class="fc" id="L49">    public Transformation {</span>
-<span class="pc bpc" id="L50" title="6 of 12 branches missed.">        if (rule == null || rule.isBlank() || transformedExpression == null || transformedExpression.isBlank()</span>
-<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            || kind == null || applicationKey == null || applicationKey.isBlank()) {</span>
-<span class="nc" id="L52">            throw new IllegalArgumentException(&quot;rule, kind, applicationKey and transformedExpression must not be blank&quot;);</span>
+    /** Compatibility constructor: one ordinary transformation is one primitive. */
+    public Transformation(
+        String rule,
+        String transformedExpression,
+        RewriteKind kind,
+        boolean mayIncreaseComplexity,
+        int estimatedCostDelta,
+        boolean equivalencePreservingByConstruction,
+        String applicationKey,
+        List&lt;String&gt; assumptions,
+        String packId,
+        String license
+    ) {
+<span class="fc" id="L86">        this(</span>
+            rule,
+            transformedExpression,
+            kind,
+            mayIncreaseComplexity,
+            estimatedCostDelta,
+            equivalencePreservingByConstruction,
+            applicationKey,
+            assumptions,
+            packId,
+            license,
+<span class="fc" id="L97">            List.of(rule));</span>
+<span class="fc" id="L98">    }</span>
+
+<span class="fc" id="L100">    public Transformation {</span>
+<span class="pc bpc" id="L101" title="3 of 6 branches missed.">        if (rule == null || rule.isBlank()</span>
+                || transformedExpression == null
+<span class="pc bpc" id="L103" title="3 of 6 branches missed.">                || transformedExpression.isBlank()</span>
+                || kind == null
+                || applicationKey == null
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                || applicationKey.isBlank()) {</span>
+<span class="nc" id="L107">            throw new IllegalArgumentException(</span>
+                &quot;rule, kind, applicationKey and transformedExpression &quot;
+                    + &quot;must not be blank&quot;);
         }
-<span class="fc" id="L54">        assumptions = AssumptionSignature.ofExpressions(assumptions).normalizedAssumptions();</span>
-<span class="pc bpc" id="L55" title="2 of 4 branches missed.">        packId = packId == null || packId.isBlank() ? &quot;core&quot; : packId;</span>
-<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        license = license == null || license.isBlank() ? &quot;PROJECT&quot; : license;</span>
-<span class="fc" id="L57">    }</span>
+<span class="fc" id="L111">        assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L112">            .normalizedAssumptions();</span>
+<span class="pc bpc" id="L113" title="2 of 4 branches missed.">        packId = packId == null || packId.isBlank() ? &quot;core&quot; : packId;</span>
+<span class="pc bpc" id="L114" title="2 of 4 branches missed.">        license = license == null || license.isBlank() ? &quot;PROJECT&quot; : license;</span>
+<span class="pc bpc" id="L115" title="1 of 4 branches missed.">        if (primitiveRuleIds == null || primitiveRuleIds.isEmpty()) {</span>
+<span class="fc" id="L116">            throw new IllegalArgumentException(</span>
+                &quot;primitiveRuleIds must contain at least one retained step&quot;);
+        }
+<span class="fc" id="L119">        primitiveRuleIds = primitiveRuleIds.stream()</span>
+<span class="fc" id="L120">            .map(value -&gt; {</span>
+<span class="pc bpc" id="L121" title="1 of 4 branches missed.">                if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L122">                    throw new IllegalArgumentException(</span>
+                        &quot;primitive rule IDs must not be blank&quot;);
+                }
+<span class="fc" id="L125">                return value.trim();</span>
+            })
+<span class="fc" id="L127">            .toList();</span>
+<span class="fc" id="L128">    }</span>
+
+    /** Number of actual primitive rewrites represented by this search edge. */
+    public int primitiveStepCount() {
+<span class="fc" id="L132">        return primitiveRuleIds.size();</span>
+    }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

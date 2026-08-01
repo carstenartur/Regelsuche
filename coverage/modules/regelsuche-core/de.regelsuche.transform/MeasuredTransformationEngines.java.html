@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MeasuredTransformationEngines.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">MeasuredTransformationEngines.java</span></div><h1>MeasuredTransformationEngines.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Objects;
+
+/** Factories for deterministic, work-accounted transformation engines. */
+public final class MeasuredTransformationEngines {
+<span class="nc" id="L12">    private static final Comparator&lt;Transformation&gt; ORDER = Comparator</span>
+<span class="nc" id="L13">        .comparing(Transformation::rule)</span>
+<span class="nc" id="L14">        .thenComparing(Transformation::transformedExpression)</span>
+<span class="nc" id="L15">        .thenComparing(Transformation::applicationKey);</span>
+
+    private MeasuredTransformationEngines() {
+    }
+
+    /** Wrap an ordinary engine with one invocation plus candidate accounting. */
+    public static MeasuredTransformationEngine counting(
+        TransformationEngine engine
+    ) {
+<span class="nc" id="L24">        Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="nc bnc" id="L25" title="All 2 branches missed.">        if (engine instanceof MeasuredTransformationEngine measured) {</span>
+<span class="nc" id="L26">            return measured;</span>
+        }
+<span class="nc" id="L28">        return expression -&gt; {</span>
+<span class="nc" id="L29">            List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
+<span class="nc" id="L30">                Objects.requireNonNull(</span>
+<span class="nc" id="L31">                    engine.transform(expression),</span>
+                    &quot;TransformationEngine.transform must not return null&quot;));
+<span class="nc" id="L33">            transformations.forEach(value -&gt;</span>
+<span class="nc" id="L34">                Objects.requireNonNull(value, &quot;transformation&quot;));</span>
+<span class="nc" id="L35">            transformations.sort(ORDER);</span>
+<span class="nc" id="L36">            return new TransformationBatch(</span>
+                transformations,
+<span class="nc" id="L38">                TransformationWorkMetrics.flatEngine(transformations.size()));</span>
+        };
+    }
+
+    /**
+     * Invoke every child exactly once, sum all work and deterministically remove
+     * duplicate output transformations.
+     */
+    public static MeasuredTransformationEngine union(
+        TransformationEngine... engines
+    ) {
+<span class="nc" id="L49">        Objects.requireNonNull(engines, &quot;engines&quot;);</span>
+<span class="nc" id="L50">        List&lt;MeasuredTransformationEngine&gt; measured = Arrays.stream(engines)</span>
+<span class="nc" id="L51">            .map(value -&gt; counting(Objects.requireNonNull(value, &quot;engine&quot;)))</span>
+<span class="nc" id="L52">            .toList();</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (measured.isEmpty()) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;at least one engine is required&quot;);</span>
+        }
+<span class="nc" id="L56">        return expression -&gt; {</span>
+<span class="nc" id="L57">            List&lt;Transformation&gt; combined = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L58">            TransformationWorkMetrics work = TransformationWorkMetrics.ZERO;</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">            for (MeasuredTransformationEngine engine : measured) {</span>
+<span class="nc" id="L60">                TransformationBatch batch = engine.transformMeasured(expression);</span>
+<span class="nc" id="L61">                combined.addAll(batch.transformations());</span>
+<span class="nc" id="L62">                work = work.plus(batch.workMetrics());</span>
+<span class="nc" id="L63">            }</span>
+<span class="nc" id="L64">            combined.sort(ORDER);</span>
+<span class="nc" id="L65">            LinkedHashMap&lt;String, Transformation&gt; distinct =</span>
+                new LinkedHashMap&lt;&gt;();
+<span class="nc bnc" id="L67" title="All 2 branches missed.">            for (Transformation transformation : combined) {</span>
+<span class="nc" id="L68">                distinct.putIfAbsent(key(transformation), transformation);</span>
+<span class="nc" id="L69">            }</span>
+<span class="nc" id="L70">            long removed = combined.size() - distinct.size();</span>
+<span class="nc" id="L71">            return new TransformationBatch(</span>
+<span class="nc" id="L72">                List.copyOf(distinct.values()),</span>
+<span class="nc" id="L73">                work.withDuplicateCandidatesDropped(removed));</span>
+        };
+    }
+
+    private static String key(Transformation transformation) {
+<span class="nc" id="L78">        return transformation.rule() + &quot;\u0000&quot;</span>
+<span class="nc" id="L79">            + transformation.transformedExpression() + &quot;\u0000&quot;</span>
+<span class="nc" id="L80">            + transformation.applicationKey() + &quot;\u0000&quot;</span>
+<span class="nc" id="L81">            + transformation.primitiveRuleIds();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

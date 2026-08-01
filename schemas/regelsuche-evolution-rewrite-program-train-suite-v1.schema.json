@@ -11,6 +11,7 @@
     "evaluatorProfile",
     "cases",
     "heuristic",
+    "primitiveWorkBudget",
     "contentHash"
   ],
   "properties": {
@@ -36,6 +37,9 @@
     },
     "heuristic": {
       "$ref": "#/$defs/heuristic"
+    },
+    "primitiveWorkBudget": {
+      "$ref": "#/$defs/primitiveWorkBudget"
     },
     "contentHash": {
       "$ref": "#/$defs/sha256"
@@ -120,6 +124,39 @@
           "minimum": 1
         },
         "beamWidth": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "primitiveWorkBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxPrimitiveSteps",
+        "maxExploredStates",
+        "maxCandidatesPerState",
+        "maxExpandingSteps",
+        "maxWorkUnits"
+      ],
+      "properties": {
+        "maxPrimitiveSteps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxExploredStates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxCandidatesPerState": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxExpandingSteps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxWorkUnits": {
           "type": "integer",
           "minimum": 1
         }

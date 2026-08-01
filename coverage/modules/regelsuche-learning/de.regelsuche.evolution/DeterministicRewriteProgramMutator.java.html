@@ -411,17 +411,17 @@ public final class DeterministicRewriteProgramMutator {
 <span class="nc" id="L411">                replaceChildren(</span>
 <span class="nc" id="L412">                    firstApplicable.alternatives(), targetNodeId, mutation));</span>
         }
-<span class="pc bpc" id="L414" title="1 of 2 branches missed.">        if (current instanceof Sequence sequence) {</span>
-<span class="nc" id="L415">            return new Sequence(</span>
-<span class="nc" id="L416">                sequence.nodeId(),</span>
-<span class="nc" id="L417">                replaceChildren(sequence.steps(), targetNodeId, mutation));</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        if (current instanceof Sequence sequence) {</span>
+<span class="fc" id="L415">            return new Sequence(</span>
+<span class="fc" id="L416">                sequence.nodeId(),</span>
+<span class="fc" id="L417">                replaceChildren(sequence.steps(), targetNodeId, mutation));</span>
         }
-<span class="fc bfc" id="L419" title="All 2 branches covered.">        if (current instanceof Repeat repeat) {</span>
-<span class="fc" id="L420">            return new Repeat(</span>
-<span class="fc" id="L421">                repeat.nodeId(),</span>
-<span class="fc" id="L422">                replace(repeat.body(), targetNodeId, mutation),</span>
-<span class="fc" id="L423">                repeat.minIterations(),</span>
-<span class="fc" id="L424">                repeat.maxIterations());</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (current instanceof Repeat repeat) {</span>
+<span class="nc" id="L420">            return new Repeat(</span>
+<span class="nc" id="L421">                repeat.nodeId(),</span>
+<span class="nc" id="L422">                replace(repeat.body(), targetNodeId, mutation),</span>
+<span class="nc" id="L423">                repeat.minIterations(),</span>
+<span class="nc" id="L424">                repeat.maxIterations());</span>
         }
 <span class="pc bpc" id="L426" title="1 of 2 branches missed.">        if (current instanceof Require require) {</span>
 <span class="nc" id="L427">            return new Require(</span>
@@ -435,14 +435,14 @@ public final class DeterministicRewriteProgramMutator {
 <span class="fc" id="L435">                replace(prioritize.body(), targetNodeId, mutation),</span>
 <span class="fc" id="L436">                prioritize.priority());</span>
         }
-<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        if (current instanceof Prune prune) {</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        if (current instanceof Prune prune) {</span>
 <span class="fc" id="L439">            return new Prune(</span>
 <span class="fc" id="L440">                prune.nodeId(),</span>
 <span class="fc" id="L441">                replace(prune.body(), targetNodeId, mutation),</span>
 <span class="fc" id="L442">                prune.maxCandidates(),</span>
 <span class="fc" id="L443">                prune.reason());</span>
         }
-<span class="nc" id="L445">        return current;</span>
+<span class="fc" id="L445">        return current;</span>
     }
 
     private static List&lt;Node&gt; replaceChildren(
@@ -450,9 +450,9 @@ public final class DeterministicRewriteProgramMutator {
         String targetNodeId,
         Function&lt;Node, Node&gt; mutation
     ) {
-<span class="nc" id="L453">        return children.stream()</span>
-<span class="nc" id="L454">            .map(child -&gt; replace(child, targetNodeId, mutation))</span>
-<span class="nc" id="L455">            .toList();</span>
+<span class="fc" id="L453">        return children.stream()</span>
+<span class="fc" id="L454">            .map(child -&gt; replace(child, targetNodeId, mutation))</span>
+<span class="fc" id="L455">            .toList();</span>
     }
 
     private static List&lt;Node&gt; flatten(Node root) {
@@ -484,15 +484,15 @@ public final class DeterministicRewriteProgramMutator {
 <span class="fc bfc" id="L484" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
 <span class="fc" id="L485">            return firstApplicable.alternatives();</span>
         }
-<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (node instanceof Sequence sequence) {</span>
-<span class="nc" id="L488">            return sequence.steps();</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L488">            return sequence.steps();</span>
         }
 <span class="fc" id="L490">        return List.of();</span>
     }
 
     private static Node wrapperBody(Node node) {
-<span class="fc bfc" id="L494" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
-<span class="fc" id="L495">            return repeat.body();</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (node instanceof Repeat repeat) {</span>
+<span class="nc" id="L495">            return repeat.body();</span>
         }
 <span class="pc bpc" id="L497" title="1 of 2 branches missed.">        if (node instanceof Require require) {</span>
 <span class="nc" id="L498">            return require.body();</span>
@@ -510,11 +510,11 @@ public final class DeterministicRewriteProgramMutator {
 <span class="pc bpc" id="L510" title="1 of 2 branches missed.">        if (node instanceof Choice choice) {</span>
 <span class="nc" id="L511">            return new Choice(choice.nodeId(), children);</span>
         }
-<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc bfc" id="L513" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
 <span class="fc" id="L514">            return new FirstApplicable(firstApplicable.nodeId(), children);</span>
         }
-<span class="nc bnc" id="L516" title="All 2 branches missed.">        if (node instanceof Sequence sequence) {</span>
-<span class="nc" id="L517">            return new Sequence(sequence.nodeId(), children);</span>
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L517">            return new Sequence(sequence.nodeId(), children);</span>
         }
 <span class="nc" id="L519">        throw new IllegalArgumentException(</span>
             &quot;node does not have swappable ordered children&quot;);

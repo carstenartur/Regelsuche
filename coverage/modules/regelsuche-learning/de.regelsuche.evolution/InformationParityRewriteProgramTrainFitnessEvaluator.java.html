@@ -7,19 +7,19 @@ import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.CaseM
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import de.regelsuche.scoring.ExpressionScorer;
-import de.regelsuche.search.SearchHeuristic;
-import de.regelsuche.search.strategy.BestFirstSearchStrategy;
-import de.regelsuche.search.strategy.BestFirstSearchStrategy.GoalSearchResult;
-import de.regelsuche.search.strategy.SearchProblem;
-import de.regelsuche.search.strategy.SearchProblem.SearchTarget;
-import de.regelsuche.search.strategy.SearchState;
+import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy;
+import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Budget;
+import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Problem;
+import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Result;
+import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.State;
+import de.regelsuche.search.strategy.SearchWorkMetrics;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
-import de.regelsuche.transform.Transformation;
-import de.regelsuche.transform.TransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.MeasuredTransformationEngines;
+import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,21 +30,14 @@ import java.util.Set;
  *
  * &lt;p&gt;Both runs receive the ordinary rule inventory and every rule compiled from
  * the candidate genome. The candidate run differs only by the additional
- * {@link de.regelsuche.search.program.ProgrammedTransformationEngine} produced
- * from the candidate topology. A gain can therefore be attributed to program
- * composition rather than hidden rule access.&lt;/p&gt;
+ * compiled program. Both runs use the same primitive-step and total-work
+ * budgets.&lt;/p&gt;
  *
- * &lt;p&gt;Mathematical path auditing is supplied through the validation-layer
- * {@link AssumptionAwareEquivalenceService} port. The learning module therefore
- * does not depend on a concrete computer-algebra implementation.&lt;/p&gt;
- *
- * &lt;p&gt;Resource reductions contribute fitness only when the retained candidate
- * path actually contains a {@code program:} edge. Merely adding a program to
- * the candidate frontier must not earn program credit when the reached path
- * still consists exclusively of the information-parity flat rules.&lt;/p&gt;
+ * &lt;p&gt;Exact path auditing is injected through the validation-layer port, so the
+ * learning module remains independent of a concrete CAS implementation.&lt;/p&gt;
  */
 public final class InformationParityRewriteProgramTrainFitnessEvaluator {
-<span class="fc" id="L47">    private static final Set&lt;FitnessComponent&gt; SUPPORTED_COMPONENTS = Set.of(</span>
+<span class="fc" id="L40">    private static final Set&lt;FitnessComponent&gt; SUPPORTED_COMPONENTS = Set.of(</span>
         FitnessComponent.TRAIN_CASES_NEWLY_SOLVED,
         FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION,
         FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION,
@@ -58,21 +51,21 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
     private final EvolutionGenomeCompiler genomeCompiler;
     private final EvolutionRewriteProgramCompiler programCompiler;
     private final AssumptionAwareEquivalenceService equivalence;
-    private final GoalSearchRunner searchRunner;
+    private final WorkSearchRunner searchRunner;
 
     public InformationParityRewriteProgramTrainFitnessEvaluator(
         EvolutionRewriteProgramTrainSuite suite,
         Set&lt;FitnessComponent&gt; requiredComponents,
         AssumptionAwareEquivalenceService equivalence
     ) {
-<span class="fc" id="L68">        this(</span>
+<span class="fc" id="L61">        this(</span>
             suite,
             requiredComponents,
             new EvolutionGenomeCompiler(),
             new EvolutionRewriteProgramCompiler(),
             equivalence,
             InformationParityRewriteProgramTrainFitnessEvaluator::search);
-<span class="fc" id="L75">    }</span>
+<span class="fc" id="L68">    }</span>
 
     InformationParityRewriteProgramTrainFitnessEvaluator(
         EvolutionRewriteProgramTrainSuite suite,
@@ -80,152 +73,206 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
         EvolutionGenomeCompiler genomeCompiler,
         EvolutionRewriteProgramCompiler programCompiler,
         AssumptionAwareEquivalenceService equivalence,
-        GoalSearchRunner searchRunner
-<span class="fc" id="L84">    ) {</span>
-<span class="fc" id="L85">        this.suite = Objects.requireNonNull(suite, &quot;suite&quot;);</span>
-<span class="fc" id="L86">        Objects.requireNonNull(requiredComponents, &quot;requiredComponents&quot;);</span>
-<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (requiredComponents.isEmpty()) {</span>
-<span class="nc" id="L88">            throw new IllegalArgumentException(</span>
+        WorkSearchRunner searchRunner
+<span class="fc" id="L77">    ) {</span>
+<span class="fc" id="L78">        this.suite = Objects.requireNonNull(suite, &quot;suite&quot;);</span>
+<span class="fc" id="L79">        Objects.requireNonNull(requiredComponents, &quot;requiredComponents&quot;);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (requiredComponents.isEmpty()) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(</span>
                 &quot;requiredComponents must not be empty&quot;);
         }
-<span class="fc" id="L91">        this.requiredComponents = Set.copyOf(requiredComponents);</span>
-<span class="fc" id="L92">        this.genomeCompiler = Objects.requireNonNull(</span>
+<span class="fc" id="L84">        this.requiredComponents = Set.copyOf(requiredComponents);</span>
+<span class="fc" id="L85">        this.genomeCompiler = Objects.requireNonNull(</span>
             genomeCompiler, &quot;genomeCompiler&quot;);
-<span class="fc" id="L94">        this.programCompiler = Objects.requireNonNull(</span>
+<span class="fc" id="L87">        this.programCompiler = Objects.requireNonNull(</span>
             programCompiler, &quot;programCompiler&quot;);
-<span class="fc" id="L96">        this.equivalence = Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
-<span class="fc" id="L97">        this.searchRunner = Objects.requireNonNull(searchRunner, &quot;searchRunner&quot;);</span>
-<span class="fc" id="L98">    }</span>
+<span class="fc" id="L89">        this.equivalence = Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
+<span class="fc" id="L90">        this.searchRunner = Objects.requireNonNull(searchRunner, &quot;searchRunner&quot;);</span>
+<span class="fc" id="L91">    }</span>
 
     public EvolutionRewriteProgramTrainFitnessEvidence evaluate(
         EvolutionRewriteProgramCandidate candidate
     ) {
-<span class="fc" id="L103">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
-<span class="fc" id="L104">        EvolutionGenome genome = candidate.genome();</span>
-<span class="fc" id="L105">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (genome.trainingScope().sourceSplit()</span>
-                != EvolutionGenome.SourceSplit.TRAIN) {
-<span class="nc" id="L108">            blockers.add(&quot;FITNESS_SOURCE_IS_NOT_TRAIN&quot;);</span>
-        }
-<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (suite.evaluatorProfile()</span>
-                != EvolutionRewriteProgramTrainSuite.EvaluatorProfile
-                    .EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS) {
-<span class="nc" id="L113">            blockers.add(&quot;UNSUPPORTED_EVALUATOR_PROFILE:&quot;</span>
-<span class="nc" id="L114">                + suite.evaluatorProfile());</span>
-        }
-<span class="fc" id="L116">        if (suite.heuristic().maxCandidatesPerState()</span>
-<span class="fc bfc" id="L117" title="All 2 branches covered.">                &lt; genome.budget().maxCandidatesPerState()) {</span>
-<span class="fc" id="L118">            blockers.add(</span>
-                &quot;SUITE_CANDIDATE_BOUND_NARROWER_THAN_GENOME_AND_PROGRAM_SOURCES&quot;);
-        }
+<span class="fc" id="L96">        Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L97">        EvolutionGenome genome = candidate.genome();</span>
+<span class="fc" id="L98">        List&lt;String&gt; blockers = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L99">        addStaticBlockers(genome, blockers);</span>
 
         EvolutionGenomeCompiler.CompiledProgram flatGenome;
         EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiledProgram;
         try {
-<span class="fc" id="L125">            flatGenome = genomeCompiler.compile(genome);</span>
-<span class="fc" id="L126">            compiledProgram = programCompiler.compile(genome, candidate.plan());</span>
-<span class="nc" id="L127">        } catch (RuntimeException exception) {</span>
-<span class="nc" id="L128">            blockers.add(&quot;CANDIDATE_COMPILATION_FAILED:&quot;</span>
-<span class="nc" id="L129">                + stableFailure(exception));</span>
-<span class="nc" id="L130">            return EvolutionRewriteProgramTrainFitnessEvidence.create(</span>
-<span class="nc" id="L131">                suite, candidate, List.of(), zeroComponents(), blockers);</span>
-<span class="fc" id="L132">        }</span>
+<span class="fc" id="L104">            flatGenome = genomeCompiler.compile(genome);</span>
+<span class="fc" id="L105">            compiledProgram = programCompiler.compile(genome, candidate.plan());</span>
+<span class="nc" id="L106">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L107">            blockers.add(&quot;CANDIDATE_COMPILATION_FAILED:&quot;</span>
+<span class="nc" id="L108">                + stableFailure(exception));</span>
+<span class="nc" id="L109">            return EvolutionRewriteProgramTrainFitnessEvidence.create(</span>
+<span class="nc" id="L110">                suite, candidate, List.of(), zeroComponents(), blockers);</span>
+<span class="fc" id="L111">        }</span>
 
-<span class="fc" id="L134">        SearchHeuristic heuristic = effectiveHeuristic(genome);</span>
-<span class="fc" id="L135">        TransformationEngine ordinary = new AstRewriteTransformationEngine(</span>
-<span class="fc" id="L136">            AstRewriteTransformationEngine.defaultRules(),</span>
-<span class="fc" id="L137">            genome.budget().maxAstGrowthPerStep(),</span>
-<span class="fc" id="L138">            heuristic.maxCandidatesPerState());</span>
-<span class="fc" id="L139">        TransformationEngine flatGenomeRules =</span>
-            new AstRewriteTransformationEngine(
-<span class="fc" id="L141">                flatGenome.rules(),</span>
-<span class="fc" id="L142">                genome.budget().maxAstGrowthPerStep(),</span>
-<span class="fc" id="L143">                heuristic.maxCandidatesPerState());</span>
-<span class="fc" id="L144">        TransformationEngine baseline = union(ordinary, flatGenomeRules);</span>
-<span class="fc" id="L145">        TransformationEngine candidateEngine = union(</span>
-<span class="fc" id="L146">            baseline, compiledProgram.engine());</span>
+<span class="fc" id="L113">        EnginePair engines = engines(genome, flatGenome, compiledProgram);</span>
+<span class="fc" id="L114">        Budget budget = effectiveBudget(genome);</span>
+<span class="fc" id="L115">        List&lt;CaseMeasurement&gt; measurements = evaluateCases(</span>
+<span class="fc" id="L116">            suite.cases(), budget, engines, blockers);</span>
+<span class="fc" id="L117">        addCaseBlockers(measurements, blockers);</span>
 
-<span class="fc" id="L148">        List&lt;CaseMeasurement&gt; measurements = new ArrayList&lt;&gt;();</span>
-        for (EvolutionRewriteProgramTrainSuite.TrainCase trainCase
-<span class="fc bfc" id="L150" title="All 2 branches covered.">                : suite.cases()) {</span>
-            try {
-<span class="fc" id="L152">                measurements.add(evaluateCase(</span>
-                    trainCase, heuristic, baseline, candidateEngine));
-<span class="nc" id="L154">            } catch (RuntimeException exception) {</span>
-<span class="nc" id="L155">                blockers.add(&quot;TRAIN_CASE_EVALUATION_FAILED:&quot;</span>
-<span class="nc" id="L156">                    + trainCase.caseId() + &quot;:&quot; + stableFailure(exception));</span>
-<span class="nc" id="L157">                measurements.add(failedMeasurement(trainCase));</span>
-<span class="fc" id="L158">            }</span>
-<span class="fc" id="L159">        }</span>
-<span class="fc" id="L160">        addCaseBlockers(measurements, blockers);</span>
-
-<span class="fc" id="L162">        Map&lt;FitnessComponent, Integer&gt; components = components(</span>
+<span class="fc" id="L119">        Map&lt;FitnessComponent, Integer&gt; components = components(</span>
             candidate, measurements);
-<span class="fc" id="L164">        requiredComponents.stream()</span>
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            .filter(component -&gt; !SUPPORTED_COMPONENTS.contains(component))</span>
-<span class="fc" id="L166">            .sorted(Comparator.comparing(Enum::name))</span>
-<span class="fc" id="L167">            .forEach(component -&gt; {</span>
-<span class="nc" id="L168">                components.put(component, 0);</span>
-<span class="nc" id="L169">                blockers.add(&quot;UNSUPPORTED_PROGRAM_TRAIN_FITNESS_COMPONENT:&quot;</span>
-                    + component);
-<span class="nc" id="L171">            });</span>
-<span class="fc" id="L172">        components.keySet().removeIf(</span>
-<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            component -&gt; !requiredComponents.contains(component));</span>
+<span class="fc" id="L121">        addUnsupportedComponentBlockers(components, blockers);</span>
+<span class="fc" id="L122">        components.keySet().removeIf(</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            component -&gt; !requiredComponents.contains(component));</span>
 
-<span class="fc" id="L175">        return EvolutionRewriteProgramTrainFitnessEvidence.create(</span>
+<span class="fc" id="L125">        return EvolutionRewriteProgramTrainFitnessEvidence.create(</span>
             suite, candidate, measurements, components, blockers);
     }
 
+    private void addStaticBlockers(
+        EvolutionGenome genome,
+        List&lt;String&gt; blockers
+    ) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (genome.trainingScope().sourceSplit()</span>
+                != EvolutionGenome.SourceSplit.TRAIN) {
+<span class="nc" id="L135">            blockers.add(&quot;FITNESS_SOURCE_IS_NOT_TRAIN&quot;);</span>
+        }
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (suite.evaluatorProfile()</span>
+                != EvolutionRewriteProgramTrainSuite.EvaluatorProfile
+                    .EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS) {
+<span class="nc" id="L140">            blockers.add(&quot;UNSUPPORTED_EVALUATOR_PROFILE:&quot;</span>
+<span class="nc" id="L141">                + suite.evaluatorProfile());</span>
+        }
+<span class="fc" id="L143">        if (suite.primitiveWorkBudget().maxCandidatesPerState()</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                &lt; genome.budget().maxCandidatesPerState()) {</span>
+<span class="fc" id="L145">            blockers.add(</span>
+                &quot;SUITE_CANDIDATE_BOUND_NARROWER_THAN_GENOME_AND_PROGRAM_SOURCES&quot;);
+        }
+<span class="fc" id="L148">    }</span>
+
+    private EnginePair engines(
+        EvolutionGenome genome,
+        EvolutionGenomeCompiler.CompiledProgram flatGenome,
+        EvolutionRewriteProgramCompiler.CompiledRewriteProgram compiledProgram
+    ) {
+<span class="fc" id="L155">        int sourceCandidateLimit = Math.min(</span>
+<span class="fc" id="L156">            suite.primitiveWorkBudget().maxCandidatesPerState(),</span>
+<span class="fc" id="L157">            genome.budget().maxCandidatesPerState());</span>
+<span class="fc" id="L158">        MeasuredTransformationEngine ordinary =</span>
+<span class="fc" id="L159">            MeasuredTransformationEngines.counting(</span>
+                new AstRewriteTransformationEngine(
+<span class="fc" id="L161">                    AstRewriteTransformationEngine.defaultRules(),</span>
+<span class="fc" id="L162">                    genome.budget().maxAstGrowthPerStep(),</span>
+                    sourceCandidateLimit));
+<span class="fc" id="L164">        MeasuredTransformationEngine flatGenomeRules =</span>
+<span class="fc" id="L165">            MeasuredTransformationEngines.counting(</span>
+                new AstRewriteTransformationEngine(
+<span class="fc" id="L167">                    flatGenome.rules(),</span>
+<span class="fc" id="L168">                    genome.budget().maxAstGrowthPerStep(),</span>
+                    sourceCandidateLimit));
+<span class="fc" id="L170">        return new EnginePair(</span>
+<span class="fc" id="L171">            MeasuredTransformationEngines.union(</span>
+                ordinary,
+                flatGenomeRules),
+<span class="fc" id="L174">            MeasuredTransformationEngines.union(</span>
+                ordinary,
+                flatGenomeRules,
+<span class="fc" id="L177">                compiledProgram.engine()));</span>
+    }
+
+    private List&lt;CaseMeasurement&gt; evaluateCases(
+        List&lt;EvolutionRewriteProgramTrainSuite.TrainCase&gt; cases,
+        Budget budget,
+        EnginePair engines,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L186">        List&lt;CaseMeasurement&gt; measurements = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (EvolutionRewriteProgramTrainSuite.TrainCase trainCase : cases) {</span>
+            try {
+<span class="fc" id="L189">                measurements.add(evaluateCase(</span>
+                    trainCase,
+                    budget,
+<span class="fc" id="L192">                    engines.baseline(),</span>
+<span class="fc" id="L193">                    engines.candidate()));</span>
+<span class="nc" id="L194">            } catch (RuntimeException exception) {</span>
+<span class="nc" id="L195">                blockers.add(&quot;TRAIN_CASE_EVALUATION_FAILED:&quot;</span>
+<span class="nc" id="L196">                    + trainCase.caseId() + &quot;:&quot; + stableFailure(exception));</span>
+<span class="nc" id="L197">                measurements.add(failedMeasurement(trainCase));</span>
+<span class="fc" id="L198">            }</span>
+<span class="fc" id="L199">        }</span>
+<span class="fc" id="L200">        return List.copyOf(measurements);</span>
+    }
+
+    private void addUnsupportedComponentBlockers(
+        Map&lt;FitnessComponent, Integer&gt; components,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L207">        requiredComponents.stream()</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            .filter(component -&gt; !SUPPORTED_COMPONENTS.contains(component))</span>
+<span class="fc" id="L209">            .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L210">            .forEach(component -&gt; {</span>
+<span class="nc" id="L211">                components.put(component, 0);</span>
+<span class="nc" id="L212">                blockers.add(&quot;UNSUPPORTED_PROGRAM_TRAIN_FITNESS_COMPONENT:&quot;</span>
+                    + component);
+<span class="nc" id="L214">            });</span>
+<span class="fc" id="L215">    }</span>
+
     private CaseMeasurement evaluateCase(
         EvolutionRewriteProgramTrainSuite.TrainCase trainCase,
-        SearchHeuristic heuristic,
-        TransformationEngine baselineEngine,
-        TransformationEngine candidateEngine
+        Budget budget,
+        MeasuredTransformationEngine baselineEngine,
+        MeasuredTransformationEngine candidateEngine
     ) {
-<span class="fc" id="L185">        GoalSearchResult baseline = searchRunner.search(</span>
+<span class="fc" id="L223">        Result baseline = searchRunner.search(</span>
             baselineEngine,
-<span class="fc" id="L187">            trainCase.inputExpression(),</span>
-<span class="fc" id="L188">            trainCase.targetExpression(),</span>
-            heuristic);
-<span class="fc" id="L190">        GoalSearchResult candidate = searchRunner.search(</span>
+<span class="fc" id="L225">            trainCase.inputExpression(),</span>
+<span class="fc" id="L226">            trainCase.targetExpression(),</span>
+            budget);
+<span class="fc" id="L228">        Result candidate = searchRunner.search(</span>
             candidateEngine,
-<span class="fc" id="L192">            trainCase.inputExpression(),</span>
-<span class="fc" id="L193">            trainCase.targetExpression(),</span>
-            heuristic);
-<span class="fc" id="L195">        PathAudit baselineAudit = auditPath(baseline, trainCase.assumptions());</span>
-<span class="fc" id="L196">        PathAudit candidateAudit = auditPath(candidate, trainCase.assumptions());</span>
-<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        boolean programUsed = candidate.reached()</span>
-<span class="fc" id="L198">            &amp;&amp; candidate.reachedState().appliedRuleIds().stream()</span>
-<span class="fc bfc" id="L199" title="All 2 branches covered.">                .anyMatch(rule -&gt; rule.startsWith(&quot;program:&quot;));</span>
-<span class="fc bfc" id="L200" title="All 2 branches covered.">        boolean newlySolved = !baseline.reached()</span>
-<span class="pc bpc" id="L201" title="2 of 4 branches missed.">            &amp;&amp; candidate.reached()</span>
+<span class="fc" id="L230">            trainCase.inputExpression(),</span>
+<span class="fc" id="L231">            trainCase.targetExpression(),</span>
+            budget);
+<span class="fc" id="L233">        PathAudit baselineAudit = auditPath(baseline, trainCase.assumptions());</span>
+<span class="fc" id="L234">        PathAudit candidateAudit = auditPath(candidate, trainCase.assumptions());</span>
+<span class="fc" id="L235">        SearchWorkMetrics baselineSearchWork = searchWork(baseline);</span>
+<span class="fc" id="L236">        SearchWorkMetrics candidateSearchWork = searchWork(candidate);</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        boolean programUsed = candidate.reached()</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            &amp;&amp; candidate.reachedState().programUsed();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        boolean newlySolved = !baseline.reached()</span>
+<span class="pc bpc" id="L240" title="3 of 4 branches missed.">            &amp;&amp; candidate.reached()</span>
             &amp;&amp; programUsed
-<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            &amp;&amp; candidateAudit.correctness() == PathCorrectness.CONFIRMED;</span>
-<span class="pc bpc" id="L204" title="1 of 4 branches missed.">        boolean reachabilityRegression = baseline.reached() &amp;&amp; !candidate.reached();</span>
-<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        boolean correctnessFailure = candidate.reached()</span>
-<span class="fc bfc" id="L206" title="All 2 branches covered.">            &amp;&amp; (candidateAudit.correctness() == PathCorrectness.REFUTED</span>
-<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                || candidateAudit.correctness()</span>
+<span class="pc bnc" id="L242" title="All 2 branches missed.">            &amp;&amp; candidateAudit.correctness() == PathCorrectness.CONFIRMED;</span>
+<span class="pc bpc" id="L243" title="1 of 4 branches missed.">        boolean reachabilityRegression = baseline.reached() &amp;&amp; !candidate.reached();</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        boolean correctnessFailure = candidate.reached()</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            &amp;&amp; (candidateAudit.correctness() == PathCorrectness.REFUTED</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                || candidateAudit.correctness()</span>
                     == PathCorrectness.MISSING_ASSUMPTION);
-<span class="fc bfc" id="L209" title="All 2 branches covered.">        boolean correctnessRegression = baseline.reached()</span>
-<span class="pc bpc" id="L210" title="1 of 4 branches missed.">            &amp;&amp; baselineAudit.correctness() == PathCorrectness.CONFIRMED</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        boolean correctnessRegression = baseline.reached()</span>
+<span class="pc bpc" id="L249" title="1 of 4 branches missed.">            &amp;&amp; baselineAudit.correctness() == PathCorrectness.CONFIRMED</span>
             &amp;&amp; correctnessFailure;
-<span class="fc" id="L212">        return new CaseMeasurement(</span>
-<span class="fc" id="L213">            trainCase.caseId(),</span>
-<span class="fc" id="L214">            trainCase.familyId(),</span>
-<span class="fc" id="L215">            baseline.status().name(),</span>
-<span class="fc" id="L216">            candidate.status().name(),</span>
-<span class="fc" id="L217">            baseline.reached(),</span>
-<span class="fc" id="L218">            candidate.reached(),</span>
-<span class="fc" id="L219">            baselineAudit.correctness(),</span>
-<span class="fc" id="L220">            candidateAudit.correctness(),</span>
-<span class="fc" id="L221">            depth(baseline),</span>
-<span class="fc" id="L222">            depth(candidate),</span>
-<span class="fc" id="L223">            baselineAudit.primitiveSteps(),</span>
-<span class="fc" id="L224">            candidateAudit.primitiveSteps(),</span>
-<span class="fc" id="L225">            baseline.metrics().exploredStates(),</span>
-<span class="fc" id="L226">            candidate.metrics().exploredStates(),</span>
-<span class="fc" id="L227">            baseline.metrics().generatedTransformations(),</span>
-<span class="fc" id="L228">            candidate.metrics().generatedTransformations(),</span>
+<span class="fc" id="L251">        return new CaseMeasurement(</span>
+<span class="fc" id="L252">            trainCase.caseId(),</span>
+<span class="fc" id="L253">            trainCase.familyId(),</span>
+<span class="fc" id="L254">            baseline.status().name(),</span>
+<span class="fc" id="L255">            candidate.status().name(),</span>
+<span class="fc" id="L256">            baseline.reached(),</span>
+<span class="fc" id="L257">            candidate.reached(),</span>
+<span class="fc" id="L258">            baselineAudit.correctness(),</span>
+<span class="fc" id="L259">            candidateAudit.correctness(),</span>
+<span class="fc" id="L260">            edgeDepth(baseline),</span>
+<span class="fc" id="L261">            edgeDepth(candidate),</span>
+<span class="fc" id="L262">            baselineAudit.primitiveSteps(),</span>
+<span class="fc" id="L263">            candidateAudit.primitiveSteps(),</span>
+<span class="fc" id="L264">            baseline.metrics().exploredStates(),</span>
+<span class="fc" id="L265">            candidate.metrics().exploredStates(),</span>
+<span class="fc" id="L266">            baseline.metrics().generatedTransformations(),</span>
+<span class="fc" id="L267">            candidate.metrics().generatedTransformations(),</span>
+<span class="fc" id="L268">            baselineSearchWork.totalWorkUnits(),</span>
+<span class="fc" id="L269">            candidateSearchWork.totalWorkUnits(),</span>
+            baselineSearchWork,
+            candidateSearchWork,
+<span class="fc" id="L272">            baselineAudit.auditCalls(),</span>
+<span class="fc" id="L273">            candidateAudit.auditCalls(),</span>
+<span class="fc" id="L274">            baseline.metrics().transformationWork(),</span>
+<span class="fc" id="L275">            candidate.metrics().transformationWork(),</span>
             programUsed,
             newlySolved,
             reachabilityRegression,
@@ -234,223 +281,233 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
     }
 
     private PathAudit auditPath(
-        GoalSearchResult result,
+        Result result,
         List&lt;String&gt; declaredAssumptions
     ) {
-<span class="fc bfc" id="L240" title="All 2 branches covered.">        if (!result.reached()) {</span>
-<span class="fc" id="L241">            return new PathAudit(PathCorrectness.NOT_EVALUATED, 0);</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (!result.reached()) {</span>
+<span class="fc" id="L288">            return new PathAudit(PathCorrectness.NOT_EVALUATED, 0, 0);</span>
         }
-<span class="fc" id="L243">        SearchState reached = result.reachedState();</span>
-<span class="fc" id="L244">        Set&lt;String&gt; declared = Set.copyOf(</span>
-<span class="fc" id="L245">            AssumptionSignature.ofExpressions(declaredAssumptions)</span>
-<span class="fc" id="L246">                .normalizedAssumptions());</span>
-<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (!declared.containsAll(reached.assumptions())) {</span>
-<span class="nc" id="L248">            return new PathAudit(</span>
+<span class="fc" id="L290">        State reached = result.reachedState();</span>
+<span class="fc" id="L291">        Set&lt;String&gt; declared = Set.copyOf(</span>
+<span class="fc" id="L292">            AssumptionSignature.ofExpressions(declaredAssumptions)</span>
+<span class="fc" id="L293">                .normalizedAssumptions());</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (!declared.containsAll(reached.assumptions())) {</span>
+<span class="nc" id="L295">            return new PathAudit(</span>
                 PathCorrectness.MISSING_ASSUMPTION,
-<span class="nc" id="L250">                primitiveStepCount(reached.appliedRuleIds()));</span>
+<span class="nc" id="L297">                reached.primitiveDepth(),</span>
+                0);
         }
-<span class="fc" id="L252">        List&lt;String&gt; path = reached.path();</span>
-<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (path.isEmpty()) {</span>
-<span class="nc" id="L254">            return new PathAudit(PathCorrectness.UNSUPPORTED, 0);</span>
+<span class="fc" id="L300">        List&lt;String&gt; path = reached.path();</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (path.isEmpty()) {</span>
+<span class="nc" id="L302">            return new PathAudit(PathCorrectness.UNSUPPORTED, 0, 0);</span>
         }
-<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (int index = 0; index + 1 &lt; path.size(); index++) {</span>
-<span class="fc" id="L257">            AssumptionAwareEquivalenceService.Evaluation evaluation =</span>
-<span class="fc" id="L258">                equivalence.evaluate(</span>
-<span class="fc" id="L259">                    path.get(index), path.get(index + 1), declaredAssumptions);</span>
-<span class="pc bpc" id="L260" title="2 of 4 branches missed.">            PathCorrectness correctness = switch (evaluation.status()) {</span>
-<span class="fc" id="L261">                case CONFIRMED -&gt; PathCorrectness.CONFIRMED;</span>
-<span class="fc" id="L262">                case REFUTED -&gt; PathCorrectness.REFUTED;</span>
-<span class="nc" id="L263">                case MISSING_ASSUMPTION -&gt; PathCorrectness.MISSING_ASSUMPTION;</span>
-<span class="pc" id="L264">                case UNSUPPORTED -&gt; PathCorrectness.UNSUPPORTED;</span>
-            };
-<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (correctness != PathCorrectness.CONFIRMED) {</span>
-<span class="fc" id="L267">                return new PathAudit(</span>
+<span class="fc" id="L304">        long auditCalls = 0;</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        for (int index = 0; index + 1 &lt; path.size(); index++) {</span>
+<span class="fc" id="L306">            auditCalls = add(auditCalls, 1);</span>
+<span class="fc" id="L307">            AssumptionAwareEquivalenceService.Evaluation evaluation =</span>
+<span class="fc" id="L308">                equivalence.evaluate(</span>
+<span class="fc" id="L309">                    path.get(index), path.get(index + 1), declaredAssumptions);</span>
+<span class="fc" id="L310">            PathCorrectness correctness = pathCorrectness(evaluation.status());</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (correctness != PathCorrectness.CONFIRMED) {</span>
+<span class="fc" id="L312">                return new PathAudit(</span>
                     correctness,
-<span class="fc" id="L269">                    primitiveStepCount(reached.appliedRuleIds()));</span>
+<span class="fc" id="L314">                    reached.primitiveDepth(),</span>
+                    auditCalls);
             }
         }
-<span class="fc" id="L272">        return new PathAudit(</span>
+<span class="fc" id="L318">        return new PathAudit(</span>
             PathCorrectness.CONFIRMED,
-<span class="fc" id="L274">            primitiveStepCount(reached.appliedRuleIds()));</span>
+<span class="fc" id="L320">            reached.primitiveDepth(),</span>
+            auditCalls);
+    }
+
+    private static PathCorrectness pathCorrectness(
+        AssumptionAwareEquivalenceService.Status status
+    ) {
+<span class="pc bpc" id="L327" title="2 of 4 branches missed.">        return switch (status) {</span>
+<span class="fc" id="L328">            case CONFIRMED -&gt; PathCorrectness.CONFIRMED;</span>
+<span class="fc" id="L329">            case REFUTED -&gt; PathCorrectness.REFUTED;</span>
+<span class="nc" id="L330">            case MISSING_ASSUMPTION -&gt; PathCorrectness.MISSING_ASSUMPTION;</span>
+<span class="nc" id="L331">            case UNSUPPORTED -&gt; PathCorrectness.UNSUPPORTED;</span>
+        };
+    }
+
+    private static SearchWorkMetrics searchWork(Result result) {
+<span class="fc" id="L336">        var metrics = result.metrics();</span>
+<span class="fc" id="L337">        return new SearchWorkMetrics(</span>
+<span class="fc" id="L338">            metrics.exploredStates(),</span>
+<span class="fc" id="L339">            metrics.expandedStates(),</span>
+<span class="fc" id="L340">            metrics.generatedTransformations(),</span>
+<span class="fc" id="L341">            metrics.enqueuedStates(),</span>
+<span class="fc" id="L342">            metrics.duplicatePrunes(),</span>
+<span class="fc" id="L343">            metrics.repeatedApplicationPrunes(),</span>
+<span class="fc" id="L344">            metrics.sameExpressionPrunes(),</span>
+<span class="fc" id="L345">            metrics.expansionBudgetPrunes(),</span>
+<span class="fc" id="L346">            metrics.primitiveBudgetPrunes(),</span>
+<span class="fc" id="L347">            metrics.candidateBudgetPrunes(),</span>
+<span class="fc" id="L348">            metrics.statesWithoutTransformations(),</span>
+<span class="fc" id="L349">            metrics.engineBatches());</span>
     }
 
     private static void addCaseBlockers(
         List&lt;CaseMeasurement&gt; measurements,
         List&lt;String&gt; blockers
     ) {
-<span class="fc" id="L281">        measurements.stream()</span>
-<span class="fc" id="L282">            .filter(CaseMeasurement::reachabilityRegression)</span>
-<span class="pc" id="L283">            .map(item -&gt; &quot;TRAIN_REACHABILITY_REGRESSION:&quot; + item.caseId())</span>
-<span class="fc" id="L284">            .forEach(blockers::add);</span>
-<span class="fc" id="L285">        measurements.stream()</span>
-<span class="fc" id="L286">            .filter(CaseMeasurement::correctnessFailure)</span>
-<span class="fc" id="L287">            .map(item -&gt; &quot;TRAIN_CORRECTNESS_FAILURE:&quot; + item.caseId()</span>
-<span class="fc" id="L288">                + &quot;:&quot; + item.candidatePathCorrectness())</span>
-<span class="fc" id="L289">            .forEach(blockers::add);</span>
-<span class="fc" id="L290">        measurements.stream()</span>
-<span class="pc bpc" id="L291" title="1 of 2 branches missed.">            .filter(item -&gt; item.candidateReached()</span>
-<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                &amp;&amp; item.candidatePathCorrectness() == PathCorrectness.UNSUPPORTED)</span>
-<span class="pc" id="L293">            .map(item -&gt; &quot;TRAIN_CORRECTNESS_UNSUPPORTED:&quot; + item.caseId())</span>
-<span class="fc" id="L294">            .forEach(blockers::add);</span>
-<span class="fc" id="L295">    }</span>
+<span class="fc" id="L356">        measurements.stream()</span>
+<span class="fc" id="L357">            .filter(CaseMeasurement::reachabilityRegression)</span>
+<span class="pc" id="L358">            .map(item -&gt; &quot;TRAIN_REACHABILITY_REGRESSION:&quot; + item.caseId())</span>
+<span class="fc" id="L359">            .forEach(blockers::add);</span>
+<span class="fc" id="L360">        measurements.stream()</span>
+<span class="fc" id="L361">            .filter(CaseMeasurement::correctnessFailure)</span>
+<span class="fc" id="L362">            .map(item -&gt; &quot;TRAIN_CORRECTNESS_FAILURE:&quot; + item.caseId()</span>
+<span class="fc" id="L363">                + &quot;:&quot; + item.candidatePathCorrectness())</span>
+<span class="fc" id="L364">            .forEach(blockers::add);</span>
+<span class="fc" id="L365">        measurements.stream()</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">            .filter(item -&gt; item.candidateReached()</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">                &amp;&amp; item.candidatePathCorrectness() == PathCorrectness.UNSUPPORTED)</span>
+<span class="pc" id="L368">            .map(item -&gt; &quot;TRAIN_CORRECTNESS_UNSUPPORTED:&quot; + item.caseId())</span>
+<span class="fc" id="L369">            .forEach(blockers::add);</span>
+<span class="fc" id="L370">    }</span>
 
-    private static TransformationEngine union(
-        TransformationEngine left,
-        TransformationEngine right
-    ) {
-<span class="fc" id="L301">        return expression -&gt; {</span>
-<span class="fc" id="L302">            LinkedHashMap&lt;String, Transformation&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L303">            List&lt;Transformation&gt; combined = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L304">            combined.addAll(left.transform(expression));</span>
-<span class="fc" id="L305">            combined.addAll(right.transform(expression));</span>
-<span class="fc" id="L306">            combined.stream()</span>
-<span class="fc" id="L307">                .sorted(Comparator</span>
-<span class="fc" id="L308">                    .comparing(Transformation::rule)</span>
-<span class="fc" id="L309">                    .thenComparing(Transformation::transformedExpression)</span>
-<span class="fc" id="L310">                    .thenComparing(Transformation::applicationKey))</span>
-<span class="fc" id="L311">                .forEach(transformation -&gt; distinct.putIfAbsent(</span>
-<span class="fc" id="L312">                    transformation.rule() + &quot;\u0000&quot;</span>
-<span class="fc" id="L313">                        + transformation.transformedExpression() + &quot;\u0000&quot;</span>
-<span class="fc" id="L314">                        + transformation.applicationKey(),</span>
-                    transformation));
-<span class="fc" id="L316">            return List.copyOf(distinct.values());</span>
-        };
-    }
-
-    private SearchHeuristic effectiveHeuristic(EvolutionGenome genome) {
-<span class="fc" id="L321">        SearchHeuristic configured = suite.heuristic();</span>
-<span class="fc" id="L322">        return new SearchHeuristic(</span>
-<span class="fc" id="L323">            Math.min(configured.maxDepth(),</span>
-<span class="fc" id="L324">                genome.budget().maxApplicationsPerPath()),</span>
-<span class="fc" id="L325">            configured.maxVisitedExpressions(),</span>
-<span class="fc" id="L326">            configured.significantImprovementThreshold(),</span>
-<span class="fc" id="L327">            Math.min(configured.maxExpandingSteps(),</span>
-<span class="fc" id="L328">                genome.budget().maxApplicationsPerPath()),</span>
-<span class="fc" id="L329">            Math.min(configured.maxCandidatesPerState(),</span>
-<span class="fc" id="L330">                genome.budget().maxCandidatesPerState()),</span>
-<span class="fc" id="L331">            configured.beamWidth());</span>
+    private Budget effectiveBudget(EvolutionGenome genome) {
+<span class="fc" id="L373">        EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget configured =</span>
+<span class="fc" id="L374">            suite.primitiveWorkBudget();</span>
+<span class="fc" id="L375">        return new Budget(</span>
+<span class="fc" id="L376">            Math.min(</span>
+<span class="fc" id="L377">                configured.maxPrimitiveSteps(),</span>
+<span class="fc" id="L378">                genome.budget().maxApplicationsPerPath()),</span>
+<span class="fc" id="L379">            configured.maxExploredStates(),</span>
+<span class="fc" id="L380">            Math.min(</span>
+<span class="fc" id="L381">                configured.maxCandidatesPerState(),</span>
+<span class="fc" id="L382">                genome.budget().maxCandidatesPerState()),</span>
+<span class="fc" id="L383">            Math.min(</span>
+<span class="fc" id="L384">                configured.maxExpandingSteps(),</span>
+<span class="fc" id="L385">                genome.budget().maxApplicationsPerPath()),</span>
+<span class="fc" id="L386">            configured.maxWorkUnits());</span>
     }
 
     private Map&lt;FitnessComponent, Integer&gt; components(
         EvolutionRewriteProgramCandidate candidate,
         List&lt;CaseMeasurement&gt; measurements
     ) {
-<span class="fc" id="L338">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
+<span class="fc" id="L393">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
             new EnumMap&lt;&gt;(FitnessComponent.class);
-<span class="fc" id="L340">        int caseCount = suite.cases().size();</span>
-<span class="fc" id="L341">        int confirmedReached = Math.toIntExact(measurements.stream()</span>
-<span class="fc" id="L342">            .filter(CaseMeasurement::candidateReached)</span>
-<span class="fc bfc" id="L343" title="All 2 branches covered.">            .filter(item -&gt; item.candidatePathCorrectness()</span>
+<span class="fc" id="L395">        int caseCount = suite.cases().size();</span>
+<span class="fc" id="L396">        int confirmedReached = Math.toIntExact(measurements.stream()</span>
+<span class="fc" id="L397">            .filter(CaseMeasurement::candidateReached)</span>
+<span class="fc bfc" id="L398" title="All 2 branches covered.">            .filter(item -&gt; item.candidatePathCorrectness()</span>
                 == PathCorrectness.CONFIRMED)
-<span class="fc" id="L345">            .count());</span>
-<span class="fc" id="L346">        int newlySolved = Math.toIntExact(measurements.stream()</span>
-<span class="fc" id="L347">            .filter(CaseMeasurement::newlySolved)</span>
-<span class="fc" id="L348">            .count());</span>
-<span class="fc" id="L349">        result.put(FitnessComponent.SUPPORT,</span>
-<span class="fc" id="L350">            permille(confirmedReached, caseCount));</span>
-<span class="fc" id="L351">        result.put(FitnessComponent.TRAIN_CASES_NEWLY_SOLVED,</span>
-<span class="fc" id="L352">            permille(newlySolved, caseCount));</span>
-<span class="fc" id="L353">        result.put(FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION,</span>
-<span class="fc" id="L354">            pairedPrimitiveStepReduction(measurements));</span>
-<span class="fc" id="L355">        result.put(FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION,</span>
-<span class="fc" id="L356">            pairedStateReduction(measurements));</span>
-<span class="fc" id="L357">        result.put(FitnessComponent.ASSUMPTION_SIMPLICITY,</span>
-<span class="fc" id="L358">            assumptionSimplicity(candidate.genome()));</span>
-<span class="fc" id="L359">        result.put(FitnessComponent.CANDIDATE_COMPLEXITY,</span>
-<span class="fc" id="L360">            candidateSimplicity(candidate));</span>
-<span class="fc" id="L361">        result.put(FitnessComponent.PROOF_COST_PROXY,</span>
-<span class="fc" id="L362">            proofCostProxy(candidate));</span>
-<span class="fc" id="L363">        return result;</span>
+<span class="fc" id="L400">            .count());</span>
+<span class="fc" id="L401">        int newlySolved = Math.toIntExact(measurements.stream()</span>
+<span class="fc" id="L402">            .filter(CaseMeasurement::newlySolved)</span>
+<span class="fc" id="L403">            .count());</span>
+<span class="fc" id="L404">        result.put(FitnessComponent.SUPPORT,</span>
+<span class="fc" id="L405">            permille(confirmedReached, caseCount));</span>
+<span class="fc" id="L406">        result.put(FitnessComponent.TRAIN_CASES_NEWLY_SOLVED,</span>
+<span class="fc" id="L407">            permille(newlySolved, caseCount));</span>
+<span class="fc" id="L408">        result.put(FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION,</span>
+<span class="fc" id="L409">            pairedPrimitiveStepReduction(measurements));</span>
+<span class="fc" id="L410">        result.put(FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION,</span>
+<span class="fc" id="L411">            pairedStateReduction(measurements));</span>
+<span class="fc" id="L412">        result.put(FitnessComponent.ASSUMPTION_SIMPLICITY,</span>
+<span class="fc" id="L413">            assumptionSimplicity(candidate.genome()));</span>
+<span class="fc" id="L414">        result.put(FitnessComponent.CANDIDATE_COMPLEXITY,</span>
+<span class="fc" id="L415">            candidateSimplicity(candidate));</span>
+<span class="fc" id="L416">        result.put(FitnessComponent.PROOF_COST_PROXY,</span>
+<span class="fc" id="L417">            proofCostProxy(candidate));</span>
+<span class="fc" id="L418">        return result;</span>
     }
 
     private Map&lt;FitnessComponent, Integer&gt; zeroComponents() {
-<span class="nc" id="L367">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
+<span class="nc" id="L422">        EnumMap&lt;FitnessComponent, Integer&gt; result =</span>
             new EnumMap&lt;&gt;(FitnessComponent.class);
-<span class="nc" id="L369">        requiredComponents.forEach(component -&gt; result.put(component, 0));</span>
-<span class="nc" id="L370">        return result;</span>
+<span class="nc" id="L424">        requiredComponents.forEach(component -&gt; result.put(component, 0));</span>
+<span class="nc" id="L425">        return result;</span>
     }
 
     private static int pairedPrimitiveStepReduction(
         List&lt;CaseMeasurement&gt; measurements
     ) {
-<span class="fc" id="L376">        long baseline = 0;</span>
-<span class="fc" id="L377">        long delta = 0;</span>
-<span class="fc bfc" id="L378" title="All 2 branches covered.">        for (CaseMeasurement item : measurements) {</span>
-<span class="pc bpc" id="L379" title="1 of 2 branches missed.">            if (comparable(item)) {</span>
-<span class="nc" id="L380">                baseline += Math.max(1, item.baselinePrimitiveSteps());</span>
-<span class="nc" id="L381">                delta += (long) item.baselinePrimitiveSteps()</span>
-<span class="nc" id="L382">                    - item.candidatePrimitiveSteps();</span>
+<span class="fc" id="L431">        long baseline = 0;</span>
+<span class="fc" id="L432">        long delta = 0;</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        for (CaseMeasurement item : measurements) {</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">            if (resourceComparable(item)) {</span>
+<span class="fc" id="L435">                baseline += Math.max(1, item.baselinePrimitiveSteps());</span>
+<span class="fc" id="L436">                delta += (long) item.baselinePrimitiveSteps()</span>
+<span class="fc" id="L437">                    - item.candidatePrimitiveSteps();</span>
             }
-<span class="fc" id="L384">        }</span>
-<span class="fc" id="L385">        return normalizedDelta(delta, baseline);</span>
+<span class="fc" id="L439">        }</span>
+<span class="fc" id="L440">        return normalizedDelta(delta, baseline);</span>
     }
 
     private static int pairedStateReduction(List&lt;CaseMeasurement&gt; measurements) {
-<span class="fc" id="L389">        long baseline = 0;</span>
-<span class="fc" id="L390">        long delta = 0;</span>
-<span class="fc bfc" id="L391" title="All 2 branches covered.">        for (CaseMeasurement item : measurements) {</span>
-<span class="pc bpc" id="L392" title="1 of 2 branches missed.">            if (comparable(item)) {</span>
-<span class="nc" id="L393">                baseline += Math.max(1L, item.baselineExploredStates());</span>
-<span class="nc" id="L394">                delta += item.baselineExploredStates()</span>
-<span class="nc" id="L395">                    - item.candidateExploredStates();</span>
+<span class="fc" id="L444">        long baseline = 0;</span>
+<span class="fc" id="L445">        long delta = 0;</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">        for (CaseMeasurement item : measurements) {</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">            if (resourceComparable(item)) {</span>
+<span class="fc" id="L448">                baseline += Math.max(1L, item.baselineExploredStates());</span>
+<span class="fc" id="L449">                delta += item.baselineExploredStates()</span>
+<span class="fc" id="L450">                    - item.candidateExploredStates();</span>
             }
-<span class="fc" id="L397">        }</span>
-<span class="fc" id="L398">        return normalizedDelta(delta, baseline);</span>
+<span class="fc" id="L452">        }</span>
+<span class="fc" id="L453">        return normalizedDelta(delta, baseline);</span>
     }
 
-    private static boolean comparable(CaseMeasurement item) {
-<span class="fc bfc" id="L402" title="All 2 branches covered.">        return item.programUsed()</span>
-<span class="pc bpc" id="L403" title="1 of 2 branches missed.">            &amp;&amp; item.baselineReached()</span>
-<span class="nc bnc" id="L404" title="All 2 branches missed.">            &amp;&amp; item.candidateReached()</span>
-<span class="nc bnc" id="L405" title="All 2 branches missed.">            &amp;&amp; item.baselinePathCorrectness() == PathCorrectness.CONFIRMED</span>
-<span class="pc bnc" id="L406" title="All 2 branches missed.">            &amp;&amp; item.candidatePathCorrectness() == PathCorrectness.CONFIRMED;</span>
+    private static boolean resourceComparable(CaseMeasurement item) {
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        return item.programUsed()</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">            &amp;&amp; item.baselineReached()</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">            &amp;&amp; item.candidateReached()</span>
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">            &amp;&amp; item.baselinePathCorrectness() == PathCorrectness.CONFIRMED</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">            &amp;&amp; item.candidatePathCorrectness() == PathCorrectness.CONFIRMED</span>
+<span class="fc" id="L462">            &amp;&amp; item.candidateTotalWorkUnits()</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">                &lt;= item.baselineTotalWorkUnits();</span>
     }
 
     private static int assumptionSimplicity(EvolutionGenome genome) {
-<span class="fc" id="L410">        int assumptions = genome.rewrites().stream()</span>
-<span class="fc" id="L411">            .mapToInt(gene -&gt; gene.assumptions().size())</span>
-<span class="fc" id="L412">            .sum();</span>
-<span class="fc" id="L413">        return inverseBudgetScore(</span>
+<span class="fc" id="L467">        int assumptions = genome.rewrites().stream()</span>
+<span class="fc" id="L468">            .mapToInt(gene -&gt; gene.assumptions().size())</span>
+<span class="fc" id="L469">            .sum();</span>
+<span class="fc" id="L470">        return inverseBudgetScore(</span>
             assumptions,
-<span class="fc" id="L415">            Math.max(1, genome.budget().maxProgramLength()));</span>
+<span class="fc" id="L472">            Math.max(1, genome.budget().maxProgramLength()));</span>
     }
 
     private static int candidateSimplicity(
         EvolutionRewriteProgramCandidate candidate
     ) {
-<span class="fc" id="L421">        EvolutionGenome genome = candidate.genome();</span>
-<span class="fc" id="L422">        int rewriteNodes = genome.rewrites().stream()</span>
-<span class="fc" id="L423">            .mapToInt(gene -&gt;</span>
-<span class="fc" id="L424">                EvolutionGenomeCompiler.nodeCount(</span>
-<span class="fc" id="L425">                    EvolutionGenomeCompiler.parsePattern(gene.sourcePattern()))</span>
-<span class="fc" id="L426">                + EvolutionGenomeCompiler.nodeCount(</span>
-<span class="fc" id="L427">                    EvolutionGenomeCompiler.parsePattern(gene.targetPattern())))</span>
-<span class="fc" id="L428">            .sum();</span>
-<span class="fc" id="L429">        int used = rewriteNodes + candidate.plan().nodeCount();</span>
-<span class="fc" id="L430">        int budget = Math.max(1,</span>
-<span class="fc" id="L431">            genome.budget().maxAstNodes() + candidate.plan().maxNodes());</span>
-<span class="fc" id="L432">        return inverseBudgetScore(used, budget);</span>
+<span class="fc" id="L478">        EvolutionGenome genome = candidate.genome();</span>
+<span class="fc" id="L479">        int rewriteNodes = genome.rewrites().stream()</span>
+<span class="fc" id="L480">            .mapToInt(gene -&gt;</span>
+<span class="fc" id="L481">                EvolutionGenomeCompiler.nodeCount(</span>
+<span class="fc" id="L482">                    EvolutionGenomeCompiler.parsePattern(gene.sourcePattern()))</span>
+<span class="fc" id="L483">                + EvolutionGenomeCompiler.nodeCount(</span>
+<span class="fc" id="L484">                    EvolutionGenomeCompiler.parsePattern(gene.targetPattern())))</span>
+<span class="fc" id="L485">            .sum();</span>
+<span class="fc" id="L486">        int used = rewriteNodes + candidate.plan().nodeCount();</span>
+<span class="fc" id="L487">        int budget = Math.max(1,</span>
+<span class="fc" id="L488">            genome.budget().maxAstNodes() + candidate.plan().maxNodes());</span>
+<span class="fc" id="L489">        return inverseBudgetScore(used, budget);</span>
     }
 
     private static int proofCostProxy(
         EvolutionRewriteProgramCandidate candidate
     ) {
-<span class="fc" id="L438">        int obligations = candidate.genome().rewrites().stream()</span>
-<span class="fc" id="L439">            .mapToInt(gene -&gt; gene.evidenceObligations().size())</span>
-<span class="fc" id="L440">            .sum();</span>
-<span class="fc" id="L441">        int used = obligations + candidate.plan().nodeCount();</span>
-<span class="fc" id="L442">        int budget = Math.max(1,</span>
-<span class="fc" id="L443">            candidate.genome().budget().maxProgramLength() * 5</span>
-<span class="fc" id="L444">                + candidate.plan().maxNodes());</span>
-<span class="fc" id="L445">        return inverseBudgetScore(used, budget);</span>
+<span class="fc" id="L495">        int obligations = candidate.genome().rewrites().stream()</span>
+<span class="fc" id="L496">            .mapToInt(gene -&gt; gene.evidenceObligations().size())</span>
+<span class="fc" id="L497">            .sum();</span>
+<span class="fc" id="L498">        int used = obligations + candidate.plan().nodeCount();</span>
+<span class="fc" id="L499">        int budget = Math.max(1,</span>
+<span class="fc" id="L500">            candidate.genome().budget().maxProgramLength() * 5</span>
+<span class="fc" id="L501">                + candidate.plan().maxNodes());</span>
+<span class="fc" id="L502">        return inverseBudgetScore(used, budget);</span>
     }
 
     private static CaseMeasurement failedMeasurement(
         EvolutionRewriteProgramTrainSuite.TrainCase trainCase
     ) {
-<span class="nc" id="L451">        return new CaseMeasurement(</span>
-<span class="nc" id="L452">            trainCase.caseId(),</span>
-<span class="nc" id="L453">            trainCase.familyId(),</span>
+<span class="nc" id="L508">        return new CaseMeasurement(</span>
+<span class="nc" id="L509">            trainCase.caseId(),</span>
+<span class="nc" id="L510">            trainCase.familyId(),</span>
             &quot;EVALUATION_FAILED&quot;,
             &quot;NOT_RUN&quot;,
             false,
@@ -465,6 +522,14 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             0,
             0,
             0,
+            0,
+            0,
+            SearchWorkMetrics.ZERO,
+            SearchWorkMetrics.ZERO,
+            0,
+            0,
+            TransformationWorkMetrics.ZERO,
+            TransformationWorkMetrics.ZERO,
             false,
             false,
             false,
@@ -472,87 +537,88 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             false);
     }
 
-    private static int primitiveStepCount(List&lt;String&gt; ruleIds) {
-<span class="fc" id="L476">        int result = 0;</span>
-<span class="fc bfc" id="L477" title="All 2 branches covered.">        for (String ruleId : ruleIds) {</span>
-<span class="fc bfc" id="L478" title="All 2 branches covered.">            if (!ruleId.startsWith(&quot;program:&quot;)</span>
-<span class="pc bpc" id="L479" title="1 of 2 branches missed.">                    || !ruleId.contains(&quot;[&quot;)</span>
-<span class="pc bpc" id="L480" title="1 of 2 branches missed.">                    || !ruleId.endsWith(&quot;]&quot;)) {</span>
-<span class="fc" id="L481">                result++;</span>
-<span class="fc" id="L482">                continue;</span>
-            }
-<span class="fc" id="L484">            String body = ruleId.substring(</span>
-<span class="fc" id="L485">                ruleId.indexOf('[') + 1, ruleId.length() - 1);</span>
-<span class="pc bpc" id="L486" title="1 of 2 branches missed.">            result += body.isBlank() ? 0 : body.split(&quot; -&gt; &quot;, -1).length;</span>
-<span class="fc" id="L487">        }</span>
-<span class="fc" id="L488">        return result;</span>
-    }
-
-    private static GoalSearchResult search(
-        TransformationEngine engine,
+    private static Result search(
+        MeasuredTransformationEngine engine,
         String input,
         String target,
-        SearchHeuristic heuristic
+        Budget budget
     ) {
-<span class="fc" id="L497">        SearchProblem problem = new SearchProblem(</span>
-            input,
-            engine,
-            new ExpressionScorer(),
-            new ExpressionCanonicalizer(),
-            heuristic)
-<span class="fc" id="L503">            .withTarget(SearchTarget.syntaxExact(target));</span>
-<span class="fc" id="L504">        return new BestFirstSearchStrategy().searchWithDiagnostics(problem);</span>
+<span class="fc" id="L546">        return new PrimitiveWorkBestFirstSearchStrategy().search(</span>
+            new Problem(
+                input,
+                target,
+                engine,
+                new ExpressionScorer(),
+                new ExpressionCanonicalizer(),
+                budget));
     }
 
-    private static int depth(GoalSearchResult result) {
-<span class="fc bfc" id="L508" title="All 2 branches covered.">        return result.reachedState() == null ? -1 : result.reachedState().depth();</span>
+    private static int edgeDepth(Result result) {
+<span class="fc bfc" id="L557" title="All 2 branches covered.">        return result.reachedState() == null</span>
+<span class="fc" id="L558">            ? -1</span>
+<span class="fc" id="L559">            : result.reachedState().edgeDepth();</span>
     }
 
     private static int inverseBudgetScore(long used, long budget) {
-<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (budget &lt;= 0) {</span>
-<span class="nc" id="L513">            return 0;</span>
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">        if (budget &lt;= 0) {</span>
+<span class="nc" id="L564">            return 0;</span>
         }
-<span class="fc" id="L515">        long penalty = Math.min(1000L, used * 1000L / budget);</span>
-<span class="fc" id="L516">        return Math.toIntExact(1000L - penalty);</span>
+<span class="fc" id="L566">        long penalty = Math.min(1000L, used * 1000L / budget);</span>
+<span class="fc" id="L567">        return Math.toIntExact(1000L - penalty);</span>
     }
 
     private static int permille(long numerator, long denominator) {
-<span class="pc bpc" id="L520" title="1 of 2 branches missed.">        return denominator &lt;= 0</span>
-<span class="nc" id="L521">            ? 0</span>
-<span class="fc" id="L522">            : clamp(Math.toIntExact(numerator * 1000L / denominator));</span>
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">        return denominator &lt;= 0</span>
+<span class="nc" id="L572">            ? 0</span>
+<span class="fc" id="L573">            : clamp(Math.toIntExact(numerator * 1000L / denominator));</span>
     }
 
     private static int normalizedDelta(long delta, long baseline) {
-<span class="pc bpc" id="L526" title="1 of 2 branches missed.">        return baseline &lt;= 0</span>
-<span class="fc" id="L527">            ? 0</span>
-<span class="nc" id="L528">            : clamp(Math.toIntExact(delta * 1000L / baseline));</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">        return baseline &lt;= 0</span>
+<span class="fc" id="L578">            ? 0</span>
+<span class="fc" id="L579">            : clamp(Math.toIntExact(delta * 1000L / baseline));</span>
     }
 
     private static int clamp(int value) {
-<span class="fc" id="L532">        return Math.max(-1000, Math.min(1000, value));</span>
+<span class="fc" id="L583">        return Math.max(-1000, Math.min(1000, value));</span>
+    }
+
+    private static long add(long left, long right) {
+        try {
+<span class="fc" id="L588">            return Math.addExact(left, right);</span>
+<span class="nc" id="L589">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L590">            return Long.MAX_VALUE;</span>
+        }
     }
 
     private static String stableFailure(Throwable failure) {
-<span class="nc" id="L536">        String message = failure.getMessage();</span>
-<span class="nc" id="L537">        return failure.getClass().getSimpleName()</span>
-<span class="nc bnc" id="L538" title="All 4 branches missed.">            + (message == null || message.isBlank()</span>
-<span class="nc" id="L539">                ? &quot;&quot;</span>
-<span class="nc" id="L540">                : &quot;:&quot; + message.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim());</span>
+<span class="nc" id="L595">        String message = failure.getMessage();</span>
+<span class="nc" id="L596">        return failure.getClass().getSimpleName()</span>
+<span class="nc bnc" id="L597" title="All 4 branches missed.">            + (message == null || message.isBlank()</span>
+<span class="nc" id="L598">                ? &quot;&quot;</span>
+<span class="nc" id="L599">                : &quot;:&quot; + message.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim());</span>
     }
 
-<span class="fc" id="L543">    private record PathAudit(</span>
+<span class="fc" id="L602">    private record EnginePair(</span>
+        MeasuredTransformationEngine baseline,
+        MeasuredTransformationEngine candidate
+    ) {
+    }
+
+<span class="fc" id="L608">    private record PathAudit(</span>
         PathCorrectness correctness,
-        int primitiveSteps
+        int primitiveSteps,
+        long auditCalls
     ) {
     }
 
     @FunctionalInterface
-    interface GoalSearchRunner {
-        GoalSearchResult search(
-            TransformationEngine engine,
+    interface WorkSearchRunner {
+        Result search(
+            MeasuredTransformationEngine engine,
             String input,
             String target,
-            SearchHeuristic heuristic);
+            Budget budget);
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

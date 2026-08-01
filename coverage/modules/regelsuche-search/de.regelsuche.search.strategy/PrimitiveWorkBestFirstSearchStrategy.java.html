@@ -1,0 +1,743 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrimitiveWorkBestFirstSearchStrategy.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">PrimitiveWorkBestFirstSearchStrategy.java</span></div><h1>PrimitiveWorkBestFirstSearchStrategy.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.scoring.ExpressionScore;
+import de.regelsuche.scoring.ExpressionScorer;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.RewriteKind;
+import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationBatch;
+import de.regelsuche.transform.TransformationWorkMetrics;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.PriorityQueue;
+import java.util.Set;
+
+/**
+ * Deterministic syntax-targeted best-first search with explicit primitive-step
+ * and total-work budgets.
+ *
+ * &lt;p&gt;Ordinary search-edge depth remains visible, but it never substitutes for
+ * primitive depth. A composed program edge containing three primitive rewrites
+ * consumes three primitive steps before it can enter the frontier. The total
+ * work budget reserves one unit per possible primitive path edge for later
+ * exact auditing; the remainder bounds transformation formation and outer
+ * search administration.&lt;/p&gt;
+ */
+<span class="fc" id="L32">public final class PrimitiveWorkBestFirstSearchStrategy {</span>
+    public Result search(Problem problem) {
+<span class="fc" id="L34">        Objects.requireNonNull(problem, &quot;problem&quot;);</span>
+<span class="fc" id="L35">        State root = State.root(problem);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (isTarget(root, problem)) {</span>
+<span class="nc" id="L37">            return rootResult(problem, root);</span>
+        }
+
+<span class="fc" id="L40">        SearchContext context = SearchContext.start(problem, root);</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        while (context.canContinue(problem)) {</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (processNextState(problem, context) == LoopAction.STOP) {</span>
+<span class="fc" id="L43">                break;</span>
+            }
+        }
+<span class="fc" id="L46">        return finish(problem, context);</span>
+    }
+
+    private static Result rootResult(Problem problem, State root) {
+<span class="nc" id="L50">        return result(</span>
+            problem,
+<span class="nc" id="L52">            List.of(root),</span>
+            root,
+            root,
+            Status.ROOT_ALREADY_TARGET,
+            new MutableMetrics());
+    }
+
+    private static LoopAction processNextState(
+        Problem problem,
+        SearchContext context
+    ) {
+<span class="fc" id="L63">        State current = context.poll();</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (!context.visit(current)) {</span>
+<span class="nc" id="L65">            return context.prune(problem, PruneKind.DUPLICATE);</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (context.exceedsWorkBudget(problem)) {</span>
+<span class="nc" id="L68">            return LoopAction.STOP;</span>
+        }
+
+<span class="fc" id="L71">        context.considerBest(current, problem);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (isTarget(current, problem)) {</span>
+<span class="fc" id="L73">            context.reached = current;</span>
+<span class="fc" id="L74">            return LoopAction.STOP;</span>
+        }
+<span class="fc" id="L76">        if (current.primitiveDepth()</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                &gt;= problem.budget().maxPrimitiveSteps()) {</span>
+<span class="nc" id="L78">            return context.prune(problem, PruneKind.PRIMITIVE_BUDGET);</span>
+        }
+<span class="fc" id="L80">        return expand(problem, context, current);</span>
+    }
+
+    private static LoopAction expand(
+        Problem problem,
+        SearchContext context,
+        State current
+    ) {
+<span class="fc" id="L88">        TransformationBatch batch = problem.engine()</span>
+<span class="fc" id="L89">            .transformMeasured(current.expression());</span>
+<span class="fc" id="L90">        context.account(batch);</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (context.exceedsWorkBudget(problem)) {</span>
+<span class="fc" id="L92">            return LoopAction.STOP;</span>
+        }
+
+<span class="fc" id="L95">        List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L96">            batch.transformations());</span>
+<span class="fc" id="L97">        transformations.sort(transformationComparator(problem));</span>
+<span class="fc" id="L98">        return enqueueCandidates(problem, context, current, transformations);</span>
+    }
+
+    private static LoopAction enqueueCandidates(
+        Problem problem,
+        SearchContext context,
+        State current,
+        List&lt;Transformation&gt; transformations
+    ) {
+<span class="fc" id="L107">        int accepted = 0;</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (context.metrics.workBudgetExceeded) {</span>
+<span class="nc" id="L110">                return LoopAction.STOP;</span>
+            }
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (accepted &gt;= problem.budget().maxCandidatesPerState()) {</span>
+<span class="nc" id="L113">                return context.prune(problem, PruneKind.CANDIDATE_BUDGET);</span>
+            }
+<span class="fc" id="L115">            CandidateAction action = processCandidate(</span>
+                problem, context, current, transformation);
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (action == CandidateAction.STOP) {</span>
+<span class="nc" id="L118">                return LoopAction.STOP;</span>
+            }
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            if (action == CandidateAction.ENQUEUED) {</span>
+<span class="fc" id="L121">                accepted++;</span>
+            }
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">        return LoopAction.CONTINUE;</span>
+    }
+
+    private static CandidateAction processCandidate(
+        Problem problem,
+        SearchContext context,
+        State current,
+        Transformation transformation
+    ) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (current.appliedRuleApplications().contains(</span>
+<span class="fc" id="L134">                transformation.applicationKey())) {</span>
+<span class="nc" id="L135">            return context.reject(problem, PruneKind.REPEATED_APPLICATION);</span>
+        }
+
+<span class="fc" id="L138">        int nextExpandingSteps = nextExpandingSteps(current, transformation);</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (nextExpandingSteps &gt; problem.budget().maxExpandingSteps()) {</span>
+<span class="nc" id="L140">            return context.reject(problem, PruneKind.EXPANSION_BUDGET);</span>
+        }
+
+<span class="fc" id="L143">        int nextPrimitiveDepth = nextPrimitiveDepth(current, transformation);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (nextPrimitiveDepth &lt; 0</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                || nextPrimitiveDepth &gt; problem.budget().maxPrimitiveSteps()) {</span>
+<span class="fc" id="L146">            return context.reject(problem, PruneKind.PRIMITIVE_BUDGET);</span>
+        }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (transformation.transformedExpression().equals(</span>
+<span class="fc" id="L149">                current.expression())) {</span>
+<span class="nc" id="L150">            return context.reject(problem, PruneKind.SAME_EXPRESSION);</span>
+        }
+
+<span class="fc" id="L153">        State next = current.next(</span>
+            problem,
+            transformation,
+            nextPrimitiveDepth,
+            nextExpandingSteps);
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (!context.queue(next)) {</span>
+<span class="fc" id="L159">            return context.reject(problem, PruneKind.DUPLICATE);</span>
+        }
+<span class="fc" id="L161">        context.metrics.enqueuedStates = add(</span>
+            context.metrics.enqueuedStates, 1);
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        return context.exceedsWorkBudget(problem)</span>
+<span class="nc" id="L164">            ? CandidateAction.STOP</span>
+<span class="fc" id="L165">            : CandidateAction.ENQUEUED;</span>
+    }
+
+    private static int nextExpandingSteps(
+        State current,
+        Transformation transformation
+    ) {
+<span class="fc" id="L172">        return current.expandingSteps()</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);</span>
+    }
+
+    private static int nextPrimitiveDepth(
+        State current,
+        Transformation transformation
+    ) {
+        try {
+<span class="fc" id="L181">            return Math.addExact(</span>
+<span class="fc" id="L182">                current.primitiveDepth(),</span>
+<span class="fc" id="L183">                transformation.primitiveStepCount());</span>
+<span class="nc" id="L184">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L185">            return -1;</span>
+        }
+    }
+
+    private static boolean isTarget(State state, Problem problem) {
+<span class="fc" id="L190">        return state.expression().equals(problem.targetExpression());</span>
+    }
+
+    private static Result finish(Problem problem, SearchContext context) {
+<span class="fc" id="L194">        return result(</span>
+            problem,
+            context.explored,
+            context.reached,
+            context.best,
+<span class="fc" id="L199">            status(problem, context),</span>
+            context.metrics);
+    }
+
+    private static Status status(Problem problem, SearchContext context) {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (context.reached != null) {</span>
+<span class="fc" id="L205">            return Status.REACHED;</span>
+        }
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (context.metrics.workBudgetExceeded) {</span>
+<span class="fc" id="L208">            return Status.WORK_BUDGET;</span>
+        }
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (!context.frontier.isEmpty()</span>
+<span class="nc" id="L211">                &amp;&amp; context.explored.size()</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                    &gt;= problem.budget().maxExploredStates()) {</span>
+<span class="nc" id="L213">            return Status.OUTER_STATE_BUDGET;</span>
+        }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (context.metrics.candidateBudgetPrunes &gt; 0) {</span>
+<span class="nc" id="L216">            return Status.CANDIDATE_BUDGET;</span>
+        }
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (context.metrics.primitiveBudgetPrunes &gt; 0) {</span>
+<span class="fc" id="L219">            return Status.PRIMITIVE_BUDGET;</span>
+        }
+<span class="nc bnc" id="L221" title="All 4 branches missed.">        if (context.metrics.expandedStates &gt; 0</span>
+                &amp;&amp; context.metrics.generatedTransformations == 0) {
+<span class="nc" id="L223">            return Status.NO_TRANSFORMATIONS;</span>
+        }
+<span class="nc" id="L225">        return Status.FRONTIER_EXHAUSTED;</span>
+    }
+
+    private static Result result(
+        Problem problem,
+        List&lt;State&gt; explored,
+        State reached,
+        State best,
+        Status status,
+        MutableMetrics metrics
+    ) {
+<span class="fc" id="L236">        return new Result(</span>
+            explored,
+            reached,
+            best,
+            status,
+            new Metrics(
+<span class="fc" id="L242">                explored.size(),</span>
+                metrics.expandedStates,
+                metrics.generatedTransformations,
+                metrics.enqueuedStates,
+                metrics.duplicatePrunes,
+                metrics.repeatedApplicationPrunes,
+                metrics.sameExpressionPrunes,
+                metrics.expansionBudgetPrunes,
+                metrics.primitiveBudgetPrunes,
+                metrics.candidateBudgetPrunes,
+                metrics.statesWithoutTransformations,
+                metrics.engineBatches,
+                metrics.work,
+<span class="fc" id="L255">                problem.budget().maxPrimitiveSteps(),</span>
+<span class="fc" id="L256">                problem.budget().maxWorkUnits()));</span>
+    }
+
+    private static Comparator&lt;State&gt; comparator(Problem problem) {
+<span class="fc" id="L260">        return Comparator</span>
+<span class="fc" id="L261">            .comparingInt((State state) -&gt; priority(state, problem))</span>
+<span class="fc" id="L262">            .thenComparingInt(State::primitiveDepth)</span>
+<span class="fc" id="L263">            .thenComparingInt(State::edgeDepth)</span>
+<span class="fc" id="L264">            .thenComparing(State::expression)</span>
+<span class="pc" id="L265">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.appliedRuleIds()))</span>
+<span class="pc" id="L266">            .thenComparing(state -&gt; String.join(&quot;-&gt;&quot;, state.path()));</span>
+    }
+
+    private static Comparator&lt;Transformation&gt; transformationComparator(
+        Problem problem
+    ) {
+<span class="fc" id="L272">        return Comparator</span>
+<span class="fc" id="L273">            .comparingInt((Transformation transformation) -&gt;</span>
+<span class="fc" id="L274">                syntaxDistance(</span>
+<span class="fc" id="L275">                    transformation.transformedExpression(),</span>
+<span class="fc" id="L276">                    problem.targetExpression(),</span>
+<span class="fc" id="L277">                    problem.canonicalizer()))</span>
+<span class="fc" id="L278">            .thenComparingInt(Transformation::primitiveStepCount)</span>
+<span class="fc" id="L279">            .thenComparing(Transformation::rule)</span>
+<span class="fc" id="L280">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L281">            .thenComparing(Transformation::applicationKey);</span>
+    }
+
+    private static int priority(State state, Problem problem) {
+<span class="fc" id="L285">        long value = state.score().weightedTotal();</span>
+<span class="fc" id="L286">        value += (long) state.primitiveDepth() * 2L;</span>
+<span class="fc" id="L287">        value += (long) state.expandingSteps() * 5L;</span>
+<span class="fc" id="L288">        value += syntaxDistance(</span>
+<span class="fc" id="L289">            state.expression(),</span>
+<span class="fc" id="L290">            problem.targetExpression(),</span>
+<span class="fc" id="L291">            problem.canonicalizer());</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        return value &gt;= Integer.MAX_VALUE / 2</span>
+<span class="nc" id="L293">            ? Integer.MAX_VALUE / 2</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">            : value &lt;= Integer.MIN_VALUE / 2</span>
+<span class="nc" id="L295">                ? Integer.MIN_VALUE / 2</span>
+<span class="fc" id="L296">                : (int) value;</span>
+    }
+
+    private static int syntaxDistance(
+        String expression,
+        String target,
+        ExpressionCanonicalizer canonicalizer
+    ) {
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (expression.equals(target)) {</span>
+<span class="fc" id="L305">            return 0;</span>
+        }
+        int nodes;
+        int targetNodes;
+        try {
+<span class="fc" id="L310">            nodes = canonicalizer.astNodeCount(expression);</span>
+<span class="fc" id="L311">            targetNodes = canonicalizer.astNodeCount(target);</span>
+<span class="nc" id="L312">        } catch (RuntimeException exception) {</span>
+<span class="nc" id="L313">            nodes = expression.length();</span>
+<span class="nc" id="L314">            targetNodes = target.length();</span>
+<span class="fc" id="L315">        }</span>
+<span class="fc" id="L316">        long distance = 1L + Math.abs((long) nodes - targetNodes)</span>
+<span class="fc" id="L317">            + Math.abs((long) expression.length() - target.length());</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        return distance &gt;= Integer.MAX_VALUE / 4</span>
+<span class="nc" id="L319">            ? Integer.MAX_VALUE / 4</span>
+<span class="fc" id="L320">            : (int) distance;</span>
+    }
+
+    private static boolean better(
+        State candidate,
+        State current,
+        Problem problem
+    ) {
+<span class="fc" id="L328">        int candidatePriority = priority(candidate, problem);</span>
+<span class="fc" id="L329">        int currentPriority = priority(current, problem);</span>
+<span class="pc bpc" id="L330" title="1 of 4 branches missed.">        return candidatePriority &lt; currentPriority</span>
+            || (candidatePriority == currentPriority
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">                &amp;&amp; candidate.primitiveDepth() &lt; current.primitiveDepth())</span>
+            || (candidatePriority == currentPriority
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                &amp;&amp; candidate.primitiveDepth() == current.primitiveDepth()</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">                &amp;&amp; candidate.expression().compareTo(current.expression()) &lt; 0);</span>
+    }
+
+    private static String stateKey(State state) {
+<span class="fc" id="L339">        return state.expression() + &quot;\u0000&quot;</span>
+<span class="fc" id="L340">            + state.primitiveDepth() + &quot;\u0000&quot;</span>
+<span class="fc" id="L341">            + AssumptionSignature.ofExpressions(state.assumptions()).fingerprint();</span>
+    }
+
+    private static String normalize(String expression, String name) {
+<span class="pc bpc" id="L345" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L346">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L348">        return expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+    private static long add(long left, long right) {
+        try {
+<span class="fc" id="L353">            return Math.addExact(left, right);</span>
+<span class="nc" id="L354">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L355">            return Long.MAX_VALUE;</span>
+        }
+    }
+
+    public record Problem(
+        String inputExpression,
+        String targetExpression,
+        MeasuredTransformationEngine engine,
+        ExpressionScorer scorer,
+        ExpressionCanonicalizer canonicalizer,
+        Budget budget
+    ) {
+<span class="fc" id="L367">        public Problem {</span>
+<span class="fc" id="L368">            inputExpression = normalize(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L369">            targetExpression = normalize(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc" id="L370">            Objects.requireNonNull(engine, &quot;engine&quot;);</span>
+<span class="fc" id="L371">            Objects.requireNonNull(scorer, &quot;scorer&quot;);</span>
+<span class="fc" id="L372">            Objects.requireNonNull(canonicalizer, &quot;canonicalizer&quot;);</span>
+<span class="fc" id="L373">            Objects.requireNonNull(budget, &quot;budget&quot;);</span>
+<span class="fc" id="L374">        }</span>
+    }
+
+    /** Total work budget including a worst-case exact path-audit reserve. */
+    public record Budget(
+        int maxPrimitiveSteps,
+        int maxExploredStates,
+        int maxCandidatesPerState,
+        int maxExpandingSteps,
+        long maxWorkUnits
+    ) {
+<span class="fc" id="L385">        public Budget {</span>
+<span class="pc bpc" id="L386" title="5 of 10 branches missed.">            if (maxPrimitiveSteps &lt; 1</span>
+                    || maxExploredStates &lt; 1
+                    || maxCandidatesPerState &lt; 1
+                    || maxExpandingSteps &lt; 0
+                    || maxWorkUnits &lt;= maxPrimitiveSteps) {
+<span class="nc" id="L391">                throw new IllegalArgumentException(</span>
+                    &quot;primitive-work search budgets are invalid or leave no &quot;
+                        + &quot;mechanical work after exact path-audit reservation&quot;);
+            }
+<span class="fc" id="L395">        }</span>
+
+        public long exactPathAuditReserve() {
+<span class="fc" id="L398">            return maxPrimitiveSteps;</span>
+        }
+
+        public long mechanicalSearchWorkBudget() {
+<span class="fc" id="L402">            return maxWorkUnits - exactPathAuditReserve();</span>
+        }
+    }
+
+    public record State(
+        String expression,
+        int edgeDepth,
+        int primitiveDepth,
+        ExpressionScore score,
+        List&lt;String&gt; path,
+        List&lt;String&gt; appliedRuleIds,
+        List&lt;String&gt; primitiveRuleIds,
+        Set&lt;String&gt; appliedRuleApplications,
+        List&lt;String&gt; assumptions,
+        int expandingSteps,
+        String canonicalHash
+    ) {
+<span class="fc" id="L419">        public State {</span>
+<span class="fc" id="L420">            expression = normalize(expression, &quot;expression&quot;);</span>
+<span class="pc bpc" id="L421" title="3 of 6 branches missed.">            if (edgeDepth &lt; 0 || primitiveDepth &lt; 0 || expandingSteps &lt; 0) {</span>
+<span class="nc" id="L422">                throw new IllegalArgumentException(</span>
+                    &quot;state depths must not be negative&quot;);
+            }
+<span class="fc" id="L425">            Objects.requireNonNull(score, &quot;score&quot;);</span>
+<span class="fc" id="L426">            path = List.copyOf(path);</span>
+<span class="fc" id="L427">            appliedRuleIds = List.copyOf(appliedRuleIds);</span>
+<span class="fc" id="L428">            primitiveRuleIds = List.copyOf(primitiveRuleIds);</span>
+<span class="fc" id="L429">            appliedRuleApplications = Set.copyOf(appliedRuleApplications);</span>
+<span class="fc" id="L430">            assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L431">                .normalizedAssumptions();</span>
+<span class="fc" id="L432">            canonicalHash = normalize(canonicalHash, &quot;canonicalHash&quot;);</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            if (primitiveRuleIds.size() != primitiveDepth) {</span>
+<span class="nc" id="L434">                throw new IllegalArgumentException(</span>
+                    &quot;primitiveDepth must equal retained primitive lineage size&quot;);
+            }
+<span class="fc" id="L437">        }</span>
+
+        private static State root(Problem problem) {
+<span class="fc" id="L440">            String input = problem.inputExpression();</span>
+<span class="fc" id="L441">            return new State(</span>
+                input,
+                0,
+                0,
+<span class="fc" id="L445">                problem.scorer().score(input),</span>
+<span class="fc" id="L446">                List.of(input),</span>
+<span class="fc" id="L447">                List.of(),</span>
+<span class="fc" id="L448">                List.of(),</span>
+<span class="fc" id="L449">                Set.of(),</span>
+<span class="fc" id="L450">                List.of(),</span>
+                0,
+<span class="fc" id="L452">                problem.canonicalizer().stableHash(input));</span>
+        }
+
+        private State next(
+            Problem problem,
+            Transformation transformation,
+            int nextPrimitiveDepth,
+            int nextExpandingSteps
+        ) {
+<span class="fc" id="L461">            String output = transformation.transformedExpression();</span>
+<span class="fc" id="L462">            List&lt;String&gt; nextPath = append(path, output);</span>
+<span class="fc" id="L463">            List&lt;String&gt; nextRules = append(</span>
+<span class="fc" id="L464">                appliedRuleIds, transformation.rule());</span>
+<span class="fc" id="L465">            List&lt;String&gt; nextPrimitiveRules = new ArrayList&lt;&gt;(</span>
+                primitiveRuleIds);
+<span class="fc" id="L467">            nextPrimitiveRules.addAll(transformation.primitiveRuleIds());</span>
+<span class="fc" id="L468">            Set&lt;String&gt; nextApplications = new LinkedHashSet&lt;&gt;(</span>
+                appliedRuleApplications);
+<span class="fc" id="L470">            nextApplications.add(transformation.applicationKey());</span>
+<span class="fc" id="L471">            List&lt;String&gt; nextAssumptions = new ArrayList&lt;&gt;(assumptions);</span>
+<span class="fc" id="L472">            nextAssumptions.addAll(transformation.assumptions());</span>
+<span class="fc" id="L473">            return new State(</span>
+                output,
+                edgeDepth + 1,
+                nextPrimitiveDepth,
+<span class="fc" id="L477">                problem.scorer().score(output),</span>
+                nextPath,
+                nextRules,
+                nextPrimitiveRules,
+                nextApplications,
+                nextAssumptions,
+                nextExpandingSteps,
+<span class="fc" id="L484">                problem.canonicalizer().stableHash(output));</span>
+        }
+
+        public boolean programUsed() {
+<span class="nc" id="L488">            return appliedRuleIds.stream()</span>
+<span class="nc" id="L489">                .anyMatch(rule -&gt; rule.startsWith(&quot;program:&quot;));</span>
+        }
+
+        private static &lt;T&gt; List&lt;T&gt; append(List&lt;T&gt; values, T value) {
+<span class="fc" id="L493">            List&lt;T&gt; result = new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L494">            result.add(value);</span>
+<span class="fc" id="L495">            return List.copyOf(result);</span>
+        }
+    }
+
+<span class="fc" id="L499">    public enum Status {</span>
+<span class="fc" id="L500">        ROOT_ALREADY_TARGET,</span>
+<span class="fc" id="L501">        REACHED,</span>
+<span class="fc" id="L502">        WORK_BUDGET,</span>
+<span class="fc" id="L503">        OUTER_STATE_BUDGET,</span>
+<span class="fc" id="L504">        PRIMITIVE_BUDGET,</span>
+<span class="fc" id="L505">        CANDIDATE_BUDGET,</span>
+<span class="fc" id="L506">        NO_TRANSFORMATIONS,</span>
+<span class="fc" id="L507">        FRONTIER_EXHAUSTED</span>
+    }
+
+    public record Metrics(
+        int exploredStates,
+        long expandedStates,
+        long generatedTransformations,
+        long enqueuedStates,
+        long duplicatePrunes,
+        long repeatedApplicationPrunes,
+        long sameExpressionPrunes,
+        long expansionBudgetPrunes,
+        long primitiveBudgetPrunes,
+        long candidateBudgetPrunes,
+        long statesWithoutTransformations,
+        long engineBatches,
+        TransformationWorkMetrics transformationWork,
+        int primitiveStepBudget,
+        long workUnitBudget
+    ) {
+<span class="fc" id="L527">        public Metrics {</span>
+<span class="fc" id="L528">            Objects.requireNonNull(transformationWork, &quot;transformationWork&quot;);</span>
+<span class="fc" id="L529">        }</span>
+
+        public long exactPathAuditReserve() {
+<span class="fc" id="L532">            return primitiveStepBudget;</span>
+        }
+
+        public long mechanicalSearchWorkBudget() {
+<span class="fc" id="L536">            return workUnitBudget - exactPathAuditReserve();</span>
+        }
+
+        public long outerSearchWorkUnits() {
+<span class="fc" id="L540">            long total = exploredStates;</span>
+<span class="fc" id="L541">            total = add(total, expandedStates);</span>
+<span class="fc" id="L542">            total = add(total, generatedTransformations);</span>
+<span class="fc" id="L543">            total = add(total, enqueuedStates);</span>
+<span class="fc" id="L544">            total = add(total, duplicatePrunes);</span>
+<span class="fc" id="L545">            total = add(total, repeatedApplicationPrunes);</span>
+<span class="fc" id="L546">            total = add(total, sameExpressionPrunes);</span>
+<span class="fc" id="L547">            total = add(total, expansionBudgetPrunes);</span>
+<span class="fc" id="L548">            total = add(total, primitiveBudgetPrunes);</span>
+<span class="fc" id="L549">            total = add(total, candidateBudgetPrunes);</span>
+<span class="fc" id="L550">            total = add(total, statesWithoutTransformations);</span>
+<span class="fc" id="L551">            return add(total, engineBatches);</span>
+        }
+
+        public long totalMechanicalWorkUnits() {
+<span class="fc" id="L555">            return add(</span>
+<span class="fc" id="L556">                transformationWork.totalWorkUnits(),</span>
+<span class="fc" id="L557">                outerSearchWorkUnits());</span>
+        }
+    }
+
+    public record Result(
+        List&lt;State&gt; exploredStates,
+        State reachedState,
+        State bestState,
+        Status status,
+        Metrics metrics
+    ) {
+<span class="fc" id="L568">        public Result {</span>
+<span class="fc" id="L569">            exploredStates = List.copyOf(exploredStates);</span>
+<span class="fc" id="L570">            Objects.requireNonNull(bestState, &quot;bestState&quot;);</span>
+<span class="fc" id="L571">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L572">            Objects.requireNonNull(metrics, &quot;metrics&quot;);</span>
+<span class="fc" id="L573">        }</span>
+
+        public boolean reached() {
+<span class="pc bpc" id="L576" title="1 of 4 branches missed.">            return status == Status.REACHED</span>
+                || status == Status.ROOT_ALREADY_TARGET;
+        }
+    }
+
+<span class="fc" id="L581">    private enum LoopAction {</span>
+<span class="fc" id="L582">        CONTINUE,</span>
+<span class="fc" id="L583">        STOP</span>
+    }
+
+<span class="fc" id="L586">    private enum CandidateAction {</span>
+<span class="fc" id="L587">        ENQUEUED,</span>
+<span class="fc" id="L588">        REJECTED,</span>
+<span class="fc" id="L589">        STOP</span>
+    }
+
+<span class="fc" id="L592">    private enum PruneKind {</span>
+<span class="fc" id="L593">        DUPLICATE,</span>
+<span class="fc" id="L594">        REPEATED_APPLICATION,</span>
+<span class="fc" id="L595">        SAME_EXPRESSION,</span>
+<span class="fc" id="L596">        EXPANSION_BUDGET,</span>
+<span class="fc" id="L597">        PRIMITIVE_BUDGET,</span>
+<span class="fc" id="L598">        CANDIDATE_BUDGET</span>
+    }
+
+    private static final class SearchContext {
+        private final PriorityQueue&lt;State&gt; frontier;
+<span class="fc" id="L603">        private final Set&lt;String&gt; queued = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L604">        private final Set&lt;String&gt; visited = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L605">        private final List&lt;State&gt; explored = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L606">        private final MutableMetrics metrics = new MutableMetrics();</span>
+        private State best;
+        private State reached;
+
+<span class="fc" id="L610">        private SearchContext(Problem problem, State root) {</span>
+<span class="fc" id="L611">            frontier = new PriorityQueue&lt;&gt;(comparator(problem));</span>
+<span class="fc" id="L612">            frontier.add(root);</span>
+<span class="fc" id="L613">            queued.add(stateKey(root));</span>
+<span class="fc" id="L614">            best = root;</span>
+<span class="fc" id="L615">        }</span>
+
+        private static SearchContext start(Problem problem, State root) {
+<span class="fc" id="L618">            return new SearchContext(problem, root);</span>
+        }
+
+        private boolean canContinue(Problem problem) {
+<span class="fc bfc" id="L622" title="All 2 branches covered.">            return !frontier.isEmpty()</span>
+<span class="pc bpc" id="L623" title="2 of 4 branches missed.">                &amp;&amp; explored.size() &lt; problem.budget().maxExploredStates()</span>
+                &amp;&amp; !metrics.workBudgetExceeded;
+        }
+
+        private State poll() {
+<span class="fc" id="L628">            State current = frontier.remove();</span>
+<span class="fc" id="L629">            queued.remove(stateKey(current));</span>
+<span class="fc" id="L630">            return current;</span>
+        }
+
+        private boolean visit(State current) {
+<span class="pc bpc" id="L634" title="1 of 2 branches missed.">            if (!visited.add(stateKey(current))) {</span>
+<span class="nc" id="L635">                return false;</span>
+            }
+<span class="fc" id="L637">            explored.add(current);</span>
+<span class="fc" id="L638">            return true;</span>
+        }
+
+        private void considerBest(State current, Problem problem) {
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">            if (better(current, best, problem)) {</span>
+<span class="nc" id="L643">                best = current;</span>
+            }
+<span class="fc" id="L645">        }</span>
+
+        private void account(TransformationBatch batch) {
+<span class="fc" id="L648">            metrics.engineBatches = add(metrics.engineBatches, 1);</span>
+<span class="fc" id="L649">            metrics.work = metrics.work.plus(batch.workMetrics());</span>
+<span class="fc" id="L650">            metrics.expandedStates = add(metrics.expandedStates, 1);</span>
+<span class="fc" id="L651">            metrics.generatedTransformations = add(</span>
+                metrics.generatedTransformations,
+<span class="fc" id="L653">                batch.transformations().size());</span>
+<span class="fc bfc" id="L654" title="All 2 branches covered.">            if (batch.transformations().isEmpty()) {</span>
+<span class="fc" id="L655">                metrics.statesWithoutTransformations = add(</span>
+                    metrics.statesWithoutTransformations, 1);
+            }
+<span class="fc" id="L658">        }</span>
+
+        private boolean queue(State state) {
+<span class="fc" id="L661">            String key = stateKey(state);</span>
+<span class="pc bpc" id="L662" title="1 of 4 branches missed.">            if (visited.contains(key) || !queued.add(key)) {</span>
+<span class="fc" id="L663">                return false;</span>
+            }
+<span class="fc" id="L665">            frontier.add(state);</span>
+<span class="fc" id="L666">            return true;</span>
+        }
+
+        private LoopAction prune(Problem problem, PruneKind kind) {
+<span class="nc" id="L670">            increment(kind);</span>
+<span class="nc bnc" id="L671" title="All 2 branches missed.">            return exceedsWorkBudget(problem)</span>
+<span class="nc" id="L672">                ? LoopAction.STOP</span>
+<span class="nc" id="L673">                : LoopAction.CONTINUE;</span>
+        }
+
+        private CandidateAction reject(Problem problem, PruneKind kind) {
+<span class="fc" id="L677">            increment(kind);</span>
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">            return exceedsWorkBudget(problem)</span>
+<span class="nc" id="L679">                ? CandidateAction.STOP</span>
+<span class="fc" id="L680">                : CandidateAction.REJECTED;</span>
+        }
+
+        private void increment(PruneKind kind) {
+<span class="pc bpc" id="L684" title="5 of 7 branches missed.">            switch (kind) {</span>
+<span class="fc" id="L685">                case DUPLICATE -&gt; metrics.duplicatePrunes = add(</span>
+                    metrics.duplicatePrunes, 1);
+                case REPEATED_APPLICATION -&gt;
+<span class="nc" id="L688">                    metrics.repeatedApplicationPrunes = add(</span>
+                        metrics.repeatedApplicationPrunes, 1);
+<span class="nc" id="L690">                case SAME_EXPRESSION -&gt; metrics.sameExpressionPrunes = add(</span>
+                    metrics.sameExpressionPrunes, 1);
+<span class="nc" id="L692">                case EXPANSION_BUDGET -&gt; metrics.expansionBudgetPrunes = add(</span>
+                    metrics.expansionBudgetPrunes, 1);
+<span class="fc" id="L694">                case PRIMITIVE_BUDGET -&gt; metrics.primitiveBudgetPrunes = add(</span>
+                    metrics.primitiveBudgetPrunes, 1);
+<span class="nc" id="L696">                case CANDIDATE_BUDGET -&gt; metrics.candidateBudgetPrunes = add(</span>
+                    metrics.candidateBudgetPrunes, 1);
+            }
+<span class="fc" id="L699">        }</span>
+
+        private boolean exceedsWorkBudget(Problem problem) {
+<span class="fc" id="L702">            if (metrics.totalMechanicalWorkUnits(explored.size())</span>
+<span class="fc bfc" id="L703" title="All 2 branches covered.">                    &gt; problem.budget().mechanicalSearchWorkBudget()) {</span>
+<span class="fc" id="L704">                metrics.workBudgetExceeded = true;</span>
+            }
+<span class="fc" id="L706">            return metrics.workBudgetExceeded;</span>
+        }
+    }
+
+<span class="fc" id="L710">    private static final class MutableMetrics {</span>
+        private long expandedStates;
+        private long generatedTransformations;
+        private long enqueuedStates;
+        private long duplicatePrunes;
+        private long repeatedApplicationPrunes;
+        private long sameExpressionPrunes;
+        private long expansionBudgetPrunes;
+        private long primitiveBudgetPrunes;
+        private long candidateBudgetPrunes;
+        private long statesWithoutTransformations;
+        private long engineBatches;
+<span class="fc" id="L722">        private TransformationWorkMetrics work =</span>
+            TransformationWorkMetrics.ZERO;
+        private boolean workBudgetExceeded;
+
+        private long totalMechanicalWorkUnits(int exploredStates) {
+<span class="fc" id="L727">            long total = exploredStates;</span>
+<span class="fc" id="L728">            total = add(total, expandedStates);</span>
+<span class="fc" id="L729">            total = add(total, generatedTransformations);</span>
+<span class="fc" id="L730">            total = add(total, enqueuedStates);</span>
+<span class="fc" id="L731">            total = add(total, duplicatePrunes);</span>
+<span class="fc" id="L732">            total = add(total, repeatedApplicationPrunes);</span>
+<span class="fc" id="L733">            total = add(total, sameExpressionPrunes);</span>
+<span class="fc" id="L734">            total = add(total, expansionBudgetPrunes);</span>
+<span class="fc" id="L735">            total = add(total, primitiveBudgetPrunes);</span>
+<span class="fc" id="L736">            total = add(total, candidateBudgetPrunes);</span>
+<span class="fc" id="L737">            total = add(total, statesWithoutTransformations);</span>
+<span class="fc" id="L738">            total = add(total, engineBatches);</span>
+<span class="fc" id="L739">            return add(total, work.totalWorkUnits());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SearchWorkMetrics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.strategy</a> &gt; <span class="el_source">SearchWorkMetrics.java</span></div><h1>SearchWorkMetrics.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.strategy;
+
+/**
+ * Deterministic outer-search work vector independent of transformation-engine
+ * and exact path-audit work.
+ */
+public record SearchWorkMetrics(
+    long exploredStates,
+    long expandedStates,
+    long generatedTransformations,
+    long enqueuedStates,
+    long duplicatePrunes,
+    long repeatedApplicationPrunes,
+    long sameExpressionPrunes,
+    long expansionBudgetPrunes,
+    long primitiveBudgetPrunes,
+    long candidateBudgetPrunes,
+    long statesWithoutTransformations,
+    long engineBatches
+) {
+<span class="nc" id="L21">    public static final SearchWorkMetrics ZERO = new SearchWorkMetrics(</span>
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+<span class="nc" id="L24">    public SearchWorkMetrics {</span>
+<span class="nc bnc" id="L25" title="All 24 branches missed.">        if (exploredStates &lt; 0</span>
+                || expandedStates &lt; 0
+                || generatedTransformations &lt; 0
+                || enqueuedStates &lt; 0
+                || duplicatePrunes &lt; 0
+                || repeatedApplicationPrunes &lt; 0
+                || sameExpressionPrunes &lt; 0
+                || expansionBudgetPrunes &lt; 0
+                || primitiveBudgetPrunes &lt; 0
+                || candidateBudgetPrunes &lt; 0
+                || statesWithoutTransformations &lt; 0
+                || engineBatches &lt; 0) {
+<span class="nc" id="L37">            throw new IllegalArgumentException(</span>
+                &quot;search work metrics must not be negative&quot;);
+        }
+<span class="nc" id="L40">    }</span>
+
+    public long totalWorkUnits() {
+<span class="nc" id="L43">        long total = exploredStates;</span>
+<span class="nc" id="L44">        total = add(total, expandedStates);</span>
+<span class="nc" id="L45">        total = add(total, generatedTransformations);</span>
+<span class="nc" id="L46">        total = add(total, enqueuedStates);</span>
+<span class="nc" id="L47">        total = add(total, duplicatePrunes);</span>
+<span class="nc" id="L48">        total = add(total, repeatedApplicationPrunes);</span>
+<span class="nc" id="L49">        total = add(total, sameExpressionPrunes);</span>
+<span class="nc" id="L50">        total = add(total, expansionBudgetPrunes);</span>
+<span class="nc" id="L51">        total = add(total, primitiveBudgetPrunes);</span>
+<span class="nc" id="L52">        total = add(total, candidateBudgetPrunes);</span>
+<span class="nc" id="L53">        total = add(total, statesWithoutTransformations);</span>
+<span class="nc" id="L54">        return add(total, engineBatches);</span>
+    }
+
+    private static long add(long left, long right) {
+        try {
+<span class="nc" id="L59">            return Math.addExact(left, right);</span>
+<span class="nc" id="L60">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L61">            return Long.MAX_VALUE;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

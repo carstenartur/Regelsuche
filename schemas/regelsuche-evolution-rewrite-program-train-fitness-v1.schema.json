@@ -4,222 +4,114 @@
   "title": "Regelsuche rewrite-program paired TRAIN fitness",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schema",
-    "suiteHash",
-    "evaluationProtocolHash",
-    "candidateHash",
-    "genomeHash",
-    "planHash",
-    "cases",
-    "rawComponents",
-    "blockers",
-    "validationStatus",
-    "finalTestStatus",
-    "proofStatus",
-    "externalNoveltyStatus",
-    "contentHash"
-  ],
+  "required": ["schema","suiteHash","evaluationProtocolHash","candidateHash","genomeHash","planHash","cases","rawComponents","blockers","validationStatus","finalTestStatus","proofStatus","externalNoveltyStatus","contentHash"],
   "properties": {
-    "schema": {
-      "const": "regelsuche.evolution-rewrite-program-train-fitness/v1"
-    },
-    "suiteHash": {
-      "$ref": "#/$defs/sha256"
-    },
-    "evaluationProtocolHash": {
-      "$ref": "#/$defs/sha256"
-    },
-    "candidateHash": {
-      "$ref": "#/$defs/sha256"
-    },
-    "genomeHash": {
-      "$ref": "#/$defs/sha256"
-    },
-    "planHash": {
-      "$ref": "#/$defs/sha256"
-    },
-    "cases": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "$ref": "#/$defs/case"
-      }
-    },
-    "rawComponents": {
-      "$ref": "#/$defs/rawComponents"
-    },
-    "blockers": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "$ref": "#/$defs/text"
-      }
-    },
-    "validationStatus": {
-      "const": "NOT_EVALUATED"
-    },
-    "finalTestStatus": {
-      "const": "NOT_EVALUATED"
-    },
-    "proofStatus": {
-      "const": "NOT_EVALUATED"
-    },
-    "externalNoveltyStatus": {
-      "const": "NOT_EVALUATED"
-    },
-    "contentHash": {
-      "$ref": "#/$defs/sha256"
-    }
+    "schema": {"const": "regelsuche.evolution-rewrite-program-train-fitness/v1"},
+    "suiteHash": {"$ref": "#/$defs/sha256"},
+    "evaluationProtocolHash": {"$ref": "#/$defs/sha256"},
+    "candidateHash": {"$ref": "#/$defs/sha256"},
+    "genomeHash": {"$ref": "#/$defs/sha256"},
+    "planHash": {"$ref": "#/$defs/sha256"},
+    "cases": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/case"}},
+    "rawComponents": {"$ref": "#/$defs/rawComponents"},
+    "blockers": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}},
+    "validationStatus": {"const": "NOT_EVALUATED"},
+    "finalTestStatus": {"const": "NOT_EVALUATED"},
+    "proofStatus": {"const": "NOT_EVALUATED"},
+    "externalNoveltyStatus": {"const": "NOT_EVALUATED"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
   },
   "$defs": {
-    "sha256": {
-      "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{2,127}$"},
+    "text": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+    "status": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+    "pathCorrectness": {"enum": ["CONFIRMED","REFUTED","MISSING_ASSUMPTION","UNSUPPORTED","NOT_EVALUATED"]},
+    "nonNegative": {"type": "integer", "minimum": 0},
+    "transformationWork": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engineInvocations","programNodeVisits","sourceInvocations","sourceCandidates","composedCandidates","requirementEvaluations","requirementRejections","priorityCandidatesOrdered","prunedCandidates","repeatIterations","repeatEndpoints","alternativeSelections","alternativesSkipped","duplicateCandidatesDropped","totalWorkUnits"],
+      "properties": {
+        "engineInvocations": {"$ref": "#/$defs/nonNegative"},
+        "programNodeVisits": {"$ref": "#/$defs/nonNegative"},
+        "sourceInvocations": {"$ref": "#/$defs/nonNegative"},
+        "sourceCandidates": {"$ref": "#/$defs/nonNegative"},
+        "composedCandidates": {"$ref": "#/$defs/nonNegative"},
+        "requirementEvaluations": {"$ref": "#/$defs/nonNegative"},
+        "requirementRejections": {"$ref": "#/$defs/nonNegative"},
+        "priorityCandidatesOrdered": {"$ref": "#/$defs/nonNegative"},
+        "prunedCandidates": {"$ref": "#/$defs/nonNegative"},
+        "repeatIterations": {"$ref": "#/$defs/nonNegative"},
+        "repeatEndpoints": {"$ref": "#/$defs/nonNegative"},
+        "alternativeSelections": {"$ref": "#/$defs/nonNegative"},
+        "alternativesSkipped": {"$ref": "#/$defs/nonNegative"},
+        "duplicateCandidatesDropped": {"$ref": "#/$defs/nonNegative"},
+        "totalWorkUnits": {"$ref": "#/$defs/nonNegative"}
+      }
     },
-    "id": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
-    },
-    "text": {
-      "type": "string",
-      "minLength": 1,
-      "pattern": ".*\\S.*"
-    },
-    "status": {
-      "type": "string",
-      "pattern": "^[A-Z][A-Z0-9_]*$"
-    },
-    "pathCorrectness": {
-      "enum": [
-        "CONFIRMED",
-        "REFUTED",
-        "MISSING_ASSUMPTION",
-        "UNSUPPORTED",
-        "NOT_EVALUATED"
-      ]
+    "searchWork": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exploredStates","expandedStates","generatedTransformations","enqueuedStates","duplicatePrunes","repeatedApplicationPrunes","sameExpressionPrunes","expansionBudgetPrunes","primitiveBudgetPrunes","candidateBudgetPrunes","statesWithoutTransformations","engineBatches","totalWorkUnits"],
+      "properties": {
+        "exploredStates": {"$ref": "#/$defs/nonNegative"},
+        "expandedStates": {"$ref": "#/$defs/nonNegative"},
+        "generatedTransformations": {"$ref": "#/$defs/nonNegative"},
+        "enqueuedStates": {"$ref": "#/$defs/nonNegative"},
+        "duplicatePrunes": {"$ref": "#/$defs/nonNegative"},
+        "repeatedApplicationPrunes": {"$ref": "#/$defs/nonNegative"},
+        "sameExpressionPrunes": {"$ref": "#/$defs/nonNegative"},
+        "expansionBudgetPrunes": {"$ref": "#/$defs/nonNegative"},
+        "primitiveBudgetPrunes": {"$ref": "#/$defs/nonNegative"},
+        "candidateBudgetPrunes": {"$ref": "#/$defs/nonNegative"},
+        "statesWithoutTransformations": {"$ref": "#/$defs/nonNegative"},
+        "engineBatches": {"$ref": "#/$defs/nonNegative"},
+        "totalWorkUnits": {"$ref": "#/$defs/nonNegative"}
+      }
     },
     "case": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "caseId",
-        "familyId",
-        "baselineStatus",
-        "candidateStatus",
-        "baselineReached",
-        "candidateReached",
-        "baselinePathCorrectness",
-        "candidatePathCorrectness",
-        "baselinePathLength",
-        "candidatePathLength",
-        "baselinePrimitiveSteps",
-        "candidatePrimitiveSteps",
-        "baselineExploredStates",
-        "candidateExploredStates",
-        "baselineGeneratedTransformations",
-        "candidateGeneratedTransformations",
-        "programUsed",
-        "newlySolved",
-        "reachabilityRegression",
-        "correctnessFailure",
-        "correctnessRegression"
-      ],
+      "required": ["caseId","familyId","baselineStatus","candidateStatus","baselineReached","candidateReached","baselinePathCorrectness","candidatePathCorrectness","baselinePathLength","candidatePathLength","baselinePrimitiveSteps","candidatePrimitiveSteps","baselineExploredStates","candidateExploredStates","baselineGeneratedTransformations","candidateGeneratedTransformations","baselineOuterSearchWorkUnits","candidateOuterSearchWorkUnits","baselineOuterSearchWork","candidateOuterSearchWork","baselinePathAuditCalls","candidatePathAuditCalls","baselineTotalWorkUnits","candidateTotalWorkUnits","baselineTransformationWork","candidateTransformationWork","programUsed","newlySolved","reachabilityRegression","correctnessFailure","correctnessRegression"],
       "properties": {
-        "caseId": {
-          "$ref": "#/$defs/id"
-        },
-        "familyId": {
-          "$ref": "#/$defs/id"
-        },
-        "baselineStatus": {
-          "$ref": "#/$defs/status"
-        },
-        "candidateStatus": {
-          "$ref": "#/$defs/status"
-        },
-        "baselineReached": {
-          "type": "boolean"
-        },
-        "candidateReached": {
-          "type": "boolean"
-        },
-        "baselinePathCorrectness": {
-          "$ref": "#/$defs/pathCorrectness"
-        },
-        "candidatePathCorrectness": {
-          "$ref": "#/$defs/pathCorrectness"
-        },
-        "baselinePathLength": {
-          "type": "integer",
-          "minimum": -1
-        },
-        "candidatePathLength": {
-          "type": "integer",
-          "minimum": -1
-        },
-        "baselinePrimitiveSteps": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "candidatePrimitiveSteps": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "baselineExploredStates": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "candidateExploredStates": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "baselineGeneratedTransformations": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "candidateGeneratedTransformations": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "programUsed": {
-          "type": "boolean"
-        },
-        "newlySolved": {
-          "type": "boolean"
-        },
-        "reachabilityRegression": {
-          "type": "boolean"
-        },
-        "correctnessFailure": {
-          "type": "boolean"
-        },
-        "correctnessRegression": {
-          "type": "boolean"
-        }
+        "caseId": {"$ref": "#/$defs/id"},
+        "familyId": {"$ref": "#/$defs/id"},
+        "baselineStatus": {"$ref": "#/$defs/status"},
+        "candidateStatus": {"$ref": "#/$defs/status"},
+        "baselineReached": {"type": "boolean"},
+        "candidateReached": {"type": "boolean"},
+        "baselinePathCorrectness": {"$ref": "#/$defs/pathCorrectness"},
+        "candidatePathCorrectness": {"$ref": "#/$defs/pathCorrectness"},
+        "baselinePathLength": {"type": "integer", "minimum": -1},
+        "candidatePathLength": {"type": "integer", "minimum": -1},
+        "baselinePrimitiveSteps": {"$ref": "#/$defs/nonNegative"},
+        "candidatePrimitiveSteps": {"$ref": "#/$defs/nonNegative"},
+        "baselineExploredStates": {"$ref": "#/$defs/nonNegative"},
+        "candidateExploredStates": {"$ref": "#/$defs/nonNegative"},
+        "baselineGeneratedTransformations": {"$ref": "#/$defs/nonNegative"},
+        "candidateGeneratedTransformations": {"$ref": "#/$defs/nonNegative"},
+        "baselineOuterSearchWorkUnits": {"$ref": "#/$defs/nonNegative"},
+        "candidateOuterSearchWorkUnits": {"$ref": "#/$defs/nonNegative"},
+        "baselineOuterSearchWork": {"$ref": "#/$defs/searchWork"},
+        "candidateOuterSearchWork": {"$ref": "#/$defs/searchWork"},
+        "baselinePathAuditCalls": {"$ref": "#/$defs/nonNegative"},
+        "candidatePathAuditCalls": {"$ref": "#/$defs/nonNegative"},
+        "baselineTotalWorkUnits": {"$ref": "#/$defs/nonNegative"},
+        "candidateTotalWorkUnits": {"$ref": "#/$defs/nonNegative"},
+        "baselineTransformationWork": {"$ref": "#/$defs/transformationWork"},
+        "candidateTransformationWork": {"$ref": "#/$defs/transformationWork"},
+        "programUsed": {"type": "boolean"},
+        "newlySolved": {"type": "boolean"},
+        "reachabilityRegression": {"type": "boolean"},
+        "correctnessFailure": {"type": "boolean"},
+        "correctnessRegression": {"type": "boolean"}
       }
     },
     "rawComponents": {
       "type": "object",
-      "propertyNames": {
-        "enum": [
-          "TRAIN_CASES_NEWLY_SOLVED",
-          "TRAIN_PATH_LENGTH_REDUCTION",
-          "TRAIN_EXPLORED_STATE_REDUCTION",
-          "SUPPORT",
-          "STRUCTURAL_DIVERSITY",
-          "PROJECT_NOVELTY",
-          "ASSUMPTION_SIMPLICITY",
-          "CANDIDATE_COMPLEXITY",
-          "COUNTEREXAMPLE_RISK",
-          "PROOF_COST_PROXY"
-        ]
-      },
-      "additionalProperties": {
-        "type": "integer",
-        "minimum": -1000,
-        "maximum": 1000
-      }
+      "propertyNames": {"enum": ["TRAIN_CASES_NEWLY_SOLVED","TRAIN_PATH_LENGTH_REDUCTION","TRAIN_EXPLORED_STATE_REDUCTION","SUPPORT","STRUCTURAL_DIVERSITY","PROJECT_NOVELTY","ASSUMPTION_SIMPLICITY","CANDIDATE_COMPLEXITY","COUNTEREXAMPLE_RISK","PROOF_COST_PROXY"]},
+      "additionalProperties": {"type": "integer", "minimum": -1000, "maximum": 1000}
     }
   }
 }

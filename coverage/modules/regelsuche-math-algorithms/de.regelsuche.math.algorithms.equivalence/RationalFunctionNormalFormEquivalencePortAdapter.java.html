@@ -4,23 +4,20 @@ import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Validation-port adapter for the exact rational-function normal-form audit.
- */
+/** Validation-port adapter for the exact rational normal-form implementation. */
 public final class RationalFunctionNormalFormEquivalencePortAdapter
         implements AssumptionAwareEquivalenceService {
-
     private final RationalFunctionNormalFormEquivalenceService delegate;
 
     public RationalFunctionNormalFormEquivalencePortAdapter() {
-<span class="fc" id="L16">        this(new RationalFunctionNormalFormEquivalenceService());</span>
-<span class="fc" id="L17">    }</span>
+<span class="fc" id="L13">        this(new RationalFunctionNormalFormEquivalenceService());</span>
+<span class="fc" id="L14">    }</span>
 
     RationalFunctionNormalFormEquivalencePortAdapter(
         RationalFunctionNormalFormEquivalenceService delegate
-<span class="fc" id="L21">    ) {</span>
-<span class="fc" id="L22">        this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
-<span class="fc" id="L23">    }</span>
+<span class="fc" id="L18">    ) {</span>
+<span class="fc" id="L19">        this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L20">    }</span>
 
     @Override
     public Evaluation evaluate(
@@ -28,18 +25,17 @@ public final class RationalFunctionNormalFormEquivalencePortAdapter
         String rightExpression,
         List&lt;String&gt; assumptions
     ) {
-<span class="fc" id="L31">        RationalFunctionNormalFormEquivalenceService.Evaluation result =</span>
-<span class="fc" id="L32">            delegate.evaluate(leftExpression, rightExpression, assumptions);</span>
-<span class="fc" id="L33">        return new Evaluation(</span>
-<span class="fc" id="L34">            Status.valueOf(result.status().name()),</span>
-<span class="fc" id="L35">            result.equivalent(),</span>
-<span class="fc" id="L36">            result.leftCrossNormalForm(),</span>
-<span class="fc" id="L37">            result.rightCrossNormalForm(),</span>
-<span class="fc" id="L38">            result.requiredNonZeroFactors(),</span>
-<span class="fc" id="L39">            result.providedNonZeroFactors(),</span>
-<span class="fc" id="L40">            result.missingNonZeroFactors(),</span>
-<span class="fc" id="L41">            result.unsupportedAssumptions(),</span>
-<span class="fc" id="L42">            result.detail());</span>
+<span class="fc" id="L28">        var result = delegate.evaluate(leftExpression, rightExpression, assumptions);</span>
+<span class="fc" id="L29">        return new Evaluation(</span>
+<span class="fc" id="L30">            Status.valueOf(result.status().name()),</span>
+<span class="fc" id="L31">            result.equivalent(),</span>
+<span class="fc" id="L32">            result.leftCrossNormalForm(),</span>
+<span class="fc" id="L33">            result.rightCrossNormalForm(),</span>
+<span class="fc" id="L34">            result.requiredNonZeroFactors(),</span>
+<span class="fc" id="L35">            result.providedNonZeroFactors(),</span>
+<span class="fc" id="L36">            result.missingNonZeroFactors(),</span>
+<span class="fc" id="L37">            result.unsupportedAssumptions(),</span>
+<span class="fc" id="L38">            result.detail());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

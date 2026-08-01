@@ -8,12 +8,6 @@ import java.util.regex.Pattern;
 /**
  * Content-addressed contract for the paired evaluator used by one evolutionary
  * rewrite-program study.
- *
- * &lt;p&gt;The protocol identity is deliberately separate from the TRAIN suite. A
- * suite fixes tasks and budgets; this artifact fixes which information each
- * side receives, how targets and correctness are evaluated, which result paths
- * may receive resource credit, and the implementation expected to realize
- * those semantics.&lt;/p&gt;
  */
 public record EvolutionRewriteProgramEvaluationProtocol(
     String schema,
@@ -23,6 +17,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
     CandidateContract candidateContract,
     TargetRelation targetRelation,
     CorrectnessContract correctnessContract,
+    WorkAccountingContract workAccountingContract,
     ResourceAttributionContract resourceAttributionContract,
     String implementationClass,
     String contentHash
@@ -34,44 +29,47 @@ public record EvolutionRewriteProgramEvaluationProtocol(
     public static final String INFORMATION_PARITY_IMPLEMENTATION =
         &quot;de.regelsuche.evolution.&quot;
             + &quot;ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator&quot;;
-<span class="fc" id="L37">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+<span class="fc" id="L32">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
 
-<span class="fc" id="L39">    public EvolutionRewriteProgramEvaluationProtocol {</span>
-<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L41">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L34">    public EvolutionRewriteProgramEvaluationProtocol {</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(</span>
                 &quot;unsupported rewrite-program evaluation-protocol schema&quot;);
         }
-<span class="fc" id="L44">        requireId(protocolId, &quot;protocolId&quot;);</span>
-<span class="fc" id="L45">        Objects.requireNonNull(evaluatorProfile, &quot;evaluatorProfile&quot;);</span>
-<span class="fc" id="L46">        Objects.requireNonNull(baselineContract, &quot;baselineContract&quot;);</span>
-<span class="fc" id="L47">        Objects.requireNonNull(candidateContract, &quot;candidateContract&quot;);</span>
-<span class="fc" id="L48">        Objects.requireNonNull(targetRelation, &quot;targetRelation&quot;);</span>
-<span class="fc" id="L49">        Objects.requireNonNull(correctnessContract, &quot;correctnessContract&quot;);</span>
-<span class="fc" id="L50">        Objects.requireNonNull(</span>
+<span class="fc" id="L39">        requireId(protocolId, &quot;protocolId&quot;);</span>
+<span class="fc" id="L40">        Objects.requireNonNull(evaluatorProfile, &quot;evaluatorProfile&quot;);</span>
+<span class="fc" id="L41">        Objects.requireNonNull(baselineContract, &quot;baselineContract&quot;);</span>
+<span class="fc" id="L42">        Objects.requireNonNull(candidateContract, &quot;candidateContract&quot;);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(targetRelation, &quot;targetRelation&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(correctnessContract, &quot;correctnessContract&quot;);</span>
+<span class="fc" id="L45">        Objects.requireNonNull(</span>
+            workAccountingContract, &quot;workAccountingContract&quot;);
+<span class="fc" id="L47">        Objects.requireNonNull(</span>
             resourceAttributionContract, &quot;resourceAttributionContract&quot;);
-<span class="fc" id="L52">        implementationClass = requireText(</span>
+<span class="fc" id="L49">        implementationClass = requireText(</span>
             implementationClass, &quot;implementationClass&quot;);
-<span class="fc" id="L54">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L55">        String expected = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L51">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L52">        String expected = EvolutionGenome.hash(render(</span>
             protocolId,
             evaluatorProfile,
             baselineContract,
             candidateContract,
             targetRelation,
             correctnessContract,
+            workAccountingContract,
             resourceAttributionContract,
             implementationClass,
             null));
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
-<span class="nc" id="L66">            throw new IllegalArgumentException(</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(</span>
                 &quot;evaluation-protocol contentHash mismatch&quot;);
         }
-<span class="fc" id="L69">    }</span>
+<span class="fc" id="L67">    }</span>
 
     /** The only protocol authorized for the #521 flagship TRAIN campaign. */
     public static EvolutionRewriteProgramEvaluationProtocol
             informationParityExactRationalV1() {
-<span class="fc" id="L74">        return create(</span>
+<span class="fc" id="L72">        return create(</span>
             INFORMATION_PARITY_PROTOCOL_ID,
             EvaluatorProfile
                 .EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS,
@@ -80,8 +78,10 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             TargetRelation.SYNTAX_EXACT,
             CorrectnessContract
                 .EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS,
+            WorkAccountingContract
+                .STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1,
             ResourceAttributionContract
-                .CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE,
+                .CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK,
             INFORMATION_PARITY_IMPLEMENTATION);
     }
 
@@ -98,8 +98,10 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             TargetRelation.SYNTAX_EXACT,
             CorrectnessContract
                 .EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS,
+            WorkAccountingContract
+                .STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1,
             ResourceAttributionContract
-                .CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE,
+                .CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK,
             &quot;de.regelsuche.evolution.testing.&quot; + protocolId);
     }
 
@@ -110,22 +112,23 @@ public record EvolutionRewriteProgramEvaluationProtocol(
         CandidateContract candidateContract,
         TargetRelation targetRelation,
         CorrectnessContract correctnessContract,
+        WorkAccountingContract workAccountingContract,
         ResourceAttributionContract resourceAttributionContract,
         String implementationClass
     ) {
-<span class="fc" id="L116">        requireId(protocolId, &quot;protocolId&quot;);</span>
-<span class="fc" id="L117">        implementationClass = requireText(implementationClass, &quot;implementationClass&quot;);</span>
-<span class="fc" id="L118">        String hash = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L119">        requireId(protocolId, &quot;protocolId&quot;);</span>
+<span class="fc" id="L120">        String hash = EvolutionGenome.hash(render(</span>
             protocolId,
             evaluatorProfile,
             baselineContract,
             candidateContract,
             targetRelation,
             correctnessContract,
+            workAccountingContract,
             resourceAttributionContract,
             implementationClass,
             null));
-<span class="fc" id="L128">        return new EvolutionRewriteProgramEvaluationProtocol(</span>
+<span class="fc" id="L131">        return new EvolutionRewriteProgramEvaluationProtocol(</span>
             SCHEMA,
             protocolId,
             evaluatorProfile,
@@ -133,19 +136,21 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             candidateContract,
             targetRelation,
             correctnessContract,
+            workAccountingContract,
             resourceAttributionContract,
             implementationClass,
             hash);
     }
 
     public String toCanonicalJson() {
-<span class="fc" id="L142">        return render(</span>
+<span class="fc" id="L146">        return render(</span>
             protocolId,
             evaluatorProfile,
             baselineContract,
             candidateContract,
             targetRelation,
             correctnessContract,
+            workAccountingContract,
             resourceAttributionContract,
             implementationClass,
             contentHash);
@@ -158,59 +163,65 @@ public record EvolutionRewriteProgramEvaluationProtocol(
         CandidateContract candidateContract,
         TargetRelation targetRelation,
         CorrectnessContract correctnessContract,
+        WorkAccountingContract workAccountingContract,
         ResourceAttributionContract resourceAttributionContract,
         String implementationClass,
         String contentHash
     ) {
-<span class="fc" id="L165">        JsonWriter json = new JsonWriter().beginObject()</span>
-<span class="fc" id="L166">            .property(&quot;schema&quot;, SCHEMA)</span>
-<span class="fc" id="L167">            .property(&quot;protocolId&quot;, protocolId)</span>
-<span class="fc" id="L168">            .property(&quot;evaluatorProfile&quot;, evaluatorProfile.name())</span>
-<span class="fc" id="L169">            .property(&quot;baselineContract&quot;, baselineContract.name())</span>
-<span class="fc" id="L170">            .property(&quot;candidateContract&quot;, candidateContract.name())</span>
-<span class="fc" id="L171">            .property(&quot;targetRelation&quot;, targetRelation.name())</span>
-<span class="fc" id="L172">            .property(&quot;correctnessContract&quot;, correctnessContract.name())</span>
-<span class="fc" id="L173">            .property(</span>
+<span class="fc" id="L171">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L172">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L173">            .property(&quot;protocolId&quot;, protocolId)</span>
+<span class="fc" id="L174">            .property(&quot;evaluatorProfile&quot;, evaluatorProfile.name())</span>
+<span class="fc" id="L175">            .property(&quot;baselineContract&quot;, baselineContract.name())</span>
+<span class="fc" id="L176">            .property(&quot;candidateContract&quot;, candidateContract.name())</span>
+<span class="fc" id="L177">            .property(&quot;targetRelation&quot;, targetRelation.name())</span>
+<span class="fc" id="L178">            .property(&quot;correctnessContract&quot;, correctnessContract.name())</span>
+<span class="fc" id="L179">            .property(&quot;workAccountingContract&quot;, workAccountingContract.name())</span>
+<span class="fc" id="L180">            .property(</span>
                 &quot;resourceAttributionContract&quot;,
-<span class="fc" id="L175">                resourceAttributionContract.name())</span>
-<span class="fc" id="L176">            .property(&quot;implementationClass&quot;, implementationClass);</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (contentHash != null) {</span>
-<span class="fc" id="L178">            json.property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L182">                resourceAttributionContract.name())</span>
+<span class="fc" id="L183">            .property(&quot;implementationClass&quot;, implementationClass);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L185">            json.property(&quot;contentHash&quot;, contentHash);</span>
         }
-<span class="fc" id="L180">        return json.endObject().toString();</span>
+<span class="fc" id="L187">        return json.endObject().toString();</span>
     }
 
-<span class="fc" id="L183">    public enum BaselineContract {</span>
-<span class="fc" id="L184">        ORDINARY_PLUS_FLAT_CANDIDATE_GENOME_RULES</span>
+<span class="fc" id="L190">    public enum BaselineContract {</span>
+<span class="fc" id="L191">        ORDINARY_PLUS_FLAT_CANDIDATE_GENOME_RULES</span>
     }
 
-<span class="fc" id="L187">    public enum CandidateContract {</span>
-<span class="fc" id="L188">        BASELINE_PLUS_COMPILED_REWRITE_PROGRAM</span>
+<span class="fc" id="L194">    public enum CandidateContract {</span>
+<span class="fc" id="L195">        BASELINE_PLUS_COMPILED_REWRITE_PROGRAM</span>
     }
 
-<span class="fc" id="L191">    public enum TargetRelation {</span>
-<span class="fc" id="L192">        SYNTAX_EXACT</span>
+<span class="fc" id="L198">    public enum TargetRelation {</span>
+<span class="fc" id="L199">        SYNTAX_EXACT</span>
     }
 
-<span class="fc" id="L195">    public enum CorrectnessContract {</span>
-<span class="fc" id="L196">        EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS</span>
+<span class="fc" id="L202">    public enum CorrectnessContract {</span>
+<span class="fc" id="L203">        EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS</span>
     }
 
-<span class="fc" id="L199">    public enum ResourceAttributionContract {</span>
-<span class="fc" id="L200">        CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE</span>
+<span class="fc" id="L206">    public enum WorkAccountingContract {</span>
+<span class="fc" id="L207">        STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1</span>
+    }
+
+<span class="fc" id="L210">    public enum ResourceAttributionContract {</span>
+<span class="fc" id="L211">        CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK</span>
     }
 
     private static void requireId(String value, String name) {
-<span class="pc bpc" id="L204" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
-<span class="nc" id="L205">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L216">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
         }
-<span class="fc" id="L207">    }</span>
+<span class="fc" id="L218">    }</span>
 
     private static String requireText(String value, String name) {
-<span class="pc bpc" id="L210" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L211">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L222">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L213">        return value.trim();</span>
+<span class="fc" id="L224">        return value.trim();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

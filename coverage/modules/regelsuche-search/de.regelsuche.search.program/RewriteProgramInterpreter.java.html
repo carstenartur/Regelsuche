@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RewriteProgramInterpreter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-search</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.search.program</a> &gt; <span class="el_source">RewriteProgramInterpreter.java</span></div><h1>RewriteProgramInterpreter.java</h1><pre class="source lang-java linenums">package de.regelsuche.search.program;
 
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -16,19 +17,19 @@ import java.util.Objects;
  * the resulting candidates through the same {@code TransformationEngine}
  * boundary used by best-first, beam, A* and the other existing strategies.&lt;/p&gt;
  */
-<span class="fc" id="L19">public final class RewriteProgramInterpreter {</span>
-<span class="fc" id="L20">    private static final Comparator&lt;Transformation&gt; TRANSFORMATION_ORDER =</span>
-<span class="fc" id="L21">        Comparator.comparing(Transformation::rule)</span>
-<span class="fc" id="L22">            .thenComparing(Transformation::transformedExpression)</span>
-<span class="fc" id="L23">            .thenComparing(Transformation::applicationKey)</span>
-<span class="pc" id="L24">            .thenComparing(transformation -&gt; transformation.kind().name());</span>
+<span class="fc" id="L20">public final class RewriteProgramInterpreter {</span>
+<span class="fc" id="L21">    private static final Comparator&lt;Transformation&gt; TRANSFORMATION_ORDER =</span>
+<span class="fc" id="L22">        Comparator.comparing(Transformation::rule)</span>
+<span class="fc" id="L23">            .thenComparing(Transformation::transformedExpression)</span>
+<span class="fc" id="L24">            .thenComparing(Transformation::applicationKey)</span>
+<span class="pc" id="L25">            .thenComparing(transformation -&gt; transformation.kind().name());</span>
 
     public RewriteExecution execute(RewriteProgram program, String expression) {
-<span class="fc" id="L27">        return execute(</span>
+<span class="fc" id="L28">        return execute(</span>
             program,
             expression,
             RewriteTraceLevel.OFF,
-<span class="fc" id="L31">            RewriteTraceSink.noOp()</span>
+<span class="fc" id="L32">            RewriteTraceSink.noOp()</span>
         );
     }
 
@@ -38,15 +39,18 @@ import java.util.Objects;
         RewriteTraceLevel traceLevel,
         RewriteTraceSink traceSink
     ) {
-<span class="fc" id="L41">        Objects.requireNonNull(program, &quot;program&quot;);</span>
-<span class="fc" id="L42">        Objects.requireNonNull(traceLevel, &quot;traceLevel&quot;);</span>
-<span class="fc" id="L43">        Objects.requireNonNull(traceSink, &quot;traceSink&quot;);</span>
-<span class="fc" id="L44">        String normalizedExpression = normalizeExpression(expression);</span>
-<span class="fc" id="L45">        Context context = new Context(traceLevel, traceSink);</span>
-<span class="fc" id="L46">        Evaluation evaluation = evaluate(program, normalizedExpression, context);</span>
-<span class="fc" id="L47">        return new RewriteExecution(</span>
-<span class="fc" id="L48">            distinct(evaluation.candidates()),</span>
-<span class="fc" id="L49">            evaluation.complete()</span>
+<span class="fc" id="L42">        Objects.requireNonNull(program, &quot;program&quot;);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(traceLevel, &quot;traceLevel&quot;);</span>
+<span class="fc" id="L44">        Objects.requireNonNull(traceSink, &quot;traceSink&quot;);</span>
+<span class="fc" id="L45">        String normalizedExpression = normalizeExpression(expression);</span>
+<span class="fc" id="L46">        Context context = new Context(traceLevel, traceSink);</span>
+<span class="fc" id="L47">        Evaluation evaluation = evaluate(program, normalizedExpression, context);</span>
+<span class="fc" id="L48">        List&lt;RewriteCandidate&gt; candidates = distinct(</span>
+<span class="fc" id="L49">            evaluation.candidates(), context);</span>
+<span class="fc" id="L50">        return new RewriteExecution(</span>
+            candidates,
+<span class="fc" id="L52">            evaluation.complete(),</span>
+<span class="fc" id="L53">            context.workMetrics()</span>
         );
     }
 
@@ -55,53 +59,54 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L58">        context.summary(</span>
+<span class="fc" id="L62">        context.programNodeVisited();</span>
+<span class="fc" id="L63">        context.summary(</span>
             RewriteTraceEventType.NODE_ENTERED,
             program,
             inputExpression,
             &quot;&quot;,
-<span class="fc" id="L63">            List.of(),</span>
+<span class="fc" id="L68">            List.of(),</span>
             0,
             true,
             &quot;&quot;
         );
 
-<span class="fc bfc" id="L69" title="All 8 branches covered.">        Evaluation evaluation = switch (program) {</span>
-<span class="fc" id="L70">            case RewriteProgram.Source source -&gt;</span>
-<span class="fc" id="L71">                evaluateSource(source, inputExpression, context);</span>
-<span class="fc" id="L72">            case RewriteProgram.Choice choice -&gt;</span>
-<span class="fc" id="L73">                evaluateChoice(choice, inputExpression, context);</span>
-<span class="fc" id="L74">            case RewriteProgram.FirstApplicable firstApplicable -&gt;</span>
-<span class="fc" id="L75">                evaluateFirstApplicable(firstApplicable, inputExpression, context);</span>
-<span class="fc" id="L76">            case RewriteProgram.Sequence sequence -&gt;</span>
-<span class="fc" id="L77">                evaluateSequence(sequence, inputExpression, context);</span>
-<span class="fc" id="L78">            case RewriteProgram.Repeat repeat -&gt;</span>
-<span class="fc" id="L79">                evaluateRepeat(repeat, inputExpression, context);</span>
-<span class="fc" id="L80">            case RewriteProgram.Require require -&gt;</span>
-<span class="fc" id="L81">                evaluateRequire(require, inputExpression, context);</span>
-<span class="fc" id="L82">            case RewriteProgram.Prioritize prioritize -&gt;</span>
-<span class="fc" id="L83">                evaluatePrioritize(prioritize, inputExpression, context);</span>
-<span class="fc" id="L84">            case RewriteProgram.Prune prune -&gt;</span>
-<span class="fc" id="L85">                evaluatePrune(prune, inputExpression, context);</span>
+<span class="fc bfc" id="L74" title="All 8 branches covered.">        Evaluation evaluation = switch (program) {</span>
+<span class="fc" id="L75">            case RewriteProgram.Source source -&gt;</span>
+<span class="fc" id="L76">                evaluateSource(source, inputExpression, context);</span>
+<span class="fc" id="L77">            case RewriteProgram.Choice choice -&gt;</span>
+<span class="fc" id="L78">                evaluateChoice(choice, inputExpression, context);</span>
+<span class="fc" id="L79">            case RewriteProgram.FirstApplicable firstApplicable -&gt;</span>
+<span class="fc" id="L80">                evaluateFirstApplicable(firstApplicable, inputExpression, context);</span>
+<span class="fc" id="L81">            case RewriteProgram.Sequence sequence -&gt;</span>
+<span class="fc" id="L82">                evaluateSequence(sequence, inputExpression, context);</span>
+<span class="fc" id="L83">            case RewriteProgram.Repeat repeat -&gt;</span>
+<span class="fc" id="L84">                evaluateRepeat(repeat, inputExpression, context);</span>
+<span class="fc" id="L85">            case RewriteProgram.Require require -&gt;</span>
+<span class="fc" id="L86">                evaluateRequire(require, inputExpression, context);</span>
+<span class="fc" id="L87">            case RewriteProgram.Prioritize prioritize -&gt;</span>
+<span class="fc" id="L88">                evaluatePrioritize(prioritize, inputExpression, context);</span>
+<span class="fc" id="L89">            case RewriteProgram.Prune prune -&gt;</span>
+<span class="fc" id="L90">                evaluatePrune(prune, inputExpression, context);</span>
         };
 
-<span class="fc bfc" id="L88" title="All 2 branches covered.">        List&lt;String&gt; rules = evaluation.candidates().size() == 1</span>
-<span class="fc" id="L89">            ? evaluation.candidates().get(0).ruleIds()</span>
-<span class="fc" id="L90">            : List.of();</span>
-<span class="fc bfc" id="L91" title="All 2 branches covered.">        String outputExpression = evaluation.candidates().size() == 1</span>
-<span class="fc" id="L92">            ? evaluation.candidates().get(0).outputExpression()</span>
-<span class="fc" id="L93">            : &quot;&quot;;</span>
-<span class="fc" id="L94">        context.summary(</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        List&lt;String&gt; rules = evaluation.candidates().size() == 1</span>
+<span class="fc" id="L94">            ? evaluation.candidates().get(0).ruleIds()</span>
+<span class="fc" id="L95">            : List.of();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        String outputExpression = evaluation.candidates().size() == 1</span>
+<span class="fc" id="L97">            ? evaluation.candidates().get(0).outputExpression()</span>
+<span class="fc" id="L98">            : &quot;&quot;;</span>
+<span class="fc" id="L99">        context.summary(</span>
             RewriteTraceEventType.NODE_EXITED,
             program,
             inputExpression,
             outputExpression,
             rules,
-<span class="fc" id="L100">            evaluation.candidates().size(),</span>
-<span class="fc" id="L101">            evaluation.complete(),</span>
+<span class="fc" id="L105">            evaluation.candidates().size(),</span>
+<span class="fc" id="L106">            evaluation.complete(),</span>
             &quot;&quot;
         );
-<span class="fc" id="L104">        return evaluation;</span>
+<span class="fc" id="L109">        return evaluation;</span>
     }
 
     private Evaluation evaluateSource(
@@ -109,37 +114,39 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L112">        List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
-<span class="fc" id="L113">            Objects.requireNonNull(</span>
-<span class="fc" id="L114">                source.engine().transform(inputExpression),</span>
+<span class="fc" id="L117">        context.sourceInvoked();</span>
+<span class="fc" id="L118">        List&lt;Transformation&gt; transformations = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L119">            Objects.requireNonNull(</span>
+<span class="fc" id="L120">                source.engine().transform(inputExpression),</span>
                 &quot;TransformationEngine.transform must not return null&quot;
             )
         );
-<span class="fc" id="L118">        transformations.forEach(transformation -&gt;</span>
-<span class="fc" id="L119">            Objects.requireNonNull(transformation, &quot;transformation&quot;));</span>
-<span class="fc" id="L120">        transformations.sort(TRANSFORMATION_ORDER);</span>
+<span class="fc" id="L124">        transformations.forEach(transformation -&gt;</span>
+<span class="fc" id="L125">            Objects.requireNonNull(transformation, &quot;transformation&quot;));</span>
+<span class="fc" id="L126">        transformations.sort(TRANSFORMATION_ORDER);</span>
+<span class="fc" id="L127">        context.sourceCandidates(transformations.size());</span>
 
-<span class="fc" id="L122">        List&lt;RewriteCandidate&gt; candidates = new ArrayList&lt;&gt;(transformations.size());</span>
-<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
-<span class="fc" id="L124">            RewriteCandidate candidate = new RewriteCandidate(</span>
-<span class="fc" id="L125">                source.id(),</span>
+<span class="fc" id="L129">        List&lt;RewriteCandidate&gt; candidates = new ArrayList&lt;&gt;(transformations.size());</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (Transformation transformation : transformations) {</span>
+<span class="fc" id="L131">            RewriteCandidate candidate = new RewriteCandidate(</span>
+<span class="fc" id="L132">                source.id(),</span>
                 inputExpression,
-<span class="fc" id="L127">                transformation.transformedExpression(),</span>
-<span class="fc" id="L128">                List.of(transformation)</span>
+<span class="fc" id="L134">                transformation.transformedExpression(),</span>
+<span class="fc" id="L135">                List.of(transformation)</span>
             );
-<span class="fc" id="L130">            candidates.add(candidate);</span>
-<span class="fc" id="L131">            context.full(</span>
+<span class="fc" id="L137">            candidates.add(candidate);</span>
+<span class="fc" id="L138">            context.full(</span>
                 RewriteTraceEventType.SOURCE_CANDIDATE,
                 source,
                 inputExpression,
-<span class="fc" id="L135">                candidate.outputExpression(),</span>
-<span class="fc" id="L136">                candidate.ruleIds(),</span>
+<span class="fc" id="L142">                candidate.outputExpression(),</span>
+<span class="fc" id="L143">                candidate.ruleIds(),</span>
                 1,
                 true,
-<span class="fc" id="L139">                transformation.applicationKey()</span>
+<span class="fc" id="L146">                transformation.applicationKey()</span>
             );
-<span class="fc" id="L141">        }</span>
-<span class="fc" id="L142">        return new Evaluation(candidates, true);</span>
+<span class="fc" id="L148">        }</span>
+<span class="fc" id="L149">        return new Evaluation(candidates, true);</span>
     }
 
     private Evaluation evaluateChoice(
@@ -147,14 +154,14 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L150">        List&lt;RewriteCandidate&gt; candidates = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L151">        boolean complete = true;</span>
-<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (RewriteProgram alternative : choice.alternatives()) {</span>
-<span class="fc" id="L153">            Evaluation evaluated = evaluate(alternative, inputExpression, context);</span>
-<span class="fc" id="L154">            candidates.addAll(evaluated.candidates());</span>
-<span class="fc" id="L155">            complete &amp;= evaluated.complete();</span>
-<span class="fc" id="L156">        }</span>
-<span class="fc" id="L157">        return new Evaluation(distinct(candidates), complete);</span>
+<span class="fc" id="L157">        List&lt;RewriteCandidate&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L158">        boolean complete = true;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (RewriteProgram alternative : choice.alternatives()) {</span>
+<span class="fc" id="L160">            Evaluation evaluated = evaluate(alternative, inputExpression, context);</span>
+<span class="fc" id="L161">            candidates.addAll(evaluated.candidates());</span>
+<span class="fc" id="L162">            complete &amp;= evaluated.complete();</span>
+<span class="fc" id="L163">        }</span>
+<span class="fc" id="L164">        return new Evaluation(distinct(candidates, context), complete);</span>
     }
 
     private Evaluation evaluateFirstApplicable(
@@ -162,44 +169,46 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L165">        boolean complete = true;</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        for (int index = 0; index &lt; firstApplicable.alternatives().size(); index++) {</span>
-<span class="fc" id="L167">            RewriteProgram alternative = firstApplicable.alternatives().get(index);</span>
-<span class="fc" id="L168">            Evaluation evaluated = evaluate(alternative, inputExpression, context);</span>
-<span class="fc" id="L169">            complete &amp;= evaluated.complete();</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">            if (evaluated.candidates().isEmpty()) {</span>
-<span class="fc" id="L171">                continue;</span>
+<span class="fc" id="L172">        boolean complete = true;</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        for (int index = 0; index &lt; firstApplicable.alternatives().size(); index++) {</span>
+<span class="fc" id="L174">            RewriteProgram alternative = firstApplicable.alternatives().get(index);</span>
+<span class="fc" id="L175">            Evaluation evaluated = evaluate(alternative, inputExpression, context);</span>
+<span class="fc" id="L176">            complete &amp;= evaluated.complete();</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">            if (evaluated.candidates().isEmpty()) {</span>
+<span class="fc" id="L178">                continue;</span>
             }
 
-<span class="fc" id="L174">            context.summary(</span>
+<span class="fc" id="L181">            context.alternativeSelected();</span>
+<span class="fc" id="L182">            context.summary(</span>
                 RewriteTraceEventType.ALTERNATIVE_SELECTED,
                 firstApplicable,
                 inputExpression,
                 &quot;&quot;,
-<span class="fc" id="L179">                List.of(),</span>
-<span class="fc" id="L180">                evaluated.candidates().size(),</span>
+<span class="fc" id="L187">                List.of(),</span>
+<span class="fc" id="L188">                evaluated.candidates().size(),</span>
                 complete,
-<span class="fc" id="L182">                alternative.id()</span>
+<span class="fc" id="L190">                alternative.id()</span>
             );
-<span class="fc" id="L184">            for (int skipped = index + 1;</span>
-<span class="fc bfc" id="L185" title="All 2 branches covered.">                    skipped &lt; firstApplicable.alternatives().size();</span>
-<span class="fc" id="L186">                    skipped++) {</span>
-<span class="fc" id="L187">                RewriteProgram skippedAlternative =</span>
-<span class="fc" id="L188">                    firstApplicable.alternatives().get(skipped);</span>
-<span class="fc" id="L189">                context.full(</span>
+<span class="fc" id="L192">            for (int skipped = index + 1;</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                    skipped &lt; firstApplicable.alternatives().size();</span>
+<span class="fc" id="L194">                    skipped++) {</span>
+<span class="fc" id="L195">                RewriteProgram skippedAlternative =</span>
+<span class="fc" id="L196">                    firstApplicable.alternatives().get(skipped);</span>
+<span class="fc" id="L197">                context.alternativeSkipped();</span>
+<span class="fc" id="L198">                context.full(</span>
                     RewriteTraceEventType.ALTERNATIVE_SKIPPED,
                     skippedAlternative,
                     inputExpression,
                     &quot;&quot;,
-<span class="fc" id="L194">                    List.of(),</span>
+<span class="fc" id="L203">                    List.of(),</span>
                     0,
                     complete,
-<span class="fc" id="L197">                    &quot;first applicable alternative was &quot; + alternative.id()</span>
+<span class="fc" id="L206">                    &quot;first applicable alternative was &quot; + alternative.id()</span>
                 );
             }
-<span class="fc" id="L200">            return new Evaluation(evaluated.candidates(), complete);</span>
+<span class="fc" id="L209">            return new Evaluation(evaluated.candidates(), complete);</span>
         }
-<span class="nc" id="L202">        return new Evaluation(List.of(), complete);</span>
+<span class="nc" id="L211">        return new Evaluation(List.of(), complete);</span>
     }
 
     private Evaluation evaluateSequence(
@@ -207,27 +216,28 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L210">        Evaluation first = evaluate(sequence.steps().get(0), inputExpression, context);</span>
-<span class="fc" id="L211">        List&lt;RewriteCandidate&gt; current = first.candidates();</span>
-<span class="fc" id="L212">        boolean complete = first.complete();</span>
+<span class="fc" id="L219">        Evaluation first = evaluate(sequence.steps().get(0), inputExpression, context);</span>
+<span class="fc" id="L220">        List&lt;RewriteCandidate&gt; current = first.candidates();</span>
+<span class="fc" id="L221">        boolean complete = first.complete();</span>
 
-<span class="pc bpc" id="L214" title="1 of 4 branches missed.">        for (int index = 1; index &lt; sequence.steps().size() &amp;&amp; !current.isEmpty(); index++) {</span>
-<span class="fc" id="L215">            RewriteProgram step = sequence.steps().get(index);</span>
-<span class="fc" id="L216">            List&lt;RewriteCandidate&gt; next = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L217" title="All 2 branches covered.">            for (RewriteCandidate prefix : current) {</span>
-<span class="fc" id="L218">                Evaluation suffixes = evaluate(step, prefix.outputExpression(), context);</span>
-<span class="fc" id="L219">                complete &amp;= suffixes.complete();</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">                for (RewriteCandidate suffix : suffixes.candidates()) {</span>
-<span class="fc" id="L221">                    next.add(prefix.append(suffix, sequence.id()));</span>
-<span class="fc" id="L222">                }</span>
-<span class="fc" id="L223">            }</span>
-<span class="fc" id="L224">            current = distinct(next);</span>
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">        for (int index = 1; index &lt; sequence.steps().size() &amp;&amp; !current.isEmpty(); index++) {</span>
+<span class="fc" id="L224">            RewriteProgram step = sequence.steps().get(index);</span>
+<span class="fc" id="L225">            List&lt;RewriteCandidate&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            for (RewriteCandidate prefix : current) {</span>
+<span class="fc" id="L227">                Evaluation suffixes = evaluate(step, prefix.outputExpression(), context);</span>
+<span class="fc" id="L228">                complete &amp;= suffixes.complete();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                for (RewriteCandidate suffix : suffixes.candidates()) {</span>
+<span class="fc" id="L230">                    context.composedCandidate();</span>
+<span class="fc" id="L231">                    next.add(prefix.append(suffix, sequence.id()));</span>
+<span class="fc" id="L232">                }</span>
+<span class="fc" id="L233">            }</span>
+<span class="fc" id="L234">            current = distinct(next, context);</span>
         }
 
-<span class="fc" id="L227">        return new Evaluation(</span>
-<span class="fc" id="L228">            current.stream()</span>
-<span class="fc" id="L229">                .map(candidate -&gt; candidate.withOriginNodeId(sequence.id()))</span>
-<span class="fc" id="L230">                .toList(),</span>
+<span class="fc" id="L237">        return new Evaluation(</span>
+<span class="fc" id="L238">            current.stream()</span>
+<span class="fc" id="L239">                .map(candidate -&gt; candidate.withOriginNodeId(sequence.id()))</span>
+<span class="fc" id="L240">                .toList(),</span>
             complete
         );
     }
@@ -237,51 +247,54 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L240">        List&lt;RewriteCandidate&gt; frontier = List.of();</span>
-<span class="fc" id="L241">        List&lt;RewriteCandidate&gt; endpoints = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L242">        boolean complete = true;</span>
+<span class="fc" id="L250">        List&lt;RewriteCandidate&gt; frontier = List.of();</span>
+<span class="fc" id="L251">        List&lt;RewriteCandidate&gt; endpoints = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L252">        boolean complete = true;</span>
 
-<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        for (int iteration = 1; iteration &lt;= repeat.maxIterations(); iteration++) {</span>
-<span class="fc" id="L245">            List&lt;RewriteCandidate&gt; next = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L246" title="All 2 branches covered.">            if (iteration == 1) {</span>
-<span class="fc" id="L247">                Evaluation evaluated = evaluate(repeat.body(), inputExpression, context);</span>
-<span class="fc" id="L248">                next.addAll(evaluated.candidates());</span>
-<span class="fc" id="L249">                complete &amp;= evaluated.complete();</span>
-<span class="fc" id="L250">            } else {</span>
-<span class="fc bfc" id="L251" title="All 2 branches covered.">                for (RewriteCandidate prefix : frontier) {</span>
-<span class="fc" id="L252">                    Evaluation suffixes = evaluate(</span>
-<span class="fc" id="L253">                        repeat.body(),</span>
-<span class="fc" id="L254">                        prefix.outputExpression(),</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        for (int iteration = 1; iteration &lt;= repeat.maxIterations(); iteration++) {</span>
+<span class="fc" id="L255">            context.repeatIteration();</span>
+<span class="fc" id="L256">            List&lt;RewriteCandidate&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (iteration == 1) {</span>
+<span class="fc" id="L258">                Evaluation evaluated = evaluate(repeat.body(), inputExpression, context);</span>
+<span class="fc" id="L259">                next.addAll(evaluated.candidates());</span>
+<span class="fc" id="L260">                complete &amp;= evaluated.complete();</span>
+<span class="fc" id="L261">            } else {</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                for (RewriteCandidate prefix : frontier) {</span>
+<span class="fc" id="L263">                    Evaluation suffixes = evaluate(</span>
+<span class="fc" id="L264">                        repeat.body(),</span>
+<span class="fc" id="L265">                        prefix.outputExpression(),</span>
                         context
                     );
-<span class="fc" id="L257">                    complete &amp;= suffixes.complete();</span>
-<span class="fc bfc" id="L258" title="All 2 branches covered.">                    for (RewriteCandidate suffix : suffixes.candidates()) {</span>
-<span class="fc" id="L259">                        next.add(prefix.append(suffix, repeat.id()));</span>
-<span class="fc" id="L260">                    }</span>
-<span class="fc" id="L261">                }</span>
+<span class="fc" id="L268">                    complete &amp;= suffixes.complete();</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                    for (RewriteCandidate suffix : suffixes.candidates()) {</span>
+<span class="fc" id="L270">                        context.composedCandidate();</span>
+<span class="fc" id="L271">                        next.add(prefix.append(suffix, repeat.id()));</span>
+<span class="fc" id="L272">                    }</span>
+<span class="fc" id="L273">                }</span>
             }
 
-<span class="fc" id="L264">            frontier = distinct(next);</span>
-<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            if (iteration &gt;= repeat.minIterations()) {</span>
-<span class="fc" id="L266">                endpoints.addAll(frontier.stream()</span>
-<span class="fc" id="L267">                    .map(candidate -&gt; candidate.withOriginNodeId(repeat.id()))</span>
-<span class="fc" id="L268">                    .toList());</span>
+<span class="fc" id="L276">            frontier = distinct(next, context);</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            if (iteration &gt;= repeat.minIterations()) {</span>
+<span class="fc" id="L278">                context.repeatEndpoints(frontier.size());</span>
+<span class="fc" id="L279">                endpoints.addAll(frontier.stream()</span>
+<span class="fc" id="L280">                    .map(candidate -&gt; candidate.withOriginNodeId(repeat.id()))</span>
+<span class="fc" id="L281">                    .toList());</span>
             }
-<span class="fc" id="L270">            context.full(</span>
+<span class="fc" id="L283">            context.full(</span>
                 RewriteTraceEventType.ITERATION_COMPLETED,
                 repeat,
                 inputExpression,
                 &quot;&quot;,
-<span class="fc" id="L275">                List.of(),</span>
-<span class="fc" id="L276">                frontier.size(),</span>
+<span class="fc" id="L288">                List.of(),</span>
+<span class="fc" id="L289">                frontier.size(),</span>
                 complete,
                 &quot;iteration=&quot; + iteration
             );
-<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (frontier.isEmpty()) {</span>
-<span class="fc" id="L281">                break;</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (frontier.isEmpty()) {</span>
+<span class="fc" id="L294">                break;</span>
             }
         }
-<span class="fc" id="L284">        return new Evaluation(distinct(endpoints), complete);</span>
+<span class="fc" id="L297">        return new Evaluation(distinct(endpoints, context), complete);</span>
     }
 
     private Evaluation evaluateRequire(
@@ -289,25 +302,27 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L292">        Evaluation evaluated = evaluate(require.body(), inputExpression, context);</span>
-<span class="fc" id="L293">        List&lt;RewriteCandidate&gt; accepted = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L294" title="All 2 branches covered.">        for (RewriteCandidate candidate : evaluated.candidates()) {</span>
-<span class="fc bfc" id="L295" title="All 2 branches covered.">            if (require.condition().test(candidate)) {</span>
-<span class="fc" id="L296">                accepted.add(candidate);</span>
-<span class="fc" id="L297">                continue;</span>
+<span class="fc" id="L305">        Evaluation evaluated = evaluate(require.body(), inputExpression, context);</span>
+<span class="fc" id="L306">        List&lt;RewriteCandidate&gt; accepted = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        for (RewriteCandidate candidate : evaluated.candidates()) {</span>
+<span class="fc" id="L308">            context.requirementEvaluated();</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (require.condition().test(candidate)) {</span>
+<span class="fc" id="L310">                accepted.add(candidate);</span>
+<span class="fc" id="L311">                continue;</span>
             }
-<span class="fc" id="L299">            context.full(</span>
+<span class="fc" id="L313">            context.requirementRejected();</span>
+<span class="fc" id="L314">            context.full(</span>
                 RewriteTraceEventType.CANDIDATE_REJECTED,
                 require,
                 inputExpression,
-<span class="fc" id="L303">                candidate.outputExpression(),</span>
-<span class="fc" id="L304">                candidate.ruleIds(),</span>
+<span class="fc" id="L318">                candidate.outputExpression(),</span>
+<span class="fc" id="L319">                candidate.ruleIds(),</span>
                 1,
-<span class="fc" id="L306">                evaluated.complete(),</span>
-<span class="fc" id="L307">                require.conditionDescription()</span>
+<span class="fc" id="L321">                evaluated.complete(),</span>
+<span class="fc" id="L322">                require.conditionDescription()</span>
             );
-<span class="fc" id="L309">        }</span>
-<span class="fc" id="L310">        return new Evaluation(accepted, evaluated.complete());</span>
+<span class="fc" id="L324">        }</span>
+<span class="fc" id="L325">        return new Evaluation(accepted, evaluated.complete());</span>
     }
 
     private Evaluation evaluatePrioritize(
@@ -315,13 +330,14 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L318">        Evaluation evaluated = evaluate(prioritize.body(), inputExpression, context);</span>
-<span class="fc" id="L319">        List&lt;RewriteCandidate&gt; candidates = new ArrayList&lt;&gt;(evaluated.candidates());</span>
-<span class="fc" id="L320">        candidates.sort(</span>
-<span class="fc" id="L321">            prioritize.comparator()</span>
-<span class="fc" id="L322">                .thenComparing(RewriteCandidate::fingerprint)</span>
+<span class="fc" id="L333">        Evaluation evaluated = evaluate(prioritize.body(), inputExpression, context);</span>
+<span class="fc" id="L334">        List&lt;RewriteCandidate&gt; candidates = new ArrayList&lt;&gt;(evaluated.candidates());</span>
+<span class="fc" id="L335">        context.priorityCandidatesOrdered(candidates.size());</span>
+<span class="fc" id="L336">        candidates.sort(</span>
+<span class="fc" id="L337">            prioritize.comparator()</span>
+<span class="fc" id="L338">                .thenComparing(RewriteCandidate::fingerprint)</span>
         );
-<span class="fc" id="L324">        return new Evaluation(candidates, evaluated.complete());</span>
+<span class="fc" id="L340">        return new Evaluation(candidates, evaluated.complete());</span>
     }
 
     private Evaluation evaluatePrune(
@@ -329,65 +345,153 @@ import java.util.Objects;
         String inputExpression,
         Context context
     ) {
-<span class="fc" id="L332">        Evaluation evaluated = evaluate(prune.body(), inputExpression, context);</span>
-<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if (evaluated.candidates().size() &lt;= prune.maxCandidates()) {</span>
-<span class="nc" id="L334">            return evaluated;</span>
+<span class="fc" id="L348">        Evaluation evaluated = evaluate(prune.body(), inputExpression, context);</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        if (evaluated.candidates().size() &lt;= prune.maxCandidates()) {</span>
+<span class="fc" id="L350">            return evaluated;</span>
         }
 
-<span class="fc" id="L337">        int removed = evaluated.candidates().size() - prune.maxCandidates();</span>
-<span class="fc" id="L338">        List&lt;RewriteCandidate&gt; retained = List.copyOf(</span>
-<span class="fc" id="L339">            evaluated.candidates().subList(0, prune.maxCandidates())</span>
+<span class="fc" id="L353">        int removed = evaluated.candidates().size() - prune.maxCandidates();</span>
+<span class="fc" id="L354">        context.prunedCandidates(removed);</span>
+<span class="fc" id="L355">        List&lt;RewriteCandidate&gt; retained = List.copyOf(</span>
+<span class="fc" id="L356">            evaluated.candidates().subList(0, prune.maxCandidates())</span>
         );
-<span class="fc" id="L341">        context.summary(</span>
+<span class="fc" id="L358">        context.summary(</span>
             RewriteTraceEventType.CANDIDATES_PRUNED,
             prune,
             inputExpression,
             &quot;&quot;,
-<span class="fc" id="L346">            List.of(),</span>
+<span class="fc" id="L363">            List.of(),</span>
             removed,
             false,
-<span class="fc" id="L349">            prune.reason()</span>
+<span class="fc" id="L366">            prune.reason()</span>
         );
-<span class="fc" id="L351">        return new Evaluation(retained, false);</span>
+<span class="fc" id="L368">        return new Evaluation(retained, false);</span>
     }
 
     private static List&lt;RewriteCandidate&gt; distinct(
-        List&lt;RewriteCandidate&gt; candidates
+        List&lt;RewriteCandidate&gt; candidates,
+        Context context
     ) {
-<span class="fc" id="L357">        Map&lt;String, RewriteCandidate&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L358" title="All 2 branches covered.">        for (RewriteCandidate candidate : candidates) {</span>
-<span class="fc" id="L359">            distinct.putIfAbsent(candidate.fingerprint(), candidate);</span>
-<span class="fc" id="L360">        }</span>
-<span class="fc" id="L361">        return List.copyOf(distinct.values());</span>
+<span class="fc" id="L375">        Map&lt;String, RewriteCandidate&gt; distinct = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        for (RewriteCandidate candidate : candidates) {</span>
+<span class="fc" id="L377">            distinct.putIfAbsent(candidate.fingerprint(), candidate);</span>
+<span class="fc" id="L378">        }</span>
+<span class="fc" id="L379">        context.duplicateCandidatesDropped(candidates.size() - distinct.size());</span>
+<span class="fc" id="L380">        return List.copyOf(distinct.values());</span>
     }
 
     private static String normalizeExpression(String expression) {
-<span class="fc" id="L365">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
-<span class="fc" id="L366">        String normalized = expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
-<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
-<span class="nc" id="L368">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+<span class="fc" id="L384">        Objects.requireNonNull(expression, &quot;expression&quot;);</span>
+<span class="fc" id="L385">        String normalized = expression.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        if (normalized.isEmpty()) {</span>
+<span class="nc" id="L387">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
         }
-<span class="fc" id="L370">        return normalized;</span>
+<span class="fc" id="L389">        return normalized;</span>
     }
 
     private record Evaluation(
         List&lt;RewriteCandidate&gt; candidates,
         boolean complete
     ) {
-<span class="fc" id="L377">        private Evaluation {</span>
-<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            candidates = candidates == null ? List.of() : List.copyOf(candidates);</span>
-<span class="fc" id="L379">        }</span>
+<span class="fc" id="L396">        private Evaluation {</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">            candidates = candidates == null ? List.of() : List.copyOf(candidates);</span>
+<span class="fc" id="L398">        }</span>
     }
 
     private static final class Context {
         private final RewriteTraceLevel level;
         private final RewriteTraceSink sink;
         private long sequence;
+        private long programNodeVisits;
+        private long sourceInvocations;
+        private long sourceCandidates;
+        private long composedCandidates;
+        private long requirementEvaluations;
+        private long requirementRejections;
+        private long priorityCandidatesOrdered;
+        private long prunedCandidates;
+        private long repeatIterations;
+        private long repeatEndpoints;
+        private long alternativeSelections;
+        private long alternativesSkipped;
+        private long duplicateCandidatesDropped;
 
-<span class="fc" id="L387">        private Context(RewriteTraceLevel level, RewriteTraceSink sink) {</span>
-<span class="fc" id="L388">            this.level = level;</span>
-<span class="fc" id="L389">            this.sink = sink;</span>
-<span class="fc" id="L390">        }</span>
+<span class="fc" id="L419">        private Context(RewriteTraceLevel level, RewriteTraceSink sink) {</span>
+<span class="fc" id="L420">            this.level = level;</span>
+<span class="fc" id="L421">            this.sink = sink;</span>
+<span class="fc" id="L422">        }</span>
+
+        private void programNodeVisited() {
+<span class="fc" id="L425">            programNodeVisits++;</span>
+<span class="fc" id="L426">        }</span>
+
+        private void sourceInvoked() {
+<span class="fc" id="L429">            sourceInvocations++;</span>
+<span class="fc" id="L430">        }</span>
+
+        private void sourceCandidates(long value) {
+<span class="fc" id="L433">            sourceCandidates = add(sourceCandidates, value);</span>
+<span class="fc" id="L434">        }</span>
+
+        private void composedCandidate() {
+<span class="fc" id="L437">            composedCandidates++;</span>
+<span class="fc" id="L438">        }</span>
+
+        private void requirementEvaluated() {
+<span class="fc" id="L441">            requirementEvaluations++;</span>
+<span class="fc" id="L442">        }</span>
+
+        private void requirementRejected() {
+<span class="fc" id="L445">            requirementRejections++;</span>
+<span class="fc" id="L446">        }</span>
+
+        private void priorityCandidatesOrdered(long value) {
+<span class="fc" id="L449">            priorityCandidatesOrdered = add(priorityCandidatesOrdered, value);</span>
+<span class="fc" id="L450">        }</span>
+
+        private void prunedCandidates(long value) {
+<span class="fc" id="L453">            prunedCandidates = add(prunedCandidates, value);</span>
+<span class="fc" id="L454">        }</span>
+
+        private void repeatIteration() {
+<span class="fc" id="L457">            repeatIterations++;</span>
+<span class="fc" id="L458">        }</span>
+
+        private void repeatEndpoints(long value) {
+<span class="fc" id="L461">            repeatEndpoints = add(repeatEndpoints, value);</span>
+<span class="fc" id="L462">        }</span>
+
+        private void alternativeSelected() {
+<span class="fc" id="L465">            alternativeSelections++;</span>
+<span class="fc" id="L466">        }</span>
+
+        private void alternativeSkipped() {
+<span class="fc" id="L469">            alternativesSkipped++;</span>
+<span class="fc" id="L470">        }</span>
+
+        private void duplicateCandidatesDropped(long value) {
+<span class="fc" id="L473">            duplicateCandidatesDropped = add(</span>
+                duplicateCandidatesDropped,
+<span class="fc" id="L475">                Math.max(0L, value));</span>
+<span class="fc" id="L476">        }</span>
+
+        private TransformationWorkMetrics workMetrics() {
+<span class="fc" id="L479">            return new TransformationWorkMetrics(</span>
+                1,
+                programNodeVisits,
+                sourceInvocations,
+                sourceCandidates,
+                composedCandidates,
+                requirementEvaluations,
+                requirementRejections,
+                priorityCandidatesOrdered,
+                prunedCandidates,
+                repeatIterations,
+                repeatEndpoints,
+                alternativeSelections,
+                alternativesSkipped,
+                duplicateCandidatesDropped);
+        }
 
         private void summary(
             RewriteTraceEventType type,
@@ -399,7 +503,7 @@ import java.util.Objects;
             boolean complete,
             String detail
         ) {
-<span class="fc" id="L402">            emit(</span>
+<span class="fc" id="L506">            emit(</span>
                 RewriteTraceLevel.SUMMARY,
                 type,
                 program,
@@ -410,7 +514,7 @@ import java.util.Objects;
                 complete,
                 detail
             );
-<span class="fc" id="L413">        }</span>
+<span class="fc" id="L517">        }</span>
 
         private void full(
             RewriteTraceEventType type,
@@ -422,7 +526,7 @@ import java.util.Objects;
             boolean complete,
             String detail
         ) {
-<span class="fc" id="L425">            emit(</span>
+<span class="fc" id="L529">            emit(</span>
                 RewriteTraceLevel.FULL,
                 type,
                 program,
@@ -433,7 +537,7 @@ import java.util.Objects;
                 complete,
                 detail
             );
-<span class="fc" id="L436">        }</span>
+<span class="fc" id="L540">        }</span>
 
         private void emit(
             RewriteTraceLevel requiredLevel,
@@ -446,15 +550,15 @@ import java.util.Objects;
             boolean complete,
             String detail
         ) {
-<span class="fc bfc" id="L449" title="All 2 branches covered.">            if (level.ordinal() &lt; requiredLevel.ordinal()) {</span>
-<span class="fc" id="L450">                return;</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">            if (level.ordinal() &lt; requiredLevel.ordinal()) {</span>
+<span class="fc" id="L554">                return;</span>
             }
-<span class="fc" id="L452">            sink.accept(new RewriteTraceEvent(</span>
+<span class="fc" id="L556">            sink.accept(new RewriteTraceEvent(</span>
                 ++sequence,
                 type,
-<span class="fc" id="L455">                program.id(),</span>
-<span class="fc" id="L456">                program.getClass().getSimpleName(),</span>
-<span class="fc" id="L457">                program.metadata().sourceLocation(),</span>
+<span class="fc" id="L559">                program.id(),</span>
+<span class="fc" id="L560">                program.getClass().getSimpleName(),</span>
+<span class="fc" id="L561">                program.metadata().sourceLocation(),</span>
                 inputExpression,
                 outputExpression,
                 ruleIds,
@@ -462,7 +566,15 @@ import java.util.Objects;
                 complete,
                 detail
             ));
-<span class="fc" id="L465">        }</span>
+<span class="fc" id="L569">        }</span>
+
+        private static long add(long left, long right) {
+            try {
+<span class="fc" id="L573">                return Math.addExact(left, right);</span>
+<span class="nc" id="L574">            } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L575">                return Long.MAX_VALUE;</span>
+            }
+        }
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
