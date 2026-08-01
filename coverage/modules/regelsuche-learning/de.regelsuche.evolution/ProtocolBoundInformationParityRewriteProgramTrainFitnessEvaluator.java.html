@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator.java</span></div><h1>ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Authoritative #521 TRAIN evaluator. It delegates mathematical execution to
+ * the information-parity evaluator and reissues the canonical evidence with the
+ * exact frozen protocol identity attached.
+ */
+public final class ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator
+        implements EvolutionRewriteProgramFitnessEvaluator {
+<span class="fc" id="L15">    private static final EvolutionRewriteProgramEvaluationProtocol PROTOCOL =</span>
+        EvolutionRewriteProgramEvaluationProtocol
+<span class="fc" id="L17">            .informationParityExactRationalV1();</span>
+
+    private final EvolutionRewriteProgramTrainSuite suite;
+    private final InformationParityRewriteProgramTrainFitnessEvaluator delegate;
+
+    public ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator(
+        EvolutionRewriteProgramTrainSuite suite,
+        Set&lt;FitnessComponent&gt; requiredComponents,
+        AssumptionAwareEquivalenceService equivalence
+<span class="fc" id="L26">    ) {</span>
+<span class="fc" id="L27">        this.suite = Objects.requireNonNull(suite, &quot;suite&quot;);</span>
+<span class="fc" id="L28">        this.delegate = new InformationParityRewriteProgramTrainFitnessEvaluator(</span>
+            suite,
+<span class="fc" id="L30">            Objects.requireNonNull(requiredComponents, &quot;requiredComponents&quot;),</span>
+<span class="fc" id="L31">            Objects.requireNonNull(equivalence, &quot;equivalence&quot;));</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (suite.evaluatorProfile() != PROTOCOL.evaluatorProfile()) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(</span>
+                &quot;TRAIN suite evaluator profile differs from frozen protocol&quot;);
+        }
+<span class="fc" id="L36">    }</span>
+
+    @Override
+    public EvolutionRewriteProgramEvaluationProtocol protocol() {
+<span class="fc" id="L40">        return PROTOCOL;</span>
+    }
+
+    @Override
+    public EvolutionRewriteProgramTrainFitnessEvidence evaluate(
+        EvolutionRewriteProgramCandidate candidate
+    ) {
+<span class="fc" id="L47">        EvolutionRewriteProgramTrainFitnessEvidence result =</span>
+<span class="fc" id="L48">            delegate.evaluate(candidate);</span>
+<span class="fc" id="L49">        return EvolutionRewriteProgramTrainFitnessEvidence.create(</span>
+            suite,
+<span class="fc" id="L51">            protocol(),</span>
+            candidate,
+<span class="fc" id="L53">            result.cases(),</span>
+<span class="fc" id="L54">            result.rawComponents(),</span>
+<span class="fc" id="L55">            result.blockers());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -275,17 +275,17 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="nc" id="L275">                    blockers.add(&quot;MUTATION_KIND_NOT_PREREGISTERED:&quot;</span>
 <span class="nc" id="L276">                        + attempt.kind());</span>
                 }
-<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                if (contentHashes.contains(child.contentHash())) {</span>
-<span class="nc" id="L279">                    blockers.add(&quot;DUPLICATE_CANDIDATE:contentHash&quot;);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">                if (contentHashes.contains(child.contentHash())) {</span>
+<span class="fc" id="L279">                    blockers.add(&quot;DUPLICATE_CANDIDATE:contentHash&quot;);</span>
                 }
-<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                if (alphaHashes.contains(child.alphaStructuralHash())) {</span>
-<span class="nc" id="L282">                    blockers.add(</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                if (alphaHashes.contains(child.alphaStructuralHash())) {</span>
+<span class="fc" id="L282">                    blockers.add(</span>
                         &quot;STRUCTURAL_DIVERSITY_DUPLICATE:candidateAlphaStructuralHash&quot;);
                 }
-<span class="pc bpc" id="L285" title="1 of 2 branches missed.">                if (!blockers.isEmpty()) {</span>
-<span class="nc" id="L286">                    rejections.add(MutationRejection.from(</span>
-<span class="nc" id="L287">                        parent.contentHash(), attempt, blockers));</span>
-<span class="nc" id="L288">                    continue;</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">                if (!blockers.isEmpty()) {</span>
+<span class="fc" id="L286">                    rejections.add(MutationRejection.from(</span>
+<span class="fc" id="L287">                        parent.contentHash(), attempt, blockers));</span>
+<span class="fc" id="L288">                    continue;</span>
                 }
 <span class="fc" id="L290">                contentHashes.add(child.contentHash());</span>
 <span class="fc" id="L291">                alphaHashes.add(child.alphaStructuralHash());</span>
@@ -297,8 +297,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="fc" id="L297">                    child.alphaStructuralHash(),</span>
 <span class="fc" id="L298">                    attempt.kind(),</span>
 <span class="fc" id="L299">                    attempt.proposalKey()));</span>
-<span class="fc bfc" id="L300" title="All 2 branches covered.">                if (children.size() &gt;= poolLimit) {</span>
-<span class="fc" id="L301">                    break;</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">                if (children.size() &gt;= poolLimit) {</span>
+<span class="nc" id="L301">                    break;</span>
                 }
 <span class="fc" id="L303">            }</span>
 <span class="fc" id="L304">        }</span>
