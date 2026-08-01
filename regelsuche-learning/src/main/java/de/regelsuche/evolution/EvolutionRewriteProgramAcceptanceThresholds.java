@@ -160,6 +160,31 @@ public record EvolutionRewriteProgramAcceptanceThresholds(
             hash);
     }
 
+    /** Ensures the frozen FINAL TEST surface can actually satisfy the threshold. */
+    public void requireCompatibleWithFinalSurface(
+        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment
+    ) {
+        Objects.requireNonNull(finalTestCommitment, "finalTestCommitment");
+        if (finalTestCommitment.split()
+                != EvolutionRewriteProgramHeldOutCommitment.Split.FINAL_TEST) {
+            throw new IllegalArgumentException(
+                "acceptance thresholds require a FINAL TEST commitment");
+        }
+        int caseCount = finalTestCommitment.cases().size();
+        long familyCount = finalTestCommitment.cases().stream()
+            .map(EvolutionRewriteProgramHeldOutCommitment.CaseCommitment
+                ::familyCommitmentHash)
+            .distinct()
+            .count();
+        if (caseCount < minimumImprovedFinalTestCases
+                || caseCount < minimumNewlyReachedCases
+                || familyCount < minimumDistinctImprovedFamilies
+                || familyCount < 3) {
+            throw new IllegalArgumentException(
+                "FINAL TEST surface cannot satisfy frozen flagship thresholds");
+        }
+    }
+
     public String toCanonicalJson() {
         return render(
             minimumImprovedFinalTestCases,
@@ -204,13 +229,17 @@ public record EvolutionRewriteProgramAcceptanceThresholds(
         NullResultPolicy nullResultPolicy
     ) {
         if (minimumImprovedFinalTestCases < 2
-                || minimumDistinctImprovedFamilies < 2) {
+                || minimumDistinctImprovedFamilies < 2
+                || minimumDistinctImprovedFamilies
+                    > minimumImprovedFinalTestCases) {
             throw new IllegalArgumentException(
-                "flagship success requires multiple cases and families");
+                "flagship success requires feasible multiple cases and families");
         }
-        if (minimumNewlyReachedCases < 0) {
+        if (minimumNewlyReachedCases < 0
+                || minimumNewlyReachedCases
+                    > minimumImprovedFinalTestCases) {
             throw new IllegalArgumentException(
-                "minimumNewlyReachedCases must not be negative");
+                "minimumNewlyReachedCases is outside the improved-case surface");
         }
         if (!allowMaterialWorkReductionRoute
                 && minimumNewlyReachedCases < 1) {
