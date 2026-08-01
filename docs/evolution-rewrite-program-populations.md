@@ -59,6 +59,14 @@ The strict schema is
 9. stop on completion, extinction, diversity failure, budget exhaustion or
    stagnation.
 
+The engine accepts a narrow evaluator interface so its population mechanics can
+be characterized with deterministic fixtures. The flagship campaign wiring is
+more restrictive: it must supply
+`InformationParityRewriteProgramTrainFitnessEvaluator`, whose baseline receives
+the same ordinary and flat candidate-genome rules as the candidate. Synthetic
+or default-rules-only evaluators are test infrastructure and are not authorized
+for the preregistered result.
+
 Raw named components in the TRAIN evidence remain authoritative. The scalar
 profile is used only for the frozen population ordering. Missing required
 components and evaluator identity drift are blockers, not zero-valued successes.
