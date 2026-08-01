@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-baseline-ablation-plan-v1.schema.json",
+  "title": "Regelsuche rewrite-program baseline and ablation plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "planId",
+    "studyId",
+    "splitManifestHash",
+    "evaluationProtocolHash",
+    "primitiveInventoryHash",
+    "programGrammarHash",
+    "mutationCatalogHash",
+    "workBudgetPolicyHash",
+    "workAccountingPolicy",
+    "tracks",
+    "status",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-baseline-ablation-plan/v1"
+    },
+    "planId": {"$ref": "#/$defs/id"},
+    "studyId": {"$ref": "#/$defs/id"},
+    "splitManifestHash": {"$ref": "#/$defs/sha256"},
+    "evaluationProtocolHash": {"$ref": "#/$defs/sha256"},
+    "primitiveInventoryHash": {"$ref": "#/$defs/sha256"},
+    "programGrammarHash": {"$ref": "#/$defs/sha256"},
+    "mutationCatalogHash": {"$ref": "#/$defs/sha256"},
+    "workBudgetPolicyHash": {"$ref": "#/$defs/sha256"},
+    "workAccountingPolicy": {
+      "const": "MATCHED_PRIMITIVE_AND_TOTAL_WORK"
+    },
+    "tracks": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/track"}
+    },
+    "status": {"const": "NOT_STARTED"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "kind": {
+      "enum": [
+        "FIXED_PRIMITIVE_BEST_FIRST",
+        "EQUALITY_SATURATION_SHARED_FRAGMENT",
+        "RANDOMIZED_VALID_PROGRAM",
+        "MUTATION_ONLY_NO_TOPOLOGY",
+        "HAND_WRITTEN_PROGRAM",
+        "NO_COMPOSITION_ABLATION",
+        "FIXED_GUARD_ABLATION",
+        "FLATTENED_PROGRAM_OUTER_SEARCH"
+      ]
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "trackId",
+        "implementationHash",
+        "configurationHash",
+        "informationSurface",
+        "workAccountingPolicy"
+      ],
+      "properties": {
+        "kind": {"$ref": "#/$defs/kind"},
+        "trackId": {"$ref": "#/$defs/id"},
+        "implementationHash": {"$ref": "#/$defs/sha256"},
+        "configurationHash": {"$ref": "#/$defs/sha256"},
+        "informationSurface": {"const": "FROZEN_SHARED_SURFACE"},
+        "workAccountingPolicy": {
+          "const": "MATCHED_PRIMITIVE_AND_TOTAL_WORK"
+        },
+        "randomSeed": {"type": "integer"},
+        "candidateProgramHash": {"$ref": "#/$defs/sha256"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"kind": {"const": "RANDOMIZED_VALID_PROGRAM"}},
+            "required": ["kind"]
+          },
+          "then": {"required": ["randomSeed"]},
+          "else": {"not": {"required": ["randomSeed"]}}
+        },
+        {
+          "if": {
+            "properties": {"kind": {"const": "HAND_WRITTEN_PROGRAM"}},
+            "required": ["kind"]
+          },
+          "then": {"required": ["candidateProgramHash"]},
+          "else": {"not": {"required": ["candidateProgramHash"]}}
+        }
+      ]
+    }
+  }
+}

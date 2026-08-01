@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramBaselineAblationPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramBaselineAblationPlan.java</span></div><h1>EvolutionRewriteProgramBaselineAblationPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/**
+ * Content-addressed, pre-execution plan for every flagship baseline and
+ * ablation track.
+ *
+ * &lt;p&gt;All tracks share the same frozen information surface, evaluation protocol,
+ * primitive inventory and matched primitive/total-work policy. A track may
+ * differ only through its explicitly hashed implementation/configuration and
+ * the semantics declared by {@link TrackKind}.&lt;/p&gt;
+ */
+public record EvolutionRewriteProgramBaselineAblationPlan(
+    String schema,
+    String planId,
+    String studyId,
+    String splitManifestHash,
+    String evaluationProtocolHash,
+    String primitiveInventoryHash,
+    String programGrammarHash,
+    String mutationCatalogHash,
+    String workBudgetPolicyHash,
+    WorkAccountingPolicy workAccountingPolicy,
+    List&lt;Track&gt; tracks,
+    PlanStatus status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-baseline-ablation-plan/v1&quot;;
+<span class="fc" id="L38">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+
+<span class="fc" id="L40">    public EvolutionRewriteProgramBaselineAblationPlan {</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program baseline/ablation-plan schema&quot;);
+        }
+<span class="fc" id="L45">        requireId(planId, &quot;planId&quot;);</span>
+<span class="fc" id="L46">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L47">        requireHashes(</span>
+            splitManifestHash,
+            evaluationProtocolHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            workBudgetPolicyHash);
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        if (workAccountingPolicy</span>
+                != WorkAccountingPolicy.MATCHED_PRIMITIVE_AND_TOTAL_WORK
+                || status != PlanStatus.NOT_STARTED) {
+<span class="nc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;baseline/ablation plan must remain matched-work and pre-execution&quot;);
+        }
+<span class="fc" id="L60">        tracks = canonicalTracks(tracks);</span>
+<span class="fc" id="L61">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L62">        String expected = EvolutionGenome.hash(render(</span>
+            planId,
+            studyId,
+            splitManifestHash,
+            evaluationProtocolHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            workBudgetPolicyHash,
+            workAccountingPolicy,
+            tracks,
+            null));
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L75">            throw new IllegalArgumentException(</span>
+                &quot;baseline/ablation-plan contentHash mismatch&quot;);
+        }
+<span class="fc" id="L78">    }</span>
+
+    public static EvolutionRewriteProgramBaselineAblationPlan create(
+        String planId,
+        String studyId,
+        String splitManifestHash,
+        String evaluationProtocolHash,
+        String primitiveInventoryHash,
+        String programGrammarHash,
+        String mutationCatalogHash,
+        String workBudgetPolicyHash,
+        List&lt;Track&gt; tracks
+    ) {
+<span class="fc" id="L91">        requireId(planId, &quot;planId&quot;);</span>
+<span class="fc" id="L92">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L93">        requireHashes(</span>
+            splitManifestHash,
+            evaluationProtocolHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            workBudgetPolicyHash);
+<span class="fc" id="L100">        List&lt;Track&gt; canonical = canonicalTracks(tracks);</span>
+<span class="fc" id="L101">        String hash = EvolutionGenome.hash(render(</span>
+            planId,
+            studyId,
+            splitManifestHash,
+            evaluationProtocolHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            workBudgetPolicyHash,
+            WorkAccountingPolicy.MATCHED_PRIMITIVE_AND_TOTAL_WORK,
+            canonical,
+            null));
+<span class="fc" id="L113">        return new EvolutionRewriteProgramBaselineAblationPlan(</span>
+            SCHEMA,
+            planId,
+            studyId,
+            splitManifestHash,
+            evaluationProtocolHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            workBudgetPolicyHash,
+            WorkAccountingPolicy.MATCHED_PRIMITIVE_AND_TOTAL_WORK,
+            canonical,
+            PlanStatus.NOT_STARTED,
+            hash);
+    }
+
+    public void requireInputs(
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
+        String primitiveInventoryHash,
+        String programGrammarHash,
+        String mutationCatalogHash,
+        String workBudgetPolicyHash
+    ) {
+<span class="fc" id="L137">        Objects.requireNonNull(splitManifest, &quot;splitManifest&quot;);</span>
+<span class="fc" id="L138">        Objects.requireNonNull(evaluationProtocol, &quot;evaluationProtocol&quot;);</span>
+<span class="fc" id="L139">        requireHashes(</span>
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            workBudgetPolicyHash);
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (!studyId.equals(splitManifest.studyId())</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">                || !this.splitManifestHash.equals(splitManifest.contentHash())</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                || !this.evaluationProtocolHash.equals(</span>
+<span class="fc" id="L147">                    evaluationProtocol.contentHash())</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                || !this.primitiveInventoryHash.equals(primitiveInventoryHash)</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                || !this.programGrammarHash.equals(programGrammarHash)</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                || !this.mutationCatalogHash.equals(mutationCatalogHash)</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                || !this.workBudgetPolicyHash.equals(workBudgetPolicyHash)) {</span>
+<span class="fc" id="L152">            throw new IllegalArgumentException(</span>
+                &quot;baseline/ablation plan input identity mismatch&quot;);
+        }
+<span class="fc" id="L155">    }</span>
+
+    public String toCanonicalJson() {
+<span class="fc" id="L158">        return render(</span>
+            planId,
+            studyId,
+            splitManifestHash,
+            evaluationProtocolHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            workBudgetPolicyHash,
+            workAccountingPolicy,
+            tracks,
+            contentHash);
+    }
+
+    private static List&lt;Track&gt; canonicalTracks(List&lt;Track&gt; values) {
+<span class="fc" id="L173">        Objects.requireNonNull(values, &quot;tracks&quot;);</span>
+<span class="fc" id="L174">        List&lt;Track&gt; result = values.stream()</span>
+<span class="fc" id="L175">            .map(value -&gt; Objects.requireNonNull(value, &quot;track&quot;))</span>
+<span class="fc" id="L176">            .sorted(Comparator.comparing(track -&gt; track.kind().name()))</span>
+<span class="fc" id="L177">            .toList();</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (result.size() != TrackKind.values().length) {</span>
+<span class="fc" id="L179">            throw new IllegalArgumentException(</span>
+                &quot;baseline/ablation plan must contain every required track exactly once&quot;);
+        }
+<span class="fc" id="L182">        Set&lt;TrackKind&gt; kinds = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L183">        Set&lt;String&gt; trackIds = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (Track track : result) {</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (!kinds.add(track.kind())) {</span>
+<span class="fc" id="L186">                throw new IllegalArgumentException(</span>
+                    &quot;baseline/ablation plan contains duplicate track kind&quot;);
+            }
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (!trackIds.add(track.trackId())) {</span>
+<span class="nc" id="L190">                throw new IllegalArgumentException(</span>
+                    &quot;baseline/ablation plan contains duplicate track ID&quot;);
+            }
+<span class="fc" id="L193">        }</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!kinds.equals(Set.copyOf(Arrays.asList(TrackKind.values())))) {</span>
+<span class="nc" id="L195">            throw new IllegalArgumentException(</span>
+                &quot;baseline/ablation plan omits a required track kind&quot;);
+        }
+<span class="fc" id="L198">        return List.copyOf(result);</span>
+    }
+
+    private static String render(
+        String planId,
+        String studyId,
+        String splitManifestHash,
+        String evaluationProtocolHash,
+        String primitiveInventoryHash,
+        String programGrammarHash,
+        String mutationCatalogHash,
+        String workBudgetPolicyHash,
+        WorkAccountingPolicy workAccountingPolicy,
+        List&lt;Track&gt; tracks,
+        String contentHash
+    ) {
+<span class="fc" id="L214">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L215">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L216">            .property(&quot;planId&quot;, planId)</span>
+<span class="fc" id="L217">            .property(&quot;studyId&quot;, studyId)</span>
+<span class="fc" id="L218">            .property(&quot;splitManifestHash&quot;, splitManifestHash)</span>
+<span class="fc" id="L219">            .property(&quot;evaluationProtocolHash&quot;, evaluationProtocolHash)</span>
+<span class="fc" id="L220">            .property(&quot;primitiveInventoryHash&quot;, primitiveInventoryHash)</span>
+<span class="fc" id="L221">            .property(&quot;programGrammarHash&quot;, programGrammarHash)</span>
+<span class="fc" id="L222">            .property(&quot;mutationCatalogHash&quot;, mutationCatalogHash)</span>
+<span class="fc" id="L223">            .property(&quot;workBudgetPolicyHash&quot;, workBudgetPolicyHash)</span>
+<span class="fc" id="L224">            .property(&quot;workAccountingPolicy&quot;, workAccountingPolicy.name())</span>
+<span class="fc" id="L225">            .array(&quot;tracks&quot;, array -&gt; tracks.forEach(track -&gt;</span>
+<span class="fc" id="L226">                array.objectValue(object -&gt; {</span>
+<span class="fc" id="L227">                    object.property(&quot;kind&quot;, track.kind().name())</span>
+<span class="fc" id="L228">                        .property(&quot;trackId&quot;, track.trackId())</span>
+<span class="fc" id="L229">                        .property(&quot;implementationHash&quot;, track.implementationHash())</span>
+<span class="fc" id="L230">                        .property(&quot;configurationHash&quot;, track.configurationHash())</span>
+<span class="fc" id="L231">                        .property(&quot;informationSurface&quot;, &quot;FROZEN_SHARED_SURFACE&quot;)</span>
+<span class="fc" id="L232">                        .property(&quot;workAccountingPolicy&quot;,</span>
+<span class="fc" id="L233">                            WorkAccountingPolicy.MATCHED_PRIMITIVE_AND_TOTAL_WORK.name());</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">                    if (track.randomSeed() != null) {</span>
+<span class="fc" id="L235">                        object.property(&quot;randomSeed&quot;, track.randomSeed());</span>
+                    }
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                    if (track.candidateProgramHash() != null) {</span>
+<span class="fc" id="L238">                        object.property(</span>
+<span class="fc" id="L239">                            &quot;candidateProgramHash&quot;, track.candidateProgramHash());</span>
+                    }
+<span class="fc" id="L241">                })))</span>
+<span class="fc" id="L242">            .property(&quot;status&quot;, PlanStatus.NOT_STARTED.name());</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L244">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L246">        return json.endObject().toString();</span>
+    }
+
+    private static void requireHashes(String... values) {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        for (int index = 0; index &lt; values.length; index++) {</span>
+<span class="fc" id="L251">            EvolutionGenome.requireSha256(values[index], &quot;hash[&quot; + index + &quot;]&quot;);</span>
+        }
+<span class="fc" id="L253">    }</span>
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L256" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L257">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L259">    }</span>
+
+<span class="fc" id="L261">    public enum WorkAccountingPolicy {</span>
+<span class="fc" id="L262">        MATCHED_PRIMITIVE_AND_TOTAL_WORK</span>
+    }
+
+<span class="fc" id="L265">    public enum PlanStatus {</span>
+<span class="fc" id="L266">        NOT_STARTED</span>
+    }
+
+<span class="fc" id="L269">    public enum TrackKind {</span>
+<span class="fc" id="L270">        FIXED_PRIMITIVE_BEST_FIRST,</span>
+<span class="fc" id="L271">        EQUALITY_SATURATION_SHARED_FRAGMENT,</span>
+<span class="fc" id="L272">        RANDOMIZED_VALID_PROGRAM,</span>
+<span class="fc" id="L273">        MUTATION_ONLY_NO_TOPOLOGY,</span>
+<span class="fc" id="L274">        HAND_WRITTEN_PROGRAM,</span>
+<span class="fc" id="L275">        NO_COMPOSITION_ABLATION,</span>
+<span class="fc" id="L276">        FIXED_GUARD_ABLATION,</span>
+<span class="fc" id="L277">        FLATTENED_PROGRAM_OUTER_SEARCH</span>
+    }
+
+    public record Track(
+        TrackKind kind,
+        String trackId,
+        String implementationHash,
+        String configurationHash,
+        Long randomSeed,
+        String candidateProgramHash
+    ) {
+<span class="fc" id="L288">        public Track {</span>
+<span class="fc" id="L289">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L290">            requireId(trackId, &quot;trackId&quot;);</span>
+<span class="fc" id="L291">            EvolutionGenome.requireSha256(</span>
+                implementationHash, &quot;implementationHash&quot;);
+<span class="fc" id="L293">            EvolutionGenome.requireSha256(</span>
+                configurationHash, &quot;configurationHash&quot;);
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            boolean randomized = kind == TrackKind.RANDOMIZED_VALID_PROGRAM;</span>
+<span class="fc bfc" id="L296" title="All 4 branches covered.">            if (randomized != (randomSeed != null)) {</span>
+<span class="fc" id="L297">                throw new IllegalArgumentException(</span>
+                    &quot;only randomized-valid-program track carries a random seed&quot;);
+            }
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            boolean handWritten = kind == TrackKind.HAND_WRITTEN_PROGRAM;</span>
+<span class="fc bfc" id="L301" title="All 4 branches covered.">            if (handWritten != (candidateProgramHash != null)) {</span>
+<span class="fc" id="L302">                throw new IllegalArgumentException(</span>
+                    &quot;only hand-written-program track carries a candidate hash&quot;);
+            }
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (candidateProgramHash != null) {</span>
+<span class="fc" id="L306">                EvolutionGenome.requireSha256(</span>
+                    candidateProgramHash, &quot;candidateProgramHash&quot;);
+            }
+<span class="fc" id="L309">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
