@@ -87,7 +87,7 @@ public final class PolynomialNormalizer {
     }
 
     private Polynomial power(Expr base, Expr exponent) {
-<span class="pc bpc" id="L90" title="1 of 4 branches missed.">        if (!(exponent instanceof NumberExpr number) || !isNonNegativeInteger(number.value())) {</span>
+<span class="fc bfc" id="L90" title="All 4 branches covered.">        if (!(exponent instanceof NumberExpr number) || !isNonNegativeInteger(number.value())) {</span>
 <span class="fc" id="L91">            return null;</span>
         }
 <span class="fc" id="L93">        int exponentValue = (int) number.value();</span>

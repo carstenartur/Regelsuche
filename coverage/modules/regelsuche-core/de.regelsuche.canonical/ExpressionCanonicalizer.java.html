@@ -172,8 +172,8 @@ import java.util.Optional;
 <span class="fc" id="L172">        Map&lt;String, FactorBucket&gt; buckets = new LinkedHashMap&lt;&gt;();</span>
 <span class="fc bfc" id="L173" title="All 2 branches covered.">        for (Expr factor : factors) {</span>
 <span class="fc" id="L174">            Expr normalized = canonicalize(factor, context);</span>
-<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (isNumber(normalized, 0)) {</span>
-<span class="nc" id="L176">                return new NumberExpr(0);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (isNumber(normalized, 0)) {</span>
+<span class="fc" id="L176">                return new NumberExpr(0);</span>
             }
 <span class="fc bfc" id="L178" title="All 2 branches covered.">            if (normalized instanceof NumberExpr numberExpr) {</span>
 <span class="fc" id="L179">                numeric *= (int) numberExpr.value();</span>
@@ -206,11 +206,11 @@ import java.util.Optional;
     private Expr canonicalizePower(BinaryExpr expression, AssumptionContext context) {
 <span class="fc" id="L207">        Expr base = canonicalize(expression.left(), context);</span>
 <span class="fc" id="L208">        Expr exponent = canonicalize(expression.right(), context);</span>
-<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (isNumber(exponent, 0)) {</span>
-<span class="nc" id="L210">            return new NumberExpr(1);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (isNumber(exponent, 0)) {</span>
+<span class="fc" id="L210">            return new NumberExpr(1);</span>
         }
-<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (isNumber(exponent, 1)) {</span>
-<span class="nc" id="L213">            return base;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (isNumber(exponent, 1)) {</span>
+<span class="fc" id="L213">            return base;</span>
         }
 <span class="fc" id="L215">        return new BinaryExpr(base, BinaryOperator.POW, exponent);</span>
     }
@@ -330,7 +330,7 @@ import java.util.Optional;
 <span class="fc bfc" id="L330" title="All 4 branches covered.">        } else if (expression instanceof BinaryExpr binaryExpr &amp;&amp; binaryExpr.operator() == BinaryOperator.SUB) {</span>
 <span class="fc" id="L331">            collectTerms(binaryExpr.left(), sign, terms);</span>
 <span class="fc" id="L332">            collectTerms(binaryExpr.right(), -sign, terms);</span>
-<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        } else if (!isNumber(expression, 0)) {</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        } else if (!isNumber(expression, 0)) {</span>
 <span class="fc" id="L334">            terms.add(new SignedTerm(sign, expression));</span>
         }
 <span class="fc" id="L336">    }</span>

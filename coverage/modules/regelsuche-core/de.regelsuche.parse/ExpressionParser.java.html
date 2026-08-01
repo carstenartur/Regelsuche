@@ -35,8 +35,8 @@ import java.util.List;
 <span class="fc" id="L35">        Cursor cursor = new Cursor(term);</span>
 <span class="fc" id="L36">        Expr expr = parseExpression(cursor);</span>
 <span class="fc" id="L37">        cursor.skipWhitespace();</span>
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (!cursor.isAtEnd()) {</span>
-<span class="nc" id="L39">            throw new IllegalArgumentException(&quot;Unexpected token at position &quot; + cursor.position());</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (!cursor.isAtEnd()) {</span>
+<span class="fc" id="L39">            throw new IllegalArgumentException(&quot;Unexpected token at position &quot; + cursor.position());</span>
         }
 <span class="fc" id="L41">        return expr;</span>
     }
@@ -146,9 +146,9 @@ import java.util.List;
 <span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (!cursor.peek(')')) {</span>
 <span class="fc" id="L147">                arguments.add(parseExpression(cursor));</span>
 <span class="fc" id="L148">                cursor.skipWhitespace();</span>
-<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                while (cursor.consume(',')) {</span>
-<span class="nc" id="L150">                    arguments.add(parseExpression(cursor));</span>
-<span class="nc" id="L151">                    cursor.skipWhitespace();</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                while (cursor.consume(',')) {</span>
+<span class="fc" id="L150">                    arguments.add(parseExpression(cursor));</span>
+<span class="fc" id="L151">                    cursor.skipWhitespace();</span>
                 }
             }
 <span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (!cursor.consume(')')) {</span>

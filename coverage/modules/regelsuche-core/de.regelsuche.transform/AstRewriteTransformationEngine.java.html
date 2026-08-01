@@ -57,8 +57,8 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         Expr root;
         try {
 <span class="fc" id="L59">            root = parser.parse(new InputRequest(InputType.TERM, expression)).terms().getFirst();</span>
-<span class="nc" id="L60">        } catch (IllegalArgumentException ex) {</span>
-<span class="nc" id="L61">            return List.of();</span>
+<span class="fc" id="L60">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L61">            return List.of();</span>
 <span class="fc" id="L62">        }</span>
 
 <span class="fc" id="L64">        String formattedInput = ExpressionFormatter.format(root);</span>
@@ -86,8 +86,8 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 <span class="fc" id="L86">                rule.descriptor().packId(),</span>
 <span class="fc" id="L87">                rule.descriptor().license()</span>
             ));
-<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (transformations.size() &gt;= maxCandidatesPerState) {</span>
-<span class="nc" id="L90">                break;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (transformations.size() &gt;= maxCandidatesPerState) {</span>
+<span class="fc" id="L90">                break;</span>
             }
 <span class="fc" id="L92">        }</span>
 <span class="fc" id="L93">        return new ArrayList&lt;&gt;(transformations);</span>
@@ -130,16 +130,16 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 <span class="fc" id="L130">            List&lt;Expr&gt; arguments = functionExpr.arguments();</span>
 <span class="fc bfc" id="L131" title="All 2 branches covered.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
 <span class="fc" id="L132">                final int position = index;</span>
-<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index))) {</span>
-<span class="nc" id="L134">                    List&lt;Expr&gt; replaced = new ArrayList&lt;&gt;(arguments);</span>
-<span class="nc" id="L135">                    replaced.set(position, argRewrite.expression());</span>
-<span class="nc" id="L136">                    results.add(new RewriteResult(</span>
-<span class="nc" id="L137">                        argRewrite.rule(),</span>
-<span class="nc" id="L138">                        new FunctionExpr(functionExpr.name(), replaced),</span>
-<span class="nc" id="L139">                        argRewrite.sourceSubtreeHash(),</span>
-<span class="nc" id="L140">                        argRewrite.assumptions()</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                for (RewriteResult argRewrite : rewriteEverywhere(arguments.get(index))) {</span>
+<span class="fc" id="L134">                    List&lt;Expr&gt; replaced = new ArrayList&lt;&gt;(arguments);</span>
+<span class="fc" id="L135">                    replaced.set(position, argRewrite.expression());</span>
+<span class="fc" id="L136">                    results.add(new RewriteResult(</span>
+<span class="fc" id="L137">                        argRewrite.rule(),</span>
+<span class="fc" id="L138">                        new FunctionExpr(functionExpr.name(), replaced),</span>
+<span class="fc" id="L139">                        argRewrite.sourceSubtreeHash(),</span>
+<span class="fc" id="L140">                        argRewrite.assumptions()</span>
                     ));
-<span class="nc" id="L142">                }</span>
+<span class="fc" id="L142">                }</span>
             }
         }
 <span class="fc" id="L145">        return results;</span>
@@ -262,16 +262,16 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="pc bpc" id="L265" title="1 of 2 branches missed.">            return exponents(subtree) != null;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            return exponents(subtree) != null;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L270">            PowerPair pair = exponents(subtree);</span>
-<span class="nc bnc" id="L271" title="All 2 branches missed.">            if (pair == null) {</span>
+<span class="fc" id="L270">            PowerPair pair = exponents(subtree);</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">            if (pair == null) {</span>
 <span class="nc" id="L272">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
             }
-<span class="nc" id="L274">            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent() + pair.rightExponent()));</span>
+<span class="fc" id="L274">            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent() + pair.rightExponent()));</span>
         }
 
         private PowerPair exponents(Expr subtree) {
@@ -280,8 +280,8 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             }
 <span class="fc" id="L281">            Power left = asPower(multiplication.left());</span>
 <span class="fc" id="L282">            Power right = asPower(multiplication.right());</span>
-<span class="pc bpc" id="L283" title="5 of 6 branches missed.">            if (left != null &amp;&amp; right != null &amp;&amp; left.base().equals(right.base())) {</span>
-<span class="nc" id="L284">                return new PowerPair(left.base(), left.exponent(), right.exponent());</span>
+<span class="pc bpc" id="L283" title="2 of 6 branches missed.">            if (left != null &amp;&amp; right != null &amp;&amp; left.base().equals(right.base())) {</span>
+<span class="fc" id="L284">                return new PowerPair(left.base(), left.exponent(), right.exponent());</span>
             }
 <span class="fc" id="L286">            return null;</span>
         }
@@ -299,28 +299,28 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            return powers(subtree) != null;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">            return powers(subtree) != null;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L307">            PowerPair pair = powers(subtree);</span>
-<span class="nc bnc" id="L308" title="All 2 branches missed.">            if (pair == null) {</span>
+<span class="fc" id="L307">            PowerPair pair = powers(subtree);</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (pair == null) {</span>
 <span class="nc" id="L309">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
             }
-<span class="nc" id="L311">            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent() * pair.rightExponent()));</span>
+<span class="fc" id="L311">            return new BinaryExpr(pair.base(), BinaryOperator.POW, new NumberExpr(pair.leftExponent() * pair.rightExponent()));</span>
         }
 
         private PowerPair powers(Expr subtree) {
 <span class="fc bfc" id="L315" title="All 4 branches covered.">            if (!(subtree instanceof BinaryExpr outerPower) || outerPower.operator() != BinaryOperator.POW</span>
-<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                || !(outerPower.right() instanceof NumberExpr outerExponent)) {</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                || !(outerPower.right() instanceof NumberExpr outerExponent)) {</span>
 <span class="fc" id="L317">                return null;</span>
             }
 <span class="fc" id="L319">            Power innerPower = asPower(outerPower.left());</span>
-<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (innerPower == null) {</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">            if (innerPower == null) {</span>
 <span class="fc" id="L321">                return null;</span>
             }
-<span class="nc" id="L323">            return new PowerPair(innerPower.base(), innerPower.exponent(), outerExponent.value());</span>
+<span class="fc" id="L323">            return new PowerPair(innerPower.base(), innerPower.exponent(), outerExponent.value());</span>
         }
     }
 
@@ -377,23 +377,23 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="pc bpc" id="L380" title="1 of 2 branches missed.">            return findDuplicateTermIndices(subtree) != null;</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            return findDuplicateTermIndices(subtree) != null;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L385">            List&lt;Expr&gt; terms = flattenAddition(subtree);</span>
-<span class="nc" id="L386">            int[] indices = findDuplicateTermIndices(terms);</span>
-<span class="nc bnc" id="L387" title="All 2 branches missed.">            if (indices == null) {</span>
+<span class="fc" id="L385">            List&lt;Expr&gt; terms = flattenAddition(subtree);</span>
+<span class="fc" id="L386">            int[] indices = findDuplicateTermIndices(terms);</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">            if (indices == null) {</span>
 <span class="nc" id="L388">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
             }
-<span class="nc" id="L390">            Expr duplicate = terms.get(indices[0]);</span>
-<span class="nc" id="L391">            List&lt;Expr&gt; rewritten = new ArrayList&lt;&gt;(terms);</span>
+<span class="fc" id="L390">            Expr duplicate = terms.get(indices[0]);</span>
+<span class="fc" id="L391">            List&lt;Expr&gt; rewritten = new ArrayList&lt;&gt;(terms);</span>
             // Remove the later index first so the earlier index stays valid.
-<span class="nc" id="L393">            rewritten.remove(indices[1]);</span>
-<span class="nc" id="L394">            rewritten.remove(indices[0]);</span>
-<span class="nc" id="L395">            rewritten.add(new BinaryExpr(new NumberExpr(2), BinaryOperator.MUL, duplicate));</span>
-<span class="nc" id="L396">            return buildAddition(rewritten);</span>
+<span class="fc" id="L393">            rewritten.remove(indices[1]);</span>
+<span class="fc" id="L394">            rewritten.remove(indices[0]);</span>
+<span class="fc" id="L395">            rewritten.add(new BinaryExpr(new NumberExpr(2), BinaryOperator.MUL, duplicate));</span>
+<span class="fc" id="L396">            return buildAddition(rewritten);</span>
         }
 
         private int[] findDuplicateTermIndices(Expr subtree) {
@@ -406,8 +406,8 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         private int[] findDuplicateTermIndices(List&lt;Expr&gt; terms) {
 <span class="fc bfc" id="L407" title="All 2 branches covered.">            for (int i = 0; i &lt; terms.size(); i++) {</span>
 <span class="fc bfc" id="L408" title="All 2 branches covered.">                for (int j = i + 1; j &lt; terms.size(); j++) {</span>
-<span class="pc bpc" id="L409" title="1 of 2 branches missed.">                    if (terms.get(i).equals(terms.get(j))) {</span>
-<span class="nc" id="L410">                        return new int[] { i, j };</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">                    if (terms.get(i).equals(terms.get(j))) {</span>
+<span class="fc" id="L410">                        return new int[] { i, j };</span>
                     }
                 }
             }
@@ -425,14 +425,14 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         }
 
         private Expr buildAddition(List&lt;Expr&gt; terms) {
-<span class="nc bnc" id="L428" title="All 2 branches missed.">            if (terms.isEmpty()) {</span>
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">            if (terms.isEmpty()) {</span>
 <span class="nc" id="L429">                return new NumberExpr(0);</span>
             }
-<span class="nc" id="L431">            Expr expression = terms.getFirst();</span>
-<span class="nc bnc" id="L432" title="All 2 branches missed.">            for (int i = 1; i &lt; terms.size(); i++) {</span>
-<span class="nc" id="L433">                expression = new BinaryExpr(expression, BinaryOperator.ADD, terms.get(i));</span>
+<span class="fc" id="L431">            Expr expression = terms.getFirst();</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">            for (int i = 1; i &lt; terms.size(); i++) {</span>
+<span class="fc" id="L433">                expression = new BinaryExpr(expression, BinaryOperator.ADD, terms.get(i));</span>
             }
-<span class="nc" id="L435">            return expression;</span>
+<span class="fc" id="L435">            return expression;</span>
         }
     }
 
@@ -574,7 +574,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
 <span class="fc" id="L574">    private record Power(Expr base, double exponent) {</span>
     }
 
-<span class="nc" id="L577">    private record PowerPair(Expr base, double leftExponent, double rightExponent) {</span>
+<span class="fc" id="L577">    private record PowerPair(Expr base, double leftExponent, double rightExponent) {</span>
     }
 
 <span class="fc" id="L580">    private record CommonTerms(Expr common, Expr leftRemainder, Expr rightRemainder) {</span>
