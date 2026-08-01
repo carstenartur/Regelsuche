@@ -544,7 +544,11 @@ public record EvolutionRewriteProgramPlan(
     }
 
     private static String alphaMaterial(Node root, int maxNodes, int maxDepth) {
-        AlphaContext context = new AlphaContext();
+        List<String> stableGeneOrder = inspect(root, maxNodes, maxDepth)
+            .referencedGeneIds().stream()
+            .sorted()
+            .toList();
+        AlphaContext context = new AlphaContext(stableGeneOrder);
         return SCHEMA
             + "\nmaxNodes=" + maxNodes
             + "\nmaxDepth=" + maxDepth
@@ -726,10 +730,20 @@ public record EvolutionRewriteProgramPlan(
     private static final class AlphaContext {
         private final Map<String, String> genes = new LinkedHashMap<>();
 
+        private AlphaContext(List<String> stableGeneOrder) {
+            int index = 0;
+            for (String geneId : stableGeneOrder) {
+                genes.put(geneId, "G" + index++);
+            }
+        }
+
         private String gene(String geneId) {
-            return genes.computeIfAbsent(
-                geneId,
-                ignored -> "G" + genes.size());
+            String alias = genes.get(geneId);
+            if (alias == null) {
+                throw new IllegalArgumentException(
+                    "alpha context is missing referenced gene: " + geneId);
+            }
+            return alias;
         }
     }
 }

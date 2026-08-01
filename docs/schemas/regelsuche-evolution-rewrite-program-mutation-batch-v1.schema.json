@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-mutation-batch-v1.schema.json",
+  "title": "Regelsuche evolved rewrite-program mutation batch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "genomeHash",
+    "parentPlanHash",
+    "parentAlphaStructuralHash",
+    "catalogHash",
+    "seed",
+    "limits",
+    "attempts",
+    "acceptedPlanHashes",
+    "acceptedAlphaStructuralHashes",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-mutation-batch/v1"
+    },
+    "genomeHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "parentPlanHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "parentAlphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "catalogHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "limits": {
+      "$ref": "#/$defs/limits"
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attempt"
+      }
+    },
+    "acceptedPlanHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "acceptedAlphaStructuralHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxProposals",
+        "maxAccepted"
+      ],
+      "properties": {
+        "maxProposals": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "maxAccepted": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "kind",
+        "proposalKey",
+        "status",
+        "childPlanHash",
+        "childAlphaStructuralHash",
+        "blockers"
+      ],
+      "properties": {
+        "ordinal": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "kind": {
+          "enum": [
+            "WRAP_REPEAT",
+            "WRAP_REQUIRE",
+            "WRAP_PRIORITY",
+            "WRAP_PRUNE",
+            "PREPEND_SOURCE",
+            "APPEND_SOURCE",
+            "SWAP_ADJACENT_CHILDREN",
+            "REMOVE_WRAPPER",
+            "CHOICE_TO_FIRST_APPLICABLE",
+            "FIRST_APPLICABLE_TO_CHOICE"
+          ]
+        },
+        "proposalKey": {
+          "$ref": "#/$defs/text"
+        },
+        "status": {
+          "enum": [
+            "ACCEPTED",
+            "REJECTED"
+          ]
+        },
+        "childPlanHash": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "childAlphaStructuralHash": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blockers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ACCEPTED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "childPlanHash": {
+                "$ref": "#/$defs/sha256"
+              },
+              "childAlphaStructuralHash": {
+                "$ref": "#/$defs/sha256"
+              },
+              "blockers": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "blockers": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
