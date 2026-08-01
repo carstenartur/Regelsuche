@@ -26,7 +26,6 @@ import de.regelsuche.evolution.EvolutionStudyPlan.PopulationPolicy;
 import de.regelsuche.evolution.EvolutionStudyPlan.StudyBudget;
 import de.regelsuche.search.SearchHeuristic;
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -64,7 +63,7 @@ class EvolutionRewriteProgramPopulationEngineTest {
             .anyMatch(edge -> !edge.childCandidateHash()
                 .equals(edge.parentCandidateHash())));
         assertTrue(first.generationReports().stream()
-            .allMatch(report -> report.distinctAlphaStructures() >= 1));
+            .allMatch(report -> report.distinctAlphaStructures() >= 2));
         assertTrue(first.toCanonicalJson().contains(
             "\"validationStatus\":\"NOT_EVALUATED\""));
         assertTrue(first.toCanonicalJson().contains(
@@ -363,7 +362,7 @@ class EvolutionRewriteProgramPopulationEngineTest {
                 catalog,
                 seeds,
                 Arrays.asList(EvolutionRewriteProgramMutationKind.values()),
-                new PopulationPolicy(4, 3, 1, 1, 2, 2, 20260801L),
+                new PopulationPolicy(4, 3, 1, 2, 2, 2, 20260801L),
                 List.of(
                     new FitnessWeight(
                         FitnessComponent.TRAIN_CASES_NEWLY_SOLVED, 700),
