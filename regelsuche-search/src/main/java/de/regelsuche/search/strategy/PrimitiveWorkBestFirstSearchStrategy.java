@@ -20,24 +20,26 @@ import java.util.Set;
 
 /**
  * Deterministic syntax-targeted best-first search with explicit primitive-step
- * and transformation-work budgets.
+ * and mechanical-work budgets.
  *
  * <p>Ordinary search-edge depth remains visible, but it never substitutes for
  * primitive depth. A composed program edge containing three primitive rewrites
- * consumes three primitive steps before it can enter the frontier.</p>
+ * consumes three primitive steps before it can enter the frontier. The work
+ * budget includes transformation formation and outer search administration.</p>
  */
 public final class PrimitiveWorkBestFirstSearchStrategy {
     public Result search(Problem problem) {
         Objects.requireNonNull(problem, "problem");
         State root = State.root(problem);
         if (root.expression().equals(problem.targetExpression())) {
+            MutableMetrics rootMetrics = new MutableMetrics();
             return result(
                 problem,
                 List.of(root),
                 root,
                 root,
                 Status.ROOT_ALREADY_TARGET,
-                new MutableMetrics());
+                rootMetrics);
         }
 
         PriorityQueue<State> frontier = new PriorityQueue<>(
@@ -57,10 +59,14 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             State current = frontier.remove();
             queued.remove(stateKey(current));
             if (!visited.add(stateKey(current))) {
-                metrics.duplicatePrunes++;
+                metrics.duplicatePrunes = add(metrics.duplicatePrunes, 1);
+                checkWorkBudget(problem, explored.size(), metrics);
                 continue;
             }
             explored.add(current);
+            if (checkWorkBudget(problem, explored.size(), metrics)) {
+                break;
+            }
             if (better(current, best, problem)) {
                 best = current;
             }
@@ -70,23 +76,29 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             }
             if (current.primitiveDepth()
                     >= problem.budget().maxPrimitiveSteps()) {
-                metrics.primitiveBudgetPrunes++;
+                metrics.primitiveBudgetPrunes = add(
+                    metrics.primitiveBudgetPrunes, 1);
+                checkWorkBudget(problem, explored.size(), metrics);
                 continue;
             }
 
             TransformationBatch batch = problem.engine()
                 .transformMeasured(current.expression());
-            metrics.engineBatches++;
+            metrics.engineBatches = add(metrics.engineBatches, 1);
             metrics.work = metrics.work.plus(batch.workMetrics());
-            if (metrics.work.totalWorkUnits()
-                    > problem.budget().maxWorkUnits()) {
-                metrics.workBudgetExceeded = true;
+            if (checkWorkBudget(problem, explored.size(), metrics)) {
                 break;
             }
-            metrics.expandedStates++;
-            metrics.generatedTransformations += batch.transformations().size();
+            metrics.expandedStates = add(metrics.expandedStates, 1);
+            metrics.generatedTransformations = add(
+                metrics.generatedTransformations,
+                batch.transformations().size());
             if (batch.transformations().isEmpty()) {
-                metrics.statesWithoutTransformations++;
+                metrics.statesWithoutTransformations = add(
+                    metrics.statesWithoutTransformations, 1);
+            }
+            if (checkWorkBudget(problem, explored.size(), metrics)) {
+                break;
             }
 
             List<Transformation> transformations = new ArrayList<>(
@@ -94,20 +106,29 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             transformations.sort(transformationComparator(problem));
             int accepted = 0;
             for (Transformation transformation : transformations) {
+                if (metrics.workBudgetExceeded) {
+                    break;
+                }
                 if (accepted >= problem.budget().maxCandidatesPerState()) {
-                    metrics.candidateBudgetPrunes++;
+                    metrics.candidateBudgetPrunes = add(
+                        metrics.candidateBudgetPrunes, 1);
+                    checkWorkBudget(problem, explored.size(), metrics);
                     break;
                 }
                 if (current.appliedRuleApplications().contains(
                         transformation.applicationKey())) {
-                    metrics.repeatedApplicationPrunes++;
+                    metrics.repeatedApplicationPrunes = add(
+                        metrics.repeatedApplicationPrunes, 1);
+                    checkWorkBudget(problem, explored.size(), metrics);
                     continue;
                 }
                 int nextExpandingSteps = current.expandingSteps()
                     + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);
                 if (nextExpandingSteps
                         > problem.budget().maxExpandingSteps()) {
-                    metrics.expansionBudgetPrunes++;
+                    metrics.expansionBudgetPrunes = add(
+                        metrics.expansionBudgetPrunes, 1);
+                    checkWorkBudget(problem, explored.size(), metrics);
                     continue;
                 }
                 int nextPrimitiveDepth;
@@ -116,17 +137,23 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                         current.primitiveDepth(),
                         transformation.primitiveStepCount());
                 } catch (ArithmeticException exception) {
-                    metrics.primitiveBudgetPrunes++;
+                    metrics.primitiveBudgetPrunes = add(
+                        metrics.primitiveBudgetPrunes, 1);
+                    checkWorkBudget(problem, explored.size(), metrics);
                     continue;
                 }
                 if (nextPrimitiveDepth
                         > problem.budget().maxPrimitiveSteps()) {
-                    metrics.primitiveBudgetPrunes++;
+                    metrics.primitiveBudgetPrunes = add(
+                        metrics.primitiveBudgetPrunes, 1);
+                    checkWorkBudget(problem, explored.size(), metrics);
                     continue;
                 }
                 if (transformation.transformedExpression().equals(
                         current.expression())) {
-                    metrics.sameExpressionPrunes++;
+                    metrics.sameExpressionPrunes = add(
+                        metrics.sameExpressionPrunes, 1);
+                    checkWorkBudget(problem, explored.size(), metrics);
                     continue;
                 }
 
@@ -137,12 +164,14 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                     nextExpandingSteps);
                 String key = stateKey(next);
                 if (visited.contains(key) || !queued.add(key)) {
-                    metrics.duplicatePrunes++;
+                    metrics.duplicatePrunes = add(metrics.duplicatePrunes, 1);
+                    checkWorkBudget(problem, explored.size(), metrics);
                     continue;
                 }
                 frontier.add(next);
-                metrics.enqueuedStates++;
+                metrics.enqueuedStates = add(metrics.enqueuedStates, 1);
                 accepted++;
+                checkWorkBudget(problem, explored.size(), metrics);
             }
         }
 
@@ -165,6 +194,18 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             status = Status.FRONTIER_EXHAUSTED;
         }
         return result(problem, explored, reached, best, status, metrics);
+    }
+
+    private static boolean checkWorkBudget(
+        Problem problem,
+        int exploredStates,
+        MutableMetrics metrics
+    ) {
+        if (metrics.totalMechanicalWorkUnits(exploredStates)
+                > problem.budget().maxWorkUnits()) {
+            metrics.workBudgetExceeded = true;
+        }
+        return metrics.workBudgetExceeded;
     }
 
     private static Result result(
@@ -288,6 +329,14 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
             throw new IllegalArgumentException(name + " must not be blank");
         }
         return expression.trim().replaceAll("\\s+", " ");
+    }
+
+    private static long add(long left, long right) {
+        try {
+            return Math.addExact(left, right);
+        } catch (ArithmeticException exception) {
+            return Long.MAX_VALUE;
+        }
     }
 
     public record Problem(
@@ -451,6 +500,27 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         public Metrics {
             Objects.requireNonNull(transformationWork, "transformationWork");
         }
+
+        public long outerSearchWorkUnits() {
+            long total = exploredStates;
+            total = add(total, expandedStates);
+            total = add(total, generatedTransformations);
+            total = add(total, enqueuedStates);
+            total = add(total, duplicatePrunes);
+            total = add(total, repeatedApplicationPrunes);
+            total = add(total, sameExpressionPrunes);
+            total = add(total, expansionBudgetPrunes);
+            total = add(total, primitiveBudgetPrunes);
+            total = add(total, candidateBudgetPrunes);
+            total = add(total, statesWithoutTransformations);
+            return add(total, engineBatches);
+        }
+
+        public long totalMechanicalWorkUnits() {
+            return add(
+                transformationWork.totalWorkUnits(),
+                outerSearchWorkUnits());
+        }
     }
 
     public record Result(
@@ -488,5 +558,21 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         private TransformationWorkMetrics work =
             TransformationWorkMetrics.ZERO;
         private boolean workBudgetExceeded;
+
+        private long totalMechanicalWorkUnits(int exploredStates) {
+            long total = exploredStates;
+            total = add(total, expandedStates);
+            total = add(total, generatedTransformations);
+            total = add(total, enqueuedStates);
+            total = add(total, duplicatePrunes);
+            total = add(total, repeatedApplicationPrunes);
+            total = add(total, sameExpressionPrunes);
+            total = add(total, expansionBudgetPrunes);
+            total = add(total, primitiveBudgetPrunes);
+            total = add(total, candidateBudgetPrunes);
+            total = add(total, statesWithoutTransformations);
+            total = add(total, engineBatches);
+            return add(total, work.totalWorkUnits());
+        }
     }
 }
