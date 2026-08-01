@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-generation-report-v1.schema.json",
+  "title": "Regelsuche rewrite-program generation report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generation",
+    "evaluationHashes",
+    "selectedCandidateHashes",
+    "lineage",
+    "rejections",
+    "distinctAlphaStructures",
+    "cumulativeMutationAttempts",
+    "cumulativeTrainEvaluations",
+    "outcome",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-generation-report/v1"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluationHashes": {
+      "$ref": "#/$defs/hashes"
+    },
+    "selectedCandidateHashes": {
+      "$ref": "#/$defs/hashes"
+    },
+    "lineage": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/lineage"
+      }
+    },
+    "rejections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rejection"
+      }
+    },
+    "distinctAlphaStructures": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cumulativeMutationAttempts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cumulativeTrainEvaluations": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "outcome": {
+      "enum": [
+        "CONTINUE",
+        "COMPLETED",
+        "EXTINCT",
+        "DIVERSITY_FLOOR",
+        "BUDGET_EXHAUSTED",
+        "STAGNATED"
+      ]
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "hashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "mutationKind": {
+      "enum": [
+        "WRAP_REPEAT",
+        "WRAP_REQUIRE",
+        "WRAP_PRIORITY",
+        "WRAP_PRUNE",
+        "PREPEND_SOURCE",
+        "APPEND_SOURCE",
+        "SWAP_ADJACENT_CHILDREN",
+        "REMOVE_WRAPPER",
+        "CHOICE_TO_FIRST_APPLICABLE",
+        "FIRST_APPLICABLE_TO_CHOICE"
+      ]
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parentCandidateHash",
+        "childCandidateHash",
+        "childPlanHash",
+        "childAlphaStructuralHash",
+        "mutationKind",
+        "proposalKey"
+      ],
+      "properties": {
+        "parentCandidateHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "childCandidateHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "childPlanHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "childAlphaStructuralHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mutationKind": {
+          "$ref": "#/$defs/mutationKind"
+        },
+        "proposalKey": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "rejection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parentCandidateHash",
+        "mutationKind",
+        "proposalKey",
+        "childPlanHash",
+        "childAlphaStructuralHash",
+        "blockers"
+      ],
+      "properties": {
+        "parentCandidateHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mutationKind": {
+          "$ref": "#/$defs/mutationKind"
+        },
+        "proposalKey": {
+          "$ref": "#/$defs/text"
+        },
+        "childPlanHash": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "childAlphaStructuralHash": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "blockers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    }
+  }
+}

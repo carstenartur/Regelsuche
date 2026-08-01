@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-study-plan-v1.schema.json",
+  "title": "Regelsuche rewrite-program evolutionary study plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyId",
+    "objective",
+    "splitManifestHash",
+    "trainSuiteHash",
+    "mutationCatalogHash",
+    "seedCandidateHashes",
+    "mutationOperators",
+    "populationPolicy",
+    "fitnessWeights",
+    "budget",
+    "status",
+    "finalTestPolicy",
+    "proofStatus",
+    "externalNoveltyStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-study-plan/v1"
+    },
+    "studyId": {
+      "$ref": "#/$defs/id"
+    },
+    "objective": {
+      "enum": [
+        "OPEN_TARGET_OPERATOR",
+        "SEARCH_POLICY_FRAGMENT"
+      ]
+    },
+    "splitManifestHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trainSuiteHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "mutationCatalogHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seedCandidateHashes": {
+      "$ref": "#/$defs/nonEmptyHashes"
+    },
+    "mutationOperators": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/mutationKind"
+      }
+    },
+    "populationPolicy": {
+      "$ref": "#/$defs/populationPolicy"
+    },
+    "fitnessWeights": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/fitnessWeight"
+      }
+    },
+    "budget": {
+      "$ref": "#/$defs/budget"
+    },
+    "status": {
+      "const": "NOT_STARTED"
+    },
+    "finalTestPolicy": {
+      "const": "ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION"
+    },
+    "proofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+    },
+    "nonEmptyHashes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "mutationKind": {
+      "enum": [
+        "WRAP_REPEAT",
+        "WRAP_REQUIRE",
+        "WRAP_PRIORITY",
+        "WRAP_PRUNE",
+        "PREPEND_SOURCE",
+        "APPEND_SOURCE",
+        "SWAP_ADJACENT_CHILDREN",
+        "REMOVE_WRAPPER",
+        "CHOICE_TO_FIRST_APPLICABLE",
+        "FIRST_APPLICABLE_TO_CHOICE"
+      ]
+    },
+    "populationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "populationSize",
+        "generationCount",
+        "eliteCount",
+        "minimumDistinctAlphaStructures",
+        "maxOffspringPerLineage",
+        "parallelism",
+        "randomSeed"
+      ],
+      "properties": {
+        "populationSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "generationCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "eliteCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimumDistinctAlphaStructures": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxOffspringPerLineage": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parallelism": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "randomSeed": {
+          "type": "integer"
+        }
+      }
+    },
+    "fitnessComponent": {
+      "enum": [
+        "TRAIN_CASES_NEWLY_SOLVED",
+        "TRAIN_PATH_LENGTH_REDUCTION",
+        "TRAIN_EXPLORED_STATE_REDUCTION",
+        "SUPPORT",
+        "STRUCTURAL_DIVERSITY",
+        "PROJECT_NOVELTY",
+        "ASSUMPTION_SIMPLICITY",
+        "CANDIDATE_COMPLEXITY",
+        "COUNTEREXAMPLE_RISK",
+        "PROOF_COST_PROXY"
+      ]
+    },
+    "fitnessWeight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "weightPermille"
+      ],
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/fitnessComponent"
+        },
+        "weightPermille": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxMutationAttempts",
+        "maxTrainEvaluations",
+        "maxValidationEvaluations",
+        "maxFinalTestEvaluations",
+        "maxCheckpoints"
+      ],
+      "properties": {
+        "maxMutationAttempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxTrainEvaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxValidationEvaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxFinalTestEvaluations": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxCheckpoints": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
