@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import de.regelsuche.evolution.EvolutionGenome.AssumptionTemplate;
 import de.regelsuche.evolution.EvolutionGenome.RewriteGene;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Sequence;
@@ -38,8 +39,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             new PrimitiveWorkBudget(1, 16, 80, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+            evaluator(suite).evaluate(candidate);
         var measurement = evidence.cases().getFirst();
 
         assertFalse(measurement.baselineReached());
@@ -65,8 +65,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             new PrimitiveWorkBudget(2, 16, 80, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+            evaluator(suite).evaluate(candidate);
         var measurement = evidence.cases().getFirst();
 
         assertTrue(measurement.baselineReached());
@@ -114,8 +113,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             List.of()), new PrimitiveWorkBudget(1, 16, 80, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+            evaluator(suite).evaluate(candidate);
         var measurement = evidence.cases().getFirst();
 
         assertTrue(measurement.baselineReached());
@@ -155,8 +153,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             List.of()), new PrimitiveWorkBudget(1, 16, 80, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+            evaluator(suite).evaluate(candidate);
         var measurement = evidence.cases().getFirst();
 
         assertTrue(measurement.baselineReached());
@@ -179,8 +176,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             new PrimitiveWorkBudget(2, 128, 20, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+            evaluator(suite).evaluate(candidate);
 
         assertTrue(evidence.blockers().contains(
             "SUITE_CANDIDATE_BOUND_NARROWER_THAN_GENOME_AND_PROGRAM_SOURCES"));
@@ -194,14 +190,31 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             new PrimitiveWorkBudget(2, 16, 80, 4, 3));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+            evaluator(suite).evaluate(candidate);
         var measurement = evidence.cases().getFirst();
 
         assertFalse(measurement.candidateReached());
         assertEquals("WORK_BUDGET", measurement.candidateStatus());
         assertTrue(measurement.candidateTotalWorkUnits() > 3);
         assertTrue(measurement.baselineTotalWorkUnits() > 0);
+    }
+
+    private static InformationParityRewriteProgramTrainFitnessEvaluator evaluator(
+        EvolutionRewriteProgramTrainSuite suite
+    ) {
+        return new InformationParityRewriteProgramTrainFitnessEvaluator(
+            suite, COMPONENTS, testEquivalence());
+    }
+
+    private static AssumptionAwareEquivalenceService testEquivalence() {
+        return (left, right, assumptions) -> {
+            String normalizedLeft = left.replaceAll("\\s+", "");
+            String normalizedRight = right.replaceAll("\\s+", "");
+            if (!"0".equals(normalizedLeft) && "0".equals(normalizedRight)) {
+                return AssumptionAwareEquivalenceService.Evaluation.refuted();
+            }
+            return AssumptionAwareEquivalenceService.Evaluation.confirmed();
+        };
     }
 
     private static TrainCase guardedCancellationCase() {
