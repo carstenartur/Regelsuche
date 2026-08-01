@@ -7,15 +7,15 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      release_version:
-        description: 'Release version in semver, e.g. 0.1.0 (no leading "v")'
+      next_version_increment:
+        description: 'Select how the development version advances after this release'
         required: true
-        type: string
-      next_development_version:
-        description: 'Next development version, e.g. 0.1.1-SNAPSHOT. Leave empty to increment patch.'
-        required: false
-        type: string
-        default: ''
+        type: choice
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
       skip_tests:
         description: 'Skip ./gradlew test during the release build'
         required: false
@@ -68,27 +68,36 @@ jobs:
       build_ref: ${{ steps.state.outputs.build_ref }}
       needs_next_pr: ${{ steps.metadata.outputs.needs_next_pr }}
     steps:
-      - name: Checkout repository
+      - name: Checkout authoritative main or immutable tag
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'main' }}
 
-      - name: Resolve release version
+      - name: Resolve release version from repository state
         id: resolve
         env:
-          INPUT_RELEASE_VERSION: ${{ inputs.release_version }}
-          INPUT_NEXT_VERSION: ${{ inputs.next_development_version }}
+          INPUT_NEXT_INCREMENT: ${{ inputs.next_version_increment }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
           INPUT_SKIP_TESTS: ${{ inputs.skip_tests }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
 
-          trim() {
-            local value="$1"
-            value="${value#"${value%%[![:space:]]*}"}"
-            value="${value%"${value##*[![:space:]]}"}"
-            printf '%s' "${value}"
+          next_from_increment() {
+            local release="$1"
+            local increment="$2"
+            local major minor patch
+            IFS='.' read -r major minor patch <<< "$release"
+            case "$increment" in
+              patch) printf '%s.%s.%s-SNAPSHOT' "$major" "$minor" "$((patch + 1))" ;;
+              minor) printf '%s.%s.0-SNAPSHOT' "$major" "$((minor + 1))" ;;
+              major) printf '%s.0.0-SNAPSHOT' "$((major + 1))" ;;
+              *)
+                echo "::error::Unsupported next_version_increment '$increment'" >&2
+                return 1
+                ;;
+            esac
           }
 
           MANAGED_RELEASE="false"
@@ -98,13 +107,6 @@ jobs:
             DRY_RUN="false"
             SKIP_TESTS="false"
             NEXT_VERSION=""
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            RELEASE_VERSION="$(trim "${INPUT_RELEASE_VERSION}")"
-            DRY_RUN="${INPUT_DRY_RUN}"
-            SKIP_TESTS="${INPUT_SKIP_TESTS}"
-            NEXT_VERSION="$(trim "${INPUT_NEXT_VERSION}")"
-            TAG_NAME="v${RELEASE_VERSION}"
-            MANAGED_RELEASE="true"
           else
             CURRENT=$(grep -E '^version=' release.properties | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
             if [[ -z "${CURRENT}" || "${CURRENT}" != *-SNAPSHOT ]]; then
@@ -112,25 +114,31 @@ jobs:
               exit 1
             fi
             RELEASE_VERSION="${CURRENT%-SNAPSHOT}"
-            if [[ "${HEAD_COMMIT_MESSAGE}" =~ \[next=([0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT)\] ]]; then
-              NEXT_VERSION="${BASH_REMATCH[1]}"
-            else
-              NEXT_VERSION=""
-            fi
             TAG_NAME="v${RELEASE_VERSION}"
-            DRY_RUN="false"
-            SKIP_TESTS="false"
             MANAGED_RELEASE="true"
+
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              NEXT_VERSION=$(next_from_increment "${RELEASE_VERSION}" "${INPUT_NEXT_INCREMENT}")
+              DRY_RUN="${INPUT_DRY_RUN}"
+              SKIP_TESTS="${INPUT_SKIP_TESTS}"
+            else
+              if [[ "${HEAD_COMMIT_MESSAGE}" =~ \[next=([0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT)\] ]]; then
+                NEXT_VERSION="${BASH_REMATCH[1]}"
+              else
+                NEXT_VERSION=""
+              fi
+              DRY_RUN="false"
+              SKIP_TESTS="false"
+            fi
           fi
 
           if ! [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid version format: '${RELEASE_VERSION}' (expected X.Y.Z)"
+            echo "::error::Invalid repository release version: '${RELEASE_VERSION}' (expected X.Y.Z)"
             exit 1
           fi
 
           if [[ -z "${NEXT_VERSION}" ]]; then
-            IFS='.' read -r MAJOR MINOR PATCH <<< "${RELEASE_VERSION}"
-            NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
+            NEXT_VERSION=$(next_from_increment "${RELEASE_VERSION}" patch)
           fi
           if ! [[ "${NEXT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
             echo "::error::Invalid next development version: '${NEXT_VERSION}'"
@@ -217,7 +225,7 @@ jobs:
             exit 1
           fi
           if [[ "${CURRENT%-SNAPSHOT}" != "${RELEASE_VERSION}" && "${DRY_RUN}" != "true" ]]; then
-            echo "::error::release_version must match release.properties base version (${CURRENT%-SNAPSHOT})"
+            echo "::error::Derived release version does not match release.properties base version (${CURRENT%-SNAPSHOT})"
             exit 1
           fi
 
