@@ -35,6 +35,11 @@ class EvolutionRewriteProgramFreezeSchemaContractTest {
         assertTrue(thresholds.contains(
             "regelsuche.evolution-rewrite-program-acceptance-thresholds/v1"));
         assertTrue(thresholds.contains("\"maximumCorrectnessRegressions\""));
+        assertTrue(thresholds.contains("\"minimum\": 50"));
+        assertTrue(thresholds.contains(
+            "\"const\": \"NEWLY_REACHED_OR_MATERIAL_WORK_REDUCTION\""));
+        assertTrue(thresholds.contains(
+            "\"const\": \"NEWLY_REACHED_REQUIRED\""));
         assertTrue(thresholds.contains("\"const\": 0"));
         assertTrue(thresholds.contains("\"additionalProperties\": false"));
         for (EvolutionRewriteProgramAcceptanceThresholds.SuccessRoute value :
