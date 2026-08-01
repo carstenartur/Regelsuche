@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import de.regelsuche.evolution.EvolutionGenome.AssumptionTemplate;
 import de.regelsuche.evolution.EvolutionGenome.RewriteGene;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Sequence;
@@ -40,9 +41,8 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
                 "y",
                 List.of("x != 0")));
 
-        EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+        EvolutionRewriteProgramTrainFitnessEvidence evidence = evaluator(suite)
+            .evaluate(candidate);
         var measurement = evidence.cases().getFirst();
 
         assertFalse(measurement.baselineReached());
@@ -76,9 +76,8 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             "x",
             List.of()));
 
-        EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+        EvolutionRewriteProgramTrainFitnessEvidence evidence = evaluator(suite)
+            .evaluate(candidate);
         var measurement = evidence.cases().getFirst();
 
         assertTrue(measurement.baselineReached());
@@ -117,9 +116,8 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             "0",
             List.of()));
 
-        EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+        EvolutionRewriteProgramTrainFitnessEvidence evidence = evaluator(suite)
+            .evaluate(candidate);
         var measurement = evidence.cases().getFirst();
 
         assertTrue(measurement.baselineReached());
@@ -150,12 +148,36 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
                     List.of("x != 0"))),
                 new SearchHeuristic(1, 128, 1, 4, 20, 12));
 
-        EvolutionRewriteProgramTrainFitnessEvidence evidence =
-            new InformationParityRewriteProgramTrainFitnessEvaluator(
-                suite, COMPONENTS).evaluate(candidate);
+        EvolutionRewriteProgramTrainFitnessEvidence evidence = evaluator(suite)
+            .evaluate(candidate);
 
         assertTrue(evidence.blockers().contains(
             "SUITE_CANDIDATE_BOUND_NARROWER_THAN_GENOME_AND_PROGRAM_SOURCES"));
+    }
+
+    private static InformationParityRewriteProgramTrainFitnessEvaluator evaluator(
+        EvolutionRewriteProgramTrainSuite suite
+    ) {
+        return new InformationParityRewriteProgramTrainFitnessEvaluator(
+            suite,
+            COMPONENTS,
+            testEquivalence());
+    }
+
+    /**
+     * Unit-test port. The concrete rational normal-form adapter is characterized
+     * in the math-algorithms module; these tests isolate evaluator attribution.
+     */
+    private static AssumptionAwareEquivalenceService testEquivalence() {
+        return (left, right, assumptions) -> {
+            String normalizedLeft = left.replaceAll("\\s+", "");
+            String normalizedRight = right.replaceAll("\\s+", "");
+            if (!"0".equals(normalizedLeft)
+                    && "0".equals(normalizedRight)) {
+                return AssumptionAwareEquivalenceService.Evaluation.refuted();
+            }
+            return AssumptionAwareEquivalenceService.Evaluation.confirmed();
+        };
     }
 
     private static EvolutionRewriteProgramCandidate cancellationCandidate() {
