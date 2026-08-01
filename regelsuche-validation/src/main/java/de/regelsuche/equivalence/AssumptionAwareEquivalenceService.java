@@ -5,15 +5,9 @@ import java.util.Objects;
 
 /**
  * Port for exact or fail-closed equivalence checks under declared assumptions.
- *
- * <p>The validation boundary owns the result vocabulary so learning and search
- * code can request an audit without depending on a concrete computer-algebra
- * implementation. Implementations may expose richer internal evidence, but
- * they must map it to this deterministic contract.</p>
  */
 @FunctionalInterface
 public interface AssumptionAwareEquivalenceService {
-
     Evaluation evaluate(
         String leftExpression,
         String rightExpression,
@@ -46,64 +40,27 @@ public interface AssumptionAwareEquivalenceService {
             }
             leftNormalForm = leftNormalForm == null ? "" : leftNormalForm;
             rightNormalForm = rightNormalForm == null ? "" : rightNormalForm;
-            requiredAssumptions = immutable(
-                requiredAssumptions, "requiredAssumptions");
-            providedAssumptions = immutable(
-                providedAssumptions, "providedAssumptions");
-            missingAssumptions = immutable(
-                missingAssumptions, "missingAssumptions");
-            unsupportedAssumptions = immutable(
-                unsupportedAssumptions, "unsupportedAssumptions");
+            requiredAssumptions = immutable(requiredAssumptions, "requiredAssumptions");
+            providedAssumptions = immutable(providedAssumptions, "providedAssumptions");
+            missingAssumptions = immutable(missingAssumptions, "missingAssumptions");
+            unsupportedAssumptions = immutable(unsupportedAssumptions, "unsupportedAssumptions");
             detail = detail == null ? "" : detail;
         }
 
         public static Evaluation confirmed() {
-            return new Evaluation(
-                Status.CONFIRMED,
-                true,
-                "",
-                "",
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                "confirmed by assumption-aware equivalence service");
+            return new Evaluation(Status.CONFIRMED, true, "", "",
+                List.of(), List.of(), List.of(), List.of(), "confirmed");
         }
 
         public static Evaluation refuted() {
-            return new Evaluation(
-                Status.REFUTED,
-                false,
-                "",
-                "",
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                "refuted by assumption-aware equivalence service");
+            return new Evaluation(Status.REFUTED, false, "", "",
+                List.of(), List.of(), List.of(), List.of(), "refuted");
         }
 
-        public static Evaluation unsupported(String detail) {
-            return new Evaluation(
-                Status.UNSUPPORTED,
-                false,
-                "",
-                "",
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                detail);
-        }
-
-        private static List<String> immutable(
-            List<String> values,
-            String name
-        ) {
+        private static List<String> immutable(List<String> values, String name) {
             Objects.requireNonNull(values, name);
             if (values.stream().anyMatch(Objects::isNull)) {
-                throw new IllegalArgumentException(
-                    name + " must not contain null");
+                throw new IllegalArgumentException(name + " must not contain null");
             }
             return List.copyOf(values);
         }

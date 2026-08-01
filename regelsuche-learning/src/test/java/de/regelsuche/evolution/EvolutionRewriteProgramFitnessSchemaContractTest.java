@@ -8,7 +8,8 @@ import org.junit.jupiter.api.Test;
 
 class EvolutionRewriteProgramFitnessSchemaContractTest {
     @Test
-    void schemasCoverRuntimeProfilesStatusesAndFailClosed() throws Exception {
+    void strictSchemasCoverCandidateSuitePrimitiveWorkAndEvidence()
+            throws Exception {
         String candidate = readSchema(
             "regelsuche-evolution-rewrite-program-candidate-v1.schema.json");
         String suite = readSchema(
@@ -18,39 +19,38 @@ class EvolutionRewriteProgramFitnessSchemaContractTest {
 
         assertTrue(candidate.contains(
             "regelsuche.evolution-rewrite-program-candidate/v1"));
-        assertTrue(candidate.contains("\"additionalProperties\": false"));
-        assertTrue(candidate.contains("\"genomeAlphaStructuralHash\""));
         assertTrue(candidate.contains("\"planAlphaStructuralHash\""));
+        assertTrue(candidate.contains("\"additionalProperties\": false"));
 
         assertTrue(suite.contains(
             "regelsuche.evolution-rewrite-program-train-suite/v1"));
         assertTrue(suite.contains("\"const\": \"TRAIN\""));
         assertTrue(suite.contains("\"assumptions\""));
+        assertTrue(suite.contains("\"primitiveWorkBudget\""));
+        assertTrue(suite.contains("\"maxPrimitiveSteps\""));
+        assertTrue(suite.contains("\"maxWorkUnits\""));
         assertTrue(suite.contains("\"additionalProperties\": false"));
-        for (EvolutionRewriteProgramTrainSuite.EvaluatorProfile profile :
-                EvolutionRewriteProgramTrainSuite.EvaluatorProfile.values()) {
-            assertTrue(suite.contains("\"" + profile.name() + "\""),
-                profile.name());
-        }
 
         assertTrue(fitness.contains(
             "regelsuche.evolution-rewrite-program-train-fitness/v1"));
-        assertTrue(fitness.contains("\"candidateHash\""));
+        assertTrue(fitness.contains("\"evaluationProtocolHash\""));
         assertTrue(fitness.contains("\"programUsed\""));
-        assertTrue(fitness.contains("\"reachabilityRegression\""));
-        assertTrue(fitness.contains("\"correctnessFailure\""));
+        assertTrue(fitness.contains("\"baselinePrimitiveSteps\""));
+        assertTrue(fitness.contains("\"candidatePrimitiveSteps\""));
+        assertTrue(fitness.contains("\"baselineOuterSearchWorkUnits\""));
+        assertTrue(fitness.contains("\"candidateOuterSearchWorkUnits\""));
+        assertTrue(fitness.contains("\"baselineOuterSearchWork\""));
+        assertTrue(fitness.contains("\"candidateOuterSearchWork\""));
+        assertTrue(fitness.contains("\"repeatedApplicationPrunes\""));
+        assertTrue(fitness.contains("\"baselinePathAuditCalls\""));
+        assertTrue(fitness.contains("\"candidatePathAuditCalls\""));
+        assertTrue(fitness.contains("\"baselineTransformationWork\""));
+        assertTrue(fitness.contains("\"candidateTransformationWork\""));
+        assertTrue(fitness.contains("\"baselineTotalWorkUnits\""));
+        assertTrue(fitness.contains("\"candidateTotalWorkUnits\""));
+        assertTrue(fitness.contains("\"validationStatus\""));
         assertTrue(fitness.contains("\"const\": \"NOT_EVALUATED\""));
         assertTrue(fitness.contains("\"additionalProperties\": false"));
-        for (EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness status :
-                EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness.values()) {
-            assertTrue(fitness.contains("\"" + status.name() + "\""),
-                status.name());
-        }
-        for (EvolutionStudyPlan.FitnessComponent component :
-                EvolutionStudyPlan.FitnessComponent.values()) {
-            assertTrue(fitness.contains("\"" + component.name() + "\""),
-                component.name());
-        }
     }
 
     private static String readSchema(String fileName) throws Exception {

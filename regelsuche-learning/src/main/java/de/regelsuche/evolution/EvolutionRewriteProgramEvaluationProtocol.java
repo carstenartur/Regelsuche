@@ -8,12 +8,6 @@ import java.util.regex.Pattern;
 /**
  * Content-addressed contract for the paired evaluator used by one evolutionary
  * rewrite-program study.
- *
- * <p>The protocol identity is deliberately separate from the TRAIN suite. A
- * suite fixes tasks and budgets; this artifact fixes which information each
- * side receives, how targets and correctness are evaluated, which result paths
- * may receive resource credit, and the implementation expected to realize
- * those semantics.</p>
  */
 public record EvolutionRewriteProgramEvaluationProtocol(
     String schema,
@@ -23,6 +17,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
     CandidateContract candidateContract,
     TargetRelation targetRelation,
     CorrectnessContract correctnessContract,
+    WorkAccountingContract workAccountingContract,
     ResourceAttributionContract resourceAttributionContract,
     String implementationClass,
     String contentHash
@@ -48,6 +43,8 @@ public record EvolutionRewriteProgramEvaluationProtocol(
         Objects.requireNonNull(targetRelation, "targetRelation");
         Objects.requireNonNull(correctnessContract, "correctnessContract");
         Objects.requireNonNull(
+            workAccountingContract, "workAccountingContract");
+        Objects.requireNonNull(
             resourceAttributionContract, "resourceAttributionContract");
         implementationClass = requireText(
             implementationClass, "implementationClass");
@@ -59,6 +56,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             candidateContract,
             targetRelation,
             correctnessContract,
+            workAccountingContract,
             resourceAttributionContract,
             implementationClass,
             null));
@@ -80,8 +78,10 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             TargetRelation.SYNTAX_EXACT,
             CorrectnessContract
                 .EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS,
+            WorkAccountingContract
+                .STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1,
             ResourceAttributionContract
-                .CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE,
+                .CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK,
             INFORMATION_PARITY_IMPLEMENTATION);
     }
 
@@ -98,8 +98,10 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             TargetRelation.SYNTAX_EXACT,
             CorrectnessContract
                 .EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS,
+            WorkAccountingContract
+                .STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1,
             ResourceAttributionContract
-                .CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE,
+                .CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK,
             "de.regelsuche.evolution.testing." + protocolId);
     }
 
@@ -110,11 +112,11 @@ public record EvolutionRewriteProgramEvaluationProtocol(
         CandidateContract candidateContract,
         TargetRelation targetRelation,
         CorrectnessContract correctnessContract,
+        WorkAccountingContract workAccountingContract,
         ResourceAttributionContract resourceAttributionContract,
         String implementationClass
     ) {
         requireId(protocolId, "protocolId");
-        implementationClass = requireText(implementationClass, "implementationClass");
         String hash = EvolutionGenome.hash(render(
             protocolId,
             evaluatorProfile,
@@ -122,6 +124,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             candidateContract,
             targetRelation,
             correctnessContract,
+            workAccountingContract,
             resourceAttributionContract,
             implementationClass,
             null));
@@ -133,6 +136,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             candidateContract,
             targetRelation,
             correctnessContract,
+            workAccountingContract,
             resourceAttributionContract,
             implementationClass,
             hash);
@@ -146,6 +150,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             candidateContract,
             targetRelation,
             correctnessContract,
+            workAccountingContract,
             resourceAttributionContract,
             implementationClass,
             contentHash);
@@ -158,6 +163,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
         CandidateContract candidateContract,
         TargetRelation targetRelation,
         CorrectnessContract correctnessContract,
+        WorkAccountingContract workAccountingContract,
         ResourceAttributionContract resourceAttributionContract,
         String implementationClass,
         String contentHash
@@ -170,6 +176,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
             .property("candidateContract", candidateContract.name())
             .property("targetRelation", targetRelation.name())
             .property("correctnessContract", correctnessContract.name())
+            .property("workAccountingContract", workAccountingContract.name())
             .property(
                 "resourceAttributionContract",
                 resourceAttributionContract.name())
@@ -196,8 +203,12 @@ public record EvolutionRewriteProgramEvaluationProtocol(
         EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS
     }
 
+    public enum WorkAccountingContract {
+        STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1
+    }
+
     public enum ResourceAttributionContract {
-        CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE
+        CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK
     }
 
     private static void requireId(String value, String name) {

@@ -32,6 +32,13 @@ public record RewriteCandidate(
         return steps.stream().map(Transformation::rule).toList();
     }
 
+    /** Ordered primitive lineage, including repeated applications. */
+    public List<String> primitiveRuleIds() {
+        return steps.stream()
+            .flatMap(step -> step.primitiveRuleIds().stream())
+            .toList();
+    }
+
     public Transformation lastStep() {
         return steps.get(steps.size() - 1);
     }
@@ -54,13 +61,18 @@ public record RewriteCandidate(
     }
 
     public RewriteCandidate withOriginNodeId(String newOriginNodeId) {
-        return new RewriteCandidate(newOriginNodeId, inputExpression, outputExpression, steps);
+        return new RewriteCandidate(
+            newOriginNodeId,
+            inputExpression,
+            outputExpression,
+            steps);
     }
 
     /**
      * Converts the path into the ordinary transformation model consumed by all
      * existing search strategies. Primitive candidates are preserved exactly;
-     * multi-step candidates become explicit macro-like transformations.
+     * multi-step candidates become explicit macro-like transformations whose
+     * structured primitive lineage remains visible to work-aware search.
      */
     public Transformation toTransformation() {
         if (steps.size() == 1) {
@@ -96,7 +108,8 @@ public record RewriteCandidate(
             applicationKey,
             assumptions,
             combinedValue(steps.stream().map(Transformation::packId).toList()),
-            combinedValue(steps.stream().map(Transformation::license).toList())
+            combinedValue(steps.stream().map(Transformation::license).toList()),
+            primitiveRuleIds()
         );
     }
 

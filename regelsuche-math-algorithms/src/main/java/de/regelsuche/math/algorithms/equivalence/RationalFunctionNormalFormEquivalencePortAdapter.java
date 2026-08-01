@@ -4,12 +4,9 @@ import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Validation-port adapter for the exact rational-function normal-form audit.
- */
+/** Validation-port adapter for the exact rational normal-form implementation. */
 public final class RationalFunctionNormalFormEquivalencePortAdapter
         implements AssumptionAwareEquivalenceService {
-
     private final RationalFunctionNormalFormEquivalenceService delegate;
 
     public RationalFunctionNormalFormEquivalencePortAdapter() {
@@ -28,8 +25,7 @@ public final class RationalFunctionNormalFormEquivalencePortAdapter
         String rightExpression,
         List<String> assumptions
     ) {
-        RationalFunctionNormalFormEquivalenceService.Evaluation result =
-            delegate.evaluate(leftExpression, rightExpression, assumptions);
+        var result = delegate.evaluate(leftExpression, rightExpression, assumptions);
         return new Evaluation(
             Status.valueOf(result.status().name()),
             result.equivalent(),
