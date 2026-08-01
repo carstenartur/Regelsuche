@@ -7,6 +7,7 @@ import argparse
 import html
 import json
 import math
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,14 @@ def finite_number(value: Any, label: str, *, non_negative: bool = False) -> floa
     if non_negative:
         require(number >= 0.0, f"{label} must be non-negative")
     return number
+
+
+def normalized_duration(value: Any, label: str) -> str:
+    require(isinstance(value, str) and value.strip(), f"{label} must be a duration string")
+    normalized = re.sub(r"\s+", "", value).lower()
+    require(re.fullmatch(r"[1-9][0-9]*(ns|us|ms|s|m|h)", normalized) is not None,
+            f"{label} has unsupported duration syntax: {value}")
+    return normalized
 
 
 def load_json(path: Path, label: str) -> Any:
@@ -58,6 +67,8 @@ def load_baseline(path: Path) -> dict[str, Any]:
             isinstance(policy.get(field), int) and policy[field] >= 1,
             f"measurementPolicy.{field} must be positive",
         )
+    normalized_duration(policy.get("warmupTime"), "measurementPolicy.warmupTime")
+    normalized_duration(policy.get("measurementTime"), "measurementPolicy.measurementTime")
     ratio = finite_number(
         policy.get("materialRegressionRatio"),
         "materialRegressionRatio",
@@ -102,6 +113,10 @@ def validate_results(
         require(benchmark not in by_name, f"duplicate benchmark identity: {benchmark}")
         require(result.get("mode") == policy["mode"], f"{benchmark} mode differs")
         require(result.get("forks") == policy["forks"], f"{benchmark} forks differ")
+        require(result.get("threads") == 1, f"{benchmark} threads differ")
+        require(result.get("warmupBatchSize") == 1, f"{benchmark} warmupBatchSize differs")
+        require(result.get("measurementBatchSize") == 1,
+                f"{benchmark} measurementBatchSize differs")
         require(
             result.get("warmupIterations") == policy["warmupIterations"],
             f"{benchmark} warmupIterations differ",
@@ -109,6 +124,16 @@ def validate_results(
         require(
             result.get("measurementIterations") == policy["measurementIterations"],
             f"{benchmark} measurementIterations differ",
+        )
+        require(
+            normalized_duration(result.get("warmupTime"), f"{benchmark} warmupTime")
+            == normalized_duration(policy["warmupTime"], "measurementPolicy.warmupTime"),
+            f"{benchmark} warmupTime differs",
+        )
+        require(
+            normalized_duration(result.get("measurementTime"), f"{benchmark} measurementTime")
+            == normalized_duration(policy["measurementTime"], "measurementPolicy.measurementTime"),
+            f"{benchmark} measurementTime differs",
         )
         metric = result.get("primaryMetric")
         require(isinstance(metric, dict), f"{benchmark} has no primaryMetric")
