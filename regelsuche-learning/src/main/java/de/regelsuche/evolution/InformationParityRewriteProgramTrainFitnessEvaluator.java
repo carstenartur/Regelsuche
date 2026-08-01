@@ -229,6 +229,10 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             candidate.metrics().exploredStates(),
             baseline.metrics().generatedTransformations(),
             candidate.metrics().generatedTransformations(),
+            outerSearchWorkUnits(baseline),
+            outerSearchWorkUnits(candidate),
+            baselineAudit.auditCalls(),
+            candidateAudit.auditCalls(),
             baseline.metrics().transformationWork(),
             candidate.metrics().transformationWork(),
             programUsed,
@@ -243,7 +247,7 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
         List<String> declaredAssumptions
     ) {
         if (!result.reached()) {
-            return new PathAudit(PathCorrectness.NOT_EVALUATED, 0);
+            return new PathAudit(PathCorrectness.NOT_EVALUATED, 0, 0);
         }
         State reached = result.reachedState();
         Set<String> declared = Set.copyOf(
@@ -252,13 +256,16 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
         if (!declared.containsAll(reached.assumptions())) {
             return new PathAudit(
                 PathCorrectness.MISSING_ASSUMPTION,
-                reached.primitiveDepth());
+                reached.primitiveDepth(),
+                0);
         }
         List<String> path = reached.path();
         if (path.isEmpty()) {
-            return new PathAudit(PathCorrectness.UNSUPPORTED, 0);
+            return new PathAudit(PathCorrectness.UNSUPPORTED, 0, 0);
         }
+        long auditCalls = 0;
         for (int index = 0; index + 1 < path.size(); index++) {
+            auditCalls = add(auditCalls, 1);
             AssumptionAwareEquivalenceService.Evaluation evaluation =
                 equivalence.evaluate(
                     path.get(index), path.get(index + 1), declaredAssumptions);
@@ -269,12 +276,16 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
                 case UNSUPPORTED -> PathCorrectness.UNSUPPORTED;
             };
             if (correctness != PathCorrectness.CONFIRMED) {
-                return new PathAudit(correctness, reached.primitiveDepth());
+                return new PathAudit(
+                    correctness,
+                    reached.primitiveDepth(),
+                    auditCalls);
             }
         }
         return new PathAudit(
             PathCorrectness.CONFIRMED,
-            reached.primitiveDepth());
+            reached.primitiveDepth(),
+            auditCalls);
     }
 
     private static void addCaseBlockers(
@@ -450,6 +461,10 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             0,
             0,
             0,
+            0,
+            0,
+            0,
+            0,
             TransformationWorkMetrics.ZERO,
             TransformationWorkMetrics.ZERO,
             false,
@@ -481,6 +496,23 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             : result.reachedState().edgeDepth();
     }
 
+    private static long outerSearchWorkUnits(Result result) {
+        var metrics = result.metrics();
+        long total = 0;
+        total = add(total, metrics.exploredStates());
+        total = add(total, metrics.expandedStates());
+        total = add(total, metrics.generatedTransformations());
+        total = add(total, metrics.enqueuedStates());
+        total = add(total, metrics.duplicatePrunes());
+        total = add(total, metrics.repeatedApplicationPrunes());
+        total = add(total, metrics.sameExpressionPrunes());
+        total = add(total, metrics.expansionBudgetPrunes());
+        total = add(total, metrics.primitiveBudgetPrunes());
+        total = add(total, metrics.candidateBudgetPrunes());
+        total = add(total, metrics.statesWithoutTransformations());
+        return add(total, metrics.engineBatches());
+    }
+
     private static int inverseBudgetScore(long used, long budget) {
         if (budget <= 0) {
             return 0;
@@ -505,6 +537,14 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
         return Math.max(-1000, Math.min(1000, value));
     }
 
+    private static long add(long left, long right) {
+        try {
+            return Math.addExact(left, right);
+        } catch (ArithmeticException exception) {
+            return Long.MAX_VALUE;
+        }
+    }
+
     private static String stableFailure(Throwable failure) {
         String message = failure.getMessage();
         return failure.getClass().getSimpleName()
@@ -515,7 +555,8 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
 
     private record PathAudit(
         PathCorrectness correctness,
-        int primitiveSteps
+        int primitiveSteps,
+        long auditCalls
     ) {
     }
 
