@@ -1,133 +1,100 @@
 package de.regelsuche.transform;
 
-import de.regelsuche.assumption.Assumption;
 import de.regelsuche.ast.Expr;
+import de.regelsuche.knowledge.RuleDescriptor;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 
-/** Rewrite rule backed by the shared AST pattern DSL. */
 public class PatternRewriteRule implements RewriteRule {
-    private static final Set<String> BUILT_IN_PACK_IDS = Set.of(
-        "core.ast-rewrite",
-        "knowledge.algebra",
-        "knowledge.binomial",
-        "knowledge.factorization",
-        "knowledge.trigonometry",
-        "knowledge.rational-function",
-        "knowledge.discovery-operators"
-    );
-
     private final String id;
     private final PatternExpr source;
     private final PatternExpr target;
-    private final RuleKind kind;
+    private final RewriteKind kind;
     private final boolean mayIncreaseComplexity;
     private final int estimatedCostDelta;
-    private final boolean equivalencePreserving;
-    private final Set<String> requiredNonZeroVariables;
+    private final boolean equivalencePreservingByConstruction;
     private final RuleDescriptor descriptor;
-    private final MatchBudget matchBudget;
     private final RecognitionProfile recognitionProfile;
     private final ThreadLocal<PreparedMatch> preparedMatch = new ThreadLocal<>();
 
-    public PatternRewriteRule(
-        String id,
-        String sourcePattern,
-        String targetPattern,
-        RuleKind kind,
-        boolean mayIncreaseComplexity,
-        int estimatedCostDelta,
-        boolean equivalencePreserving
-    ) {
-        this(id, sourcePattern, targetPattern, kind, mayIncreaseComplexity,
-            estimatedCostDelta, equivalencePreserving, Set.of());
+    public PatternRewriteRule(String id, PatternExpr source, PatternExpr target) {
+        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true);
     }
 
     public PatternRewriteRule(
         String id,
-        String sourcePattern,
-        String targetPattern,
-        RuleKind kind,
-        boolean mayIncreaseComplexity,
-        int estimatedCostDelta,
-        boolean equivalencePreserving,
-        Set<String> requiredNonZeroVariables
-    ) {
-        this(
-            id,
-            sourcePattern,
-            targetPattern,
-            kind,
-            mayIncreaseComplexity,
-            estimatedCostDelta,
-            equivalencePreserving,
-            requiredNonZeroVariables,
-            RuleDescriptor.builtIn("core.ast-rewrite"),
-            MatchBudget.standard(),
-            RecognitionProfile.SAFE_DEFAULT
-        );
-    }
-
-    public PatternRewriteRule(
-        String id,
-        String sourcePattern,
-        String targetPattern,
-        RuleKind kind,
-        boolean mayIncreaseComplexity,
-        int estimatedCostDelta,
-        boolean equivalencePreserving,
-        Set<String> requiredNonZeroVariables,
-        RuleDescriptor descriptor
-    ) {
-        this(
-            id,
-            sourcePattern,
-            targetPattern,
-            kind,
-            mayIncreaseComplexity,
-            estimatedCostDelta,
-            equivalencePreserving,
-            requiredNonZeroVariables,
-            descriptor,
-            MatchBudget.standard(),
-            RecognitionProfile.SAFE_DEFAULT
-        );
-    }
-
-    public PatternRewriteRule(
-        String id,
-        String sourcePattern,
-        String targetPattern,
-        RuleKind kind,
-        boolean mayIncreaseComplexity,
-        int estimatedCostDelta,
-        boolean equivalencePreserving,
-        Set<String> requiredNonZeroVariables,
-        RuleDescriptor descriptor,
-        MatchBudget matchBudget,
+        PatternExpr source,
+        PatternExpr target,
         RecognitionProfile recognitionProfile
     ) {
-        this.id = Objects.requireNonNull(id, "id");
-        this.source = PatternParser.parse(sourcePattern);
-        this.target = PatternParser.parse(targetPattern);
-        this.kind = Objects.requireNonNull(kind, "kind");
+        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true,
+            RuleDescriptor.core(id, java.util.List.of()), recognitionProfile);
+    }
+
+    public PatternRewriteRule(String id, PatternExpr source, PatternExpr target, RuleDescriptor descriptor) {
+        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor);
+    }
+
+    public PatternRewriteRule(
+        String id,
+        PatternExpr source,
+        PatternExpr target,
+        RuleDescriptor descriptor,
+        RecognitionProfile recognitionProfile
+    ) {
+        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor, recognitionProfile);
+    }
+
+    public PatternRewriteRule(
+        String id,
+        PatternExpr source,
+        PatternExpr target,
+        RewriteKind kind,
+        boolean mayIncreaseComplexity,
+        int estimatedCostDelta,
+        boolean equivalencePreservingByConstruction
+    ) {
+        this(id, source, target, kind, mayIncreaseComplexity, estimatedCostDelta, equivalencePreservingByConstruction,
+            RuleDescriptor.core(id, java.util.List.of()));
+    }
+
+    public PatternRewriteRule(
+        String id,
+        PatternExpr source,
+        PatternExpr target,
+        RewriteKind kind,
+        boolean mayIncreaseComplexity,
+        int estimatedCostDelta,
+        boolean equivalencePreservingByConstruction,
+        RuleDescriptor descriptor
+    ) {
+        this(id, source, target, kind, mayIncreaseComplexity, estimatedCostDelta,
+            equivalencePreservingByConstruction, descriptor, RecognitionProfile.exact());
+    }
+
+    public PatternRewriteRule(
+        String id,
+        PatternExpr source,
+        PatternExpr target,
+        RewriteKind kind,
+        boolean mayIncreaseComplexity,
+        int estimatedCostDelta,
+        boolean equivalencePreservingByConstruction,
+        RuleDescriptor descriptor,
+        RecognitionProfile recognitionProfile
+    ) {
+        if (id == null || id.isBlank() || source == null || target == null) {
+            throw new IllegalArgumentException("id, source and target are required");
+        }
+        this.id = id;
+        this.source = source;
+        this.target = target;
+        this.kind = kind;
         this.mayIncreaseComplexity = mayIncreaseComplexity;
         this.estimatedCostDelta = estimatedCostDelta;
-        this.equivalencePreserving = equivalencePreserving;
-        this.requiredNonZeroVariables = Set.copyOf(requiredNonZeroVariables);
-        this.descriptor = Objects.requireNonNull(descriptor, "descriptor");
-        this.matchBudget = Objects.requireNonNull(matchBudget, "matchBudget");
-        this.recognitionProfile = Objects.requireNonNull(recognitionProfile, "recognitionProfile");
-        validateDescriptor(this.descriptor);
-        if (!source.variables().containsAll(this.requiredNonZeroVariables)) {
-            throw new IllegalArgumentException("Non-zero variables must be bound by the source pattern");
-        }
-        if (!source.variables().containsAll(target.variables())) {
-            throw new IllegalArgumentException("Target pattern references unbound variables");
-        }
+        this.equivalencePreservingByConstruction = equivalencePreservingByConstruction;
+        this.descriptor = descriptor == null ? RuleDescriptor.core(id, java.util.List.of()) : descriptor;
+        this.recognitionProfile = recognitionProfile == null ? RecognitionProfile.exact() : recognitionProfile;
     }
 
     @Override
@@ -136,59 +103,39 @@ public class PatternRewriteRule implements RewriteRule {
     }
 
     @Override
-    public boolean matches(Expr subtree) {
-        preparedMatch.remove();
-        Map<String, Expr> bindings = new HashMap<>();
-        if (!EquivalenceAwarePatternMatcher.match(
-                source,
-                subtree,
-                bindings,
-                recognitionProfile,
-                matchBudget)) {
-            return false;
-        }
-        preparedMatch.set(new PreparedMatch(subtree, Map.copyOf(bindings)));
-        return true;
+    public RuleDescriptor descriptor() {
+        return descriptor;
+    }
+
+    /**
+     * Source (left-hand side) pattern of this rule. Exposed so e-graph
+     * adapters in {@code de.regelsuche.egraph} can match the pattern
+     * directly against e-nodes/e-classes instead of materialising every
+     * concrete representative first.
+     */
+    public PatternExpr source() {
+        return source;
+    }
+
+    /**
+     * Target (right-hand side) pattern of this rule. Exposed so e-graph
+     * adapters can instantiate the rewrite directly inside the e-graph
+     * (a-la egg's {@code Applier}) rather than via an AST round-trip.
+     */
+    public PatternExpr target() {
+        return target;
+    }
+
+    /**
+     * Equivalences that may be used while recognizing the source pattern.
+     * Existing rules remain exact unless they explicitly opt in.
+     */
+    public RecognitionProfile recognitionProfile() {
+        return recognitionProfile;
     }
 
     @Override
-    public Expr apply(Expr subtree) {
-        PreparedMatch prepared = preparedMatch.get();
-        preparedMatch.remove();
-        if (prepared != null && prepared.subtree() == subtree) {
-            return target.instantiate(prepared.bindings());
-        }
-        Map<String, Expr> bindings = new HashMap<>();
-        if (!EquivalenceAwarePatternMatcher.match(
-                source,
-                subtree,
-                bindings,
-                recognitionProfile,
-                matchBudget)) {
-            throw new IllegalArgumentException("Pattern does not match subtree for rule " + id);
-        }
-        return target.instantiate(bindings);
-    }
-
-    @Override
-    public List<Assumption> assumptions(Expr subtree) {
-        Map<String, Expr> bindings = new HashMap<>();
-        if (!EquivalenceAwarePatternMatcher.match(
-                source,
-                subtree,
-                bindings,
-                recognitionProfile,
-                matchBudget)) {
-            return List.of();
-        }
-        return requiredNonZeroVariables.stream()
-            .sorted()
-            .map(name -> Assumption.nonZero(bindings.get(name).toString()))
-            .toList();
-    }
-
-    @Override
-    public RuleKind kind() {
+    public RewriteKind kind() {
         return kind;
     }
 
@@ -204,40 +151,34 @@ public class PatternRewriteRule implements RewriteRule {
 
     @Override
     public boolean isEquivalencePreservingByConstruction() {
-        return equivalencePreserving;
+        return equivalencePreservingByConstruction;
     }
 
     @Override
-    public RuleDescriptor descriptor() {
-        return descriptor;
-    }
-
-    PatternExpr sourcePattern() {
-        return source;
-    }
-
-    PatternExpr targetPattern() {
-        return target;
-    }
-
-    MatchBudget matchBudget() {
-        return matchBudget;
-    }
-
-    RecognitionProfile recognitionProfile() {
-        return recognitionProfile;
-    }
-
-    private static void validateDescriptor(RuleDescriptor descriptor) {
-        if (descriptor.packId().startsWith("core.") && !BUILT_IN_PACK_IDS.contains(descriptor.packId())) {
-            throw new IllegalArgumentException("Unregistered core pack id: " + descriptor.packId());
+    public boolean matches(Expr subtree) {
+        preparedMatch.remove();
+        Map<String, Expr> bindings = new HashMap<>();
+        if (!EquivalenceAwarePatternMatcher.match(source, subtree, bindings, recognitionProfile)) {
+            return false;
         }
+        preparedMatch.set(new PreparedMatch(subtree, Map.copyOf(bindings)));
+        return true;
+    }
+
+    @Override
+    public Expr apply(Expr subtree) {
+        PreparedMatch prepared = preparedMatch.get();
+        preparedMatch.remove();
+        if (prepared != null && prepared.subtree() == subtree) {
+            return target.instantiate(prepared.bindings());
+        }
+        Map<String, Expr> bindings = new HashMap<>();
+        if (!EquivalenceAwarePatternMatcher.match(source, subtree, bindings, recognitionProfile)) {
+            throw new IllegalArgumentException("Rule does not match subtree");
+        }
+        return target.instantiate(bindings);
     }
 
     private record PreparedMatch(Expr subtree, Map<String, Expr> bindings) {
-        private PreparedMatch {
-            Objects.requireNonNull(subtree, "subtree");
-            bindings = Map.copyOf(bindings);
-        }
     }
 }
