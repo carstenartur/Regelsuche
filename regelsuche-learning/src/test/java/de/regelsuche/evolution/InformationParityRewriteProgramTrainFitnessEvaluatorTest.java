@@ -11,6 +11,7 @@ import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Sequence;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Source;
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness;
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainSuite.EvaluatorProfile;
+import de.regelsuche.evolution.EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget;
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainSuite.TrainCase;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import de.regelsuche.search.SearchHeuristic;
@@ -30,15 +31,11 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
         FitnessComponent.PROOF_COST_PROXY);
 
     @Test
-    void programGainComesFromCompositionRatherThanHiddenRuleAccess() {
+    void twoStepProgramCannotBypassOnePrimitiveStepBudget() {
         EvolutionRewriteProgramCandidate candidate = cancellationCandidate();
         EvolutionRewriteProgramTrainSuite suite = suite(
-            new TrainCase(
-                "train_guarded_cancellation",
-                "guarded_factor_family",
-                "(x*y)/(x*1)",
-                "y",
-                List.of("x != 0")));
+            guardedCancellationCase(),
+            new PrimitiveWorkBudget(1, 16, 80, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
             new InformationParityRewriteProgramTrainFitnessEvaluator(
@@ -46,16 +43,56 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
         var measurement = evidence.cases().getFirst();
 
         assertFalse(measurement.baselineReached());
-        assertTrue(measurement.candidateReached());
-        assertTrue(measurement.programUsed());
-        assertTrue(measurement.newlySolved());
-        assertEquals(PathCorrectness.CONFIRMED,
-            measurement.candidatePathCorrectness());
-        assertEquals(2, measurement.candidatePrimitiveSteps());
-        assertTrue(evidence.blockers().isEmpty(), evidence.blockers().toString());
-        assertEquals(1000,
+        assertFalse(measurement.candidateReached());
+        assertFalse(measurement.programUsed());
+        assertFalse(measurement.newlySolved());
+        assertEquals(0,
             evidence.rawComponents().get(
                 FitnessComponent.TRAIN_CASES_NEWLY_SOLVED));
+        assertEquals(0,
+            evidence.rawComponents().get(
+                FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION));
+        assertTrue(
+            measurement.candidateTransformationWork().programNodeVisits() > 0,
+            "the rejected macro's internal formation work is still retained");
+    }
+
+    @Test
+    void equalPrimitiveBudgetLetsBothSidesReachWithoutHiddenResourceCredit() {
+        EvolutionRewriteProgramCandidate candidate = cancellationCandidate();
+        EvolutionRewriteProgramTrainSuite suite = suite(
+            guardedCancellationCase(),
+            new PrimitiveWorkBudget(2, 16, 80, 4, 10_000));
+
+        EvolutionRewriteProgramTrainFitnessEvidence evidence =
+            new InformationParityRewriteProgramTrainFitnessEvaluator(
+                suite, COMPONENTS).evaluate(candidate);
+        var measurement = evidence.cases().getFirst();
+
+        assertTrue(measurement.baselineReached());
+        assertTrue(measurement.candidateReached());
+        assertTrue(measurement.programUsed());
+        assertFalse(measurement.newlySolved());
+        assertEquals(PathCorrectness.CONFIRMED,
+            measurement.baselinePathCorrectness());
+        assertEquals(PathCorrectness.CONFIRMED,
+            measurement.candidatePathCorrectness());
+        assertEquals(2, measurement.baselinePrimitiveSteps());
+        assertEquals(2, measurement.candidatePrimitiveSteps());
+        assertEquals(2, measurement.baselinePathLength());
+        assertEquals(1, measurement.candidatePathLength(),
+            "macro compression remains a representation fact");
+        assertTrue(
+            measurement.candidateTotalWorkUnits()
+                > measurement.baselineTotalWorkUnits(),
+            "all additional program formation work must remain visible");
+        assertEquals(0,
+            evidence.rawComponents().get(
+                FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION),
+            "a shorter outer path cannot earn credit with greater total work");
+        assertEquals(0,
+            evidence.rawComponents().get(
+                FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION));
     }
 
     @Test
@@ -74,7 +111,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             "flat_rule_control_family",
             "x+0",
             "x",
-            List.of()));
+            List.of()), new PrimitiveWorkBudget(1, 16, 80, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
             new InformationParityRewriteProgramTrainFitnessEvaluator(
@@ -115,7 +152,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             "refuted_control_family",
             "x",
             "0",
-            List.of()));
+            List.of()), new PrimitiveWorkBudget(1, 16, 80, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
             new InformationParityRewriteProgramTrainFitnessEvaluator(
@@ -137,18 +174,9 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
     @Test
     void narrowerSuiteBoundaryBlocksBothFlatAndProgramSources() {
         EvolutionRewriteProgramCandidate candidate = cancellationCandidate();
-        EvolutionRewriteProgramTrainSuite suite =
-            EvolutionRewriteProgramTrainSuite.create(
-                "narrow_information_parity_suite",
-                EvaluatorProfile
-                    .EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS,
-                List.of(new TrainCase(
-                    "train_guarded_cancellation",
-                    "guarded_factor_family",
-                    "(x*y)/(x*1)",
-                    "y",
-                    List.of("x != 0"))),
-                new SearchHeuristic(1, 128, 1, 4, 20, 12));
+        EvolutionRewriteProgramTrainSuite suite = suite(
+            guardedCancellationCase(),
+            new PrimitiveWorkBudget(2, 128, 20, 4, 10_000));
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
             new InformationParityRewriteProgramTrainFitnessEvaluator(
@@ -156,6 +184,33 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
 
         assertTrue(evidence.blockers().contains(
             "SUITE_CANDIDATE_BOUND_NARROWER_THAN_GENOME_AND_PROGRAM_SOURCES"));
+    }
+
+    @Test
+    void totalWorkBudgetIsAppliedEquallyAndRetained() {
+        EvolutionRewriteProgramCandidate candidate = cancellationCandidate();
+        EvolutionRewriteProgramTrainSuite suite = suite(
+            guardedCancellationCase(),
+            new PrimitiveWorkBudget(2, 16, 80, 4, 3));
+
+        EvolutionRewriteProgramTrainFitnessEvidence evidence =
+            new InformationParityRewriteProgramTrainFitnessEvaluator(
+                suite, COMPONENTS).evaluate(candidate);
+        var measurement = evidence.cases().getFirst();
+
+        assertFalse(measurement.candidateReached());
+        assertEquals("WORK_BUDGET", measurement.candidateStatus());
+        assertTrue(measurement.candidateTotalWorkUnits() > 3);
+        assertTrue(measurement.baselineTotalWorkUnits() > 0);
+    }
+
+    private static TrainCase guardedCancellationCase() {
+        return new TrainCase(
+            "train_guarded_cancellation",
+            "guarded_factor_family",
+            "(x*y)/(x*1)",
+            "y",
+            List.of("x != 0"));
     }
 
     private static EvolutionRewriteProgramCandidate cancellationCandidate() {
@@ -200,12 +255,22 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
         return EvolutionRewriteProgramCandidate.create(genome, plan);
     }
 
-    private static EvolutionRewriteProgramTrainSuite suite(TrainCase trainCase) {
+    private static EvolutionRewriteProgramTrainSuite suite(
+        TrainCase trainCase,
+        PrimitiveWorkBudget workBudget
+    ) {
         return EvolutionRewriteProgramTrainSuite.create(
             "information_parity_train_suite",
             EvaluatorProfile
                 .EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS,
             List.of(trainCase),
-            new SearchHeuristic(1, 128, 1, 4, 80, 12));
+            new SearchHeuristic(
+                workBudget.maxPrimitiveSteps(),
+                workBudget.maxExploredStates(),
+                1,
+                workBudget.maxExpandingSteps(),
+                workBudget.maxCandidatesPerState(),
+                12),
+            workBudget);
     }
 }
