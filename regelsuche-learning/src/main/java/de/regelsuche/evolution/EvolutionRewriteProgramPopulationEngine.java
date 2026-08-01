@@ -375,6 +375,15 @@ public final class EvolutionRewriteProgramPopulationEngine {
                     result.add(CandidateEvaluation.blocked(
                         candidate,
                         List.of("TRAIN_EVALUATION_INTERRUPTED")));
+                    futures.subList(index + 1, futures.size())
+                        .forEach(f -> f.cancel(true));
+                    for (int remaining = index + 1;
+                            remaining < candidates.size(); remaining++) {
+                        result.add(CandidateEvaluation.blocked(
+                            candidates.get(remaining),
+                            List.of("TRAIN_EVALUATION_INTERRUPTED")));
+                    }
+                    break;
                 } catch (ExecutionException exception) {
                     result.add(CandidateEvaluation.blocked(
                         candidate,
@@ -606,6 +615,10 @@ public final class EvolutionRewriteProgramPopulationEngine {
             EvolutionRewriteProgramTrainFitnessEvidence evidence
         ) {
             Objects.requireNonNull(evidence, "evidence");
+            if (!plan.trainSuiteHash().equals(evidence.suiteHash())) {
+                return blocked(candidate, List.of(
+                    "TRAIN_EVIDENCE_SUITE_IDENTITY_MISMATCH"));
+            }
             if (!candidate.contentHash().equals(evidence.candidateHash())
                     || !candidate.genome().contentHash().equals(
                         evidence.genomeHash())
