@@ -25,6 +25,7 @@ public record EvolutionRewriteProgramStudyPlan(
     Objective objective,
     String splitManifestHash,
     String trainSuiteHash,
+    String trainEvaluationProtocolHash,
     String mutationCatalogHash,
     List<String> seedCandidateHashes,
     List<EvolutionRewriteProgramMutationKind> mutationOperators,
@@ -53,6 +54,8 @@ public record EvolutionRewriteProgramStudyPlan(
         EvolutionGenome.requireSha256(splitManifestHash, "splitManifestHash");
         EvolutionGenome.requireSha256(trainSuiteHash, "trainSuiteHash");
         EvolutionGenome.requireSha256(
+            trainEvaluationProtocolHash, "trainEvaluationProtocolHash");
+        EvolutionGenome.requireSha256(
             mutationCatalogHash, "mutationCatalogHash");
         seedCandidateHashes = canonicalHashes(
             seedCandidateHashes, "seedCandidateHashes");
@@ -76,6 +79,7 @@ public record EvolutionRewriteProgramStudyPlan(
             objective,
             splitManifestHash,
             trainSuiteHash,
+            trainEvaluationProtocolHash,
             mutationCatalogHash,
             seedCandidateHashes,
             mutationOperators,
@@ -93,6 +97,7 @@ public record EvolutionRewriteProgramStudyPlan(
         String studyId,
         EvolutionSplitManifest splitManifest,
         EvolutionRewriteProgramTrainSuite trainSuite,
+        EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
         MutationCatalog mutationCatalog,
         List<EvolutionRewriteProgramCandidate> seedCandidates,
         List<EvolutionRewriteProgramMutationKind> mutationOperators,
@@ -102,6 +107,7 @@ public record EvolutionRewriteProgramStudyPlan(
     ) {
         Objects.requireNonNull(splitManifest, "splitManifest");
         Objects.requireNonNull(trainSuite, "trainSuite");
+        Objects.requireNonNull(evaluationProtocol, "evaluationProtocol");
         Objects.requireNonNull(mutationCatalog, "mutationCatalog");
         Objects.requireNonNull(seedCandidates, "seedCandidates");
         requireId(studyId, "studyId");
@@ -110,6 +116,7 @@ public record EvolutionRewriteProgramStudyPlan(
                 "studyId differs from split-manifest studyId");
         }
         requireExactTrainSurface(splitManifest, trainSuite);
+        requireMatchingEvaluatorProfile(trainSuite, evaluationProtocol);
         if (seedCandidates.isEmpty()) {
             throw new IllegalArgumentException(
                 "seedCandidates must not be empty");
@@ -141,6 +148,7 @@ public record EvolutionRewriteProgramStudyPlan(
             objective,
             splitManifest.contentHash(),
             trainSuite.contentHash(),
+            evaluationProtocol.contentHash(),
             mutationCatalog.contentHash(),
             seedHashes,
             mutations,
@@ -154,6 +162,7 @@ public record EvolutionRewriteProgramStudyPlan(
             objective,
             splitManifest.contentHash(),
             trainSuite.contentHash(),
+            evaluationProtocol.contentHash(),
             mutationCatalog.contentHash(),
             seedHashes,
             mutations,
@@ -175,6 +184,7 @@ public record EvolutionRewriteProgramStudyPlan(
             objective,
             splitManifestHash,
             trainSuiteHash,
+            trainEvaluationProtocolHash,
             mutationCatalogHash,
             seedCandidateHashes,
             mutationOperators,
@@ -187,11 +197,13 @@ public record EvolutionRewriteProgramStudyPlan(
     public void requireInputs(
         EvolutionSplitManifest splitManifest,
         EvolutionRewriteProgramTrainSuite trainSuite,
+        EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
         MutationCatalog mutationCatalog,
         List<EvolutionRewriteProgramCandidate> seeds
     ) {
         Objects.requireNonNull(splitManifest, "splitManifest");
         Objects.requireNonNull(trainSuite, "trainSuite");
+        Objects.requireNonNull(evaluationProtocol, "evaluationProtocol");
         Objects.requireNonNull(mutationCatalog, "mutationCatalog");
         Objects.requireNonNull(seeds, "seeds");
         if (!studyId.equals(splitManifest.studyId())) {
@@ -199,9 +211,12 @@ public record EvolutionRewriteProgramStudyPlan(
                 "rewrite-program studyId differs from split manifest");
         }
         requireExactTrainSurface(splitManifest, trainSuite);
+        requireMatchingEvaluatorProfile(trainSuite, evaluationProtocol);
         requireCatalogSourcesInEverySeed(mutationCatalog, seeds);
         if (!splitManifest.contentHash().equals(splitManifestHash)
                 || !trainSuite.contentHash().equals(trainSuiteHash)
+                || !evaluationProtocol.contentHash().equals(
+                    trainEvaluationProtocolHash)
                 || !mutationCatalog.contentHash().equals(mutationCatalogHash)) {
             throw new IllegalArgumentException(
                 "rewrite-program study input identity mismatch");
@@ -230,6 +245,17 @@ public record EvolutionRewriteProgramStudyPlan(
         if (!manifestCases.equals(suiteCases)) {
             throw new IllegalArgumentException(
                 "TRAIN suite case/family surface differs from split manifest");
+        }
+    }
+
+    private static void requireMatchingEvaluatorProfile(
+        EvolutionRewriteProgramTrainSuite trainSuite,
+        EvolutionRewriteProgramEvaluationProtocol evaluationProtocol
+    ) {
+        if (trainSuite.evaluatorProfile()
+                != evaluationProtocol.evaluatorProfile()) {
+            throw new IllegalArgumentException(
+                "TRAIN suite evaluator profile differs from evaluation protocol");
         }
     }
 
@@ -322,6 +348,7 @@ public record EvolutionRewriteProgramStudyPlan(
         Objective objective,
         String splitManifestHash,
         String trainSuiteHash,
+        String trainEvaluationProtocolHash,
         String mutationCatalogHash,
         List<String> seedCandidateHashes,
         List<EvolutionRewriteProgramMutationKind> mutationOperators,
@@ -336,6 +363,9 @@ public record EvolutionRewriteProgramStudyPlan(
             .property("objective", objective.name())
             .property("splitManifestHash", splitManifestHash)
             .property("trainSuiteHash", trainSuiteHash)
+            .property(
+                "trainEvaluationProtocolHash",
+                trainEvaluationProtocolHash)
             .property("mutationCatalogHash", mutationCatalogHash)
             .stringArray("seedCandidateHashes", seedCandidateHashes)
             .stringArray("mutationOperators", mutationOperators.stream()
