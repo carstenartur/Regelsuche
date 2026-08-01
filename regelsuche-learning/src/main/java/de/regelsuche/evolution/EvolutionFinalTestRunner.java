@@ -30,6 +30,7 @@ public final class EvolutionFinalTestRunner {
                 suite.baselineProfileHash(), selection.selectedGenomeHash(),
                 selected.searchConfiguration());
         List<EvolutionFinalTestCaseEvidence> evidence = new ArrayList<>();
+        boolean restoreInterruption = false;
         for (EvolutionFinalTestSuite.CaseDefinition definition
                 : suite.cases()) {
             EvolutionFinalTestCaseEvaluator.Pair pair;
@@ -39,7 +40,11 @@ public final class EvolutionFinalTestRunner {
                     "evaluator result");
             } catch (Exception exception) {
                 if (exception instanceof InterruptedException) {
-                    Thread.currentThread().interrupt();
+                    // Persist the consumed FINAL TEST attempt before restoring
+                    // the interrupt flag. Re-interrupting here would make the
+                    // following NIO write fail with ClosedByInterruptException
+                    // and lose the required technical-failure evidence.
+                    restoreInterruption = true;
                 }
                 String reason = "EVALUATOR_EXCEPTION:"
                     + exception.getClass().getSimpleName();
@@ -52,8 +57,14 @@ public final class EvolutionFinalTestRunner {
         }
         EvolutionFinalTestEvaluation result =
             EvolutionFinalTestEvaluation.create(reservation, suite, evidence);
-        store.writeEvaluation(result);
-        return result;
+        try {
+            store.writeEvaluation(result);
+            return result;
+        } finally {
+            if (restoreInterruption) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     private static EvolutionValidationCandidate selectedCandidate(
