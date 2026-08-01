@@ -225,7 +225,7 @@ class EvolutionRewriteProgramEvaluationProtocolTest {
                 catalog,
                 List.of(candidate),
                 List.of(EvolutionRewriteProgramMutationKind.WRAP_REPEAT),
-                new PopulationPolicy(2, 1, 1, 1, 1, 1, 20260801L),
+                new PopulationPolicy(2, 1, 1, 2, 1, 1, 20260801L),
                 List.of(
                     new FitnessWeight(
                         FitnessComponent.TRAIN_CASES_NEWLY_SOLVED, 700),
