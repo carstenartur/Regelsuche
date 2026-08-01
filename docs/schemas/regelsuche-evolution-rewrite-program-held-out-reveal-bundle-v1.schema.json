@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-held-out-reveal-bundle-v1.schema.json",
+  "title": "Regelsuche private held-out rewrite-program reveal bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyId",
+    "split",
+    "cases",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-held-out-reveal-bundle/v1"
+    },
+    "studyId": {"$ref": "#/$defs/id"},
+    "split": {
+      "enum": ["VALIDATION", "FINAL_TEST"]
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/case"}
+    },
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "familyId",
+        "inputExpression",
+        "targetExpression",
+        "assumptions",
+        "difficultyTier",
+        "expectedTerminalClass",
+        "contentHash"
+      ],
+      "properties": {
+        "caseId": {"$ref": "#/$defs/id"},
+        "familyId": {"$ref": "#/$defs/id"},
+        "inputExpression": {"$ref": "#/$defs/text"},
+        "targetExpression": {"$ref": "#/$defs/text"},
+        "assumptions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/text"}
+        },
+        "difficultyTier": {
+          "enum": ["CONTROL", "STANDARD", "HARD", "BOUNDARY"]
+        },
+        "expectedTerminalClass": {
+          "enum": [
+            "CONFIRMED",
+            "MISSING_ASSUMPTION",
+            "REFUTED",
+            "UNSUPPORTED"
+          ]
+        },
+        "contentHash": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

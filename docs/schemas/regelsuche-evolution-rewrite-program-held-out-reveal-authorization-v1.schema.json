@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-evolution-rewrite-program-held-out-reveal-authorization-v1.schema.json",
+  "title": "Regelsuche held-out reveal authorization v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyId",
+    "split",
+    "stage",
+    "studyPlanHash",
+    "splitManifestHash",
+    "heldOutCommitmentHash",
+    "prerequisiteArtifactHash",
+    "validationSelectionHash",
+    "heldOutSuiteHash",
+    "terminalOutcome",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-held-out-reveal-authorization/v1"
+    },
+    "studyId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+    },
+    "split": {
+      "enum": ["VALIDATION", "FINAL_TEST"]
+    },
+    "stage": {
+      "enum": [
+        "VALIDATION_AFTER_TRAIN_POPULATION_COMPLETE",
+        "FINAL_TEST_AFTER_FROZEN_SELECTION_AND_RESERVATION"
+      ]
+    },
+    "studyPlanHash": { "$ref": "#/$defs/sha256" },
+    "splitManifestHash": { "$ref": "#/$defs/sha256" },
+    "heldOutCommitmentHash": { "$ref": "#/$defs/sha256" },
+    "prerequisiteArtifactHash": { "$ref": "#/$defs/sha256" },
+    "validationSelectionHash": {
+      "oneOf": [
+        { "const": "" },
+        { "$ref": "#/$defs/sha256" }
+      ]
+    },
+    "heldOutSuiteHash": {
+      "oneOf": [
+        { "const": "" },
+        { "$ref": "#/$defs/sha256" }
+      ]
+    },
+    "terminalOutcome": {
+      "type": "string"
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "split": { "const": "VALIDATION" }
+        }
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "VALIDATION_AFTER_TRAIN_POPULATION_COMPLETE"
+          },
+          "validationSelectionHash": { "const": "" },
+          "heldOutSuiteHash": { "const": "" },
+          "terminalOutcome": {
+            "enum": [
+              "COMPLETED",
+              "EXTINCT",
+              "STAGNATED",
+              "DIVERSITY_FLOOR_UNMET",
+              "MUTATION_BUDGET_EXHAUSTED",
+              "TRAIN_EVALUATION_BUDGET_EXHAUSTED"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "split": { "const": "FINAL_TEST" }
+        }
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "const": "FINAL_TEST_AFTER_FROZEN_SELECTION_AND_RESERVATION"
+          },
+          "validationSelectionHash": { "$ref": "#/$defs/sha256" },
+          "heldOutSuiteHash": { "$ref": "#/$defs/sha256" },
+          "terminalOutcome": { "const": "RESERVED" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
