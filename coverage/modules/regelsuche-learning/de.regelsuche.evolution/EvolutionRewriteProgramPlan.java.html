@@ -236,9 +236,9 @@ public record EvolutionRewriteProgramPlan(
     public record Requirement(RequirementKind kind, int threshold) {
 <span class="fc" id="L237">        public Requirement {</span>
 <span class="fc" id="L238">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="pc bpc" id="L239" title="3 of 4 branches missed.">            switch (kind) {</span>
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">            switch (kind) {</span>
                 case EQUIVALENCE_PRESERVING_BY_CONSTRUCTION, ASSUMPTION_FREE -&gt; {
-<span class="nc bnc" id="L241" title="All 2 branches missed.">                    if (threshold != 0) {</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                    if (threshold != 0) {</span>
 <span class="nc" id="L242">                        throw new IllegalArgumentException(</span>
                             kind + &quot; requires threshold=0&quot;);
                     }
@@ -264,7 +264,7 @@ public record EvolutionRewriteProgramPlan(
         }
 
         public static Requirement assumptionFree() {
-<span class="nc" id="L267">            return new Requirement(RequirementKind.ASSUMPTION_FREE, 0);</span>
+<span class="fc" id="L267">            return new Requirement(RequirementKind.ASSUMPTION_FREE, 0);</span>
         }
 
         public static Requirement maxEstimatedCostDelta(int threshold) {
@@ -544,54 +544,58 @@ public record EvolutionRewriteProgramPlan(
     }
 
     private static String alphaMaterial(Node root, int maxNodes, int maxDepth) {
-<span class="fc" id="L547">        AlphaContext context = new AlphaContext();</span>
-<span class="fc" id="L548">        return SCHEMA</span>
+<span class="fc" id="L547">        List&lt;String&gt; stableGeneOrder = inspect(root, maxNodes, maxDepth)</span>
+<span class="fc" id="L548">            .referencedGeneIds().stream()</span>
+<span class="fc" id="L549">            .sorted()</span>
+<span class="fc" id="L550">            .toList();</span>
+<span class="fc" id="L551">        AlphaContext context = new AlphaContext(stableGeneOrder);</span>
+<span class="fc" id="L552">        return SCHEMA</span>
             + &quot;\nmaxNodes=&quot; + maxNodes
             + &quot;\nmaxDepth=&quot; + maxDepth
-<span class="fc" id="L551">            + &quot;\nroot=&quot; + alphaNode(root, context);</span>
+<span class="fc" id="L555">            + &quot;\nroot=&quot; + alphaNode(root, context);</span>
     }
 
     private static String alphaNode(Node node, AlphaContext context) {
-<span class="fc bfc" id="L555" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
-<span class="fc" id="L556">            return &quot;SOURCE(&quot; + source.geneIds().stream()</span>
-<span class="fc" id="L557">                .map(context::gene)</span>
-<span class="fc" id="L558">                .toList() + &quot;)&quot;;</span>
+<span class="fc bfc" id="L559" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
+<span class="fc" id="L560">            return &quot;SOURCE(&quot; + source.geneIds().stream()</span>
+<span class="fc" id="L561">                .map(context::gene)</span>
+<span class="fc" id="L562">                .toList() + &quot;)&quot;;</span>
         }
-<span class="fc bfc" id="L560" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
-<span class="fc" id="L561">            return &quot;CHOICE&quot; + alphaChildren(choice.alternatives(), context);</span>
+<span class="fc bfc" id="L564" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L565">            return &quot;CHOICE&quot; + alphaChildren(choice.alternatives(), context);</span>
         }
-<span class="fc bfc" id="L563" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
-<span class="fc" id="L564">            return &quot;FIRST_APPLICABLE&quot;</span>
-<span class="fc" id="L565">                + alphaChildren(firstApplicable.alternatives(), context);</span>
+<span class="fc bfc" id="L567" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L568">            return &quot;FIRST_APPLICABLE&quot;</span>
+<span class="fc" id="L569">                + alphaChildren(firstApplicable.alternatives(), context);</span>
         }
-<span class="fc bfc" id="L567" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
-<span class="fc" id="L568">            return &quot;SEQUENCE&quot; + alphaChildren(sequence.steps(), context);</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L572">            return &quot;SEQUENCE&quot; + alphaChildren(sequence.steps(), context);</span>
         }
-<span class="fc bfc" id="L570" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
-<span class="fc" id="L571">            return &quot;REPEAT(&quot; + repeat.minIterations() + &quot;,&quot;</span>
-<span class="fc" id="L572">                + repeat.maxIterations() + &quot;,&quot;</span>
-<span class="fc" id="L573">                + alphaNode(repeat.body(), context) + &quot;)&quot;;</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L575">            return &quot;REPEAT(&quot; + repeat.minIterations() + &quot;,&quot;</span>
+<span class="fc" id="L576">                + repeat.maxIterations() + &quot;,&quot;</span>
+<span class="fc" id="L577">                + alphaNode(repeat.body(), context) + &quot;)&quot;;</span>
         }
-<span class="fc bfc" id="L575" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
-<span class="fc" id="L576">            return &quot;REQUIRE(&quot; + require.requirement().kind().name() + &quot;,&quot;</span>
-<span class="fc" id="L577">                + require.requirement().threshold() + &quot;,&quot;</span>
-<span class="fc" id="L578">                + alphaNode(require.body(), context) + &quot;)&quot;;</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L580">            return &quot;REQUIRE(&quot; + require.requirement().kind().name() + &quot;,&quot;</span>
+<span class="fc" id="L581">                + require.requirement().threshold() + &quot;,&quot;</span>
+<span class="fc" id="L582">                + alphaNode(require.body(), context) + &quot;)&quot;;</span>
         }
-<span class="fc bfc" id="L580" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
-<span class="fc" id="L581">            List&lt;String&gt; preferred = prioritize.priority().preferredGeneIds().stream()</span>
-<span class="fc" id="L582">                .map(context::gene)</span>
-<span class="fc" id="L583">                .toList();</span>
-<span class="fc" id="L584">            return &quot;PRIORITIZE(&quot; + prioritize.priority().kind().name() + &quot;,&quot;</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L585">            List&lt;String&gt; preferred = prioritize.priority().preferredGeneIds().stream()</span>
+<span class="fc" id="L586">                .map(context::gene)</span>
+<span class="fc" id="L587">                .toList();</span>
+<span class="fc" id="L588">            return &quot;PRIORITIZE(&quot; + prioritize.priority().kind().name() + &quot;,&quot;</span>
                 + preferred + &quot;,&quot;
-<span class="fc" id="L586">                + alphaNode(prioritize.body(), context) + &quot;)&quot;;</span>
+<span class="fc" id="L590">                + alphaNode(prioritize.body(), context) + &quot;)&quot;;</span>
         }
-<span class="fc" id="L588">        Prune prune = (Prune) node;</span>
-<span class="fc" id="L589">        return &quot;PRUNE(&quot; + prune.maxCandidates() + &quot;,&quot;</span>
-<span class="fc" id="L590">            + alphaNode(prune.body(), context) + &quot;)&quot;;</span>
+<span class="fc" id="L592">        Prune prune = (Prune) node;</span>
+<span class="fc" id="L593">        return &quot;PRUNE(&quot; + prune.maxCandidates() + &quot;,&quot;</span>
+<span class="fc" id="L594">            + alphaNode(prune.body(), context) + &quot;)&quot;;</span>
     }
 
     private static String alphaChildren(List&lt;Node&gt; nodes, AlphaContext context) {
-<span class="fc" id="L594">        return nodes.stream().map(node -&gt; alphaNode(node, context)).toList().toString();</span>
+<span class="fc" id="L598">        return nodes.stream().map(node -&gt; alphaNode(node, context)).toList().toString();</span>
     }
 
     private static void appendReadable(
@@ -599,86 +603,86 @@ public record EvolutionRewriteProgramPlan(
         Node node,
         int indentation
     ) {
-<span class="fc" id="L602">        String prefix = &quot;  &quot;.repeat(indentation);</span>
-<span class="fc bfc" id="L603" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
-<span class="fc" id="L604">            output.append(prefix)</span>
-<span class="fc" id="L605">                .append(&quot;source &quot;)</span>
-<span class="fc" id="L606">                .append(source.geneIds())</span>
-<span class="fc" id="L607">                .append(&quot;\n&quot;);</span>
-<span class="fc" id="L608">            return;</span>
+<span class="fc" id="L606">        String prefix = &quot;  &quot;.repeat(indentation);</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
+<span class="fc" id="L608">            output.append(prefix)</span>
+<span class="fc" id="L609">                .append(&quot;source &quot;)</span>
+<span class="fc" id="L610">                .append(source.geneIds())</span>
+<span class="fc" id="L611">                .append(&quot;\n&quot;);</span>
+<span class="fc" id="L612">            return;</span>
         }
-<span class="fc bfc" id="L610" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
-<span class="fc" id="L611">            output.append(prefix)</span>
-<span class="fc" id="L612">                .append(&quot;repeat &quot;)</span>
-<span class="fc" id="L613">                .append(repeat.minIterations())</span>
-<span class="fc" id="L614">                .append(&quot;..&quot;)</span>
-<span class="fc" id="L615">                .append(repeat.maxIterations())</span>
-<span class="fc" id="L616">                .append(&quot; {\n&quot;);</span>
-<span class="fc" id="L617">            appendReadable(output, repeat.body(), indentation + 1);</span>
-<span class="fc" id="L618">            output.append(prefix).append(&quot;}\n&quot;);</span>
-<span class="fc" id="L619">            return;</span>
+<span class="fc bfc" id="L614" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L615">            output.append(prefix)</span>
+<span class="fc" id="L616">                .append(&quot;repeat &quot;)</span>
+<span class="fc" id="L617">                .append(repeat.minIterations())</span>
+<span class="fc" id="L618">                .append(&quot;..&quot;)</span>
+<span class="fc" id="L619">                .append(repeat.maxIterations())</span>
+<span class="fc" id="L620">                .append(&quot; {\n&quot;);</span>
+<span class="fc" id="L621">            appendReadable(output, repeat.body(), indentation + 1);</span>
+<span class="fc" id="L622">            output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L623">            return;</span>
         }
-<span class="fc bfc" id="L621" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
-<span class="fc" id="L622">            output.append(prefix)</span>
-<span class="fc" id="L623">                .append(&quot;require &quot;)</span>
-<span class="fc" id="L624">                .append(require.requirement().kind())</span>
-<span class="fc" id="L625">                .append(&quot;(&quot;)</span>
-<span class="fc" id="L626">                .append(require.requirement().threshold())</span>
-<span class="fc" id="L627">                .append(&quot;) {\n&quot;);</span>
-<span class="fc" id="L628">            appendReadable(output, require.body(), indentation + 1);</span>
-<span class="fc" id="L629">            output.append(prefix).append(&quot;}\n&quot;);</span>
-<span class="fc" id="L630">            return;</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L626">            output.append(prefix)</span>
+<span class="fc" id="L627">                .append(&quot;require &quot;)</span>
+<span class="fc" id="L628">                .append(require.requirement().kind())</span>
+<span class="fc" id="L629">                .append(&quot;(&quot;)</span>
+<span class="fc" id="L630">                .append(require.requirement().threshold())</span>
+<span class="fc" id="L631">                .append(&quot;) {\n&quot;);</span>
+<span class="fc" id="L632">            appendReadable(output, require.body(), indentation + 1);</span>
+<span class="fc" id="L633">            output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L634">            return;</span>
         }
-<span class="fc bfc" id="L632" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
-<span class="fc" id="L633">            output.append(prefix)</span>
-<span class="fc" id="L634">                .append(&quot;prioritize &quot;)</span>
-<span class="fc" id="L635">                .append(prioritize.priority().kind())</span>
-<span class="fc" id="L636">                .append(prioritize.priority().preferredGeneIds())</span>
-<span class="fc" id="L637">                .append(&quot; {\n&quot;);</span>
-<span class="fc" id="L638">            appendReadable(output, prioritize.body(), indentation + 1);</span>
-<span class="fc" id="L639">            output.append(prefix).append(&quot;}\n&quot;);</span>
-<span class="fc" id="L640">            return;</span>
+<span class="fc bfc" id="L636" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L637">            output.append(prefix)</span>
+<span class="fc" id="L638">                .append(&quot;prioritize &quot;)</span>
+<span class="fc" id="L639">                .append(prioritize.priority().kind())</span>
+<span class="fc" id="L640">                .append(prioritize.priority().preferredGeneIds())</span>
+<span class="fc" id="L641">                .append(&quot; {\n&quot;);</span>
+<span class="fc" id="L642">            appendReadable(output, prioritize.body(), indentation + 1);</span>
+<span class="fc" id="L643">            output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L644">            return;</span>
         }
-<span class="pc bpc" id="L642" title="1 of 2 branches missed.">        if (node instanceof Prune prune) {</span>
-<span class="nc" id="L643">            output.append(prefix)</span>
-<span class="nc" id="L644">                .append(&quot;prune &quot;)</span>
-<span class="nc" id="L645">                .append(prune.maxCandidates())</span>
-<span class="nc" id="L646">                .append(&quot; because \&quot;&quot;)</span>
-<span class="nc" id="L647">                .append(prune.reason())</span>
-<span class="nc" id="L648">                .append(&quot;\&quot; {\n&quot;);</span>
-<span class="nc" id="L649">            appendReadable(output, prune.body(), indentation + 1);</span>
-<span class="nc" id="L650">            output.append(prefix).append(&quot;}\n&quot;);</span>
-<span class="nc" id="L651">            return;</span>
+<span class="fc bfc" id="L646" title="All 2 branches covered.">        if (node instanceof Prune prune) {</span>
+<span class="fc" id="L647">            output.append(prefix)</span>
+<span class="fc" id="L648">                .append(&quot;prune &quot;)</span>
+<span class="fc" id="L649">                .append(prune.maxCandidates())</span>
+<span class="fc" id="L650">                .append(&quot; because \&quot;&quot;)</span>
+<span class="fc" id="L651">                .append(prune.reason())</span>
+<span class="fc" id="L652">                .append(&quot;\&quot; {\n&quot;);</span>
+<span class="fc" id="L653">            appendReadable(output, prune.body(), indentation + 1);</span>
+<span class="fc" id="L654">            output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L655">            return;</span>
         }
 
         String keyword;
         List&lt;Node&gt; children;
-<span class="fc bfc" id="L656" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
-<span class="fc" id="L657">            keyword = &quot;choice&quot;;</span>
-<span class="fc" id="L658">            children = choice.alternatives();</span>
-<span class="pc bpc" id="L659" title="1 of 2 branches missed.">        } else if (node instanceof FirstApplicable firstApplicable) {</span>
-<span class="nc" id="L660">            keyword = &quot;firstApplicable&quot;;</span>
-<span class="nc" id="L661">            children = firstApplicable.alternatives();</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L661">            keyword = &quot;choice&quot;;</span>
+<span class="fc" id="L662">            children = choice.alternatives();</span>
+<span class="fc bfc" id="L663" title="All 2 branches covered.">        } else if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L664">            keyword = &quot;firstApplicable&quot;;</span>
+<span class="fc" id="L665">            children = firstApplicable.alternatives();</span>
         } else {
-<span class="fc" id="L663">            keyword = &quot;sequence&quot;;</span>
-<span class="fc" id="L664">            children = ((Sequence) node).steps();</span>
+<span class="fc" id="L667">            keyword = &quot;sequence&quot;;</span>
+<span class="fc" id="L668">            children = ((Sequence) node).steps();</span>
         }
-<span class="fc" id="L666">        output.append(prefix).append(keyword).append(&quot; {\n&quot;);</span>
-<span class="fc bfc" id="L667" title="All 2 branches covered.">        for (Node child : children) {</span>
-<span class="fc" id="L668">            appendReadable(output, child, indentation + 1);</span>
-<span class="fc" id="L669">        }</span>
-<span class="fc" id="L670">        output.append(prefix).append(&quot;}\n&quot;);</span>
-<span class="fc" id="L671">    }</span>
+<span class="fc" id="L670">        output.append(prefix).append(keyword).append(&quot; {\n&quot;);</span>
+<span class="fc bfc" id="L671" title="All 2 branches covered.">        for (Node child : children) {</span>
+<span class="fc" id="L672">            appendReadable(output, child, indentation + 1);</span>
+<span class="fc" id="L673">        }</span>
+<span class="fc" id="L674">        output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L675">    }</span>
 
     private static List&lt;Node&gt; immutableNodes(List&lt;Node&gt; values, String name) {
-<span class="fc" id="L674">        Objects.requireNonNull(values, name);</span>
-<span class="fc" id="L675">        List&lt;Node&gt; copy = values.stream()</span>
-<span class="fc" id="L676">            .map(value -&gt; Objects.requireNonNull(value, &quot;program node&quot;))</span>
-<span class="fc" id="L677">            .toList();</span>
-<span class="pc bpc" id="L678" title="1 of 2 branches missed.">        if (copy.isEmpty()) {</span>
-<span class="nc" id="L679">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+<span class="fc" id="L678">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L679">        List&lt;Node&gt; copy = values.stream()</span>
+<span class="fc" id="L680">            .map(value -&gt; Objects.requireNonNull(value, &quot;program node&quot;))</span>
+<span class="fc" id="L681">            .toList();</span>
+<span class="pc bpc" id="L682" title="1 of 2 branches missed.">        if (copy.isEmpty()) {</span>
+<span class="nc" id="L683">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
         }
-<span class="fc" id="L681">        return copy;</span>
+<span class="fc" id="L685">        return copy;</span>
     }
 
     private static List&lt;String&gt; immutableIds(
@@ -686,36 +690,36 @@ public record EvolutionRewriteProgramPlan(
         String name,
         boolean requireNonEmpty
     ) {
-<span class="fc" id="L689">        Objects.requireNonNull(values, name);</span>
-<span class="fc" id="L690">        List&lt;String&gt; copy = values.stream()</span>
-<span class="fc" id="L691">            .map(value -&gt; normalizeId(value, name + &quot; entry&quot;))</span>
-<span class="fc" id="L692">            .toList();</span>
-<span class="pc bpc" id="L693" title="1 of 4 branches missed.">        if (requireNonEmpty &amp;&amp; copy.isEmpty()) {</span>
-<span class="nc" id="L694">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+<span class="fc" id="L693">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L694">        List&lt;String&gt; copy = values.stream()</span>
+<span class="fc" id="L695">            .map(value -&gt; normalizeId(value, name + &quot; entry&quot;))</span>
+<span class="fc" id="L696">            .toList();</span>
+<span class="pc bpc" id="L697" title="1 of 4 branches missed.">        if (requireNonEmpty &amp;&amp; copy.isEmpty()) {</span>
+<span class="nc" id="L698">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
         }
-<span class="pc bpc" id="L696" title="1 of 2 branches missed.">        if (new LinkedHashSet&lt;&gt;(copy).size() != copy.size()) {</span>
-<span class="nc" id="L697">            throw new IllegalArgumentException(name + &quot; must not contain duplicates&quot;);</span>
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">        if (new LinkedHashSet&lt;&gt;(copy).size() != copy.size()) {</span>
+<span class="nc" id="L701">            throw new IllegalArgumentException(name + &quot; must not contain duplicates&quot;);</span>
         }
-<span class="fc" id="L699">        return copy;</span>
+<span class="fc" id="L703">        return copy;</span>
     }
 
     private static String normalizeId(String value, String name) {
-<span class="fc" id="L703">        String normalized = normalizeText(value, name)</span>
-<span class="fc" id="L704">            .toLowerCase(java.util.Locale.ROOT);</span>
-<span class="pc bpc" id="L705" title="1 of 2 branches missed.">        if (!ID.matcher(normalized).matches()) {</span>
-<span class="nc" id="L706">            throw new IllegalArgumentException(&quot;invalid &quot; + name + &quot;: &quot; + value);</span>
+<span class="fc" id="L707">        String normalized = normalizeText(value, name)</span>
+<span class="fc" id="L708">            .toLowerCase(java.util.Locale.ROOT);</span>
+<span class="pc bpc" id="L709" title="1 of 2 branches missed.">        if (!ID.matcher(normalized).matches()) {</span>
+<span class="nc" id="L710">            throw new IllegalArgumentException(&quot;invalid &quot; + name + &quot;: &quot; + value);</span>
         }
-<span class="fc" id="L708">        return normalized;</span>
+<span class="fc" id="L712">        return normalized;</span>
     }
 
     private static String normalizeText(String value, String name) {
-<span class="pc bpc" id="L712" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L713">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L716" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L717">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L715">        return value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="fc" id="L719">        return value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
-<span class="fc" id="L718">    private record TreeFacts(</span>
+<span class="fc" id="L722">    private record TreeFacts(</span>
         int nodeCount,
         int actualDepth,
         List&lt;String&gt; referencedGeneIds,
@@ -723,13 +727,23 @@ public record EvolutionRewriteProgramPlan(
     ) {
     }
 
-<span class="fc" id="L726">    private static final class AlphaContext {</span>
-<span class="fc" id="L727">        private final Map&lt;String, String&gt; genes = new LinkedHashMap&lt;&gt;();</span>
+    private static final class AlphaContext {
+<span class="fc" id="L731">        private final Map&lt;String, String&gt; genes = new LinkedHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L733">        private AlphaContext(List&lt;String&gt; stableGeneOrder) {</span>
+<span class="fc" id="L734">            int index = 0;</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">            for (String geneId : stableGeneOrder) {</span>
+<span class="fc" id="L736">                genes.put(geneId, &quot;G&quot; + index++);</span>
+<span class="fc" id="L737">            }</span>
+<span class="fc" id="L738">        }</span>
 
         private String gene(String geneId) {
-<span class="fc" id="L730">            return genes.computeIfAbsent(</span>
-                geneId,
-<span class="fc" id="L732">                ignored -&gt; &quot;G&quot; + genes.size());</span>
+<span class="fc" id="L741">            String alias = genes.get(geneId);</span>
+<span class="pc bpc" id="L742" title="1 of 2 branches missed.">            if (alias == null) {</span>
+<span class="nc" id="L743">                throw new IllegalArgumentException(</span>
+                    &quot;alpha context is missing referenced gene: &quot; + geneId);
+            }
+<span class="fc" id="L746">            return alias;</span>
         }
     }
 }

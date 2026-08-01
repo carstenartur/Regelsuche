@@ -103,17 +103,17 @@ public final class EvolutionRewriteProgramCompiler {
         EvolutionGenome.ResourceBudget budget
     ) {
 <span class="fc bfc" id="L105" title="All 2 branches covered.">        if (node instanceof Repeat repeat</span>
-<span class="pc bpc" id="L106" title="1 of 2 branches missed.">                &amp;&amp; repeat.maxIterations() &gt; budget.maxApplicationsPerPath()) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                &amp;&amp; repeat.maxIterations() &gt; budget.maxApplicationsPerPath()) {</span>
 <span class="fc" id="L107">            throw new IllegalArgumentException(</span>
                 &quot;repeat exceeds genome maxApplicationsPerPath&quot;);
         }
 <span class="fc bfc" id="L110" title="All 2 branches covered.">        if (node instanceof Prune prune</span>
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                &amp;&amp; prune.maxCandidates() &gt; budget.maxCandidatesPerState()) {</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                &amp;&amp; prune.maxCandidates() &gt; budget.maxCandidatesPerState()) {</span>
 <span class="fc" id="L112">            throw new IllegalArgumentException(</span>
                 &quot;prune exceeds genome maxCandidatesPerState&quot;);
         }
 <span class="fc bfc" id="L115" title="All 2 branches covered.">        if (node instanceof Require require</span>
-<span class="pc bpc" id="L116" title="1 of 2 branches missed.">                &amp;&amp; require.requirement().kind()</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                &amp;&amp; require.requirement().kind()</span>
                     == EvolutionRewriteProgramPlan.RequirementKind.MAX_PRIMITIVE_STEPS
 <span class="fc" id="L118">                &amp;&amp; require.requirement().threshold()</span>
 <span class="pc bpc" id="L119" title="1 of 2 branches missed.">                    &gt; budget.maxApplicationsPerPath()) {</span>
@@ -162,27 +162,27 @@ public final class EvolutionRewriteProgramCompiler {
 <span class="fc" id="L162">                    context.genome().budget().maxAstGrowthPerStep(),</span>
 <span class="fc" id="L163">                    context.genome().budget().maxCandidatesPerState()));</span>
         }
-<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (node instanceof Choice choice) {</span>
-<span class="nc" id="L166">            return new RewriteProgram.Choice(</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L166">            return new RewriteProgram.Choice(</span>
                 metadata,
-<span class="nc" id="L168">                compileChildren(choice.alternatives(), context));</span>
+<span class="fc" id="L168">                compileChildren(choice.alternatives(), context));</span>
         }
-<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (node instanceof FirstApplicable firstApplicable) {</span>
-<span class="nc" id="L171">            return new RewriteProgram.FirstApplicable(</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L171">            return new RewriteProgram.FirstApplicable(</span>
                 metadata,
-<span class="nc" id="L173">                compileChildren(firstApplicable.alternatives(), context));</span>
+<span class="fc" id="L173">                compileChildren(firstApplicable.alternatives(), context));</span>
         }
 <span class="fc bfc" id="L175" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
 <span class="fc" id="L176">            return new RewriteProgram.Sequence(</span>
                 metadata,
 <span class="fc" id="L178">                compileChildren(sequence.steps(), context));</span>
         }
-<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (node instanceof Repeat repeat) {</span>
-<span class="nc" id="L181">            return new RewriteProgram.Repeat(</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L181">            return new RewriteProgram.Repeat(</span>
                 metadata,
-<span class="nc" id="L183">                compileNode(repeat.body(), context),</span>
-<span class="nc" id="L184">                repeat.minIterations(),</span>
-<span class="nc" id="L185">                repeat.maxIterations());</span>
+<span class="fc" id="L183">                compileNode(repeat.body(), context),</span>
+<span class="fc" id="L184">                repeat.minIterations(),</span>
+<span class="fc" id="L185">                repeat.maxIterations());</span>
         }
 <span class="fc bfc" id="L187" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
 <span class="fc" id="L188">            Requirement requirement = require.requirement();</span>
@@ -192,19 +192,19 @@ public final class EvolutionRewriteProgramCompiler {
 <span class="fc" id="L192">                requirementDescription(requirement),</span>
 <span class="fc" id="L193">                requirementPredicate(requirement));</span>
         }
-<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
 <span class="fc" id="L196">            return new RewriteProgram.Prioritize(</span>
                 metadata,
 <span class="fc" id="L198">                compileNode(prioritize.body(), context),</span>
 <span class="fc" id="L199">                priorityDescription(prioritize),</span>
 <span class="fc" id="L200">                priorityComparator(prioritize, context));</span>
         }
-<span class="nc" id="L202">        Prune prune = (Prune) node;</span>
-<span class="nc" id="L203">        return new RewriteProgram.Prune(</span>
+<span class="fc" id="L202">        Prune prune = (Prune) node;</span>
+<span class="fc" id="L203">        return new RewriteProgram.Prune(</span>
             metadata,
-<span class="nc" id="L205">            compileNode(prune.body(), context),</span>
-<span class="nc" id="L206">            prune.maxCandidates(),</span>
-<span class="nc" id="L207">            prune.reason());</span>
+<span class="fc" id="L205">            compileNode(prune.body(), context),</span>
+<span class="fc" id="L206">            prune.maxCandidates(),</span>
+<span class="fc" id="L207">            prune.reason());</span>
     }
 
     private static List&lt;RewriteProgram&gt; compileChildren(
@@ -219,10 +219,10 @@ public final class EvolutionRewriteProgramCompiler {
     private static Predicate&lt;RewriteCandidate&gt; requirementPredicate(
         Requirement requirement
     ) {
-<span class="pc bpc" id="L222" title="3 of 4 branches missed.">        return switch (requirement.kind()) {</span>
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">        return switch (requirement.kind()) {</span>
             case EQUIVALENCE_PRESERVING_BY_CONSTRUCTION -&gt;
 <span class="nc" id="L224">                RewritePrograms.equivalencePreserving();</span>
-<span class="nc" id="L225">            case ASSUMPTION_FREE -&gt; candidate -&gt; candidate.steps().stream()</span>
+<span class="pc" id="L225">            case ASSUMPTION_FREE -&gt; candidate -&gt; candidate.steps().stream()</span>
 <span class="nc" id="L226">                .allMatch(step -&gt; step.assumptions().isEmpty());</span>
 <span class="nc" id="L227">            case MAX_ESTIMATED_COST_DELTA -&gt; candidate -&gt;</span>
 <span class="nc" id="L228">                candidate.toTransformation().estimatedCostDelta()</span>
@@ -256,17 +256,17 @@ public final class EvolutionRewriteProgramCompiler {
     }
 
     private static List&lt;Node&gt; children(Node node) {
-<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (node instanceof Choice choice) {</span>
-<span class="nc" id="L260">            return choice.alternatives();</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L260">            return choice.alternatives();</span>
         }
-<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (node instanceof FirstApplicable firstApplicable) {</span>
-<span class="nc" id="L263">            return firstApplicable.alternatives();</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L263">            return firstApplicable.alternatives();</span>
         }
 <span class="fc bfc" id="L265" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
 <span class="fc" id="L266">            return sequence.steps();</span>
         }
-<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (node instanceof Repeat repeat) {</span>
-<span class="nc" id="L269">            return List.of(repeat.body());</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L269">            return List.of(repeat.body());</span>
         }
 <span class="fc bfc" id="L271" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
 <span class="fc" id="L272">            return List.of(require.body());</span>
@@ -274,8 +274,8 @@ public final class EvolutionRewriteProgramCompiler {
 <span class="fc bfc" id="L274" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
 <span class="fc" id="L275">            return List.of(prioritize.body());</span>
         }
-<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (node instanceof Prune prune) {</span>
-<span class="nc" id="L278">            return List.of(prune.body());</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (node instanceof Prune prune) {</span>
+<span class="fc" id="L278">            return List.of(prune.body());</span>
         }
 <span class="fc" id="L280">        return List.of();</span>
     }
