@@ -27,6 +27,8 @@ class EvolutionSchemaContractTest {
             "regelsuche-evolution-train-search-suite-v1.schema.json");
         String trainFitness = readSchema(
             "regelsuche-evolution-train-fitness-v1.schema.json");
+        String rewriteProgram = readSchema(
+            "regelsuche-evolution-rewrite-program-plan-v1.schema.json");
 
         assertTrue(genome.contains("regelsuche.evolution-genome/v1"));
         assertTrue(genome.contains("\"const\": \"TRAIN\""));
@@ -104,6 +106,26 @@ class EvolutionSchemaContractTest {
         assertTrue(trainFitness.contains("\"validationStatus\""));
         assertTrue(trainFitness.contains("\"const\": \"NOT_EVALUATED\""));
         assertTrue(trainFitness.contains("\"additionalProperties\": false"));
+
+        assertTrue(rewriteProgram.contains(
+            "regelsuche.evolution-rewrite-program-plan/v1"));
+        assertTrue(rewriteProgram.contains("\"additionalProperties\": false"));
+        assertTrue(rewriteProgram.contains("\"const\": \"SOURCE\""));
+        assertTrue(rewriteProgram.contains("\"const\": \"SEQUENCE\""));
+        assertTrue(rewriteProgram.contains(
+            "\"const\": \"FIRST_APPLICABLE\""));
+        assertTrue(rewriteProgram.contains("\"const\": \"REPEAT\""));
+        assertTrue(rewriteProgram.contains("\"const\": \"PRUNE\""));
+        for (EvolutionRewriteProgramPlan.RequirementKind kind :
+                EvolutionRewriteProgramPlan.RequirementKind.values()) {
+            assertTrue(rewriteProgram.contains("\"" + kind.name() + "\""),
+                kind.name());
+        }
+        for (EvolutionRewriteProgramPlan.PriorityKind kind :
+                EvolutionRewriteProgramPlan.PriorityKind.values()) {
+            assertTrue(rewriteProgram.contains("\"" + kind.name() + "\""),
+                kind.name());
+        }
     }
 
     private static String readSchema(String fileName) throws Exception {
