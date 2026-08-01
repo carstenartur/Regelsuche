@@ -101,6 +101,34 @@
       "$ref": "#/$defs/sha256"
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "allowMaterialWorkReductionRoute": {"const": true}
+        },
+        "required": ["allowMaterialWorkReductionRoute"]
+      },
+      "then": {
+        "properties": {
+          "minimumMechanicalWorkReductionPermille": {
+            "minimum": 50,
+            "maximum": 1000
+          },
+          "successRoute": {
+            "const": "NEWLY_REACHED_OR_MATERIAL_WORK_REDUCTION"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "minimumNewlyReachedCases": {"minimum": 1},
+          "minimumMechanicalWorkReductionPermille": {"const": 0},
+          "successRoute": {"const": "NEWLY_REACHED_REQUIRED"}
+        }
+      }
+    }
+  ],
   "$defs": {
     "sha256": {
       "type": "string",
