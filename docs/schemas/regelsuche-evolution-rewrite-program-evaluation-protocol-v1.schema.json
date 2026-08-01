@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-evaluation-protocol-v1.schema.json",
+  "title": "Regelsuche rewrite-program evaluation protocol",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "protocolId",
+    "evaluatorProfile",
+    "baselineContract",
+    "candidateContract",
+    "targetRelation",
+    "correctnessContract",
+    "resourceAttributionContract",
+    "implementationClass",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-evaluation-protocol/v1"
+    },
+    "protocolId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+    },
+    "evaluatorProfile": {
+      "const": "EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS"
+    },
+    "baselineContract": {
+      "const": "ORDINARY_PLUS_FLAT_CANDIDATE_GENOME_RULES"
+    },
+    "candidateContract": {
+      "const": "BASELINE_PLUS_COMPILED_REWRITE_PROGRAM"
+    },
+    "targetRelation": {
+      "const": "SYNTAX_EXACT"
+    },
+    "correctnessContract": {
+      "const": "EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS"
+    },
+    "resourceAttributionContract": {
+      "const": "CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE"
+    },
+    "implementationClass": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

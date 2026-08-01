@@ -10,6 +10,7 @@
     "objective",
     "splitManifestHash",
     "trainSuiteHash",
+    "trainEvaluationProtocolHash",
     "mutationCatalogHash",
     "seedCandidateHashes",
     "mutationOperators",
@@ -41,6 +42,9 @@
       "$ref": "#/$defs/sha256"
     },
     "trainSuiteHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trainEvaluationProtocolHash": {
       "$ref": "#/$defs/sha256"
     },
     "mutationCatalogHash": {
