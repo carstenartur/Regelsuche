@@ -1,5 +1,6 @@
 package de.regelsuche.evolution;
 
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import java.util.Objects;
 import java.util.Set;
@@ -20,12 +21,14 @@ public final class ProtocolBoundInformationParityRewriteProgramTrainFitnessEvalu
 
     public ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator(
         EvolutionRewriteProgramTrainSuite suite,
-        Set<FitnessComponent> requiredComponents
+        Set<FitnessComponent> requiredComponents,
+        AssumptionAwareEquivalenceService equivalence
     ) {
         this.suite = Objects.requireNonNull(suite, "suite");
         this.delegate = new InformationParityRewriteProgramTrainFitnessEvaluator(
             suite,
-            Objects.requireNonNull(requiredComponents, "requiredComponents"));
+            Objects.requireNonNull(requiredComponents, "requiredComponents"),
+            Objects.requireNonNull(equivalence, "equivalence"));
         if (suite.evaluatorProfile() != PROTOCOL.evaluatorProfile()) {
             throw new IllegalArgumentException(
                 "TRAIN suite evaluator profile differs from frozen protocol");
