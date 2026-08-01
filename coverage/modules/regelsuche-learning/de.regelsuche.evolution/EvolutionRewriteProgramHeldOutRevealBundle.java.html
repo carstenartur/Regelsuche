@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramHeldOutRevealBundle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramHeldOutRevealBundle.java</span></div><h1>EvolutionRewriteProgramHeldOutRevealBundle.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.CaseCommitment;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.Split;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Private, content-addressed held-out reveal material.
+ *
+ * &lt;p&gt;The public surface exposes only hashes and split references. Concrete
+ * expressions become available only through {@link #open} after the caller
+ * supplies content-addressed prerequisite evidence and the exact public
+ * commitment. Real reveal JSON belongs outside the repository and must never
+ * be placed on a TRAIN-visible classpath.&lt;/p&gt;
+ */
+public final class EvolutionRewriteProgramHeldOutRevealBundle {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-held-out-reveal-bundle/v1&quot;;
+<span class="fc" id="L31">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+<span class="fc" id="L32">    private static final Pattern IDENTIFIER =</span>
+<span class="fc" id="L33">        Pattern.compile(&quot;\\b[A-Za-z][A-Za-z0-9_]*\\b&quot;);</span>
+<span class="fc" id="L34">    private static final Set&lt;String&gt; RESERVED_IDENTIFIERS = Set.of(</span>
+        &quot;sin&quot;, &quot;cos&quot;, &quot;tan&quot;, &quot;sqrt&quot;, &quot;abs&quot;, &quot;log&quot;, &quot;ln&quot;, &quot;exp&quot;, &quot;matrix&quot;);
+
+    private final String studyId;
+    private final Split split;
+    private final List&lt;RevealCase&gt; cases;
+    private final String contentHash;
+
+    private EvolutionRewriteProgramHeldOutRevealBundle(
+        String studyId,
+        Split split,
+        List&lt;RevealCase&gt; cases,
+        String contentHash
+<span class="fc" id="L47">    ) {</span>
+<span class="fc" id="L48">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L49">        this.studyId = studyId;</span>
+<span class="fc" id="L50">        this.split = Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L51">        this.cases = canonicalCases(cases);</span>
+<span class="fc" id="L52">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L53">        String expected = EvolutionGenome.hash(render(</span>
+            studyId,
+            split,
+            this.cases,
+            null));
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L59">            throw new IllegalArgumentException(</span>
+                &quot;held-out reveal-bundle contentHash mismatch&quot;);
+        }
+<span class="fc" id="L62">        this.contentHash = contentHash;</span>
+<span class="fc" id="L63">    }</span>
+
+    public static EvolutionRewriteProgramHeldOutRevealBundle create(
+        String studyId,
+        Split split,
+        List&lt;RevealCase&gt; cases
+    ) {
+<span class="fc" id="L70">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L71">        Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L72">        List&lt;RevealCase&gt; canonical = canonicalCases(cases);</span>
+<span class="fc" id="L73">        String hash = EvolutionGenome.hash(render(</span>
+            studyId,
+            split,
+            canonical,
+            null));
+<span class="fc" id="L78">        return new EvolutionRewriteProgramHeldOutRevealBundle(</span>
+            studyId,
+            split,
+            canonical,
+            hash);
+    }
+
+    public String studyId() {
+<span class="fc" id="L86">        return studyId;</span>
+    }
+
+    public Split split() {
+<span class="fc" id="L90">        return split;</span>
+    }
+
+    /** Safe public identity of the private reveal payload. */
+    public String contentHash() {
+<span class="fc" id="L95">        return contentHash;</span>
+    }
+
+    /** Builds the public commitment without exposing any concrete expression. */
+    public EvolutionRewriteProgramHeldOutCommitment commitment() {
+<span class="fc" id="L100">        List&lt;CaseCommitment&gt; commitments = cases.stream()</span>
+<span class="fc" id="L101">            .map(RevealCase::commitment)</span>
+<span class="fc" id="L102">            .toList();</span>
+<span class="fc" id="L103">        return EvolutionRewriteProgramHeldOutCommitment.create(</span>
+            studyId,
+            split,
+            commitments,
+            contentHash);
+    }
+
+    /** Hash-only split references used to build the public split manifest. */
+    public List&lt;EvolutionSplitManifest.CaseReference&gt; splitReferences() {
+<span class="fc" id="L112">        return cases.stream()</span>
+<span class="fc" id="L113">            .map(RevealCase::reference)</span>
+<span class="fc" id="L114">            .toList();</span>
+    }
+
+    /**
+     * Opens the reveal only after verifying content-addressed prerequisite
+     * evidence for this split and the exact public commitment.
+     */
+    public OpenedReveal open(
+        EvolutionRewriteProgramHeldOutRevealAuthorization authorization,
+        EvolutionRewriteProgramHeldOutCommitment expectedCommitment
+    ) {
+<span class="fc" id="L125">        Objects.requireNonNull(authorization, &quot;authorization&quot;);</span>
+<span class="fc" id="L126">        Objects.requireNonNull(expectedCommitment, &quot;expectedCommitment&quot;);</span>
+<span class="fc" id="L127">        authorization.requireMatches(this, expectedCommitment);</span>
+<span class="fc" id="L128">        return new OpenedReveal(studyId, split, cases, contentHash);</span>
+    }
+
+    /** Private canonical payload for an external sealed-reveal writer/loader. */
+    String privateCanonicalJson() {
+<span class="fc" id="L133">        return render(studyId, split, cases, contentHash);</span>
+    }
+
+    private static List&lt;RevealCase&gt; canonicalCases(List&lt;RevealCase&gt; values) {
+<span class="fc" id="L137">        Objects.requireNonNull(values, &quot;cases&quot;);</span>
+<span class="fc" id="L138">        List&lt;RevealCase&gt; result = values.stream()</span>
+<span class="fc" id="L139">            .map(value -&gt; Objects.requireNonNull(value, &quot;reveal case&quot;))</span>
+<span class="fc" id="L140">            .sorted(Comparator.comparing(RevealCase::caseId))</span>
+<span class="fc" id="L141">            .toList();</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L143">            throw new IllegalArgumentException(</span>
+                &quot;held-out reveal bundle must contain cases&quot;);
+        }
+<span class="fc" id="L146">        requireUnique(result, &quot;case ID&quot;, RevealCase::caseId);</span>
+<span class="fc" id="L147">        requireUnique(result, &quot;input&quot;, RevealCase::inputHash);</span>
+<span class="fc" id="L148">        requireUnique(result, &quot;target&quot;, RevealCase::targetHash);</span>
+<span class="fc" id="L149">        requireUnique(result, &quot;exact signature&quot;, RevealCase::exactSignatureHash);</span>
+<span class="fc" id="L150">        requireUnique(result, &quot;alpha signature&quot;, RevealCase::alphaSignatureHash);</span>
+<span class="fc" id="L151">        requireUnique(result, &quot;reveal entry&quot;, RevealCase::contentHash);</span>
+<span class="fc" id="L152">        return List.copyOf(result);</span>
+    }
+
+    private static void requireUnique(
+        List&lt;RevealCase&gt; cases,
+        String label,
+        java.util.function.Function&lt;RevealCase, String&gt; identity
+    ) {
+<span class="fc" id="L160">        List&lt;String&gt; values = cases.stream().map(identity).toList();</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
+<span class="nc" id="L162">            throw new IllegalArgumentException(</span>
+                &quot;held-out reveal bundle contains duplicate &quot; + label);
+        }
+<span class="fc" id="L165">    }</span>
+
+    private static String render(
+        String studyId,
+        Split split,
+        List&lt;RevealCase&gt; cases,
+        String contentHash
+    ) {
+<span class="fc" id="L173">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L174">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L175">            .property(&quot;studyId&quot;, studyId)</span>
+<span class="fc" id="L176">            .property(&quot;split&quot;, split.name())</span>
+<span class="fc" id="L177">            .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L178">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L179">                    .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L180">                    .property(&quot;familyId&quot;, item.familyId())</span>
+<span class="fc" id="L181">                    .property(&quot;inputExpression&quot;, item.inputExpression())</span>
+<span class="fc" id="L182">                    .property(&quot;targetExpression&quot;, item.targetExpression())</span>
+<span class="fc" id="L183">                    .stringArray(&quot;assumptions&quot;, item.assumptions())</span>
+<span class="fc" id="L184">                    .property(&quot;difficultyTier&quot;, item.difficultyTier().name())</span>
+<span class="fc" id="L185">                    .property(&quot;expectedTerminalClass&quot;,</span>
+<span class="fc" id="L186">                        item.expectedTerminalClass().name())</span>
+<span class="fc" id="L187">                    .property(&quot;contentHash&quot;, item.contentHash()))));</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L189">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L191">        return json.endObject().toString();</span>
+    }
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L196">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L198">    }</span>
+
+    private static String normalizeExpression(String expression) {
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L202">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="fc" id="L204">        return ExpressionFormatter.format(</span>
+<span class="fc" id="L205">            new ExpressionParser().parseTerm(expression));</span>
+    }
+
+    private static String assumptionsHash(List&lt;String&gt; assumptions) {
+<span class="fc" id="L209">        return EvolutionGenome.hash(</span>
+            &quot;regelsuche.evolution-assumptions/v1\n&quot;
+<span class="fc" id="L211">                + String.join(&quot;\n&quot;, assumptions));</span>
+    }
+
+    private static String exactSignature(
+        String input,
+        String target,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L219">        return EvolutionGenome.hash(</span>
+            &quot;regelsuche.evolution-held-out-exact-signature/v1\n&quot;
+                + input + &quot;\n&quot; + target + &quot;\n&quot;
+<span class="fc" id="L222">                + String.join(&quot;\n&quot;, assumptions));</span>
+    }
+
+    private static String alphaSignature(
+        String input,
+        String target,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L230">        Map&lt;String, String&gt; variables = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L231">        String alphaInput = alphaNormalize(input, variables);</span>
+<span class="fc" id="L232">        String alphaTarget = alphaNormalize(target, variables);</span>
+<span class="fc" id="L233">        List&lt;String&gt; alphaAssumptions = assumptions.stream()</span>
+<span class="fc" id="L234">            .map(value -&gt; alphaNormalize(value, variables))</span>
+<span class="fc" id="L235">            .sorted()</span>
+<span class="fc" id="L236">            .toList();</span>
+<span class="fc" id="L237">        return EvolutionGenome.hash(</span>
+            &quot;regelsuche.evolution-held-out-alpha-signature/v1\n&quot;
+                + alphaInput + &quot;\n&quot; + alphaTarget + &quot;\n&quot;
+<span class="fc" id="L240">                + String.join(&quot;\n&quot;, alphaAssumptions));</span>
+    }
+
+    private static String alphaNormalize(
+        String expression,
+        Map&lt;String, String&gt; variables
+    ) {
+<span class="fc" id="L247">        Matcher matcher = IDENTIFIER.matcher(expression);</span>
+<span class="fc" id="L248">        StringBuffer output = new StringBuffer();</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        while (matcher.find()) {</span>
+<span class="fc" id="L250">            String token = matcher.group();</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            String replacement = RESERVED_IDENTIFIERS.contains(</span>
+<span class="fc" id="L252">                token.toLowerCase(java.util.Locale.ROOT))</span>
+<span class="nc" id="L253">                ? token</span>
+<span class="fc" id="L254">                : variables.computeIfAbsent(</span>
+                    token,
+<span class="fc" id="L256">                    ignored -&gt; &quot;v&quot; + variables.size());</span>
+<span class="fc" id="L257">            matcher.appendReplacement(</span>
+                output,
+<span class="fc" id="L259">                Matcher.quoteReplacement(replacement));</span>
+<span class="fc" id="L260">        }</span>
+<span class="fc" id="L261">        matcher.appendTail(output);</span>
+<span class="fc" id="L262">        return output.toString();</span>
+    }
+
+<span class="fc" id="L265">    public enum DifficultyTier {</span>
+<span class="fc" id="L266">        CONTROL,</span>
+<span class="fc" id="L267">        STANDARD,</span>
+<span class="fc" id="L268">        HARD,</span>
+<span class="fc" id="L269">        BOUNDARY</span>
+    }
+
+<span class="fc" id="L272">    public enum ExpectedTerminalClass {</span>
+<span class="fc" id="L273">        CONFIRMED,</span>
+<span class="fc" id="L274">        MISSING_ASSUMPTION,</span>
+<span class="fc" id="L275">        REFUTED,</span>
+<span class="fc" id="L276">        UNSUPPORTED</span>
+    }
+
+    public record RevealCase(
+        String caseId,
+        String familyId,
+        String inputExpression,
+        String targetExpression,
+        List&lt;String&gt; assumptions,
+        DifficultyTier difficultyTier,
+        ExpectedTerminalClass expectedTerminalClass,
+        String contentHash
+    ) {
+<span class="fc" id="L289">        public RevealCase {</span>
+<span class="fc" id="L290">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L291">            requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L292">            inputExpression = normalizeExpression(inputExpression);</span>
+<span class="fc" id="L293">            targetExpression = normalizeExpression(targetExpression);</span>
+<span class="fc" id="L294">            assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L295">                .normalizedAssumptions();</span>
+<span class="fc" id="L296">            Objects.requireNonNull(difficultyTier, &quot;difficultyTier&quot;);</span>
+<span class="fc" id="L297">            Objects.requireNonNull(</span>
+                expectedTerminalClass, &quot;expectedTerminalClass&quot;);
+<span class="fc" id="L299">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L300">            String expected = EvolutionGenome.hash(renderCase(</span>
+                caseId,
+                familyId,
+                inputExpression,
+                targetExpression,
+                assumptions,
+                difficultyTier,
+                expectedTerminalClass,
+                null));
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L310">                throw new IllegalArgumentException(</span>
+                    &quot;held-out reveal-case contentHash mismatch&quot;);
+            }
+<span class="fc" id="L313">        }</span>
+
+        public static RevealCase create(
+            String caseId,
+            String familyId,
+            String inputExpression,
+            String targetExpression,
+            List&lt;String&gt; assumptions,
+            DifficultyTier difficultyTier,
+            ExpectedTerminalClass expectedTerminalClass
+        ) {
+<span class="fc" id="L324">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L325">            requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L326">            String input = normalizeExpression(inputExpression);</span>
+<span class="fc" id="L327">            String target = normalizeExpression(targetExpression);</span>
+<span class="fc" id="L328">            List&lt;String&gt; normalizedAssumptions =</span>
+<span class="fc" id="L329">                AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L330">                    .normalizedAssumptions();</span>
+<span class="fc" id="L331">            Objects.requireNonNull(difficultyTier, &quot;difficultyTier&quot;);</span>
+<span class="fc" id="L332">            Objects.requireNonNull(</span>
+                expectedTerminalClass, &quot;expectedTerminalClass&quot;);
+<span class="fc" id="L334">            String hash = EvolutionGenome.hash(renderCase(</span>
+                caseId,
+                familyId,
+                input,
+                target,
+                normalizedAssumptions,
+                difficultyTier,
+                expectedTerminalClass,
+                null));
+<span class="fc" id="L343">            return new RevealCase(</span>
+                caseId,
+                familyId,
+                input,
+                target,
+                normalizedAssumptions,
+                difficultyTier,
+                expectedTerminalClass,
+                hash);
+        }
+
+        String inputHash() {
+<span class="fc" id="L355">            return EvolutionGenome.hash(inputExpression);</span>
+        }
+
+        String targetHash() {
+<span class="fc" id="L359">            return EvolutionGenome.hash(targetExpression);</span>
+        }
+
+        String assumptionsHash() {
+<span class="fc" id="L363">            return EvolutionRewriteProgramHeldOutRevealBundle</span>
+<span class="fc" id="L364">                .assumptionsHash(assumptions);</span>
+        }
+
+        String exactSignatureHash() {
+<span class="fc" id="L368">            return exactSignature(</span>
+                inputExpression, targetExpression, assumptions);
+        }
+
+        String alphaSignatureHash() {
+<span class="fc" id="L373">            return alphaSignature(</span>
+                inputExpression, targetExpression, assumptions);
+        }
+
+        private CaseCommitment commitment() {
+<span class="fc" id="L378">            return new CaseCommitment(</span>
+                caseId,
+                EvolutionRewriteProgramHeldOutCommitment
+<span class="fc" id="L381">                    .familyCommitment(familyId),</span>
+<span class="fc" id="L382">                inputHash(),</span>
+<span class="fc" id="L383">                targetHash(),</span>
+<span class="fc" id="L384">                assumptionsHash(),</span>
+<span class="fc" id="L385">                exactSignatureHash(),</span>
+<span class="fc" id="L386">                alphaSignatureHash(),</span>
+<span class="fc" id="L387">                EvolutionGenome.hash(</span>
+<span class="fc" id="L388">                    &quot;difficulty-tier:&quot; + difficultyTier.name()),</span>
+<span class="fc" id="L389">                EvolutionGenome.hash(</span>
+                    &quot;expected-terminal-class:&quot;
+<span class="fc" id="L391">                        + expectedTerminalClass.name()),</span>
+                contentHash);
+        }
+
+        private EvolutionSplitManifest.CaseReference reference() {
+<span class="fc" id="L396">            return new EvolutionSplitManifest.CaseReference(</span>
+                caseId,
+                familyId,
+<span class="fc" id="L399">                exactSignatureHash(),</span>
+<span class="fc" id="L400">                alphaSignatureHash(),</span>
+<span class="fc" id="L401">                inputHash(),</span>
+<span class="fc" id="L402">                targetHash());</span>
+        }
+
+        private static String renderCase(
+            String caseId,
+            String familyId,
+            String inputExpression,
+            String targetExpression,
+            List&lt;String&gt; assumptions,
+            DifficultyTier difficultyTier,
+            ExpectedTerminalClass expectedTerminalClass,
+            String contentHash
+        ) {
+<span class="fc" id="L415">            JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L416">                .property(&quot;caseId&quot;, caseId)</span>
+<span class="fc" id="L417">                .property(&quot;familyId&quot;, familyId)</span>
+<span class="fc" id="L418">                .property(&quot;inputExpression&quot;, inputExpression)</span>
+<span class="fc" id="L419">                .property(&quot;targetExpression&quot;, targetExpression)</span>
+<span class="fc" id="L420">                .stringArray(&quot;assumptions&quot;, assumptions)</span>
+<span class="fc" id="L421">                .property(&quot;difficultyTier&quot;, difficultyTier.name())</span>
+<span class="fc" id="L422">                .property(&quot;expectedTerminalClass&quot;,</span>
+<span class="fc" id="L423">                    expectedTerminalClass.name());</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (contentHash != null) {</span>
+<span class="nc" id="L425">                json.property(&quot;contentHash&quot;, contentHash);</span>
+            }
+<span class="fc" id="L427">            return json.endObject().toString();</span>
+        }
+    }
+
+    /**
+     * Concrete held-out material returned only by the verified open boundary.
+     * The constructor is intentionally private so callers cannot forge an
+     * opened reveal without passing {@link #open}.
+     */
+    public static final class OpenedReveal {
+        private final String studyId;
+        private final Split split;
+        private final List&lt;RevealCase&gt; cases;
+        private final String contentHash;
+
+        private OpenedReveal(
+            String studyId,
+            Split split,
+            List&lt;RevealCase&gt; cases,
+            String contentHash
+<span class="fc" id="L447">        ) {</span>
+<span class="fc" id="L448">            requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L449">            this.studyId = studyId;</span>
+<span class="fc" id="L450">            this.split = Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L451">            this.cases = List.copyOf(cases);</span>
+<span class="fc" id="L452">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L453">            this.contentHash = contentHash;</span>
+<span class="fc" id="L454">        }</span>
+
+        public String studyId() {
+<span class="nc" id="L457">            return studyId;</span>
+        }
+
+        public Split split() {
+<span class="fc" id="L461">            return split;</span>
+        }
+
+        public List&lt;RevealCase&gt; cases() {
+<span class="fc" id="L465">            return cases;</span>
+        }
+
+        public String contentHash() {
+<span class="fc" id="L469">            return contentHash;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
