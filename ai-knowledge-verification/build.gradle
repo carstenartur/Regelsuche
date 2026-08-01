@@ -16,6 +16,12 @@ aiKnowledge {
     maxMethodCyclomaticComplexity = 35
     maxAverageMethodCognitiveComplexity = 4.0d
     maxAverageMethodCyclomaticComplexity = 4.0d
+
+    // Trend ratchets complement the absolute limits. Weakening them requires an
+    // explicit policy change rather than a workflow edit.
+    maxCognitiveDebtIncrease = 10.0d
+    maxConceptRadiusIncrease = 3.0d
+    maxContextTokenIncrease = 15000.0d
 }
 
 apply from: rootProject.file('gradle/ai-knowledge-verification.gradle')

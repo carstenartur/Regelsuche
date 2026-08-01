@@ -36,8 +36,29 @@ def verifyAiKnowledgeArtifacts = tasks.register(
     inputs.dir(aiKnowledgeArtifactDirectory)
 }
 
+def verifyComplexityHotspots = tasks.register(
+    'verifyComplexityHotspots',
+    Exec
+) {
+    group = 'verification'
+    description = 'Rejects new or materially worsened method-complexity hotspots without a finite exception.'
+    dependsOn verifyAiKnowledgeArtifacts
+    workingDir rootProject.projectDir
+    commandLine aiKnowledgePython,
+        rootProject.file('scripts/verify-complexity-hotspots.py').absolutePath,
+        '--complexity', rootProject.file('build/ai-knowledge/complexity.json').absolutePath,
+        '--policy', rootProject.file('config/quality/complexity-hotspots.json').absolutePath,
+        '--json-output', rootProject.file('build/reports/quality/complexity-hotspot-report.json').absolutePath,
+        '--markdown-output', rootProject.file('build/reports/quality/complexity-hotspot-report.md').absolutePath
+    inputs.file(rootProject.file('scripts/verify-complexity-hotspots.py'))
+    inputs.file(rootProject.file('config/quality/complexity-hotspots.json'))
+    inputs.file(rootProject.file('ai-knowledge/complexity-baseline.json'))
+    outputs.file(rootProject.file('build/reports/quality/complexity-hotspot-report.json'))
+    outputs.file(rootProject.file('build/reports/quality/complexity-hotspot-report.md'))
+}
+
 tasks.register('aiKnowledgeCheck') {
     group = 'verification'
     description = 'Runs the complete checkout-local AI knowledge generation and verification lifecycle.'
-    dependsOn verifyAiKnowledgeArtifacts
+    dependsOn verifyAiKnowledgeArtifacts, verifyComplexityHotspots
 }
