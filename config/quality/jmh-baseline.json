@@ -1,0 +1,132 @@
+{
+  "baselineRevision": "2068cddfed8c4d6d3267185b975f4df55b1c3f2f",
+  "benchmarks": {
+    "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial": {
+      "baselineScore": 3.087177773703518,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium": {
+      "baselineScore": 8.74129715866327,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge": {
+      "baselineScore": 3642.822550868636,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium": {
+      "baselineScore": 6.390414475904069,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge": {
+      "baselineScore": 1759.6670141168925,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge": {
+      "baselineScore": 510.6466766985672,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall": {
+      "baselineScore": 2.2151922337947956,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial": {
+      "baselineScore": 97.47546556872538,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium": {
+      "baselineScore": 216.87396000194784,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory": {
+      "baselineScore": 1101.3811872967551,
+      "scoreUnit": "us/op"
+    },
+    "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedFixedWorkSearch": {
+      "baselineScore": 20.117663821397755,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedTargetedSearch": {
+      "baselineScore": 0.46874166023963726,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceFixedWorkSearch": {
+      "baselineScore": 37.2584101872549,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceTargetedSearch": {
+      "baselineScore": 0.8963513944783349,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.directAstRewriteSource": {
+      "baselineScore": 0.2254648847172465,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.directSyntheticSource": {
+      "baselineScore": 6.14710526313439e-05,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedAstRewriteSource": {
+      "baselineScore": 0.27195870323945676,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedChoiceTwoAlternatives": {
+      "baselineScore": 0.0011329210322968315,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedFirstApplicableSecondAlternative": {
+      "baselineScore": 0.0006802592586776569,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedNestedControlFlow": {
+      "baselineScore": 0.0042381322599699435,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedPrioritizeTwoCandidates": {
+      "baselineScore": 0.0014714769406893628,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedPruneTwoCandidatesToOne": {
+      "baselineScore": 0.0013582434846887046,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedRepeatThreeIterations": {
+      "baselineScore": 0.003022861329179826,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedRequireFilter": {
+      "baselineScore": 0.0015815151626818753,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedSequenceTwoSteps": {
+      "baselineScore": 0.001443866290503808,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedSingleSource": {
+      "baselineScore": 0.0004928929672226829,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.preparedAstRewriteSource": {
+      "baselineScore": 0.08951599382721613,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.programmedAstRewriteSource": {
+      "baselineScore": 0.271465209059304,
+      "scoreUnit": "ms/op"
+    },
+    "de.regelsuche.benchmark.RewriteProgramBenchmarks.programmedSingleSource": {
+      "baselineScore": 0.0007343419405359849,
+      "scoreUnit": "ms/op"
+    }
+  },
+  "measurementPolicy": {
+    "decisionRule": "For average-time benchmarks, fail only when current score minus scoreError is greater than baselineScore multiplied by materialRegressionRatio. Exact benchmark identities, units and iteration policy must match.",
+    "forks": 1,
+    "materialRegressionRatio": 1.5,
+    "measurementIterations": 3,
+    "measurementTime": "1s",
+    "mode": "avgt",
+    "warmupIterations": 2,
+    "warmupTime": "1s"
+  },
+  "schema": "regelsuche.quality.jmh-baseline/v2"
+}
