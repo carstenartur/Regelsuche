@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationCatalog;
 import de.regelsuche.evolution.EvolutionGenome.FeatureWeight;
 import de.regelsuche.evolution.EvolutionGenome.FitnessSignal;
@@ -69,7 +70,9 @@ class EvolutionRewriteProgramEvaluationProtocolTest {
         Fixture fixture = fixture();
         EvolutionRewriteProgramFitnessEvaluator evaluator =
             new ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator(
-                fixture.suite(), COMPONENTS);
+                fixture.suite(),
+                COMPONENTS,
+                confirmedEquivalence());
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
             evaluator.evaluate(fixture.candidate());
@@ -139,6 +142,11 @@ class EvolutionRewriteProgramEvaluationProtocolTest {
         assertTrue(protocol.contains("\"additionalProperties\": false"));
         assertTrue(fitness.contains("\"evaluationProtocolHash\""));
         assertTrue(study.contains("\"trainEvaluationProtocolHash\""));
+    }
+
+    private static AssumptionAwareEquivalenceService confirmedEquivalence() {
+        return (left, right, assumptions) ->
+            AssumptionAwareEquivalenceService.Evaluation.confirmed();
     }
 
     private static EvolutionRewriteProgramFitnessEvaluator evaluator(
