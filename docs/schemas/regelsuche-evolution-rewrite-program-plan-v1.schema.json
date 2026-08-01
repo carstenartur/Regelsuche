@@ -1,0 +1,457 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-plan-v1.schema.json",
+  "title": "Regelsuche evolved rewrite-program plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "genomeHash",
+    "maxNodes",
+    "maxDepth",
+    "root",
+    "alphaStructuralHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-plan/v1"
+    },
+    "genomeHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "maxNodes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1024
+    },
+    "maxDepth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 128
+    },
+    "root": {
+      "$ref": "#/$defs/node"
+    },
+    "alphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "geneIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    },
+    "node": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/source"
+        },
+        {
+          "$ref": "#/$defs/choice"
+        },
+        {
+          "$ref": "#/$defs/firstApplicable"
+        },
+        {
+          "$ref": "#/$defs/sequence"
+        },
+        {
+          "$ref": "#/$defs/repeat"
+        },
+        {
+          "$ref": "#/$defs/require"
+        },
+        {
+          "$ref": "#/$defs/prioritize"
+        },
+        {
+          "$ref": "#/$defs/prune"
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeType",
+        "nodeId",
+        "geneIds"
+      ],
+      "properties": {
+        "nodeType": {
+          "const": "SOURCE"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "geneIds": {
+          "$ref": "#/$defs/geneIds"
+        }
+      }
+    },
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeType",
+        "nodeId",
+        "alternatives"
+      ],
+      "properties": {
+        "nodeType": {
+          "const": "CHOICE"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "alternatives": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        }
+      }
+    },
+    "firstApplicable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeType",
+        "nodeId",
+        "alternatives"
+      ],
+      "properties": {
+        "nodeType": {
+          "const": "FIRST_APPLICABLE"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "alternatives": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        }
+      }
+    },
+    "sequence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeType",
+        "nodeId",
+        "steps"
+      ],
+      "properties": {
+        "nodeType": {
+          "const": "SEQUENCE"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        }
+      }
+    },
+    "repeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeType",
+        "nodeId",
+        "minIterations",
+        "maxIterations",
+        "body"
+      ],
+      "properties": {
+        "nodeType": {
+          "const": "REPEAT"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "minIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "maxIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "body": {
+          "$ref": "#/$defs/node"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "minIterations",
+              "maxIterations"
+            ]
+          },
+          "then": {
+            "$comment": "The Java constructor additionally enforces minIterations <= maxIterations."
+          }
+        }
+      ]
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "threshold"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "EQUIVALENCE_PRESERVING_BY_CONSTRUCTION",
+            "ASSUMPTION_FREE",
+            "MAX_ESTIMATED_COST_DELTA",
+            "MAX_PRIMITIVE_STEPS"
+          ]
+        },
+        "threshold": {
+          "type": "integer"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "EQUIVALENCE_PRESERVING_BY_CONSTRUCTION",
+                  "ASSUMPTION_FREE"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "threshold": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "MAX_ESTIMATED_COST_DELTA"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "threshold": {
+                "minimum": -1000000,
+                "maximum": 1000000
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "MAX_PRIMITIVE_STEPS"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "threshold": {
+                "minimum": 1,
+                "maximum": 1024
+              }
+            }
+          }
+        }
+      ]
+    },
+    "require": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeType",
+        "nodeId",
+        "requirement",
+        "body"
+      ],
+      "properties": {
+        "nodeType": {
+          "const": "REQUIRE"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "requirement": {
+          "$ref": "#/$defs/requirement"
+        },
+        "body": {
+          "$ref": "#/$defs/node"
+        }
+      }
+    },
+    "priority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "preferredGeneIds"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "ESTIMATED_COST_THEN_RULE",
+            "PREFERRED_GENE_ORDER"
+          ]
+        },
+        "preferredGeneIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "ESTIMATED_COST_THEN_RULE"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "preferredGeneIds": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "PREFERRED_GENE_ORDER"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "preferredGeneIds": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "prioritize": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeType",
+        "nodeId",
+        "priority",
+        "body"
+      ],
+      "properties": {
+        "nodeType": {
+          "const": "PRIORITIZE"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "body": {
+          "$ref": "#/$defs/node"
+        }
+      }
+    },
+    "prune": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeType",
+        "nodeId",
+        "maxCandidates",
+        "reason",
+        "body"
+      ],
+      "properties": {
+        "nodeType": {
+          "const": "PRUNE"
+        },
+        "nodeId": {
+          "$ref": "#/$defs/id"
+        },
+        "maxCandidates": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "reason": {
+          "$ref": "#/$defs/text"
+        },
+        "body": {
+          "$ref": "#/$defs/node"
+        }
+      }
+    }
+  }
+}
