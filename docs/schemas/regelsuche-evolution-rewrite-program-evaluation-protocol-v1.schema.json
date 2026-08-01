@@ -12,6 +12,7 @@
     "candidateContract",
     "targetRelation",
     "correctnessContract",
+    "workAccountingContract",
     "resourceAttributionContract",
     "implementationClass",
     "contentHash"
@@ -39,8 +40,11 @@
     "correctnessContract": {
       "const": "EXACT_RATIONAL_NORMAL_FORM_PER_PATH_EDGE_WITH_DECLARED_ASSUMPTIONS"
     },
+    "workAccountingContract": {
+      "const": "STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1"
+    },
     "resourceAttributionContract": {
-      "const": "CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE"
+      "const": "CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK"
     },
     "implementationClass": {
       "type": "string",

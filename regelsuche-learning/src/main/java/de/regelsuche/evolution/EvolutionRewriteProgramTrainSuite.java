@@ -5,6 +5,7 @@ import de.regelsuche.json.JsonWriter;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
 import de.regelsuche.search.SearchHeuristic;
+import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -18,6 +19,7 @@ public record EvolutionRewriteProgramTrainSuite(
     EvaluatorProfile evaluatorProfile,
     List<TrainCase> cases,
     SearchHeuristic heuristic,
+    PrimitiveWorkBudget primitiveWorkBudget,
     String contentHash
 ) {
     public static final String SCHEMA =
@@ -33,39 +35,81 @@ public record EvolutionRewriteProgramTrainSuite(
         Objects.requireNonNull(evaluatorProfile, "evaluatorProfile");
         cases = canonicalCases(cases);
         Objects.requireNonNull(heuristic, "heuristic");
+        Objects.requireNonNull(primitiveWorkBudget, "primitiveWorkBudget");
         EvolutionGenome.requireSha256(contentHash, "contentHash");
         String expected = EvolutionGenome.hash(render(
-            suiteId, evaluatorProfile, cases, heuristic, null));
+            suiteId,
+            evaluatorProfile,
+            cases,
+            heuristic,
+            primitiveWorkBudget,
+            null));
         if (!expected.equals(contentHash)) {
             throw new IllegalArgumentException(
                 "rewrite-program TRAIN suite contentHash mismatch");
         }
     }
 
+    /**
+     * Compatibility factory. It freezes an explicit derived v1 work budget;
+     * callers preparing the flagship suite should use the overload that accepts
+     * a reviewed {@link PrimitiveWorkBudget}.
+     */
     public static EvolutionRewriteProgramTrainSuite create(
         String suiteId,
         EvaluatorProfile evaluatorProfile,
         List<TrainCase> cases,
         SearchHeuristic heuristic
     ) {
+        return create(
+            suiteId,
+            evaluatorProfile,
+            cases,
+            heuristic,
+            PrimitiveWorkBudget.derivedFrom(heuristic));
+    }
+
+    public static EvolutionRewriteProgramTrainSuite create(
+        String suiteId,
+        EvaluatorProfile evaluatorProfile,
+        List<TrainCase> cases,
+        SearchHeuristic heuristic,
+        PrimitiveWorkBudget primitiveWorkBudget
+    ) {
         requireId(suiteId, "suiteId");
         Objects.requireNonNull(evaluatorProfile, "evaluatorProfile");
         List<TrainCase> canonicalCases = canonicalCases(cases);
         Objects.requireNonNull(heuristic, "heuristic");
+        Objects.requireNonNull(primitiveWorkBudget, "primitiveWorkBudget");
         String hash = EvolutionGenome.hash(render(
-            suiteId, evaluatorProfile, canonicalCases, heuristic, null));
+            suiteId,
+            evaluatorProfile,
+            canonicalCases,
+            heuristic,
+            primitiveWorkBudget,
+            null));
         return new EvolutionRewriteProgramTrainSuite(
             SCHEMA,
             suiteId,
             evaluatorProfile,
             canonicalCases,
             heuristic,
+            primitiveWorkBudget,
             hash);
     }
 
     public String toCanonicalJson() {
         return render(
-            suiteId, evaluatorProfile, cases, heuristic, contentHash);
+            suiteId,
+            evaluatorProfile,
+            cases,
+            heuristic,
+            primitiveWorkBudget,
+            contentHash);
+    }
+
+    public PrimitiveWorkBestFirstSearchStrategy.Budget searchBudget() {
+        return primitiveWorkBudget.toSearchBudget();
     }
 
     private static List<TrainCase> canonicalCases(List<TrainCase> values) {
@@ -91,6 +135,7 @@ public record EvolutionRewriteProgramTrainSuite(
         EvaluatorProfile evaluatorProfile,
         List<TrainCase> cases,
         SearchHeuristic heuristic,
+        PrimitiveWorkBudget primitiveWorkBudget,
         String contentHash
     ) {
         JsonWriter json = new JsonWriter().beginObject()
@@ -114,7 +159,18 @@ public record EvolutionRewriteProgramTrainSuite(
                 .property("maxExpandingSteps", heuristic.maxExpandingSteps())
                 .property("maxCandidatesPerState",
                     heuristic.maxCandidatesPerState())
-                .property("beamWidth", heuristic.beamWidth()));
+                .property("beamWidth", heuristic.beamWidth()))
+            .object("primitiveWorkBudget", object -> object
+                .property("maxPrimitiveSteps",
+                    primitiveWorkBudget.maxPrimitiveSteps())
+                .property("maxExploredStates",
+                    primitiveWorkBudget.maxExploredStates())
+                .property("maxCandidatesPerState",
+                    primitiveWorkBudget.maxCandidatesPerState())
+                .property("maxExpandingSteps",
+                    primitiveWorkBudget.maxExpandingSteps())
+                .property("maxWorkUnits",
+                    primitiveWorkBudget.maxWorkUnits()));
         if (contentHash != null) {
             json.property("contentHash", contentHash);
         }
@@ -123,6 +179,65 @@ public record EvolutionRewriteProgramTrainSuite(
 
     public enum EvaluatorProfile {
         EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS
+    }
+
+    /**
+     * Total paired-evaluation work budget. One unit per permitted primitive step
+     * is reserved for exact retained-path auditing; the remainder is available
+     * to the mechanical search ledger.
+     */
+    public record PrimitiveWorkBudget(
+        int maxPrimitiveSteps,
+        int maxExploredStates,
+        int maxCandidatesPerState,
+        int maxExpandingSteps,
+        long maxWorkUnits
+    ) {
+        public PrimitiveWorkBudget {
+            new PrimitiveWorkBestFirstSearchStrategy.Budget(
+                maxPrimitiveSteps,
+                maxExploredStates,
+                maxCandidatesPerState,
+                maxExpandingSteps,
+                maxWorkUnits);
+        }
+
+        static PrimitiveWorkBudget derivedFrom(SearchHeuristic heuristic) {
+            Objects.requireNonNull(heuristic, "heuristic");
+            int primitiveSteps = Math.max(1, heuristic.maxDepth());
+            long units;
+            try {
+                units = Math.multiplyExact(
+                    (long) heuristic.maxVisitedExpressions(),
+                    (long) heuristic.maxCandidatesPerState() + 4L);
+            } catch (ArithmeticException exception) {
+                units = Long.MAX_VALUE;
+            }
+            units = Math.max(units, (long) primitiveSteps + 1L);
+            return new PrimitiveWorkBudget(
+                primitiveSteps,
+                heuristic.maxVisitedExpressions(),
+                heuristic.maxCandidatesPerState(),
+                heuristic.maxExpandingSteps(),
+                units);
+        }
+
+        public long exactPathAuditReserve() {
+            return maxPrimitiveSteps;
+        }
+
+        public long mechanicalSearchWorkBudget() {
+            return maxWorkUnits - exactPathAuditReserve();
+        }
+
+        PrimitiveWorkBestFirstSearchStrategy.Budget toSearchBudget() {
+            return new PrimitiveWorkBestFirstSearchStrategy.Budget(
+                maxPrimitiveSteps,
+                maxExploredStates,
+                maxCandidatesPerState,
+                maxExpandingSteps,
+                maxWorkUnits);
+        }
     }
 
     public record TrainCase(

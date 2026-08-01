@@ -56,8 +56,11 @@ class EvolutionRewriteProgramEvaluationProtocolTest {
             "\"baselineContract\":"
                 + "\"ORDINARY_PLUS_FLAT_CANDIDATE_GENOME_RULES\""));
         assertTrue(first.toCanonicalJson().contains(
+            "\"workAccountingContract\":"
+                + "\"STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1\""));
+        assertTrue(first.toCanonicalJson().contains(
             "\"resourceAttributionContract\":"
-                + "\"CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE\""));
+                + "\"CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK\""));
 
         EvolutionRewriteProgramEvaluationProtocol substituted =
             EvolutionRewriteProgramEvaluationProtocol.testingProtocol(
@@ -70,9 +73,7 @@ class EvolutionRewriteProgramEvaluationProtocolTest {
         Fixture fixture = fixture();
         EvolutionRewriteProgramFitnessEvaluator evaluator =
             new ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator(
-                fixture.suite(),
-                COMPONENTS,
-                confirmedEquivalence());
+                fixture.suite(), COMPONENTS, confirmedEquivalence());
 
         EvolutionRewriteProgramTrainFitnessEvidence evidence =
             evaluator.evaluate(fixture.candidate());
@@ -138,7 +139,9 @@ class EvolutionRewriteProgramEvaluationProtocolTest {
         assertTrue(protocol.contains(
             "ORDINARY_PLUS_FLAT_CANDIDATE_GENOME_RULES"));
         assertTrue(protocol.contains(
-            "CONFIRMED_RETAINED_PATH_REQUIRES_PROGRAM_EDGE"));
+            "STRUCTURED_PRIMITIVE_LINEAGE_AND_TOTAL_MECHANICAL_WORK_V1"));
+        assertTrue(protocol.contains(
+            "CONFIRMED_PROGRAM_PATH_AND_NONINCREASING_TOTAL_WORK"));
         assertTrue(protocol.contains("\"additionalProperties\": false"));
         assertTrue(fitness.contains("\"evaluationProtocolHash\""));
         assertTrue(study.contains("\"trainEvaluationProtocolHash\""));

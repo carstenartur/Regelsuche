@@ -1,6 +1,7 @@
 package de.regelsuche.search.program;
 
 import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -44,9 +45,12 @@ public final class RewriteProgramInterpreter {
         String normalizedExpression = normalizeExpression(expression);
         Context context = new Context(traceLevel, traceSink);
         Evaluation evaluation = evaluate(program, normalizedExpression, context);
+        List<RewriteCandidate> candidates = distinct(
+            evaluation.candidates(), context);
         return new RewriteExecution(
-            distinct(evaluation.candidates()),
-            evaluation.complete()
+            candidates,
+            evaluation.complete(),
+            context.workMetrics()
         );
     }
 
@@ -55,6 +59,7 @@ public final class RewriteProgramInterpreter {
         String inputExpression,
         Context context
     ) {
+        context.programNodeVisited();
         context.summary(
             RewriteTraceEventType.NODE_ENTERED,
             program,
@@ -109,6 +114,7 @@ public final class RewriteProgramInterpreter {
         String inputExpression,
         Context context
     ) {
+        context.sourceInvoked();
         List<Transformation> transformations = new ArrayList<>(
             Objects.requireNonNull(
                 source.engine().transform(inputExpression),
@@ -118,6 +124,7 @@ public final class RewriteProgramInterpreter {
         transformations.forEach(transformation ->
             Objects.requireNonNull(transformation, "transformation"));
         transformations.sort(TRANSFORMATION_ORDER);
+        context.sourceCandidates(transformations.size());
 
         List<RewriteCandidate> candidates = new ArrayList<>(transformations.size());
         for (Transformation transformation : transformations) {
@@ -154,7 +161,7 @@ public final class RewriteProgramInterpreter {
             candidates.addAll(evaluated.candidates());
             complete &= evaluated.complete();
         }
-        return new Evaluation(distinct(candidates), complete);
+        return new Evaluation(distinct(candidates, context), complete);
     }
 
     private Evaluation evaluateFirstApplicable(
@@ -171,6 +178,7 @@ public final class RewriteProgramInterpreter {
                 continue;
             }
 
+            context.alternativeSelected();
             context.summary(
                 RewriteTraceEventType.ALTERNATIVE_SELECTED,
                 firstApplicable,
@@ -186,6 +194,7 @@ public final class RewriteProgramInterpreter {
                     skipped++) {
                 RewriteProgram skippedAlternative =
                     firstApplicable.alternatives().get(skipped);
+                context.alternativeSkipped();
                 context.full(
                     RewriteTraceEventType.ALTERNATIVE_SKIPPED,
                     skippedAlternative,
@@ -218,10 +227,11 @@ public final class RewriteProgramInterpreter {
                 Evaluation suffixes = evaluate(step, prefix.outputExpression(), context);
                 complete &= suffixes.complete();
                 for (RewriteCandidate suffix : suffixes.candidates()) {
+                    context.composedCandidate();
                     next.add(prefix.append(suffix, sequence.id()));
                 }
             }
-            current = distinct(next);
+            current = distinct(next, context);
         }
 
         return new Evaluation(
@@ -242,6 +252,7 @@ public final class RewriteProgramInterpreter {
         boolean complete = true;
 
         for (int iteration = 1; iteration <= repeat.maxIterations(); iteration++) {
+            context.repeatIteration();
             List<RewriteCandidate> next = new ArrayList<>();
             if (iteration == 1) {
                 Evaluation evaluated = evaluate(repeat.body(), inputExpression, context);
@@ -256,13 +267,15 @@ public final class RewriteProgramInterpreter {
                     );
                     complete &= suffixes.complete();
                     for (RewriteCandidate suffix : suffixes.candidates()) {
+                        context.composedCandidate();
                         next.add(prefix.append(suffix, repeat.id()));
                     }
                 }
             }
 
-            frontier = distinct(next);
+            frontier = distinct(next, context);
             if (iteration >= repeat.minIterations()) {
+                context.repeatEndpoints(frontier.size());
                 endpoints.addAll(frontier.stream()
                     .map(candidate -> candidate.withOriginNodeId(repeat.id()))
                     .toList());
@@ -281,7 +294,7 @@ public final class RewriteProgramInterpreter {
                 break;
             }
         }
-        return new Evaluation(distinct(endpoints), complete);
+        return new Evaluation(distinct(endpoints, context), complete);
     }
 
     private Evaluation evaluateRequire(
@@ -292,10 +305,12 @@ public final class RewriteProgramInterpreter {
         Evaluation evaluated = evaluate(require.body(), inputExpression, context);
         List<RewriteCandidate> accepted = new ArrayList<>();
         for (RewriteCandidate candidate : evaluated.candidates()) {
+            context.requirementEvaluated();
             if (require.condition().test(candidate)) {
                 accepted.add(candidate);
                 continue;
             }
+            context.requirementRejected();
             context.full(
                 RewriteTraceEventType.CANDIDATE_REJECTED,
                 require,
@@ -317,6 +332,7 @@ public final class RewriteProgramInterpreter {
     ) {
         Evaluation evaluated = evaluate(prioritize.body(), inputExpression, context);
         List<RewriteCandidate> candidates = new ArrayList<>(evaluated.candidates());
+        context.priorityCandidatesOrdered(candidates.size());
         candidates.sort(
             prioritize.comparator()
                 .thenComparing(RewriteCandidate::fingerprint)
@@ -335,6 +351,7 @@ public final class RewriteProgramInterpreter {
         }
 
         int removed = evaluated.candidates().size() - prune.maxCandidates();
+        context.prunedCandidates(removed);
         List<RewriteCandidate> retained = List.copyOf(
             evaluated.candidates().subList(0, prune.maxCandidates())
         );
@@ -352,12 +369,14 @@ public final class RewriteProgramInterpreter {
     }
 
     private static List<RewriteCandidate> distinct(
-        List<RewriteCandidate> candidates
+        List<RewriteCandidate> candidates,
+        Context context
     ) {
         Map<String, RewriteCandidate> distinct = new LinkedHashMap<>();
         for (RewriteCandidate candidate : candidates) {
             distinct.putIfAbsent(candidate.fingerprint(), candidate);
         }
+        context.duplicateCandidatesDropped(candidates.size() - distinct.size());
         return List.copyOf(distinct.values());
     }
 
@@ -383,10 +402,95 @@ public final class RewriteProgramInterpreter {
         private final RewriteTraceLevel level;
         private final RewriteTraceSink sink;
         private long sequence;
+        private long programNodeVisits;
+        private long sourceInvocations;
+        private long sourceCandidates;
+        private long composedCandidates;
+        private long requirementEvaluations;
+        private long requirementRejections;
+        private long priorityCandidatesOrdered;
+        private long prunedCandidates;
+        private long repeatIterations;
+        private long repeatEndpoints;
+        private long alternativeSelections;
+        private long alternativesSkipped;
+        private long duplicateCandidatesDropped;
 
         private Context(RewriteTraceLevel level, RewriteTraceSink sink) {
             this.level = level;
             this.sink = sink;
+        }
+
+        private void programNodeVisited() {
+            programNodeVisits++;
+        }
+
+        private void sourceInvoked() {
+            sourceInvocations++;
+        }
+
+        private void sourceCandidates(long value) {
+            sourceCandidates = add(sourceCandidates, value);
+        }
+
+        private void composedCandidate() {
+            composedCandidates++;
+        }
+
+        private void requirementEvaluated() {
+            requirementEvaluations++;
+        }
+
+        private void requirementRejected() {
+            requirementRejections++;
+        }
+
+        private void priorityCandidatesOrdered(long value) {
+            priorityCandidatesOrdered = add(priorityCandidatesOrdered, value);
+        }
+
+        private void prunedCandidates(long value) {
+            prunedCandidates = add(prunedCandidates, value);
+        }
+
+        private void repeatIteration() {
+            repeatIterations++;
+        }
+
+        private void repeatEndpoints(long value) {
+            repeatEndpoints = add(repeatEndpoints, value);
+        }
+
+        private void alternativeSelected() {
+            alternativeSelections++;
+        }
+
+        private void alternativeSkipped() {
+            alternativesSkipped++;
+        }
+
+        private void duplicateCandidatesDropped(long value) {
+            duplicateCandidatesDropped = add(
+                duplicateCandidatesDropped,
+                Math.max(0L, value));
+        }
+
+        private TransformationWorkMetrics workMetrics() {
+            return new TransformationWorkMetrics(
+                1,
+                programNodeVisits,
+                sourceInvocations,
+                sourceCandidates,
+                composedCandidates,
+                requirementEvaluations,
+                requirementRejections,
+                priorityCandidatesOrdered,
+                prunedCandidates,
+                repeatIterations,
+                repeatEndpoints,
+                alternativeSelections,
+                alternativesSkipped,
+                duplicateCandidatesDropped);
         }
 
         private void summary(
@@ -462,6 +566,14 @@ public final class RewriteProgramInterpreter {
                 complete,
                 detail
             ));
+        }
+
+        private static long add(long left, long right) {
+            try {
+                return Math.addExact(left, right);
+            } catch (ArithmeticException exception) {
+                return Long.MAX_VALUE;
+            }
         }
     }
 }
