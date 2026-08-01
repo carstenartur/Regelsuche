@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramPerformancePlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramPerformancePlan.java</span></div><h1>EvolutionRewriteProgramPerformancePlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Environment-qualified performance measurement plan kept separate from the
+ * canonical primitive and total-work ledgers used for scientific comparison.
+ */
+public record EvolutionRewriteProgramPerformancePlan(
+    String schema,
+    String benchmarkRevisionHash,
+    String benchmarkSuiteHash,
+    String runtimeEnvironmentHash,
+    int warmupIterations,
+    int measurementIterations,
+    int forks,
+    int sampleTimeMillis,
+    boolean allocationMeasurementRequired,
+    List&lt;MeasurementLayer&gt; requiredLayers,
+    boolean fixedWorkEndToEndRequired,
+    boolean fixedTimeDiagnosticRequired,
+    int maximumPinnedRegressionPermille,
+    boolean canonicalEvidenceParityRequired,
+    boolean referenceFallbackRequired,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-performance-plan/v1&quot;;
+
+<span class="fc" id="L35">    public EvolutionRewriteProgramPerformancePlan {</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program performance-plan schema&quot;);
+        }
+<span class="fc" id="L40">        EvolutionGenome.requireSha256(</span>
+            benchmarkRevisionHash, &quot;benchmarkRevisionHash&quot;);
+<span class="fc" id="L42">        EvolutionGenome.requireSha256(</span>
+            benchmarkSuiteHash, &quot;benchmarkSuiteHash&quot;);
+<span class="fc" id="L44">        EvolutionGenome.requireSha256(</span>
+            runtimeEnvironmentHash, &quot;runtimeEnvironmentHash&quot;);
+<span class="fc" id="L46">        requiredLayers = canonicalLayers(requiredLayers);</span>
+<span class="fc" id="L47">        validatePolicy(</span>
+            warmupIterations,
+            measurementIterations,
+            forks,
+            sampleTimeMillis,
+            allocationMeasurementRequired,
+            requiredLayers,
+            fixedWorkEndToEndRequired,
+            fixedTimeDiagnosticRequired,
+            maximumPinnedRegressionPermille,
+            canonicalEvidenceParityRequired,
+            referenceFallbackRequired);
+<span class="fc" id="L59">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L60">        String expected = EvolutionGenome.hash(render(</span>
+            benchmarkRevisionHash,
+            benchmarkSuiteHash,
+            runtimeEnvironmentHash,
+            warmupIterations,
+            measurementIterations,
+            forks,
+            sampleTimeMillis,
+            allocationMeasurementRequired,
+            requiredLayers,
+            fixedWorkEndToEndRequired,
+            fixedTimeDiagnosticRequired,
+            maximumPinnedRegressionPermille,
+            canonicalEvidenceParityRequired,
+            referenceFallbackRequired,
+            null));
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L77">            throw new IllegalArgumentException(</span>
+                &quot;performance-plan contentHash mismatch&quot;);
+        }
+<span class="fc" id="L80">    }</span>
+
+    public static EvolutionRewriteProgramPerformancePlan create(
+        String benchmarkRevisionHash,
+        String benchmarkSuiteHash,
+        String runtimeEnvironmentHash,
+        int warmupIterations,
+        int measurementIterations,
+        int forks,
+        int sampleTimeMillis,
+        int maximumPinnedRegressionPermille
+    ) {
+<span class="fc" id="L92">        EvolutionGenome.requireSha256(</span>
+            benchmarkRevisionHash, &quot;benchmarkRevisionHash&quot;);
+<span class="fc" id="L94">        EvolutionGenome.requireSha256(</span>
+            benchmarkSuiteHash, &quot;benchmarkSuiteHash&quot;);
+<span class="fc" id="L96">        EvolutionGenome.requireSha256(</span>
+            runtimeEnvironmentHash, &quot;runtimeEnvironmentHash&quot;);
+<span class="fc" id="L98">        List&lt;MeasurementLayer&gt; layers = canonicalLayers(</span>
+<span class="fc" id="L99">            Arrays.asList(MeasurementLayer.values()));</span>
+<span class="fc" id="L100">        validatePolicy(</span>
+            warmupIterations,
+            measurementIterations,
+            forks,
+            sampleTimeMillis,
+            true,
+            layers,
+            true,
+            true,
+            maximumPinnedRegressionPermille,
+            true,
+            true);
+<span class="fc" id="L112">        String hash = EvolutionGenome.hash(render(</span>
+            benchmarkRevisionHash,
+            benchmarkSuiteHash,
+            runtimeEnvironmentHash,
+            warmupIterations,
+            measurementIterations,
+            forks,
+            sampleTimeMillis,
+            true,
+            layers,
+            true,
+            true,
+            maximumPinnedRegressionPermille,
+            true,
+            true,
+            null));
+<span class="fc" id="L128">        return new EvolutionRewriteProgramPerformancePlan(</span>
+            SCHEMA,
+            benchmarkRevisionHash,
+            benchmarkSuiteHash,
+            runtimeEnvironmentHash,
+            warmupIterations,
+            measurementIterations,
+            forks,
+            sampleTimeMillis,
+            true,
+            layers,
+            true,
+            true,
+            maximumPinnedRegressionPermille,
+            true,
+            true,
+            hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L148">        return render(</span>
+            benchmarkRevisionHash,
+            benchmarkSuiteHash,
+            runtimeEnvironmentHash,
+            warmupIterations,
+            measurementIterations,
+            forks,
+            sampleTimeMillis,
+            allocationMeasurementRequired,
+            requiredLayers,
+            fixedWorkEndToEndRequired,
+            fixedTimeDiagnosticRequired,
+            maximumPinnedRegressionPermille,
+            canonicalEvidenceParityRequired,
+            referenceFallbackRequired,
+            contentHash);
+    }
+
+    private static List&lt;MeasurementLayer&gt; canonicalLayers(
+        List&lt;MeasurementLayer&gt; values
+    ) {
+<span class="fc" id="L169">        Objects.requireNonNull(values, &quot;requiredLayers&quot;);</span>
+<span class="fc" id="L170">        List&lt;MeasurementLayer&gt; result = values.stream()</span>
+<span class="fc" id="L171">            .map(value -&gt; Objects.requireNonNull(value, &quot;measurement layer&quot;))</span>
+<span class="fc" id="L172">            .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L173">            .toList();</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(result).size() != result.size()) {</span>
+<span class="nc" id="L175">            throw new IllegalArgumentException(</span>
+                &quot;performance measurement layers must be unique&quot;);
+        }
+<span class="fc" id="L178">        return List.copyOf(result);</span>
+    }
+
+    private static void validatePolicy(
+        int warmupIterations,
+        int measurementIterations,
+        int forks,
+        int sampleTimeMillis,
+        boolean allocationMeasurementRequired,
+        List&lt;MeasurementLayer&gt; requiredLayers,
+        boolean fixedWorkEndToEndRequired,
+        boolean fixedTimeDiagnosticRequired,
+        int maximumPinnedRegressionPermille,
+        boolean canonicalEvidenceParityRequired,
+        boolean referenceFallbackRequired
+    ) {
+<span class="pc bpc" id="L194" title="4 of 8 branches missed.">        if (warmupIterations &lt; 1</span>
+                || measurementIterations &lt; 3
+                || forks &lt; 1
+                || sampleTimeMillis &lt; 100) {
+<span class="nc" id="L198">            throw new IllegalArgumentException(</span>
+                &quot;performance sampling policy is too weak&quot;);
+        }
+<span class="fc" id="L201">        List&lt;MeasurementLayer&gt; all = canonicalLayers(</span>
+<span class="fc" id="L202">            Arrays.asList(MeasurementLayer.values()));</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if (!requiredLayers.equals(all)) {</span>
+<span class="nc" id="L204">            throw new IllegalArgumentException(</span>
+                &quot;performance plan must cover every required layer&quot;);
+        }
+<span class="pc bpc" id="L207" title="5 of 10 branches missed.">        if (!allocationMeasurementRequired</span>
+                || !fixedWorkEndToEndRequired
+                || !fixedTimeDiagnosticRequired
+                || !canonicalEvidenceParityRequired
+                || !referenceFallbackRequired) {
+<span class="nc" id="L212">            throw new IllegalArgumentException(</span>
+                &quot;performance plan must retain allocation, end-to-end, parity and fallback controls&quot;);
+        }
+<span class="pc bpc" id="L215" title="2 of 4 branches missed.">        if (maximumPinnedRegressionPermille &lt; 0</span>
+                || maximumPinnedRegressionPermille &gt; 250) {
+<span class="nc" id="L217">            throw new IllegalArgumentException(</span>
+                &quot;pinned runtime regression threshold must be in [0,250] permille&quot;);
+        }
+<span class="fc" id="L220">    }</span>
+
+    private static String render(
+        String benchmarkRevisionHash,
+        String benchmarkSuiteHash,
+        String runtimeEnvironmentHash,
+        int warmupIterations,
+        int measurementIterations,
+        int forks,
+        int sampleTimeMillis,
+        boolean allocationMeasurementRequired,
+        List&lt;MeasurementLayer&gt; requiredLayers,
+        boolean fixedWorkEndToEndRequired,
+        boolean fixedTimeDiagnosticRequired,
+        int maximumPinnedRegressionPermille,
+        boolean canonicalEvidenceParityRequired,
+        boolean referenceFallbackRequired,
+        String contentHash
+    ) {
+<span class="fc" id="L239">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L240">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L241">            .property(&quot;benchmarkRevisionHash&quot;, benchmarkRevisionHash)</span>
+<span class="fc" id="L242">            .property(&quot;benchmarkSuiteHash&quot;, benchmarkSuiteHash)</span>
+<span class="fc" id="L243">            .property(&quot;runtimeEnvironmentHash&quot;, runtimeEnvironmentHash)</span>
+<span class="fc" id="L244">            .property(&quot;warmupIterations&quot;, warmupIterations)</span>
+<span class="fc" id="L245">            .property(&quot;measurementIterations&quot;, measurementIterations)</span>
+<span class="fc" id="L246">            .property(&quot;forks&quot;, forks)</span>
+<span class="fc" id="L247">            .property(&quot;sampleTimeMillis&quot;, sampleTimeMillis)</span>
+<span class="fc" id="L248">            .property(&quot;allocationMeasurementRequired&quot;,</span>
+                allocationMeasurementRequired)
+<span class="fc" id="L250">            .stringArray(&quot;requiredLayers&quot;, requiredLayers.stream()</span>
+<span class="fc" id="L251">                .map(Enum::name).toList())</span>
+<span class="fc" id="L252">            .property(&quot;fixedWorkEndToEndRequired&quot;,</span>
+                fixedWorkEndToEndRequired)
+<span class="fc" id="L254">            .property(&quot;fixedTimeDiagnosticRequired&quot;,</span>
+                fixedTimeDiagnosticRequired)
+<span class="fc" id="L256">            .property(&quot;maximumPinnedRegressionPermille&quot;,</span>
+                maximumPinnedRegressionPermille)
+<span class="fc" id="L258">            .property(&quot;canonicalEvidenceParityRequired&quot;,</span>
+                canonicalEvidenceParityRequired)
+<span class="fc" id="L260">            .property(&quot;referenceFallbackRequired&quot;, referenceFallbackRequired)</span>
+<span class="fc" id="L261">            .property(&quot;scientificResourceAuthority&quot;,</span>
+                &quot;CANONICAL_PRIMITIVE_AND_TOTAL_WORK_LEDGER&quot;)
+<span class="fc" id="L263">            .property(&quot;wallClockRole&quot;,</span>
+                &quot;ENVIRONMENT_QUALIFIED_ENGINEERING_DIAGNOSTIC&quot;);
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L266">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L268">        return json.endObject().toString();</span>
+    }
+
+<span class="fc" id="L271">    public enum MeasurementLayer {</span>
+<span class="fc" id="L272">        EXECUTOR,</span>
+<span class="fc" id="L273">        AST_MATCH_AND_REWRITE,</span>
+<span class="fc" id="L274">        CANONICALIZATION,</span>
+<span class="fc" id="L275">        DEDUPLICATION,</span>
+<span class="fc" id="L276">        FRONTIER,</span>
+<span class="fc" id="L277">        EXACT_AUDIT,</span>
+<span class="fc" id="L278">        END_TO_END</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

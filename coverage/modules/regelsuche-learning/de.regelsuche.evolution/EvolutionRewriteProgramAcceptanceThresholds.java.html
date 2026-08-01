@@ -1,0 +1,362 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramAcceptanceThresholds.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramAcceptanceThresholds.java</span></div><h1>EvolutionRewriteProgramAcceptanceThresholds.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Objects;
+
+/**
+ * Numerical success and transparent-null-result thresholds frozen before any
+ * evaluated flagship rewrite-program search begins.
+ */
+public record EvolutionRewriteProgramAcceptanceThresholds(
+    String schema,
+    int minimumImprovedFinalTestCases,
+    int minimumDistinctImprovedFamilies,
+    int minimumNewlyReachedCases,
+    boolean allowMaterialWorkReductionRoute,
+    int minimumMechanicalWorkReductionPermille,
+    int minimumRetainedProgramPrimitiveSteps,
+    boolean requireCompositionTopology,
+    boolean requireDecisionTopology,
+    int maximumCorrectnessRegressions,
+    int maximumHiddenAssumptionRegressions,
+    int maximumUnexpectedUnsupportedCases,
+    int maximumTechnicalFailures,
+    int maximumProgramNodes,
+    int maximumGenomeRules,
+    int requiredCleanReproductions,
+    boolean requirePinnedContainerReproduction,
+    SuccessRoute successRoute,
+    NullResultPolicy nullResultPolicy,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-acceptance-thresholds/v1&quot;;
+
+<span class="fc" id="L35">    public EvolutionRewriteProgramAcceptanceThresholds {</span>
+<span class="fc" id="L36">        validate(</span>
+            minimumImprovedFinalTestCases,
+            minimumDistinctImprovedFamilies,
+            minimumNewlyReachedCases,
+            allowMaterialWorkReductionRoute,
+            minimumMechanicalWorkReductionPermille,
+            minimumRetainedProgramPrimitiveSteps,
+            requireCompositionTopology,
+            requireDecisionTopology,
+            maximumCorrectnessRegressions,
+            maximumHiddenAssumptionRegressions,
+            maximumUnexpectedUnsupportedCases,
+            maximumTechnicalFailures,
+            maximumProgramNodes,
+            maximumGenomeRules,
+            requiredCleanReproductions,
+            requirePinnedContainerReproduction,
+            successRoute,
+            nullResultPolicy);
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program acceptance-threshold schema&quot;);
+        }
+<span class="fc" id="L59">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L60">        String expected = EvolutionGenome.hash(render(</span>
+            minimumImprovedFinalTestCases,
+            minimumDistinctImprovedFamilies,
+            minimumNewlyReachedCases,
+            allowMaterialWorkReductionRoute,
+            minimumMechanicalWorkReductionPermille,
+            minimumRetainedProgramPrimitiveSteps,
+            requireCompositionTopology,
+            requireDecisionTopology,
+            maximumCorrectnessRegressions,
+            maximumHiddenAssumptionRegressions,
+            maximumUnexpectedUnsupportedCases,
+            maximumTechnicalFailures,
+            maximumProgramNodes,
+            maximumGenomeRules,
+            requiredCleanReproductions,
+            requirePinnedContainerReproduction,
+            successRoute,
+            nullResultPolicy,
+            null));
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(</span>
+                &quot;acceptance-threshold contentHash mismatch&quot;);
+        }
+<span class="fc" id="L84">    }</span>
+
+    public static EvolutionRewriteProgramAcceptanceThresholds create(
+        int minimumImprovedFinalTestCases,
+        int minimumDistinctImprovedFamilies,
+        int minimumNewlyReachedCases,
+        boolean allowMaterialWorkReductionRoute,
+        int minimumMechanicalWorkReductionPermille,
+        int minimumRetainedProgramPrimitiveSteps,
+        int maximumUnexpectedUnsupportedCases,
+        int maximumProgramNodes,
+        int maximumGenomeRules,
+        int requiredCleanReproductions
+    ) {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        SuccessRoute successRoute = allowMaterialWorkReductionRoute</span>
+<span class="fc" id="L99">            ? SuccessRoute.NEWLY_REACHED_OR_MATERIAL_WORK_REDUCTION</span>
+<span class="pc" id="L100">            : SuccessRoute.NEWLY_REACHED_REQUIRED;</span>
+<span class="fc" id="L101">        validate(</span>
+            minimumImprovedFinalTestCases,
+            minimumDistinctImprovedFamilies,
+            minimumNewlyReachedCases,
+            allowMaterialWorkReductionRoute,
+            minimumMechanicalWorkReductionPermille,
+            minimumRetainedProgramPrimitiveSteps,
+            true,
+            true,
+            0,
+            0,
+            maximumUnexpectedUnsupportedCases,
+            0,
+            maximumProgramNodes,
+            maximumGenomeRules,
+            requiredCleanReproductions,
+            true,
+            successRoute,
+            NullResultPolicy.TRANSPARENT_COMPLETE_NULL_RESULT);
+<span class="fc" id="L120">        String hash = EvolutionGenome.hash(render(</span>
+            minimumImprovedFinalTestCases,
+            minimumDistinctImprovedFamilies,
+            minimumNewlyReachedCases,
+            allowMaterialWorkReductionRoute,
+            minimumMechanicalWorkReductionPermille,
+            minimumRetainedProgramPrimitiveSteps,
+            true,
+            true,
+            0,
+            0,
+            maximumUnexpectedUnsupportedCases,
+            0,
+            maximumProgramNodes,
+            maximumGenomeRules,
+            requiredCleanReproductions,
+            true,
+            successRoute,
+            NullResultPolicy.TRANSPARENT_COMPLETE_NULL_RESULT,
+            null));
+<span class="fc" id="L140">        return new EvolutionRewriteProgramAcceptanceThresholds(</span>
+            SCHEMA,
+            minimumImprovedFinalTestCases,
+            minimumDistinctImprovedFamilies,
+            minimumNewlyReachedCases,
+            allowMaterialWorkReductionRoute,
+            minimumMechanicalWorkReductionPermille,
+            minimumRetainedProgramPrimitiveSteps,
+            true,
+            true,
+            0,
+            0,
+            maximumUnexpectedUnsupportedCases,
+            0,
+            maximumProgramNodes,
+            maximumGenomeRules,
+            requiredCleanReproductions,
+            true,
+            successRoute,
+            NullResultPolicy.TRANSPARENT_COMPLETE_NULL_RESULT,
+            hash);
+    }
+
+    /** Ensures the frozen FINAL TEST surface can actually satisfy the threshold. */
+    public void requireCompatibleWithFinalSurface(
+        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment
+    ) {
+<span class="fc" id="L167">        Objects.requireNonNull(finalTestCommitment, &quot;finalTestCommitment&quot;);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (finalTestCommitment.split()</span>
+                != EvolutionRewriteProgramHeldOutCommitment.Split.FINAL_TEST) {
+<span class="nc" id="L170">            throw new IllegalArgumentException(</span>
+                &quot;acceptance thresholds require a FINAL TEST commitment&quot;);
+        }
+<span class="fc" id="L173">        int caseCount = finalTestCommitment.cases().size();</span>
+<span class="fc" id="L174">        long familyCount = finalTestCommitment.cases().stream()</span>
+<span class="fc" id="L175">            .map(EvolutionRewriteProgramHeldOutCommitment.CaseCommitment</span>
+                ::familyCommitmentHash)
+<span class="fc" id="L177">            .distinct()</span>
+<span class="fc" id="L178">            .count();</span>
+<span class="pc bpc" id="L179" title="3 of 8 branches missed.">        if (caseCount &lt; minimumImprovedFinalTestCases</span>
+                || caseCount &lt; minimumNewlyReachedCases
+                || familyCount &lt; minimumDistinctImprovedFamilies
+                || familyCount &lt; 3) {
+<span class="fc" id="L183">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST surface cannot satisfy frozen flagship thresholds&quot;);
+        }
+<span class="fc" id="L186">    }</span>
+
+    public String toCanonicalJson() {
+<span class="nc" id="L189">        return render(</span>
+            minimumImprovedFinalTestCases,
+            minimumDistinctImprovedFamilies,
+            minimumNewlyReachedCases,
+            allowMaterialWorkReductionRoute,
+            minimumMechanicalWorkReductionPermille,
+            minimumRetainedProgramPrimitiveSteps,
+            requireCompositionTopology,
+            requireDecisionTopology,
+            maximumCorrectnessRegressions,
+            maximumHiddenAssumptionRegressions,
+            maximumUnexpectedUnsupportedCases,
+            maximumTechnicalFailures,
+            maximumProgramNodes,
+            maximumGenomeRules,
+            requiredCleanReproductions,
+            requirePinnedContainerReproduction,
+            successRoute,
+            nullResultPolicy,
+            contentHash);
+    }
+
+    private static void validate(
+        int minimumImprovedFinalTestCases,
+        int minimumDistinctImprovedFamilies,
+        int minimumNewlyReachedCases,
+        boolean allowMaterialWorkReductionRoute,
+        int minimumMechanicalWorkReductionPermille,
+        int minimumRetainedProgramPrimitiveSteps,
+        boolean requireCompositionTopology,
+        boolean requireDecisionTopology,
+        int maximumCorrectnessRegressions,
+        int maximumHiddenAssumptionRegressions,
+        int maximumUnexpectedUnsupportedCases,
+        int maximumTechnicalFailures,
+        int maximumProgramNodes,
+        int maximumGenomeRules,
+        int requiredCleanReproductions,
+        boolean requirePinnedContainerReproduction,
+        SuccessRoute successRoute,
+        NullResultPolicy nullResultPolicy
+    ) {
+<span class="pc bpc" id="L231" title="3 of 6 branches missed.">        if (minimumImprovedFinalTestCases &lt; 2</span>
+                || minimumDistinctImprovedFamilies &lt; 2
+                || minimumDistinctImprovedFamilies
+                    &gt; minimumImprovedFinalTestCases) {
+<span class="nc" id="L235">            throw new IllegalArgumentException(</span>
+                &quot;flagship success requires feasible multiple cases and families&quot;);
+        }
+<span class="pc bpc" id="L238" title="2 of 4 branches missed.">        if (minimumNewlyReachedCases &lt; 0</span>
+                || minimumNewlyReachedCases
+                    &gt; minimumImprovedFinalTestCases) {
+<span class="nc" id="L241">            throw new IllegalArgumentException(</span>
+                &quot;minimumNewlyReachedCases is outside the improved-case surface&quot;);
+        }
+<span class="pc bpc" id="L244" title="3 of 4 branches missed.">        if (!allowMaterialWorkReductionRoute</span>
+                &amp;&amp; minimumNewlyReachedCases &lt; 1) {
+<span class="nc" id="L246">            throw new IllegalArgumentException(</span>
+                &quot;newly-reached route requires at least one case&quot;);
+        }
+<span class="pc bpc" id="L249" title="3 of 6 branches missed.">        if (allowMaterialWorkReductionRoute</span>
+                &amp;&amp; (minimumMechanicalWorkReductionPermille &lt; 50
+                    || minimumMechanicalWorkReductionPermille &gt; 1000)) {
+<span class="nc" id="L252">            throw new IllegalArgumentException(</span>
+                &quot;material-work route requires a reduction in [50,1000] permille&quot;);
+        }
+<span class="pc bpc" id="L255" title="3 of 4 branches missed.">        if (!allowMaterialWorkReductionRoute</span>
+                &amp;&amp; minimumMechanicalWorkReductionPermille != 0) {
+<span class="nc" id="L257">            throw new IllegalArgumentException(</span>
+                &quot;disabled material-work route requires zero reduction threshold&quot;);
+        }
+<span class="pc bpc" id="L260" title="3 of 6 branches missed.">        if (minimumRetainedProgramPrimitiveSteps &lt; 3</span>
+                || !requireCompositionTopology
+                || !requireDecisionTopology) {
+<span class="nc" id="L263">            throw new IllegalArgumentException(</span>
+                &quot;flagship program must use multi-step composition and decision topology&quot;);
+        }
+<span class="pc bpc" id="L266" title="2 of 6 branches missed.">        if (maximumCorrectnessRegressions != 0</span>
+                || maximumHiddenAssumptionRegressions != 0
+                || maximumTechnicalFailures != 0) {
+<span class="fc" id="L269">            throw new IllegalArgumentException(</span>
+                &quot;positive flagship claim permits no correctness, assumption or technical failures&quot;);
+        }
+<span class="pc bpc" id="L272" title="3 of 6 branches missed.">        if (maximumUnexpectedUnsupportedCases &lt; 0</span>
+                || maximumProgramNodes &lt; 1
+                || maximumGenomeRules &lt; 1) {
+<span class="nc" id="L275">            throw new IllegalArgumentException(</span>
+                &quot;unsupported and complexity thresholds are invalid&quot;);
+        }
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">        if (requiredCleanReproductions &lt; 2</span>
+                || !requirePinnedContainerReproduction) {
+<span class="nc" id="L280">            throw new IllegalArgumentException(</span>
+                &quot;flagship evidence requires two clean and one pinned reproduction&quot;);
+        }
+<span class="fc" id="L283">        Objects.requireNonNull(successRoute, &quot;successRoute&quot;);</span>
+<span class="fc" id="L284">        Objects.requireNonNull(nullResultPolicy, &quot;nullResultPolicy&quot;);</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        SuccessRoute expected = allowMaterialWorkReductionRoute</span>
+<span class="fc" id="L286">            ? SuccessRoute.NEWLY_REACHED_OR_MATERIAL_WORK_REDUCTION</span>
+<span class="pc" id="L287">            : SuccessRoute.NEWLY_REACHED_REQUIRED;</span>
+<span class="pc bpc" id="L288" title="2 of 4 branches missed.">        if (successRoute != expected</span>
+                || nullResultPolicy
+                    != NullResultPolicy.TRANSPARENT_COMPLETE_NULL_RESULT) {
+<span class="nc" id="L291">            throw new IllegalArgumentException(</span>
+                &quot;success or null-result policy is inconsistent&quot;);
+        }
+<span class="fc" id="L294">    }</span>
+
+    private static String render(
+        int minimumImprovedFinalTestCases,
+        int minimumDistinctImprovedFamilies,
+        int minimumNewlyReachedCases,
+        boolean allowMaterialWorkReductionRoute,
+        int minimumMechanicalWorkReductionPermille,
+        int minimumRetainedProgramPrimitiveSteps,
+        boolean requireCompositionTopology,
+        boolean requireDecisionTopology,
+        int maximumCorrectnessRegressions,
+        int maximumHiddenAssumptionRegressions,
+        int maximumUnexpectedUnsupportedCases,
+        int maximumTechnicalFailures,
+        int maximumProgramNodes,
+        int maximumGenomeRules,
+        int requiredCleanReproductions,
+        boolean requirePinnedContainerReproduction,
+        SuccessRoute successRoute,
+        NullResultPolicy nullResultPolicy,
+        String contentHash
+    ) {
+<span class="fc" id="L317">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L318">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L319">            .property(&quot;minimumImprovedFinalTestCases&quot;,</span>
+                minimumImprovedFinalTestCases)
+<span class="fc" id="L321">            .property(&quot;minimumDistinctImprovedFamilies&quot;,</span>
+                minimumDistinctImprovedFamilies)
+<span class="fc" id="L323">            .property(&quot;minimumNewlyReachedCases&quot;, minimumNewlyReachedCases)</span>
+<span class="fc" id="L324">            .property(&quot;allowMaterialWorkReductionRoute&quot;,</span>
+                allowMaterialWorkReductionRoute)
+<span class="fc" id="L326">            .property(&quot;minimumMechanicalWorkReductionPermille&quot;,</span>
+                minimumMechanicalWorkReductionPermille)
+<span class="fc" id="L328">            .property(&quot;minimumRetainedProgramPrimitiveSteps&quot;,</span>
+                minimumRetainedProgramPrimitiveSteps)
+<span class="fc" id="L330">            .property(&quot;requireCompositionTopology&quot;, requireCompositionTopology)</span>
+<span class="fc" id="L331">            .property(&quot;requireDecisionTopology&quot;, requireDecisionTopology)</span>
+<span class="fc" id="L332">            .property(&quot;maximumCorrectnessRegressions&quot;,</span>
+                maximumCorrectnessRegressions)
+<span class="fc" id="L334">            .property(&quot;maximumHiddenAssumptionRegressions&quot;,</span>
+                maximumHiddenAssumptionRegressions)
+<span class="fc" id="L336">            .property(&quot;maximumUnexpectedUnsupportedCases&quot;,</span>
+                maximumUnexpectedUnsupportedCases)
+<span class="fc" id="L338">            .property(&quot;maximumTechnicalFailures&quot;, maximumTechnicalFailures)</span>
+<span class="fc" id="L339">            .property(&quot;maximumProgramNodes&quot;, maximumProgramNodes)</span>
+<span class="fc" id="L340">            .property(&quot;maximumGenomeRules&quot;, maximumGenomeRules)</span>
+<span class="fc" id="L341">            .property(&quot;requiredCleanReproductions&quot;,</span>
+                requiredCleanReproductions)
+<span class="fc" id="L343">            .property(&quot;requirePinnedContainerReproduction&quot;,</span>
+                requirePinnedContainerReproduction)
+<span class="fc" id="L345">            .property(&quot;successRoute&quot;, successRoute.name())</span>
+<span class="fc" id="L346">            .property(&quot;nullResultPolicy&quot;, nullResultPolicy.name());</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
+<span class="nc" id="L348">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L350">        return json.endObject().toString();</span>
+    }
+
+<span class="fc" id="L353">    public enum SuccessRoute {</span>
+<span class="fc" id="L354">        NEWLY_REACHED_REQUIRED,</span>
+<span class="fc" id="L355">        NEWLY_REACHED_OR_MATERIAL_WORK_REDUCTION</span>
+    }
+
+<span class="fc" id="L358">    public enum NullResultPolicy {</span>
+<span class="fc" id="L359">        TRANSPARENT_COMPLETE_NULL_RESULT</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

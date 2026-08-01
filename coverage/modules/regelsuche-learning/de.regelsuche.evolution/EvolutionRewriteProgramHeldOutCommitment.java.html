@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramHeldOutCommitment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramHeldOutCommitment.java</span></div><h1>EvolutionRewriteProgramHeldOutCommitment.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/**
+ * Content-addressed commitment to one concrete held-out rewrite-program suite.
+ *
+ * &lt;p&gt;The commitment freezes case identities and hashes before evaluated search
+ * without exposing the concrete target, assumptions, difficulty annotation or
+ * expected terminal class. A later reveal must be verified against both the
+ * per-case reveal-entry hashes and {@link #sealedRevealHash()} before any held-
+ * out evaluator may inspect it.&lt;/p&gt;
+ */
+public record EvolutionRewriteProgramHeldOutCommitment(
+    String schema,
+    String studyId,
+    Split split,
+    List&lt;CaseCommitment&gt; cases,
+    String sealedRevealHash,
+    RevealPolicy revealPolicy,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-held-out-commitment/v1&quot;;
+<span class="fc" id="L32">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+
+<span class="fc" id="L34">    public EvolutionRewriteProgramHeldOutCommitment {</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program held-out commitment schema&quot;);
+        }
+<span class="fc" id="L39">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L40">        Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L41">        cases = canonicalCases(cases);</span>
+<span class="fc" id="L42">        EvolutionGenome.requireSha256(sealedRevealHash, &quot;sealedRevealHash&quot;);</span>
+<span class="fc" id="L43">        Objects.requireNonNull(revealPolicy, &quot;revealPolicy&quot;);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (revealPolicy != split.requiredRevealPolicy()) {</span>
+<span class="fc" id="L45">            throw new IllegalArgumentException(</span>
+                &quot;held-out reveal policy does not match split&quot;);
+        }
+<span class="fc" id="L48">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L49">        String expected = EvolutionGenome.hash(render(</span>
+            studyId,
+            split,
+            cases,
+            sealedRevealHash,
+            revealPolicy,
+            null));
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;held-out commitment contentHash mismatch&quot;);
+        }
+<span class="fc" id="L60">    }</span>
+
+    public static EvolutionRewriteProgramHeldOutCommitment create(
+        String studyId,
+        Split split,
+        List&lt;CaseCommitment&gt; cases,
+        String sealedRevealHash
+    ) {
+<span class="fc" id="L68">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L69">        Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L70">        List&lt;CaseCommitment&gt; canonical = canonicalCases(cases);</span>
+<span class="fc" id="L71">        EvolutionGenome.requireSha256(sealedRevealHash, &quot;sealedRevealHash&quot;);</span>
+<span class="fc" id="L72">        RevealPolicy revealPolicy = split.requiredRevealPolicy();</span>
+<span class="fc" id="L73">        String hash = EvolutionGenome.hash(render(</span>
+            studyId,
+            split,
+            canonical,
+            sealedRevealHash,
+            revealPolicy,
+            null));
+<span class="fc" id="L80">        return new EvolutionRewriteProgramHeldOutCommitment(</span>
+            SCHEMA,
+            studyId,
+            split,
+            canonical,
+            sealedRevealHash,
+            revealPolicy,
+            hash);
+    }
+
+    /**
+     * Verifies that this commitment is exactly the corresponding split surface
+     * from the already-frozen split manifest.
+     */
+    public void requireMatches(EvolutionSplitManifest manifest) {
+<span class="fc" id="L95">        Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (!studyId.equals(manifest.studyId())) {</span>
+<span class="nc" id="L97">            throw new IllegalArgumentException(</span>
+                &quot;held-out commitment studyId differs from split manifest&quot;);
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        List&lt;EvolutionSplitManifest.CaseReference&gt; references = switch (split) {</span>
+<span class="fc" id="L101">            case VALIDATION -&gt; manifest.validationCases();</span>
+<span class="fc" id="L102">            case FINAL_TEST -&gt; manifest.finalTestCases();</span>
+        };
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (references.size() != cases.size()) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(</span>
+                &quot;held-out commitment case count differs from split manifest&quot;);
+        }
+<span class="fc" id="L108">        Map&lt;String, EvolutionSplitManifest.CaseReference&gt; byId = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L109">        references.forEach(reference -&gt; byId.put(reference.caseId(), reference));</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (CaseCommitment commitment : cases) {</span>
+<span class="fc" id="L111">            EvolutionSplitManifest.CaseReference reference =</span>
+<span class="fc" id="L112">                byId.get(commitment.caseId());</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (reference == null) {</span>
+<span class="nc" id="L114">                throw new IllegalArgumentException(</span>
+                    &quot;held-out case is absent from split manifest: &quot;
+<span class="nc" id="L116">                        + commitment.caseId());</span>
+            }
+<span class="fc" id="L118">            String expectedFamily = familyCommitment(reference.familyId());</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (!expectedFamily.equals(commitment.familyCommitmentHash())</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">                    || !reference.inputHash().equals(commitment.inputHash())</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                    || !reference.hiddenTargetHash().equals(</span>
+<span class="fc" id="L122">                        commitment.targetHash())</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                    || !reference.exactSignatureHash().equals(</span>
+<span class="fc" id="L124">                        commitment.exactSignatureHash())</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                    || !reference.alphaSignatureHash().equals(</span>
+<span class="fc" id="L126">                        commitment.alphaSignatureHash())) {</span>
+<span class="fc" id="L127">                throw new IllegalArgumentException(</span>
+                    &quot;held-out case identity differs from split manifest: &quot;
+<span class="fc" id="L129">                        + commitment.caseId());</span>
+            }
+<span class="fc" id="L131">        }</span>
+<span class="fc" id="L132">    }</span>
+
+    public String toCanonicalJson() {
+<span class="nc" id="L135">        return render(</span>
+            studyId,
+            split,
+            cases,
+            sealedRevealHash,
+            revealPolicy,
+            contentHash);
+    }
+
+    public static String familyCommitment(String familyId) {
+<span class="fc" id="L145">        requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L146">        return EvolutionGenome.hash(</span>
+            &quot;regelsuche.evolution-family-commitment/v1\nfamilyId=&quot; + familyId);
+    }
+
+    private static List&lt;CaseCommitment&gt; canonicalCases(
+        List&lt;CaseCommitment&gt; values
+    ) {
+<span class="fc" id="L153">        Objects.requireNonNull(values, &quot;cases&quot;);</span>
+<span class="fc" id="L154">        List&lt;CaseCommitment&gt; result = values.stream()</span>
+<span class="fc" id="L155">            .map(value -&gt; Objects.requireNonNull(value, &quot;case commitment&quot;))</span>
+<span class="fc" id="L156">            .sorted(Comparator.comparing(CaseCommitment::caseId))</span>
+<span class="fc" id="L157">            .toList();</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L159">            throw new IllegalArgumentException(</span>
+                &quot;held-out commitment must contain cases&quot;);
+        }
+<span class="fc" id="L162">        requireUnique(result, &quot;case ID&quot;, CaseCommitment::caseId);</span>
+<span class="fc" id="L163">        requireUnique(result, &quot;input hash&quot;, CaseCommitment::inputHash);</span>
+<span class="fc" id="L164">        requireUnique(result, &quot;target hash&quot;, CaseCommitment::targetHash);</span>
+<span class="fc" id="L165">        requireUnique(</span>
+            result, &quot;exact signature&quot;, CaseCommitment::exactSignatureHash);
+<span class="fc" id="L167">        requireUnique(</span>
+            result, &quot;alpha signature&quot;, CaseCommitment::alphaSignatureHash);
+<span class="fc" id="L169">        requireUnique(</span>
+            result, &quot;reveal entry&quot;, CaseCommitment::revealEntryHash);
+<span class="fc" id="L171">        return List.copyOf(result);</span>
+    }
+
+    private static void requireUnique(
+        List&lt;CaseCommitment&gt; cases,
+        String label,
+        java.util.function.Function&lt;CaseCommitment, String&gt; identity
+    ) {
+<span class="fc" id="L179">        List&lt;String&gt; values = cases.stream().map(identity).toList();</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
+<span class="nc" id="L181">            throw new IllegalArgumentException(</span>
+                &quot;held-out commitment contains duplicate &quot; + label);
+        }
+<span class="fc" id="L184">    }</span>
+
+    private static String render(
+        String studyId,
+        Split split,
+        List&lt;CaseCommitment&gt; cases,
+        String sealedRevealHash,
+        RevealPolicy revealPolicy,
+        String contentHash
+    ) {
+<span class="fc" id="L194">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L195">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L196">            .property(&quot;studyId&quot;, studyId)</span>
+<span class="fc" id="L197">            .property(&quot;split&quot;, split.name())</span>
+<span class="fc" id="L198">            .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L199">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L200">                    .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L201">                    .property(&quot;familyCommitmentHash&quot;,</span>
+<span class="fc" id="L202">                        item.familyCommitmentHash())</span>
+<span class="fc" id="L203">                    .property(&quot;inputHash&quot;, item.inputHash())</span>
+<span class="fc" id="L204">                    .property(&quot;targetHash&quot;, item.targetHash())</span>
+<span class="fc" id="L205">                    .property(&quot;assumptionsHash&quot;, item.assumptionsHash())</span>
+<span class="fc" id="L206">                    .property(&quot;exactSignatureHash&quot;,</span>
+<span class="fc" id="L207">                        item.exactSignatureHash())</span>
+<span class="fc" id="L208">                    .property(&quot;alphaSignatureHash&quot;,</span>
+<span class="fc" id="L209">                        item.alphaSignatureHash())</span>
+<span class="fc" id="L210">                    .property(&quot;difficultyTierHash&quot;,</span>
+<span class="fc" id="L211">                        item.difficultyTierHash())</span>
+<span class="fc" id="L212">                    .property(&quot;expectedTerminalClassHash&quot;,</span>
+<span class="fc" id="L213">                        item.expectedTerminalClassHash())</span>
+<span class="fc" id="L214">                    .property(&quot;revealEntryHash&quot;, item.revealEntryHash()))))</span>
+<span class="fc" id="L215">            .property(&quot;sealedRevealHash&quot;, sealedRevealHash)</span>
+<span class="fc" id="L216">            .property(&quot;revealPolicy&quot;, revealPolicy.name());</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
+<span class="nc" id="L218">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L220">        return json.endObject().toString();</span>
+    }
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L224" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L225">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L227">    }</span>
+
+<span class="fc" id="L229">    public enum Split {</span>
+<span class="fc" id="L230">        VALIDATION,</span>
+<span class="fc" id="L231">        FINAL_TEST;</span>
+
+        RevealPolicy requiredRevealPolicy() {
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            return switch (this) {</span>
+                case VALIDATION -&gt;
+<span class="fc" id="L236">                    RevealPolicy.AFTER_TRAIN_POPULATION_COMPLETE;</span>
+<span class="fc" id="L237">                case FINAL_TEST -&gt; RevealPolicy</span>
+                    .ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION;
+            };
+        }
+    }
+
+<span class="fc" id="L243">    public enum RevealPolicy {</span>
+<span class="fc" id="L244">        AFTER_TRAIN_POPULATION_COMPLETE,</span>
+<span class="fc" id="L245">        ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION</span>
+    }
+
+    public record CaseCommitment(
+        String caseId,
+        String familyCommitmentHash,
+        String inputHash,
+        String targetHash,
+        String assumptionsHash,
+        String exactSignatureHash,
+        String alphaSignatureHash,
+        String difficultyTierHash,
+        String expectedTerminalClassHash,
+        String revealEntryHash
+    ) {
+<span class="fc" id="L260">        public CaseCommitment {</span>
+<span class="fc" id="L261">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L262">            EvolutionGenome.requireSha256(</span>
+                familyCommitmentHash, &quot;familyCommitmentHash&quot;);
+<span class="fc" id="L264">            EvolutionGenome.requireSha256(inputHash, &quot;inputHash&quot;);</span>
+<span class="fc" id="L265">            EvolutionGenome.requireSha256(targetHash, &quot;targetHash&quot;);</span>
+<span class="fc" id="L266">            EvolutionGenome.requireSha256(</span>
+                assumptionsHash, &quot;assumptionsHash&quot;);
+<span class="fc" id="L268">            EvolutionGenome.requireSha256(</span>
+                exactSignatureHash, &quot;exactSignatureHash&quot;);
+<span class="fc" id="L270">            EvolutionGenome.requireSha256(</span>
+                alphaSignatureHash, &quot;alphaSignatureHash&quot;);
+<span class="fc" id="L272">            EvolutionGenome.requireSha256(</span>
+                difficultyTierHash, &quot;difficultyTierHash&quot;);
+<span class="fc" id="L274">            EvolutionGenome.requireSha256(</span>
+                expectedTerminalClassHash,
+                &quot;expectedTerminalClassHash&quot;);
+<span class="fc" id="L277">            EvolutionGenome.requireSha256(</span>
+                revealEntryHash, &quot;revealEntryHash&quot;);
+<span class="fc" id="L279">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

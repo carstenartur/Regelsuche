@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramFreezeReceipt.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramFreezeReceipt.java</span></div><h1>EvolutionRewriteProgramFreezeReceipt.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/**
+ * Canonical pre-execution receipt binding every flagship input while proving
+ * that TRAIN, VALIDATION and FINAL TEST result roots are still absent.
+ */
+public record EvolutionRewriteProgramFreezeReceipt(
+    String schema,
+    String freezeId,
+    String repositoryCommit,
+    DirtyStatePolicy dirtyStatePolicy,
+    String splitManifestHash,
+    String trainSuiteHash,
+    String validationCommitmentHash,
+    String finalTestCommitmentHash,
+    String evaluationProtocolHash,
+    String populationStudyPlanHash,
+    String acceptanceThresholdsHash,
+    String primitiveInventoryHash,
+    String programGrammarHash,
+    String mutationCatalogHash,
+    String baselineAblationPlanHash,
+    String performancePlanHash,
+    String schemaBundleHash,
+    FreezeStatus status,
+    StageStatus trainResultStatus,
+    StageStatus validationResultStatus,
+    StageStatus finalTestResultStatus,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-freeze-receipt/v1&quot;;
+<span class="fc" id="L37">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+<span class="fc" id="L38">    private static final Pattern COMMIT = Pattern.compile(&quot;[0-9a-f]{40}&quot;);</span>
+
+<span class="fc" id="L40">    public EvolutionRewriteProgramFreezeReceipt {</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program freeze-receipt schema&quot;);
+        }
+<span class="fc" id="L45">        requireId(freezeId, &quot;freezeId&quot;);</span>
+<span class="fc" id="L46">        requireCommit(repositoryCommit);</span>
+<span class="fc" id="L47">        requirePreExecutionState(</span>
+            dirtyStatePolicy,
+            status,
+            trainResultStatus,
+            validationResultStatus,
+            finalTestResultStatus);
+<span class="fc" id="L53">        requireHashes(</span>
+            splitManifestHash,
+            trainSuiteHash,
+            validationCommitmentHash,
+            finalTestCommitmentHash,
+            evaluationProtocolHash,
+            populationStudyPlanHash,
+            acceptanceThresholdsHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            baselineAblationPlanHash,
+            performancePlanHash,
+            schemaBundleHash);
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (validationCommitmentHash.equals(finalTestCommitmentHash)) {</span>
+<span class="nc" id="L68">            throw new IllegalArgumentException(</span>
+                &quot;VALIDATION and FINAL TEST commitments must differ&quot;);
+        }
+<span class="fc" id="L71">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L72">        String expected = EvolutionGenome.hash(render(</span>
+            freezeId,
+            repositoryCommit,
+            dirtyStatePolicy,
+            splitManifestHash,
+            trainSuiteHash,
+            validationCommitmentHash,
+            finalTestCommitmentHash,
+            evaluationProtocolHash,
+            populationStudyPlanHash,
+            acceptanceThresholdsHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            baselineAblationPlanHash,
+            performancePlanHash,
+            schemaBundleHash,
+            null));
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L91">            throw new IllegalArgumentException(</span>
+                &quot;freeze-receipt contentHash mismatch&quot;);
+        }
+<span class="fc" id="L94">    }</span>
+
+    public static EvolutionRewriteProgramFreezeReceipt create(
+        String freezeId,
+        String repositoryCommit,
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite trainSuite,
+        EvolutionRewriteProgramHeldOutCommitment validationCommitment,
+        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment,
+        EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
+        EvolutionRewriteProgramStudyPlan populationStudyPlan,
+        EvolutionRewriteProgramAcceptanceThresholds acceptanceThresholds,
+        String primitiveInventoryHash,
+        String programGrammarHash,
+        String baselineAblationPlanHash,
+        EvolutionRewriteProgramPerformancePlan performancePlan,
+        String schemaBundleHash
+    ) {
+<span class="fc" id="L112">        requireId(freezeId, &quot;freezeId&quot;);</span>
+<span class="fc" id="L113">        requireCommit(repositoryCommit);</span>
+<span class="fc" id="L114">        validateInputs(</span>
+            splitManifest,
+            trainSuite,
+            validationCommitment,
+            finalTestCommitment,
+            evaluationProtocol,
+            populationStudyPlan,
+            acceptanceThresholds,
+            primitiveInventoryHash,
+            programGrammarHash,
+            baselineAblationPlanHash,
+            performancePlan,
+            schemaBundleHash);
+<span class="fc" id="L127">        String hash = EvolutionGenome.hash(render(</span>
+            freezeId,
+            repositoryCommit,
+            DirtyStatePolicy.REQUIRE_CLEAN,
+<span class="fc" id="L131">            splitManifest.contentHash(),</span>
+<span class="fc" id="L132">            trainSuite.contentHash(),</span>
+<span class="fc" id="L133">            validationCommitment.contentHash(),</span>
+<span class="fc" id="L134">            finalTestCommitment.contentHash(),</span>
+<span class="fc" id="L135">            evaluationProtocol.contentHash(),</span>
+<span class="fc" id="L136">            populationStudyPlan.contentHash(),</span>
+<span class="fc" id="L137">            acceptanceThresholds.contentHash(),</span>
+            primitiveInventoryHash,
+            programGrammarHash,
+<span class="fc" id="L140">            populationStudyPlan.mutationCatalogHash(),</span>
+            baselineAblationPlanHash,
+<span class="fc" id="L142">            performancePlan.contentHash(),</span>
+            schemaBundleHash,
+            null));
+<span class="fc" id="L145">        return new EvolutionRewriteProgramFreezeReceipt(</span>
+            SCHEMA,
+            freezeId,
+            repositoryCommit,
+            DirtyStatePolicy.REQUIRE_CLEAN,
+<span class="fc" id="L150">            splitManifest.contentHash(),</span>
+<span class="fc" id="L151">            trainSuite.contentHash(),</span>
+<span class="fc" id="L152">            validationCommitment.contentHash(),</span>
+<span class="fc" id="L153">            finalTestCommitment.contentHash(),</span>
+<span class="fc" id="L154">            evaluationProtocol.contentHash(),</span>
+<span class="fc" id="L155">            populationStudyPlan.contentHash(),</span>
+<span class="fc" id="L156">            acceptanceThresholds.contentHash(),</span>
+            primitiveInventoryHash,
+            programGrammarHash,
+<span class="fc" id="L159">            populationStudyPlan.mutationCatalogHash(),</span>
+            baselineAblationPlanHash,
+<span class="fc" id="L161">            performancePlan.contentHash(),</span>
+            schemaBundleHash,
+            FreezeStatus.FROZEN_NOT_RUN,
+            StageStatus.NOT_EVALUATED,
+            StageStatus.NOT_EVALUATED,
+            StageStatus.NOT_EVALUATED,
+            hash);
+    }
+
+    public void requireInputs(
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite trainSuite,
+        EvolutionRewriteProgramHeldOutCommitment validationCommitment,
+        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment,
+        EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
+        EvolutionRewriteProgramStudyPlan populationStudyPlan,
+        EvolutionRewriteProgramAcceptanceThresholds acceptanceThresholds,
+        String primitiveInventoryHash,
+        String programGrammarHash,
+        String baselineAblationPlanHash,
+        EvolutionRewriteProgramPerformancePlan performancePlan,
+        String schemaBundleHash
+    ) {
+<span class="fc" id="L184">        validateInputs(</span>
+            splitManifest,
+            trainSuite,
+            validationCommitment,
+            finalTestCommitment,
+            evaluationProtocol,
+            populationStudyPlan,
+            acceptanceThresholds,
+            primitiveInventoryHash,
+            programGrammarHash,
+            baselineAblationPlanHash,
+            performancePlan,
+            schemaBundleHash);
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (!splitManifest.contentHash().equals(splitManifestHash)</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                || !trainSuite.contentHash().equals(trainSuiteHash)</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                || !validationCommitment.contentHash().equals(</span>
+                    validationCommitmentHash)
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                || !finalTestCommitment.contentHash().equals(</span>
+                    finalTestCommitmentHash)
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">                || !evaluationProtocol.contentHash().equals(</span>
+                    evaluationProtocolHash)
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                || !populationStudyPlan.contentHash().equals(</span>
+                    populationStudyPlanHash)
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">                || !acceptanceThresholds.contentHash().equals(</span>
+                    acceptanceThresholdsHash)
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">                || !primitiveInventoryHash.equals(this.primitiveInventoryHash)</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                || !programGrammarHash.equals(this.programGrammarHash)</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                || !populationStudyPlan.mutationCatalogHash().equals(</span>
+                    mutationCatalogHash)
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                || !baselineAblationPlanHash.equals(</span>
+                    this.baselineAblationPlanHash)
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                || !performancePlan.contentHash().equals(performancePlanHash)</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                || !schemaBundleHash.equals(this.schemaBundleHash)) {</span>
+<span class="fc" id="L217">            throw new IllegalArgumentException(</span>
+                &quot;freeze receipt input identity mismatch&quot;);
+        }
+<span class="fc" id="L220">    }</span>
+
+    public String toCanonicalJson() {
+<span class="fc" id="L223">        return render(</span>
+            freezeId,
+            repositoryCommit,
+            dirtyStatePolicy,
+            splitManifestHash,
+            trainSuiteHash,
+            validationCommitmentHash,
+            finalTestCommitmentHash,
+            evaluationProtocolHash,
+            populationStudyPlanHash,
+            acceptanceThresholdsHash,
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            baselineAblationPlanHash,
+            performancePlanHash,
+            schemaBundleHash,
+            contentHash);
+    }
+
+    private static void validateInputs(
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite trainSuite,
+        EvolutionRewriteProgramHeldOutCommitment validationCommitment,
+        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment,
+        EvolutionRewriteProgramEvaluationProtocol evaluationProtocol,
+        EvolutionRewriteProgramStudyPlan populationStudyPlan,
+        EvolutionRewriteProgramAcceptanceThresholds acceptanceThresholds,
+        String primitiveInventoryHash,
+        String programGrammarHash,
+        String baselineAblationPlanHash,
+        EvolutionRewriteProgramPerformancePlan performancePlan,
+        String schemaBundleHash
+    ) {
+<span class="fc" id="L257">        Objects.requireNonNull(splitManifest, &quot;splitManifest&quot;);</span>
+<span class="fc" id="L258">        Objects.requireNonNull(trainSuite, &quot;trainSuite&quot;);</span>
+<span class="fc" id="L259">        Objects.requireNonNull(validationCommitment, &quot;validationCommitment&quot;);</span>
+<span class="fc" id="L260">        Objects.requireNonNull(finalTestCommitment, &quot;finalTestCommitment&quot;);</span>
+<span class="fc" id="L261">        Objects.requireNonNull(evaluationProtocol, &quot;evaluationProtocol&quot;);</span>
+<span class="fc" id="L262">        Objects.requireNonNull(populationStudyPlan, &quot;populationStudyPlan&quot;);</span>
+<span class="fc" id="L263">        Objects.requireNonNull(acceptanceThresholds, &quot;acceptanceThresholds&quot;);</span>
+<span class="fc" id="L264">        Objects.requireNonNull(performancePlan, &quot;performancePlan&quot;);</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (validationCommitment.split()</span>
+                != EvolutionRewriteProgramHeldOutCommitment.Split.VALIDATION
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                || finalTestCommitment.split()</span>
+                    != EvolutionRewriteProgramHeldOutCommitment.Split.FINAL_TEST) {
+<span class="nc" id="L269">            throw new IllegalArgumentException(</span>
+                &quot;held-out commitments are bound to the wrong splits&quot;);
+        }
+<span class="fc" id="L272">        validationCommitment.requireMatches(splitManifest);</span>
+<span class="fc" id="L273">        finalTestCommitment.requireMatches(splitManifest);</span>
+<span class="fc" id="L274">        acceptanceThresholds.requireCompatibleWithFinalSurface(</span>
+            finalTestCommitment);
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">        if (!populationStudyPlan.splitManifestHash().equals(</span>
+<span class="fc" id="L277">                splitManifest.contentHash())</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                || !populationStudyPlan.trainSuiteHash().equals(</span>
+<span class="fc" id="L279">                    trainSuite.contentHash())</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                || !populationStudyPlan.trainEvaluationProtocolHash().equals(</span>
+<span class="fc" id="L281">                    evaluationProtocol.contentHash())) {</span>
+<span class="nc" id="L282">            throw new IllegalArgumentException(</span>
+                &quot;population plan is not bound to freeze inputs&quot;);
+        }
+<span class="fc" id="L285">        requireHashes(</span>
+            primitiveInventoryHash,
+            programGrammarHash,
+            baselineAblationPlanHash,
+<span class="fc" id="L289">            performancePlan.contentHash(),</span>
+            schemaBundleHash);
+<span class="fc" id="L291">    }</span>
+
+    private static void requirePreExecutionState(
+        DirtyStatePolicy dirtyStatePolicy,
+        FreezeStatus status,
+        StageStatus trainResultStatus,
+        StageStatus validationResultStatus,
+        StageStatus finalTestResultStatus
+    ) {
+<span class="pc bpc" id="L300" title="5 of 10 branches missed.">        if (dirtyStatePolicy != DirtyStatePolicy.REQUIRE_CLEAN</span>
+                || status != FreezeStatus.FROZEN_NOT_RUN
+                || trainResultStatus != StageStatus.NOT_EVALUATED
+                || validationResultStatus != StageStatus.NOT_EVALUATED
+                || finalTestResultStatus != StageStatus.NOT_EVALUATED) {
+<span class="nc" id="L305">            throw new IllegalArgumentException(</span>
+                &quot;freeze receipt must remain clean and pre-execution&quot;);
+        }
+<span class="fc" id="L308">    }</span>
+
+    private static void requireHashes(String... hashes) {
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        for (int index = 0; index &lt; hashes.length; index++) {</span>
+<span class="fc" id="L312">            EvolutionGenome.requireSha256(hashes[index], &quot;hash[&quot; + index + &quot;]&quot;);</span>
+        }
+<span class="fc" id="L314">    }</span>
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L317" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L318">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L320">    }</span>
+
+    private static void requireCommit(String value) {
+<span class="pc bpc" id="L323" title="2 of 4 branches missed.">        if (value == null || !COMMIT.matcher(value).matches()) {</span>
+<span class="nc" id="L324">            throw new IllegalArgumentException(</span>
+                &quot;repositoryCommit must be a lowercase 40-character Git commit&quot;);
+        }
+<span class="fc" id="L327">    }</span>
+
+    private static String render(
+        String freezeId,
+        String repositoryCommit,
+        DirtyStatePolicy dirtyStatePolicy,
+        String splitManifestHash,
+        String trainSuiteHash,
+        String validationCommitmentHash,
+        String finalTestCommitmentHash,
+        String evaluationProtocolHash,
+        String populationStudyPlanHash,
+        String acceptanceThresholdsHash,
+        String primitiveInventoryHash,
+        String programGrammarHash,
+        String mutationCatalogHash,
+        String baselineAblationPlanHash,
+        String performancePlanHash,
+        String schemaBundleHash,
+        String contentHash
+    ) {
+<span class="fc" id="L348">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L349">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L350">            .property(&quot;freezeId&quot;, freezeId)</span>
+<span class="fc" id="L351">            .property(&quot;repositoryCommit&quot;, repositoryCommit)</span>
+<span class="fc" id="L352">            .property(&quot;dirtyStatePolicy&quot;, dirtyStatePolicy.name())</span>
+<span class="fc" id="L353">            .property(&quot;splitManifestHash&quot;, splitManifestHash)</span>
+<span class="fc" id="L354">            .property(&quot;trainSuiteHash&quot;, trainSuiteHash)</span>
+<span class="fc" id="L355">            .property(&quot;validationCommitmentHash&quot;,</span>
+                validationCommitmentHash)
+<span class="fc" id="L357">            .property(&quot;finalTestCommitmentHash&quot;, finalTestCommitmentHash)</span>
+<span class="fc" id="L358">            .property(&quot;evaluationProtocolHash&quot;, evaluationProtocolHash)</span>
+<span class="fc" id="L359">            .property(&quot;populationStudyPlanHash&quot;, populationStudyPlanHash)</span>
+<span class="fc" id="L360">            .property(&quot;acceptanceThresholdsHash&quot;, acceptanceThresholdsHash)</span>
+<span class="fc" id="L361">            .property(&quot;primitiveInventoryHash&quot;, primitiveInventoryHash)</span>
+<span class="fc" id="L362">            .property(&quot;programGrammarHash&quot;, programGrammarHash)</span>
+<span class="fc" id="L363">            .property(&quot;mutationCatalogHash&quot;, mutationCatalogHash)</span>
+<span class="fc" id="L364">            .property(&quot;baselineAblationPlanHash&quot;, baselineAblationPlanHash)</span>
+<span class="fc" id="L365">            .property(&quot;performancePlanHash&quot;, performancePlanHash)</span>
+<span class="fc" id="L366">            .property(&quot;schemaBundleHash&quot;, schemaBundleHash)</span>
+<span class="fc" id="L367">            .property(&quot;status&quot;, FreezeStatus.FROZEN_NOT_RUN.name())</span>
+<span class="fc" id="L368">            .property(&quot;trainResultStatus&quot;, StageStatus.NOT_EVALUATED.name())</span>
+<span class="fc" id="L369">            .property(&quot;validationResultStatus&quot;,</span>
+<span class="fc" id="L370">                StageStatus.NOT_EVALUATED.name())</span>
+<span class="fc" id="L371">            .property(&quot;finalTestResultStatus&quot;,</span>
+<span class="fc" id="L372">                StageStatus.NOT_EVALUATED.name());</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L374">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L376">        return json.endObject().toString();</span>
+    }
+
+<span class="fc" id="L379">    public enum DirtyStatePolicy {</span>
+<span class="fc" id="L380">        REQUIRE_CLEAN</span>
+    }
+
+<span class="fc" id="L383">    public enum FreezeStatus {</span>
+<span class="fc" id="L384">        FROZEN_NOT_RUN</span>
+    }
+
+<span class="fc" id="L387">    public enum StageStatus {</span>
+<span class="fc" id="L388">        NOT_EVALUATED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
