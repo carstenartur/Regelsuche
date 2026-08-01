@@ -7,6 +7,7 @@
   "required": [
     "schema",
     "suiteHash",
+    "evaluationProtocolHash",
     "candidateHash",
     "genomeHash",
     "planHash",
@@ -24,6 +25,9 @@
       "const": "regelsuche.evolution-rewrite-program-train-fitness/v1"
     },
     "suiteHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluationProtocolHash": {
       "$ref": "#/$defs/sha256"
     },
     "candidateHash": {
