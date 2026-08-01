@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionValidationSearchConfiguration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionValidationSearchConfiguration.java</span></div><h1>EvolutionValidationSearchConfiguration.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Bounded search parameters selected together with an evolution genome. */
+public record EvolutionValidationSearchConfiguration(
+    int maxDepth,
+    int maxExpandedStates,
+    int maxCandidatesPerState
+) {
+<span class="fc" id="L12">    public EvolutionValidationSearchConfiguration {</span>
+<span class="pc bpc" id="L13" title="3 of 6 branches missed.">        if (maxDepth &lt; 1 || maxExpandedStates &lt; 1</span>
+                || maxCandidatesPerState &lt; 1) {
+<span class="nc" id="L15">            throw new IllegalArgumentException(</span>
+                &quot;search configuration limits must be positive&quot;);
+        }
+<span class="fc" id="L18">    }</span>
+
+    Map&lt;String, Object&gt; canonicalMaterial() {
+<span class="fc" id="L21">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L22">        value.put(&quot;maxCandidatesPerState&quot;, maxCandidatesPerState);</span>
+<span class="fc" id="L23">        value.put(&quot;maxDepth&quot;, maxDepth);</span>
+<span class="fc" id="L24">        value.put(&quot;maxExpandedStates&quot;, maxExpandedStates);</span>
+<span class="fc" id="L25">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

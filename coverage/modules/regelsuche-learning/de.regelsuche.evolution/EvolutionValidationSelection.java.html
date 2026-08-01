@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionValidationSelection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionValidationSelection.java</span></div><h1>EvolutionValidationSelection.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/**
+ * Immutable VALIDATION-only selection evidence for one completed evolutionary
+ * TRAIN population. The contract ends before FINAL TEST.
+ */
+public record EvolutionValidationSelection(
+    String schema,
+    String studyPlanHash,
+    String splitManifestHash,
+    String trainPopulationRunHash,
+    String validationSuiteHash,
+    String evaluationSplit,
+    List&lt;String&gt; validationCaseIds,
+    List&lt;EvolutionValidationCandidate&gt; candidates,
+    String selectionPolicy,
+    SelectionOutcome selectionOutcome,
+    String selectedGenomeHash,
+    String selectedConfigurationHash,
+    String validationStatus,
+    String finalTestStatus,
+    String proofStatus,
+    String externalNoveltyStatus,
+    String promotionStatus,
+    String publicEvidenceStatus,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-validation-selection/v1&quot;;
+    public static final String SELECTION_POLICY =
+        &quot;MAX_NEWLY_SOLVED_THEN_REACHED_THEN_MIN_RESOURCES_THEN_CONFIGURATION_HASH&quot;;
+    public static final String VALIDATION = &quot;VALIDATION&quot;;
+    public static final String COMPLETED = &quot;COMPLETED&quot;;
+    public static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+
+<span class="fc" id="L43">    private static final Comparator&lt;EvolutionValidationCandidate&gt; ORDER =</span>
+<span class="fc" id="L44">        Comparator.comparingInt(EvolutionValidationCandidate::newlySolvedCases)</span>
+<span class="fc" id="L45">            .reversed()</span>
+<span class="fc" id="L46">            .thenComparing(Comparator.comparingInt(</span>
+<span class="fc" id="L47">                EvolutionValidationCandidate::reachedCases).reversed())</span>
+<span class="fc" id="L48">            .thenComparingLong(EvolutionValidationCandidate::exploredStates)</span>
+<span class="fc" id="L49">            .thenComparingLong(</span>
+                EvolutionValidationCandidate::candidateEvaluations)
+<span class="fc" id="L51">            .thenComparing(EvolutionValidationCandidate::configurationHash);</span>
+
+<span class="fc" id="L53">    public EvolutionValidationSelection {</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(</span>
+                &quot;unsupported validation-selection schema&quot;);
+        }
+<span class="fc" id="L58">        EvolutionGenome.requireSha256(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L59">        EvolutionGenome.requireSha256(splitManifestHash, &quot;splitManifestHash&quot;);</span>
+<span class="fc" id="L60">        EvolutionGenome.requireSha256(</span>
+            trainPopulationRunHash, &quot;trainPopulationRunHash&quot;);
+<span class="fc" id="L62">        EvolutionGenome.requireSha256(</span>
+            validationSuiteHash, &quot;validationSuiteHash&quot;);
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (!VALIDATION.equals(evaluationSplit)) {</span>
+<span class="fc" id="L65">            throw new IllegalArgumentException(</span>
+                &quot;selection evidence must come from the VALIDATION split&quot;);
+        }
+<span class="fc" id="L68">        validationCaseIds = canonicalCaseIds(validationCaseIds);</span>
+<span class="fc" id="L69">        candidates = canonicalCandidates(candidates, validationCaseIds);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (!SELECTION_POLICY.equals(selectionPolicy)) {</span>
+<span class="nc" id="L71">            throw new IllegalArgumentException(</span>
+                &quot;unsupported validation selection policy&quot;);
+        }
+<span class="fc" id="L74">        Objects.requireNonNull(selectionOutcome, &quot;selectionOutcome&quot;);</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        selectedGenomeHash = selectedGenomeHash == null</span>
+<span class="pc" id="L76">            ? &quot;&quot; : selectedGenomeHash;</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        selectedConfigurationHash = selectedConfigurationHash == null</span>
+<span class="pc" id="L78">            ? &quot;&quot; : selectedConfigurationHash;</span>
+<span class="fc" id="L79">        Selection expected = select(candidates);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (selectionOutcome != expected.outcome()</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                || !selectedGenomeHash.equals(expected.genomeHash())</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                || !selectedConfigurationHash.equals(</span>
+<span class="fc" id="L83">                    expected.configurationHash())) {</span>
+<span class="fc" id="L84">            throw new IllegalArgumentException(</span>
+                &quot;frozen selection differs from deterministic VALIDATION result&quot;);
+        }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!COMPLETED.equals(validationStatus)) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(</span>
+                &quot;validation selection must be complete&quot;);
+        }
+<span class="fc" id="L91">        requireNotEvaluated(finalTestStatus, &quot;finalTestStatus&quot;);</span>
+<span class="fc" id="L92">        requireNotEvaluated(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L93">        requireNotEvaluated(</span>
+            externalNoveltyStatus, &quot;externalNoveltyStatus&quot;);
+<span class="fc" id="L95">        requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L96">        requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L97">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L98">        String expectedHash = EvolutionValidationArtifactSupport.hash(payload(</span>
+            studyPlanHash, splitManifestHash, trainPopulationRunHash,
+            validationSuiteHash, evaluationSplit, validationCaseIds,
+            candidates, selectionPolicy, selectionOutcome,
+            selectedGenomeHash, selectedConfigurationHash, validationStatus,
+            finalTestStatus, proofStatus, externalNoveltyStatus,
+            promotionStatus, publicEvidenceStatus));
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!expectedHash.equals(contentHash)) {</span>
+<span class="nc" id="L106">            throw new IllegalArgumentException(</span>
+                &quot;validation selection contentHash mismatch&quot;);
+        }
+<span class="fc" id="L109">    }</span>
+
+    public static EvolutionValidationSelection create(
+        String studyPlanHash,
+        String splitManifestHash,
+        String trainPopulationRunHash,
+        String validationSuiteHash,
+        List&lt;String&gt; validationCaseIds,
+        List&lt;EvolutionValidationCandidate&gt; candidates
+    ) {
+<span class="fc" id="L119">        List&lt;String&gt; retainedCaseIds = canonicalCaseIds(validationCaseIds);</span>
+<span class="fc" id="L120">        List&lt;EvolutionValidationCandidate&gt; retainedCandidates =</span>
+<span class="fc" id="L121">            canonicalCandidates(candidates, retainedCaseIds);</span>
+<span class="fc" id="L122">        Selection selected = select(retainedCandidates);</span>
+<span class="fc" id="L123">        Map&lt;String, Object&gt; payload = payload(</span>
+            studyPlanHash, splitManifestHash, trainPopulationRunHash,
+            validationSuiteHash, VALIDATION, retainedCaseIds,
+<span class="fc" id="L126">            retainedCandidates, SELECTION_POLICY, selected.outcome(),</span>
+<span class="fc" id="L127">            selected.genomeHash(), selected.configurationHash(), COMPLETED,</span>
+            NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED,
+            NOT_EVALUATED, NOT_EVALUATED);
+<span class="fc" id="L130">        return new EvolutionValidationSelection(</span>
+            SCHEMA, studyPlanHash, splitManifestHash, trainPopulationRunHash,
+            validationSuiteHash, VALIDATION, retainedCaseIds,
+<span class="fc" id="L133">            retainedCandidates, SELECTION_POLICY, selected.outcome(),</span>
+<span class="fc" id="L134">            selected.genomeHash(), selected.configurationHash(), COMPLETED,</span>
+            NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED,
+            NOT_EVALUATED, NOT_EVALUATED,
+<span class="fc" id="L137">            EvolutionValidationArtifactSupport.hash(payload));</span>
+    }
+
+    public static EvolutionValidationSelection fromCanonicalJson(String json) {
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L142">            throw new IllegalArgumentException(</span>
+                &quot;validation selection JSON must not be blank&quot;);
+        }
+        try {
+<span class="fc" id="L146">            return EvolutionValidationArtifactSupport.JSON.readValue(</span>
+                json, EvolutionValidationSelection.class);
+<span class="fc" id="L148">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(</span>
+                &quot;invalid validation selection JSON&quot;, exception);
+        }
+    }
+
+    public String toCanonicalJson() {
+        try {
+<span class="fc" id="L156">            Map&lt;String, Object&gt; value = payload(</span>
+                studyPlanHash, splitManifestHash, trainPopulationRunHash,
+                validationSuiteHash, evaluationSplit, validationCaseIds,
+                candidates, selectionPolicy, selectionOutcome,
+                selectedGenomeHash, selectedConfigurationHash,
+                validationStatus, finalTestStatus, proofStatus,
+                externalNoveltyStatus, promotionStatus, publicEvidenceStatus);
+<span class="fc" id="L163">            value.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L164">            value.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L165">            return EvolutionValidationArtifactSupport.JSON</span>
+<span class="fc" id="L166">                .writeValueAsString(value) + &quot;\n&quot;;</span>
+<span class="nc" id="L167">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L168">            throw new IllegalStateException(</span>
+                &quot;cannot serialize validation selection&quot;, exception);
+        }
+    }
+
+    public boolean hasSelection() {
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        return selectionOutcome == SelectionOutcome.SELECTED;</span>
+    }
+
+<span class="fc" id="L177">    public enum SelectionOutcome {</span>
+<span class="fc" id="L178">        SELECTED,</span>
+<span class="fc" id="L179">        NO_ELIGIBLE_CANDIDATE</span>
+    }
+
+<span class="fc" id="L182">    private record Selection(</span>
+        SelectionOutcome outcome,
+        String genomeHash,
+        String configurationHash
+    ) {
+        static Selection none() {
+<span class="fc" id="L188">            return new Selection(</span>
+                SelectionOutcome.NO_ELIGIBLE_CANDIDATE, &quot;&quot;, &quot;&quot;);
+        }
+    }
+
+    private static Selection select(
+        List&lt;EvolutionValidationCandidate&gt; candidates
+    ) {
+<span class="fc" id="L196">        return candidates.stream()</span>
+<span class="fc" id="L197">            .filter(EvolutionValidationCandidate::eligible)</span>
+<span class="fc" id="L198">            .min(ORDER)</span>
+<span class="fc" id="L199">            .map(candidate -&gt; new Selection(</span>
+                SelectionOutcome.SELECTED,
+<span class="fc" id="L201">                candidate.genomeHash(), candidate.configurationHash()))</span>
+<span class="fc" id="L202">            .orElseGet(Selection::none);</span>
+    }
+
+    private static List&lt;String&gt; canonicalCaseIds(List&lt;String&gt; values) {
+<span class="pc bpc" id="L206" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L207">            throw new IllegalArgumentException(</span>
+                &quot;validation suite requires case ids&quot;);
+        }
+<span class="fc" id="L210">        List&lt;String&gt; retained = values.stream()</span>
+<span class="fc" id="L211">            .map(value -&gt; EvolutionValidationArtifactSupport.requireText(</span>
+                value, &quot;validationCaseId&quot;))
+<span class="fc" id="L213">            .toList();</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (retained.stream().distinct().count() != retained.size()) {</span>
+<span class="nc" id="L215">            throw new IllegalArgumentException(</span>
+                &quot;validation suite contains duplicate case ids&quot;);
+        }
+<span class="fc" id="L218">        return retained;</span>
+    }
+
+    private static List&lt;EvolutionValidationCandidate&gt; canonicalCandidates(
+        List&lt;EvolutionValidationCandidate&gt; values,
+        List&lt;String&gt; validationCaseIds
+    ) {
+<span class="pc bpc" id="L225" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L226">            throw new IllegalArgumentException(</span>
+                &quot;validation selection requires candidate configurations&quot;);
+        }
+<span class="fc" id="L229">        List&lt;EvolutionValidationCandidate&gt; retained = values.stream()</span>
+<span class="fc" id="L230">            .map(value -&gt; Objects.requireNonNull(value, &quot;candidate validation&quot;))</span>
+<span class="fc" id="L231">            .sorted(Comparator.comparing(</span>
+                EvolutionValidationCandidate::configurationHash))
+<span class="fc" id="L233">            .toList();</span>
+<span class="fc" id="L234">        if (retained.stream()</span>
+<span class="fc" id="L235">                .map(EvolutionValidationCandidate::configurationHash)</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                .distinct().count() != retained.size()) {</span>
+<span class="nc" id="L237">            throw new IllegalArgumentException(</span>
+                &quot;duplicate validation configuration&quot;);
+        }
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (EvolutionValidationCandidate candidate : retained) {</span>
+<span class="fc" id="L241">            List&lt;String&gt; actual = candidate.cases().stream()</span>
+<span class="fc" id="L242">                .map(EvolutionValidationCaseEvidence::caseId).toList();</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">            if (!validationCaseIds.equals(actual)) {</span>
+<span class="fc" id="L244">                throw new IllegalArgumentException(</span>
+                    &quot;candidate validation does not retain the complete frozen case order&quot;);
+            }
+<span class="fc" id="L247">        }</span>
+<span class="fc" id="L248">        return retained;</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String studyPlanHash,
+        String splitManifestHash,
+        String trainPopulationRunHash,
+        String validationSuiteHash,
+        String evaluationSplit,
+        List&lt;String&gt; validationCaseIds,
+        List&lt;EvolutionValidationCandidate&gt; candidates,
+        String selectionPolicy,
+        SelectionOutcome selectionOutcome,
+        String selectedGenomeHash,
+        String selectedConfigurationHash,
+        String validationStatus,
+        String finalTestStatus,
+        String proofStatus,
+        String externalNoveltyStatus,
+        String promotionStatus,
+        String publicEvidenceStatus
+    ) {
+<span class="fc" id="L270">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L271">        value.put(&quot;candidates&quot;, candidates);</span>
+<span class="fc" id="L272">        value.put(&quot;evaluationSplit&quot;, evaluationSplit);</span>
+<span class="fc" id="L273">        value.put(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus);</span>
+<span class="fc" id="L274">        value.put(&quot;finalTestStatus&quot;, finalTestStatus);</span>
+<span class="fc" id="L275">        value.put(&quot;promotionStatus&quot;, promotionStatus);</span>
+<span class="fc" id="L276">        value.put(&quot;proofStatus&quot;, proofStatus);</span>
+<span class="fc" id="L277">        value.put(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus);</span>
+<span class="fc" id="L278">        value.put(&quot;selectedConfigurationHash&quot;, selectedConfigurationHash);</span>
+<span class="fc" id="L279">        value.put(&quot;selectedGenomeHash&quot;, selectedGenomeHash);</span>
+<span class="fc" id="L280">        value.put(&quot;selectionOutcome&quot;, selectionOutcome);</span>
+<span class="fc" id="L281">        value.put(&quot;selectionPolicy&quot;, selectionPolicy);</span>
+<span class="fc" id="L282">        value.put(&quot;splitManifestHash&quot;, splitManifestHash);</span>
+<span class="fc" id="L283">        value.put(&quot;studyPlanHash&quot;, studyPlanHash);</span>
+<span class="fc" id="L284">        value.put(&quot;trainPopulationRunHash&quot;, trainPopulationRunHash);</span>
+<span class="fc" id="L285">        value.put(&quot;validationCaseIds&quot;, validationCaseIds);</span>
+<span class="fc" id="L286">        value.put(&quot;validationStatus&quot;, validationStatus);</span>
+<span class="fc" id="L287">        value.put(&quot;validationSuiteHash&quot;, validationSuiteHash);</span>
+<span class="fc" id="L288">        return value;</span>
+    }
+
+    private static void requireNotEvaluated(String value, String field) {
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (!NOT_EVALUATED.equals(value)) {</span>
+<span class="fc" id="L293">            throw new IllegalArgumentException(</span>
+                field + &quot; must remain NOT_EVALUATED&quot;);
+        }
+<span class="fc" id="L296">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

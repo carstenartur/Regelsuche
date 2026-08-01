@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionValidationCaseEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionValidationCaseEvidence.java</span></div><h1>EvolutionValidationCaseEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.Objects;
+
+/** Complete paired evidence for one frozen VALIDATION case. */
+public record EvolutionValidationCaseEvidence(
+    String caseId,
+    String family,
+    boolean baselineReached,
+    boolean candidateReached,
+    EvolutionCorrectnessStatus baselineCorrectness,
+    EvolutionCorrectnessStatus candidateCorrectness,
+    String baselineTerminalReason,
+    String candidateTerminalReason,
+    int baselineDepth,
+    int candidateDepth,
+    long baselineExploredStates,
+    long candidateExploredStates,
+    long baselineCandidateEvaluations,
+    long candidateCandidateEvaluations,
+    boolean newlySolved,
+    boolean reachabilityRegression,
+    boolean correctnessFailure,
+    boolean correctnessRegression
+) {
+<span class="fc" id="L26">    public EvolutionValidationCaseEvidence {</span>
+<span class="fc" id="L27">        EvolutionValidationArtifactSupport.requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L28">        EvolutionValidationArtifactSupport.requireText(family, &quot;family&quot;);</span>
+<span class="fc" id="L29">        Objects.requireNonNull(baselineCorrectness, &quot;baselineCorrectness&quot;);</span>
+<span class="fc" id="L30">        Objects.requireNonNull(candidateCorrectness, &quot;candidateCorrectness&quot;);</span>
+<span class="fc" id="L31">        EvolutionValidationArtifactSupport.requireText(</span>
+            baselineTerminalReason, &quot;baselineTerminalReason&quot;);
+<span class="fc" id="L33">        EvolutionValidationArtifactSupport.requireText(</span>
+            candidateTerminalReason, &quot;candidateTerminalReason&quot;);
+<span class="pc bpc" id="L35" title="6 of 12 branches missed.">        if (baselineDepth &lt; -1 || candidateDepth &lt; -1</span>
+                || baselineExploredStates &lt; 0
+                || candidateExploredStates &lt; 0
+                || baselineCandidateEvaluations &lt; 0
+                || candidateCandidateEvaluations &lt; 0) {
+<span class="nc" id="L40">            throw new IllegalArgumentException(</span>
+                &quot;validation case measurements are outside bounded ranges&quot;);
+        }
+<span class="fc" id="L43">        requireReachabilityConsistency(</span>
+            baselineReached, baselineDepth, baselineCorrectness, &quot;baseline&quot;);
+<span class="fc" id="L45">        requireReachabilityConsistency(</span>
+            candidateReached, candidateDepth, candidateCorrectness, &quot;candidate&quot;);
+<span class="fc bfc" id="L47" title="All 6 branches covered.">        boolean expectedNewlySolved = !baselineReached</span>
+            &amp;&amp; candidateReached
+            &amp;&amp; candidateCorrectness == EvolutionCorrectnessStatus.CONFIRMED;
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (newlySolved != expectedNewlySolved) {</span>
+<span class="nc" id="L51">            throw new IllegalArgumentException(</span>
+                &quot;newlySolved differs from retained reachability/correctness&quot;);
+        }
+<span class="pc bpc" id="L54" title="1 of 6 branches missed.">        if (reachabilityRegression</span>
+                != (baselineReached &amp;&amp; !candidateReached)) {
+<span class="nc" id="L56">            throw new IllegalArgumentException(</span>
+                &quot;reachabilityRegression differs from retained reachability&quot;);
+        }
+<span class="fc bfc" id="L59" title="All 4 branches covered.">        boolean expectedCorrectnessFailure = candidateReached</span>
+            &amp;&amp; candidateCorrectness == EvolutionCorrectnessStatus.REFUTED;
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (correctnessFailure != expectedCorrectnessFailure) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(</span>
+                &quot;correctnessFailure differs from retained correctness evidence&quot;);
+        }
+<span class="pc bpc" id="L65" title="1 of 8 branches missed.">        boolean expectedCorrectnessRegression = baselineReached</span>
+            &amp;&amp; baselineCorrectness == EvolutionCorrectnessStatus.CONFIRMED
+            &amp;&amp; candidateReached
+            &amp;&amp; candidateCorrectness == EvolutionCorrectnessStatus.REFUTED;
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (correctnessRegression != expectedCorrectnessRegression) {</span>
+<span class="nc" id="L70">            throw new IllegalArgumentException(</span>
+                &quot;correctnessRegression differs from retained correctness evidence&quot;);
+        }
+<span class="fc" id="L73">    }</span>
+
+    private static void requireReachabilityConsistency(
+        boolean reached,
+        int depth,
+        EvolutionCorrectnessStatus correctness,
+        String side
+    ) {
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (reached &amp;&amp; depth &lt; 0) {</span>
+<span class="nc" id="L82">            throw new IllegalArgumentException(</span>
+                side + &quot; reached target but has no path depth&quot;);
+        }
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">        if (!reached &amp;&amp; depth != -1) {</span>
+<span class="nc" id="L86">            throw new IllegalArgumentException(</span>
+                side + &quot; did not reach target but retains a path depth&quot;);
+        }
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">        if (reached</span>
+                &amp;&amp; correctness == EvolutionCorrectnessStatus.NOT_EVALUATED) {
+<span class="nc" id="L91">            throw new IllegalArgumentException(</span>
+                side + &quot; reached target without correctness evidence&quot;);
+        }
+<span class="fc bfc" id="L94" title="All 4 branches covered.">        if (!reached</span>
+                &amp;&amp; correctness != EvolutionCorrectnessStatus.NOT_EVALUATED) {
+<span class="fc" id="L96">            throw new IllegalArgumentException(</span>
+                side + &quot; has correctness evidence without reaching target&quot;);
+        }
+<span class="fc" id="L99">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

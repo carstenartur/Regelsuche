@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionValidationCandidate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionValidationCandidate.java</span></div><h1>EvolutionValidationCandidate.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.List;
+import java.util.Objects;
+
+/** Complete VALIDATION evidence for one genome/search configuration. */
+public record EvolutionValidationCandidate(
+    String genomeHash,
+    String alphaStructuralHash,
+    EvolutionValidationSearchConfiguration searchConfiguration,
+    String configurationHash,
+    List&lt;EvolutionValidationCaseEvidence&gt; cases,
+    int reachedCases,
+    int newlySolvedCases,
+    int reachabilityRegressions,
+    int correctnessFailures,
+    int correctnessRegressions,
+    long exploredStates,
+    long candidateEvaluations,
+    List&lt;String&gt; blockers
+) {
+<span class="fc" id="L22">    public EvolutionValidationCandidate {</span>
+<span class="fc" id="L23">        EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L24">        EvolutionGenome.requireSha256(</span>
+            alphaStructuralHash, &quot;alphaStructuralHash&quot;);
+<span class="fc" id="L26">        Objects.requireNonNull(searchConfiguration, &quot;searchConfiguration&quot;);</span>
+<span class="fc" id="L27">        EvolutionGenome.requireSha256(configurationHash, &quot;configurationHash&quot;);</span>
+<span class="fc" id="L28">        String expectedHash = EvolutionValidationArtifactSupport.configurationHash(</span>
+            genomeHash, alphaStructuralHash, searchConfiguration);
+<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (!expectedHash.equals(configurationHash)) {</span>
+<span class="nc" id="L31">            throw new IllegalArgumentException(</span>
+                &quot;candidate configurationHash mismatch&quot;);
+        }
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">        if (cases == null || cases.isEmpty()) {</span>
+<span class="nc" id="L35">            throw new IllegalArgumentException(</span>
+                &quot;candidate validation requires case evidence&quot;);
+        }
+<span class="fc" id="L38">        cases = List.copyOf(cases);</span>
+<span class="fc" id="L39">        if (cases.stream().map(EvolutionValidationCaseEvidence::caseId)</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">                .distinct().count() != cases.size()) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(</span>
+                &quot;candidate validation contains duplicate case ids&quot;);
+        }
+<span class="fc" id="L44">        int actualReached = Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L45">            .filter(EvolutionValidationCaseEvidence::candidateReached).count());</span>
+<span class="fc" id="L46">        int actualNewlySolved = Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L47">            .filter(EvolutionValidationCaseEvidence::newlySolved).count());</span>
+<span class="fc" id="L48">        int actualReachabilityRegressions = Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L49">            .filter(EvolutionValidationCaseEvidence::reachabilityRegression)</span>
+<span class="fc" id="L50">            .count());</span>
+<span class="fc" id="L51">        int actualCorrectnessFailures = Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L52">            .filter(EvolutionValidationCaseEvidence::correctnessFailure).count());</span>
+<span class="fc" id="L53">        int actualCorrectnessRegressions = Math.toIntExact(cases.stream()</span>
+<span class="fc" id="L54">            .filter(EvolutionValidationCaseEvidence::correctnessRegression)</span>
+<span class="fc" id="L55">            .count());</span>
+<span class="fc" id="L56">        long actualExplored = cases.stream().mapToLong(</span>
+<span class="fc" id="L57">            EvolutionValidationCaseEvidence::candidateExploredStates).sum();</span>
+<span class="fc" id="L58">        long actualEvaluations = cases.stream().mapToLong(</span>
+            EvolutionValidationCaseEvidence::candidateCandidateEvaluations)
+<span class="fc" id="L60">            .sum();</span>
+<span class="pc bpc" id="L61" title="6 of 14 branches missed.">        if (reachedCases != actualReached</span>
+                || newlySolvedCases != actualNewlySolved
+                || reachabilityRegressions != actualReachabilityRegressions
+                || correctnessFailures != actualCorrectnessFailures
+                || correctnessRegressions != actualCorrectnessRegressions
+                || exploredStates != actualExplored
+                || candidateEvaluations != actualEvaluations) {
+<span class="fc" id="L68">            throw new IllegalArgumentException(</span>
+                &quot;candidate validation aggregates differ from case evidence&quot;);
+        }
+<span class="fc" id="L71">        blockers = EvolutionValidationArtifactSupport.canonicalStrings(</span>
+            blockers, &quot;blocker&quot;);
+<span class="fc" id="L73">    }</span>
+
+    public static EvolutionValidationCandidate create(
+        String genomeHash,
+        String alphaStructuralHash,
+        EvolutionValidationSearchConfiguration searchConfiguration,
+        List&lt;EvolutionValidationCaseEvidence&gt; cases,
+        List&lt;String&gt; blockers
+    ) {
+<span class="fc" id="L82">        List&lt;EvolutionValidationCaseEvidence&gt; retained = List.copyOf(cases);</span>
+<span class="fc" id="L83">        return new EvolutionValidationCandidate(</span>
+            genomeHash,
+            alphaStructuralHash,
+            searchConfiguration,
+<span class="fc" id="L87">            EvolutionValidationArtifactSupport.configurationHash(</span>
+                genomeHash, alphaStructuralHash, searchConfiguration),
+            retained,
+<span class="fc" id="L90">            Math.toIntExact(retained.stream()</span>
+<span class="fc" id="L91">                .filter(EvolutionValidationCaseEvidence::candidateReached)</span>
+<span class="fc" id="L92">                .count()),</span>
+<span class="fc" id="L93">            Math.toIntExact(retained.stream()</span>
+<span class="fc" id="L94">                .filter(EvolutionValidationCaseEvidence::newlySolved).count()),</span>
+<span class="fc" id="L95">            Math.toIntExact(retained.stream()</span>
+<span class="fc" id="L96">                .filter(EvolutionValidationCaseEvidence::reachabilityRegression)</span>
+<span class="fc" id="L97">                .count()),</span>
+<span class="fc" id="L98">            Math.toIntExact(retained.stream()</span>
+<span class="fc" id="L99">                .filter(EvolutionValidationCaseEvidence::correctnessFailure)</span>
+<span class="fc" id="L100">                .count()),</span>
+<span class="fc" id="L101">            Math.toIntExact(retained.stream()</span>
+<span class="fc" id="L102">                .filter(EvolutionValidationCaseEvidence::correctnessRegression)</span>
+<span class="fc" id="L103">                .count()),</span>
+<span class="fc" id="L104">            retained.stream().mapToLong(</span>
+<span class="fc" id="L105">                EvolutionValidationCaseEvidence::candidateExploredStates).sum(),</span>
+<span class="fc" id="L106">            retained.stream().mapToLong(</span>
+                EvolutionValidationCaseEvidence::candidateCandidateEvaluations)
+<span class="fc" id="L108">                .sum(),</span>
+            blockers);
+    }
+
+    public boolean eligible() {
+<span class="fc bfc" id="L113" title="All 6 branches covered.">        return blockers.isEmpty()</span>
+            &amp;&amp; reachabilityRegressions == 0
+            &amp;&amp; correctnessFailures == 0;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
