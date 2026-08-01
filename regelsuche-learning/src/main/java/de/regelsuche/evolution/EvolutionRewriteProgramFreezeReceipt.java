@@ -111,7 +111,7 @@ public record EvolutionRewriteProgramFreezeReceipt(
     ) {
         requireId(freezeId, "freezeId");
         requireCommit(repositoryCommit);
-        requireInputs(
+        validateInputs(
             splitManifest,
             trainSuite,
             validationCommitment,
@@ -181,7 +181,7 @@ public record EvolutionRewriteProgramFreezeReceipt(
         EvolutionRewriteProgramPerformancePlan performancePlan,
         String schemaBundleHash
     ) {
-        requireInputs(
+        validateInputs(
             splitManifest,
             trainSuite,
             validationCommitment,
@@ -240,7 +240,7 @@ public record EvolutionRewriteProgramFreezeReceipt(
             contentHash);
     }
 
-    private static void requireInputs(
+    private static void validateInputs(
         EvolutionSplitManifest splitManifest,
         EvolutionRewriteProgramTrainSuite trainSuite,
         EvolutionRewriteProgramHeldOutCommitment validationCommitment,
