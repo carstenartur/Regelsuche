@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-freeze-receipt-v1.schema.json",
+  "title": "Regelsuche rewrite-program freeze receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "freezeId",
+    "repositoryCommit",
+    "dirtyStatePolicy",
+    "splitManifestHash",
+    "trainSuiteHash",
+    "validationCommitmentHash",
+    "finalTestCommitmentHash",
+    "evaluationProtocolHash",
+    "populationStudyPlanHash",
+    "acceptanceThresholdsHash",
+    "primitiveInventoryHash",
+    "programGrammarHash",
+    "mutationCatalogHash",
+    "baselineAblationPlanHash",
+    "performancePlanHash",
+    "schemaBundleHash",
+    "status",
+    "trainResultStatus",
+    "validationResultStatus",
+    "finalTestResultStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-freeze-receipt/v1"
+    },
+    "freezeId": {"$ref": "#/$defs/id"},
+    "repositoryCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "dirtyStatePolicy": {"const": "REQUIRE_CLEAN"},
+    "splitManifestHash": {"$ref": "#/$defs/sha256"},
+    "trainSuiteHash": {"$ref": "#/$defs/sha256"},
+    "validationCommitmentHash": {"$ref": "#/$defs/sha256"},
+    "finalTestCommitmentHash": {"$ref": "#/$defs/sha256"},
+    "evaluationProtocolHash": {"$ref": "#/$defs/sha256"},
+    "populationStudyPlanHash": {"$ref": "#/$defs/sha256"},
+    "acceptanceThresholdsHash": {"$ref": "#/$defs/sha256"},
+    "primitiveInventoryHash": {"$ref": "#/$defs/sha256"},
+    "programGrammarHash": {"$ref": "#/$defs/sha256"},
+    "mutationCatalogHash": {"$ref": "#/$defs/sha256"},
+    "baselineAblationPlanHash": {"$ref": "#/$defs/sha256"},
+    "performancePlanHash": {"$ref": "#/$defs/sha256"},
+    "schemaBundleHash": {"$ref": "#/$defs/sha256"},
+    "status": {"const": "FROZEN_NOT_RUN"},
+    "trainResultStatus": {"const": "NOT_EVALUATED"},
+    "validationResultStatus": {"const": "NOT_EVALUATED"},
+    "finalTestResultStatus": {"const": "NOT_EVALUATED"},
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
