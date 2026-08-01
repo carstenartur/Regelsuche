@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.parse.ExpressionFormatter;
 import de.regelsuche.parse.ExpressionParser;
@@ -16,19 +17,18 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 
 class PatternRewriteRulePreparedMatchTest {
-    private final ExpressionParser parser = new ExpressionParser();
     private final PatternRewriteRule rule = new PatternRewriteRule(
         "remove_additive_zero",
-        "?A + 0",
-        "?A",
-        RuleKind.SIMPLIFICATION,
+        PatternExpr.op(BinaryOperator.ADD, PatternExpr.var("A"), PatternExpr.num(0)),
+        PatternExpr.var("A"),
+        RewriteKind.NORMALIZE,
         false,
         -1,
         true);
 
     @Test
     void matchingThenApplyingTheSameImmutableSubtreePreservesSemantics() {
-        Expr expression = parser.parseTerm("x + 0");
+        Expr expression = new ExpressionParser().parseTerm("x + 0");
 
         assertTrue(rule.matches(expression));
         assertEquals("x", ExpressionFormatter.format(rule.apply(expression)));
@@ -36,6 +36,7 @@ class PatternRewriteRulePreparedMatchTest {
 
     @Test
     void applyingAnotherSubtreeCannotReuseThePreviousBinding() {
+        ExpressionParser parser = new ExpressionParser();
         Expr first = parser.parseTerm("x + 0");
         Expr second = parser.parseTerm("y + 0");
 
@@ -45,6 +46,7 @@ class PatternRewriteRulePreparedMatchTest {
 
     @Test
     void failedMatchClearsAnEarlierPreparedBinding() {
+        ExpressionParser parser = new ExpressionParser();
         Expr matching = parser.parseTerm("x + 0");
         Expr nonMatching = parser.parseTerm("y * 1");
 
@@ -75,7 +77,7 @@ class PatternRewriteRulePreparedMatchTest {
         CountDownLatch bothMatched,
         CountDownLatch applyNow
     ) throws Exception {
-        Expr expression = parser.parseTerm(source);
+        Expr expression = new ExpressionParser().parseTerm(source);
         assertTrue(rule.matches(expression));
         bothMatched.countDown();
         assertTrue(applyNow.await(5, TimeUnit.SECONDS));
