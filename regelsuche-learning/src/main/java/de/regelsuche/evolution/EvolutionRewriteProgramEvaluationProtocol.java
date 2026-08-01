@@ -33,7 +33,7 @@ public record EvolutionRewriteProgramEvaluationProtocol(
         "information_parity_exact_rational_v1";
     public static final String INFORMATION_PARITY_IMPLEMENTATION =
         "de.regelsuche.evolution."
-            + "InformationParityRewriteProgramTrainFitnessEvaluator";
+            + "ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator";
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]{2,127}");
 
     public EvolutionRewriteProgramEvaluationProtocol {
