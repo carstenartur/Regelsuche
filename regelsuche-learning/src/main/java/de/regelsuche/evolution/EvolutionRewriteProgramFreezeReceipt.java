@@ -271,6 +271,8 @@ public record EvolutionRewriteProgramFreezeReceipt(
         }
         validationCommitment.requireMatches(splitManifest);
         finalTestCommitment.requireMatches(splitManifest);
+        acceptanceThresholds.requireCompatibleWithFinalSurface(
+            finalTestCommitment);
         if (!populationStudyPlan.splitManifestHash().equals(
                 splitManifest.contentHash())
                 || !populationStudyPlan.trainSuiteHash().equals(
