@@ -39,3 +39,14 @@ not counted as newly solved cases, reachability regressions, or mathematical cor
 Before accepting an evaluation, the durable store compares every reservation-bound identity field,
 not only the reservation content hash. File contents are forced to storage and the parent directory is
 forced where the platform supports directory channels.
+
+## Local reproduction
+
+The focused contract can be run from an ordinary checkout without GitHub Actions:
+
+```bash
+./gradlew --no-daemon :regelsuche-learning:test \
+  --tests 'de.regelsuche.evolution.EvolutionFinalTest*'
+```
+
+The repository-wide release-equivalent verification remains `./gradlew --no-daemon ciCheck`.
