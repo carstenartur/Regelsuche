@@ -39,6 +39,9 @@ class EvolutionRewriteProgramFitnessSchemaContractTest {
         assertTrue(fitness.contains("\"candidatePrimitiveSteps\""));
         assertTrue(fitness.contains("\"baselineOuterSearchWorkUnits\""));
         assertTrue(fitness.contains("\"candidateOuterSearchWorkUnits\""));
+        assertTrue(fitness.contains("\"baselineOuterSearchWork\""));
+        assertTrue(fitness.contains("\"candidateOuterSearchWork\""));
+        assertTrue(fitness.contains("\"repeatedApplicationPrunes\""));
         assertTrue(fitness.contains("\"baselinePathAuditCalls\""));
         assertTrue(fitness.contains("\"candidatePathAuditCalls\""));
         assertTrue(fitness.contains("\"baselineTransformationWork\""));
