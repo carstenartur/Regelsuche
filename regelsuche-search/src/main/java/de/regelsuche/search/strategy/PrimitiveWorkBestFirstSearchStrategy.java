@@ -20,12 +20,14 @@ import java.util.Set;
 
 /**
  * Deterministic syntax-targeted best-first search with explicit primitive-step
- * and mechanical-work budgets.
+ * and total-work budgets.
  *
  * <p>Ordinary search-edge depth remains visible, but it never substitutes for
  * primitive depth. A composed program edge containing three primitive rewrites
- * consumes three primitive steps before it can enter the frontier. The work
- * budget includes transformation formation and outer search administration.</p>
+ * consumes three primitive steps before it can enter the frontier. The total
+ * work budget reserves one unit per possible primitive path edge for later
+ * exact auditing; the remainder bounds transformation formation and outer
+ * search administration.</p>
  */
 public final class PrimitiveWorkBestFirstSearchStrategy {
     public Result search(Problem problem) {
@@ -202,7 +204,7 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         MutableMetrics metrics
     ) {
         if (metrics.totalMechanicalWorkUnits(exploredStates)
-                > problem.budget().maxWorkUnits()) {
+                > problem.budget().mechanicalSearchWorkBudget()) {
             metrics.workBudgetExceeded = true;
         }
         return metrics.workBudgetExceeded;
@@ -357,6 +359,7 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         }
     }
 
+    /** Total work budget including a worst-case exact path-audit reserve. */
     public record Budget(
         int maxPrimitiveSteps,
         int maxExploredStates,
@@ -369,10 +372,19 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
                     || maxExploredStates < 1
                     || maxCandidatesPerState < 1
                     || maxExpandingSteps < 0
-                    || maxWorkUnits < 1) {
+                    || maxWorkUnits <= maxPrimitiveSteps) {
                 throw new IllegalArgumentException(
-                    "primitive-work search budgets are invalid");
+                    "primitive-work search budgets are invalid or leave no "
+                        + "mechanical work after exact path-audit reservation");
             }
+        }
+
+        public long exactPathAuditReserve() {
+            return maxPrimitiveSteps;
+        }
+
+        public long mechanicalSearchWorkBudget() {
+            return maxWorkUnits - exactPathAuditReserve();
         }
     }
 
@@ -499,6 +511,14 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
     ) {
         public Metrics {
             Objects.requireNonNull(transformationWork, "transformationWork");
+        }
+
+        public long exactPathAuditReserve() {
+            return primitiveStepBudget;
+        }
+
+        public long mechanicalSearchWorkBudget() {
+            return workUnitBudget - exactPathAuditReserve();
         }
 
         public long outerSearchWorkUnits() {
