@@ -241,6 +241,14 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                             item.baselineGeneratedTransformations())
                         .property("candidateGeneratedTransformations",
                             item.candidateGeneratedTransformations())
+                        .property("baselineOuterSearchWorkUnits",
+                            item.baselineOuterSearchWorkUnits())
+                        .property("candidateOuterSearchWorkUnits",
+                            item.candidateOuterSearchWorkUnits())
+                        .property("baselinePathAuditCalls",
+                            item.baselinePathAuditCalls())
+                        .property("candidatePathAuditCalls",
+                            item.candidatePathAuditCalls())
                         .property("baselineTotalWorkUnits",
                             item.baselineTotalWorkUnits())
                         .property("candidateTotalWorkUnits",
@@ -324,6 +332,10 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         long candidateExploredStates,
         long baselineGeneratedTransformations,
         long candidateGeneratedTransformations,
+        long baselineOuterSearchWorkUnits,
+        long candidateOuterSearchWorkUnits,
+        long baselinePathAuditCalls,
+        long candidatePathAuditCalls,
         TransformationWorkMetrics baselineTransformationWork,
         TransformationWorkMetrics candidateTransformationWork,
         boolean programUsed,
@@ -373,6 +385,10 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                 candidateExploredStates,
                 baselineGeneratedTransformations,
                 candidateGeneratedTransformations,
+                0,
+                0,
+                0,
+                0,
                 TransformationWorkMetrics.ZERO,
                 TransformationWorkMetrics.ZERO,
                 programUsed,
@@ -399,7 +415,11 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                     || baselinePrimitiveSteps < 0 || candidatePrimitiveSteps < 0
                     || baselineExploredStates < 0 || candidateExploredStates < 0
                     || baselineGeneratedTransformations < 0
-                    || candidateGeneratedTransformations < 0) {
+                    || candidateGeneratedTransformations < 0
+                    || baselineOuterSearchWorkUnits < 0
+                    || candidateOuterSearchWorkUnits < 0
+                    || baselinePathAuditCalls < 0
+                    || candidatePathAuditCalls < 0) {
                 throw new IllegalArgumentException(
                     "invalid rewrite-program TRAIN case metrics");
             }
@@ -446,11 +466,36 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         }
 
         public long baselineTotalWorkUnits() {
-            return baselineTransformationWork.totalWorkUnits();
+            return totalWork(
+                baselineTransformationWork,
+                baselineOuterSearchWorkUnits,
+                baselinePathAuditCalls);
         }
 
         public long candidateTotalWorkUnits() {
-            return candidateTransformationWork.totalWorkUnits();
+            return totalWork(
+                candidateTransformationWork,
+                candidateOuterSearchWorkUnits,
+                candidatePathAuditCalls);
+        }
+
+        private static long totalWork(
+            TransformationWorkMetrics transformationWork,
+            long outerSearchWorkUnits,
+            long pathAuditCalls
+        ) {
+            return add(add(
+                transformationWork.totalWorkUnits(),
+                outerSearchWorkUnits),
+                pathAuditCalls);
+        }
+
+        private static long add(long left, long right) {
+            try {
+                return Math.addExact(left, right);
+            } catch (ArithmeticException exception) {
+                return Long.MAX_VALUE;
+            }
         }
     }
 
