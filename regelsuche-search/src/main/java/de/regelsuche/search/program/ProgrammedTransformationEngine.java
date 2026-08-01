@@ -1,16 +1,17 @@
 package de.regelsuche.search.program;
 
-import de.regelsuche.transform.Transformation;
+import de.regelsuche.transform.MeasuredTransformationEngine;
+import de.regelsuche.transform.TransformationBatch;
 import de.regelsuche.transform.TransformationEngine;
-import java.util.List;
 import java.util.Objects;
 
 /**
  * Adapter that makes an interpreted rewrite program available to every
  * existing search strategy through the ordinary {@link TransformationEngine}
- * interface.
+ * interface while retaining deterministic internal-work metrics.
  */
-public final class ProgrammedTransformationEngine implements TransformationEngine {
+public final class ProgrammedTransformationEngine
+        implements MeasuredTransformationEngine {
     private final RewriteProgram program;
     private final RewriteProgramInterpreter interpreter;
     private final RewriteTraceLevel traceLevel;
@@ -46,8 +47,11 @@ public final class ProgrammedTransformationEngine implements TransformationEngin
     }
 
     @Override
-    public List<Transformation> transform(String expression) {
-        return execute(expression).transformations();
+    public TransformationBatch transformMeasured(String expression) {
+        RewriteExecution execution = execute(expression);
+        return new TransformationBatch(
+            execution.transformations(),
+            execution.workMetrics());
     }
 
     public RewriteExecution execute(String expression) {
