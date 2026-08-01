@@ -2,10 +2,10 @@ package de.regelsuche.evolution;
 
 import de.regelsuche.assumption.AssumptionSignature;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.CaseMeasurement;
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainFitnessEvidence.PathCorrectness;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
-import de.regelsuche.math.algorithms.equivalence.RationalFunctionNormalFormEquivalenceService;
 import de.regelsuche.scoring.ExpressionScorer;
 import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy;
 import de.regelsuche.search.strategy.PrimitiveWorkBestFirstSearchStrategy.Budget;
@@ -31,6 +31,9 @@ import java.util.Set;
  * the candidate genome. The candidate run differs only by the additional
  * compiled program. Both runs use the same primitive-step and total-work
  * budgets.</p>
+ *
+ * <p>Exact path auditing is injected through the validation-layer port, so the
+ * learning module remains independent of a concrete CAS implementation.</p>
  */
 public final class InformationParityRewriteProgramTrainFitnessEvaluator {
     private static final Set<FitnessComponent> SUPPORTED_COMPONENTS = Set.of(
@@ -46,19 +49,20 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
     private final Set<FitnessComponent> requiredComponents;
     private final EvolutionGenomeCompiler genomeCompiler;
     private final EvolutionRewriteProgramCompiler programCompiler;
-    private final RationalFunctionNormalFormEquivalenceService equivalence;
+    private final AssumptionAwareEquivalenceService equivalence;
     private final WorkSearchRunner searchRunner;
 
     public InformationParityRewriteProgramTrainFitnessEvaluator(
         EvolutionRewriteProgramTrainSuite suite,
-        Set<FitnessComponent> requiredComponents
+        Set<FitnessComponent> requiredComponents,
+        AssumptionAwareEquivalenceService equivalence
     ) {
         this(
             suite,
             requiredComponents,
             new EvolutionGenomeCompiler(),
             new EvolutionRewriteProgramCompiler(),
-            new RationalFunctionNormalFormEquivalenceService(),
+            equivalence,
             InformationParityRewriteProgramTrainFitnessEvaluator::search);
     }
 
@@ -67,7 +71,7 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
         Set<FitnessComponent> requiredComponents,
         EvolutionGenomeCompiler genomeCompiler,
         EvolutionRewriteProgramCompiler programCompiler,
-        RationalFunctionNormalFormEquivalenceService equivalence,
+        AssumptionAwareEquivalenceService equivalence,
         WorkSearchRunner searchRunner
     ) {
         this.suite = Objects.requireNonNull(suite, "suite");
@@ -255,8 +259,9 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             return new PathAudit(PathCorrectness.UNSUPPORTED, 0);
         }
         for (int index = 0; index + 1 < path.size(); index++) {
-            var evaluation = equivalence.evaluate(
-                path.get(index), path.get(index + 1), declaredAssumptions);
+            AssumptionAwareEquivalenceService.Evaluation evaluation =
+                equivalence.evaluate(
+                    path.get(index), path.get(index + 1), declaredAssumptions);
             PathCorrectness correctness = switch (evaluation.status()) {
                 case CONFIRMED -> PathCorrectness.CONFIRMED;
                 case REFUTED -> PathCorrectness.REFUTED;
