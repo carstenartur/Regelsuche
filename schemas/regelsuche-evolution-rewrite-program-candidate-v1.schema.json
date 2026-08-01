@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-candidate-v1.schema.json",
+  "title": "Regelsuche evolution rewrite-program candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "genomeHash",
+    "genomeAlphaStructuralHash",
+    "planHash",
+    "planAlphaStructuralHash",
+    "alphaStructuralHash",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-candidate/v1"
+    },
+    "genomeHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "genomeAlphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "planHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "planAlphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "alphaStructuralHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

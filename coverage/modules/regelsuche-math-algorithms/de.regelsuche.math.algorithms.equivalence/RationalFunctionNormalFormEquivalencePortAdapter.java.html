@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RationalFunctionNormalFormEquivalencePortAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-math-algorithms</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.math.algorithms.equivalence</a> &gt; <span class="el_source">RationalFunctionNormalFormEquivalencePortAdapter.java</span></div><h1>RationalFunctionNormalFormEquivalencePortAdapter.java</h1><pre class="source lang-java linenums">package de.regelsuche.math.algorithms.equivalence;
+
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Validation-port adapter for the exact rational-function normal-form audit.
+ */
+public final class RationalFunctionNormalFormEquivalencePortAdapter
+        implements AssumptionAwareEquivalenceService {
+
+    private final RationalFunctionNormalFormEquivalenceService delegate;
+
+    public RationalFunctionNormalFormEquivalencePortAdapter() {
+<span class="fc" id="L16">        this(new RationalFunctionNormalFormEquivalenceService());</span>
+<span class="fc" id="L17">    }</span>
+
+    RationalFunctionNormalFormEquivalencePortAdapter(
+        RationalFunctionNormalFormEquivalenceService delegate
+<span class="fc" id="L21">    ) {</span>
+<span class="fc" id="L22">        this.delegate = Objects.requireNonNull(delegate, &quot;delegate&quot;);</span>
+<span class="fc" id="L23">    }</span>
+
+    @Override
+    public Evaluation evaluate(
+        String leftExpression,
+        String rightExpression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L31">        RationalFunctionNormalFormEquivalenceService.Evaluation result =</span>
+<span class="fc" id="L32">            delegate.evaluate(leftExpression, rightExpression, assumptions);</span>
+<span class="fc" id="L33">        return new Evaluation(</span>
+<span class="fc" id="L34">            Status.valueOf(result.status().name()),</span>
+<span class="fc" id="L35">            result.equivalent(),</span>
+<span class="fc" id="L36">            result.leftCrossNormalForm(),</span>
+<span class="fc" id="L37">            result.rightCrossNormalForm(),</span>
+<span class="fc" id="L38">            result.requiredNonZeroFactors(),</span>
+<span class="fc" id="L39">            result.providedNonZeroFactors(),</span>
+<span class="fc" id="L40">            result.missingNonZeroFactors(),</span>
+<span class="fc" id="L41">            result.unsupportedAssumptions(),</span>
+<span class="fc" id="L42">            result.detail());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

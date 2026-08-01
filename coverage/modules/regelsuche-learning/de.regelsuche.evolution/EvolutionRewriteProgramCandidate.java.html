@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramCandidate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramCandidate.java</span></div><h1>EvolutionRewriteProgramCandidate.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Objects;
+
+/** One executable evolutionary candidate: rule genome plus strategy topology. */
+public record EvolutionRewriteProgramCandidate(
+    String schema,
+    EvolutionGenome genome,
+    EvolutionRewriteProgramPlan plan,
+    String alphaStructuralHash,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-candidate/v1&quot;;
+
+<span class="fc" id="L17">    public EvolutionRewriteProgramCandidate {</span>
+<span class="pc bpc" id="L18" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L19">            throw new IllegalArgumentException(</span>
+                &quot;unsupported evolution rewrite-program candidate schema&quot;);
+        }
+<span class="fc" id="L22">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L23">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (!genome.contentHash().equals(plan.genomeHash())) {</span>
+<span class="nc" id="L25">            throw new IllegalArgumentException(</span>
+                &quot;candidate plan is bound to a different genome&quot;);
+        }
+<span class="fc" id="L28">        EvolutionGenome.requireSha256(</span>
+            alphaStructuralHash, &quot;alphaStructuralHash&quot;);
+<span class="fc" id="L30">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L31">        String expectedAlpha = EvolutionGenome.hash(alphaMaterial(genome, plan));</span>
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">        if (!expectedAlpha.equals(alphaStructuralHash)) {</span>
+<span class="nc" id="L33">            throw new IllegalArgumentException(</span>
+                &quot;candidate alphaStructuralHash does not match genome and plan&quot;);
+        }
+<span class="fc" id="L36">        String expectedContent = EvolutionGenome.hash(canonicalPayload(</span>
+            genome, plan, alphaStructuralHash));
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (!expectedContent.equals(contentHash)) {</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(</span>
+                &quot;candidate contentHash does not match genome and plan&quot;);
+        }
+<span class="fc" id="L42">    }</span>
+
+    public static EvolutionRewriteProgramCandidate create(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan
+    ) {
+<span class="fc" id="L48">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L49">        Objects.requireNonNull(plan, &quot;plan&quot;);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (!genome.contentHash().equals(plan.genomeHash())) {</span>
+<span class="nc" id="L51">            throw new IllegalArgumentException(</span>
+                &quot;candidate plan is bound to a different genome&quot;);
+        }
+<span class="fc" id="L54">        String alphaHash = EvolutionGenome.hash(alphaMaterial(genome, plan));</span>
+<span class="fc" id="L55">        String payload = canonicalPayload(genome, plan, alphaHash);</span>
+<span class="fc" id="L56">        return new EvolutionRewriteProgramCandidate(</span>
+            SCHEMA,
+            genome,
+            plan,
+            alphaHash,
+<span class="fc" id="L61">            EvolutionGenome.hash(payload));</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="nc" id="L65">        return render(genome, plan, alphaStructuralHash, contentHash);</span>
+    }
+
+    private static String alphaMaterial(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan
+    ) {
+<span class="fc" id="L72">        return SCHEMA</span>
+<span class="fc" id="L73">            + &quot;\ngenomeAlphaStructuralHash=&quot; + genome.alphaStructuralHash()</span>
+<span class="fc" id="L74">            + &quot;\nplanAlphaStructuralHash=&quot; + plan.alphaStructuralHash();</span>
+    }
+
+    private static String canonicalPayload(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan,
+        String alphaHash
+    ) {
+<span class="fc" id="L82">        return render(genome, plan, alphaHash, null);</span>
+    }
+
+    private static String render(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan plan,
+        String alphaHash,
+        String contentHash
+    ) {
+<span class="fc" id="L91">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L92">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L93">            .property(&quot;genomeHash&quot;, genome.contentHash())</span>
+<span class="fc" id="L94">            .property(&quot;genomeAlphaStructuralHash&quot;, genome.alphaStructuralHash())</span>
+<span class="fc" id="L95">            .property(&quot;planHash&quot;, plan.contentHash())</span>
+<span class="fc" id="L96">            .property(&quot;planAlphaStructuralHash&quot;, plan.alphaStructuralHash())</span>
+<span class="fc" id="L97">            .property(&quot;alphaStructuralHash&quot;, alphaHash);</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
+<span class="nc" id="L99">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L101">        return json.endObject().toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

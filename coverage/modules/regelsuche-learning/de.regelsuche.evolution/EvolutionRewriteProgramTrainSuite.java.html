@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramTrainSuite.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramTrainSuite.java</span></div><h1>EvolutionRewriteProgramTrainSuite.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.parse.ExpressionFormatter;
+import de.regelsuche.parse.ExpressionParser;
+import de.regelsuche.search.SearchHeuristic;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/** Frozen assumption-aware TRAIN cases for executable rewrite-program fitness. */
+public record EvolutionRewriteProgramTrainSuite(
+    String schema,
+    String suiteId,
+    EvaluatorProfile evaluatorProfile,
+    List&lt;TrainCase&gt; cases,
+    SearchHeuristic heuristic,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-train-suite/v1&quot;;
+<span class="fc" id="L25">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+
+<span class="fc" id="L27">    public EvolutionRewriteProgramTrainSuite {</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L29">            throw new IllegalArgumentException(</span>
+                &quot;unsupported rewrite-program TRAIN suite schema&quot;);
+        }
+<span class="fc" id="L32">        requireId(suiteId, &quot;suiteId&quot;);</span>
+<span class="fc" id="L33">        Objects.requireNonNull(evaluatorProfile, &quot;evaluatorProfile&quot;);</span>
+<span class="fc" id="L34">        cases = canonicalCases(cases);</span>
+<span class="fc" id="L35">        Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L36">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L37">        String expected = EvolutionGenome.hash(render(</span>
+            suiteId, evaluatorProfile, cases, heuristic, null));
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program TRAIN suite contentHash mismatch&quot;);
+        }
+<span class="fc" id="L43">    }</span>
+
+    public static EvolutionRewriteProgramTrainSuite create(
+        String suiteId,
+        EvaluatorProfile evaluatorProfile,
+        List&lt;TrainCase&gt; cases,
+        SearchHeuristic heuristic
+    ) {
+<span class="fc" id="L51">        requireId(suiteId, &quot;suiteId&quot;);</span>
+<span class="fc" id="L52">        Objects.requireNonNull(evaluatorProfile, &quot;evaluatorProfile&quot;);</span>
+<span class="fc" id="L53">        List&lt;TrainCase&gt; canonicalCases = canonicalCases(cases);</span>
+<span class="fc" id="L54">        Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L55">        String hash = EvolutionGenome.hash(render(</span>
+            suiteId, evaluatorProfile, canonicalCases, heuristic, null));
+<span class="fc" id="L57">        return new EvolutionRewriteProgramTrainSuite(</span>
+            SCHEMA,
+            suiteId,
+            evaluatorProfile,
+            canonicalCases,
+            heuristic,
+            hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="nc" id="L67">        return render(</span>
+            suiteId, evaluatorProfile, cases, heuristic, contentHash);
+    }
+
+    private static List&lt;TrainCase&gt; canonicalCases(List&lt;TrainCase&gt; values) {
+<span class="fc" id="L72">        Objects.requireNonNull(values, &quot;cases&quot;);</span>
+<span class="fc" id="L73">        List&lt;TrainCase&gt; result = values.stream()</span>
+<span class="fc" id="L74">            .map(item -&gt; Objects.requireNonNull(item, &quot;TRAIN case&quot;))</span>
+<span class="fc" id="L75">            .sorted(Comparator.comparing(TrainCase::caseId))</span>
+<span class="fc" id="L76">            .toList();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program TRAIN suite must not be empty&quot;);
+        }
+<span class="fc" id="L81">        if (new HashSet&lt;&gt;(result.stream().map(TrainCase::caseId).toList()).size()</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L83">            throw new IllegalArgumentException(</span>
+                &quot;rewrite-program TRAIN case IDs must be unique&quot;);
+        }
+<span class="fc" id="L86">        return result;</span>
+    }
+
+    private static String render(
+        String suiteId,
+        EvaluatorProfile evaluatorProfile,
+        List&lt;TrainCase&gt; cases,
+        SearchHeuristic heuristic,
+        String contentHash
+    ) {
+<span class="fc" id="L96">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L97">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L98">            .property(&quot;suiteId&quot;, suiteId)</span>
+<span class="fc" id="L99">            .property(&quot;evaluationSplit&quot;, &quot;TRAIN&quot;)</span>
+<span class="fc" id="L100">            .property(&quot;evaluatorProfile&quot;, evaluatorProfile.name())</span>
+<span class="fc" id="L101">            .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L102">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L103">                    .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L104">                    .property(&quot;familyId&quot;, item.familyId())</span>
+<span class="fc" id="L105">                    .property(&quot;inputExpression&quot;, item.inputExpression())</span>
+<span class="fc" id="L106">                    .property(&quot;targetExpression&quot;, item.targetExpression())</span>
+<span class="fc" id="L107">                    .stringArray(&quot;assumptions&quot;, item.assumptions()))))</span>
+<span class="fc" id="L108">            .object(&quot;heuristic&quot;, object -&gt; object</span>
+<span class="fc" id="L109">                .property(&quot;maxDepth&quot;, heuristic.maxDepth())</span>
+<span class="fc" id="L110">                .property(&quot;maxVisitedExpressions&quot;,</span>
+<span class="fc" id="L111">                    heuristic.maxVisitedExpressions())</span>
+<span class="fc" id="L112">                .property(&quot;significantImprovementThreshold&quot;,</span>
+<span class="fc" id="L113">                    heuristic.significantImprovementThreshold())</span>
+<span class="fc" id="L114">                .property(&quot;maxExpandingSteps&quot;, heuristic.maxExpandingSteps())</span>
+<span class="fc" id="L115">                .property(&quot;maxCandidatesPerState&quot;,</span>
+<span class="fc" id="L116">                    heuristic.maxCandidatesPerState())</span>
+<span class="fc" id="L117">                .property(&quot;beamWidth&quot;, heuristic.beamWidth()));</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (contentHash != null) {</span>
+<span class="nc" id="L119">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L121">        return json.endObject().toString();</span>
+    }
+
+<span class="fc" id="L124">    public enum EvaluatorProfile {</span>
+<span class="fc" id="L125">        EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS</span>
+    }
+
+    public record TrainCase(
+        String caseId,
+        String familyId,
+        String inputExpression,
+        String targetExpression,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L135">        public TrainCase {</span>
+<span class="fc" id="L136">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L137">            requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L138">            inputExpression = normalizeExpression(inputExpression);</span>
+<span class="fc" id="L139">            targetExpression = normalizeExpression(targetExpression);</span>
+<span class="fc" id="L140">            assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L141">                .normalizedAssumptions();</span>
+<span class="fc" id="L142">        }</span>
+    }
+
+    private static String normalizeExpression(String expression) {
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L147">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+        }
+<span class="fc" id="L149">        return ExpressionFormatter.format(</span>
+<span class="fc" id="L150">            new ExpressionParser().parseTerm(expression));</span>
+    }
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L154" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L155">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L157">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
