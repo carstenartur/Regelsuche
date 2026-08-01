@@ -73,6 +73,29 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         }
     }
 
+    /**
+     * Compatibility path for the information-parity diagnostic evaluator. The
+     * semantics are fixed to the same official protocol, while population
+     * execution additionally verifies the evaluator object through the
+     * protocol-bound runner.
+     */
+    public static EvolutionRewriteProgramTrainFitnessEvidence create(
+        EvolutionRewriteProgramTrainSuite suite,
+        EvolutionRewriteProgramCandidate candidate,
+        List<CaseMeasurement> cases,
+        Map<FitnessComponent, Integer> rawComponents,
+        List<String> blockers
+    ) {
+        return create(
+            suite,
+            EvolutionRewriteProgramEvaluationProtocol
+                .informationParityExactRationalV1(),
+            candidate,
+            cases,
+            rawComponents,
+            blockers);
+    }
+
     public static EvolutionRewriteProgramTrainFitnessEvidence create(
         EvolutionRewriteProgramTrainSuite suite,
         EvolutionRewriteProgramEvaluationProtocol protocol,
