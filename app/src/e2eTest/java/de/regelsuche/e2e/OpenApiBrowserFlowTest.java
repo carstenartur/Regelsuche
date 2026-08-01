@@ -94,8 +94,14 @@ class OpenApiBrowserFlowTest {
         assertTrue(submitJob.innerText().contains("/api/proof/jobs"));
         submitJob.locator(".opblock-summary").click();
         page.waitForFunction("() => Array.from(document.querySelectorAll('.opblock'))"
-            + ".some(block => block.textContent.includes('submitProofJob')"
-            + " && block.querySelector('.opblock-body'))");
+            + ".some(block => {"
+            + " const text = block.textContent || '';"
+            + " return text.includes('submitProofJob')"
+            + " && block.querySelector('.opblock-body')"
+            + " && text.includes('leftPattern')"
+            + " && text.includes('201')"
+            + " && text.includes('400');"
+            + "})");
         String contract = submitJob.innerText();
         assertTrue(contract.contains("leftPattern"));
         assertTrue(contract.contains("201"));
