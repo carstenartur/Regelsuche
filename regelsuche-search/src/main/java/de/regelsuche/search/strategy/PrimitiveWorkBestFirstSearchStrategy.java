@@ -33,181 +33,196 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
     public Result search(Problem problem) {
         Objects.requireNonNull(problem, "problem");
         State root = State.root(problem);
-        if (root.expression().equals(problem.targetExpression())) {
-            MutableMetrics rootMetrics = new MutableMetrics();
-            return result(
-                problem,
-                List.of(root),
-                root,
-                root,
-                Status.ROOT_ALREADY_TARGET,
-                rootMetrics);
+        if (isTarget(root, problem)) {
+            return rootResult(problem, root);
         }
 
-        PriorityQueue<State> frontier = new PriorityQueue<>(
-            comparator(problem));
-        Set<String> queued = new HashSet<>();
-        Set<String> visited = new HashSet<>();
-        List<State> explored = new ArrayList<>();
-        MutableMetrics metrics = new MutableMetrics();
-        frontier.add(root);
-        queued.add(stateKey(root));
-        State best = root;
-        State reached = null;
-
-        while (!frontier.isEmpty()
-                && explored.size() < problem.budget().maxExploredStates()
-                && !metrics.workBudgetExceeded) {
-            State current = frontier.remove();
-            queued.remove(stateKey(current));
-            if (!visited.add(stateKey(current))) {
-                metrics.duplicatePrunes = add(metrics.duplicatePrunes, 1);
-                checkWorkBudget(problem, explored.size(), metrics);
-                continue;
-            }
-            explored.add(current);
-            if (checkWorkBudget(problem, explored.size(), metrics)) {
+        SearchContext context = SearchContext.start(problem, root);
+        while (context.canContinue(problem)) {
+            if (processNextState(problem, context) == LoopAction.STOP) {
                 break;
-            }
-            if (better(current, best, problem)) {
-                best = current;
-            }
-            if (current.expression().equals(problem.targetExpression())) {
-                reached = current;
-                break;
-            }
-            if (current.primitiveDepth()
-                    >= problem.budget().maxPrimitiveSteps()) {
-                metrics.primitiveBudgetPrunes = add(
-                    metrics.primitiveBudgetPrunes, 1);
-                checkWorkBudget(problem, explored.size(), metrics);
-                continue;
-            }
-
-            TransformationBatch batch = problem.engine()
-                .transformMeasured(current.expression());
-            metrics.engineBatches = add(metrics.engineBatches, 1);
-            metrics.work = metrics.work.plus(batch.workMetrics());
-            if (checkWorkBudget(problem, explored.size(), metrics)) {
-                break;
-            }
-            metrics.expandedStates = add(metrics.expandedStates, 1);
-            metrics.generatedTransformations = add(
-                metrics.generatedTransformations,
-                batch.transformations().size());
-            if (batch.transformations().isEmpty()) {
-                metrics.statesWithoutTransformations = add(
-                    metrics.statesWithoutTransformations, 1);
-            }
-            if (checkWorkBudget(problem, explored.size(), metrics)) {
-                break;
-            }
-
-            List<Transformation> transformations = new ArrayList<>(
-                batch.transformations());
-            transformations.sort(transformationComparator(problem));
-            int accepted = 0;
-            for (Transformation transformation : transformations) {
-                if (metrics.workBudgetExceeded) {
-                    break;
-                }
-                if (accepted >= problem.budget().maxCandidatesPerState()) {
-                    metrics.candidateBudgetPrunes = add(
-                        metrics.candidateBudgetPrunes, 1);
-                    checkWorkBudget(problem, explored.size(), metrics);
-                    break;
-                }
-                if (current.appliedRuleApplications().contains(
-                        transformation.applicationKey())) {
-                    metrics.repeatedApplicationPrunes = add(
-                        metrics.repeatedApplicationPrunes, 1);
-                    checkWorkBudget(problem, explored.size(), metrics);
-                    continue;
-                }
-                int nextExpandingSteps = current.expandingSteps()
-                    + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);
-                if (nextExpandingSteps
-                        > problem.budget().maxExpandingSteps()) {
-                    metrics.expansionBudgetPrunes = add(
-                        metrics.expansionBudgetPrunes, 1);
-                    checkWorkBudget(problem, explored.size(), metrics);
-                    continue;
-                }
-                int nextPrimitiveDepth;
-                try {
-                    nextPrimitiveDepth = Math.addExact(
-                        current.primitiveDepth(),
-                        transformation.primitiveStepCount());
-                } catch (ArithmeticException exception) {
-                    metrics.primitiveBudgetPrunes = add(
-                        metrics.primitiveBudgetPrunes, 1);
-                    checkWorkBudget(problem, explored.size(), metrics);
-                    continue;
-                }
-                if (nextPrimitiveDepth
-                        > problem.budget().maxPrimitiveSteps()) {
-                    metrics.primitiveBudgetPrunes = add(
-                        metrics.primitiveBudgetPrunes, 1);
-                    checkWorkBudget(problem, explored.size(), metrics);
-                    continue;
-                }
-                if (transformation.transformedExpression().equals(
-                        current.expression())) {
-                    metrics.sameExpressionPrunes = add(
-                        metrics.sameExpressionPrunes, 1);
-                    checkWorkBudget(problem, explored.size(), metrics);
-                    continue;
-                }
-
-                State next = current.next(
-                    problem,
-                    transformation,
-                    nextPrimitiveDepth,
-                    nextExpandingSteps);
-                String key = stateKey(next);
-                if (visited.contains(key) || !queued.add(key)) {
-                    metrics.duplicatePrunes = add(metrics.duplicatePrunes, 1);
-                    checkWorkBudget(problem, explored.size(), metrics);
-                    continue;
-                }
-                frontier.add(next);
-                metrics.enqueuedStates = add(metrics.enqueuedStates, 1);
-                accepted++;
-                checkWorkBudget(problem, explored.size(), metrics);
             }
         }
-
-        Status status;
-        if (reached != null) {
-            status = Status.REACHED;
-        } else if (metrics.workBudgetExceeded) {
-            status = Status.WORK_BUDGET;
-        } else if (!frontier.isEmpty()
-                && explored.size() >= problem.budget().maxExploredStates()) {
-            status = Status.OUTER_STATE_BUDGET;
-        } else if (metrics.candidateBudgetPrunes > 0) {
-            status = Status.CANDIDATE_BUDGET;
-        } else if (metrics.primitiveBudgetPrunes > 0) {
-            status = Status.PRIMITIVE_BUDGET;
-        } else if (metrics.expandedStates > 0
-                && metrics.generatedTransformations == 0) {
-            status = Status.NO_TRANSFORMATIONS;
-        } else {
-            status = Status.FRONTIER_EXHAUSTED;
-        }
-        return result(problem, explored, reached, best, status, metrics);
+        return finish(problem, context);
     }
 
-    private static boolean checkWorkBudget(
+    private static Result rootResult(Problem problem, State root) {
+        return result(
+            problem,
+            List.of(root),
+            root,
+            root,
+            Status.ROOT_ALREADY_TARGET,
+            new MutableMetrics());
+    }
+
+    private static LoopAction processNextState(
         Problem problem,
-        int exploredStates,
-        MutableMetrics metrics
+        SearchContext context
     ) {
-        if (metrics.totalMechanicalWorkUnits(exploredStates)
-                > problem.budget().mechanicalSearchWorkBudget()) {
-            metrics.workBudgetExceeded = true;
+        State current = context.poll();
+        if (!context.visit(current)) {
+            return context.prune(problem, PruneKind.DUPLICATE);
         }
-        return metrics.workBudgetExceeded;
+        if (context.exceedsWorkBudget(problem)) {
+            return LoopAction.STOP;
+        }
+
+        context.considerBest(current, problem);
+        if (isTarget(current, problem)) {
+            context.reached = current;
+            return LoopAction.STOP;
+        }
+        if (current.primitiveDepth()
+                >= problem.budget().maxPrimitiveSteps()) {
+            return context.prune(problem, PruneKind.PRIMITIVE_BUDGET);
+        }
+        return expand(problem, context, current);
+    }
+
+    private static LoopAction expand(
+        Problem problem,
+        SearchContext context,
+        State current
+    ) {
+        TransformationBatch batch = problem.engine()
+            .transformMeasured(current.expression());
+        context.account(batch);
+        if (context.exceedsWorkBudget(problem)) {
+            return LoopAction.STOP;
+        }
+
+        List<Transformation> transformations = new ArrayList<>(
+            batch.transformations());
+        transformations.sort(transformationComparator(problem));
+        return enqueueCandidates(problem, context, current, transformations);
+    }
+
+    private static LoopAction enqueueCandidates(
+        Problem problem,
+        SearchContext context,
+        State current,
+        List<Transformation> transformations
+    ) {
+        int accepted = 0;
+        for (Transformation transformation : transformations) {
+            if (context.metrics.workBudgetExceeded) {
+                return LoopAction.STOP;
+            }
+            if (accepted >= problem.budget().maxCandidatesPerState()) {
+                return context.prune(problem, PruneKind.CANDIDATE_BUDGET);
+            }
+            CandidateAction action = processCandidate(
+                problem, context, current, transformation);
+            if (action == CandidateAction.STOP) {
+                return LoopAction.STOP;
+            }
+            if (action == CandidateAction.ENQUEUED) {
+                accepted++;
+            }
+        }
+        return LoopAction.CONTINUE;
+    }
+
+    private static CandidateAction processCandidate(
+        Problem problem,
+        SearchContext context,
+        State current,
+        Transformation transformation
+    ) {
+        if (current.appliedRuleApplications().contains(
+                transformation.applicationKey())) {
+            return context.reject(problem, PruneKind.REPEATED_APPLICATION);
+        }
+
+        int nextExpandingSteps = nextExpandingSteps(current, transformation);
+        if (nextExpandingSteps > problem.budget().maxExpandingSteps()) {
+            return context.reject(problem, PruneKind.EXPANSION_BUDGET);
+        }
+
+        int nextPrimitiveDepth = nextPrimitiveDepth(current, transformation);
+        if (nextPrimitiveDepth < 0
+                || nextPrimitiveDepth > problem.budget().maxPrimitiveSteps()) {
+            return context.reject(problem, PruneKind.PRIMITIVE_BUDGET);
+        }
+        if (transformation.transformedExpression().equals(
+                current.expression())) {
+            return context.reject(problem, PruneKind.SAME_EXPRESSION);
+        }
+
+        State next = current.next(
+            problem,
+            transformation,
+            nextPrimitiveDepth,
+            nextExpandingSteps);
+        if (!context.queue(next)) {
+            return context.reject(problem, PruneKind.DUPLICATE);
+        }
+        context.metrics.enqueuedStates = add(
+            context.metrics.enqueuedStates, 1);
+        return context.exceedsWorkBudget(problem)
+            ? CandidateAction.STOP
+            : CandidateAction.ENQUEUED;
+    }
+
+    private static int nextExpandingSteps(
+        State current,
+        Transformation transformation
+    ) {
+        return current.expandingSteps()
+            + (transformation.kind() == RewriteKind.EXPAND ? 1 : 0);
+    }
+
+    private static int nextPrimitiveDepth(
+        State current,
+        Transformation transformation
+    ) {
+        try {
+            return Math.addExact(
+                current.primitiveDepth(),
+                transformation.primitiveStepCount());
+        } catch (ArithmeticException exception) {
+            return -1;
+        }
+    }
+
+    private static boolean isTarget(State state, Problem problem) {
+        return state.expression().equals(problem.targetExpression());
+    }
+
+    private static Result finish(Problem problem, SearchContext context) {
+        return result(
+            problem,
+            context.explored,
+            context.reached,
+            context.best,
+            status(problem, context),
+            context.metrics);
+    }
+
+    private static Status status(Problem problem, SearchContext context) {
+        if (context.reached != null) {
+            return Status.REACHED;
+        }
+        if (context.metrics.workBudgetExceeded) {
+            return Status.WORK_BUDGET;
+        }
+        if (!context.frontier.isEmpty()
+                && context.explored.size()
+                    >= problem.budget().maxExploredStates()) {
+            return Status.OUTER_STATE_BUDGET;
+        }
+        if (context.metrics.candidateBudgetPrunes > 0) {
+            return Status.CANDIDATE_BUDGET;
+        }
+        if (context.metrics.primitiveBudgetPrunes > 0) {
+            return Status.PRIMITIVE_BUDGET;
+        }
+        if (context.metrics.expandedStates > 0
+                && context.metrics.generatedTransformations == 0) {
+            return Status.NO_TRANSFORMATIONS;
+        }
+        return Status.FRONTIER_EXHAUSTED;
     }
 
     private static Result result(
@@ -560,6 +575,135 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         public boolean reached() {
             return status == Status.REACHED
                 || status == Status.ROOT_ALREADY_TARGET;
+        }
+    }
+
+    private enum LoopAction {
+        CONTINUE,
+        STOP
+    }
+
+    private enum CandidateAction {
+        ENQUEUED,
+        REJECTED,
+        STOP
+    }
+
+    private enum PruneKind {
+        DUPLICATE,
+        REPEATED_APPLICATION,
+        SAME_EXPRESSION,
+        EXPANSION_BUDGET,
+        PRIMITIVE_BUDGET,
+        CANDIDATE_BUDGET
+    }
+
+    private static final class SearchContext {
+        private final PriorityQueue<State> frontier;
+        private final Set<String> queued = new HashSet<>();
+        private final Set<String> visited = new HashSet<>();
+        private final List<State> explored = new ArrayList<>();
+        private final MutableMetrics metrics = new MutableMetrics();
+        private State best;
+        private State reached;
+
+        private SearchContext(Problem problem, State root) {
+            frontier = new PriorityQueue<>(comparator(problem));
+            frontier.add(root);
+            queued.add(stateKey(root));
+            best = root;
+        }
+
+        private static SearchContext start(Problem problem, State root) {
+            return new SearchContext(problem, root);
+        }
+
+        private boolean canContinue(Problem problem) {
+            return !frontier.isEmpty()
+                && explored.size() < problem.budget().maxExploredStates()
+                && !metrics.workBudgetExceeded;
+        }
+
+        private State poll() {
+            State current = frontier.remove();
+            queued.remove(stateKey(current));
+            return current;
+        }
+
+        private boolean visit(State current) {
+            if (!visited.add(stateKey(current))) {
+                return false;
+            }
+            explored.add(current);
+            return true;
+        }
+
+        private void considerBest(State current, Problem problem) {
+            if (better(current, best, problem)) {
+                best = current;
+            }
+        }
+
+        private void account(TransformationBatch batch) {
+            metrics.engineBatches = add(metrics.engineBatches, 1);
+            metrics.work = metrics.work.plus(batch.workMetrics());
+            metrics.expandedStates = add(metrics.expandedStates, 1);
+            metrics.generatedTransformations = add(
+                metrics.generatedTransformations,
+                batch.transformations().size());
+            if (batch.transformations().isEmpty()) {
+                metrics.statesWithoutTransformations = add(
+                    metrics.statesWithoutTransformations, 1);
+            }
+        }
+
+        private boolean queue(State state) {
+            String key = stateKey(state);
+            if (visited.contains(key) || !queued.add(key)) {
+                return false;
+            }
+            frontier.add(state);
+            return true;
+        }
+
+        private LoopAction prune(Problem problem, PruneKind kind) {
+            increment(kind);
+            return exceedsWorkBudget(problem)
+                ? LoopAction.STOP
+                : LoopAction.CONTINUE;
+        }
+
+        private CandidateAction reject(Problem problem, PruneKind kind) {
+            increment(kind);
+            return exceedsWorkBudget(problem)
+                ? CandidateAction.STOP
+                : CandidateAction.REJECTED;
+        }
+
+        private void increment(PruneKind kind) {
+            switch (kind) {
+                case DUPLICATE -> metrics.duplicatePrunes = add(
+                    metrics.duplicatePrunes, 1);
+                case REPEATED_APPLICATION ->
+                    metrics.repeatedApplicationPrunes = add(
+                        metrics.repeatedApplicationPrunes, 1);
+                case SAME_EXPRESSION -> metrics.sameExpressionPrunes = add(
+                    metrics.sameExpressionPrunes, 1);
+                case EXPANSION_BUDGET -> metrics.expansionBudgetPrunes = add(
+                    metrics.expansionBudgetPrunes, 1);
+                case PRIMITIVE_BUDGET -> metrics.primitiveBudgetPrunes = add(
+                    metrics.primitiveBudgetPrunes, 1);
+                case CANDIDATE_BUDGET -> metrics.candidateBudgetPrunes = add(
+                    metrics.candidateBudgetPrunes, 1);
+            }
+        }
+
+        private boolean exceedsWorkBudget(Problem problem) {
+            if (metrics.totalMechanicalWorkUnits(explored.size())
+                    > problem.budget().mechanicalSearchWorkBudget()) {
+                metrics.workBudgetExceeded = true;
+            }
+            return metrics.workBudgetExceeded;
         }
     }
 
