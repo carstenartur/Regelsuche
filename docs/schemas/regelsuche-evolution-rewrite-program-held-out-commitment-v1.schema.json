@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-held-out-commitment-v1.schema.json",
+  "title": "Regelsuche rewrite-program held-out commitment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyId",
+    "split",
+    "cases",
+    "sealedRevealHash",
+    "revealPolicy",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-held-out-commitment/v1"
+    },
+    "studyId": {
+      "$ref": "#/$defs/id"
+    },
+    "split": {
+      "enum": ["VALIDATION", "FINAL_TEST"]
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/caseCommitment"
+      }
+    },
+    "sealedRevealHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "revealPolicy": {
+      "enum": [
+        "AFTER_TRAIN_POPULATION_COMPLETE",
+        "ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION"
+      ]
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "split": {"const": "VALIDATION"}
+        }
+      },
+      "then": {
+        "properties": {
+          "revealPolicy": {"const": "AFTER_TRAIN_POPULATION_COMPLETE"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "split": {"const": "FINAL_TEST"}
+        }
+      },
+      "then": {
+        "properties": {
+          "revealPolicy": {
+            "const": "ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{2,127}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "caseCommitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "familyCommitmentHash",
+        "inputHash",
+        "targetHash",
+        "assumptionsHash",
+        "exactSignatureHash",
+        "alphaSignatureHash",
+        "difficultyTierHash",
+        "expectedTerminalClassHash",
+        "revealEntryHash"
+      ],
+      "properties": {
+        "caseId": {"$ref": "#/$defs/id"},
+        "familyCommitmentHash": {"$ref": "#/$defs/sha256"},
+        "inputHash": {"$ref": "#/$defs/sha256"},
+        "targetHash": {"$ref": "#/$defs/sha256"},
+        "assumptionsHash": {"$ref": "#/$defs/sha256"},
+        "exactSignatureHash": {"$ref": "#/$defs/sha256"},
+        "alphaSignatureHash": {"$ref": "#/$defs/sha256"},
+        "difficultyTierHash": {"$ref": "#/$defs/sha256"},
+        "expectedTerminalClassHash": {"$ref": "#/$defs/sha256"},
+        "revealEntryHash": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
