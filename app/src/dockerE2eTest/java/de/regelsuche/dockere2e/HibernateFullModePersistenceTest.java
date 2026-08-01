@@ -38,7 +38,9 @@ class HibernateFullModePersistenceTest {
         .withEnv("POSTGRES_USER", "regelsuche")
         .withEnv("POSTGRES_PASSWORD", "regelsuche-demo")
         .withExposedPorts(5432)
-        .waitingFor(Wait.forListeningPort());
+        .waitingFor(Wait.forLogMessage(
+            ".*database system is ready to accept connections.*\\n",
+            2));
 
     @TempDir
     Path tempDir;
