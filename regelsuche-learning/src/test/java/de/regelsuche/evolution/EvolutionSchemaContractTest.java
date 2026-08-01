@@ -29,6 +29,8 @@ class EvolutionSchemaContractTest {
             "regelsuche-evolution-train-fitness-v1.schema.json");
         String rewriteProgram = readSchema(
             "regelsuche-evolution-rewrite-program-plan-v1.schema.json");
+        String rewriteProgramMutations = readSchema(
+            "regelsuche-evolution-rewrite-program-mutation-batch-v1.schema.json");
 
         assertTrue(genome.contains("regelsuche.evolution-genome/v1"));
         assertTrue(genome.contains("\"const\": \"TRAIN\""));
@@ -125,6 +127,23 @@ class EvolutionSchemaContractTest {
                 EvolutionRewriteProgramPlan.PriorityKind.values()) {
             assertTrue(rewriteProgram.contains("\"" + kind.name() + "\""),
                 kind.name());
+        }
+
+        assertTrue(rewriteProgramMutations.contains(
+            "regelsuche.evolution-rewrite-program-mutation-batch/v1"));
+        assertTrue(rewriteProgramMutations.contains(
+            "\"additionalProperties\": false"));
+        assertTrue(rewriteProgramMutations.contains("\"acceptedPlanHashes\""));
+        assertTrue(rewriteProgramMutations.contains("\"blockers\""));
+        for (EvolutionRewriteProgramMutationKind kind :
+                EvolutionRewriteProgramMutationKind.values()) {
+            assertTrue(rewriteProgramMutations.contains(
+                "\"" + kind.name() + "\""), kind.name());
+        }
+        for (DeterministicRewriteProgramMutator.MutationStatus status :
+                DeterministicRewriteProgramMutator.MutationStatus.values()) {
+            assertTrue(rewriteProgramMutations.contains(
+                "\"" + status.name() + "\""), status.name());
         }
     }
 
