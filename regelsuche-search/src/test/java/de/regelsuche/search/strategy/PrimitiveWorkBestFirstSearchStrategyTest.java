@@ -71,6 +71,28 @@ class PrimitiveWorkBestFirstSearchStrategyTest {
     }
 
     @Test
+    void outerSearchAdministrationCanExhaustBudgetWithoutInternalProgramWork() {
+        MeasuredTransformationEngine empty = expression ->
+            new TransformationBatch(List.of(), TransformationWorkMetrics.ZERO);
+
+        var result = search.search(problem(
+            empty,
+            new Budget(1, 10, 10, 10, 3)));
+
+        assertFalse(result.reached());
+        assertEquals(
+            PrimitiveWorkBestFirstSearchStrategy.Status.WORK_BUDGET,
+            result.status());
+        assertEquals(0,
+            result.metrics().transformationWork().totalWorkUnits());
+        assertTrue(result.metrics().outerSearchWorkUnits()
+            > result.metrics().mechanicalSearchWorkBudget());
+        assertEquals(
+            result.metrics().outerSearchWorkUnits(),
+            result.metrics().totalMechanicalWorkUnits());
+    }
+
+    @Test
     void flatAndMacroPathsReceiveTheSamePrimitiveAllowance() {
         TransformationEngine flat = expression -> switch (expression) {
             case "a" -> List.of(primitive("r1", "b"));
@@ -98,9 +120,11 @@ class PrimitiveWorkBestFirstSearchStrategyTest {
         assertEquals(2, flatResult.reachedState().edgeDepth());
         assertEquals(1, macroResult.reachedState().edgeDepth());
         assertTrue(
-            macroResult.metrics().transformationWork().totalWorkUnits()
-                > flatResult.metrics().transformationWork().totalWorkUnits(),
-            "the macro's additional internal/frontier work remains visible");
+            macroResult.metrics().totalMechanicalWorkUnits()
+                > flatResult.metrics().totalMechanicalWorkUnits(),
+            "the macro's additional internal and outer work remains visible");
+        assertEquals(2, budget.exactPathAuditReserve());
+        assertEquals(998, budget.mechanicalSearchWorkBudget());
     }
 
     private static Problem problem(
