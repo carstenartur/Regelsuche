@@ -33,6 +33,11 @@ import java.util.Set;
  * {@link de.regelsuche.search.program.ProgrammedTransformationEngine} produced
  * from the candidate topology. A gain can therefore be attributed to program
  * composition rather than hidden rule access.</p>
+ *
+ * <p>Resource reductions contribute fitness only when the retained candidate
+ * path actually contains a {@code program:} edge. Merely adding a program to
+ * the candidate frontier must not earn program credit when the reached path
+ * still consists exclusively of the information-parity flat rules.</p>
  */
 public final class InformationParityRewriteProgramTrainFitnessEvaluator {
     private static final Set<FitnessComponent> SUPPORTED_COMPONENTS = Set.of(
@@ -388,7 +393,8 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
     }
 
     private static boolean comparable(CaseMeasurement item) {
-        return item.baselineReached()
+        return item.programUsed()
+            && item.baselineReached()
             && item.candidateReached()
             && item.baselinePathCorrectness() == PathCorrectness.CONFIRMED
             && item.candidatePathCorrectness() == PathCorrectness.CONFIRMED;
