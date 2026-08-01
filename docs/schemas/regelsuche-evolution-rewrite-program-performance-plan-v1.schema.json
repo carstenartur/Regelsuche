@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-performance-plan-v1.schema.json",
+  "title": "Regelsuche rewrite-program performance plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "benchmarkRevisionHash",
+    "benchmarkSuiteHash",
+    "runtimeEnvironmentHash",
+    "warmupIterations",
+    "measurementIterations",
+    "forks",
+    "sampleTimeMillis",
+    "allocationMeasurementRequired",
+    "requiredLayers",
+    "fixedWorkEndToEndRequired",
+    "fixedTimeDiagnosticRequired",
+    "maximumPinnedRegressionPermille",
+    "canonicalEvidenceParityRequired",
+    "referenceFallbackRequired",
+    "scientificResourceAuthority",
+    "wallClockRole",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-performance-plan/v1"
+    },
+    "benchmarkRevisionHash": {"$ref": "#/$defs/sha256"},
+    "benchmarkSuiteHash": {"$ref": "#/$defs/sha256"},
+    "runtimeEnvironmentHash": {"$ref": "#/$defs/sha256"},
+    "warmupIterations": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "measurementIterations": {
+      "type": "integer",
+      "minimum": 3
+    },
+    "forks": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "sampleTimeMillis": {
+      "type": "integer",
+      "minimum": 100
+    },
+    "allocationMeasurementRequired": {"const": true},
+    "requiredLayers": {
+      "const": [
+        "AST_MATCH_AND_REWRITE",
+        "CANONICALIZATION",
+        "DEDUPLICATION",
+        "END_TO_END",
+        "EXACT_AUDIT",
+        "EXECUTOR",
+        "FRONTIER"
+      ]
+    },
+    "fixedWorkEndToEndRequired": {"const": true},
+    "fixedTimeDiagnosticRequired": {"const": true},
+    "maximumPinnedRegressionPermille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 250
+    },
+    "canonicalEvidenceParityRequired": {"const": true},
+    "referenceFallbackRequired": {"const": true},
+    "scientificResourceAuthority": {
+      "const": "CANONICAL_PRIMITIVE_AND_TOTAL_WORK_LEDGER"
+    },
+    "wallClockRole": {
+      "const": "ENVIRONMENT_QUALIFIED_ENGINEERING_DIAGNOSTIC"
+    },
+    "contentHash": {"$ref": "#/$defs/sha256"}
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
