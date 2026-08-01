@@ -11,8 +11,11 @@ import de.regelsuche.evolution.EvolutionStudyPlan.StudyStatus;
 import de.regelsuche.json.JsonWriter;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /** Preregistered TRAIN population plan for combined genome/program candidates. */
@@ -101,6 +104,12 @@ public record EvolutionRewriteProgramStudyPlan(
         Objects.requireNonNull(trainSuite, "trainSuite");
         Objects.requireNonNull(mutationCatalog, "mutationCatalog");
         Objects.requireNonNull(seedCandidates, "seedCandidates");
+        requireId(studyId, "studyId");
+        if (!studyId.equals(splitManifest.studyId())) {
+            throw new IllegalArgumentException(
+                "studyId differs from split-manifest studyId");
+        }
+        requireExactTrainSurface(splitManifest, trainSuite);
         if (seedCandidates.isEmpty()) {
             throw new IllegalArgumentException(
                 "seedCandidates must not be empty");
@@ -118,6 +127,7 @@ public record EvolutionRewriteProgramStudyPlan(
                     "seed candidate is outside split-manifest TRAIN scope");
             }
         }
+        requireCatalogSourcesInEverySeed(mutationCatalog, seedCandidates);
         List<String> seedHashes = canonicalHashes(
             seedCandidates.stream()
                 .map(EvolutionRewriteProgramCandidate::contentHash)
@@ -183,6 +193,13 @@ public record EvolutionRewriteProgramStudyPlan(
         Objects.requireNonNull(splitManifest, "splitManifest");
         Objects.requireNonNull(trainSuite, "trainSuite");
         Objects.requireNonNull(mutationCatalog, "mutationCatalog");
+        Objects.requireNonNull(seeds, "seeds");
+        if (!studyId.equals(splitManifest.studyId())) {
+            throw new IllegalArgumentException(
+                "rewrite-program studyId differs from split manifest");
+        }
+        requireExactTrainSurface(splitManifest, trainSuite);
+        requireCatalogSourcesInEverySeed(mutationCatalog, seeds);
         if (!splitManifest.contentHash().equals(splitManifestHash)
                 || !trainSuite.contentHash().equals(trainSuiteHash)
                 || !mutationCatalog.contentHash().equals(mutationCatalogHash)) {
@@ -197,6 +214,44 @@ public record EvolutionRewriteProgramStudyPlan(
         if (!seedCandidateHashes.equals(actualSeeds)) {
             throw new IllegalArgumentException(
                 "rewrite-program study seed candidates differ");
+        }
+    }
+
+    private static void requireExactTrainSurface(
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite trainSuite
+    ) {
+        Map<String, String> manifestCases = new LinkedHashMap<>();
+        splitManifest.trainCases().forEach(reference ->
+            manifestCases.put(reference.caseId(), reference.familyId()));
+        Map<String, String> suiteCases = new LinkedHashMap<>();
+        trainSuite.cases().forEach(trainCase ->
+            suiteCases.put(trainCase.caseId(), trainCase.familyId()));
+        if (!manifestCases.equals(suiteCases)) {
+            throw new IllegalArgumentException(
+                "TRAIN suite case/family surface differs from split manifest");
+        }
+    }
+
+    private static void requireCatalogSourcesInEverySeed(
+        MutationCatalog mutationCatalog,
+        List<EvolutionRewriteProgramCandidate> seedCandidates
+    ) {
+        Set<String> referenced = new HashSet<>(mutationCatalog.sourceGeneIds());
+        mutationCatalog.priorities().forEach(priority ->
+            referenced.addAll(priority.preferredGeneIds()));
+        for (EvolutionRewriteProgramCandidate candidate : seedCandidates) {
+            Set<String> available = candidate.genome().rewrites().stream()
+                .map(EvolutionGenome.RewriteGene::geneId)
+                .collect(java.util.stream.Collectors.toSet());
+            Set<String> missing = new HashSet<>(referenced);
+            missing.removeAll(available);
+            if (!missing.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "mutation catalog references genes absent from seed "
+                        + candidate.contentHash() + ": " + missing.stream()
+                            .sorted().toList());
+            }
         }
     }
 
