@@ -69,6 +69,12 @@ identity and counts the primitive steps. Path-length fitness therefore cannot
 claim a two-step program costs one primitive operation merely because the
 search graph stores it as one replayable edge.
 
+Explored-state and primitive-step reductions contribute fitness only for a
+confirmed candidate path that actually contains a `program:` edge. Merely
+adding a program to the candidate frontier can change queue pressure or tie
+ordering; it must not earn topology credit when the retained solution path uses
+only the same flat rules already available to the baseline.
+
 Explored states and generated transformations remain separate dimensions. Raw
 fitness components remain authoritative independently of the frozen scalar
 population profile.
