@@ -102,6 +102,65 @@ def verifyJmhBenchmark = tasks.register('verifyJmhBenchmark', Exec) {
     }
 }
 
+def jmhAllocationResult = project(':app').layout.buildDirectory.file(
+    'reports/jmh-allocation/result.json')
+def runJmhAllocationBenchmark = tasks.register(
+    'runJmhAllocationBenchmark', Exec) {
+    group = 'verification'
+    description = 'Runs the scoped AST/search JMH set with normalized GC allocation metrics.'
+    dependsOn ':app:jmhJar'
+    workingDir repositoryRoot
+    outputs.file jmhAllocationResult
+    outputs.upToDateWhen { false }
+    doFirst {
+        def result = jmhAllocationResult.get().asFile
+        result.parentFile.mkdirs()
+        def jmhJar = project(':app').tasks.named('jmhJar').get()
+            .archiveFile.get().asFile
+        def javaName = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+            .contains('windows') ? 'java.exe' : 'java'
+        def javaExecutable = new File(
+            new File(System.getProperty('java.home'), 'bin'), javaName)
+        commandLine javaExecutable.absolutePath,
+            '-jar', jmhJar.absolutePath,
+            '.*(directAstRewriteSource|preparedAstRewriteSource|referenceFixedWorkSearch|preparedFixedWorkSearch|referenceTargetedSearch|preparedTargetedSearch)',
+            '-bm', 'avgt',
+            '-tu', 'ms',
+            '-f', '1',
+            '-wi', '2',
+            '-i', '3',
+            '-w', '1s',
+            '-r', '1s',
+            '-prof', 'gc',
+            '-foe', 'true',
+            '-rf', 'json',
+            '-rff', result.absolutePath
+    }
+}
+
+runJmhAllocationBenchmark.configure {
+    mustRunAfter ':app:jmh'
+}
+
+def verifyJmhAllocationBenchmark = tasks.register(
+    'verifyJmhAllocationBenchmark', Exec) {
+    group = 'verification'
+    description = 'Verifies normalized B/op evidence for scoped AST and search benchmarks.'
+    dependsOn 'prepareVerificationEnvironment', runJmhAllocationBenchmark
+    workingDir repositoryRoot
+    inputs.file repositoryRoot.file('scripts/verify-jmh-allocation-benchmark.py')
+    inputs.file jmhAllocationResult
+    outputs.file repositoryRoot.file('public/dev/bench/allocation.json')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine verificationPython.get().absolutePath,
+            'scripts/verify-jmh-allocation-benchmark.py',
+            '--result', jmhAllocationResult.get().asFile.absolutePath,
+            '--summary-output',
+            repositoryRoot.file('public/dev/bench/allocation.json').asFile.absolutePath
+    }
+}
+
 def z3VersionOutput = new ByteArrayOutputStream()
 def verifyComparativeZ3Toolchain = tasks.register(
     'verifyComparativeZ3Toolchain', Exec) {
@@ -210,7 +269,9 @@ tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
 }
 
 tasks.matching { candidate -> candidate.name == 'fullCheck' }.configureEach {
-    dependsOn verifyJmhBenchmark, verifyComparativeBenchmarks
+    dependsOn verifyJmhBenchmark,
+        verifyJmhAllocationBenchmark,
+        verifyComparativeBenchmarks
 }
 
 tasks.matching { candidate -> candidate.name == 'generateCiPages' }.configureEach {
