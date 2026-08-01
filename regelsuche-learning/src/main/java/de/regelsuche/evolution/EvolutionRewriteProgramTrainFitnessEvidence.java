@@ -13,11 +13,12 @@ import java.util.regex.Pattern;
 
 /**
  * Canonical paired production-search evidence for one genome/program candidate
- * on one frozen assumption-aware TRAIN suite.
+ * on one frozen assumption-aware TRAIN suite and evaluation protocol.
  */
 public record EvolutionRewriteProgramTrainFitnessEvidence(
     String schema,
     String suiteHash,
+    String evaluationProtocolHash,
     String candidateHash,
     String genomeHash,
     String planHash,
@@ -40,6 +41,8 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                 "unsupported rewrite-program TRAIN fitness schema");
         }
         EvolutionGenome.requireSha256(suiteHash, "suiteHash");
+        EvolutionGenome.requireSha256(
+            evaluationProtocolHash, "evaluationProtocolHash");
         EvolutionGenome.requireSha256(candidateHash, "candidateHash");
         EvolutionGenome.requireSha256(genomeHash, "genomeHash");
         EvolutionGenome.requireSha256(planHash, "planHash");
@@ -56,6 +59,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         EvolutionGenome.requireSha256(contentHash, "contentHash");
         String expected = EvolutionGenome.hash(render(
             suiteHash,
+            evaluationProtocolHash,
             candidateHash,
             genomeHash,
             planHash,
@@ -71,19 +75,26 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
 
     public static EvolutionRewriteProgramTrainFitnessEvidence create(
         EvolutionRewriteProgramTrainSuite suite,
+        EvolutionRewriteProgramEvaluationProtocol protocol,
         EvolutionRewriteProgramCandidate candidate,
         List<CaseMeasurement> cases,
         Map<FitnessComponent, Integer> rawComponents,
         List<String> blockers
     ) {
         Objects.requireNonNull(suite, "suite");
+        Objects.requireNonNull(protocol, "protocol");
         Objects.requireNonNull(candidate, "candidate");
+        if (suite.evaluatorProfile() != protocol.evaluatorProfile()) {
+            throw new IllegalArgumentException(
+                "TRAIN suite evaluator profile differs from evidence protocol");
+        }
         List<CaseMeasurement> canonicalCases = canonicalCases(cases);
         Map<FitnessComponent, Integer> canonicalComponents =
             canonicalComponents(rawComponents);
         List<String> canonicalBlockers = canonicalStrings(blockers);
         String hash = EvolutionGenome.hash(render(
             suite.contentHash(),
+            protocol.contentHash(),
             candidate.contentHash(),
             candidate.genome().contentHash(),
             candidate.plan().contentHash(),
@@ -94,6 +105,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         return new EvolutionRewriteProgramTrainFitnessEvidence(
             SCHEMA,
             suite.contentHash(),
+            protocol.contentHash(),
             candidate.contentHash(),
             candidate.genome().contentHash(),
             candidate.plan().contentHash(),
@@ -110,6 +122,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
     public String toCanonicalJson() {
         return render(
             suiteHash,
+            evaluationProtocolHash,
             candidateHash,
             genomeHash,
             planHash,
@@ -167,6 +180,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
 
     private static String render(
         String suiteHash,
+        String evaluationProtocolHash,
         String candidateHash,
         String genomeHash,
         String planHash,
@@ -178,6 +192,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         JsonWriter json = new JsonWriter().beginObject()
             .property("schema", SCHEMA)
             .property("suiteHash", suiteHash)
+            .property("evaluationProtocolHash", evaluationProtocolHash)
             .property("candidateHash", candidateHash)
             .property("genomeHash", genomeHash)
             .property("planHash", planHash)
