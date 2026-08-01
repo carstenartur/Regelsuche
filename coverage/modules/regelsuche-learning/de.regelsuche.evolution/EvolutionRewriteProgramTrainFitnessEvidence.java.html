@@ -286,7 +286,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
 <span class="nc" id="L286">                throw new IllegalArgumentException(</span>
                     &quot;unreached baseline path must be NOT_EVALUATED&quot;);
             }
-<span class="pc bpc" id="L289" title="3 of 4 branches missed.">            if (!candidateReached</span>
+<span class="pc bpc" id="L289" title="1 of 4 branches missed.">            if (!candidateReached</span>
                     &amp;&amp; candidatePathCorrectness != PathCorrectness.NOT_EVALUATED) {
 <span class="nc" id="L291">                throw new IllegalArgumentException(</span>
                     &quot;unreached candidate path must be NOT_EVALUATED&quot;);
@@ -295,7 +295,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
 <span class="nc" id="L295">                throw new IllegalArgumentException(</span>
                     &quot;programUsed requires a reached candidate path&quot;);
             }
-<span class="pc bpc" id="L298" title="3 of 8 branches missed.">            boolean expectedNewlySolved = !baselineReached</span>
+<span class="pc bpc" id="L298" title="2 of 8 branches missed.">            boolean expectedNewlySolved = !baselineReached</span>
                 &amp;&amp; candidateReached
                 &amp;&amp; programUsed
                 &amp;&amp; candidatePathCorrectness == PathCorrectness.CONFIRMED;
@@ -306,7 +306,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
 <span class="nc" id="L306">                throw new IllegalArgumentException(</span>
                     &quot;reachabilityRegression is inconsistent&quot;);
             }
-<span class="pc bpc" id="L309" title="2 of 6 branches missed.">            boolean expectedCorrectnessFailure = candidateReached</span>
+<span class="pc bpc" id="L309" title="1 of 6 branches missed.">            boolean expectedCorrectnessFailure = candidateReached</span>
                 &amp;&amp; (candidatePathCorrectness == PathCorrectness.REFUTED
                     || candidatePathCorrectness
                         == PathCorrectness.MISSING_ASSUMPTION);

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-population-run-v1.schema.json",
+  "title": "Regelsuche rewrite-program population run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyPlanHash",
+    "seedCandidateHashes",
+    "generationReportHashes",
+    "finalCandidateHashes",
+    "terminalOutcome",
+    "mutationAttempts",
+    "trainEvaluations",
+    "validationStatus",
+    "finalTestStatus",
+    "proofStatus",
+    "externalNoveltyStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-population-run/v1"
+    },
+    "studyPlanHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seedCandidateHashes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "generationReportHashes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "finalCandidateHashes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "terminalOutcome": {
+      "enum": [
+        "COMPLETED",
+        "EXTINCT",
+        "DIVERSITY_FLOOR",
+        "BUDGET_EXHAUSTED",
+        "STAGNATED"
+      ]
+    },
+    "mutationAttempts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "trainEvaluations": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "validationStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "finalTestStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "proofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
