@@ -46,9 +46,17 @@ A plan binds:
 - the exact genome content hash;
 - one immutable root node;
 - explicit maximum node and depth limits;
-- an alpha-structural hash that ignores node and gene names while retaining
-  topology, order, bounds, guards and priorities;
+- an alpha-structural hash that ignores node identifiers, normalizes referenced
+  genes through one stable program-wide alias table, and retains topology,
+  ordered rule use, bounds, guards and priorities;
 - an exact content hash over the complete canonical payload.
+
+The alias table is established before the tree is traversed. It is therefore
+independent of execution order. Swapping two different source rules in a
+`Sequence` or `FirstApplicable` node changes the alpha identity, while merely
+renaming node IDs does not. This distinction is required because rule order can
+change executable search semantics and must remain visible to population
+diversity and duplicate suppression.
 
 Node IDs are unique within one plan. Source gene IDs are ordered and unique.
 Cycles, reused node instances, unknown node kinds, duplicate JSON fields,
