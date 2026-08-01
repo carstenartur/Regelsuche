@@ -2,6 +2,7 @@ package de.regelsuche.evolution;
 
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -73,12 +74,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         }
     }
 
-    /**
-     * Compatibility path for the information-parity diagnostic evaluator. The
-     * semantics are fixed to the same official protocol, while population
-     * execution additionally verifies the evaluator object through the
-     * protocol-bound runner.
-     */
+    /** Compatibility path bound to the official information-parity protocol. */
     public static EvolutionRewriteProgramTrainFitnessEvidence create(
         EvolutionRewriteProgramTrainSuite suite,
         EvolutionRewriteProgramCandidate candidate,
@@ -220,38 +216,47 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
             .property("genomeHash", genomeHash)
             .property("planHash", planHash)
             .array("cases", array -> cases.forEach(item ->
-                array.objectValue(object -> object
-                    .property("caseId", item.caseId())
-                    .property("familyId", item.familyId())
-                    .property("baselineStatus", item.baselineStatus())
-                    .property("candidateStatus", item.candidateStatus())
-                    .property("baselineReached", item.baselineReached())
-                    .property("candidateReached", item.candidateReached())
-                    .property("baselinePathCorrectness",
-                        item.baselinePathCorrectness().name())
-                    .property("candidatePathCorrectness",
-                        item.candidatePathCorrectness().name())
-                    .property("baselinePathLength", item.baselinePathLength())
-                    .property("candidatePathLength", item.candidatePathLength())
-                    .property("baselinePrimitiveSteps",
-                        item.baselinePrimitiveSteps())
-                    .property("candidatePrimitiveSteps",
-                        item.candidatePrimitiveSteps())
-                    .property("baselineExploredStates",
-                        item.baselineExploredStates())
-                    .property("candidateExploredStates",
-                        item.candidateExploredStates())
-                    .property("baselineGeneratedTransformations",
-                        item.baselineGeneratedTransformations())
-                    .property("candidateGeneratedTransformations",
-                        item.candidateGeneratedTransformations())
-                    .property("programUsed", item.programUsed())
-                    .property("newlySolved", item.newlySolved())
-                    .property("reachabilityRegression",
-                        item.reachabilityRegression())
-                    .property("correctnessFailure", item.correctnessFailure())
-                    .property("correctnessRegression",
-                        item.correctnessRegression()))))
+                array.objectValue(object -> {
+                    object.property("caseId", item.caseId())
+                        .property("familyId", item.familyId())
+                        .property("baselineStatus", item.baselineStatus())
+                        .property("candidateStatus", item.candidateStatus())
+                        .property("baselineReached", item.baselineReached())
+                        .property("candidateReached", item.candidateReached())
+                        .property("baselinePathCorrectness",
+                            item.baselinePathCorrectness().name())
+                        .property("candidatePathCorrectness",
+                            item.candidatePathCorrectness().name())
+                        .property("baselinePathLength", item.baselinePathLength())
+                        .property("candidatePathLength", item.candidatePathLength())
+                        .property("baselinePrimitiveSteps",
+                            item.baselinePrimitiveSteps())
+                        .property("candidatePrimitiveSteps",
+                            item.candidatePrimitiveSteps())
+                        .property("baselineExploredStates",
+                            item.baselineExploredStates())
+                        .property("candidateExploredStates",
+                            item.candidateExploredStates())
+                        .property("baselineGeneratedTransformations",
+                            item.baselineGeneratedTransformations())
+                        .property("candidateGeneratedTransformations",
+                            item.candidateGeneratedTransformations())
+                        .property("baselineTotalWorkUnits",
+                            item.baselineTotalWorkUnits())
+                        .property("candidateTotalWorkUnits",
+                            item.candidateTotalWorkUnits());
+                    object.object("baselineTransformationWork", work ->
+                        writeWork(work, item.baselineTransformationWork()));
+                    object.object("candidateTransformationWork", work ->
+                        writeWork(work, item.candidateTransformationWork()));
+                    object.property("programUsed", item.programUsed())
+                        .property("newlySolved", item.newlySolved())
+                        .property("reachabilityRegression",
+                            item.reachabilityRegression())
+                        .property("correctnessFailure", item.correctnessFailure())
+                        .property("correctnessRegression",
+                            item.correctnessRegression());
+                })))
             .object("rawComponents", object -> {
                 for (FitnessComponent component : FitnessComponent.values()) {
                     Integer value = rawComponents.get(component);
@@ -269,6 +274,29 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
             json.property("contentHash", contentHash);
         }
         return json.endObject().toString();
+    }
+
+    private static void writeWork(
+        JsonWriter json,
+        TransformationWorkMetrics work
+    ) {
+        json.property("engineInvocations", work.engineInvocations())
+            .property("programNodeVisits", work.programNodeVisits())
+            .property("sourceInvocations", work.sourceInvocations())
+            .property("sourceCandidates", work.sourceCandidates())
+            .property("composedCandidates", work.composedCandidates())
+            .property("requirementEvaluations", work.requirementEvaluations())
+            .property("requirementRejections", work.requirementRejections())
+            .property("priorityCandidatesOrdered",
+                work.priorityCandidatesOrdered())
+            .property("prunedCandidates", work.prunedCandidates())
+            .property("repeatIterations", work.repeatIterations())
+            .property("repeatEndpoints", work.repeatEndpoints())
+            .property("alternativeSelections", work.alternativeSelections())
+            .property("alternativesSkipped", work.alternativesSkipped())
+            .property("duplicateCandidatesDropped",
+                work.duplicateCandidatesDropped())
+            .property("totalWorkUnits", work.totalWorkUnits());
     }
 
     public enum PathCorrectness {
@@ -296,12 +324,64 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         long candidateExploredStates,
         long baselineGeneratedTransformations,
         long candidateGeneratedTransformations,
+        TransformationWorkMetrics baselineTransformationWork,
+        TransformationWorkMetrics candidateTransformationWork,
         boolean programUsed,
         boolean newlySolved,
         boolean reachabilityRegression,
         boolean correctnessFailure,
         boolean correctnessRegression
     ) {
+        /** Compatibility constructor for older diagnostic fixtures. */
+        public CaseMeasurement(
+            String caseId,
+            String familyId,
+            String baselineStatus,
+            String candidateStatus,
+            boolean baselineReached,
+            boolean candidateReached,
+            PathCorrectness baselinePathCorrectness,
+            PathCorrectness candidatePathCorrectness,
+            int baselinePathLength,
+            int candidatePathLength,
+            int baselinePrimitiveSteps,
+            int candidatePrimitiveSteps,
+            long baselineExploredStates,
+            long candidateExploredStates,
+            long baselineGeneratedTransformations,
+            long candidateGeneratedTransformations,
+            boolean programUsed,
+            boolean newlySolved,
+            boolean reachabilityRegression,
+            boolean correctnessFailure,
+            boolean correctnessRegression
+        ) {
+            this(
+                caseId,
+                familyId,
+                baselineStatus,
+                candidateStatus,
+                baselineReached,
+                candidateReached,
+                baselinePathCorrectness,
+                candidatePathCorrectness,
+                baselinePathLength,
+                candidatePathLength,
+                baselinePrimitiveSteps,
+                candidatePrimitiveSteps,
+                baselineExploredStates,
+                candidateExploredStates,
+                baselineGeneratedTransformations,
+                candidateGeneratedTransformations,
+                TransformationWorkMetrics.ZERO,
+                TransformationWorkMetrics.ZERO,
+                programUsed,
+                newlySolved,
+                reachabilityRegression,
+                correctnessFailure,
+                correctnessRegression);
+        }
+
         public CaseMeasurement {
             requireId(caseId, "caseId");
             requireId(familyId, "familyId");
@@ -311,6 +391,10 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                 baselinePathCorrectness, "baselinePathCorrectness");
             Objects.requireNonNull(
                 candidatePathCorrectness, "candidatePathCorrectness");
+            baselineTransformationWork = Objects.requireNonNull(
+                baselineTransformationWork, "baselineTransformationWork");
+            candidateTransformationWork = Objects.requireNonNull(
+                candidateTransformationWork, "candidateTransformationWork");
             if (baselinePathLength < -1 || candidatePathLength < -1
                     || baselinePrimitiveSteps < 0 || candidatePrimitiveSteps < 0
                     || baselineExploredStates < 0 || candidateExploredStates < 0
@@ -359,6 +443,14 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                 throw new IllegalArgumentException(
                     "correctnessRegression is inconsistent");
             }
+        }
+
+        public long baselineTotalWorkUnits() {
+            return baselineTransformationWork.totalWorkUnits();
+        }
+
+        public long candidateTotalWorkUnits() {
+            return candidateTransformationWork.totalWorkUnits();
         }
     }
 
