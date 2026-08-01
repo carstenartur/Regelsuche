@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/evolution-final-test-evaluation-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "runIdentity",
+    "studyPlanHash",
+    "splitManifestHash",
+    "validationSelectionHash",
+    "finalTestSuiteHash",
+    "reservationHash",
+    "selectedGenomeHash",
+    "selectedConfigurationHash",
+    "evaluationSplit",
+    "finalTestCaseIds",
+    "cases",
+    "baselineReachedCases",
+    "selectedReachedCases",
+    "newlySolvedCases",
+    "reachabilityRegressions",
+    "correctnessFailures",
+    "correctnessRegressions",
+    "failedCaseEvaluations",
+    "executionOutcome",
+    "finalTestStatus",
+    "proofStatus",
+    "externalNoveltyStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "runIdentity": {
+      "$ref": "#/$defs/sha256"
+    },
+    "studyPlanHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "splitManifestHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "validationSelectionHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "finalTestSuiteHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "reservationHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "selectedGenomeHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "selectedConfigurationHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "schema": {
+      "const": "regelsuche.evolution-final-test-evaluation/v1"
+    },
+    "evaluationSplit": {
+      "const": "FINAL_TEST"
+    },
+    "finalTestCaseIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "executionOutcome": {
+      "enum": [
+        "COMPLETED",
+        "COMPLETED_WITH_FAILURES",
+        "COMPLETED_WITH_QUALITY_BLOCKERS",
+        "COMPLETED_WITH_FAILURES_AND_QUALITY_BLOCKERS"
+      ]
+    },
+    "finalTestStatus": {
+      "const": "COMPLETED"
+    },
+    "proofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "baselineReachedCases": {
+      "$ref": "#/$defs/nonNegative"
+    },
+    "selectedReachedCases": {
+      "$ref": "#/$defs/nonNegative"
+    },
+    "newlySolvedCases": {
+      "$ref": "#/$defs/nonNegative"
+    },
+    "reachabilityRegressions": {
+      "$ref": "#/$defs/nonNegative"
+    },
+    "correctnessFailures": {
+      "$ref": "#/$defs/nonNegative"
+    },
+    "correctnessRegressions": {
+      "$ref": "#/$defs/nonNegative"
+    },
+    "failedCaseEvaluations": {
+      "$ref": "#/$defs/nonNegative"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "nonNegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reached",
+        "terminalReason",
+        "depth",
+        "exploredStates",
+        "candidateEvaluations",
+        "correctnessStatus",
+        "resultArtifactHash"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "COMPLETED",
+            "FAILED"
+          ]
+        },
+        "reached": {
+          "type": "boolean"
+        },
+        "terminalReason": {
+          "$ref": "#/$defs/text"
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "exploredStates": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "candidateEvaluations": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "correctnessStatus": {
+          "enum": [
+            "CONFIRMED",
+            "REFUTED",
+            "INCONCLUSIVE",
+            "NOT_EVALUATED"
+          ]
+        },
+        "resultArtifactHash": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "const": ""
+            }
+          ]
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "family",
+        "baseline",
+        "selected",
+        "newlySolved",
+        "reachabilityRegression",
+        "correctnessFailure",
+        "correctnessRegression",
+        "evaluationFailed"
+      ],
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/text"
+        },
+        "family": {
+          "$ref": "#/$defs/text"
+        },
+        "baseline": {
+          "$ref": "#/$defs/measurement"
+        },
+        "selected": {
+          "$ref": "#/$defs/measurement"
+        },
+        "newlySolved": {
+          "type": "boolean"
+        },
+        "reachabilityRegression": {
+          "type": "boolean"
+        },
+        "correctnessFailure": {
+          "type": "boolean"
+        },
+        "correctnessRegression": {
+          "type": "boolean"
+        },
+        "evaluationFailed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

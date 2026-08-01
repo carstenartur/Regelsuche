@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionFinalTestMeasurement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionFinalTestMeasurement.java</span></div><h1>EvolutionFinalTestMeasurement.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.Objects;
+
+/** One bounded baseline or selected-configuration FINAL TEST measurement. */
+public record EvolutionFinalTestMeasurement(
+    Status status,
+    boolean reached,
+    String terminalReason,
+    int depth,
+    long exploredStates,
+    long candidateEvaluations,
+    EvolutionCorrectnessStatus correctnessStatus,
+    String resultArtifactHash
+) {
+<span class="fc" id="L16">    public EvolutionFinalTestMeasurement {</span>
+<span class="fc" id="L17">        Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L18">        EvolutionValidationArtifactSupport.requireText(</span>
+            terminalReason, &quot;terminalReason&quot;);
+<span class="fc" id="L20">        Objects.requireNonNull(correctnessStatus, &quot;correctnessStatus&quot;);</span>
+<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        resultArtifactHash = resultArtifactHash == null</span>
+<span class="pc" id="L22">            ? &quot;&quot; : resultArtifactHash;</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        if (!resultArtifactHash.isEmpty()) {</span>
+<span class="fc" id="L24">            EvolutionGenome.requireSha256(</span>
+                resultArtifactHash, &quot;resultArtifactHash&quot;);
+        }
+<span class="fc bfc" id="L27" title="All 6 branches covered.">        if (depth &lt; -1 || exploredStates &lt; 0 || candidateEvaluations &lt; 0) {</span>
+<span class="fc" id="L28">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST measurement is outside bounded ranges&quot;);
+        }
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        if (status == Status.FAILED) {</span>
+<span class="fc" id="L32">            requireFailedMeasurement(</span>
+                reached, depth, correctnessStatus, resultArtifactHash);
+        } else {
+<span class="fc" id="L35">            requireCompletedMeasurement(</span>
+                reached, depth, correctnessStatus, resultArtifactHash);
+        }
+<span class="fc" id="L38">    }</span>
+
+    public static EvolutionFinalTestMeasurement failed(String reason) {
+<span class="fc" id="L41">        return new EvolutionFinalTestMeasurement(</span>
+            Status.FAILED, false, reason, -1, 0, 0,
+            EvolutionCorrectnessStatus.NOT_EVALUATED, &quot;&quot;);
+    }
+
+    private static void requireFailedMeasurement(
+        boolean reached,
+        int depth,
+        EvolutionCorrectnessStatus correctnessStatus,
+        String resultArtifactHash
+    ) {
+<span class="fc bfc" id="L52" title="All 6 branches covered.">        if (reached || depth != -1</span>
+                || correctnessStatus
+                    != EvolutionCorrectnessStatus.NOT_EVALUATED
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                || !resultArtifactHash.isEmpty()) {</span>
+<span class="fc" id="L56">            throw new IllegalArgumentException(</span>
+                &quot;failed measurement cannot claim a result&quot;);
+        }
+<span class="fc" id="L59">    }</span>
+
+    private static void requireCompletedMeasurement(
+        boolean reached,
+        int depth,
+        EvolutionCorrectnessStatus correctnessStatus,
+        String resultArtifactHash
+    ) {
+<span class="fc bfc" id="L67" title="All 4 branches covered.">        if (reached &amp;&amp; depth &lt; 0) {</span>
+<span class="fc" id="L68">            throw new IllegalArgumentException(</span>
+                &quot;reached measurement requires a path depth&quot;);
+        }
+<span class="fc bfc" id="L71" title="All 4 branches covered.">        if (!reached &amp;&amp; depth != -1) {</span>
+<span class="fc" id="L72">            throw new IllegalArgumentException(</span>
+                &quot;unreached measurement cannot retain a path depth&quot;);
+        }
+<span class="fc bfc" id="L75" title="All 4 branches covered.">        if (reached</span>
+                &amp;&amp; correctnessStatus
+                    == EvolutionCorrectnessStatus.NOT_EVALUATED) {
+<span class="fc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;reached measurement requires correctness evidence&quot;);
+        }
+<span class="fc bfc" id="L81" title="All 4 branches covered.">        if (!reached</span>
+                &amp;&amp; correctnessStatus
+                    != EvolutionCorrectnessStatus.NOT_EVALUATED) {
+<span class="fc" id="L84">            throw new IllegalArgumentException(</span>
+                &quot;unreached measurement cannot claim correctness evidence&quot;);
+        }
+<span class="fc bfc" id="L87" title="All 4 branches covered.">        if (reached &amp;&amp; resultArtifactHash.isEmpty()) {</span>
+<span class="fc" id="L88">            throw new IllegalArgumentException(</span>
+                &quot;reached measurement requires a result artifact hash&quot;);
+        }
+<span class="fc" id="L91">    }</span>
+
+<span class="fc" id="L93">    public enum Status {</span>
+<span class="fc" id="L94">        COMPLETED,</span>
+<span class="fc" id="L95">        FAILED</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

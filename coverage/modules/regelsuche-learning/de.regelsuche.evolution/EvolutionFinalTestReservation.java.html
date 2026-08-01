@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionFinalTestReservation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionFinalTestReservation.java</span></div><h1>EvolutionFinalTestReservation.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.Map;
+import java.util.TreeMap;
+
+/** Durable claim that consumes one preregistered FINAL TEST attempt. */
+public record EvolutionFinalTestReservation(
+    String schema,
+    String runIdentity,
+    String studyPlanHash,
+    String splitManifestHash,
+    String validationSelectionHash,
+    String finalTestSuiteHash,
+    String selectedGenomeHash,
+    String selectedConfigurationHash,
+    String finalTestStatus,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-final-test-reservation/v1&quot;;
+    public static final String RESERVED = &quot;RESERVED&quot;;
+
+<span class="fc" id="L24">    public EvolutionFinalTestReservation {</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="fc" id="L26">            throw new IllegalArgumentException(</span>
+                &quot;unsupported FINAL TEST reservation schema&quot;);
+        }
+<span class="fc" id="L29">        EvolutionGenome.requireSha256(runIdentity, &quot;runIdentity&quot;);</span>
+<span class="fc" id="L30">        EvolutionGenome.requireSha256(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L31">        EvolutionGenome.requireSha256(splitManifestHash, &quot;splitManifestHash&quot;);</span>
+<span class="fc" id="L32">        EvolutionGenome.requireSha256(</span>
+            validationSelectionHash, &quot;validationSelectionHash&quot;);
+<span class="fc" id="L34">        EvolutionGenome.requireSha256(finalTestSuiteHash, &quot;finalTestSuiteHash&quot;);</span>
+<span class="fc" id="L35">        EvolutionGenome.requireSha256(selectedGenomeHash, &quot;selectedGenomeHash&quot;);</span>
+<span class="fc" id="L36">        EvolutionGenome.requireSha256(</span>
+            selectedConfigurationHash, &quot;selectedConfigurationHash&quot;);
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (!RESERVED.equals(finalTestStatus)) {</span>
+<span class="fc" id="L39">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST reservation must be RESERVED&quot;);
+        }
+<span class="fc" id="L42">        String expectedIdentity = runIdentity(studyPlanHash, splitManifestHash);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (!expectedIdentity.equals(runIdentity)) {</span>
+<span class="fc" id="L44">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST runIdentity mismatch&quot;);
+        }
+<span class="fc" id="L47">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L48">        if (!EvolutionValidationArtifactSupport.hash(payload(</span>
+                runIdentity, studyPlanHash, splitManifestHash,
+                validationSelectionHash, finalTestSuiteHash,
+                selectedGenomeHash, selectedConfigurationHash,
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                finalTestStatus)).equals(contentHash)) {</span>
+<span class="fc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST reservation contentHash mismatch&quot;);
+        }
+<span class="fc" id="L56">    }</span>
+
+    public static EvolutionFinalTestReservation create(
+        EvolutionValidationSelection selection,
+        EvolutionFinalTestSuite suite
+    ) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (!selection.hasSelection()) {</span>
+<span class="fc" id="L63">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST requires one frozen VALIDATION selection&quot;);
+        }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        if (!selection.studyPlanHash().equals(suite.studyPlanHash())</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">                || !selection.splitManifestHash().equals(</span>
+<span class="fc" id="L68">                    suite.splitManifestHash())) {</span>
+<span class="fc" id="L69">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST suite does not match the frozen study/split&quot;);
+        }
+<span class="fc" id="L72">        String identity = runIdentity(</span>
+<span class="fc" id="L73">            selection.studyPlanHash(), selection.splitManifestHash());</span>
+<span class="fc" id="L74">        Map&lt;String, Object&gt; payload = payload(</span>
+<span class="fc" id="L75">            identity, selection.studyPlanHash(), selection.splitManifestHash(),</span>
+<span class="fc" id="L76">            selection.contentHash(), suite.contentHash(),</span>
+<span class="fc" id="L77">            selection.selectedGenomeHash(),</span>
+<span class="fc" id="L78">            selection.selectedConfigurationHash(), RESERVED);</span>
+<span class="fc" id="L79">        return new EvolutionFinalTestReservation(</span>
+<span class="fc" id="L80">            SCHEMA, identity, selection.studyPlanHash(),</span>
+<span class="fc" id="L81">            selection.splitManifestHash(), selection.contentHash(),</span>
+<span class="fc" id="L82">            suite.contentHash(), selection.selectedGenomeHash(),</span>
+<span class="fc" id="L83">            selection.selectedConfigurationHash(), RESERVED,</span>
+<span class="fc" id="L84">            EvolutionValidationArtifactSupport.hash(payload));</span>
+    }
+
+    public static EvolutionFinalTestReservation fromCanonicalJson(String json) {
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="fc" id="L89">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST reservation JSON must not be blank&quot;);
+        }
+        try {
+<span class="fc" id="L93">            return EvolutionValidationArtifactSupport.JSON.readValue(</span>
+                json, EvolutionFinalTestReservation.class);
+<span class="fc" id="L95">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L96">            throw new IllegalArgumentException(</span>
+                &quot;invalid FINAL TEST reservation JSON&quot;, exception);
+        }
+    }
+
+    public String toCanonicalJson() {
+        try {
+<span class="fc" id="L103">            Map&lt;String, Object&gt; value = payload(</span>
+                runIdentity, studyPlanHash, splitManifestHash,
+                validationSelectionHash, finalTestSuiteHash,
+                selectedGenomeHash, selectedConfigurationHash,
+                finalTestStatus);
+<span class="fc" id="L108">            value.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L109">            value.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L110">            return EvolutionValidationArtifactSupport.JSON</span>
+<span class="fc" id="L111">                .writeValueAsString(value) + &quot;\n&quot;;</span>
+<span class="nc" id="L112">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L113">            throw new IllegalStateException(</span>
+                &quot;cannot serialize FINAL TEST reservation&quot;, exception);
+        }
+    }
+
+    static String runIdentity(
+        String studyPlanHash,
+        String splitManifestHash
+    ) {
+<span class="fc" id="L122">        EvolutionGenome.requireSha256(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L123">        EvolutionGenome.requireSha256(splitManifestHash, &quot;splitManifestHash&quot;);</span>
+<span class="fc" id="L124">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L125">        value.put(&quot;schema&quot;, &quot;regelsuche.evolution-final-test-run-identity/v1&quot;);</span>
+<span class="fc" id="L126">        value.put(&quot;splitManifestHash&quot;, splitManifestHash);</span>
+<span class="fc" id="L127">        value.put(&quot;studyPlanHash&quot;, studyPlanHash);</span>
+<span class="fc" id="L128">        return EvolutionValidationArtifactSupport.hash(value);</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String runIdentity,
+        String studyPlanHash,
+        String splitManifestHash,
+        String validationSelectionHash,
+        String finalTestSuiteHash,
+        String selectedGenomeHash,
+        String selectedConfigurationHash,
+        String finalTestStatus
+    ) {
+<span class="fc" id="L141">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L142">        value.put(&quot;finalTestStatus&quot;, finalTestStatus);</span>
+<span class="fc" id="L143">        value.put(&quot;finalTestSuiteHash&quot;, finalTestSuiteHash);</span>
+<span class="fc" id="L144">        value.put(&quot;runIdentity&quot;, runIdentity);</span>
+<span class="fc" id="L145">        value.put(&quot;selectedConfigurationHash&quot;, selectedConfigurationHash);</span>
+<span class="fc" id="L146">        value.put(&quot;selectedGenomeHash&quot;, selectedGenomeHash);</span>
+<span class="fc" id="L147">        value.put(&quot;splitManifestHash&quot;, splitManifestHash);</span>
+<span class="fc" id="L148">        value.put(&quot;studyPlanHash&quot;, studyPlanHash);</span>
+<span class="fc" id="L149">        value.put(&quot;validationSelectionHash&quot;, validationSelectionHash);</span>
+<span class="fc" id="L150">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

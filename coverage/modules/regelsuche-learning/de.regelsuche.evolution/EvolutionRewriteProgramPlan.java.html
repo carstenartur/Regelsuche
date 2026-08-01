@@ -1,0 +1,736 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramPlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramPlan.java</span></div><h1>EvolutionRewriteProgramPlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Pattern;
+
+/**
+ * Canonical, bounded and serializable topology for an evolved rewrite program.
+ *
+ * &lt;p&gt;The plan contains only stable semantic data. Runtime transformation engines,
+ * predicates and comparators are supplied by {@link EvolutionRewriteProgramCompiler}
+ * after the referenced genome has passed its ordinary preflight validation.&lt;/p&gt;
+ */
+public record EvolutionRewriteProgramPlan(
+    String schema,
+    String genomeHash,
+    Node root,
+    int maxNodes,
+    int maxDepth,
+    String alphaStructuralHash,
+    String contentHash
+) {
+    public static final String SCHEMA = &quot;regelsuche.evolution-rewrite-program-plan/v1&quot;;
+<span class="fc" id="L32">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+    private static final int ABSOLUTE_MAX_NODES = 1024;
+    private static final int ABSOLUTE_MAX_DEPTH = 128;
+
+<span class="fc" id="L36">    public EvolutionRewriteProgramPlan {</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(</span>
+                &quot;unsupported evolution rewrite-program plan schema&quot;);
+        }
+<span class="fc" id="L41">        EvolutionGenome.requireSha256(genomeHash, &quot;genomeHash&quot;);</span>
+<span class="fc" id="L42">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="fc" id="L43">        validateBounds(maxNodes, maxDepth);</span>
+<span class="fc" id="L44">        TreeFacts facts = inspect(root, maxNodes, maxDepth);</span>
+<span class="fc" id="L45">        requirePreferredGenesAreReferenced(facts);</span>
+<span class="fc" id="L46">        EvolutionGenome.requireSha256(alphaStructuralHash, &quot;alphaStructuralHash&quot;);</span>
+<span class="fc" id="L47">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+
+<span class="fc" id="L49">        String expectedAlpha = EvolutionGenome.hash(alphaMaterial(</span>
+            root, maxNodes, maxDepth));
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (!expectedAlpha.equals(alphaStructuralHash)) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(</span>
+                &quot;alphaStructuralHash does not match program topology&quot;);
+        }
+<span class="fc" id="L55">        String expectedContent = EvolutionGenome.hash(canonicalPayload(</span>
+            genomeHash, root, maxNodes, maxDepth, alphaStructuralHash));
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (!expectedContent.equals(contentHash)) {</span>
+<span class="fc" id="L58">            throw new IllegalArgumentException(</span>
+                &quot;contentHash does not match program-plan payload&quot;);
+        }
+<span class="fc" id="L61">    }</span>
+
+    public static EvolutionRewriteProgramPlan create(
+        EvolutionGenome genome,
+        Node root,
+        int maxNodes,
+        int maxDepth
+    ) {
+<span class="fc" id="L69">        Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L70">        Objects.requireNonNull(root, &quot;root&quot;);</span>
+<span class="fc" id="L71">        validateBounds(maxNodes, maxDepth);</span>
+<span class="fc" id="L72">        TreeFacts facts = inspect(root, maxNodes, maxDepth);</span>
+<span class="fc" id="L73">        requirePreferredGenesAreReferenced(facts);</span>
+<span class="fc" id="L74">        String alphaHash = EvolutionGenome.hash(alphaMaterial(</span>
+            root, maxNodes, maxDepth));
+<span class="fc" id="L76">        String payload = canonicalPayload(</span>
+<span class="fc" id="L77">            genome.contentHash(), root, maxNodes, maxDepth, alphaHash);</span>
+<span class="fc" id="L78">        return new EvolutionRewriteProgramPlan(</span>
+            SCHEMA,
+<span class="fc" id="L80">            genome.contentHash(),</span>
+            root,
+            maxNodes,
+            maxDepth,
+            alphaHash,
+<span class="fc" id="L85">            EvolutionGenome.hash(payload));</span>
+    }
+
+    public int nodeCount() {
+<span class="fc" id="L89">        return inspect(root, maxNodes, maxDepth).nodeCount();</span>
+    }
+
+    public int actualDepth() {
+<span class="fc" id="L93">        return inspect(root, maxNodes, maxDepth).actualDepth();</span>
+    }
+
+    public List&lt;String&gt; referencedGeneIds() {
+<span class="fc" id="L97">        return inspect(root, maxNodes, maxDepth).referencedGeneIds();</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L101">        return render(</span>
+            genomeHash,
+            root,
+            maxNodes,
+            maxDepth,
+            alphaStructuralHash,
+            contentHash);
+    }
+
+    /** Human-readable representation used in evidence and review surfaces. */
+    public String toReadableProgram() {
+<span class="fc" id="L112">        StringBuilder output = new StringBuilder();</span>
+<span class="fc" id="L113">        appendReadable(output, root, 0);</span>
+<span class="fc" id="L114">        return output.toString();</span>
+    }
+
+    public sealed interface Node permits
+            Source,
+            Choice,
+            FirstApplicable,
+            Sequence,
+            Repeat,
+            Require,
+            Prioritize,
+            Prune {
+        String nodeId();
+    }
+
+    /** One ordinary AST rewrite engine containing the referenced genome rules. */
+    public record Source(String nodeId, List&lt;String&gt; geneIds) implements Node {
+<span class="fc" id="L131">        public Source {</span>
+<span class="fc" id="L132">            nodeId = normalizeId(nodeId, &quot;nodeId&quot;);</span>
+<span class="fc" id="L133">            geneIds = immutableIds(geneIds, &quot;geneIds&quot;, true);</span>
+<span class="fc" id="L134">        }</span>
+    }
+
+    /** Deterministic union of every alternative. */
+    public record Choice(String nodeId, List&lt;Node&gt; alternatives) implements Node {
+<span class="fc" id="L139">        public Choice {</span>
+<span class="fc" id="L140">            nodeId = normalizeId(nodeId, &quot;nodeId&quot;);</span>
+<span class="fc" id="L141">            alternatives = immutableNodes(alternatives, &quot;alternatives&quot;);</span>
+<span class="fc" id="L142">        }</span>
+    }
+
+    /** Select the first alternative that yields at least one candidate. */
+    public record FirstApplicable(String nodeId, List&lt;Node&gt; alternatives)
+            implements Node {
+<span class="fc" id="L148">        public FirstApplicable {</span>
+<span class="fc" id="L149">            nodeId = normalizeId(nodeId, &quot;nodeId&quot;);</span>
+<span class="fc" id="L150">            alternatives = immutableNodes(alternatives, &quot;alternatives&quot;);</span>
+<span class="fc" id="L151">        }</span>
+    }
+
+    /** Feed every candidate produced by one step into the next step. */
+    public record Sequence(String nodeId, List&lt;Node&gt; steps) implements Node {
+<span class="fc" id="L156">        public Sequence {</span>
+<span class="fc" id="L157">            nodeId = normalizeId(nodeId, &quot;nodeId&quot;);</span>
+<span class="fc" id="L158">            steps = immutableNodes(steps, &quot;steps&quot;);</span>
+<span class="fc" id="L159">        }</span>
+    }
+
+    /** Bounded repetition; the interpreter retains endpoints in the declared range. */
+    public record Repeat(
+        String nodeId,
+        Node body,
+        int minIterations,
+        int maxIterations
+    ) implements Node {
+<span class="fc" id="L169">        public Repeat {</span>
+<span class="fc" id="L170">            nodeId = normalizeId(nodeId, &quot;nodeId&quot;);</span>
+<span class="fc" id="L171">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="pc bpc" id="L172" title="3 of 6 branches missed.">            if (minIterations &lt; 1 || maxIterations &lt; minIterations</span>
+                    || maxIterations &gt; 1024) {
+<span class="nc" id="L174">                throw new IllegalArgumentException(</span>
+                    &quot;repeat requires 1 &lt;= minIterations &lt;= maxIterations &lt;= 1024&quot;);
+            }
+<span class="fc" id="L177">        }</span>
+    }
+
+    /** Hard, serializable candidate condition. */
+    public record Require(
+        String nodeId,
+        Node body,
+        Requirement requirement
+    ) implements Node {
+<span class="fc" id="L186">        public Require {</span>
+<span class="fc" id="L187">            nodeId = normalizeId(nodeId, &quot;nodeId&quot;);</span>
+<span class="fc" id="L188">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc" id="L189">            Objects.requireNonNull(requirement, &quot;requirement&quot;);</span>
+<span class="fc" id="L190">        }</span>
+    }
+
+    /** Soft, serializable candidate ordering. */
+    public record Prioritize(
+        String nodeId,
+        Node body,
+        Priority priority
+    ) implements Node {
+<span class="fc" id="L199">        public Prioritize {</span>
+<span class="fc" id="L200">            nodeId = normalizeId(nodeId, &quot;nodeId&quot;);</span>
+<span class="fc" id="L201">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="fc" id="L202">            Objects.requireNonNull(priority, &quot;priority&quot;);</span>
+<span class="fc" id="L203">        }</span>
+    }
+
+    /** Explicitly incomplete candidate truncation. */
+    public record Prune(
+        String nodeId,
+        Node body,
+        int maxCandidates,
+        String reason
+    ) implements Node {
+<span class="fc" id="L213">        public Prune {</span>
+<span class="fc" id="L214">            nodeId = normalizeId(nodeId, &quot;nodeId&quot;);</span>
+<span class="fc" id="L215">            Objects.requireNonNull(body, &quot;body&quot;);</span>
+<span class="pc bpc" id="L216" title="2 of 4 branches missed.">            if (maxCandidates &lt; 1 || maxCandidates &gt; 1_000_000) {</span>
+<span class="nc" id="L217">                throw new IllegalArgumentException(</span>
+                    &quot;maxCandidates must be in [1,1000000]&quot;);
+            }
+<span class="fc" id="L220">            reason = normalizeText(reason, &quot;reason&quot;);</span>
+<span class="fc" id="L221">        }</span>
+    }
+
+<span class="fc" id="L224">    public enum RequirementKind {</span>
+<span class="fc" id="L225">        EQUIVALENCE_PRESERVING_BY_CONSTRUCTION,</span>
+<span class="fc" id="L226">        ASSUMPTION_FREE,</span>
+<span class="fc" id="L227">        MAX_ESTIMATED_COST_DELTA,</span>
+<span class="fc" id="L228">        MAX_PRIMITIVE_STEPS</span>
+    }
+
+    /**
+     * The threshold is zero for boolean requirements, a signed cost ceiling for
+     * {@code MAX_ESTIMATED_COST_DELTA}, and a positive step ceiling for
+     * {@code MAX_PRIMITIVE_STEPS}.
+     */
+    public record Requirement(RequirementKind kind, int threshold) {
+<span class="fc" id="L237">        public Requirement {</span>
+<span class="fc" id="L238">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="pc bpc" id="L239" title="3 of 4 branches missed.">            switch (kind) {</span>
+                case EQUIVALENCE_PRESERVING_BY_CONSTRUCTION, ASSUMPTION_FREE -&gt; {
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                    if (threshold != 0) {</span>
+<span class="nc" id="L242">                        throw new IllegalArgumentException(</span>
+                            kind + &quot; requires threshold=0&quot;);
+                    }
+                }
+                case MAX_ESTIMATED_COST_DELTA -&gt; {
+<span class="nc bnc" id="L247" title="All 4 branches missed.">                    if (threshold &lt; -1_000_000 || threshold &gt; 1_000_000) {</span>
+<span class="nc" id="L248">                        throw new IllegalArgumentException(</span>
+                            &quot;estimated-cost threshold is out of range&quot;);
+                    }
+                }
+                case MAX_PRIMITIVE_STEPS -&gt; {
+<span class="pc bpc" id="L253" title="2 of 4 branches missed.">                    if (threshold &lt; 1 || threshold &gt; 1024) {</span>
+<span class="nc" id="L254">                        throw new IllegalArgumentException(</span>
+                            &quot;primitive-step threshold must be in [1,1024]&quot;);
+                    }
+                }
+            }
+<span class="fc" id="L259">        }</span>
+
+        public static Requirement equivalencePreservingByConstruction() {
+<span class="nc" id="L262">            return new Requirement(</span>
+                RequirementKind.EQUIVALENCE_PRESERVING_BY_CONSTRUCTION, 0);
+        }
+
+        public static Requirement assumptionFree() {
+<span class="nc" id="L267">            return new Requirement(RequirementKind.ASSUMPTION_FREE, 0);</span>
+        }
+
+        public static Requirement maxEstimatedCostDelta(int threshold) {
+<span class="nc" id="L271">            return new Requirement(</span>
+                RequirementKind.MAX_ESTIMATED_COST_DELTA, threshold);
+        }
+
+        public static Requirement maxPrimitiveSteps(int threshold) {
+<span class="fc" id="L276">            return new Requirement(RequirementKind.MAX_PRIMITIVE_STEPS, threshold);</span>
+        }
+    }
+
+<span class="fc" id="L280">    public enum PriorityKind {</span>
+<span class="fc" id="L281">        ESTIMATED_COST_THEN_RULE,</span>
+<span class="fc" id="L282">        PREFERRED_GENE_ORDER</span>
+    }
+
+    public record Priority(PriorityKind kind, List&lt;String&gt; preferredGeneIds) {
+<span class="fc" id="L286">        public Priority {</span>
+<span class="fc" id="L287">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L288">            preferredGeneIds = immutableIds(</span>
+                preferredGeneIds, &quot;preferredGeneIds&quot;, false);
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            if (kind == PriorityKind.ESTIMATED_COST_THEN_RULE</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                    &amp;&amp; !preferredGeneIds.isEmpty()) {</span>
+<span class="nc" id="L292">                throw new IllegalArgumentException(</span>
+                    &quot;estimated-cost priority must not declare preferred genes&quot;);
+            }
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            if (kind == PriorityKind.PREFERRED_GENE_ORDER</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                    &amp;&amp; preferredGeneIds.isEmpty()) {</span>
+<span class="nc" id="L297">                throw new IllegalArgumentException(</span>
+                    &quot;preferred-gene priority requires at least one gene&quot;);
+            }
+<span class="fc" id="L300">        }</span>
+
+        public static Priority estimatedCostThenRule() {
+<span class="fc" id="L303">            return new Priority(PriorityKind.ESTIMATED_COST_THEN_RULE, List.of());</span>
+        }
+
+        public static Priority preferredGeneOrder(List&lt;String&gt; geneIds) {
+<span class="fc" id="L307">            return new Priority(PriorityKind.PREFERRED_GENE_ORDER, geneIds);</span>
+        }
+    }
+
+    private static void validateBounds(int maxNodes, int maxDepth) {
+<span class="pc bpc" id="L312" title="2 of 4 branches missed.">        if (maxNodes &lt; 1 || maxNodes &gt; ABSOLUTE_MAX_NODES) {</span>
+<span class="nc" id="L313">            throw new IllegalArgumentException(</span>
+                &quot;maxNodes must be in [1,&quot; + ABSOLUTE_MAX_NODES + &quot;]&quot;);
+        }
+<span class="pc bpc" id="L316" title="2 of 4 branches missed.">        if (maxDepth &lt; 1 || maxDepth &gt; ABSOLUTE_MAX_DEPTH) {</span>
+<span class="nc" id="L317">            throw new IllegalArgumentException(</span>
+                &quot;maxDepth must be in [1,&quot; + ABSOLUTE_MAX_DEPTH + &quot;]&quot;);
+        }
+<span class="fc" id="L320">    }</span>
+
+    private static TreeFacts inspect(Node root, int maxNodes, int maxDepth) {
+<span class="fc" id="L323">        Set&lt;Node&gt; identities = Collections.newSetFromMap(new IdentityHashMap&lt;&gt;());</span>
+<span class="fc" id="L324">        Set&lt;Node&gt; active = Collections.newSetFromMap(new IdentityHashMap&lt;&gt;());</span>
+<span class="fc" id="L325">        LinkedHashSet&lt;String&gt; nodeIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L326">        LinkedHashSet&lt;String&gt; geneIds = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L327">        List&lt;Priority&gt; priorities = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L328">        int[] count = {0};</span>
+<span class="fc" id="L329">        int[] depth = {0};</span>
+<span class="fc" id="L330">        inspectNode(</span>
+            root,
+            1,
+            maxNodes,
+            maxDepth,
+            identities,
+            active,
+            nodeIds,
+            geneIds,
+            priorities,
+            count,
+            depth);
+<span class="fc" id="L342">        return new TreeFacts(</span>
+            count[0],
+            depth[0],
+<span class="fc" id="L345">            List.copyOf(geneIds),</span>
+<span class="fc" id="L346">            List.copyOf(priorities));</span>
+    }
+
+    private static void inspectNode(
+        Node node,
+        int currentDepth,
+        int maxNodes,
+        int maxDepth,
+        Set&lt;Node&gt; identities,
+        Set&lt;Node&gt; active,
+        Set&lt;String&gt; nodeIds,
+        Set&lt;String&gt; geneIds,
+        List&lt;Priority&gt; priorities,
+        int[] count,
+        int[] actualDepth
+    ) {
+<span class="fc" id="L362">        Objects.requireNonNull(node, &quot;program node&quot;);</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (!active.add(node)) {</span>
+<span class="nc" id="L364">            throw new IllegalArgumentException(&quot;program topology contains a cycle&quot;);</span>
+        }
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">        if (!identities.add(node)) {</span>
+<span class="nc" id="L367">            throw new IllegalArgumentException(</span>
+                &quot;program topology reuses one node instance&quot;);
+        }
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (!nodeIds.add(node.nodeId())) {</span>
+<span class="fc" id="L371">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L372">                &quot;program node IDs must be unique: &quot; + node.nodeId());</span>
+        }
+<span class="fc" id="L374">        count[0]++;</span>
+<span class="fc" id="L375">        actualDepth[0] = Math.max(actualDepth[0], currentDepth);</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">        if (count[0] &gt; maxNodes) {</span>
+<span class="nc" id="L377">            throw new IllegalArgumentException(</span>
+                &quot;program topology exceeds maxNodes=&quot; + maxNodes);
+        }
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (currentDepth &gt; maxDepth) {</span>
+<span class="nc" id="L381">            throw new IllegalArgumentException(</span>
+                &quot;program topology exceeds maxDepth=&quot; + maxDepth);
+        }
+
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
+<span class="fc" id="L386">            geneIds.addAll(source.geneIds());</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        } else if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L388">            priorities.add(prioritize.priority());</span>
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (Node child : children(node)) {</span>
+<span class="fc" id="L391">            inspectNode(</span>
+                child,
+                currentDepth + 1,
+                maxNodes,
+                maxDepth,
+                identities,
+                active,
+                nodeIds,
+                geneIds,
+                priorities,
+                count,
+                actualDepth);
+<span class="fc" id="L403">        }</span>
+<span class="fc" id="L404">        active.remove(node);</span>
+<span class="fc" id="L405">    }</span>
+
+    private static List&lt;Node&gt; children(Node node) {
+<span class="fc bfc" id="L408" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L409">            return choice.alternatives();</span>
+        }
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L412">            return firstApplicable.alternatives();</span>
+        }
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L415">            return sequence.steps();</span>
+        }
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L418">            return List.of(repeat.body());</span>
+        }
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L421">            return List.of(require.body());</span>
+        }
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L424">            return List.of(prioritize.body());</span>
+        }
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        if (node instanceof Prune prune) {</span>
+<span class="fc" id="L427">            return List.of(prune.body());</span>
+        }
+<span class="fc" id="L429">        return List.of();</span>
+    }
+
+    private static void requirePreferredGenesAreReferenced(TreeFacts facts) {
+<span class="fc" id="L433">        Set&lt;String&gt; referenced = Set.copyOf(facts.referencedGeneIds());</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        for (Priority priority : facts.priorities()) {</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            if (priority.kind() != PriorityKind.PREFERRED_GENE_ORDER) {</span>
+<span class="fc" id="L436">                continue;</span>
+            }
+<span class="fc bfc" id="L438" title="All 2 branches covered.">            for (String geneId : priority.preferredGeneIds()) {</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">                if (!referenced.contains(geneId)) {</span>
+<span class="fc" id="L440">                    throw new IllegalArgumentException(</span>
+                        &quot;preferred gene is absent from program sources: &quot; + geneId);
+                }
+<span class="fc" id="L443">            }</span>
+<span class="fc" id="L444">        }</span>
+<span class="fc" id="L445">    }</span>
+
+    private static String canonicalPayload(
+        String genomeHash,
+        Node root,
+        int maxNodes,
+        int maxDepth,
+        String alphaHash
+    ) {
+<span class="fc" id="L454">        return render(genomeHash, root, maxNodes, maxDepth, alphaHash, null);</span>
+    }
+
+    private static String render(
+        String genomeHash,
+        Node root,
+        int maxNodes,
+        int maxDepth,
+        String alphaHash,
+        String contentHash
+    ) {
+<span class="fc" id="L465">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L466">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L467">            .property(&quot;genomeHash&quot;, genomeHash)</span>
+<span class="fc" id="L468">            .property(&quot;maxNodes&quot;, maxNodes)</span>
+<span class="fc" id="L469">            .property(&quot;maxDepth&quot;, maxDepth)</span>
+<span class="fc" id="L470">            .object(&quot;root&quot;, object -&gt; writeNode(object, root))</span>
+<span class="fc" id="L471">            .property(&quot;alphaStructuralHash&quot;, alphaHash);</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L473">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L475">        return json.endObject().toString();</span>
+    }
+
+    private static void writeNode(JsonWriter json, Node node) {
+<span class="fc" id="L479">        json.property(&quot;nodeType&quot;, nodeType(node))</span>
+<span class="fc" id="L480">            .property(&quot;nodeId&quot;, node.nodeId());</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
+<span class="fc" id="L482">            json.stringArray(&quot;geneIds&quot;, source.geneIds());</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        } else if (node instanceof Choice choice) {</span>
+<span class="fc" id="L484">            writeChildren(json, &quot;alternatives&quot;, choice.alternatives());</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">        } else if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L486">            writeChildren(json, &quot;alternatives&quot;, firstApplicable.alternatives());</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        } else if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L488">            writeChildren(json, &quot;steps&quot;, sequence.steps());</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        } else if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L490">            json.property(&quot;minIterations&quot;, repeat.minIterations())</span>
+<span class="fc" id="L491">                .property(&quot;maxIterations&quot;, repeat.maxIterations())</span>
+<span class="fc" id="L492">                .object(&quot;body&quot;, object -&gt; writeNode(object, repeat.body()));</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        } else if (node instanceof Require require) {</span>
+<span class="fc" id="L494">            json.object(&quot;requirement&quot;, object -&gt; object</span>
+<span class="fc" id="L495">                    .property(&quot;kind&quot;, require.requirement().kind().name())</span>
+<span class="fc" id="L496">                    .property(&quot;threshold&quot;, require.requirement().threshold()))</span>
+<span class="fc" id="L497">                .object(&quot;body&quot;, object -&gt; writeNode(object, require.body()));</span>
+<span class="fc bfc" id="L498" title="All 2 branches covered.">        } else if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L499">            json.object(&quot;priority&quot;, object -&gt; object</span>
+<span class="fc" id="L500">                    .property(&quot;kind&quot;, prioritize.priority().kind().name())</span>
+<span class="fc" id="L501">                    .stringArray(</span>
+                        &quot;preferredGeneIds&quot;,
+<span class="fc" id="L503">                        prioritize.priority().preferredGeneIds()))</span>
+<span class="fc" id="L504">                .object(&quot;body&quot;, object -&gt; writeNode(object, prioritize.body()));</span>
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">        } else if (node instanceof Prune prune) {</span>
+<span class="fc" id="L506">            json.property(&quot;maxCandidates&quot;, prune.maxCandidates())</span>
+<span class="fc" id="L507">                .property(&quot;reason&quot;, prune.reason())</span>
+<span class="fc" id="L508">                .object(&quot;body&quot;, object -&gt; writeNode(object, prune.body()));</span>
+        }
+<span class="fc" id="L510">    }</span>
+
+    private static void writeChildren(
+        JsonWriter json,
+        String property,
+        List&lt;Node&gt; children
+    ) {
+<span class="fc" id="L517">        json.array(property, array -&gt; children.forEach(child -&gt;</span>
+<span class="fc" id="L518">            array.objectValue(object -&gt; writeNode(object, child))));</span>
+<span class="fc" id="L519">    }</span>
+
+    private static String nodeType(Node node) {
+<span class="fc bfc" id="L522" title="All 2 branches covered.">        if (node instanceof Source) {</span>
+<span class="fc" id="L523">            return &quot;SOURCE&quot;;</span>
+        }
+<span class="fc bfc" id="L525" title="All 2 branches covered.">        if (node instanceof Choice) {</span>
+<span class="fc" id="L526">            return &quot;CHOICE&quot;;</span>
+        }
+<span class="fc bfc" id="L528" title="All 2 branches covered.">        if (node instanceof FirstApplicable) {</span>
+<span class="fc" id="L529">            return &quot;FIRST_APPLICABLE&quot;;</span>
+        }
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        if (node instanceof Sequence) {</span>
+<span class="fc" id="L532">            return &quot;SEQUENCE&quot;;</span>
+        }
+<span class="fc bfc" id="L534" title="All 2 branches covered.">        if (node instanceof Repeat) {</span>
+<span class="fc" id="L535">            return &quot;REPEAT&quot;;</span>
+        }
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        if (node instanceof Require) {</span>
+<span class="fc" id="L538">            return &quot;REQUIRE&quot;;</span>
+        }
+<span class="fc bfc" id="L540" title="All 2 branches covered.">        if (node instanceof Prioritize) {</span>
+<span class="fc" id="L541">            return &quot;PRIORITIZE&quot;;</span>
+        }
+<span class="fc" id="L543">        return &quot;PRUNE&quot;;</span>
+    }
+
+    private static String alphaMaterial(Node root, int maxNodes, int maxDepth) {
+<span class="fc" id="L547">        AlphaContext context = new AlphaContext();</span>
+<span class="fc" id="L548">        return SCHEMA</span>
+            + &quot;\nmaxNodes=&quot; + maxNodes
+            + &quot;\nmaxDepth=&quot; + maxDepth
+<span class="fc" id="L551">            + &quot;\nroot=&quot; + alphaNode(root, context);</span>
+    }
+
+    private static String alphaNode(Node node, AlphaContext context) {
+<span class="fc bfc" id="L555" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
+<span class="fc" id="L556">            return &quot;SOURCE(&quot; + source.geneIds().stream()</span>
+<span class="fc" id="L557">                .map(context::gene)</span>
+<span class="fc" id="L558">                .toList() + &quot;)&quot;;</span>
+        }
+<span class="fc bfc" id="L560" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L561">            return &quot;CHOICE&quot; + alphaChildren(choice.alternatives(), context);</span>
+        }
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="fc" id="L564">            return &quot;FIRST_APPLICABLE&quot;</span>
+<span class="fc" id="L565">                + alphaChildren(firstApplicable.alternatives(), context);</span>
+        }
+<span class="fc bfc" id="L567" title="All 2 branches covered.">        if (node instanceof Sequence sequence) {</span>
+<span class="fc" id="L568">            return &quot;SEQUENCE&quot; + alphaChildren(sequence.steps(), context);</span>
+        }
+<span class="fc bfc" id="L570" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L571">            return &quot;REPEAT(&quot; + repeat.minIterations() + &quot;,&quot;</span>
+<span class="fc" id="L572">                + repeat.maxIterations() + &quot;,&quot;</span>
+<span class="fc" id="L573">                + alphaNode(repeat.body(), context) + &quot;)&quot;;</span>
+        }
+<span class="fc bfc" id="L575" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L576">            return &quot;REQUIRE(&quot; + require.requirement().kind().name() + &quot;,&quot;</span>
+<span class="fc" id="L577">                + require.requirement().threshold() + &quot;,&quot;</span>
+<span class="fc" id="L578">                + alphaNode(require.body(), context) + &quot;)&quot;;</span>
+        }
+<span class="fc bfc" id="L580" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L581">            List&lt;String&gt; preferred = prioritize.priority().preferredGeneIds().stream()</span>
+<span class="fc" id="L582">                .map(context::gene)</span>
+<span class="fc" id="L583">                .toList();</span>
+<span class="fc" id="L584">            return &quot;PRIORITIZE(&quot; + prioritize.priority().kind().name() + &quot;,&quot;</span>
+                + preferred + &quot;,&quot;
+<span class="fc" id="L586">                + alphaNode(prioritize.body(), context) + &quot;)&quot;;</span>
+        }
+<span class="fc" id="L588">        Prune prune = (Prune) node;</span>
+<span class="fc" id="L589">        return &quot;PRUNE(&quot; + prune.maxCandidates() + &quot;,&quot;</span>
+<span class="fc" id="L590">            + alphaNode(prune.body(), context) + &quot;)&quot;;</span>
+    }
+
+    private static String alphaChildren(List&lt;Node&gt; nodes, AlphaContext context) {
+<span class="fc" id="L594">        return nodes.stream().map(node -&gt; alphaNode(node, context)).toList().toString();</span>
+    }
+
+    private static void appendReadable(
+        StringBuilder output,
+        Node node,
+        int indentation
+    ) {
+<span class="fc" id="L602">        String prefix = &quot;  &quot;.repeat(indentation);</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">        if (node instanceof Source source) {</span>
+<span class="fc" id="L604">            output.append(prefix)</span>
+<span class="fc" id="L605">                .append(&quot;source &quot;)</span>
+<span class="fc" id="L606">                .append(source.geneIds())</span>
+<span class="fc" id="L607">                .append(&quot;\n&quot;);</span>
+<span class="fc" id="L608">            return;</span>
+        }
+<span class="fc bfc" id="L610" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L611">            output.append(prefix)</span>
+<span class="fc" id="L612">                .append(&quot;repeat &quot;)</span>
+<span class="fc" id="L613">                .append(repeat.minIterations())</span>
+<span class="fc" id="L614">                .append(&quot;..&quot;)</span>
+<span class="fc" id="L615">                .append(repeat.maxIterations())</span>
+<span class="fc" id="L616">                .append(&quot; {\n&quot;);</span>
+<span class="fc" id="L617">            appendReadable(output, repeat.body(), indentation + 1);</span>
+<span class="fc" id="L618">            output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L619">            return;</span>
+        }
+<span class="fc bfc" id="L621" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L622">            output.append(prefix)</span>
+<span class="fc" id="L623">                .append(&quot;require &quot;)</span>
+<span class="fc" id="L624">                .append(require.requirement().kind())</span>
+<span class="fc" id="L625">                .append(&quot;(&quot;)</span>
+<span class="fc" id="L626">                .append(require.requirement().threshold())</span>
+<span class="fc" id="L627">                .append(&quot;) {\n&quot;);</span>
+<span class="fc" id="L628">            appendReadable(output, require.body(), indentation + 1);</span>
+<span class="fc" id="L629">            output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L630">            return;</span>
+        }
+<span class="fc bfc" id="L632" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
+<span class="fc" id="L633">            output.append(prefix)</span>
+<span class="fc" id="L634">                .append(&quot;prioritize &quot;)</span>
+<span class="fc" id="L635">                .append(prioritize.priority().kind())</span>
+<span class="fc" id="L636">                .append(prioritize.priority().preferredGeneIds())</span>
+<span class="fc" id="L637">                .append(&quot; {\n&quot;);</span>
+<span class="fc" id="L638">            appendReadable(output, prioritize.body(), indentation + 1);</span>
+<span class="fc" id="L639">            output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L640">            return;</span>
+        }
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">        if (node instanceof Prune prune) {</span>
+<span class="nc" id="L643">            output.append(prefix)</span>
+<span class="nc" id="L644">                .append(&quot;prune &quot;)</span>
+<span class="nc" id="L645">                .append(prune.maxCandidates())</span>
+<span class="nc" id="L646">                .append(&quot; because \&quot;&quot;)</span>
+<span class="nc" id="L647">                .append(prune.reason())</span>
+<span class="nc" id="L648">                .append(&quot;\&quot; {\n&quot;);</span>
+<span class="nc" id="L649">            appendReadable(output, prune.body(), indentation + 1);</span>
+<span class="nc" id="L650">            output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="nc" id="L651">            return;</span>
+        }
+
+        String keyword;
+        List&lt;Node&gt; children;
+<span class="fc bfc" id="L656" title="All 2 branches covered.">        if (node instanceof Choice choice) {</span>
+<span class="fc" id="L657">            keyword = &quot;choice&quot;;</span>
+<span class="fc" id="L658">            children = choice.alternatives();</span>
+<span class="pc bpc" id="L659" title="1 of 2 branches missed.">        } else if (node instanceof FirstApplicable firstApplicable) {</span>
+<span class="nc" id="L660">            keyword = &quot;firstApplicable&quot;;</span>
+<span class="nc" id="L661">            children = firstApplicable.alternatives();</span>
+        } else {
+<span class="fc" id="L663">            keyword = &quot;sequence&quot;;</span>
+<span class="fc" id="L664">            children = ((Sequence) node).steps();</span>
+        }
+<span class="fc" id="L666">        output.append(prefix).append(keyword).append(&quot; {\n&quot;);</span>
+<span class="fc bfc" id="L667" title="All 2 branches covered.">        for (Node child : children) {</span>
+<span class="fc" id="L668">            appendReadable(output, child, indentation + 1);</span>
+<span class="fc" id="L669">        }</span>
+<span class="fc" id="L670">        output.append(prefix).append(&quot;}\n&quot;);</span>
+<span class="fc" id="L671">    }</span>
+
+    private static List&lt;Node&gt; immutableNodes(List&lt;Node&gt; values, String name) {
+<span class="fc" id="L674">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L675">        List&lt;Node&gt; copy = values.stream()</span>
+<span class="fc" id="L676">            .map(value -&gt; Objects.requireNonNull(value, &quot;program node&quot;))</span>
+<span class="fc" id="L677">            .toList();</span>
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">        if (copy.isEmpty()) {</span>
+<span class="nc" id="L679">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="fc" id="L681">        return copy;</span>
+    }
+
+    private static List&lt;String&gt; immutableIds(
+        List&lt;String&gt; values,
+        String name,
+        boolean requireNonEmpty
+    ) {
+<span class="fc" id="L689">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L690">        List&lt;String&gt; copy = values.stream()</span>
+<span class="fc" id="L691">            .map(value -&gt; normalizeId(value, name + &quot; entry&quot;))</span>
+<span class="fc" id="L692">            .toList();</span>
+<span class="pc bpc" id="L693" title="1 of 4 branches missed.">        if (requireNonEmpty &amp;&amp; copy.isEmpty()) {</span>
+<span class="nc" id="L694">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L696" title="1 of 2 branches missed.">        if (new LinkedHashSet&lt;&gt;(copy).size() != copy.size()) {</span>
+<span class="nc" id="L697">            throw new IllegalArgumentException(name + &quot; must not contain duplicates&quot;);</span>
+        }
+<span class="fc" id="L699">        return copy;</span>
+    }
+
+    private static String normalizeId(String value, String name) {
+<span class="fc" id="L703">        String normalized = normalizeText(value, name)</span>
+<span class="fc" id="L704">            .toLowerCase(java.util.Locale.ROOT);</span>
+<span class="pc bpc" id="L705" title="1 of 2 branches missed.">        if (!ID.matcher(normalized).matches()) {</span>
+<span class="nc" id="L706">            throw new IllegalArgumentException(&quot;invalid &quot; + name + &quot;: &quot; + value);</span>
+        }
+<span class="fc" id="L708">        return normalized;</span>
+    }
+
+    private static String normalizeText(String value, String name) {
+<span class="pc bpc" id="L712" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L713">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L715">        return value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+<span class="fc" id="L718">    private record TreeFacts(</span>
+        int nodeCount,
+        int actualDepth,
+        List&lt;String&gt; referencedGeneIds,
+        List&lt;Priority&gt; priorities
+    ) {
+    }
+
+<span class="fc" id="L726">    private static final class AlphaContext {</span>
+<span class="fc" id="L727">        private final Map&lt;String, String&gt; genes = new LinkedHashMap&lt;&gt;();</span>
+
+        private String gene(String geneId) {
+<span class="fc" id="L730">            return genes.computeIfAbsent(</span>
+                geneId,
+<span class="fc" id="L732">                ignored -&gt; &quot;G&quot; + genes.size());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

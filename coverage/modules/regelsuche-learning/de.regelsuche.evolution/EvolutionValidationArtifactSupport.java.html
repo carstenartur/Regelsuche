@@ -63,8 +63,8 @@ final class EvolutionValidationArtifactSupport {
     }
 
     static String requireText(String value, String field) {
-<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L67">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L66" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L67">            throw new IllegalArgumentException(field + &quot; must not be blank&quot;);</span>
         }
 <span class="fc" id="L69">        return value;</span>
     }

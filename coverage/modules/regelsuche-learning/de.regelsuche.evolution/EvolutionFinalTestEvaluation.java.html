@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionFinalTestEvaluation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionFinalTestEvaluation.java</span></div><h1>EvolutionFinalTestEvaluation.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+
+/** Immutable result of one consumed FINAL TEST attempt. */
+public record EvolutionFinalTestEvaluation(
+    String schema,
+    String runIdentity,
+    String studyPlanHash,
+    String splitManifestHash,
+    String validationSelectionHash,
+    String finalTestSuiteHash,
+    String reservationHash,
+    String selectedGenomeHash,
+    String selectedConfigurationHash,
+    String evaluationSplit,
+    List&lt;String&gt; finalTestCaseIds,
+    List&lt;EvolutionFinalTestCaseEvidence&gt; cases,
+    int baselineReachedCases,
+    int selectedReachedCases,
+    int newlySolvedCases,
+    int reachabilityRegressions,
+    int correctnessFailures,
+    int correctnessRegressions,
+    int failedCaseEvaluations,
+    ExecutionOutcome executionOutcome,
+    String finalTestStatus,
+    String proofStatus,
+    String externalNoveltyStatus,
+    String promotionStatus,
+    String publicEvidenceStatus,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-final-test-evaluation/v1&quot;;
+    public static final String COMPLETED = &quot;COMPLETED&quot;;
+    public static final String NOT_EVALUATED = &quot;NOT_EVALUATED&quot;;
+
+<span class="fc" id="L43">    public EvolutionFinalTestEvaluation {</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="fc" id="L45">            throw new IllegalArgumentException(</span>
+                &quot;unsupported FINAL TEST evaluation schema&quot;);
+        }
+<span class="fc" id="L48">        requireHashes(runIdentity, studyPlanHash, splitManifestHash,</span>
+            validationSelectionHash, finalTestSuiteHash, reservationHash,
+            selectedGenomeHash, selectedConfigurationHash, contentHash);
+<span class="fc" id="L51">        if (!EvolutionFinalTestReservation.runIdentity(</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">                studyPlanHash, splitManifestHash).equals(runIdentity)) {</span>
+<span class="fc" id="L53">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evaluation runIdentity mismatch&quot;);
+        }
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (!EvolutionFinalTestSuite.FINAL_TEST.equals(evaluationSplit)) {</span>
+<span class="fc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;evaluationSplit must be FINAL_TEST&quot;);
+        }
+<span class="fc" id="L60">        finalTestCaseIds = canonicalIds(finalTestCaseIds);</span>
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">        if (cases == null || cases.isEmpty()) {</span>
+<span class="fc" id="L62">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evaluation requires case evidence&quot;);
+        }
+<span class="fc" id="L65">        cases = List.copyOf(cases);</span>
+<span class="fc" id="L66">        List&lt;String&gt; actualIds = cases.stream()</span>
+<span class="fc" id="L67">            .map(EvolutionFinalTestCaseEvidence::caseId).toList();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (!finalTestCaseIds.equals(actualIds)) {</span>
+<span class="fc" id="L69">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evidence does not retain the frozen case order&quot;);
+        }
+<span class="fc" id="L72">        int actualBaselineReached = count(cases,</span>
+<span class="fc" id="L73">            evidence -&gt; evidence.baseline().reached());</span>
+<span class="fc" id="L74">        int actualSelectedReached = count(cases,</span>
+<span class="fc" id="L75">            evidence -&gt; evidence.selected().reached());</span>
+<span class="fc" id="L76">        int actualNewlySolved = count(cases,</span>
+            EvolutionFinalTestCaseEvidence::newlySolved);
+<span class="fc" id="L78">        int actualReachabilityRegressions = count(cases,</span>
+            EvolutionFinalTestCaseEvidence::reachabilityRegression);
+<span class="fc" id="L80">        int actualCorrectnessFailures = count(cases,</span>
+            EvolutionFinalTestCaseEvidence::correctnessFailure);
+<span class="fc" id="L82">        int actualCorrectnessRegressions = count(cases,</span>
+            EvolutionFinalTestCaseEvidence::correctnessRegression);
+<span class="fc" id="L84">        int actualFailures = count(cases,</span>
+            EvolutionFinalTestCaseEvidence::evaluationFailed);
+<span class="fc bfc" id="L86" title="All 14 branches covered.">        if (baselineReachedCases != actualBaselineReached</span>
+                || selectedReachedCases != actualSelectedReached
+                || newlySolvedCases != actualNewlySolved
+                || reachabilityRegressions != actualReachabilityRegressions
+                || correctnessFailures != actualCorrectnessFailures
+                || correctnessRegressions != actualCorrectnessRegressions
+                || failedCaseEvaluations != actualFailures) {
+<span class="fc" id="L93">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST aggregates differ from case evidence&quot;);
+        }
+<span class="fc" id="L96">        Objects.requireNonNull(executionOutcome, &quot;executionOutcome&quot;);</span>
+<span class="fc" id="L97">        ExecutionOutcome expectedOutcome = outcome(</span>
+            actualFailures, actualReachabilityRegressions,
+            actualCorrectnessFailures);
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (executionOutcome != expectedOutcome) {</span>
+<span class="fc" id="L101">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST executionOutcome mismatch&quot;);
+        }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (!COMPLETED.equals(finalTestStatus)) {</span>
+<span class="fc" id="L105">            throw new IllegalArgumentException(</span>
+                &quot;consumed FINAL TEST must be marked COMPLETED&quot;);
+        }
+<span class="fc" id="L108">        requireNotEvaluated(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L109">        requireNotEvaluated(</span>
+            externalNoveltyStatus, &quot;externalNoveltyStatus&quot;);
+<span class="fc" id="L111">        requireNotEvaluated(promotionStatus, &quot;promotionStatus&quot;);</span>
+<span class="fc" id="L112">        requireNotEvaluated(publicEvidenceStatus, &quot;publicEvidenceStatus&quot;);</span>
+<span class="fc" id="L113">        if (!EvolutionValidationArtifactSupport.hash(payload(</span>
+                runIdentity, studyPlanHash, splitManifestHash,
+                validationSelectionHash, finalTestSuiteHash, reservationHash,
+                selectedGenomeHash, selectedConfigurationHash,
+                evaluationSplit, finalTestCaseIds, cases,
+                baselineReachedCases, selectedReachedCases, newlySolvedCases,
+                reachabilityRegressions, correctnessFailures,
+                correctnessRegressions, failedCaseEvaluations,
+                executionOutcome, finalTestStatus, proofStatus,
+                externalNoveltyStatus, promotionStatus,
+<span class="fc bfc" id="L123" title="All 2 branches covered.">                publicEvidenceStatus)).equals(contentHash)) {</span>
+<span class="fc" id="L124">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evaluation contentHash mismatch&quot;);
+        }
+<span class="fc" id="L127">    }</span>
+
+    public static EvolutionFinalTestEvaluation create(
+        EvolutionFinalTestReservation reservation,
+        EvolutionFinalTestSuite suite,
+        List&lt;EvolutionFinalTestCaseEvidence&gt; cases
+    ) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (!reservation.finalTestSuiteHash().equals(suite.contentHash())</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                || !reservation.studyPlanHash().equals(suite.studyPlanHash())</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                || !reservation.splitManifestHash().equals(</span>
+<span class="fc" id="L137">                    suite.splitManifestHash())) {</span>
+<span class="fc" id="L138">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evaluation does not match its reservation&quot;);
+        }
+<span class="fc" id="L141">        List&lt;EvolutionFinalTestCaseEvidence&gt; retained = List.copyOf(cases);</span>
+<span class="fc" id="L142">        requireSuiteEvidenceMatch(suite, retained);</span>
+<span class="fc" id="L143">        List&lt;String&gt; ids = suite.cases().stream()</span>
+<span class="fc" id="L144">            .map(EvolutionFinalTestSuite.CaseDefinition::caseId).toList();</span>
+<span class="fc" id="L145">        int baselineReached = count(retained,</span>
+<span class="fc" id="L146">            evidence -&gt; evidence.baseline().reached());</span>
+<span class="fc" id="L147">        int selectedReached = count(retained,</span>
+<span class="fc" id="L148">            evidence -&gt; evidence.selected().reached());</span>
+<span class="fc" id="L149">        int newlySolved = count(retained,</span>
+            EvolutionFinalTestCaseEvidence::newlySolved);
+<span class="fc" id="L151">        int reachabilityRegressions = count(retained,</span>
+            EvolutionFinalTestCaseEvidence::reachabilityRegression);
+<span class="fc" id="L153">        int correctnessFailures = count(retained,</span>
+            EvolutionFinalTestCaseEvidence::correctnessFailure);
+<span class="fc" id="L155">        int correctnessRegressions = count(retained,</span>
+            EvolutionFinalTestCaseEvidence::correctnessRegression);
+<span class="fc" id="L157">        int failures = count(retained,</span>
+            EvolutionFinalTestCaseEvidence::evaluationFailed);
+<span class="fc" id="L159">        ExecutionOutcome executionOutcome = outcome(</span>
+            failures, reachabilityRegressions, correctnessFailures);
+<span class="fc" id="L161">        Map&lt;String, Object&gt; payload = payload(</span>
+<span class="fc" id="L162">            reservation.runIdentity(), reservation.studyPlanHash(),</span>
+<span class="fc" id="L163">            reservation.splitManifestHash(),</span>
+<span class="fc" id="L164">            reservation.validationSelectionHash(), suite.contentHash(),</span>
+<span class="fc" id="L165">            reservation.contentHash(), reservation.selectedGenomeHash(),</span>
+<span class="fc" id="L166">            reservation.selectedConfigurationHash(),</span>
+            EvolutionFinalTestSuite.FINAL_TEST, ids, retained,
+            baselineReached, selectedReached, newlySolved,
+            reachabilityRegressions, correctnessFailures,
+            correctnessRegressions, failures, executionOutcome, COMPLETED,
+            NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED);
+<span class="fc" id="L172">        return new EvolutionFinalTestEvaluation(</span>
+<span class="fc" id="L173">            SCHEMA, reservation.runIdentity(), reservation.studyPlanHash(),</span>
+<span class="fc" id="L174">            reservation.splitManifestHash(),</span>
+<span class="fc" id="L175">            reservation.validationSelectionHash(), suite.contentHash(),</span>
+<span class="fc" id="L176">            reservation.contentHash(), reservation.selectedGenomeHash(),</span>
+<span class="fc" id="L177">            reservation.selectedConfigurationHash(),</span>
+            EvolutionFinalTestSuite.FINAL_TEST, ids, retained,
+            baselineReached, selectedReached, newlySolved,
+            reachabilityRegressions, correctnessFailures,
+            correctnessRegressions, failures, executionOutcome, COMPLETED,
+            NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED, NOT_EVALUATED,
+<span class="fc" id="L183">            EvolutionValidationArtifactSupport.hash(payload));</span>
+    }
+
+    public boolean qualificationEligible() {
+<span class="fc bfc" id="L187" title="All 6 branches covered.">        return failedCaseEvaluations == 0</span>
+            &amp;&amp; reachabilityRegressions == 0
+            &amp;&amp; correctnessFailures == 0;
+    }
+
+    boolean matchesReservation(EvolutionFinalTestReservation reservation) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        return reservation != null</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            &amp;&amp; runIdentity.equals(reservation.runIdentity())</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">            &amp;&amp; studyPlanHash.equals(reservation.studyPlanHash())</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            &amp;&amp; splitManifestHash.equals(reservation.splitManifestHash())</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            &amp;&amp; validationSelectionHash.equals(</span>
+<span class="fc" id="L198">                reservation.validationSelectionHash())</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            &amp;&amp; finalTestSuiteHash.equals(reservation.finalTestSuiteHash())</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            &amp;&amp; reservationHash.equals(reservation.contentHash())</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">            &amp;&amp; selectedGenomeHash.equals(reservation.selectedGenomeHash())</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            &amp;&amp; selectedConfigurationHash.equals(</span>
+<span class="fc" id="L203">                reservation.selectedConfigurationHash());</span>
+    }
+
+    public static EvolutionFinalTestEvaluation fromCanonicalJson(String json) {
+<span class="pc bpc" id="L207" title="1 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="fc" id="L208">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evaluation JSON must not be blank&quot;);
+        }
+        try {
+<span class="fc" id="L212">            return EvolutionValidationArtifactSupport.JSON.readValue(</span>
+                json, EvolutionFinalTestEvaluation.class);
+<span class="fc" id="L214">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L215">            throw new IllegalArgumentException(</span>
+                &quot;invalid FINAL TEST evaluation JSON&quot;, exception);
+        }
+    }
+
+    public String toCanonicalJson() {
+        try {
+<span class="fc" id="L222">            Map&lt;String, Object&gt; value = payload(</span>
+                runIdentity, studyPlanHash, splitManifestHash,
+                validationSelectionHash, finalTestSuiteHash, reservationHash,
+                selectedGenomeHash, selectedConfigurationHash,
+                evaluationSplit, finalTestCaseIds, cases,
+                baselineReachedCases, selectedReachedCases, newlySolvedCases,
+                reachabilityRegressions, correctnessFailures,
+                correctnessRegressions, failedCaseEvaluations,
+                executionOutcome, finalTestStatus, proofStatus,
+                externalNoveltyStatus, promotionStatus, publicEvidenceStatus);
+<span class="fc" id="L232">            value.put(&quot;schema&quot;, SCHEMA);</span>
+<span class="fc" id="L233">            value.put(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L234">            return EvolutionValidationArtifactSupport.JSON</span>
+<span class="fc" id="L235">                .writeValueAsString(value) + &quot;\n&quot;;</span>
+<span class="nc" id="L236">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L237">            throw new IllegalStateException(</span>
+                &quot;cannot serialize FINAL TEST evaluation&quot;, exception);
+        }
+    }
+
+<span class="fc" id="L242">    public enum ExecutionOutcome {</span>
+<span class="fc" id="L243">        COMPLETED,</span>
+<span class="fc" id="L244">        COMPLETED_WITH_FAILURES,</span>
+<span class="fc" id="L245">        COMPLETED_WITH_QUALITY_BLOCKERS,</span>
+<span class="fc" id="L246">        COMPLETED_WITH_FAILURES_AND_QUALITY_BLOCKERS</span>
+    }
+
+    private interface EvidencePredicate {
+        boolean test(EvolutionFinalTestCaseEvidence evidence);
+    }
+
+    private static int count(
+        List&lt;EvolutionFinalTestCaseEvidence&gt; values,
+        EvidencePredicate predicate
+    ) {
+<span class="fc" id="L257">        return Math.toIntExact(values.stream().filter(predicate::test).count());</span>
+    }
+
+    private static ExecutionOutcome outcome(
+        int failures,
+        int reachabilityRegressions,
+        int correctnessFailures
+    ) {
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        boolean failed = failures &gt; 0;</span>
+<span class="fc bfc" id="L266" title="All 4 branches covered.">        boolean blocked = reachabilityRegressions &gt; 0</span>
+            || correctnessFailures &gt; 0;
+<span class="fc bfc" id="L268" title="All 4 branches covered.">        if (failed &amp;&amp; blocked) {</span>
+<span class="fc" id="L269">            return ExecutionOutcome.COMPLETED_WITH_FAILURES_AND_QUALITY_BLOCKERS;</span>
+        }
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (failed) {</span>
+<span class="fc" id="L272">            return ExecutionOutcome.COMPLETED_WITH_FAILURES;</span>
+        }
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (blocked) {</span>
+<span class="fc" id="L275">            return ExecutionOutcome.COMPLETED_WITH_QUALITY_BLOCKERS;</span>
+        }
+<span class="fc" id="L277">        return ExecutionOutcome.COMPLETED;</span>
+    }
+
+    private static void requireSuiteEvidenceMatch(
+        EvolutionFinalTestSuite suite,
+        List&lt;EvolutionFinalTestCaseEvidence&gt; evidence
+    ) {
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        if (suite.cases().size() != evidence.size()) {</span>
+<span class="fc" id="L285">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evidence count differs from the frozen suite&quot;);
+        }
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        for (int index = 0; index &lt; evidence.size(); index++) {</span>
+<span class="fc" id="L289">            EvolutionFinalTestSuite.CaseDefinition definition =</span>
+<span class="fc" id="L290">                suite.cases().get(index);</span>
+<span class="fc" id="L291">            EvolutionFinalTestCaseEvidence retained = evidence.get(index);</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (!definition.caseId().equals(retained.caseId())</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                    || !definition.family().equals(retained.family())) {</span>
+<span class="fc" id="L294">                throw new IllegalArgumentException(</span>
+                    &quot;FINAL TEST evidence differs from the frozen suite at index &quot;
+                        + index);
+            }
+        }
+<span class="fc" id="L299">    }</span>
+
+    private static List&lt;String&gt; canonicalIds(List&lt;String&gt; values) {
+<span class="pc bpc" id="L302" title="1 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="fc" id="L303">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evaluation requires case ids&quot;);
+        }
+<span class="fc" id="L306">        List&lt;String&gt; retained = values.stream()</span>
+<span class="fc" id="L307">            .map(value -&gt; EvolutionValidationArtifactSupport.requireText(</span>
+                value, &quot;finalTestCaseId&quot;))
+<span class="fc" id="L309">            .toList();</span>
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (retained.stream().distinct().count() != retained.size()) {</span>
+<span class="nc" id="L311">            throw new IllegalArgumentException(</span>
+                &quot;FINAL TEST evaluation contains duplicate case ids&quot;);
+        }
+<span class="fc" id="L314">        return retained;</span>
+    }
+
+    private static void requireHashes(String... values) {
+<span class="fc" id="L318">        String[] fields = {</span>
+            &quot;runIdentity&quot;, &quot;studyPlanHash&quot;, &quot;splitManifestHash&quot;,
+            &quot;validationSelectionHash&quot;, &quot;finalTestSuiteHash&quot;,
+            &quot;reservationHash&quot;, &quot;selectedGenomeHash&quot;,
+            &quot;selectedConfigurationHash&quot;, &quot;contentHash&quot;
+        };
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        for (int index = 0; index &lt; fields.length; index++) {</span>
+<span class="fc" id="L325">            EvolutionGenome.requireSha256(values[index], fields[index]);</span>
+        }
+<span class="fc" id="L327">    }</span>
+
+    private static void requireNotEvaluated(String value, String field) {
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (!NOT_EVALUATED.equals(value)) {</span>
+<span class="fc" id="L331">            throw new IllegalArgumentException(</span>
+                field + &quot; must remain NOT_EVALUATED&quot;);
+        }
+<span class="fc" id="L334">    }</span>
+
+    private static Map&lt;String, Object&gt; payload(
+        String runIdentity,
+        String studyPlanHash,
+        String splitManifestHash,
+        String validationSelectionHash,
+        String finalTestSuiteHash,
+        String reservationHash,
+        String selectedGenomeHash,
+        String selectedConfigurationHash,
+        String evaluationSplit,
+        List&lt;String&gt; finalTestCaseIds,
+        List&lt;EvolutionFinalTestCaseEvidence&gt; cases,
+        int baselineReachedCases,
+        int selectedReachedCases,
+        int newlySolvedCases,
+        int reachabilityRegressions,
+        int correctnessFailures,
+        int correctnessRegressions,
+        int failedCaseEvaluations,
+        ExecutionOutcome executionOutcome,
+        String finalTestStatus,
+        String proofStatus,
+        String externalNoveltyStatus,
+        String promotionStatus,
+        String publicEvidenceStatus
+    ) {
+<span class="fc" id="L362">        Map&lt;String, Object&gt; value = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L363">        value.put(&quot;baselineReachedCases&quot;, baselineReachedCases);</span>
+<span class="fc" id="L364">        value.put(&quot;cases&quot;, cases);</span>
+<span class="fc" id="L365">        value.put(&quot;correctnessFailures&quot;, correctnessFailures);</span>
+<span class="fc" id="L366">        value.put(&quot;correctnessRegressions&quot;, correctnessRegressions);</span>
+<span class="fc" id="L367">        value.put(&quot;evaluationSplit&quot;, evaluationSplit);</span>
+<span class="fc" id="L368">        value.put(&quot;executionOutcome&quot;, executionOutcome);</span>
+<span class="fc" id="L369">        value.put(&quot;externalNoveltyStatus&quot;, externalNoveltyStatus);</span>
+<span class="fc" id="L370">        value.put(&quot;failedCaseEvaluations&quot;, failedCaseEvaluations);</span>
+<span class="fc" id="L371">        value.put(&quot;finalTestCaseIds&quot;, finalTestCaseIds);</span>
+<span class="fc" id="L372">        value.put(&quot;finalTestStatus&quot;, finalTestStatus);</span>
+<span class="fc" id="L373">        value.put(&quot;finalTestSuiteHash&quot;, finalTestSuiteHash);</span>
+<span class="fc" id="L374">        value.put(&quot;newlySolvedCases&quot;, newlySolvedCases);</span>
+<span class="fc" id="L375">        value.put(&quot;promotionStatus&quot;, promotionStatus);</span>
+<span class="fc" id="L376">        value.put(&quot;proofStatus&quot;, proofStatus);</span>
+<span class="fc" id="L377">        value.put(&quot;publicEvidenceStatus&quot;, publicEvidenceStatus);</span>
+<span class="fc" id="L378">        value.put(&quot;reachabilityRegressions&quot;, reachabilityRegressions);</span>
+<span class="fc" id="L379">        value.put(&quot;reservationHash&quot;, reservationHash);</span>
+<span class="fc" id="L380">        value.put(&quot;runIdentity&quot;, runIdentity);</span>
+<span class="fc" id="L381">        value.put(&quot;selectedConfigurationHash&quot;, selectedConfigurationHash);</span>
+<span class="fc" id="L382">        value.put(&quot;selectedGenomeHash&quot;, selectedGenomeHash);</span>
+<span class="fc" id="L383">        value.put(&quot;selectedReachedCases&quot;, selectedReachedCases);</span>
+<span class="fc" id="L384">        value.put(&quot;splitManifestHash&quot;, splitManifestHash);</span>
+<span class="fc" id="L385">        value.put(&quot;studyPlanHash&quot;, studyPlanHash);</span>
+<span class="fc" id="L386">        value.put(&quot;validationSelectionHash&quot;, validationSelectionHash);</span>
+<span class="fc" id="L387">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

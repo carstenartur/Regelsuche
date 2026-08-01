@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionFinalTestCaseEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionFinalTestCaseEvidence.java</span></div><h1>EvolutionFinalTestCaseEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.Objects;
+
+/** Complete paired evidence for one ordered FINAL TEST case. */
+public record EvolutionFinalTestCaseEvidence(
+    String caseId,
+    String family,
+    EvolutionFinalTestMeasurement baseline,
+    EvolutionFinalTestMeasurement selected,
+    boolean newlySolved,
+    boolean reachabilityRegression,
+    boolean correctnessFailure,
+    boolean correctnessRegression,
+    boolean evaluationFailed
+) {
+<span class="fc" id="L17">    public EvolutionFinalTestCaseEvidence {</span>
+<span class="fc" id="L18">        EvolutionValidationArtifactSupport.requireText(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L19">        EvolutionValidationArtifactSupport.requireText(family, &quot;family&quot;);</span>
+<span class="fc" id="L20">        Objects.requireNonNull(baseline, &quot;baseline&quot;);</span>
+<span class="fc" id="L21">        Objects.requireNonNull(selected, &quot;selected&quot;);</span>
+<span class="fc bfc" id="L22" title="All 4 branches covered.">        boolean bothCompleted = completed(baseline) &amp;&amp; completed(selected);</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        boolean expectedNewlySolved = bothCompleted</span>
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            &amp;&amp; !baseline.reached()</span>
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            &amp;&amp; selected.reached()</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">            &amp;&amp; selected.correctnessStatus()</span>
+                == EvolutionCorrectnessStatus.CONFIRMED;
+<span class="fc bfc" id="L28" title="All 2 branches covered.">        if (newlySolved != expectedNewlySolved) {</span>
+<span class="fc" id="L29">            throw new IllegalArgumentException(</span>
+                &quot;newlySolved differs from FINAL TEST evidence&quot;);
+        }
+<span class="fc bfc" id="L32" title="All 2 branches covered.">        boolean expectedReachabilityRegression = bothCompleted</span>
+<span class="fc bfc" id="L33" title="All 2 branches covered.">            &amp;&amp; baseline.reached()</span>
+<span class="fc bfc" id="L34" title="All 2 branches covered.">            &amp;&amp; !selected.reached();</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        if (reachabilityRegression != expectedReachabilityRegression) {</span>
+<span class="fc" id="L36">            throw new IllegalArgumentException(</span>
+                &quot;reachabilityRegression differs from FINAL TEST evidence&quot;);
+        }
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        boolean expectedCorrectnessFailure = completed(selected)</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">            &amp;&amp; selected.reached()</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            &amp;&amp; selected.correctnessStatus()</span>
+                == EvolutionCorrectnessStatus.REFUTED;
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (correctnessFailure != expectedCorrectnessFailure) {</span>
+<span class="fc" id="L44">            throw new IllegalArgumentException(</span>
+                &quot;correctnessFailure differs from FINAL TEST evidence&quot;);
+        }
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        boolean expectedCorrectnessRegression = bothCompleted</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            &amp;&amp; baseline.reached()</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">            &amp;&amp; baseline.correctnessStatus()</span>
+                == EvolutionCorrectnessStatus.CONFIRMED
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            &amp;&amp; selected.reached()</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            &amp;&amp; selected.correctnessStatus()</span>
+                == EvolutionCorrectnessStatus.REFUTED;
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (correctnessRegression != expectedCorrectnessRegression) {</span>
+<span class="fc" id="L55">            throw new IllegalArgumentException(</span>
+                &quot;correctnessRegression differs from FINAL TEST evidence&quot;);
+        }
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        boolean expectedFailure = !bothCompleted;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (evaluationFailed != expectedFailure) {</span>
+<span class="fc" id="L60">            throw new IllegalArgumentException(</span>
+                &quot;evaluationFailed differs from FINAL TEST evidence&quot;);
+        }
+<span class="fc" id="L63">    }</span>
+
+    public static EvolutionFinalTestCaseEvidence create(
+        EvolutionFinalTestSuite.CaseDefinition definition,
+        EvolutionFinalTestMeasurement baseline,
+        EvolutionFinalTestMeasurement selected
+    ) {
+<span class="fc bfc" id="L70" title="All 4 branches covered.">        boolean bothCompleted = completed(baseline) &amp;&amp; completed(selected);</span>
+<span class="fc" id="L71">        return new EvolutionFinalTestCaseEvidence(</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            definition.caseId(), definition.family(), baseline, selected,</span>
+<span class="fc bfc" id="L73" title="All 4 branches covered.">            bothCompleted &amp;&amp; !baseline.reached() &amp;&amp; selected.reached()</span>
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">                &amp;&amp; selected.correctnessStatus()</span>
+                    == EvolutionCorrectnessStatus.CONFIRMED,
+<span class="fc bfc" id="L76" title="All 4 branches covered.">            bothCompleted &amp;&amp; baseline.reached() &amp;&amp; !selected.reached(),</span>
+<span class="fc bfc" id="L77" title="All 4 branches covered.">            completed(selected) &amp;&amp; selected.reached()</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">                &amp;&amp; selected.correctnessStatus()</span>
+                    == EvolutionCorrectnessStatus.REFUTED,
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            bothCompleted &amp;&amp; baseline.reached()</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                &amp;&amp; baseline.correctnessStatus()</span>
+                    == EvolutionCorrectnessStatus.CONFIRMED
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                &amp;&amp; selected.reached()</span>
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">                &amp;&amp; selected.correctnessStatus()</span>
+                    == EvolutionCorrectnessStatus.REFUTED,
+            !bothCompleted);
+    }
+
+    private static boolean completed(EvolutionFinalTestMeasurement value) {
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        return value.status() == EvolutionFinalTestMeasurement.Status.COMPLETED;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
