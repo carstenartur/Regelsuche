@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-acceptance-thresholds-v1.schema.json",
+  "title": "Regelsuche rewrite-program acceptance thresholds",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "minimumImprovedFinalTestCases",
+    "minimumDistinctImprovedFamilies",
+    "minimumNewlyReachedCases",
+    "allowMaterialWorkReductionRoute",
+    "minimumMechanicalWorkReductionPermille",
+    "minimumRetainedProgramPrimitiveSteps",
+    "requireCompositionTopology",
+    "requireDecisionTopology",
+    "maximumCorrectnessRegressions",
+    "maximumHiddenAssumptionRegressions",
+    "maximumUnexpectedUnsupportedCases",
+    "maximumTechnicalFailures",
+    "maximumProgramNodes",
+    "maximumGenomeRules",
+    "requiredCleanReproductions",
+    "requirePinnedContainerReproduction",
+    "successRoute",
+    "nullResultPolicy",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-acceptance-thresholds/v1"
+    },
+    "minimumImprovedFinalTestCases": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "minimumDistinctImprovedFamilies": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "minimumNewlyReachedCases": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "allowMaterialWorkReductionRoute": {
+      "type": "boolean"
+    },
+    "minimumMechanicalWorkReductionPermille": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "minimumRetainedProgramPrimitiveSteps": {
+      "type": "integer",
+      "minimum": 3
+    },
+    "requireCompositionTopology": {
+      "const": true
+    },
+    "requireDecisionTopology": {
+      "const": true
+    },
+    "maximumCorrectnessRegressions": {
+      "const": 0
+    },
+    "maximumHiddenAssumptionRegressions": {
+      "const": 0
+    },
+    "maximumUnexpectedUnsupportedCases": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "maximumTechnicalFailures": {
+      "const": 0
+    },
+    "maximumProgramNodes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maximumGenomeRules": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "requiredCleanReproductions": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "requirePinnedContainerReproduction": {
+      "const": true
+    },
+    "successRoute": {
+      "enum": [
+        "NEWLY_REACHED_REQUIRED",
+        "NEWLY_REACHED_OR_MATERIAL_WORK_REDUCTION"
+      ]
+    },
+    "nullResultPolicy": {
+      "const": "TRANSPARENT_COMPLETE_NULL_RESULT"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
