@@ -16,7 +16,7 @@ import de.regelsuche.search.program.RewriteCandidate;
 import de.regelsuche.search.program.RewriteProgram;
 import de.regelsuche.search.program.RewriteProgram.NodeMetadata;
 import de.regelsuche.search.program.RewritePrograms;
-import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.AstRewriteTransformationEngines;
 import de.regelsuche.transform.RewriteRule;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -31,13 +31,34 @@ import java.util.function.Predicate;
  */
 public final class EvolutionRewriteProgramCompiler {
     private final EvolutionGenomeCompiler genomeCompiler;
+    private final AstRewriteTransformationEngines.Backend astRewriteBackend;
 
     public EvolutionRewriteProgramCompiler() {
-        this(new EvolutionGenomeCompiler());
+        this(
+            new EvolutionGenomeCompiler(),
+            AstRewriteTransformationEngines.productionBackend()
+        );
     }
 
     public EvolutionRewriteProgramCompiler(EvolutionGenomeCompiler genomeCompiler) {
-        this.genomeCompiler = Objects.requireNonNull(genomeCompiler, "genomeCompiler");
+        this(
+            genomeCompiler,
+            AstRewriteTransformationEngines.productionBackend()
+        );
+    }
+
+    public EvolutionRewriteProgramCompiler(
+        EvolutionGenomeCompiler genomeCompiler,
+        AstRewriteTransformationEngines.Backend astRewriteBackend
+    ) {
+        this.genomeCompiler = Objects.requireNonNull(
+            genomeCompiler,
+            "genomeCompiler"
+        );
+        this.astRewriteBackend = Objects.requireNonNull(
+            astRewriteBackend,
+            "astRewriteBackend"
+        );
     }
 
     public CompiledRewriteProgram compile(
@@ -65,7 +86,8 @@ public final class EvolutionRewriteProgramCompiler {
 
         CompilationContext context = new CompilationContext(
             genome,
-            rulesByGeneId);
+            rulesByGeneId,
+            astRewriteBackend);
         RewriteProgram program = compileNode(plan.root(), context);
         ProgrammedTransformationEngine engine =
             new ProgrammedTransformationEngine(program);
@@ -157,7 +179,8 @@ public final class EvolutionRewriteProgramCompiler {
                 .toList();
             return new RewriteProgram.Source(
                 metadata,
-                new AstRewriteTransformationEngine(
+                AstRewriteTransformationEngines.create(
+                    context.astRewriteBackend(),
                     rules,
                     context.genome().budget().maxAstGrowthPerStep(),
                     context.genome().budget().maxCandidatesPerState()));
@@ -309,11 +332,13 @@ public final class EvolutionRewriteProgramCompiler {
 
     private record CompilationContext(
         EvolutionGenome genome,
-        Map<String, RewriteRule> rulesByGeneId
+        Map<String, RewriteRule> rulesByGeneId,
+        AstRewriteTransformationEngines.Backend astRewriteBackend
     ) {
         private CompilationContext {
             Objects.requireNonNull(genome, "genome");
             rulesByGeneId = Map.copyOf(rulesByGeneId);
+            Objects.requireNonNull(astRewriteBackend, "astRewriteBackend");
         }
 
         private RewriteRule rule(String geneId) {
