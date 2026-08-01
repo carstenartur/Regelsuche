@@ -55,6 +55,8 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
         assertTrue(
             measurement.candidateTransformationWork().programNodeVisits() > 0,
             "the rejected macro's internal formation work is still retained");
+        assertEquals(0, measurement.baselinePathAuditCalls());
+        assertEquals(0, measurement.candidatePathAuditCalls());
     }
 
     @Test
@@ -81,10 +83,22 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
         assertEquals(2, measurement.baselinePathLength());
         assertEquals(1, measurement.candidatePathLength(),
             "macro compression remains a representation fact");
+        assertEquals(2, measurement.baselinePathAuditCalls());
+        assertEquals(1, measurement.candidatePathAuditCalls());
+        assertEquals(
+            measurement.baselineTransformationWork().totalWorkUnits()
+                + measurement.baselineOuterSearchWorkUnits()
+                + measurement.baselinePathAuditCalls(),
+            measurement.baselineTotalWorkUnits());
+        assertEquals(
+            measurement.candidateTransformationWork().totalWorkUnits()
+                + measurement.candidateOuterSearchWorkUnits()
+                + measurement.candidatePathAuditCalls(),
+            measurement.candidateTotalWorkUnits());
         assertTrue(
             measurement.candidateTotalWorkUnits()
                 > measurement.baselineTotalWorkUnits(),
-            "all additional program formation work must remain visible");
+            "all additional program formation and search work must remain visible");
         assertEquals(0,
             evidence.rawComponents().get(
                 FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION),
@@ -92,6 +106,10 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
         assertEquals(0,
             evidence.rawComponents().get(
                 FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION));
+        assertTrue(measurement.baselineTotalWorkUnits()
+            <= suite.primitiveWorkBudget().maxWorkUnits());
+        assertTrue(measurement.candidateTotalWorkUnits()
+            <= suite.primitiveWorkBudget().maxWorkUnits());
     }
 
     @Test
@@ -122,6 +140,8 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
         assertFalse(measurement.newlySolved());
         assertEquals(PathCorrectness.CONFIRMED,
             measurement.baselinePathCorrectness());
+        assertEquals(1, measurement.baselinePathAuditCalls());
+        assertEquals(1, measurement.candidatePathAuditCalls());
         assertEquals(0,
             evidence.rawComponents().get(
                 FitnessComponent.TRAIN_CASES_NEWLY_SOLVED));
@@ -162,6 +182,8 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
             measurement.baselinePathCorrectness());
         assertEquals(PathCorrectness.REFUTED,
             measurement.candidatePathCorrectness());
+        assertEquals(1, measurement.baselinePathAuditCalls());
+        assertEquals(1, measurement.candidatePathAuditCalls());
         assertFalse(measurement.newlySolved());
         assertTrue(measurement.correctnessFailure());
         assertTrue(evidence.blockers().contains(
@@ -197,6 +219,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
         assertEquals("WORK_BUDGET", measurement.candidateStatus());
         assertTrue(measurement.candidateTotalWorkUnits() > 3);
         assertTrue(measurement.baselineTotalWorkUnits() > 0);
+        assertEquals(0, measurement.candidatePathAuditCalls());
     }
 
     private static InformationParityRewriteProgramTrainFitnessEvaluator evaluator(
