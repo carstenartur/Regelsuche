@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/evolution-validation-selection-v1.schema.json",
+  "title": "Regelsuche evolutionary VALIDATION selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "studyPlanHash",
+    "splitManifestHash",
+    "trainPopulationRunHash",
+    "validationSuiteHash",
+    "evaluationSplit",
+    "validationCaseIds",
+    "candidates",
+    "selectionPolicy",
+    "selectionOutcome",
+    "selectedGenomeHash",
+    "selectedConfigurationHash",
+    "validationStatus",
+    "finalTestStatus",
+    "proofStatus",
+    "externalNoveltyStatus",
+    "promotionStatus",
+    "publicEvidenceStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-validation-selection/v1"
+    },
+    "studyPlanHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "splitManifestHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "trainPopulationRunHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "validationSuiteHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "evaluationSplit": {
+      "const": "VALIDATION"
+    },
+    "validationCaseIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "selectionPolicy": {
+      "const": "MAX_NEWLY_SOLVED_THEN_REACHED_THEN_MIN_RESOURCES_THEN_CONFIGURATION_HASH"
+    },
+    "selectionOutcome": {
+      "enum": [
+        "SELECTED",
+        "NO_ELIGIBLE_CANDIDATE"
+      ]
+    },
+    "selectedGenomeHash": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "const": ""
+        }
+      ]
+    },
+    "selectedConfigurationHash": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "const": ""
+        }
+      ]
+    },
+    "validationStatus": {
+      "const": "COMPLETED"
+    },
+    "finalTestStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "proofStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "externalNoveltyStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "promotionStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "publicEvidenceStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": ".*\\S.*"
+    },
+    "nonNegative": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "correctness": {
+      "enum": [
+        "CONFIRMED",
+        "REFUTED",
+        "INCONCLUSIVE",
+        "NOT_EVALUATED"
+      ]
+    },
+    "search": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxDepth",
+        "maxExpandedStates",
+        "maxCandidatesPerState"
+      ],
+      "properties": {
+        "maxDepth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxExpandedStates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxCandidatesPerState": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "family",
+        "baselineReached",
+        "candidateReached",
+        "baselineCorrectness",
+        "candidateCorrectness",
+        "baselineTerminalReason",
+        "candidateTerminalReason",
+        "baselineDepth",
+        "candidateDepth",
+        "baselineExploredStates",
+        "candidateExploredStates",
+        "baselineCandidateEvaluations",
+        "candidateCandidateEvaluations",
+        "newlySolved",
+        "reachabilityRegression",
+        "correctnessFailure",
+        "correctnessRegression"
+      ],
+      "properties": {
+        "caseId": {
+          "$ref": "#/$defs/text"
+        },
+        "family": {
+          "$ref": "#/$defs/text"
+        },
+        "baselineReached": {
+          "type": "boolean"
+        },
+        "candidateReached": {
+          "type": "boolean"
+        },
+        "baselineCorrectness": {
+          "$ref": "#/$defs/correctness"
+        },
+        "candidateCorrectness": {
+          "$ref": "#/$defs/correctness"
+        },
+        "baselineTerminalReason": {
+          "$ref": "#/$defs/text"
+        },
+        "candidateTerminalReason": {
+          "$ref": "#/$defs/text"
+        },
+        "baselineDepth": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "candidateDepth": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "baselineExploredStates": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "candidateExploredStates": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "baselineCandidateEvaluations": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "candidateCandidateEvaluations": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "newlySolved": {
+          "type": "boolean"
+        },
+        "reachabilityRegression": {
+          "type": "boolean"
+        },
+        "correctnessFailure": {
+          "type": "boolean"
+        },
+        "correctnessRegression": {
+          "type": "boolean"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "genomeHash",
+        "alphaStructuralHash",
+        "searchConfiguration",
+        "configurationHash",
+        "cases",
+        "reachedCases",
+        "newlySolvedCases",
+        "reachabilityRegressions",
+        "correctnessFailures",
+        "correctnessRegressions",
+        "exploredStates",
+        "candidateEvaluations",
+        "blockers"
+      ],
+      "properties": {
+        "genomeHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "alphaStructuralHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "searchConfiguration": {
+          "$ref": "#/$defs/search"
+        },
+        "configurationHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/case"
+          }
+        },
+        "reachedCases": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "newlySolvedCases": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "reachabilityRegressions": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "correctnessFailures": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "correctnessRegressions": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "exploredStates": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "candidateEvaluations": {
+          "$ref": "#/$defs/nonNegative"
+        },
+        "blockers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    }
+  }
+}
