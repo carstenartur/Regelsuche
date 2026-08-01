@@ -30,14 +30,20 @@ class EvolutionRewriteProgramFitnessSchemaContractTest {
         assertTrue(suite.contains("\"maxPrimitiveSteps\""));
         assertTrue(suite.contains("\"maxWorkUnits\""));
         assertTrue(suite.contains("\"additionalProperties\": false"));
+
         assertTrue(fitness.contains(
             "regelsuche.evolution-rewrite-program-train-fitness/v1"));
         assertTrue(fitness.contains("\"evaluationProtocolHash\""));
         assertTrue(fitness.contains("\"programUsed\""));
         assertTrue(fitness.contains("\"baselinePrimitiveSteps\""));
         assertTrue(fitness.contains("\"candidatePrimitiveSteps\""));
+        assertTrue(fitness.contains("\"baselineOuterSearchWorkUnits\""));
+        assertTrue(fitness.contains("\"candidateOuterSearchWorkUnits\""));
+        assertTrue(fitness.contains("\"baselinePathAuditCalls\""));
+        assertTrue(fitness.contains("\"candidatePathAuditCalls\""));
         assertTrue(fitness.contains("\"baselineTransformationWork\""));
         assertTrue(fitness.contains("\"candidateTransformationWork\""));
+        assertTrue(fitness.contains("\"baselineTotalWorkUnits\""));
         assertTrue(fitness.contains("\"candidateTotalWorkUnits\""));
         assertTrue(fitness.contains("\"validationStatus\""));
         assertTrue(fitness.contains("\"const\": \"NOT_EVALUATED\""));
