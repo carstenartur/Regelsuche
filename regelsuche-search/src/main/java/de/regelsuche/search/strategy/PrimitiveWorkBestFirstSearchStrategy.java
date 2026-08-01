@@ -15,7 +15,6 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
 
@@ -268,16 +267,19 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         State current,
         Problem problem
     ) {
-        return priority(candidate, problem) < priority(current, problem)
-            || priority(candidate, problem) == priority(current, problem)
-                && candidate.primitiveDepth() < current.primitiveDepth()
-            || priority(candidate, problem) == priority(current, problem)
+        int candidatePriority = priority(candidate, problem);
+        int currentPriority = priority(current, problem);
+        return candidatePriority < currentPriority
+            || (candidatePriority == currentPriority
+                && candidate.primitiveDepth() < current.primitiveDepth())
+            || (candidatePriority == currentPriority
                 && candidate.primitiveDepth() == current.primitiveDepth()
-                && candidate.expression().compareTo(current.expression()) < 0;
+                && candidate.expression().compareTo(current.expression()) < 0);
     }
 
     private static String stateKey(State state) {
         return state.expression() + "\u0000"
+            + state.primitiveDepth() + "\u0000"
             + AssumptionSignature.ofExpressions(state.assumptions()).fingerprint();
     }
 
@@ -468,10 +470,6 @@ public final class PrimitiveWorkBestFirstSearchStrategy {
         public boolean reached() {
             return status == Status.REACHED
                 || status == Status.ROOT_ALREADY_TARGET;
-        }
-
-        public Optional<State> reached() {
-            return Optional.ofNullable(reachedState);
         }
     }
 
