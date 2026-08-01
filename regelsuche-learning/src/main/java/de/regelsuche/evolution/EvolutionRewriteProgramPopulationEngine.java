@@ -56,8 +56,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
         ProgramFitnessEvaluator evaluator
     ) {
         validateInputs(plan, splitManifest, suite, seeds, catalog, evaluator);
-        ExecutionState state = initialState(seeds);
-        execute(
+        ExecutionState state = ExecutionState.initial(seeds);
+        evolve(
             plan,
             catalog,
             evaluator,
@@ -77,23 +77,23 @@ public final class EvolutionRewriteProgramPopulationEngine {
         int completedGeneration
     ) {
         validateInputs(plan, splitManifest, suite, seeds, catalog, evaluator);
-        int total = plan.populationPolicy().generationCount();
-        if (completedGeneration < 1 || completedGeneration >= total) {
+        if (completedGeneration < 1
+                || completedGeneration >= plan.populationPolicy().generationCount()) {
             throw new IllegalArgumentException(
                 "completedGeneration must be in [1,generationCount-1]");
         }
-        ExecutionState state = initialState(seeds);
-        execute(
+        ExecutionState state = ExecutionState.initial(seeds);
+        evolve(
             plan,
             catalog,
             evaluator,
             state,
             1,
             completedGeneration);
-        if (state.terminal != null) {
+        if (state.terminalOutcome != null) {
             throw new IllegalStateException(
-                "terminal program population cannot be checkpointed: "
-                    + state.terminal);
+                "terminal population cannot be checkpointed: "
+                    + state.terminalOutcome);
         }
         return PopulationCheckpoint.create(
             plan, suite, catalog, seeds, completedGeneration, state);
@@ -112,7 +112,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
         Objects.requireNonNull(checkpoint, "checkpoint");
         checkpoint.requireCompatible(plan, suite, catalog, seeds);
         ExecutionState state = checkpoint.executionState();
-        execute(
+        evolve(
             plan,
             catalog,
             evaluator,
@@ -132,36 +132,16 @@ public final class EvolutionRewriteProgramPopulationEngine {
     ) {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(evaluator, "evaluator");
+        Objects.requireNonNull(seeds, "seeds");
         plan.requireInputs(splitManifest, suite, catalog, seeds);
         if (seeds.size() > plan.populationPolicy().populationSize()) {
             throw new IllegalArgumentException(
                 "seed population exceeds frozen population size");
         }
-        if (new HashSet<>(seeds.stream()
-                .map(EvolutionRewriteProgramCandidate::alphaStructuralHash)
-                .toList()).size() != seeds.size()) {
-            throw new IllegalArgumentException(
-                "seed population contains alpha-structural duplicates");
-        }
+        requireUniqueCandidateIdentities(seeds, "seed population");
     }
 
-    private static ExecutionState initialState(
-        List<EvolutionRewriteProgramCandidate> seeds
-    ) {
-        List<EvolutionRewriteProgramCandidate> population = seeds.stream()
-            .sorted(Comparator.comparing(
-                EvolutionRewriteProgramCandidate::contentHash))
-            .toList();
-        return new ExecutionState(
-            population,
-            Map.of(),
-            List.of(),
-            0,
-            0,
-            null);
-    }
-
-    private void execute(
+    private void evolve(
         EvolutionRewriteProgramStudyPlan plan,
         MutationCatalog catalog,
         ProgramFitnessEvaluator evaluator,
@@ -172,7 +152,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
         for (int generation = firstGeneration;
                 generation <= lastGeneration;
                 generation++) {
-            evaluate(plan, state.population, evaluator, state);
+            evaluateCandidates(plan, state.population, evaluator, state);
             List<EvolutionRewriteProgramCandidate> parents = eligible(
                 state.population, state.evaluations);
             if (parents.isEmpty()) {
@@ -187,20 +167,20 @@ public final class EvolutionRewriteProgramPopulationEngine {
                     state.trainEvaluations,
                     GenerationOutcome.EXTINCT));
                 state.population = List.of();
-                state.terminal = TerminalOutcome.EXTINCT;
+                state.terminalOutcome = TerminalOutcome.EXTINCT;
                 return;
             }
 
-            MutationRound mutations = mutate(
+            MutationRound mutationRound = mutate(
                 plan,
                 catalog,
                 generation,
                 parents,
                 state.population,
                 state);
-            evaluate(plan, mutations.children(), evaluator, state);
+            evaluateCandidates(plan, mutationRound.children(), evaluator, state);
             List<EvolutionRewriteProgramCandidate> pool = merge(
-                state.population, mutations.children());
+                state.population, mutationRound.children());
             List<EvolutionRewriteProgramCandidate> selected = select(
                 plan, state.population, pool, state.evaluations);
             int diversity = Math.toIntExact(selected.stream()
@@ -212,7 +192,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
                 generation,
                 state.population,
                 selected,
-                mutations,
+                mutationRound,
                 diversity,
                 state);
             state.reports.add(GenerationReport.create(
@@ -221,16 +201,15 @@ public final class EvolutionRewriteProgramPopulationEngine {
                 selected.stream()
                     .map(EvolutionRewriteProgramCandidate::contentHash)
                     .toList(),
-                mutations.lineage(),
-                mutations.rejections(),
+                mutationRound.lineage(),
+                mutationRound.rejections(),
                 diversity,
                 state.mutationAttempts,
                 state.trainEvaluations,
                 outcome));
             state.population = selected;
-            if (outcome != GenerationOutcome.CONTINUE
-                    && outcome != GenerationOutcome.COMPLETED) {
-                state.terminal = outcome.terminal();
+            if (outcome.terminal() != null) {
+                state.terminalOutcome = outcome.terminal();
                 return;
             }
         }
@@ -241,17 +220,17 @@ public final class EvolutionRewriteProgramPopulationEngine {
         MutationCatalog catalog,
         int generation,
         List<EvolutionRewriteProgramCandidate> parents,
-        List<EvolutionRewriteProgramCandidate> population,
+        List<EvolutionRewriteProgramCandidate> currentPopulation,
         ExecutionState state
     ) {
         List<EvolutionRewriteProgramCandidate> children = new ArrayList<>();
         List<LineageEdge> lineage = new ArrayList<>();
         List<MutationRejection> rejections = new ArrayList<>();
-        Set<String> hashes = new LinkedHashSet<>();
-        Set<String> structures = new LinkedHashSet<>();
-        population.forEach(candidate -> {
-            hashes.add(candidate.contentHash());
-            structures.add(candidate.alphaStructuralHash());
+        Set<String> contentHashes = new LinkedHashSet<>();
+        Set<String> alphaHashes = new LinkedHashSet<>();
+        currentPopulation.forEach(candidate -> {
+            contentHashes.add(candidate.contentHash());
+            alphaHashes.add(candidate.alphaStructuralHash());
         });
         Set<EvolutionRewriteProgramMutationKind> permitted = Set.copyOf(
             plan.mutationOperators());
@@ -260,12 +239,12 @@ public final class EvolutionRewriteProgramPopulationEngine {
             GENERATED_POOL_MULTIPLIER);
 
         for (EvolutionRewriteProgramCandidate parent : parents) {
-            int remaining = plan.budget().maxMutationAttempts()
+            int remainingAttempts = plan.budget().maxMutationAttempts()
                 - state.mutationAttempts;
-            if (remaining <= 0 || children.size() >= poolLimit) {
+            if (remainingAttempts <= 0 || children.size() >= poolLimit) {
                 break;
             }
-            int maxProposals = Math.min(128, remaining);
+            int maxProposals = Math.min(128, remainingAttempts);
             int maxAccepted = Math.min(
                 plan.populationPolicy().maxOffspringPerLineage(),
                 maxProposals);
@@ -296,10 +275,10 @@ public final class EvolutionRewriteProgramPopulationEngine {
                     blockers.add("MUTATION_KIND_NOT_PREREGISTERED:"
                         + attempt.kind());
                 }
-                if (hashes.contains(child.contentHash())) {
+                if (contentHashes.contains(child.contentHash())) {
                     blockers.add("DUPLICATE_CANDIDATE:contentHash");
                 }
-                if (structures.contains(child.alphaStructuralHash())) {
+                if (alphaHashes.contains(child.alphaStructuralHash())) {
                     blockers.add(
                         "STRUCTURAL_DIVERSITY_DUPLICATE:candidateAlphaStructuralHash");
                 }
@@ -308,8 +287,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
                         parent.contentHash(), attempt, blockers));
                     continue;
                 }
-                hashes.add(child.contentHash());
-                structures.add(child.alphaStructuralHash());
+                contentHashes.add(child.contentHash());
+                alphaHashes.add(child.alphaStructuralHash());
                 children.add(child);
                 lineage.add(new LineageEdge(
                     parent.contentHash(),
@@ -329,7 +308,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
             List.copyOf(rejections));
     }
 
-    private static void evaluate(
+    private static void evaluateCandidates(
         EvolutionRewriteProgramStudyPlan plan,
         Collection<EvolutionRewriteProgramCandidate> candidates,
         ProgramFitnessEvaluator evaluator,
@@ -346,17 +325,18 @@ public final class EvolutionRewriteProgramPopulationEngine {
         }
         int remaining = Math.max(0,
             plan.budget().maxTrainEvaluations() - state.trainEvaluations);
-        int count = Math.min(remaining, pending.size());
+        int executableCount = Math.min(remaining, pending.size());
         List<EvolutionRewriteProgramCandidate> executable =
-            pending.subList(0, count);
+            pending.subList(0, executableCount);
         List<CandidateEvaluation> completed = evaluateParallel(
             plan, executable, evaluator);
         for (int index = 0; index < executable.size(); index++) {
             state.evaluations.put(
                 executable.get(index).contentHash(), completed.get(index));
         }
-        state.trainEvaluations = Math.addExact(state.trainEvaluations, count);
-        for (int index = count; index < pending.size(); index++) {
+        state.trainEvaluations = Math.addExact(
+            state.trainEvaluations, executableCount);
+        for (int index = executableCount; index < pending.size(); index++) {
             EvolutionRewriteProgramCandidate candidate = pending.get(index);
             state.evaluations.put(
                 candidate.contentHash(),
@@ -377,6 +357,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
         int parallelism = Math.min(
             plan.populationPolicy().parallelism(), candidates.size());
         ExecutorService executor = Executors.newFixedThreadPool(parallelism);
+        boolean restoreInterruption = false;
         try {
             List<Future<EvolutionRewriteProgramTrainFitnessEvidence>> futures =
                 candidates.stream()
@@ -390,7 +371,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
                     result.add(CandidateEvaluation.from(
                         plan, candidate, futures.get(index).get()));
                 } catch (InterruptedException exception) {
-                    Thread.currentThread().interrupt();
+                    restoreInterruption = true;
                     result.add(CandidateEvaluation.blocked(
                         candidate,
                         List.of("TRAIN_EVALUATION_INTERRUPTED")));
@@ -404,6 +385,9 @@ public final class EvolutionRewriteProgramPopulationEngine {
             return List.copyOf(result);
         } finally {
             executor.shutdownNow();
+            if (restoreInterruption) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 
@@ -464,7 +448,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
         int generation,
         List<EvolutionRewriteProgramCandidate> previous,
         List<EvolutionRewriteProgramCandidate> selected,
-        MutationRound mutations,
+        MutationRound mutationRound,
         int diversity,
         ExecutionState state
     ) {
@@ -479,7 +463,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
                 || state.mutationAttempts >= plan.budget().maxMutationAttempts()) {
             return GenerationOutcome.BUDGET_EXHAUSTED;
         }
-        if (samePopulation(previous, selected) && mutations.children().isEmpty()) {
+        if (samePopulation(previous, selected)
+                && mutationRound.children().isEmpty()) {
             return GenerationOutcome.STAGNATED;
         }
         if (generation == plan.populationPolicy().generationCount()) {
@@ -811,12 +796,12 @@ public final class EvolutionRewriteProgramPopulationEngine {
                 throw new IllegalArgumentException(
                     "invalid rewrite-program generation report");
             }
-            evaluations = evaluations.stream()
-                .sorted(Comparator.comparing(CandidateEvaluation::candidateHash))
-                .toList();
-            selectedCandidateHashes = canonicalHashes(selectedCandidateHashes);
-            lineage = List.copyOf(lineage);
-            rejections = List.copyOf(rejections);
+            evaluations = canonicalEvaluations(evaluations);
+            selectedCandidateHashes = canonicalHashes(
+                selectedCandidateHashes, false, "selectedCandidateHashes");
+            lineage = List.copyOf(Objects.requireNonNull(lineage, "lineage"));
+            rejections = List.copyOf(
+                Objects.requireNonNull(rejections, "rejections"));
             if (distinctAlphaStructures < 0
                     || cumulativeMutationAttempts < 0
                     || cumulativeTrainEvaluations < 0) {
@@ -824,6 +809,22 @@ public final class EvolutionRewriteProgramPopulationEngine {
                     "generation counters must not be negative");
             }
             Objects.requireNonNull(outcome, "outcome");
+            Set<String> evaluated = evaluations.stream()
+                .map(CandidateEvaluation::candidateHash)
+                .collect(java.util.stream.Collectors.toSet());
+            if (!evaluated.containsAll(selectedCandidateHashes)) {
+                throw new IllegalArgumentException(
+                    "selected candidates are absent from generation evaluations");
+            }
+            if (selectedCandidateHashes.isEmpty()
+                    != (outcome == GenerationOutcome.EXTINCT)) {
+                throw new IllegalArgumentException(
+                    "only an extinct generation may select no candidate");
+            }
+            if (distinctAlphaStructures > selectedCandidateHashes.size()) {
+                throw new IllegalArgumentException(
+                    "diversity exceeds selected candidate count");
+            }
             EvolutionGenome.requireSha256(contentHash, "contentHash");
             String expected = EvolutionGenome.hash(render(
                 generation,
@@ -853,10 +854,13 @@ public final class EvolutionRewriteProgramPopulationEngine {
             int trainEvaluations,
             GenerationOutcome outcome
         ) {
-            List<String> selected = canonicalHashes(selectedCandidateHashes);
+            List<CandidateEvaluation> canonicalEvaluations =
+                canonicalEvaluations(evaluations);
+            List<String> selected = canonicalHashes(
+                selectedCandidateHashes, false, "selectedCandidateHashes");
             String hash = EvolutionGenome.hash(render(
                 generation,
-                evaluations,
+                canonicalEvaluations,
                 selected,
                 lineage,
                 rejections,
@@ -868,7 +872,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
             return new GenerationReport(
                 GENERATION_SCHEMA,
                 generation,
-                evaluations,
+                canonicalEvaluations,
                 selected,
                 lineage,
                 rejections,
@@ -961,10 +965,28 @@ public final class EvolutionRewriteProgramPopulationEngine {
                     "unsupported rewrite-program population-run schema");
             }
             EvolutionGenome.requireSha256(studyPlanHash, "studyPlanHash");
-            seedCandidateHashes = canonicalHashes(seedCandidateHashes);
-            generationReports = List.copyOf(generationReports);
-            finalCandidateHashes = canonicalHashesAllowEmpty(finalCandidateHashes);
+            seedCandidateHashes = canonicalHashes(
+                seedCandidateHashes, true, "seedCandidateHashes");
+            generationReports = List.copyOf(
+                Objects.requireNonNull(generationReports, "generationReports"));
+            if (generationReports.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "population run requires generation reports");
+            }
+            for (int index = 0; index < generationReports.size(); index++) {
+                if (generationReports.get(index).generation() != index + 1) {
+                    throw new IllegalArgumentException(
+                        "generation reports are incomplete or reordered");
+                }
+            }
+            finalCandidateHashes = canonicalHashes(
+                finalCandidateHashes, false, "finalCandidateHashes");
             Objects.requireNonNull(terminalOutcome, "terminalOutcome");
+            if (terminalOutcome == TerminalOutcome.EXTINCT
+                    != finalCandidateHashes.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "only extinct runs may have an empty final population");
+            }
             if (mutationAttempts < 0 || trainEvaluations < 0) {
                 throw new IllegalArgumentException(
                     "population-run counters must not be negative");
@@ -995,17 +1017,17 @@ public final class EvolutionRewriteProgramPopulationEngine {
             List<EvolutionRewriteProgramCandidate> seeds,
             ExecutionState state
         ) {
-            TerminalOutcome terminal = state.terminal == null
-                ? TerminalOutcome.COMPLETED : state.terminal;
+            TerminalOutcome terminal = state.terminalOutcome == null
+                ? TerminalOutcome.COMPLETED : state.terminalOutcome;
             List<String> seedHashes = seeds.stream()
                 .map(EvolutionRewriteProgramCandidate::contentHash).toList();
             List<String> finalHashes = state.population.stream()
                 .map(EvolutionRewriteProgramCandidate::contentHash).toList();
             String hash = EvolutionGenome.hash(render(
                 plan.contentHash(),
-                seedHashes,
+                canonicalHashes(seedHashes, true, "seedCandidateHashes"),
                 state.reports,
-                finalHashes,
+                canonicalHashes(finalHashes, false, "finalCandidateHashes"),
                 terminal,
                 state.mutationAttempts,
                 state.trainEvaluations,
@@ -1094,15 +1116,35 @@ public final class EvolutionRewriteProgramPopulationEngine {
             EvolutionGenome.requireSha256(trainSuiteHash, "trainSuiteHash");
             EvolutionGenome.requireSha256(
                 mutationCatalogHash, "mutationCatalogHash");
-            seedCandidateHashes = canonicalHashes(seedCandidateHashes);
-            population = population.stream()
-                .sorted(Comparator.comparing(
-                    EvolutionRewriteProgramCandidate::contentHash))
-                .toList();
-            evaluations = evaluations.stream()
-                .sorted(Comparator.comparing(CandidateEvaluation::candidateHash))
-                .toList();
-            generationReports = List.copyOf(generationReports);
+            seedCandidateHashes = canonicalHashes(
+                seedCandidateHashes, true, "seedCandidateHashes");
+            population = canonicalCandidates(population);
+            if (population.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "checkpoint population must not be empty");
+            }
+            evaluations = canonicalEvaluations(evaluations);
+            generationReports = List.copyOf(
+                Objects.requireNonNull(generationReports, "generationReports"));
+            if (generationReports.size() != completedGeneration) {
+                throw new IllegalArgumentException(
+                    "checkpoint generation count does not match reports");
+            }
+            for (int index = 0; index < generationReports.size(); index++) {
+                if (generationReports.get(index).generation() != index + 1) {
+                    throw new IllegalArgumentException(
+                        "checkpoint generation reports are incomplete or reordered");
+                }
+            }
+            Set<String> evaluated = evaluations.stream()
+                .map(CandidateEvaluation::candidateHash)
+                .collect(java.util.stream.Collectors.toSet());
+            for (EvolutionRewriteProgramCandidate candidate : population) {
+                if (!evaluated.contains(candidate.contentHash())) {
+                    throw new IllegalArgumentException(
+                        "checkpoint population candidate lacks evaluation");
+                }
+            }
             if (mutationAttempts < 0 || trainEvaluations < 0) {
                 throw new IllegalArgumentException(
                     "checkpoint counters must not be negative");
@@ -1141,18 +1183,19 @@ public final class EvolutionRewriteProgramPopulationEngine {
         ) {
             List<String> seedHashes = seeds.stream()
                 .map(EvolutionRewriteProgramCandidate::contentHash).toList();
-            List<CandidateEvaluation> evaluations = state.evaluations.values()
-                .stream()
-                .sorted(Comparator.comparing(CandidateEvaluation::candidateHash))
-                .toList();
+            List<CandidateEvaluation> retainedEvaluations =
+                state.evaluations.values().stream()
+                    .sorted(Comparator.comparing(
+                        CandidateEvaluation::candidateHash))
+                    .toList();
             String hash = EvolutionGenome.hash(render(
                 plan.contentHash(),
                 suite.contentHash(),
                 catalog.contentHash(),
-                seedHashes,
+                canonicalHashes(seedHashes, true, "seedCandidateHashes"),
                 completedGeneration,
-                state.population,
-                evaluations,
+                canonicalCandidates(state.population),
+                retainedEvaluations,
                 state.reports,
                 state.mutationAttempts,
                 state.trainEvaluations,
@@ -1165,7 +1208,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
                 seedHashes,
                 completedGeneration,
                 state.population,
-                evaluations,
+                retainedEvaluations,
                 state.reports,
                 state.mutationAttempts,
                 state.trainEvaluations,
@@ -1190,10 +1233,12 @@ public final class EvolutionRewriteProgramPopulationEngine {
                 throw new IllegalArgumentException(
                     "checkpoint source identity mismatch");
             }
-            List<String> actualSeeds = seeds.stream()
-                .map(EvolutionRewriteProgramCandidate::contentHash)
-                .sorted()
-                .toList();
+            List<String> actualSeeds = canonicalHashes(
+                seeds.stream()
+                    .map(EvolutionRewriteProgramCandidate::contentHash)
+                    .toList(),
+                true,
+                "seedCandidateHashes");
             if (!seedCandidateHashes.equals(actualSeeds)) {
                 throw new IllegalArgumentException(
                     "checkpoint seed identity mismatch");
@@ -1284,7 +1329,7 @@ public final class EvolutionRewriteProgramPopulationEngine {
         private final List<GenerationReport> reports;
         private int mutationAttempts;
         private int trainEvaluations;
-        private TerminalOutcome terminal;
+        private TerminalOutcome terminalOutcome;
 
         private ExecutionState(
             List<EvolutionRewriteProgramCandidate> population,
@@ -1292,14 +1337,21 @@ public final class EvolutionRewriteProgramPopulationEngine {
             List<GenerationReport> reports,
             int mutationAttempts,
             int trainEvaluations,
-            TerminalOutcome terminal
+            TerminalOutcome terminalOutcome
         ) {
-            this.population = List.copyOf(population);
+            this.population = canonicalCandidates(population);
             this.evaluations = new LinkedHashMap<>(evaluations);
             this.reports = new ArrayList<>(reports);
             this.mutationAttempts = mutationAttempts;
             this.trainEvaluations = trainEvaluations;
-            this.terminal = terminal;
+            this.terminalOutcome = terminalOutcome;
+        }
+
+        static ExecutionState initial(
+            List<EvolutionRewriteProgramCandidate> seeds
+        ) {
+            return new ExecutionState(
+                seeds, Map.of(), List.of(), 0, 0, null);
         }
     }
 
@@ -1322,6 +1374,54 @@ public final class EvolutionRewriteProgramPopulationEngine {
         return Collections.unmodifiableMap(result);
     }
 
+    private static List<CandidateEvaluation> canonicalEvaluations(
+        List<CandidateEvaluation> values
+    ) {
+        Objects.requireNonNull(values, "evaluations");
+        List<CandidateEvaluation> result = values.stream()
+            .map(value -> Objects.requireNonNull(value, "evaluation"))
+            .sorted(Comparator.comparing(CandidateEvaluation::candidateHash))
+            .toList();
+        if (new HashSet<>(result.stream()
+                .map(CandidateEvaluation::candidateHash).toList()).size()
+                != result.size()) {
+            throw new IllegalArgumentException(
+                "candidate evaluations must be unique");
+        }
+        return result;
+    }
+
+    private static List<EvolutionRewriteProgramCandidate> canonicalCandidates(
+        List<EvolutionRewriteProgramCandidate> values
+    ) {
+        Objects.requireNonNull(values, "candidates");
+        List<EvolutionRewriteProgramCandidate> result = values.stream()
+            .map(value -> Objects.requireNonNull(value, "candidate"))
+            .sorted(Comparator.comparing(
+                EvolutionRewriteProgramCandidate::contentHash))
+            .toList();
+        requireUniqueCandidateIdentities(result, "candidate list");
+        return result;
+    }
+
+    private static void requireUniqueCandidateIdentities(
+        List<EvolutionRewriteProgramCandidate> candidates,
+        String name
+    ) {
+        if (new HashSet<>(candidates.stream()
+                .map(EvolutionRewriteProgramCandidate::contentHash).toList()).size()
+                != candidates.size()) {
+            throw new IllegalArgumentException(
+                name + " contains duplicate candidate hashes");
+        }
+        if (new HashSet<>(candidates.stream()
+                .map(EvolutionRewriteProgramCandidate::alphaStructuralHash)
+                .toList()).size() != candidates.size()) {
+            throw new IllegalArgumentException(
+                name + " contains alpha-structural duplicates");
+        }
+    }
+
     private static List<String> canonicalStrings(List<String> values) {
         return values == null
             ? List.of()
@@ -1332,25 +1432,21 @@ public final class EvolutionRewriteProgramPopulationEngine {
                 .toList();
     }
 
-    private static List<String> canonicalHashes(List<String> values) {
+    private static List<String> canonicalHashes(
+        List<String> values,
+        boolean requireNonEmpty,
+        String name
+    ) {
+        Objects.requireNonNull(values, name);
         List<String> result = values.stream()
-            .peek(value -> EvolutionGenome.requireSha256(value, "hash"))
+            .peek(value -> EvolutionGenome.requireSha256(value, name))
             .sorted()
             .toList();
-        if (result.isEmpty() || new HashSet<>(result).size() != result.size()) {
-            throw new IllegalArgumentException(
-                "hash list must be non-empty and unique");
+        if (requireNonEmpty && result.isEmpty()) {
+            throw new IllegalArgumentException(name + " must not be empty");
         }
-        return result;
-    }
-
-    private static List<String> canonicalHashesAllowEmpty(List<String> values) {
-        List<String> result = values.stream()
-            .peek(value -> EvolutionGenome.requireSha256(value, "hash"))
-            .sorted()
-            .toList();
         if (new HashSet<>(result).size() != result.size()) {
-            throw new IllegalArgumentException("hash list must be unique");
+            throw new IllegalArgumentException(name + " must be unique");
         }
         return result;
     }
