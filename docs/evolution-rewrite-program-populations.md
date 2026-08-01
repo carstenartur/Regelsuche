@@ -63,6 +63,21 @@ Raw named components in the TRAIN evidence remain authoritative. The scalar
 profile is used only for the frozen population ordering. Missing required
 components and evaluator identity drift are blockers, not zero-valued successes.
 
+## Flagship evaluator boundary
+
+The population engine deliberately accepts a narrow evaluator interface so its
+selection, diversity, parallelism and resume mechanics can be tested with small
+synthetic fixtures. That generic entrypoint does not authorize a flagship
+result. The production campaign must additionally bind the exact evaluator
+protocol and implementation identity, and the selected evaluator must carry the
+same protocol hash into every retained TRAIN evidence root.
+
+Protocol binding is supplied by the following #521 slice. Matched primitive,
+program-internal, outer-search and exact-audit work remains a separate mandatory
+fairness gate in #527. Until both layers are green, a population result is
+mechanical development evidence only and cannot advance to VALIDATION or consume
+the one-time FINAL TEST.
+
 ## Complete generation evidence
 
 Every generation retains:
@@ -115,10 +130,12 @@ The strict checkpoint and run schemas are:
 
 This layer establishes deterministic TRAIN-only population mechanics for
 combined rule/program candidates and in-memory checkpoint equivalence. It does
-not establish a standalone durable checkpoint loader, positive self-improvement,
-VALIDATION selection, FINAL TEST utility, formal proof or external novelty.
+not establish a standalone durable checkpoint loader, fair work-accounted
+self-improvement, VALIDATION selection, FINAL TEST utility, formal proof or
+external novelty.
 
-After this slice is green, the next scientifically irreversible step is to
-freeze the concrete assumption-sensitive rational/polynomial TRAIN, VALIDATION
-and FINAL TEST corpus, grammar, baselines, metrics and numerical success
-thresholds before any evaluated flagship campaign runs.
+After this slice and its protocol/work-accounting successors are green, the next
+scientifically irreversible step is to freeze the concrete assumption-sensitive
+rational/polynomial TRAIN, VALIDATION and FINAL TEST corpus, grammar, baselines,
+metrics and numerical success thresholds before any evaluated flagship campaign
+runs.
