@@ -2,6 +2,7 @@ package de.regelsuche.evolution;
 
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import de.regelsuche.json.JsonWriter;
+import de.regelsuche.search.strategy.SearchWorkMetrics;
 import de.regelsuche.transform.TransformationWorkMetrics;
 import java.util.Collections;
 import java.util.Comparator;
@@ -216,55 +217,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
             .property("genomeHash", genomeHash)
             .property("planHash", planHash)
             .array("cases", array -> cases.forEach(item ->
-                array.objectValue(object -> {
-                    object.property("caseId", item.caseId())
-                        .property("familyId", item.familyId())
-                        .property("baselineStatus", item.baselineStatus())
-                        .property("candidateStatus", item.candidateStatus())
-                        .property("baselineReached", item.baselineReached())
-                        .property("candidateReached", item.candidateReached())
-                        .property("baselinePathCorrectness",
-                            item.baselinePathCorrectness().name())
-                        .property("candidatePathCorrectness",
-                            item.candidatePathCorrectness().name())
-                        .property("baselinePathLength", item.baselinePathLength())
-                        .property("candidatePathLength", item.candidatePathLength())
-                        .property("baselinePrimitiveSteps",
-                            item.baselinePrimitiveSteps())
-                        .property("candidatePrimitiveSteps",
-                            item.candidatePrimitiveSteps())
-                        .property("baselineExploredStates",
-                            item.baselineExploredStates())
-                        .property("candidateExploredStates",
-                            item.candidateExploredStates())
-                        .property("baselineGeneratedTransformations",
-                            item.baselineGeneratedTransformations())
-                        .property("candidateGeneratedTransformations",
-                            item.candidateGeneratedTransformations())
-                        .property("baselineOuterSearchWorkUnits",
-                            item.baselineOuterSearchWorkUnits())
-                        .property("candidateOuterSearchWorkUnits",
-                            item.candidateOuterSearchWorkUnits())
-                        .property("baselinePathAuditCalls",
-                            item.baselinePathAuditCalls())
-                        .property("candidatePathAuditCalls",
-                            item.candidatePathAuditCalls())
-                        .property("baselineTotalWorkUnits",
-                            item.baselineTotalWorkUnits())
-                        .property("candidateTotalWorkUnits",
-                            item.candidateTotalWorkUnits());
-                    object.object("baselineTransformationWork", work ->
-                        writeWork(work, item.baselineTransformationWork()));
-                    object.object("candidateTransformationWork", work ->
-                        writeWork(work, item.candidateTransformationWork()));
-                    object.property("programUsed", item.programUsed())
-                        .property("newlySolved", item.newlySolved())
-                        .property("reachabilityRegression",
-                            item.reachabilityRegression())
-                        .property("correctnessFailure", item.correctnessFailure())
-                        .property("correctnessRegression",
-                            item.correctnessRegression());
-                })))
+                array.objectValue(object -> writeCase(object, item))))
             .object("rawComponents", object -> {
                 for (FitnessComponent component : FitnessComponent.values()) {
                     Integer value = rawComponents.get(component);
@@ -284,7 +237,85 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         return json.endObject().toString();
     }
 
-    private static void writeWork(
+    private static void writeCase(JsonWriter object, CaseMeasurement item) {
+        object.property("caseId", item.caseId())
+            .property("familyId", item.familyId())
+            .property("baselineStatus", item.baselineStatus())
+            .property("candidateStatus", item.candidateStatus())
+            .property("baselineReached", item.baselineReached())
+            .property("candidateReached", item.candidateReached())
+            .property("baselinePathCorrectness",
+                item.baselinePathCorrectness().name())
+            .property("candidatePathCorrectness",
+                item.candidatePathCorrectness().name())
+            .property("baselinePathLength", item.baselinePathLength())
+            .property("candidatePathLength", item.candidatePathLength())
+            .property("baselinePrimitiveSteps",
+                item.baselinePrimitiveSteps())
+            .property("candidatePrimitiveSteps",
+                item.candidatePrimitiveSteps())
+            .property("baselineExploredStates",
+                item.baselineExploredStates())
+            .property("candidateExploredStates",
+                item.candidateExploredStates())
+            .property("baselineGeneratedTransformations",
+                item.baselineGeneratedTransformations())
+            .property("candidateGeneratedTransformations",
+                item.candidateGeneratedTransformations())
+            .property("baselineOuterSearchWorkUnits",
+                item.baselineOuterSearchWorkUnits())
+            .property("candidateOuterSearchWorkUnits",
+                item.candidateOuterSearchWorkUnits())
+            .object("baselineOuterSearchWork", work ->
+                writeSearchWork(work, item.baselineOuterSearchWork()))
+            .object("candidateOuterSearchWork", work ->
+                writeSearchWork(work, item.candidateOuterSearchWork()))
+            .property("baselinePathAuditCalls",
+                item.baselinePathAuditCalls())
+            .property("candidatePathAuditCalls",
+                item.candidatePathAuditCalls())
+            .property("baselineTotalWorkUnits",
+                item.baselineTotalWorkUnits())
+            .property("candidateTotalWorkUnits",
+                item.candidateTotalWorkUnits())
+            .object("baselineTransformationWork", work ->
+                writeTransformationWork(
+                    work, item.baselineTransformationWork()))
+            .object("candidateTransformationWork", work ->
+                writeTransformationWork(
+                    work, item.candidateTransformationWork()))
+            .property("programUsed", item.programUsed())
+            .property("newlySolved", item.newlySolved())
+            .property("reachabilityRegression",
+                item.reachabilityRegression())
+            .property("correctnessFailure", item.correctnessFailure())
+            .property("correctnessRegression",
+                item.correctnessRegression());
+    }
+
+    private static void writeSearchWork(
+        JsonWriter json,
+        SearchWorkMetrics work
+    ) {
+        json.property("exploredStates", work.exploredStates())
+            .property("expandedStates", work.expandedStates())
+            .property("generatedTransformations",
+                work.generatedTransformations())
+            .property("enqueuedStates", work.enqueuedStates())
+            .property("duplicatePrunes", work.duplicatePrunes())
+            .property("repeatedApplicationPrunes",
+                work.repeatedApplicationPrunes())
+            .property("sameExpressionPrunes", work.sameExpressionPrunes())
+            .property("expansionBudgetPrunes", work.expansionBudgetPrunes())
+            .property("primitiveBudgetPrunes", work.primitiveBudgetPrunes())
+            .property("candidateBudgetPrunes", work.candidateBudgetPrunes())
+            .property("statesWithoutTransformations",
+                work.statesWithoutTransformations())
+            .property("engineBatches", work.engineBatches())
+            .property("totalWorkUnits", work.totalWorkUnits());
+    }
+
+    private static void writeTransformationWork(
         JsonWriter json,
         TransformationWorkMetrics work
     ) {
@@ -334,6 +365,8 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         long candidateGeneratedTransformations,
         long baselineOuterSearchWorkUnits,
         long candidateOuterSearchWorkUnits,
+        SearchWorkMetrics baselineOuterSearchWork,
+        SearchWorkMetrics candidateOuterSearchWork,
         long baselinePathAuditCalls,
         long candidatePathAuditCalls,
         TransformationWorkMetrics baselineTransformationWork,
@@ -344,7 +377,7 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
         boolean correctnessFailure,
         boolean correctnessRegression
     ) {
-        /** Compatibility constructor for older diagnostic fixtures. */
+        /** Compatibility constructor for population-mechanics fixtures. */
         public CaseMeasurement(
             String caseId,
             String familyId,
@@ -385,8 +418,18 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                 candidateExploredStates,
                 baselineGeneratedTransformations,
                 candidateGeneratedTransformations,
-                0,
-                0,
+                compatibilitySearchWork(
+                    baselineExploredStates,
+                    baselineGeneratedTransformations).totalWorkUnits(),
+                compatibilitySearchWork(
+                    candidateExploredStates,
+                    candidateGeneratedTransformations).totalWorkUnits(),
+                compatibilitySearchWork(
+                    baselineExploredStates,
+                    baselineGeneratedTransformations),
+                compatibilitySearchWork(
+                    candidateExploredStates,
+                    candidateGeneratedTransformations),
                 0,
                 0,
                 TransformationWorkMetrics.ZERO,
@@ -407,10 +450,98 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                 baselinePathCorrectness, "baselinePathCorrectness");
             Objects.requireNonNull(
                 candidatePathCorrectness, "candidatePathCorrectness");
+            baselineOuterSearchWork = Objects.requireNonNull(
+                baselineOuterSearchWork, "baselineOuterSearchWork");
+            candidateOuterSearchWork = Objects.requireNonNull(
+                candidateOuterSearchWork, "candidateOuterSearchWork");
             baselineTransformationWork = Objects.requireNonNull(
                 baselineTransformationWork, "baselineTransformationWork");
             candidateTransformationWork = Objects.requireNonNull(
                 candidateTransformationWork, "candidateTransformationWork");
+            requireNonNegativeMetrics(
+                baselinePathLength,
+                candidatePathLength,
+                baselinePrimitiveSteps,
+                candidatePrimitiveSteps,
+                baselineExploredStates,
+                candidateExploredStates,
+                baselineGeneratedTransformations,
+                candidateGeneratedTransformations,
+                baselineOuterSearchWorkUnits,
+                candidateOuterSearchWorkUnits,
+                baselinePathAuditCalls,
+                candidatePathAuditCalls);
+            requireWorkConsistency(
+                baselineExploredStates,
+                baselineGeneratedTransformations,
+                baselineOuterSearchWorkUnits,
+                baselineOuterSearchWork,
+                "baseline");
+            requireWorkConsistency(
+                candidateExploredStates,
+                candidateGeneratedTransformations,
+                candidateOuterSearchWorkUnits,
+                candidateOuterSearchWork,
+                "candidate");
+            requireReachabilityConsistency(
+                baselineReached,
+                candidateReached,
+                baselinePathCorrectness,
+                candidatePathCorrectness,
+                programUsed,
+                newlySolved,
+                reachabilityRegression,
+                correctnessFailure,
+                correctnessRegression);
+        }
+
+        public long baselineTotalWorkUnits() {
+            return totalWork(
+                baselineTransformationWork,
+                baselineOuterSearchWorkUnits,
+                baselinePathAuditCalls);
+        }
+
+        public long candidateTotalWorkUnits() {
+            return totalWork(
+                candidateTransformationWork,
+                candidateOuterSearchWorkUnits,
+                candidatePathAuditCalls);
+        }
+
+        private static SearchWorkMetrics compatibilitySearchWork(
+            long exploredStates,
+            long generatedTransformations
+        ) {
+            return new SearchWorkMetrics(
+                exploredStates,
+                0,
+                generatedTransformations,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0);
+        }
+
+        private static void requireNonNegativeMetrics(
+            int baselinePathLength,
+            int candidatePathLength,
+            int baselinePrimitiveSteps,
+            int candidatePrimitiveSteps,
+            long baselineExploredStates,
+            long candidateExploredStates,
+            long baselineGeneratedTransformations,
+            long candidateGeneratedTransformations,
+            long baselineOuterSearchWorkUnits,
+            long candidateOuterSearchWorkUnits,
+            long baselinePathAuditCalls,
+            long candidatePathAuditCalls
+        ) {
             if (baselinePathLength < -1 || candidatePathLength < -1
                     || baselinePrimitiveSteps < 0 || candidatePrimitiveSteps < 0
                     || baselineExploredStates < 0 || candidateExploredStates < 0
@@ -423,6 +554,35 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                 throw new IllegalArgumentException(
                     "invalid rewrite-program TRAIN case metrics");
             }
+        }
+
+        private static void requireWorkConsistency(
+            long exploredStates,
+            long generatedTransformations,
+            long outerSearchWorkUnits,
+            SearchWorkMetrics work,
+            String side
+        ) {
+            if (exploredStates != work.exploredStates()
+                    || generatedTransformations
+                        != work.generatedTransformations()
+                    || outerSearchWorkUnits != work.totalWorkUnits()) {
+                throw new IllegalArgumentException(
+                    side + " outer-search work vector is inconsistent");
+            }
+        }
+
+        private static void requireReachabilityConsistency(
+            boolean baselineReached,
+            boolean candidateReached,
+            PathCorrectness baselinePathCorrectness,
+            PathCorrectness candidatePathCorrectness,
+            boolean programUsed,
+            boolean newlySolved,
+            boolean reachabilityRegression,
+            boolean correctnessFailure,
+            boolean correctnessRegression
+        ) {
             if (!baselineReached
                     && baselinePathCorrectness != PathCorrectness.NOT_EVALUATED) {
                 throw new IllegalArgumentException(
@@ -463,20 +623,6 @@ public record EvolutionRewriteProgramTrainFitnessEvidence(
                 throw new IllegalArgumentException(
                     "correctnessRegression is inconsistent");
             }
-        }
-
-        public long baselineTotalWorkUnits() {
-            return totalWork(
-                baselineTransformationWork,
-                baselineOuterSearchWorkUnits,
-                baselinePathAuditCalls);
-        }
-
-        public long candidateTotalWorkUnits() {
-            return totalWork(
-                candidateTransformationWork,
-                candidateOuterSearchWorkUnits,
-                candidatePathAuditCalls);
         }
 
         private static long totalWork(
