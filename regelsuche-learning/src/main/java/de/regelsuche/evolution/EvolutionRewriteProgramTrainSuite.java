@@ -199,12 +199,7 @@ public record EvolutionRewriteProgramTrainSuite(
                 maxExploredStates,
                 maxCandidatesPerState,
                 maxExpandingSteps,
-                1);
-            if (maxWorkUnits <= maxPrimitiveSteps) {
-                throw new IllegalArgumentException(
-                    "maxWorkUnits must leave at least one mechanical search unit "
-                        + "after reserving exact path-audit calls");
-            }
+                maxWorkUnits);
         }
 
         static PrimitiveWorkBudget derivedFrom(SearchHeuristic heuristic) {
@@ -241,7 +236,7 @@ public record EvolutionRewriteProgramTrainSuite(
                 maxExploredStates,
                 maxCandidatesPerState,
                 maxExpandingSteps,
-                mechanicalSearchWorkBudget());
+                maxWorkUnits);
         }
     }
 
