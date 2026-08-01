@@ -93,6 +93,35 @@ public record EvolutionRewriteProgramStudyPlan(
         }
     }
 
+    /**
+     * Compatibility factory for deterministic population-mechanics tests. It
+     * remains bound to the same official information-parity protocol.
+     */
+    public static EvolutionRewriteProgramStudyPlan create(
+        String studyId,
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite trainSuite,
+        MutationCatalog mutationCatalog,
+        List<EvolutionRewriteProgramCandidate> seedCandidates,
+        List<EvolutionRewriteProgramMutationKind> mutationOperators,
+        PopulationPolicy populationPolicy,
+        List<FitnessWeight> fitnessWeights,
+        StudyBudget budget
+    ) {
+        return create(
+            studyId,
+            splitManifest,
+            trainSuite,
+            EvolutionRewriteProgramEvaluationProtocol
+                .informationParityExactRationalV1(),
+            mutationCatalog,
+            seedCandidates,
+            mutationOperators,
+            populationPolicy,
+            fitnessWeights,
+            budget);
+    }
+
     public static EvolutionRewriteProgramStudyPlan create(
         String studyId,
         EvolutionSplitManifest splitManifest,
@@ -192,6 +221,22 @@ public record EvolutionRewriteProgramStudyPlan(
             fitnessWeights,
             budget,
             contentHash);
+    }
+
+    /** Compatibility check used by the generic mechanics engine. */
+    public void requireInputs(
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite trainSuite,
+        MutationCatalog mutationCatalog,
+        List<EvolutionRewriteProgramCandidate> seeds
+    ) {
+        requireInputs(
+            splitManifest,
+            trainSuite,
+            EvolutionRewriteProgramEvaluationProtocol
+                .informationParityExactRationalV1(),
+            mutationCatalog,
+            seeds);
     }
 
     public void requireInputs(
