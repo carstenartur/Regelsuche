@@ -16,6 +16,7 @@ import de.regelsuche.search.program.RewriteExecution;
 import de.regelsuche.search.program.RewriteProgram;
 import de.regelsuche.search.program.RewriteProgramInterpreter;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
+import de.regelsuche.transform.PreparedAstRewriteTransformationEngine;
 import de.regelsuche.transform.RewriteKind;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
@@ -36,9 +37,10 @@ import org.openjdk.jmh.annotations.State;
  * composition. The adapter cases additionally include conversion back into the
  * ordinary {@code TransformationEngine} boundary used by production search.
  * The AST cases compare the same real transformation engine directly, through
- * the interpreter and through the production adapter, so program overhead can
- * be separated from parsing, matching and rewrite construction. All published
- * series use milliseconds per operation; smaller is better.</p>
+ * the interpreter and through the production adapter. The prepared AST case
+ * measures direct-AST size/hash handling and single-pass pattern binding while
+ * keeping the same string boundary and rule inventory. All published series
+ * use milliseconds per operation; smaller is better.</p>
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
@@ -53,6 +55,7 @@ public class RewriteProgramBenchmarks {
     private RewriteProgramInterpreter interpreter;
     private TransformationEngine syntheticSingleEngine;
     private TransformationEngine astEngine;
+    private TransformationEngine preparedAstEngine;
     private TransformationEngine programmedSingleEngine;
     private TransformationEngine programmedAstEngine;
     private RewriteProgram singleSource;
@@ -138,6 +141,7 @@ public class RewriteProgramBenchmarks {
             "benchmark candidate ceiling");
 
         astEngine = new AstRewriteTransformationEngine();
+        preparedAstEngine = new PreparedAstRewriteTransformationEngine();
         astProgram = source("ordinary-ast-rules", astEngine);
         programmedSingleEngine = new ProgrammedTransformationEngine(singleSource);
         programmedAstEngine = new ProgrammedTransformationEngine(astProgram);
@@ -201,6 +205,11 @@ public class RewriteProgramBenchmarks {
     @Benchmark
     public int directAstRewriteSource() {
         return astEngine.transform(AST_INPUT).size();
+    }
+
+    @Benchmark
+    public int preparedAstRewriteSource() {
+        return preparedAstEngine.transform(AST_INPUT).size();
     }
 
     @Benchmark
