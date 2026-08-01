@@ -38,11 +38,10 @@ class EvolutionRewriteProgramFreezeContractsTest {
 
         assertEquals(first, second);
         assertEquals(first.toCanonicalJson(), second.toCanonicalJson());
-        assertTrue(first.toCanonicalJson().contains("\"status\":\"FROZEN_NOT_RUN\""));
         assertTrue(first.toCanonicalJson().contains(
-            "\"wallClockRole\":\"ENVIRONMENT_QUALIFIED_ENGINEERING_DIAGNOSTIC\"")
-            || fixture.performance().toCanonicalJson().contains(
-                "\"wallClockRole\":\"ENVIRONMENT_QUALIFIED_ENGINEERING_DIAGNOSTIC\""));
+            "\"status\":\"FROZEN_NOT_RUN\""));
+        assertTrue(fixture.performance().toCanonicalJson().contains(
+            "\"wallClockRole\":\"ENVIRONMENT_QUALIFIED_ENGINEERING_DIAGNOSTIC\""));
         first.requireInputs(
             fixture.manifest(),
             fixture.suite(),
@@ -200,10 +199,19 @@ class EvolutionRewriteProgramFreezeContractsTest {
                 "validation_freeze_case",
                 "validation_freeze_family",
                 "validation-freeze")),
-            List.of(caseRef(
-                "final_freeze_case",
-                "final_freeze_family",
-                "final-freeze")));
+            List.of(
+                caseRef(
+                    "final_freeze_case_a",
+                    "final_freeze_family_a",
+                    "final-freeze-a"),
+                caseRef(
+                    "final_freeze_case_b",
+                    "final_freeze_family_b",
+                    "final-freeze-b"),
+                caseRef(
+                    "final_freeze_case_c",
+                    "final_freeze_family_c",
+                    "final-freeze-c")));
         EvolutionGenome genome = EvolutionGenome.create(
             Objective.OPEN_TARGET_OPERATOR,
             manifest.trainingScope(),
