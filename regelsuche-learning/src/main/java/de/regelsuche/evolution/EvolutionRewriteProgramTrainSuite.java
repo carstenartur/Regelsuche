@@ -181,6 +181,11 @@ public record EvolutionRewriteProgramTrainSuite(
         EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS
     }
 
+    /**
+     * Total paired-evaluation work budget. One unit per permitted primitive step
+     * is reserved for exact retained-path auditing; the remainder is available
+     * to the mechanical search ledger.
+     */
     public record PrimitiveWorkBudget(
         int maxPrimitiveSteps,
         int maxExploredStates,
@@ -194,11 +199,17 @@ public record EvolutionRewriteProgramTrainSuite(
                 maxExploredStates,
                 maxCandidatesPerState,
                 maxExpandingSteps,
-                maxWorkUnits);
+                1);
+            if (maxWorkUnits <= maxPrimitiveSteps) {
+                throw new IllegalArgumentException(
+                    "maxWorkUnits must leave at least one mechanical search unit "
+                        + "after reserving exact path-audit calls");
+            }
         }
 
         static PrimitiveWorkBudget derivedFrom(SearchHeuristic heuristic) {
             Objects.requireNonNull(heuristic, "heuristic");
+            int primitiveSteps = Math.max(1, heuristic.maxDepth());
             long units;
             try {
                 units = Math.multiplyExact(
@@ -207,12 +218,21 @@ public record EvolutionRewriteProgramTrainSuite(
             } catch (ArithmeticException exception) {
                 units = Long.MAX_VALUE;
             }
+            units = Math.max(units, (long) primitiveSteps + 1L);
             return new PrimitiveWorkBudget(
-                Math.max(1, heuristic.maxDepth()),
+                primitiveSteps,
                 heuristic.maxVisitedExpressions(),
                 heuristic.maxCandidatesPerState(),
                 heuristic.maxExpandingSteps(),
-                Math.max(1L, units));
+                units);
+        }
+
+        public long exactPathAuditReserve() {
+            return maxPrimitiveSteps;
+        }
+
+        public long mechanicalSearchWorkBudget() {
+            return maxWorkUnits - exactPathAuditReserve();
         }
 
         PrimitiveWorkBestFirstSearchStrategy.Budget toSearchBudget() {
@@ -221,7 +241,7 @@ public record EvolutionRewriteProgramTrainSuite(
                 maxExploredStates,
                 maxCandidatesPerState,
                 maxExpandingSteps,
-                maxWorkUnits);
+                mechanicalSearchWorkBudget());
         }
     }
 
