@@ -59,7 +59,7 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
     }
 
     @Test
-    void flatGenomeRuleCanSolveWithoutFabricatingProgramUse() {
+    void flatGenomeRuleCanSolveWithoutFabricatingProgramCredit() {
         EvolutionGenome genome = EvolutionGenomeTestFixtures.genome(
             EvolutionGenomeTestFixtures.addZero("add_zero", "A"));
         EvolutionRewriteProgramPlan plan = EvolutionRewriteProgramPlan.create(
@@ -83,12 +83,19 @@ class InformationParityRewriteProgramTrainFitnessEvaluatorTest {
 
         assertTrue(measurement.baselineReached());
         assertTrue(measurement.candidateReached());
+        assertFalse(measurement.programUsed());
         assertFalse(measurement.newlySolved());
         assertEquals(PathCorrectness.CONFIRMED,
             measurement.baselinePathCorrectness());
         assertEquals(0,
             evidence.rawComponents().get(
                 FitnessComponent.TRAIN_CASES_NEWLY_SOLVED));
+        assertEquals(0,
+            evidence.rawComponents().get(
+                FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION));
+        assertEquals(0,
+            evidence.rawComponents().get(
+                FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION));
     }
 
     @Test
