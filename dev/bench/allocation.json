@@ -1,0 +1,71 @@
+{
+  "allocationUnit": "B/op",
+  "benchmarks": [
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.directAstRewriteSource",
+      "bytesPerOperation": 594716.5125885936,
+      "millisecondsPerOperation": 0.23590881967834032,
+      "workCounters": {}
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.preparedAstRewriteSource",
+      "bytesPerOperation": 355313.1906785145,
+      "millisecondsPerOperation": 0.09293954358784284,
+      "workCounters": {}
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceFixedWorkSearch",
+      "bytesPerOperation": 62932397.57344878,
+      "millisecondsPerOperation": 36.91750419603174,
+      "workCounters": {
+        "enqueuedStates": 28336.0,
+        "expandedStates": 5984.0,
+        "exploredStates": 11264.0,
+        "generatedTransformations": 29744.0,
+        "reachedTargets": 0.0,
+        "searches": 88.0
+      }
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedFixedWorkSearch",
+      "bytesPerOperation": 43362803.247796915,
+      "millisecondsPerOperation": 19.38997444820384,
+      "workCounters": {
+        "enqueuedStates": 51842.0,
+        "expandedStates": 10948.0,
+        "exploredStates": 20608.0,
+        "generatedTransformations": 54418.0,
+        "reachedTargets": 0.0,
+        "searches": 161.0
+      }
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceTargetedSearch",
+      "bytesPerOperation": 1382367.5771401785,
+      "millisecondsPerOperation": 0.8660856059912199,
+      "workCounters": {
+        "enqueuedStates": 49126.0,
+        "expandedStates": 14036.0,
+        "exploredStates": 17545.0,
+        "generatedTransformations": 49126.0,
+        "reachedTargets": 3509.0,
+        "searches": 3509.0
+      }
+    },
+    {
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedTargetedSearch",
+      "bytesPerOperation": 802370.0484758528,
+      "millisecondsPerOperation": 0.46183239174793583,
+      "workCounters": {
+        "enqueuedStates": 95312.0,
+        "expandedStates": 27232.0,
+        "exploredStates": 34040.0,
+        "generatedTransformations": 95312.0,
+        "reachedTargets": 6808.0,
+        "searches": 6808.0
+      }
+    }
+  ],
+  "primaryUnit": "ms/op",
+  "schema": "regelsuche.jmh-allocation-summary/v1"
+}
