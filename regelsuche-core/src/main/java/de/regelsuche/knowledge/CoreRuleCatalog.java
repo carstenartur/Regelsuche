@@ -109,10 +109,6 @@ public final class CoreRuleCatalog {
 
     private static final Map<String, CoreRulePack> BY_ID = indexById(PACKS);
     private static final Map<String, String> PACK_ID_BY_RULE_ID = indexByRuleId(PACKS);
-    private static final Set<String> KNOWN_KNOWLEDGE_PACK_IDS =
-            new KnowledgePackRegistry().allPacks().stream()
-                    .map(KnowledgePack::packId)
-                    .collect(Collectors.toUnmodifiableSet());
 
     private CoreRuleCatalog() {
     }
@@ -188,10 +184,18 @@ public final class CoreRuleCatalog {
 
     private static void validatePackIds(Set<String> packIds) {
         for (String packId : packIds) {
-            if (!BY_ID.containsKey(packId) && !KNOWN_KNOWLEDGE_PACK_IDS.contains(packId)) {
+            if (!BY_ID.containsKey(packId) && !KnowledgePackIdsHolder.IDS.contains(packId)) {
                 throw new IllegalArgumentException("Unknown rule pack: " + packId);
             }
         }
+    }
+
+    /** Loads YAML pack ids only when a selection explicitly references a non-core pack. */
+    private static final class KnowledgePackIdsHolder {
+        private static final Set<String> IDS =
+                new KnowledgePackRegistry().allPacks().stream()
+                        .map(KnowledgePack::packId)
+                        .collect(Collectors.toUnmodifiableSet());
     }
 
     private static void rejectKernelDisable(Set<String> disabledPacks) {
