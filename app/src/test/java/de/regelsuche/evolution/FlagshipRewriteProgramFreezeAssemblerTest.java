@@ -56,11 +56,9 @@ class FlagshipRewriteProgramFreezeAssemblerTest {
         assertEquals(
             EvolutionRewriteProgramBaselineAblationPlan.TrackKind.values().length,
             first.baselineAblation().tracks().size());
-        assertEquals(29,
-            countOccurrences(first.performance().toCanonicalJson(),
-                "MeasurementLayer") == 0
-                    ? 29
-                    : 29);
+        assertEquals(
+            EvolutionRewriteProgramPerformancePlan.MeasurementLayer.values().length,
+            first.performance().requiredLayers().size());
         assertTrue(first.primitiveInventoryJson().contains("contentHash"));
         assertTrue(first.programGrammarJson().contains("contentHash"));
         assertTrue(first.mutationCatalogJson().contains("contentHash"));
@@ -172,16 +170,6 @@ class FlagshipRewriteProgramFreezeAssemblerTest {
             }
             return result;
         }
-    }
-
-    private static int countOccurrences(String value, String needle) {
-        int count = 0;
-        int offset = 0;
-        while ((offset = value.indexOf(needle, offset)) >= 0) {
-            count++;
-            offset += needle.length();
-        }
-        return count;
     }
 
     private static EvolutionRewriteProgramHeldOutRevealBundle validationBundle(
