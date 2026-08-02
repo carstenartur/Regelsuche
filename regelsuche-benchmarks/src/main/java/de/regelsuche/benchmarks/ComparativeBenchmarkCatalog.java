@@ -75,13 +75,13 @@ final class ComparativeBenchmarkCatalog {
     /**
      * Target-free simplification corpus.
      *
-     * <p>The stored target expression is the reference simplest form. It is the
+     * <p>The stored target expression is a pinned reference form. It is the
      * shared judge's answer key and is never handed to a competitor: the parity
      * manifest for this track sets {@code targetVisible=false}.</p>
      *
-     * <p>The corpus deliberately spans families that Regelsuche's rewrite
-     * inventory does not cover, so that an external competitor can win. A track
-     * where every configured competitor succeeds would carry no information.</p>
+     * <p>The corpus deliberately contains a held-out capability gap. Exact
+     * polynomial long division exists only in an opt-in experimental pack and
+     * is not part of the measured default inventory.</p>
      */
     static List<Case> simplificationCases() {
         return List.of(
@@ -204,7 +204,7 @@ final class ComparativeBenchmarkCatalog {
                     + "\nexternal-timeoutMillis=20000"),
             notApplicable("research-brief"),
             notApplicable("qualification-split"),
-            List.of("REFERENCE_FORM_REACHABILITY"));
+            List.of("PINNED_REFERENCE_FORM_REACHABILITY"));
     }
 
     static Configuration searchConfiguration(
@@ -261,11 +261,7 @@ final class ComparativeBenchmarkCatalog {
             system.version(),
             SolverIr.sha256(
                 "target-free-simplification/v1\nimplementation="
-                    + (system.strategy() == null
-                        ? "external:"
-                            + system.externalSimplifier().configurationHash()
-                        : "internal:"
-                            + system.strategy().getClass().getName())),
+                    + system.implementationIdentity()),
             SolverIr.sha256("NO_MODEL"),
             SolverIr.sha256(system.environmentIdentity()),
             true,
@@ -290,12 +286,12 @@ final class ComparativeBenchmarkCatalog {
                     "PROJECT_NOVELTY_AND_FALSIFICATION")),
             CoverageGap.create(
                 Track.SIMPLIFICATION_COMPETITION,
-                "The head-to-head simplification corpus is small, single-domain and does not yet include an equality-saturation or randomized-valid competitor.",
+                "The target-free simplification corpus is small and single-domain; equality saturation, randomized-valid competitors and an independent assumption-aware output validator remain unmeasured.",
                 List.of(
-                    "EQUALITY_SATURATION_COMPETITOR",
+                    "EQUALITY_SATURATION_COMPETITOR_WITH_EXACT_SIDE_CONDITION_PROVENANCE",
                     "RANDOMIZED_VALID_COMPETITOR",
                     "MULTI_DOMAIN_SIMPLIFICATION_CORPUS",
-                    "ASSUMPTION_AWARE_CANCELLATION_CONTRACT")),
+                    "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION")),
             CoverageGap.create(
                 Track.CROSS_FAMILY_TRANSFER,
                 "The fully held-out #222 transfer split is not part of the first executable slice.",
