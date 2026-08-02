@@ -7,6 +7,7 @@ import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.Split;
 import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.DifficultyTier;
 import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.ExpectedTerminalClass;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.RevealCase;
 import de.regelsuche.math.algorithms.equivalence.RationalFunctionNormalFormEquivalencePortAdapter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -48,23 +49,24 @@ public final class FlagshipHeldOutDraftSealCommand {
         Path splitReferencesOutput
     ) {
         DraftDto draft = readDraft(draftInput);
-        List<CaseValidation> validations = draft.cases().stream()
+        List<RevealCase> normalizedCases = draft.cases().stream()
+            .map(CaseDto::toRuntime)
+            .toList();
+        List<CaseValidation> validations = normalizedCases.stream()
             .map(this::validateCase)
             .toList();
-        EvolutionRewriteProgramHeldOutSealTool.SealResult sealed =
-            sealTool.seal(
-                draftInput,
-                privateBundleOutput,
-                commitmentOutput,
-                splitReferencesOutput);
+        sealTool.seal(
+            draftInput,
+            privateBundleOutput,
+            commitmentOutput,
+            splitReferencesOutput);
         return new ValidatedSealResult(
             draft.studyId(),
             draft.split(),
-            validations,
-            sealed);
+            validations);
     }
 
-    private CaseValidation validateCase(CaseDto heldOutCase) {
+    private CaseValidation validateCase(RevealCase heldOutCase) {
         AssumptionAwareEquivalenceService.Evaluation evaluation =
             equivalence.evaluate(
                 heldOutCase.inputExpression(),
@@ -104,7 +106,9 @@ public final class FlagshipHeldOutDraftSealCommand {
             if (!EvolutionRewriteProgramHeldOutSealTool.DRAFT_SCHEMA.equals(
                     dto.schema())) {
                 throw new IllegalArgumentException(
-                    "unsupported held-out reveal draft schema");
+                    "unsupported held-out reveal draft schema: expected="
+                        + EvolutionRewriteProgramHeldOutSealTool.DRAFT_SCHEMA
+                        + ", actual=" + dto.schema());
             }
             return dto;
         } catch (JsonProcessingException exception) {
@@ -145,17 +149,19 @@ public final class FlagshipHeldOutDraftSealCommand {
         }
     }
 
+    /**
+     * Privacy-minimal validation receipt. Output paths and sealing metadata are
+     * intentionally absent; callers already possess the paths they supplied.
+     */
     public record ValidatedSealResult(
         String studyId,
         Split split,
-        List<CaseValidation> cases,
-        EvolutionRewriteProgramHeldOutSealTool.SealResult seal
+        List<CaseValidation> cases
     ) {
         public ValidatedSealResult {
             Objects.requireNonNull(studyId, "studyId");
             Objects.requireNonNull(split, "split");
             cases = List.copyOf(Objects.requireNonNull(cases, "cases"));
-            Objects.requireNonNull(seal, "seal");
         }
     }
 
@@ -191,6 +197,17 @@ public final class FlagshipHeldOutDraftSealCommand {
             Objects.requireNonNull(difficultyTier, "difficultyTier");
             Objects.requireNonNull(
                 expectedTerminalClass, "expectedTerminalClass");
+        }
+
+        private RevealCase toRuntime() {
+            return RevealCase.create(
+                caseId,
+                familyId,
+                inputExpression,
+                targetExpression,
+                assumptions,
+                difficultyTier,
+                expectedTerminalClass);
         }
     }
 }
