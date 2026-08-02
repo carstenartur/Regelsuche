@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Characterize the JMH v2 verifier with one pass and four fail-closed cases."""
+"""Characterize the JMH v2 verifier with two passes and four fail-closed cases."""
 
 from __future__ import annotations
 
@@ -47,21 +47,31 @@ def load_verifier(path: Path):
     return module
 
 
-def execute(verifier, root: Path, label: str, result: list[dict], expected: int) -> None:
+def execute(
+    verifier,
+    root: Path,
+    label: str,
+    result: list[dict],
+    expected: int,
+    legacy_options: bool = False,
+) -> None:
     result_path = root / f"{label}-result.json"
     json_output = root / f"{label}-report.json"
     markdown_output = root / f"{label}-report.md"
     write(result_path, result)
+    result_option = "--results" if legacy_options else "--result"
+    json_option = "--report-json" if legacy_options else "--json-output"
+    markdown_option = "--report-md" if legacy_options else "--markdown-output"
     previous = sys.argv
     sys.argv = [
         "verify-jmh-regression-v2.py",
-        "--result",
+        result_option,
         str(result_path),
         "--policy",
         str(root / "policy.json"),
-        "--json-output",
+        json_option,
         str(json_output),
-        "--markdown-output",
+        markdown_option,
         str(markdown_output),
     ]
     try:
@@ -115,6 +125,14 @@ def main() -> None:
         }
         write(root / "policy.json", policy)
         execute(verifier, root, "pass", [benchmark()], 0)
+        execute(
+            verifier,
+            root,
+            "legacy-options-pass",
+            [benchmark()],
+            0,
+            legacy_options=True,
+        )
         execute(verifier, root, "missing", [], 1)
         execute(
             verifier,
@@ -125,7 +143,7 @@ def main() -> None:
         )
         execute(verifier, root, "wrong-unit", [benchmark(unit="ms/op")], 1)
         execute(verifier, root, "regression", [benchmark(score=1.6)], 1)
-    print("JMH regression verifier characterization passed: 1 positive, 4 negative")
+    print("JMH regression verifier characterization passed: 2 positive, 4 negative")
 
 
 if __name__ == "__main__":
