@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FlagshipRewriteProgramTrainCorpus.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">FlagshipRewriteProgramTrainCorpus.java</span></div><h1>FlagshipRewriteProgramTrainCorpus.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.search.SearchHeuristic;
+import java.util.List;
+
+/**
+ * Open, reviewable TRAIN corpus for the proof-carrying rewrite-program study.
+ *
+ * &lt;p&gt;All cases are visible by design and may be used for mutation and fitness.
+ * No VALIDATION or FINAL TEST material is referenced from this class.&lt;/p&gt;
+ */
+public final class FlagshipRewriteProgramTrainCorpus {
+    public static final String SUITE_ID =
+        &quot;flagship_rational_polynomial_train_v1&quot;;
+
+    private FlagshipRewriteProgramTrainCorpus() {
+    }
+
+    public static EvolutionRewriteProgramTrainSuite create() {
+<span class="fc" id="L20">        SearchHeuristic heuristic = new SearchHeuristic(</span>
+            6,
+            512,
+            1,
+            4,
+            40,
+            8);
+<span class="fc" id="L27">        EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget workBudget =</span>
+            new EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget(
+                6,
+                512,
+                40,
+                4,
+                20_000L);
+<span class="fc" id="L34">        return EvolutionRewriteProgramTrainSuite.create(</span>
+            SUITE_ID,
+            EvolutionRewriteProgramTrainSuite.EvaluatorProfile
+                .EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS,
+<span class="fc" id="L38">            cases(),</span>
+            heuristic,
+            workBudget);
+    }
+
+    public static List&lt;EvolutionRewriteProgramTrainSuite.TrainCase&gt; cases() {
+<span class="fc" id="L44">        return List.of(</span>
+<span class="fc" id="L45">            trainCase(</span>
+                &quot;train_affine_factor_cancellation&quot;,
+                &quot;affine_factor_cancellation&quot;,
+                &quot;((u + 2) * p) / ((u + 2) * q)&quot;,
+                &quot;p / q&quot;,
+<span class="fc" id="L50">                List.of(&quot;u + 2 != 0&quot;, &quot;q != 0&quot;)),</span>
+<span class="fc" id="L51">            trainCase(</span>
+                &quot;train_common_denominator_difference&quot;,
+                &quot;common_denominator_arithmetic&quot;,
+                &quot;a / x - a / y&quot;,
+                &quot;a * (y - x) / (x * y)&quot;,
+<span class="fc" id="L56">                List.of(&quot;x != 0&quot;, &quot;y != 0&quot;)),</span>
+<span class="fc" id="L57">            trainCase(</span>
+                &quot;train_direct_factor_cancellation&quot;,
+                &quot;direct_factor_cancellation&quot;,
+                &quot;(x * a) / (x * b)&quot;,
+                &quot;a / b&quot;,
+<span class="fc" id="L62">                List.of(&quot;x != 0&quot;, &quot;b != 0&quot;)),</span>
+<span class="fc" id="L63">            trainCase(</span>
+                &quot;train_equal_denominator_collection&quot;,
+                &quot;common_denominator_arithmetic&quot;,
+                &quot;a / x + b / x&quot;,
+                &quot;(a + b) / x&quot;,
+<span class="fc" id="L68">                List.of(&quot;x != 0&quot;)),</span>
+<span class="fc" id="L69">            trainCase(</span>
+                &quot;train_identity_then_cancellation&quot;,
+                &quot;normalization_before_cancellation&quot;,
+                &quot;((z + 1) * 1) / ((z + 1) * t)&quot;,
+                &quot;1 / t&quot;,
+<span class="fc" id="L74">                List.of(&quot;z + 1 != 0&quot;, &quot;t != 0&quot;)),</span>
+<span class="fc" id="L75">            trainCase(</span>
+                &quot;train_nested_shared_denominator_division&quot;,
+                &quot;nested_rational_composition&quot;,
+                &quot;(m / n) / (p / n)&quot;,
+                &quot;m / p&quot;,
+<span class="fc" id="L80">                List.of(&quot;n != 0&quot;, &quot;p != 0&quot;)),</span>
+<span class="fc" id="L81">            trainCase(</span>
+                &quot;train_scaled_linear_collection&quot;,
+                &quot;polynomial_collection&quot;,
+                &quot;(2 * x + 2 * y) / 2&quot;,
+                &quot;x + y&quot;,
+<span class="fc" id="L86">                List.of()),</span>
+<span class="fc" id="L87">            trainCase(</span>
+                &quot;train_square_difference_bridge&quot;,
+                &quot;polynomial_factor_bridge&quot;,
+                &quot;(r^2 - s^2) / (r - s)&quot;,
+                &quot;r + s&quot;,
+<span class="fc" id="L92">                List.of(&quot;r - s != 0&quot;)));</span>
+    }
+
+    private static EvolutionRewriteProgramTrainSuite.TrainCase trainCase(
+        String caseId,
+        String familyId,
+        String input,
+        String target,
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L102">        return new EvolutionRewriteProgramTrainSuite.TrainCase(</span>
+            caseId,
+            familyId,
+            input,
+            target,
+            assumptions);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

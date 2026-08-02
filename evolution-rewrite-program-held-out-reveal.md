@@ -1,7 +1,7 @@
 # Sealed held-out reveal handling
 
-Status: private reveal-envelope and content-addressed authorization contract for
-#533 and #521
+Status: private reveal-envelope, strict external-file boundary and
+content-addressed authorization contract for #533 and #521
 
 The public repository may contain held-out commitments, split references and
 reveal-authorization evidence. It must not contain concrete VALIDATION or FINAL
@@ -19,12 +19,39 @@ Without opening a bundle, callers can obtain only:
 - `EvolutionSplitManifest.CaseReference` values containing identities and hashes;
 - `EvolutionRewriteProgramHeldOutCommitment` containing per-case and whole-bundle
   commitments;
+- `EvolutionRewriteProgramHeldOutSplitReferences`, a canonical public root over
+  the hash-only manifest references;
 - `EvolutionRewriteProgramHeldOutRevealAuthorization`, which contains only
   prerequisite artifact hashes and terminal-stage metadata.
 
-No public artifact contains concrete input, target or assumption text. Changing
-any private value changes the reveal entry, complete reveal and public commitment
-identities.
+The commitment and split-reference JSON contain no concrete input, target or
+assumption text. Changing any private value changes the reveal entry, complete
+reveal and all derived public artifact identities.
+
+## Strict loader and public exporter
+
+`EvolutionRewriteProgramHeldOutRevealCodec` reads a private JSON file through
+strict Jackson DTOs with unknown-field rejection. It reconstructs every runtime
+`RevealCase` and the complete bundle, causing all per-case and root hashes to be
+recomputed before the file is accepted.
+
+Its public exporter writes exactly two separate files:
+
+1. the held-out commitment;
+2. the hash-only split references.
+
+Writes use a temporary file followed by an atomic replace where supported. The
+trusted private writer restricts its output to owner read/write permissions on
+POSIX filesystems. Private values are never written to stdout by the codec.
+
+A caller must keep private input and output paths outside ordinary repository,
+CI-artifact and web-publication directories. The codec enforces content and
+output separation; deployment configuration remains responsible for filesystem
+and secret-store isolation.
+
+The public split-reference schema is:
+
+[`regelsuche-evolution-rewrite-program-held-out-split-references-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-held-out-split-references-v1.schema.json)
 
 ## Opening policy
 
@@ -113,7 +140,8 @@ experiments cannot receive an earlier reveal or a wider information surface.
 
 ## Claim boundary
 
-This layer secures reveal identity, public prerequisite evidence and the API
-opening boundary. It does not encrypt external storage, generate real held-out
-cases, execute a case, select a candidate or consume FINAL TEST. Exactly-once
+This layer secures reveal identity, strict loading, hash-only public derivation,
+public prerequisite evidence and the API opening boundary. It does not encrypt
+external storage, manage an external secret store, generate real held-out cases,
+execute a case, select a candidate or consume FINAL TEST. Exactly-once
 consumption remains enforced by the existing final-test executor and ledger.

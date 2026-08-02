@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramHeldOutSplitReferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramHeldOutSplitReferences.java</span></div><h1>EvolutionRewriteProgramHeldOutSplitReferences.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.Split;
+import de.regelsuche.json.JsonWriter;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.regex.Pattern;
+
+/**
+ * Public hash-only view of one private held-out reveal bundle.
+ *
+ * &lt;p&gt;This artifact can be committed beside the public held-out commitment. It
+ * contains no expression or assumption text and binds the exact split-manifest
+ * references to the private reveal-bundle root.&lt;/p&gt;
+ */
+public record EvolutionRewriteProgramHeldOutSplitReferences(
+    String schema,
+    String studyId,
+    Split split,
+    String revealBundleHash,
+    List&lt;EvolutionSplitManifest.CaseReference&gt; cases,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-held-out-split-references/v1&quot;;
+<span class="fc" id="L28">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+
+<span class="fc" id="L30">    public EvolutionRewriteProgramHeldOutSplitReferences {</span>
+<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L32">            throw new IllegalArgumentException(</span>
+                &quot;unsupported held-out split-reference schema&quot;);
+        }
+<span class="fc" id="L35">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L36">        Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L37">        EvolutionGenome.requireSha256(revealBundleHash, &quot;revealBundleHash&quot;);</span>
+<span class="fc" id="L38">        cases = canonicalCases(cases);</span>
+<span class="fc" id="L39">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L40">        String expected = EvolutionGenome.hash(render(</span>
+            studyId,
+            split,
+            revealBundleHash,
+            cases,
+            null));
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(</span>
+                &quot;held-out split-reference contentHash mismatch&quot;);
+        }
+<span class="fc" id="L50">    }</span>
+
+    public static EvolutionRewriteProgramHeldOutSplitReferences create(
+        EvolutionRewriteProgramHeldOutRevealBundle bundle
+    ) {
+<span class="fc" id="L55">        Objects.requireNonNull(bundle, &quot;bundle&quot;);</span>
+<span class="fc" id="L56">        List&lt;EvolutionSplitManifest.CaseReference&gt; references =</span>
+<span class="fc" id="L57">            canonicalCases(bundle.splitReferences());</span>
+<span class="fc" id="L58">        String hash = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L59">            bundle.studyId(),</span>
+<span class="fc" id="L60">            bundle.split(),</span>
+<span class="fc" id="L61">            bundle.contentHash(),</span>
+            references,
+            null));
+<span class="fc" id="L64">        return new EvolutionRewriteProgramHeldOutSplitReferences(</span>
+            SCHEMA,
+<span class="fc" id="L66">            bundle.studyId(),</span>
+<span class="fc" id="L67">            bundle.split(),</span>
+<span class="fc" id="L68">            bundle.contentHash(),</span>
+            references,
+            hash);
+    }
+
+    public void requireMatches(
+        EvolutionRewriteProgramHeldOutRevealBundle bundle
+    ) {
+<span class="nc" id="L76">        Objects.requireNonNull(bundle, &quot;bundle&quot;);</span>
+<span class="nc" id="L77">        EvolutionRewriteProgramHeldOutSplitReferences actual = create(bundle);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (!equals(actual)) {</span>
+<span class="nc" id="L79">            throw new IllegalArgumentException(</span>
+                &quot;held-out split references do not match reveal bundle&quot;);
+        }
+<span class="nc" id="L82">    }</span>
+
+    public void requireMatches(EvolutionSplitManifest manifest) {
+<span class="nc" id="L85">        Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (!studyId.equals(manifest.studyId())) {</span>
+<span class="nc" id="L87">            throw new IllegalArgumentException(</span>
+                &quot;held-out split references use another study&quot;);
+        }
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        List&lt;EvolutionSplitManifest.CaseReference&gt; expected = switch (split) {</span>
+<span class="nc" id="L91">            case VALIDATION -&gt; manifest.validationCases();</span>
+<span class="nc" id="L92">            case FINAL_TEST -&gt; manifest.finalTestCases();</span>
+        };
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (!cases.equals(canonicalCases(expected))) {</span>
+<span class="nc" id="L95">            throw new IllegalArgumentException(</span>
+                &quot;held-out split references differ from split manifest&quot;);
+        }
+<span class="nc" id="L98">    }</span>
+
+    public String toCanonicalJson() {
+<span class="fc" id="L101">        return render(</span>
+            studyId,
+            split,
+            revealBundleHash,
+            cases,
+            contentHash);
+    }
+
+    private static List&lt;EvolutionSplitManifest.CaseReference&gt; canonicalCases(
+        List&lt;EvolutionSplitManifest.CaseReference&gt; values
+    ) {
+<span class="fc" id="L112">        Objects.requireNonNull(values, &quot;cases&quot;);</span>
+<span class="fc" id="L113">        List&lt;EvolutionSplitManifest.CaseReference&gt; result = values.stream()</span>
+<span class="fc" id="L114">            .map(value -&gt; Objects.requireNonNull(value, &quot;case reference&quot;))</span>
+<span class="fc" id="L115">            .sorted(Comparator.comparing(</span>
+                EvolutionSplitManifest.CaseReference::caseId))
+<span class="fc" id="L117">            .toList();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (result.isEmpty()) {</span>
+<span class="nc" id="L119">            throw new IllegalArgumentException(</span>
+                &quot;held-out split references must contain cases&quot;);
+        }
+<span class="fc" id="L122">        requireUnique(result, &quot;case ID&quot;,</span>
+            EvolutionSplitManifest.CaseReference::caseId);
+<span class="fc" id="L124">        requireUnique(result, &quot;input identity&quot;,</span>
+            EvolutionSplitManifest.CaseReference::inputHash);
+<span class="fc" id="L126">        requireUnique(result, &quot;hidden-target identity&quot;,</span>
+            EvolutionSplitManifest.CaseReference::hiddenTargetHash);
+<span class="fc" id="L128">        requireUnique(result, &quot;exact signature&quot;,</span>
+            EvolutionSplitManifest.CaseReference::exactSignatureHash);
+<span class="fc" id="L130">        requireUnique(result, &quot;alpha signature&quot;,</span>
+            EvolutionSplitManifest.CaseReference::alphaSignatureHash);
+<span class="fc" id="L132">        return List.copyOf(result);</span>
+    }
+
+    private static void requireUnique(
+        List&lt;EvolutionSplitManifest.CaseReference&gt; cases,
+        String label,
+        java.util.function.Function&lt;
+            EvolutionSplitManifest.CaseReference,
+            String&gt; identity
+    ) {
+<span class="fc" id="L142">        if (new HashSet&lt;&gt;(cases.stream().map(identity).toList()).size()</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                != cases.size()) {</span>
+<span class="nc" id="L144">            throw new IllegalArgumentException(</span>
+                &quot;held-out split references contain duplicate &quot; + label);
+        }
+<span class="fc" id="L147">    }</span>
+
+    private static String render(
+        String studyId,
+        Split split,
+        String revealBundleHash,
+        List&lt;EvolutionSplitManifest.CaseReference&gt; cases,
+        String contentHash
+    ) {
+<span class="fc" id="L156">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L157">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L158">            .property(&quot;studyId&quot;, studyId)</span>
+<span class="fc" id="L159">            .property(&quot;split&quot;, split.name())</span>
+<span class="fc" id="L160">            .property(&quot;revealBundleHash&quot;, revealBundleHash)</span>
+<span class="fc" id="L161">            .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L162">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L163">                    .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L164">                    .property(&quot;familyId&quot;, item.familyId())</span>
+<span class="fc" id="L165">                    .property(&quot;exactSignatureHash&quot;,</span>
+<span class="fc" id="L166">                        item.exactSignatureHash())</span>
+<span class="fc" id="L167">                    .property(&quot;alphaSignatureHash&quot;,</span>
+<span class="fc" id="L168">                        item.alphaSignatureHash())</span>
+<span class="fc" id="L169">                    .property(&quot;inputHash&quot;, item.inputHash())</span>
+<span class="fc" id="L170">                    .property(&quot;hiddenTargetHash&quot;,</span>
+<span class="fc" id="L171">                        item.hiddenTargetHash()))));</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L173">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L175">        return json.endObject().toString();</span>
+    }
+
+    private static void requireId(String value, String name) {
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L180">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+        }
+<span class="fc" id="L182">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

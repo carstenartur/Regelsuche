@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Experimental prepared variant of {@link AstRewriteTransformationEngine}.
+ * Prepared variant of {@link AstRewriteTransformationEngine}.
  *
  * &lt;p&gt;It deliberately keeps the public string-based transformation boundary so
  * search semantics remain comparable, but removes avoidable work inside one
@@ -39,208 +39,209 @@ import java.util.Set;
  * &lt;p&gt;Subclasses of {@code PatternRewriteRule} deliberately retain the ordinary
  * {@link RewriteRule} dispatch so overridden behavior is never bypassed.&lt;/p&gt;
  *
- * &lt;p&gt;This class is an evidence-gathering backend for #530, not yet the default
- * production engine. Differential tests require exact ordered transformation
- * parity with the reference implementation.&lt;/p&gt;
+ * &lt;p&gt;This is the production backend for repeated rewrite-program execution after
+ * the matched-work, end-to-end and allocation measurements from #530. The
+ * reference implementation remains selectable as the executable semantic
+ * oracle, and differential tests require exact ordered transformation parity.&lt;/p&gt;
  */
 public final class PreparedAstRewriteTransformationEngine
         implements TransformationEngine {
     private static final int DEFAULT_MAX_AST_SIZE_INCREASE = 12;
     private static final int DEFAULT_MAX_CANDIDATES_PER_STATE = 80;
 
-<span class="fc" id="L51">    private final ExpressionParser parser = new ExpressionParser();</span>
-<span class="fc" id="L52">    private final ExpressionCanonicalizer canonicalizer =</span>
+<span class="fc" id="L52">    private final ExpressionParser parser = new ExpressionParser();</span>
+<span class="fc" id="L53">    private final ExpressionCanonicalizer canonicalizer =</span>
         new ExpressionCanonicalizer();
     private final List&lt;RewriteRule&gt; rules;
     private final int maxAstSizeIncreasePerStep;
     private final int maxCandidatesPerState;
 
     public PreparedAstRewriteTransformationEngine() {
-<span class="fc" id="L59">        this(AstRewriteTransformationEngine.defaultRules());</span>
-<span class="fc" id="L60">    }</span>
+<span class="fc" id="L60">        this(AstRewriteTransformationEngine.defaultRules());</span>
+<span class="fc" id="L61">    }</span>
 
     public PreparedAstRewriteTransformationEngine(List&lt;RewriteRule&gt; rules) {
-<span class="fc" id="L63">        this(</span>
+<span class="fc" id="L64">        this(</span>
             rules,
             DEFAULT_MAX_AST_SIZE_INCREASE,
             DEFAULT_MAX_CANDIDATES_PER_STATE
         );
-<span class="fc" id="L68">    }</span>
+<span class="fc" id="L69">    }</span>
 
     public PreparedAstRewriteTransformationEngine(
         List&lt;RewriteRule&gt; rules,
         int maxAstSizeIncreasePerStep,
         int maxCandidatesPerState
-<span class="fc" id="L74">    ) {</span>
-<span class="fc" id="L75">        this.rules = List.copyOf(rules);</span>
-<span class="fc" id="L76">        this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;</span>
-<span class="fc" id="L77">        this.maxCandidatesPerState = maxCandidatesPerState;</span>
-<span class="fc" id="L78">    }</span>
+<span class="fc" id="L75">    ) {</span>
+<span class="fc" id="L76">        this.rules = List.copyOf(rules);</span>
+<span class="fc" id="L77">        this.maxAstSizeIncreasePerStep = maxAstSizeIncreasePerStep;</span>
+<span class="fc" id="L78">        this.maxCandidatesPerState = maxCandidatesPerState;</span>
+<span class="fc" id="L79">    }</span>
 
     public List&lt;RewriteRule&gt; rules() {
-<span class="nc" id="L81">        return rules;</span>
+<span class="nc" id="L82">        return rules;</span>
     }
 
     @Override
     public List&lt;Transformation&gt; transform(String expression) {
         Expr root;
         try {
-<span class="fc" id="L88">            root = parser.parse(new InputRequest(InputType.TERM, expression))</span>
-<span class="fc" id="L89">                .terms()</span>
-<span class="fc" id="L90">                .getFirst();</span>
-<span class="fc" id="L91">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L92">            return List.of();</span>
-<span class="fc" id="L93">        }</span>
+<span class="fc" id="L89">            root = parser.parse(new InputRequest(InputType.TERM, expression))</span>
+<span class="fc" id="L90">                .terms()</span>
+<span class="fc" id="L91">                .getFirst();</span>
+<span class="fc" id="L92">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L93">            return List.of();</span>
+<span class="fc" id="L94">        }</span>
 
-<span class="fc" id="L95">        String formattedInput = ExpressionFormatter.format(root);</span>
-<span class="fc" id="L96">        int originalSize = canonicalAstNodeCount(root);</span>
-<span class="fc" id="L97">        Set&lt;Transformation&gt; transformations = new LinkedHashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L98" title="All 2 branches covered.">        for (RewriteResult result : rewriteEverywhere(root)) {</span>
-<span class="fc" id="L99">            String formatted = ExpressionFormatter.format(result.expression());</span>
-<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            if (formatted.equals(formattedInput)) {</span>
-<span class="nc" id="L101">                continue;</span>
+<span class="fc" id="L96">        String formattedInput = ExpressionFormatter.format(root);</span>
+<span class="fc" id="L97">        int originalSize = canonicalAstNodeCount(root);</span>
+<span class="fc" id="L98">        Set&lt;Transformation&gt; transformations = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (RewriteResult result : rewriteEverywhere(root)) {</span>
+<span class="fc" id="L100">            String formatted = ExpressionFormatter.format(result.expression());</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (formatted.equals(formattedInput)) {</span>
+<span class="nc" id="L102">                continue;</span>
             }
-<span class="fc" id="L103">            int growth = canonicalAstNodeCount(result.expression()) - originalSize;</span>
-<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (growth &gt; maxAstSizeIncreasePerStep) {</span>
-<span class="nc" id="L105">                continue;</span>
+<span class="fc" id="L104">            int growth = canonicalAstNodeCount(result.expression()) - originalSize;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            if (growth &gt; maxAstSizeIncreasePerStep) {</span>
+<span class="nc" id="L106">                continue;</span>
             }
-<span class="fc" id="L107">            RewriteRule rule = result.rule();</span>
-<span class="fc" id="L108">            transformations.add(new Transformation(</span>
-<span class="fc" id="L109">                rule.id(),</span>
+<span class="fc" id="L108">            RewriteRule rule = result.rule();</span>
+<span class="fc" id="L109">            transformations.add(new Transformation(</span>
+<span class="fc" id="L110">                rule.id(),</span>
                 formatted,
-<span class="fc" id="L111">                rule.kind(),</span>
-<span class="fc" id="L112">                rule.mayIncreaseComplexity(),</span>
-<span class="fc" id="L113">                rule.estimatedCostDelta(),</span>
-<span class="fc" id="L114">                rule.isEquivalencePreservingByConstruction(),</span>
-<span class="fc" id="L115">                rule.id() + &quot;:&quot; + result.sourceSubtreeHash(),</span>
-<span class="fc" id="L116">                result.assumptions().stream()</span>
-<span class="fc" id="L117">                    .map(Assumption::expression)</span>
-<span class="fc" id="L118">                    .toList(),</span>
-<span class="fc" id="L119">                rule.descriptor().packId(),</span>
-<span class="fc" id="L120">                rule.descriptor().license()</span>
+<span class="fc" id="L112">                rule.kind(),</span>
+<span class="fc" id="L113">                rule.mayIncreaseComplexity(),</span>
+<span class="fc" id="L114">                rule.estimatedCostDelta(),</span>
+<span class="fc" id="L115">                rule.isEquivalencePreservingByConstruction(),</span>
+<span class="fc" id="L116">                rule.id() + &quot;:&quot; + result.sourceSubtreeHash(),</span>
+<span class="fc" id="L117">                result.assumptions().stream()</span>
+<span class="fc" id="L118">                    .map(Assumption::expression)</span>
+<span class="fc" id="L119">                    .toList(),</span>
+<span class="fc" id="L120">                rule.descriptor().packId(),</span>
+<span class="fc" id="L121">                rule.descriptor().license()</span>
             ));
-<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (transformations.size() &gt;= maxCandidatesPerState) {</span>
-<span class="fc" id="L123">                break;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (transformations.size() &gt;= maxCandidatesPerState) {</span>
+<span class="fc" id="L124">                break;</span>
             }
-<span class="fc" id="L125">        }</span>
-<span class="fc" id="L126">        return new ArrayList&lt;&gt;(transformations);</span>
+<span class="fc" id="L126">        }</span>
+<span class="fc" id="L127">        return new ArrayList&lt;&gt;(transformations);</span>
     }
 
     private List&lt;RewriteResult&gt; rewriteEverywhere(Expr subtree) {
-<span class="fc" id="L130">        List&lt;RewriteResult&gt; results = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L131">        String subtreeHash = null;</span>
-<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
-<span class="fc" id="L133">            Expr rewritten = applyIfMatched(rule, subtree);</span>
-<span class="pc bpc" id="L134" title="1 of 4 branches missed.">            if (rewritten == null || rewritten.equals(subtree)) {</span>
-<span class="nc" id="L135">                continue;</span>
+<span class="fc" id="L131">        List&lt;RewriteResult&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L132">        String subtreeHash = null;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (RewriteRule rule : rules) {</span>
+<span class="fc" id="L134">            Expr rewritten = applyIfMatched(rule, subtree);</span>
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">            if (rewritten == null || rewritten.equals(subtree)) {</span>
+<span class="nc" id="L136">                continue;</span>
             }
-<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (subtreeHash == null) {</span>
-<span class="fc" id="L138">                subtreeHash = stableHash(subtree);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (subtreeHash == null) {</span>
+<span class="fc" id="L139">                subtreeHash = stableHash(subtree);</span>
             }
-<span class="fc" id="L140">            results.add(new RewriteResult(</span>
+<span class="fc" id="L141">            results.add(new RewriteResult(</span>
                 rule,
                 rewritten,
                 subtreeHash,
-<span class="fc" id="L144">                rule.assumptions(subtree)</span>
+<span class="fc" id="L145">                rule.assumptions(subtree)</span>
             ));
-<span class="fc" id="L146">        }</span>
+<span class="fc" id="L147">        }</span>
 
-<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (subtree instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (subtree instanceof BinaryExpr binaryExpr) {</span>
             for (RewriteResult leftRewrite :
-<span class="fc bfc" id="L150" title="All 2 branches covered.">                    rewriteEverywhere(binaryExpr.left())) {</span>
-<span class="fc" id="L151">                results.add(new RewriteResult(</span>
-<span class="fc" id="L152">                    leftRewrite.rule(),</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                    rewriteEverywhere(binaryExpr.left())) {</span>
+<span class="fc" id="L152">                results.add(new RewriteResult(</span>
+<span class="fc" id="L153">                    leftRewrite.rule(),</span>
                     new BinaryExpr(
-<span class="fc" id="L154">                        leftRewrite.expression(),</span>
-<span class="fc" id="L155">                        binaryExpr.operator(),</span>
-<span class="fc" id="L156">                        binaryExpr.right()</span>
+<span class="fc" id="L155">                        leftRewrite.expression(),</span>
+<span class="fc" id="L156">                        binaryExpr.operator(),</span>
+<span class="fc" id="L157">                        binaryExpr.right()</span>
                     ),
-<span class="fc" id="L158">                    leftRewrite.sourceSubtreeHash(),</span>
-<span class="fc" id="L159">                    leftRewrite.assumptions()</span>
+<span class="fc" id="L159">                    leftRewrite.sourceSubtreeHash(),</span>
+<span class="fc" id="L160">                    leftRewrite.assumptions()</span>
                 ));
-<span class="fc" id="L161">            }</span>
+<span class="fc" id="L162">            }</span>
             for (RewriteResult rightRewrite :
-<span class="fc bfc" id="L163" title="All 2 branches covered.">                    rewriteEverywhere(binaryExpr.right())) {</span>
-<span class="fc" id="L164">                results.add(new RewriteResult(</span>
-<span class="fc" id="L165">                    rightRewrite.rule(),</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">                    rewriteEverywhere(binaryExpr.right())) {</span>
+<span class="fc" id="L165">                results.add(new RewriteResult(</span>
+<span class="fc" id="L166">                    rightRewrite.rule(),</span>
                     new BinaryExpr(
-<span class="fc" id="L167">                        binaryExpr.left(),</span>
-<span class="fc" id="L168">                        binaryExpr.operator(),</span>
-<span class="fc" id="L169">                        rightRewrite.expression()</span>
+<span class="fc" id="L168">                        binaryExpr.left(),</span>
+<span class="fc" id="L169">                        binaryExpr.operator(),</span>
+<span class="fc" id="L170">                        rightRewrite.expression()</span>
                     ),
-<span class="fc" id="L171">                    rightRewrite.sourceSubtreeHash(),</span>
-<span class="fc" id="L172">                    rightRewrite.assumptions()</span>
+<span class="fc" id="L172">                    rightRewrite.sourceSubtreeHash(),</span>
+<span class="fc" id="L173">                    rightRewrite.assumptions()</span>
                 ));
-<span class="fc" id="L174">            }</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">        } else if (subtree instanceof FunctionExpr functionExpr) {</span>
-<span class="fc" id="L176">            List&lt;Expr&gt; arguments = functionExpr.arguments();</span>
-<span class="fc bfc" id="L177" title="All 2 branches covered.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
-<span class="fc" id="L178">                final int position = index;</span>
+<span class="fc" id="L175">            }</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        } else if (subtree instanceof FunctionExpr functionExpr) {</span>
+<span class="fc" id="L177">            List&lt;Expr&gt; arguments = functionExpr.arguments();</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            for (int index = 0; index &lt; arguments.size(); index++) {</span>
+<span class="fc" id="L179">                final int position = index;</span>
                 for (RewriteResult argumentRewrite :
-<span class="fc bfc" id="L180" title="All 2 branches covered.">                        rewriteEverywhere(arguments.get(index))) {</span>
-<span class="fc" id="L181">                    List&lt;Expr&gt; replaced = new ArrayList&lt;&gt;(arguments);</span>
-<span class="fc" id="L182">                    replaced.set(position, argumentRewrite.expression());</span>
-<span class="fc" id="L183">                    results.add(new RewriteResult(</span>
-<span class="fc" id="L184">                        argumentRewrite.rule(),</span>
-<span class="fc" id="L185">                        new FunctionExpr(functionExpr.name(), replaced),</span>
-<span class="fc" id="L186">                        argumentRewrite.sourceSubtreeHash(),</span>
-<span class="fc" id="L187">                        argumentRewrite.assumptions()</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                        rewriteEverywhere(arguments.get(index))) {</span>
+<span class="fc" id="L182">                    List&lt;Expr&gt; replaced = new ArrayList&lt;&gt;(arguments);</span>
+<span class="fc" id="L183">                    replaced.set(position, argumentRewrite.expression());</span>
+<span class="fc" id="L184">                    results.add(new RewriteResult(</span>
+<span class="fc" id="L185">                        argumentRewrite.rule(),</span>
+<span class="fc" id="L186">                        new FunctionExpr(functionExpr.name(), replaced),</span>
+<span class="fc" id="L187">                        argumentRewrite.sourceSubtreeHash(),</span>
+<span class="fc" id="L188">                        argumentRewrite.assumptions()</span>
                     ));
-<span class="fc" id="L189">                }</span>
+<span class="fc" id="L190">                }</span>
             }
         }
-<span class="fc" id="L192">        return results;</span>
+<span class="fc" id="L193">        return results;</span>
     }
 
     private static Expr applyIfMatched(RewriteRule rule, Expr subtree) {
-<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (rule.getClass() == PatternRewriteRule.class) {</span>
-<span class="fc" id="L197">            PatternRewriteRule patternRule = (PatternRewriteRule) rule;</span>
-<span class="fc" id="L198">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (!EquivalenceAwarePatternMatcher.match(</span>
-<span class="fc" id="L200">                    patternRule.source(),</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (rule.getClass() == PatternRewriteRule.class) {</span>
+<span class="fc" id="L198">            PatternRewriteRule patternRule = (PatternRewriteRule) rule;</span>
+<span class="fc" id="L199">            Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (!EquivalenceAwarePatternMatcher.match(</span>
+<span class="fc" id="L201">                    patternRule.source(),</span>
                     subtree,
                     bindings,
-<span class="fc" id="L203">                    patternRule.recognitionProfile())) {</span>
-<span class="fc" id="L204">                return null;</span>
+<span class="fc" id="L204">                    patternRule.recognitionProfile())) {</span>
+<span class="fc" id="L205">                return null;</span>
             }
-<span class="fc" id="L206">            return patternRule.target().instantiate(bindings);</span>
+<span class="fc" id="L207">            return patternRule.target().instantiate(bindings);</span>
         }
-<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (!rule.matches(subtree)) {</span>
-<span class="fc" id="L209">            return null;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (!rule.matches(subtree)) {</span>
+<span class="fc" id="L210">            return null;</span>
         }
-<span class="fc" id="L211">        return rule.apply(subtree);</span>
+<span class="fc" id="L212">        return rule.apply(subtree);</span>
     }
 
     private int canonicalAstNodeCount(Expr expression) {
-<span class="fc" id="L215">        return count(canonicalizer.canonicalize(expression));</span>
+<span class="fc" id="L216">        return count(canonicalizer.canonicalize(expression));</span>
     }
 
     private static int count(Expr expression) {
-<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
-<span class="fc" id="L220">            return 1 + count(binaryExpr.left()) + count(binaryExpr.right());</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (expression instanceof BinaryExpr binaryExpr) {</span>
+<span class="fc" id="L221">            return 1 + count(binaryExpr.left()) + count(binaryExpr.right());</span>
         }
-<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
-<span class="fc" id="L223">            int total = 1;</span>
-<span class="fc bfc" id="L224" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
-<span class="fc" id="L225">                total += count(argument);</span>
-<span class="fc" id="L226">            }</span>
-<span class="fc" id="L227">            return total;</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (expression instanceof FunctionExpr functionExpr) {</span>
+<span class="fc" id="L224">            int total = 1;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            for (Expr argument : functionExpr.arguments()) {</span>
+<span class="fc" id="L226">                total += count(argument);</span>
+<span class="fc" id="L227">            }</span>
+<span class="fc" id="L228">            return total;</span>
         }
-<span class="fc" id="L229">        return 1;</span>
+<span class="fc" id="L230">        return 1;</span>
     }
 
     private String stableHash(Expr expression) {
-<span class="fc" id="L233">        Expr canonical = canonicalizer.canonicalize(expression);</span>
-<span class="fc" id="L234">        return sha256(ExpressionFormatter.format(canonical));</span>
+<span class="fc" id="L234">        Expr canonical = canonicalizer.canonicalize(expression);</span>
+<span class="fc" id="L235">        return sha256(ExpressionFormatter.format(canonical));</span>
     }
 
     private static String sha256(String value) {
         try {
-<span class="fc" id="L239">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
-<span class="fc" id="L240">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
-<span class="fc" id="L241">            return java.util.HexFormat.of().formatHex(digest);</span>
-<span class="nc" id="L242">        } catch (NoSuchAlgorithmException ex) {</span>
-<span class="nc" id="L243">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, ex);</span>
+<span class="fc" id="L240">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L241">                .digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L242">            return java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L243">        } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L244">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, ex);</span>
         }
     }
 
@@ -250,11 +251,11 @@ public final class PreparedAstRewriteTransformationEngine
         String sourceSubtreeHash,
         List&lt;Assumption&gt; assumptions
     ) {
-<span class="fc" id="L253">        private RewriteResult {</span>
-<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            assumptions = assumptions == null</span>
-<span class="nc" id="L255">                ? List.of()</span>
-<span class="fc" id="L256">                : List.copyOf(assumptions);</span>
-<span class="fc" id="L257">        }</span>
+<span class="fc" id="L254">        private RewriteResult {</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            assumptions = assumptions == null</span>
+<span class="nc" id="L256">                ? List.of()</span>
+<span class="fc" id="L257">                : List.copyOf(assumptions);</span>
+<span class="fc" id="L258">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

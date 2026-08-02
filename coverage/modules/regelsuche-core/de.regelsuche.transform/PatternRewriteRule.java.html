@@ -2,6 +2,7 @@
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.knowledge.RuleDescriptor;
+import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,10 +16,12 @@ public class PatternRewriteRule implements RewriteRule {
     private final boolean equivalencePreservingByConstruction;
     private final RuleDescriptor descriptor;
     private final RecognitionProfile recognitionProfile;
+<span class="fc" id="L19">    private final ThreadLocal&lt;WeakReference&lt;PreparedMatch&gt;&gt; preparedMatch =</span>
+        new ThreadLocal&lt;&gt;();
 
     public PatternRewriteRule(String id, PatternExpr source, PatternExpr target) {
-<span class="fc" id="L20">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true);</span>
-<span class="fc" id="L21">    }</span>
+<span class="fc" id="L23">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true);</span>
+<span class="fc" id="L24">    }</span>
 
     public PatternRewriteRule(
         String id,
@@ -26,13 +29,13 @@ public class PatternRewriteRule implements RewriteRule {
         PatternExpr target,
         RecognitionProfile recognitionProfile
     ) {
-<span class="fc" id="L29">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true,</span>
-<span class="fc" id="L30">            RuleDescriptor.core(id, java.util.List.of()), recognitionProfile);</span>
-<span class="fc" id="L31">    }</span>
+<span class="fc" id="L32">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true,</span>
+<span class="fc" id="L33">            RuleDescriptor.core(id, java.util.List.of()), recognitionProfile);</span>
+<span class="fc" id="L34">    }</span>
 
     public PatternRewriteRule(String id, PatternExpr source, PatternExpr target, RuleDescriptor descriptor) {
-<span class="fc" id="L34">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor);</span>
-<span class="fc" id="L35">    }</span>
+<span class="fc" id="L37">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor);</span>
+<span class="fc" id="L38">    }</span>
 
     public PatternRewriteRule(
         String id,
@@ -41,8 +44,8 @@ public class PatternRewriteRule implements RewriteRule {
         RuleDescriptor descriptor,
         RecognitionProfile recognitionProfile
     ) {
-<span class="nc" id="L44">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor, recognitionProfile);</span>
-<span class="nc" id="L45">    }</span>
+<span class="nc" id="L47">        this(id, source, target, RewriteKind.NORMALIZE, false, 0, true, descriptor, recognitionProfile);</span>
+<span class="nc" id="L48">    }</span>
 
     public PatternRewriteRule(
         String id,
@@ -53,9 +56,9 @@ public class PatternRewriteRule implements RewriteRule {
         int estimatedCostDelta,
         boolean equivalencePreservingByConstruction
     ) {
-<span class="fc" id="L56">        this(id, source, target, kind, mayIncreaseComplexity, estimatedCostDelta, equivalencePreservingByConstruction,</span>
-<span class="fc" id="L57">            RuleDescriptor.core(id, java.util.List.of()));</span>
-<span class="fc" id="L58">    }</span>
+<span class="fc" id="L59">        this(id, source, target, kind, mayIncreaseComplexity, estimatedCostDelta, equivalencePreservingByConstruction,</span>
+<span class="fc" id="L60">            RuleDescriptor.core(id, java.util.List.of()));</span>
+<span class="fc" id="L61">    }</span>
 
     public PatternRewriteRule(
         String id,
@@ -67,9 +70,9 @@ public class PatternRewriteRule implements RewriteRule {
         boolean equivalencePreservingByConstruction,
         RuleDescriptor descriptor
     ) {
-<span class="fc" id="L70">        this(id, source, target, kind, mayIncreaseComplexity, estimatedCostDelta,</span>
-<span class="fc" id="L71">            equivalencePreservingByConstruction, descriptor, RecognitionProfile.exact());</span>
-<span class="fc" id="L72">    }</span>
+<span class="fc" id="L73">        this(id, source, target, kind, mayIncreaseComplexity, estimatedCostDelta,</span>
+<span class="fc" id="L74">            equivalencePreservingByConstruction, descriptor, RecognitionProfile.exact());</span>
+<span class="fc" id="L75">    }</span>
 
     public PatternRewriteRule(
         String id,
@@ -81,29 +84,29 @@ public class PatternRewriteRule implements RewriteRule {
         boolean equivalencePreservingByConstruction,
         RuleDescriptor descriptor,
         RecognitionProfile recognitionProfile
-<span class="fc" id="L84">    ) {</span>
-<span class="pc bpc" id="L85" title="4 of 8 branches missed.">        if (id == null || id.isBlank() || source == null || target == null) {</span>
-<span class="nc" id="L86">            throw new IllegalArgumentException(&quot;id, source and target are required&quot;);</span>
+<span class="fc" id="L87">    ) {</span>
+<span class="pc bpc" id="L88" title="4 of 8 branches missed.">        if (id == null || id.isBlank() || source == null || target == null) {</span>
+<span class="nc" id="L89">            throw new IllegalArgumentException(&quot;id, source and target are required&quot;);</span>
         }
-<span class="fc" id="L88">        this.id = id;</span>
-<span class="fc" id="L89">        this.source = source;</span>
-<span class="fc" id="L90">        this.target = target;</span>
-<span class="fc" id="L91">        this.kind = kind;</span>
-<span class="fc" id="L92">        this.mayIncreaseComplexity = mayIncreaseComplexity;</span>
-<span class="fc" id="L93">        this.estimatedCostDelta = estimatedCostDelta;</span>
-<span class="fc" id="L94">        this.equivalencePreservingByConstruction = equivalencePreservingByConstruction;</span>
-<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        this.descriptor = descriptor == null ? RuleDescriptor.core(id, java.util.List.of()) : descriptor;</span>
-<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        this.recognitionProfile = recognitionProfile == null ? RecognitionProfile.exact() : recognitionProfile;</span>
-<span class="fc" id="L97">    }</span>
+<span class="fc" id="L91">        this.id = id;</span>
+<span class="fc" id="L92">        this.source = source;</span>
+<span class="fc" id="L93">        this.target = target;</span>
+<span class="fc" id="L94">        this.kind = kind;</span>
+<span class="fc" id="L95">        this.mayIncreaseComplexity = mayIncreaseComplexity;</span>
+<span class="fc" id="L96">        this.estimatedCostDelta = estimatedCostDelta;</span>
+<span class="fc" id="L97">        this.equivalencePreservingByConstruction = equivalencePreservingByConstruction;</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        this.descriptor = descriptor == null ? RuleDescriptor.core(id, java.util.List.of()) : descriptor;</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        this.recognitionProfile = recognitionProfile == null ? RecognitionProfile.exact() : recognitionProfile;</span>
+<span class="fc" id="L100">    }</span>
 
     @Override
     public String id() {
-<span class="fc" id="L101">        return id;</span>
+<span class="fc" id="L104">        return id;</span>
     }
 
     @Override
     public RuleDescriptor descriptor() {
-<span class="fc" id="L106">        return descriptor;</span>
+<span class="fc" id="L109">        return descriptor;</span>
     }
 
     /**
@@ -113,7 +116,7 @@ public class PatternRewriteRule implements RewriteRule {
      * concrete representative first.
      */
     public PatternExpr source() {
-<span class="fc" id="L116">        return source;</span>
+<span class="fc" id="L119">        return source;</span>
     }
 
     /**
@@ -122,7 +125,7 @@ public class PatternRewriteRule implements RewriteRule {
      * (a-la egg's {@code Applier}) rather than via an AST round-trip.
      */
     public PatternExpr target() {
-<span class="fc" id="L125">        return target;</span>
+<span class="fc" id="L128">        return target;</span>
     }
 
     /**
@@ -130,41 +133,57 @@ public class PatternRewriteRule implements RewriteRule {
      * Existing rules remain exact unless they explicitly opt in.
      */
     public RecognitionProfile recognitionProfile() {
-<span class="fc" id="L133">        return recognitionProfile;</span>
+<span class="fc" id="L136">        return recognitionProfile;</span>
     }
 
     @Override
     public RewriteKind kind() {
-<span class="fc" id="L138">        return kind;</span>
+<span class="fc" id="L141">        return kind;</span>
     }
 
     @Override
     public boolean mayIncreaseComplexity() {
-<span class="fc" id="L143">        return mayIncreaseComplexity;</span>
+<span class="fc" id="L146">        return mayIncreaseComplexity;</span>
     }
 
     @Override
     public int estimatedCostDelta() {
-<span class="fc" id="L148">        return estimatedCostDelta;</span>
+<span class="fc" id="L151">        return estimatedCostDelta;</span>
     }
 
     @Override
     public boolean isEquivalencePreservingByConstruction() {
-<span class="fc" id="L153">        return equivalencePreservingByConstruction;</span>
+<span class="fc" id="L156">        return equivalencePreservingByConstruction;</span>
     }
 
     @Override
     public boolean matches(Expr subtree) {
-<span class="fc" id="L158">        return EquivalenceAwarePatternMatcher.match(source, subtree, new HashMap&lt;&gt;(), recognitionProfile);</span>
+<span class="fc" id="L161">        preparedMatch.remove();</span>
+<span class="fc" id="L162">        Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (!EquivalenceAwarePatternMatcher.match(source, subtree, bindings, recognitionProfile)) {</span>
+<span class="fc" id="L164">            return false;</span>
+        }
+<span class="fc" id="L166">        preparedMatch.set(new WeakReference&lt;&gt;(</span>
+<span class="fc" id="L167">            new PreparedMatch(subtree, Map.copyOf(bindings))));</span>
+<span class="fc" id="L168">        return true;</span>
     }
 
     @Override
     public Expr apply(Expr subtree) {
-<span class="fc" id="L163">        Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
-<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (!EquivalenceAwarePatternMatcher.match(source, subtree, bindings, recognitionProfile)) {</span>
-<span class="nc" id="L165">            throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="fc" id="L173">        WeakReference&lt;PreparedMatch&gt; reference = preparedMatch.get();</span>
+<span class="fc" id="L174">        preparedMatch.remove();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        PreparedMatch prepared = reference == null ? null : reference.get();</span>
+<span class="fc bfc" id="L176" title="All 4 branches covered.">        if (prepared != null &amp;&amp; prepared.subtree() == subtree) {</span>
+<span class="fc" id="L177">            return target.instantiate(prepared.bindings());</span>
         }
-<span class="fc" id="L167">        return target.instantiate(bindings);</span>
+<span class="fc" id="L179">        Map&lt;String, Expr&gt; bindings = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (!EquivalenceAwarePatternMatcher.match(source, subtree, bindings, recognitionProfile)) {</span>
+<span class="fc" id="L181">            throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+        }
+<span class="fc" id="L183">        return target.instantiate(bindings);</span>
+    }
+
+<span class="fc" id="L186">    private record PreparedMatch(Expr subtree, Map&lt;String, Expr&gt; bindings) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
