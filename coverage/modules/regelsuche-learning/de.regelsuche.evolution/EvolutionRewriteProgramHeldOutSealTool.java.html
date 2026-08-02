@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramHeldOutSealTool.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramHeldOutSealTool.java</span></div><h1>EvolutionRewriteProgramHeldOutSealTool.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.Split;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.DifficultyTier;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.ExpectedTerminalClass;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.RevealCase;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Local-only sealing command for private held-out case drafts.
+ *
+ * &lt;p&gt;The input contains concrete case material but no caller-supplied hashes.
+ * Runtime records compute and validate all case and bundle identities. The
+ * command writes one private sealed bundle and two public hash-only artifacts.
+ * It never prints concrete expressions or assumptions.&lt;/p&gt;
+ */
+<span class="fc" id="L25">public final class EvolutionRewriteProgramHeldOutSealTool {</span>
+    public static final String DRAFT_SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-held-out-reveal-draft/v1&quot;;
+
+<span class="fc" id="L29">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L30">        .findAndRegisterModules()</span>
+<span class="fc" id="L31">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+<span class="fc" id="L33">    private final EvolutionRewriteProgramHeldOutRevealCodec codec =</span>
+        new EvolutionRewriteProgramHeldOutRevealCodec();
+
+    public SealResult seal(
+        Path draftInput,
+        Path privateBundleOutput,
+        Path commitmentOutput,
+        Path splitReferencesOutput
+    ) {
+<span class="fc" id="L42">        Path draft = normalized(draftInput);</span>
+<span class="fc" id="L43">        Path privateOutput = normalized(privateBundleOutput);</span>
+<span class="fc" id="L44">        Path commitment = normalized(commitmentOutput);</span>
+<span class="fc" id="L45">        Path references = normalized(splitReferencesOutput);</span>
+<span class="fc" id="L46">        requireDistinct(draft, privateOutput, commitment, references);</span>
+
+<span class="fc" id="L48">        DraftDto dto = readDraft(draft);</span>
+<span class="fc" id="L49">        EvolutionRewriteProgramHeldOutRevealBundle bundle = dto.toBundle();</span>
+<span class="fc" id="L50">        codec.writePrivate(privateOutput, bundle);</span>
+<span class="fc" id="L51">        EvolutionRewriteProgramHeldOutRevealCodec.PublicArtifacts publicArtifacts =</span>
+<span class="fc" id="L52">            codec.writePublicArtifacts(commitment, references, bundle);</span>
+<span class="fc" id="L53">        return new SealResult(</span>
+            privateOutput,
+<span class="fc" id="L55">            publicArtifacts.commitmentPath(),</span>
+<span class="fc" id="L56">            publicArtifacts.splitReferencesPath(),</span>
+<span class="fc" id="L57">            publicArtifacts.commitmentHash(),</span>
+<span class="fc" id="L58">            publicArtifacts.splitReferencesHash(),</span>
+<span class="fc" id="L59">            bundle.contentHash());</span>
+    }
+
+    private static DraftDto readDraft(Path input) {
+        try {
+<span class="fc" id="L64">            String json = Files.readString(input, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L65">            DraftDto dto = JSON.readValue(json, DraftDto.class);</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            if (!DRAFT_SCHEMA.equals(dto.schema())) {</span>
+<span class="nc" id="L67">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported held-out reveal draft schema&quot;);
+            }
+<span class="fc" id="L70">            return dto;</span>
+<span class="fc" id="L71">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L72">            throw new IllegalArgumentException(</span>
+                &quot;invalid held-out reveal draft JSON&quot;, exception);
+<span class="nc" id="L74">        } catch (IOException exception) {</span>
+<span class="nc" id="L75">            throw new IllegalArgumentException(</span>
+                &quot;unable to read held-out reveal draft&quot;, exception);
+        }
+    }
+
+    private static Path normalized(Path path) {
+<span class="fc" id="L81">        return Objects.requireNonNull(path, &quot;path&quot;)</span>
+<span class="fc" id="L82">            .toAbsolutePath()</span>
+<span class="fc" id="L83">            .normalize();</span>
+    }
+
+    private static void requireDistinct(Path... paths) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (int left = 0; left &lt; paths.length; left++) {</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            for (int right = left + 1; right &lt; paths.length; right++) {</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                if (paths[left].equals(paths[right])) {</span>
+<span class="fc" id="L90">                    throw new IllegalArgumentException(</span>
+                        &quot;held-out draft and output paths must be distinct&quot;);
+                }
+            }
+        }
+<span class="fc" id="L95">    }</span>
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (args.length != 4) {</span>
+<span class="nc" id="L99">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;private-draft.json&gt; &lt;sealed-private.json&gt; &quot;
+                    + &quot;&lt;public-commitment.json&gt; &lt;public-split-references.json&gt;&quot;);
+        }
+<span class="nc" id="L103">        new EvolutionRewriteProgramHeldOutSealTool().seal(</span>
+<span class="nc" id="L104">            Path.of(args[0]),</span>
+<span class="nc" id="L105">            Path.of(args[1]),</span>
+<span class="nc" id="L106">            Path.of(args[2]),</span>
+<span class="nc" id="L107">            Path.of(args[3]));</span>
+<span class="nc" id="L108">    }</span>
+
+    public record SealResult(
+        Path privateBundlePath,
+        Path commitmentPath,
+        Path splitReferencesPath,
+        String commitmentHash,
+        String splitReferencesHash,
+        String revealBundleHash
+    ) {
+<span class="fc" id="L118">        public SealResult {</span>
+<span class="fc" id="L119">            privateBundlePath = normalized(privateBundlePath);</span>
+<span class="fc" id="L120">            commitmentPath = normalized(commitmentPath);</span>
+<span class="fc" id="L121">            splitReferencesPath = normalized(splitReferencesPath);</span>
+<span class="fc" id="L122">            EvolutionGenome.requireSha256(commitmentHash, &quot;commitmentHash&quot;);</span>
+<span class="fc" id="L123">            EvolutionGenome.requireSha256(</span>
+                splitReferencesHash, &quot;splitReferencesHash&quot;);
+<span class="fc" id="L125">            EvolutionGenome.requireSha256(</span>
+                revealBundleHash, &quot;revealBundleHash&quot;);
+<span class="fc" id="L127">        }</span>
+    }
+
+    private record DraftDto(
+        String schema,
+        String studyId,
+        Split split,
+        List&lt;CaseDto&gt; cases
+    ) {
+<span class="fc" id="L136">        private DraftDto {</span>
+<span class="fc" id="L137">            Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L138">            Objects.requireNonNull(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L139">            Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L140">            cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L141">        }</span>
+
+        private EvolutionRewriteProgramHeldOutRevealBundle toBundle() {
+<span class="fc" id="L144">            return EvolutionRewriteProgramHeldOutRevealBundle.create(</span>
+                studyId,
+                split,
+<span class="fc" id="L147">                cases.stream().map(CaseDto::toRuntime).toList());</span>
+        }
+    }
+
+    private record CaseDto(
+        String caseId,
+        String familyId,
+        String inputExpression,
+        String targetExpression,
+        List&lt;String&gt; assumptions,
+        DifficultyTier difficultyTier,
+        ExpectedTerminalClass expectedTerminalClass
+    ) {
+<span class="fc" id="L160">        private CaseDto {</span>
+<span class="fc" id="L161">            Objects.requireNonNull(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L162">            Objects.requireNonNull(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L163">            Objects.requireNonNull(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L164">            Objects.requireNonNull(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L166">            Objects.requireNonNull(difficultyTier, &quot;difficultyTier&quot;);</span>
+<span class="fc" id="L167">            Objects.requireNonNull(</span>
+                expectedTerminalClass, &quot;expectedTerminalClass&quot;);
+<span class="fc" id="L169">        }</span>
+
+        private RevealCase toRuntime() {
+<span class="fc" id="L172">            return RevealCase.create(</span>
+                caseId,
+                familyId,
+                inputExpression,
+                targetExpression,
+                assumptions,
+                difficultyTier,
+                expectedTerminalClass);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -53,6 +53,35 @@ The public split-reference schema is:
 
 [`regelsuche-evolution-rewrite-program-held-out-split-references-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-held-out-split-references-v1.schema.json)
 
+## Local sealing command
+
+`EvolutionRewriteProgramHeldOutSealTool` accepts a private draft containing the
+concrete values but no caller-supplied hash fields. It constructs runtime cases,
+computes every case/root identity and writes:
+
+1. one sealed private bundle;
+2. one public commitment;
+3. one public split-reference root.
+
+The four input/output paths must be distinct. Unknown draft fields are rejected.
+The tool emits no private expression or assumption to stdout.
+
+The draft schema is public:
+
+[`regelsuche-evolution-rewrite-program-held-out-reveal-draft-v1.schema.json`](schemas/regelsuche-evolution-rewrite-program-held-out-reveal-draft-v1.schema.json)
+
+Example invocation from a trusted checkout:
+
+```text
+java ... EvolutionRewriteProgramHeldOutSealTool \
+  /private/validation-draft.json \
+  /private/validation-sealed.json \
+  ./public/validation-commitment.json \
+  ./public/validation-split-references.json
+```
+
+Only the last two files are eligible for repository publication before reveal.
+
 ## Opening policy
 
 A reveal can be opened only with both:
@@ -140,8 +169,9 @@ experiments cannot receive an earlier reveal or a wider information surface.
 
 ## Claim boundary
 
-This layer secures reveal identity, strict loading, hash-only public derivation,
-public prerequisite evidence and the API opening boundary. It does not encrypt
-external storage, manage an external secret store, generate real held-out cases,
-execute a case, select a candidate or consume FINAL TEST. Exactly-once
-consumption remains enforced by the existing final-test executor and ledger.
+This layer secures reveal identity, strict loading, local sealing, hash-only
+public derivation, public prerequisite evidence and the API opening boundary. It
+does not encrypt external storage, manage an external secret store, generate
+real held-out cases, execute a case, select a candidate or consume FINAL TEST.
+Exactly-once consumption remains enforced by the existing final-test executor
+and ledger.
