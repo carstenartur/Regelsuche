@@ -51,12 +51,27 @@ bash scripts/freeze-flagship-rewrite-program.sh \
   ./build/flagship-freeze
 ```
 
+The wrapper fails before Gradle starts unless all of these conditions hold:
+
+- the supplied lowercase 40-character commit equals the checkout's current
+  `HEAD`;
+- `git status --porcelain --untracked-files=all` is empty;
+- both private bundles are regular files outside the repository tree;
+- the public output path is absent or an empty directory.
+
+The output-directory rule prevents stale result or receipt files from being
+mistaken for part of the new freeze. Ignored build outputs do not make the
+checkout dirty, but the selected freeze directory itself must still be empty.
+
 The wrapper invokes the checkout-owned Gradle task through the versioned init
 script:
 
 ```text
 :app:freezeFlagshipRewriteProgram
 ```
+
+The Gradle Java process runs with the repository root as its working directory,
+so relative paths have one stable meaning across local environments.
 
 The assembler binds:
 
