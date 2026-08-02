@@ -2,6 +2,7 @@ package de.regelsuche.benchmarks;
 
 import de.regelsuche.solver.ir.SolverIr;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -18,6 +19,15 @@ import java.util.Objects;
  * <p>The produced expression is rendered in Regelsuche surface syntax so that a
  * single shared judge can canonicalize both competitors' outputs. Rendering is
  * a printing concern only; it never changes the simplification result.</p>
+ *
+ * <p>The declared case assumptions travel through the same
+ * {@link SimplificationAssumptionContract} as for every other competitor.
+ * Symbol-scoped declarations are bound as SymPy symbol assumptions before
+ * parsing, which is the mechanism SymPy's own simplifier consults. A
+ * declaration whose subject is a composite expression has no symbol to bind to
+ * and is therefore passed but unused; that residue is declared as the
+ * configuration limitation
+ * {@code COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS}.</p>
  */
 final class ExternalSymPySimplificationBaseline {
     static final String SIMPLIFY_SCRIPT =
@@ -25,7 +35,14 @@ final class ExternalSymPySimplificationBaseline {
             + "from sympy.parsing.sympy_parser import parse_expr,"
             + "standard_transformations,convert_xor\n"
             + "t=standard_transformations+(convert_xor,)\n"
-            + "a=parse_expr(sys.argv[1],transformations=t,evaluate=False)\n"
+            + "d={}\n"
+            + "for a in sys.argv[2:]:\n"
+            + "    s,_,k=a.rpartition('|')\n"
+            + "    if not s.isidentifier() or not k:\n"
+            + "        continue\n"
+            + "    d[s]=sympy.Symbol(s,**{k:True})\n"
+            + "a=parse_expr(sys.argv[1],transformations=t,evaluate=False,"
+            + "local_dict=d)\n"
             + "print(str(sympy.simplify(a)).replace('**','^'))\n";
 
     private final String backendId = "sympy-cas-simplifier";
@@ -60,6 +77,8 @@ final class ExternalSymPySimplificationBaseline {
         this.configurationHash = SolverIr.sha256(
             "timeoutMillis=" + Math.max(100L, timeout.toMillis())
                 + "\nrole=TARGET_FREE_SIMPLIFICATION"
+                + "\nassumptionContract="
+                    + SimplificationAssumptionContract.CONTRACT_ID
                 + "\nscript=" + SIMPLIFY_SCRIPT);
     }
 
@@ -90,17 +109,34 @@ final class ExternalSymPySimplificationBaseline {
     /**
      * Simplifies {@code inputExpression} without any knowledge of a target.
      *
-     * @param inputExpression the only information handed to the baseline
+     * @param inputExpression the only expression handed to the baseline
+     * @param contract the declared case assumptions, injected identically for
+     *     every configured competitor
      * @return the produced simplification outcome, never {@code null}
      */
-    Simplification simplify(String inputExpression) {
+    Simplification simplify(
+        String inputExpression,
+        SimplificationAssumptionContract contract
+    ) {
         Objects.requireNonNull(inputExpression, "inputExpression");
+        Objects.requireNonNull(contract, "contract");
         if (!available) {
             return new Simplification(
                 Outcome.UNAVAILABLE, "", List.of("BACKEND_UNAVAILABLE"));
         }
-        ExternalCommand.Output output = ExternalCommand.run(
-            List.of(python, "-c", SIMPLIFY_SCRIPT, inputExpression), timeout);
+        List<String> command = new ArrayList<>(
+            List.of(python, "-c", SIMPLIFY_SCRIPT, inputExpression));
+        List<String> unbound = new ArrayList<>();
+        for (SimplificationAssumptionContract.Declaration declaration
+                : contract.declarations()) {
+            if (declaration.symbolScoped()) {
+                command.add(declaration.subject() + '|'
+                    + declaration.kind().externalAssumptionName());
+            } else {
+                unbound.add(declaration.canonicalText());
+            }
+        }
+        ExternalCommand.Output output = ExternalCommand.run(command, timeout);
         if (!output.available()) {
             return new Simplification(
                 Outcome.ERROR, "", List.of("EXTERNAL_PROCESS_UNAVAILABLE"));
@@ -122,7 +158,13 @@ final class ExternalSymPySimplificationBaseline {
             return new Simplification(
                 Outcome.ERROR, "", List.of("EMPTY_EXTERNAL_OUTPUT"));
         }
-        return new Simplification(Outcome.PRODUCED, produced, List.of());
+        return new Simplification(
+            Outcome.PRODUCED,
+            produced,
+            unbound.isEmpty()
+                ? List.of()
+                : List.of(
+                    "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS"));
     }
 
     static ExternalSymPySimplificationBaseline detectSystemSymPy() {

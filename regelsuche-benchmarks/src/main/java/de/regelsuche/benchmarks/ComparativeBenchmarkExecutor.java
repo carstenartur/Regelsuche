@@ -105,11 +105,17 @@ final class ComparativeBenchmarkExecutor {
     /**
      * Runs one target-free simplification competitor on one case.
      *
-     * <p>The competitor receives {@code benchmarkCase.inputExpression()} only.
-     * The reference simplest form is used afterwards by a single shared judge —
+     * <p>The competitor receives {@code benchmarkCase.inputExpression()} and
+     * the declared assumptions of the case through the shared
+     * {@link SimplificationAssumptionContract} — never the reference simplest
+     * form. The reference form is used afterwards by a single shared judge —
      * Regelsuche's canonicalizer — applied identically to every competitor's
      * output, so the judge cannot favour one implementation's surface syntax.
      * </p>
+     *
+     * <p>Reaching the reference form is not sufficient: a competitor that
+     * relied on a side condition the case never declared is recorded as
+     * {@code ASSUMPTION_NOT_DISCHARGED} instead of as a success.</p>
      */
     Result runSimplification(
         SimplificationSystem system,
@@ -118,18 +124,26 @@ final class ComparativeBenchmarkExecutor {
     ) {
         String referenceHash =
             canonicalizer.stableHash(benchmarkCase.targetExpression());
-        return system.strategy() == null
-            ? runExternalSimplification(
-                system, configuration, benchmarkCase, referenceHash)
-            : runInternalSimplification(
-                system, configuration, benchmarkCase, referenceHash);
+        SimplificationAssumptionContract contract =
+            SimplificationAssumptionContract.forCase(benchmarkCase);
+        if (system.externalSimplifier() != null) {
+            return runExternalSimplification(
+                system, configuration, benchmarkCase, referenceHash, contract);
+        }
+        if (system.saturationSimplifier() != null) {
+            return runSaturatedSimplification(
+                system, configuration, benchmarkCase, referenceHash, contract);
+        }
+        return runInternalSimplification(
+            system, configuration, benchmarkCase, referenceHash, contract);
     }
 
     private Result runInternalSimplification(
         SimplificationSystem system,
         Configuration configuration,
         Case benchmarkCase,
-        String referenceHash
+        String referenceHash,
+        SimplificationAssumptionContract contract
     ) {
         CountingEngine engine = new CountingEngine(
             new AstRewriteTransformationEngine());
@@ -141,11 +155,18 @@ final class ComparativeBenchmarkExecutor {
             ComparativeBenchmarkCatalog.SEARCH_BUDGET)
             .withoutTarget();
         List<SearchState> states = system.strategy().search(problem);
-        SearchState reached = states.stream()
+        List<SearchState> matching = states.stream()
             .filter(state -> canonicalHash(state.expression())
                 .equals(referenceHash))
-            .min(Comparator.comparingInt(SearchState::depth))
+            .sorted(Comparator.comparingInt(SearchState::depth))
+            .toList();
+        SearchState reached = matching.stream()
+            .filter(state -> contract.discharges(state.assumptions()))
+            .findFirst()
             .orElse(null);
+        List<String> undischarged = reached != null || matching.isEmpty()
+            ? List.of()
+            : contract.undischarged(matching.getFirst().assumptions());
         ObservedVerdict verdict = reached == null
             ? ObservedVerdict.UNKNOWN
             : ObservedVerdict.TARGET_REACHED;
@@ -163,15 +184,20 @@ final class ComparativeBenchmarkExecutor {
         EvidenceMetrics evidence = new EvidenceMetrics(
             verdict == ObservedVerdict.TARGET_REACHED
                 ? "REFERENCE_FORM_REACHED"
-                : "REFERENCE_FORM_NOT_REACHED",
+                : undischarged.isEmpty()
+                    ? "REFERENCE_FORM_NOT_REACHED"
+                    : "ASSUMPTION_NOT_DISCHARGED",
             "NOT_REQUESTED",
             "NOT_REQUESTED",
             "",
-            List.of());
+            undischarged.isEmpty()
+                ? List.of()
+                : List.of("ASSUMPTION_NOT_DISCHARGED"));
         String traceHash = SolverIr.sha256(
             "simplification/v1"
                 + "\nsystem=" + system.id()
                 + "\ncase=" + benchmarkCase.contentHash()
+                + "\nassumptionContract=" + contract.contractHash()
                 + "\nstates=" + states.stream()
                     .map(SearchState::expression).toList()
                 + "\nreachedPath="
@@ -187,7 +213,84 @@ final class ComparativeBenchmarkExecutor {
                 "referenceFormReached", reached == null ? 0L : 1L,
                 "appliedRewriteSteps",
                     reached == null ? 0L : (long) reached.depth(),
+                "declaredAssumptions",
+                    (long) contract.declaredAssumptions().size(),
+                "undischargedAssumptions", (long) undischarged.size(),
                 "engineInvocations", (long) engine.invocations()),
+            List.of(traceHash));
+    }
+
+    /**
+     * Runs the equality-saturation competitor on one case.
+     *
+     * <p>Saturation does not retain which rewrite produced the extracted
+     * representative, so the discharge check is a conservative
+     * over-approximation: a fired rule that can emit a side condition requires
+     * the case to declare an assumption context.</p>
+     */
+    private Result runSaturatedSimplification(
+        SimplificationSystem system,
+        Configuration configuration,
+        Case benchmarkCase,
+        String referenceHash,
+        SimplificationAssumptionContract contract
+    ) {
+        EqualitySaturationSimplificationBaseline.Saturation saturation =
+            system.saturationSimplifier().simplify(
+                benchmarkCase.inputExpression());
+        boolean matched = saturation.produced()
+            && referenceHash.equals(
+                canonicalHash(saturation.producedExpression()));
+        boolean conditional = !saturation.conditionalRuleIds().isEmpty();
+        boolean discharged = !conditional
+            || !contract.declaredAssumptions().isEmpty();
+        ObservedVerdict verdict = matched && discharged
+            ? ObservedVerdict.TARGET_REACHED
+            : ObservedVerdict.UNKNOWN;
+        ResourceMetrics resources = new ResourceMetrics(
+            1,
+            1,
+            0,
+            0,
+            saturation.exploredNodes(),
+            saturation.firedRewrites(),
+            -1,
+            saturation.firedRewrites(),
+            1,
+            1);
+        EvidenceMetrics evidence = new EvidenceMetrics(
+            verdict == ObservedVerdict.TARGET_REACHED
+                ? "REFERENCE_FORM_REACHED"
+                : matched ? "ASSUMPTION_NOT_DISCHARGED"
+                    : "REFERENCE_FORM_NOT_REACHED",
+            "NOT_REQUESTED",
+            "NOT_REQUESTED",
+            "",
+            matched && !discharged
+                ? List.of("ASSUMPTION_NOT_DISCHARGED")
+                : List.of());
+        String traceHash = SolverIr.sha256(
+            "simplification/v1"
+                + "\nsystem=" + system.id()
+                + "\ncase=" + benchmarkCase.contentHash()
+                + "\nassumptionContract=" + contract.contractHash()
+                + "\nproduced=" + saturation.producedExpression()
+                + "\nconditionalRules=" + saturation.conditionalRuleIds());
+        return Result.create(
+            configuration,
+            benchmarkCase,
+            Disposition.EXECUTED,
+            verdict,
+            resources,
+            evidence,
+            Map.of(
+                "referenceFormReached", matched && discharged ? 1L : 0L,
+                "declaredAssumptions",
+                    (long) contract.declaredAssumptions().size(),
+                "conditionalRewriteRules",
+                    (long) saturation.conditionalRuleIds().size(),
+                "saturatedToFixPoint", saturation.saturated() ? 1L : 0L,
+                "firedRewrites", (long) saturation.firedRewrites()),
             List.of(traceHash));
     }
 
@@ -195,11 +298,12 @@ final class ComparativeBenchmarkExecutor {
         SimplificationSystem system,
         Configuration configuration,
         Case benchmarkCase,
-        String referenceHash
+        String referenceHash,
+        SimplificationAssumptionContract contract
     ) {
         ExternalSymPySimplificationBaseline.Simplification simplification =
             system.externalSimplifier().simplify(
-                benchmarkCase.inputExpression());
+                benchmarkCase.inputExpression(), contract);
         boolean produced = simplification.outcome()
             == ExternalSymPySimplificationBaseline.Outcome.PRODUCED;
         boolean matched = produced
@@ -245,6 +349,7 @@ final class ComparativeBenchmarkExecutor {
             "simplification/v1"
                 + "\nsystem=" + system.id()
                 + "\ncase=" + benchmarkCase.contentHash()
+                + "\nassumptionContract=" + contract.contractHash()
                 + "\noutcome=" + simplification.outcome().name()
                 + "\nproduced=" + simplification.producedExpression());
         return Result.create(
@@ -256,6 +361,8 @@ final class ComparativeBenchmarkExecutor {
             evidence,
             Map.of(
                 "referenceFormReached", matched ? 1L : 0L,
+                "declaredAssumptions",
+                    (long) contract.declaredAssumptions().size(),
                 "producedExpression", produced ? 1L : 0L),
             List.of(traceHash));
     }

@@ -186,6 +186,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             new SquareLiteralSplitRule(),
             new DistributeDivisionOverSumRule(),
             new CancelDivisionFactorRule(),
+            new ExactPolynomialDivisionRule(),
             new FoldNumericArithmeticRule(),
             new CanonicalNormalizeRule()
         );
@@ -635,6 +636,11 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
         public boolean matches(Expr subtree) {
             return remainingFactor(subtree) != null;
         }
@@ -778,6 +784,83 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
                 BinaryOperator.SUB,
                 new BinaryExpr(new NumberExpr(root), BinaryOperator.POW, new NumberExpr(2))
             );
+        }
+    }
+
+    /**
+     * {@code P / Q -> R} where {@code P == Q * R} as univariate polynomials.
+     *
+     * <p>This is general exact polynomial division, not a textbook shortcut for
+     * one binomial shape: the quotient is computed by long division over the
+     * coefficient vectors of {@code P} and {@code Q}. The rule refuses every
+     * input it cannot decide exactly — a second variable, a symbolic or large
+     * exponent, a non-integer coefficient or a non-zero remainder all leave the
+     * expression untouched — so no rewrite is ever derived from a rounded
+     * value.</p>
+     *
+     * <p>Like {@link CancelDivisionFactorRule} the rewrite is only equivalence
+     * preserving where the divisor is non-zero, so a symbolic divisor surfaces
+     * that side condition through {@link RewriteRule#assumptions(Expr)}.</p>
+     */
+    private static final class ExactPolynomialDivisionRule extends MetadataRule {
+        private ExactPolynomialDivisionRule() {
+            super(RewriteKind.SIMPLIFY, false, -4);
+        }
+
+        @Override
+        public String id() {
+            return "ast_polynomial_exact_division";
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+            return quotient(subtree) != null;
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+            Expr quotient = quotient(subtree);
+            if (quotient == null) {
+                throw new IllegalArgumentException("Rule does not match subtree");
+            }
+            return quotient;
+        }
+
+        @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
+        public List<Assumption> assumptions(Expr subtree) {
+            if (quotient(subtree) == null) {
+                return List.of();
+            }
+            Expr divisor = ((BinaryExpr) subtree).right();
+            if (divisor instanceof NumberExpr) {
+                return List.of();
+            }
+            return List.of(Assumption.nonZero(ExpressionFormatter.format(divisor)));
+        }
+
+        private Expr quotient(Expr subtree) {
+            if (!(subtree instanceof BinaryExpr division)
+                || division.operator() != BinaryOperator.DIV
+                || isExplicitZero(division.right())) {
+                return null;
+            }
+            UnivariatePolynomial divisor =
+                UnivariatePolynomial.of(division.right());
+            if (divisor == null || divisor.isConstant()) {
+                return null;
+            }
+            UnivariatePolynomial dividend =
+                UnivariatePolynomial.of(division.left());
+            if (dividend == null) {
+                return null;
+            }
+            UnivariatePolynomial quotient = dividend.divideExactly(divisor);
+            return quotient == null ? null : quotient.toExpression();
         }
     }
 

@@ -132,14 +132,25 @@ public final class ComparativeBenchmarkRunner {
                 List.of(
                     "INTERNAL_REGELSUCHE_SEARCH",
                     "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
-                    "RECORDED_CASE_ASSUMPTIONS_ARE_NOT_INJECTED")),
+                    "CASE_ASSUMPTIONS_INJECTED_VIA_"
+                        + SimplificationAssumptionContract.CONTRACT_ID)),
+            SimplificationSystem.saturation(
+                new EqualitySaturationSimplificationBaseline(),
+                List.of(
+                    "INTERNAL_REGELSUCHE_EQUALITY_SATURATION",
+                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                    "CASE_ASSUMPTIONS_INJECTED_VIA_"
+                        + SimplificationAssumptionContract.CONTRACT_ID,
+                    "SATURATION_SIDE_CONDITIONS_APPROXIMATED_BY_RULE_IDENTITY")),
             SimplificationSystem.external(
                 simplifier,
                 simplifier.available()
                     ? List.of(
                         "EXTERNAL_CAS_NATIVE_SIMPLIFIER",
                         "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
-                        "RECORDED_CASE_ASSUMPTIONS_ARE_NOT_INJECTED",
+                        "CASE_ASSUMPTIONS_INJECTED_VIA_"
+                            + SimplificationAssumptionContract.CONTRACT_ID,
+                        "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS",
                         "SIMPLIFICATION_IS_NOT_DISCOVERY_OR_FORMAL_PROOF")
                     : List.of(
                         "BACKEND_UNAVAILABLE",
@@ -281,7 +292,7 @@ public final class ComparativeBenchmarkRunner {
             },
             hashes(results),
             List.of(
-                "SEVEN_SMALL_ALGEBRAIC_CASES_ONLY",
+                "TEN_SMALL_CASES_ACROSS_ALGEBRAIC_TRIGONOMETRIC_LOGARITHMIC_AND_EXPONENTIAL_FAMILIES",
                 "NO_RUNTIME_OR_SCALABILITY_CLAIM",
                 "SHARED_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER",
                 "REACHING_A_SIMPLEST_FORM_IS_NOT_DISCOVERY_OR_PROOF"));

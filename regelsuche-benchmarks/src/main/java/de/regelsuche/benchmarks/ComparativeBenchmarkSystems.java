@@ -6,6 +6,7 @@ import de.regelsuche.search.strategy.SearchStrategy;
 import de.regelsuche.solver.ir.SolverBackend;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /** Runtime system descriptors used by the initial comparative benchmark slice. */
 final class ComparativeBenchmarkSystems {
@@ -54,8 +55,11 @@ final class ComparativeBenchmarkSystems {
     /**
      * One competitor in the target-free simplification track.
      *
-     * <p>Exactly one of {@code strategy} and {@code externalSimplifier} is set.
-     * Both competitor kinds receive the input expression only.</p>
+     * <p>Exactly one of {@code strategy}, {@code externalSimplifier} and
+     * {@code saturationSimplifier} is set: a path-based internal search, an
+     * external CAS simplifier, or internal equality saturation. Every
+     * competitor kind receives the input expression and the declared case
+     * assumptions only.</p>
      */
     record SimplificationSystem(
         String id,
@@ -63,6 +67,7 @@ final class ComparativeBenchmarkSystems {
         SystemKind kind,
         SearchStrategy strategy,
         ExternalSymPySimplificationBaseline externalSimplifier,
+        EqualitySaturationSimplificationBaseline saturationSimplifier,
         boolean available,
         String environmentIdentity,
         List<String> limitations
@@ -71,12 +76,27 @@ final class ComparativeBenchmarkSystems {
             requireText(id, "simplification system id");
             requireText(version, "simplification system version");
             Objects.requireNonNull(kind, "kind");
-            if ((strategy == null) == (externalSimplifier == null)) {
+            long implementations = Stream.of(
+                    strategy, externalSimplifier, saturationSimplifier)
+                .filter(Objects::nonNull)
+                .count();
+            if (implementations != 1L) {
                 throw new IllegalArgumentException(
                     "exactly one simplification competitor implementation is required");
             }
             requireText(environmentIdentity, "environmentIdentity");
             limitations = clean(limitations);
+        }
+
+        /** @return the stable identity of the competitor implementation. */
+        String implementationIdentity() {
+            if (strategy != null) {
+                return "internal:" + strategy.getClass().getName();
+            }
+            if (saturationSimplifier != null) {
+                return "saturation:" + saturationSimplifier.configurationHash();
+            }
+            return "external:" + externalSimplifier.configurationHash();
         }
 
         static SimplificationSystem internal(
@@ -86,8 +106,25 @@ final class ComparativeBenchmarkSystems {
             List<String> limitations
         ) {
             return new SimplificationSystem(
-                id, version, SystemKind.REGELSUCHE, strategy, null, true,
+                id, version, SystemKind.REGELSUCHE, strategy, null, null, true,
                 "java=21\nsearch-kernel=regelsuche-search/v1", limitations);
+        }
+
+        static SimplificationSystem saturation(
+            EqualitySaturationSimplificationBaseline simplifier,
+            List<String> limitations
+        ) {
+            Objects.requireNonNull(simplifier, "simplifier");
+            return new SimplificationSystem(
+                simplifier.backendId(),
+                simplifier.backendVersion(),
+                SystemKind.REGELSUCHE,
+                null,
+                null,
+                simplifier,
+                true,
+                simplifier.environmentIdentity(),
+                limitations);
         }
 
         static SimplificationSystem external(
@@ -101,6 +138,7 @@ final class ComparativeBenchmarkSystems {
                 SystemKind.EXTERNAL_BASELINE,
                 null,
                 simplifier,
+                null,
                 simplifier.available(),
                 simplifier.environmentIdentity(),
                 limitations);

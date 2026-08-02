@@ -90,6 +90,11 @@ public final class LogarithmicRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
         public List<Assumption> assumptions(Expr subtree) {
             BinaryExpr product = extract(subtree);
             if (product == null) {
@@ -168,6 +173,11 @@ public final class LogarithmicRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
         public List<Assumption> assumptions(Expr subtree) {
             BinaryExpr quotient = extract(subtree);
             if (quotient == null) {
@@ -243,6 +253,11 @@ public final class LogarithmicRules {
                 BinaryOperator.MUL,
                 new FunctionExpr(name, power.left())
             );
+        }
+
+        @Override
+        public boolean mayEmitAssumptions() {
+            return true;
         }
 
         @Override

@@ -77,6 +77,11 @@ public final class RationalRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
         public java.util.List<de.regelsuche.assumption.Assumption> assumptions(Expr subtree) {
             Cancellable terms = extract(subtree);
             if (terms == null) {
@@ -187,6 +192,11 @@ public final class RationalRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
         public java.util.List<de.regelsuche.assumption.Assumption> assumptions(Expr subtree) {
             Pair pair = parts(subtree);
             if (pair == null) {
@@ -267,6 +277,11 @@ public final class RationalRules {
         @Override
         public boolean matches(Expr subtree) {
             return extract(subtree) != null;
+        }
+
+        @Override
+        public boolean mayEmitAssumptions() {
+            return true;
         }
 
         @Override
