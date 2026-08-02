@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExternalSymPySimplificationBaseline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ExternalSymPySimplificationBaseline.java</span></div><h1>ExternalSymPySimplificationBaseline.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.solver.ir.SolverIr;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * External SymPy baseline in the competing-simplifier role.
+ *
+ * &lt;p&gt;This adapter is deliberately different from
+ * {@link ExternalSymPySolverBackend}. The solver backend is a validator: it
+ * receives both sides of a statement and decides equality. This adapter
+ * receives the input expression only and must produce a simplified expression
+ * on its own, exactly like the untargeted Regelsuche search it is compared
+ * against. Neither competitor sees the reference simplest form.&lt;/p&gt;
+ *
+ * &lt;p&gt;The produced expression is rendered in Regelsuche surface syntax so that a
+ * single shared judge can canonicalize both competitors' outputs. Rendering is
+ * a printing concern only; it never changes the simplification result.&lt;/p&gt;
+ *
+ * &lt;p&gt;The declared case assumptions travel through the same
+ * {@link SimplificationAssumptionContract} as for every other competitor.
+ * Symbol-scoped declarations are bound as SymPy symbol assumptions before
+ * parsing, which is the mechanism SymPy's own simplifier consults. A
+ * declaration whose subject is a composite expression has no symbol to bind to
+ * and is therefore passed but unused; that residue is declared as the
+ * configuration limitation
+ * {@code COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS}.&lt;/p&gt;
+ */
+final class ExternalSymPySimplificationBaseline {
+    static final String SIMPLIFY_SCRIPT =
+        &quot;import sys,sympy\n&quot;
+            + &quot;from sympy.parsing.sympy_parser import parse_expr,&quot;
+            + &quot;standard_transformations,convert_xor\n&quot;
+            + &quot;t=standard_transformations+(convert_xor,)\n&quot;
+            + &quot;d={}\n&quot;
+            + &quot;for a in sys.argv[2:]:\n&quot;
+            + &quot;    s,_,k=a.rpartition('|')\n&quot;
+            + &quot;    if not s.isidentifier() or not k:\n&quot;
+            + &quot;        continue\n&quot;
+            + &quot;    d[s]=sympy.Symbol(s,**{k:True})\n&quot;
+            + &quot;a=parse_expr(sys.argv[1],transformations=t,evaluate=False,&quot;
+            + &quot;local_dict=d)\n&quot;
+            + &quot;print(str(sympy.simplify(a)).replace('**','^'))\n&quot;;
+
+<span class="fc" id="L48">    private final String backendId = &quot;sympy-cas-simplifier&quot;;</span>
+    private final String backendVersion;
+    private final String python;
+    private final Duration timeout;
+    private final boolean available;
+    private final String detail;
+    private final String configurationHash;
+
+    private ExternalSymPySimplificationBaseline(
+        String backendVersion,
+        String python,
+        Duration timeout,
+        boolean available,
+        String detail
+<span class="fc" id="L62">    ) {</span>
+<span class="pc bpc" id="L63" title="2 of 4 branches missed.">        if (backendVersion == null || backendVersion.isBlank()) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(&quot;backendVersion must not be blank&quot;);</span>
+        }
+<span class="pc bpc" id="L66" title="2 of 4 branches missed.">        if (python == null || python.isBlank()) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(&quot;python must not be blank&quot;);</span>
+        }
+<span class="fc" id="L69">        this.backendVersion = backendVersion.trim();</span>
+<span class="fc" id="L70">        this.python = python;</span>
+<span class="fc" id="L71">        this.timeout = Objects.requireNonNull(timeout, &quot;timeout&quot;);</span>
+<span class="fc" id="L72">        this.available = available;</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        this.detail = detail == null ? &quot;&quot; : detail;</span>
+        // The interpreter path is runtime placement, not semantic
+        // configuration. Evidence must stay stable when the same SymPy
+        // revision runs from a different absolute path.
+<span class="fc" id="L77">        this.configurationHash = SolverIr.sha256(</span>
+<span class="fc" id="L78">            &quot;timeoutMillis=&quot; + Math.max(100L, timeout.toMillis())</span>
+                + &quot;\nrole=TARGET_FREE_SIMPLIFICATION&quot;
+                + &quot;\nassumptionContract=&quot;
+                    + SimplificationAssumptionContract.CONTRACT_ID
+                + &quot;\nscript=&quot; + SIMPLIFY_SCRIPT);
+<span class="fc" id="L83">    }</span>
+
+    String backendId() {
+<span class="fc" id="L86">        return backendId;</span>
+    }
+
+    String backendVersion() {
+<span class="fc" id="L90">        return backendVersion;</span>
+    }
+
+    boolean available() {
+<span class="fc" id="L94">        return available;</span>
+    }
+
+    String detail() {
+<span class="nc" id="L98">        return detail;</span>
+    }
+
+    String configurationHash() {
+<span class="fc" id="L102">        return configurationHash;</span>
+    }
+
+    String environmentIdentity() {
+<span class="fc" id="L106">        return &quot;sympy=&quot; + backendVersion + &quot;\nrole=target-free-simplifier&quot;;</span>
+    }
+
+    /**
+     * Simplifies {@code inputExpression} without any knowledge of a target.
+     *
+     * @param inputExpression the only expression handed to the baseline
+     * @param contract the declared case assumptions, injected identically for
+     *     every configured competitor
+     * @return the produced simplification outcome, never {@code null}
+     */
+    Simplification simplify(
+        String inputExpression,
+        SimplificationAssumptionContract contract
+    ) {
+<span class="fc" id="L121">        Objects.requireNonNull(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L122">        Objects.requireNonNull(contract, &quot;contract&quot;);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (!available) {</span>
+<span class="nc" id="L124">            return new Simplification(</span>
+<span class="nc" id="L125">                Outcome.UNAVAILABLE, &quot;&quot;, List.of(&quot;BACKEND_UNAVAILABLE&quot;));</span>
+        }
+<span class="fc" id="L127">        List&lt;String&gt; command = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L128">            List.of(python, &quot;-c&quot;, SIMPLIFY_SCRIPT, inputExpression));</span>
+<span class="fc" id="L129">        List&lt;String&gt; unbound = new ArrayList&lt;&gt;();</span>
+        for (SimplificationAssumptionContract.Declaration declaration
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                : contract.declarations()) {</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (declaration.symbolScoped()) {</span>
+<span class="nc" id="L133">                command.add(declaration.subject() + '|'</span>
+<span class="nc" id="L134">                    + declaration.kind().externalAssumptionName());</span>
+            } else {
+<span class="fc" id="L136">                unbound.add(declaration.canonicalText());</span>
+            }
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        ExternalCommand.Output output = ExternalCommand.run(command, timeout);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (!output.available()) {</span>
+<span class="nc" id="L141">            return new Simplification(</span>
+<span class="nc" id="L142">                Outcome.ERROR, &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_UNAVAILABLE&quot;));</span>
+        }
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (output.timedOut()) {</span>
+<span class="nc" id="L145">            return new Simplification(</span>
+<span class="nc" id="L146">                Outcome.TIMEOUT, &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_TIMEOUT&quot;));</span>
+        }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (output.exitCode() != 0) {</span>
+<span class="nc" id="L149">            return new Simplification(</span>
+<span class="nc" id="L150">                Outcome.ERROR, &quot;&quot;, List.of(&quot;EXTERNAL_PROCESS_FAILED&quot;));</span>
+        }
+<span class="fc" id="L152">        String produced = output.stdout().lines()</span>
+<span class="fc" id="L153">            .map(String::trim)</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            .filter(line -&gt; !line.isBlank())</span>
+<span class="pc" id="L155">            .reduce((first, second) -&gt; second)</span>
+<span class="fc" id="L156">            .orElse(&quot;&quot;);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (produced.isEmpty()) {</span>
+<span class="nc" id="L158">            return new Simplification(</span>
+<span class="nc" id="L159">                Outcome.ERROR, &quot;&quot;, List.of(&quot;EMPTY_EXTERNAL_OUTPUT&quot;));</span>
+        }
+<span class="fc" id="L161">        return new Simplification(</span>
+            Outcome.PRODUCED,
+            produced,
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            unbound.isEmpty()</span>
+<span class="fc" id="L165">                ? List.of()</span>
+<span class="fc" id="L166">                : List.of(</span>
+                    &quot;COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS&quot;));
+    }
+
+    static ExternalSymPySimplificationBaseline detectSystemSymPy() {
+<span class="fc" id="L171">        String python = System.getenv().getOrDefault(</span>
+            &quot;REGELSUCHE_SYMPY_PYTHON&quot;, &quot;python3&quot;);
+<span class="fc" id="L173">        ExternalCommand.Output output = ExternalCommand.run(</span>
+<span class="fc" id="L174">            List.of(python, &quot;-c&quot;, &quot;import sympy; print(sympy.__version__)&quot;),</span>
+<span class="fc" id="L175">            Duration.ofSeconds(5));</span>
+<span class="pc bpc" id="L176" title="3 of 6 branches missed.">        if (!output.available() || output.timedOut() || output.exitCode() != 0) {</span>
+<span class="nc" id="L177">            return new ExternalSymPySimplificationBaseline(</span>
+                &quot;unavailable&quot;,
+                python,
+<span class="nc" id="L180">                Duration.ofSeconds(20),</span>
+                false,
+<span class="nc" id="L182">                normalize(output.stdout() + &quot; &quot; + output.stderr()));</span>
+        }
+<span class="fc" id="L184">        String version = normalize(output.stdout());</span>
+<span class="fc" id="L185">        return new ExternalSymPySimplificationBaseline(</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            version.isBlank() ? &quot;system&quot; : version,</span>
+            python,
+<span class="fc" id="L188">            Duration.ofSeconds(20),</span>
+            true,
+            version);
+    }
+
+    private static String normalize(String value) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+    }
+
+<span class="fc" id="L197">    enum Outcome {</span>
+<span class="fc" id="L198">        PRODUCED,</span>
+<span class="fc" id="L199">        UNAVAILABLE,</span>
+<span class="fc" id="L200">        TIMEOUT,</span>
+<span class="fc" id="L201">        ERROR</span>
+    }
+
+    record Simplification(
+        Outcome outcome,
+        String producedExpression,
+        List&lt;String&gt; issues
+    ) {
+<span class="fc" id="L209">        Simplification {</span>
+<span class="fc" id="L210">            Objects.requireNonNull(outcome, &quot;outcome&quot;);</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            producedExpression = producedExpression == null</span>
+<span class="pc" id="L212">                ? &quot;&quot; : producedExpression.trim();</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            issues = issues == null ? List.of() : issues.stream()</span>
+<span class="fc" id="L214">                .filter(Objects::nonNull)</span>
+<span class="fc" id="L215">                .map(String::trim)</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                .filter(value -&gt; !value.isEmpty())</span>
+<span class="fc" id="L217">                .distinct()</span>
+<span class="fc" id="L218">                .sorted()</span>
+<span class="fc" id="L219">                .toList();</span>
+<span class="fc" id="L220">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

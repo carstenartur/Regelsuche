@@ -96,6 +96,14 @@ Das Manifestformat, die Trust-Store-Struktur, Policies und Fail-closed-Status si
 - `docs/plugin-api.md` enthält den Autorenleitfaden inklusive Metadaten, Abhängigkeiten und Service-Registrierung.
 - Die Beispielplugins unter `de.regelsuche.plugin.example` dienen als Templates/Referenzprojekte für Community-Erweiterungen.
 
+## Abgrenzung zu Core-Regelpaketen
+
+Erstanbieter-Transformationen werden nicht als weiteres Plugin ausgeliefert, sondern als
+Core-Regelpaket mit Tier. Damit wird eine Ablation als Profil-ID plus Manifest-Hash deklariert
+statt über die Anwesenheit einer JAR-Datei in `plugins/`. Der Plugin-Pfad bleibt für fremden Code
+mit eigenem ClassLoader und Artefaktprüfung reserviert. Siehe
+[Regel-Tiers und Ablation](rule-tiers.md).
+
 ## Aktivierungsprofile
 
 Aktivierungsprofile bündeln Regeln, Transformationen und Makros über ihre `tags` zu

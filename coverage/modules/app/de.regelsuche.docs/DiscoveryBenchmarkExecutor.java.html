@@ -190,20 +190,20 @@ public final class DiscoveryBenchmarkExecutor {
         }
 <span class="fc" id="L191">        int maxDepth = Math.max(1, scenario.budgets().maxDepth());</span>
 <span class="fc" id="L192">        int maxStates = Math.max(1, scenario.budgets().maxStates());</span>
-<span class="pc bpc" id="L193" title="1 of 4 branches missed.">        for (int attempt = 0; attempt &lt; 3 &amp;&amp; bestNodeCount &lt; minVisibleNodes; attempt++) {</span>
+<span class="fc bfc" id="L193" title="All 4 branches covered.">        for (int attempt = 0; attempt &lt; 3 &amp;&amp; bestNodeCount &lt; minVisibleNodes; attempt++) {</span>
 <span class="fc" id="L194">            maxDepth = maxDepth + 2;</span>
 <span class="fc" id="L195">            maxStates = maxStates * 2;</span>
 <span class="fc" id="L196">            SearchRun expandedRun = run(scenario, engine, maxDepth, maxStates);</span>
 <span class="fc" id="L197">            int expandedNodeCount = uniqueNodeCount(expandedRun.exploredStates());</span>
-<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (expandedNodeCount &gt; bestNodeCount) {</span>
-<span class="nc" id="L199">                bestCoverage = new SearchRun(</span>
-<span class="nc" id="L200">                        baselineRun.success(),</span>
-<span class="nc" id="L201">                        baselineRun.failureReason(),</span>
-<span class="nc" id="L202">                        baselineRun.path(),</span>
-<span class="nc" id="L203">                        baselineRun.appliedRuleIds(),</span>
-<span class="nc" id="L204">                        baselineRun.steps(),</span>
-<span class="nc" id="L205">                        expandedRun.exploredStates());</span>
-<span class="nc" id="L206">                bestNodeCount = expandedNodeCount;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (expandedNodeCount &gt; bestNodeCount) {</span>
+<span class="fc" id="L199">                bestCoverage = new SearchRun(</span>
+<span class="fc" id="L200">                        baselineRun.success(),</span>
+<span class="fc" id="L201">                        baselineRun.failureReason(),</span>
+<span class="fc" id="L202">                        baselineRun.path(),</span>
+<span class="fc" id="L203">                        baselineRun.appliedRuleIds(),</span>
+<span class="fc" id="L204">                        baselineRun.steps(),</span>
+<span class="fc" id="L205">                        expandedRun.exploredStates());</span>
+<span class="fc" id="L206">                bestNodeCount = expandedNodeCount;</span>
             }
         }
 <span class="fc" id="L209">        return bestCoverage;</span>

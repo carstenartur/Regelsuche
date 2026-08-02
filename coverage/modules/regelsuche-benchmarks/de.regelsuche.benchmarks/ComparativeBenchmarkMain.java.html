@@ -1,48 +1,96 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComparativeBenchmarkMain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">ComparativeBenchmarkMain.java</span></div><h1>ComparativeBenchmarkMain.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
 
+import de.regelsuche.benchmarks.ComparativeBenchmark.CapabilityClaim;
 import de.regelsuche.benchmarks.ComparativeBenchmark.ClaimStatus;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import java.nio.file.Path;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
-/** Writes the real initial #235 bundle and fails closed on incomplete baselines. */
+/**
+ * Writes the real #235 bundle and fails closed on overclaiming.
+ *
+ * &lt;p&gt;The gate deliberately does &lt;em&gt;not&lt;/em&gt; require every configured system to
+ * win. A comparative benchmark that can only be published when the local system
+ * succeeds everywhere cannot produce information about competing systems. What
+ * must not happen is an incomplete toolchain silently replacing prior evidence,
+ * or a claim that is stronger than its own track's retained results.&lt;/p&gt;
+ */
 public final class ComparativeBenchmarkMain {
+<span class="fc" id="L24">    private static final Map&lt;Track, Long&gt; EXPECTED_RESULTS =</span>
+<span class="fc" id="L25">        new EnumMap&lt;&gt;(Map.of(</span>
+<span class="fc" id="L26">            Track.TARGET_DIRECTED_SEARCH, 9L,</span>
+<span class="fc" id="L27">            Track.EQUALITY_VALIDATION, 6L,</span>
+<span class="fc" id="L28">            Track.SIMPLIFICATION_COMPETITION, 14L));</span>
+
     private ComparativeBenchmarkMain() {
     }
 
     public static void main(String[] args) {
-<span class="nc bnc" id="L14" title="All 2 branches missed.">        Path output = args.length == 0</span>
-<span class="nc" id="L15">            ? Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;comparative-benchmarks&quot;)</span>
-<span class="nc" id="L16">            : Path.of(args[0]);</span>
-<span class="nc" id="L17">        var report = ComparativeBenchmarkRunner.system().run();</span>
-<span class="nc" id="L18">        new ComparativeBenchmarkBundleWriter().write(output, report);</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        Path output = args.length == 0</span>
+<span class="nc" id="L35">            ? Path.of(&quot;build&quot;, &quot;reports&quot;, &quot;comparative-benchmarks&quot;)</span>
+<span class="nc" id="L36">            : Path.of(args[0]);</span>
+<span class="nc" id="L37">        Report report = ComparativeBenchmarkRunner.system().run();</span>
+<span class="nc" id="L38">        new ComparativeBenchmarkBundleWriter().write(output, report);</span>
+<span class="nc" id="L39">        verify(report);</span>
+<span class="nc" id="L40">    }</span>
 
-<span class="nc" id="L20">        long searchResults = report.results().stream()</span>
-<span class="nc bnc" id="L21" title="All 2 branches missed.">            .filter(result -&gt; result.track()</span>
-                == Track.TARGET_DIRECTED_SEARCH)
-<span class="nc" id="L23">            .count();</span>
-<span class="nc" id="L24">        long validationResults = report.results().stream()</span>
-<span class="nc bnc" id="L25" title="All 2 branches missed.">            .filter(result -&gt; result.track()</span>
-                == Track.EQUALITY_VALIDATION)
-<span class="nc" id="L27">            .count();</span>
-<span class="nc bnc" id="L28" title="All 4 branches missed.">        if (searchResults != 9L || validationResults != 6L) {</span>
-<span class="nc" id="L29">            throw new IllegalStateException(</span>
-                &quot;unexpected comparative result counts: search=&quot;
-                    + searchResults + &quot;, validation=&quot; + validationResults);
+    static void verify(Report report) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        for (Map.Entry&lt;Track, Long&gt; expected : EXPECTED_RESULTS.entrySet()) {</span>
+<span class="fc" id="L44">            long actual = report.results().stream()</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                .filter(result -&gt; result.track() == expected.getKey())</span>
+<span class="fc" id="L46">                .count();</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">            if (actual != expected.getValue()) {</span>
+<span class="nc" id="L48">                throw new IllegalStateException(</span>
+                    &quot;unexpected comparative result count for &quot;
+<span class="nc" id="L50">                        + expected.getKey() + &quot;: expected &quot;</span>
+<span class="nc" id="L51">                        + expected.getValue() + &quot;, found &quot; + actual);</span>
+            }
+<span class="fc" id="L53">        }</span>
+
+        // An unavailable, timed-out or crashed system means the evidence was
+        // not produced at all. That must never replace a prior complete bundle.
+<span class="fc" id="L57">        List&lt;Result&gt; notExecuted = report.results().stream()</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            .filter(result -&gt; result.disposition() != Disposition.EXECUTED)</span>
+<span class="fc" id="L59">            .toList();</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (!notExecuted.isEmpty()) {</span>
+<span class="nc" id="L61">            throw new IllegalStateException(</span>
+                &quot;comparative benchmark did not execute every configured system: &quot;
+<span class="nc" id="L63">                    + report.toCanonicalJson());</span>
         }
-<span class="nc bnc" id="L33" title="All 2 branches missed.">        if (report.results().stream().anyMatch(result -&gt;</span>
-<span class="nc bnc" id="L34" title="All 2 branches missed.">                result.disposition() != Disposition.EXECUTED</span>
-<span class="nc bnc" id="L35" title="All 2 branches missed.">                    || !result.correct())) {</span>
-<span class="nc" id="L36">            throw new IllegalStateException(</span>
-                &quot;comparative benchmark contains incomplete or incorrect results: &quot;
-<span class="nc" id="L38">                    + report.toCanonicalJson());</span>
-        }
-<span class="nc bnc" id="L40" title="All 2 branches missed.">        if (report.claims().stream().anyMatch(claim -&gt;</span>
-<span class="nc bnc" id="L41" title="All 2 branches missed.">                claim.status() != ClaimStatus.SUPPORTED)) {</span>
-<span class="nc" id="L42">            throw new IllegalStateException(</span>
-                &quot;comparative capability claim is not supported: &quot;
-<span class="nc" id="L44">                    + report.toCanonicalJson());</span>
-        }
-<span class="nc" id="L46">    }</span>
+
+        // Retained incorrect results are legitimate evidence, but they must be
+        // reflected in the claim of their own track.
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (CapabilityClaim claim : report.claims()) {</span>
+<span class="fc" id="L69">            List&lt;Result&gt; trackResults = report.results().stream()</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                .filter(result -&gt; result.track() == claim.track())</span>
+<span class="fc" id="L71">                .toList();</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (trackResults.isEmpty()) {</span>
+<span class="nc" id="L73">                throw new IllegalStateException(</span>
+<span class="nc" id="L74">                    &quot;comparative claim without track evidence: &quot; + claim.id());</span>
+            }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            ClaimStatus derived = trackResults.stream().allMatch(Result::correct)</span>
+<span class="fc" id="L77">                ? ClaimStatus.SUPPORTED</span>
+<span class="fc" id="L78">                : ClaimStatus.NEGATIVE;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (claim.status() != derived) {</span>
+<span class="fc" id="L80">                throw new IllegalStateException(</span>
+                    &quot;comparative claim status is not derived from its own track: &quot;
+<span class="fc" id="L82">                        + claim.id() + &quot; declares &quot; + claim.status()</span>
+                        + &quot; but its results imply &quot; + derived);
+            }
+<span class="fc" id="L85">        }</span>
+
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (Track track : EXPECTED_RESULTS.keySet()) {</span>
+<span class="fc" id="L88">            if (report.claims().stream()</span>
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">                    .noneMatch(claim -&gt; claim.track() == track)) {</span>
+<span class="nc" id="L90">                throw new IllegalStateException(</span>
+                    &quot;comparative track without a retained claim: &quot; + track);
+            }
+<span class="fc" id="L93">        }</span>
+<span class="fc" id="L94">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

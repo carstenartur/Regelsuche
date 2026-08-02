@@ -44,17 +44,17 @@
     "mediaType" : "text/markdown",
     "name" : "summary",
     "path" : "summary.md",
-    "sha256" : "sha256:c35b84409d36679e96012ba945a503e3ec7563f3e83e920619784a8b2ccd8d4b"
+    "sha256" : "sha256:19cbc560d9fe521b67206812255efad1d520404b2f2448397809e233999dc93f"
   }, {
     "mediaType" : "image/svg+xml",
     "name" : "search-space",
     "path" : "search-space.svg",
-    "sha256" : "sha256:14f224503026314a47725c7a024bc340816725d14b9577b4036651f57b6ca764"
+    "sha256" : "sha256:d69381c0d39155cdb380d6db6ab21ee07b39ad3591740f51447e7a8b7383f8a4"
   } ],
   "assumptions" : [ ],
   "bridgeRulesUsed" : [ "complete_square_bridge", "ast_square_difference_factor" ],
-  "canonicalEvidenceHash" : "sha256:98ad53da0459ab21e42d39419b5fd18056dcb6d4aee01f7b904afdb888ba3192",
-  "canonicalEvidenceId" : "regelsuche.discovery-evidence/v1#sha256:98ad53da0459ab21e42d39419b5fd18056dcb6d4aee01f7b904afdb888ba3192",
+  "canonicalEvidenceHash" : "sha256:217d5ca4dff3dba588f16d8451195a883378956a795259936317d3d35e8ce273",
+  "canonicalEvidenceId" : "regelsuche.discovery-evidence/v1#sha256:217d5ca4dff3dba588f16d8451195a883378956a795259936317d3d35e8ce273",
   "claims" : [ {
     "evidenceRefs" : [ "observation-search-trace", "oracle-equivalence", "ablation-macro-reuse" ],
     "extensions" : { },
@@ -74,82 +74,6 @@
   "counterexamples" : [ ],
   "edgeCount" : 32,
   "edges" : [ {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x+1)*(x+3)+(x+1)*2",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(x + 1) * (x + 5)",
-      "canonicalBefore" : "(x + 1) * (x + 3) + 2 * (x + 1)",
-      "expandedMoves" : [ ],
-      "kind" : "FACTOR",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "FACTOR|ast_factor_common_left|(x + 1) * (x + 3) + 2 * (x + 1)=>(x + 1) * (x + 5)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 666745,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 2
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_factor_common_left",
-      "sourceExpression" : "(x + 1) * (x + 3) + (x + 1) * 2",
-      "tags" : [ "alternative-branch" ],
-      "targetExpression" : "(x + 1) * (x + 3 + 2)",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_factor_common_left",
-    "searchEffect" : [ "FACTORIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x+1)*(x+3+2)"
-  }, {
-    "assumptions" : [ ],
-    "enabledByProfile" : false,
-    "from" : "(x+1)*(x+3+2)",
-    "kind" : "rule",
-    "maturity" : "CORE",
-    "operatorId" : "",
-    "packId" : "core",
-    "rewriteMove" : {
-      "assumptions" : [ ],
-      "atomic" : true,
-      "canonicalAfter" : "(x + 1) * (x + 3) + 2 * (x + 1)",
-      "canonicalBefore" : "(x + 1) * (x + 5)",
-      "expandedMoves" : [ ],
-      "kind" : "UNKNOWN",
-      "learnedFromPathId" : "",
-      "macro" : false,
-      "macroId" : "",
-      "macroVersion" : 0,
-      "moveId" : "UNKNOWN|ast_distribute_left_add|(x + 1) * (x + 5)=>(x + 1) * (x + 3) + 2 * (x + 1)",
-      "operatorId" : "",
-      "ordinal" : {
-        "occurrenceOrdinal" : 397701,
-        "parameterOrdinals" : [ ],
-        "ruleOrdinal" : 14
-      },
-      "parameters" : [ ],
-      "ruleId" : "ast_distribute_left_add",
-      "sourceExpression" : "(x + 1) * (x + 3 + 2)",
-      "tags" : [ "alternative-branch", "parameters-unresolved" ],
-      "targetExpression" : "(x + 1) * (x + 3) + (x + 1) * 2",
-      "validationStatus" : ""
-    },
-    "ruleId" : "ast_distribute_left_add",
-    "searchEffect" : [ "NORMALIZING" ],
-    "source" : "core",
-    "tags" : [ "alternative-branch" ],
-    "to" : "(x+1)*(x+3)+(x+1)*2"
-  }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
     "from" : "(x+1)*(x+3+2)",
@@ -532,6 +456,44 @@
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
+    "from" : "(x+3)^2-2*2",
+    "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
+    "packId" : "core",
+    "rewriteMove" : {
+      "assumptions" : [ ],
+      "atomic" : true,
+      "canonicalAfter" : "(x + 3) ^ 2 - 4",
+      "canonicalBefore" : "(x + 3) ^ 2 - 4",
+      "expandedMoves" : [ ],
+      "kind" : "UNKNOWN",
+      "learnedFromPathId" : "",
+      "macro" : false,
+      "macroId" : "",
+      "macroVersion" : 0,
+      "moveId" : "UNKNOWN|ast_fold_numeric_arithmetic|(x + 3) ^ 2 - 4=>(x + 3) ^ 2 - 4",
+      "operatorId" : "",
+      "ordinal" : {
+        "occurrenceOrdinal" : 154047,
+        "parameterOrdinals" : [ ],
+        "ruleOrdinal" : 14
+      },
+      "parameters" : [ ],
+      "ruleId" : "ast_fold_numeric_arithmetic",
+      "sourceExpression" : "(x + 3) ^ 2 - 2 * 2",
+      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "targetExpression" : "(x + 3) ^ 2 - 4",
+      "validationStatus" : ""
+    },
+    "ruleId" : "ast_fold_numeric_arithmetic",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-4"
+  }, {
+    "assumptions" : [ ],
+    "enabledByProfile" : false,
     "from" : "(x+3)^2-2^2",
     "kind" : "rule",
     "maturity" : "CORE",
@@ -757,6 +719,44 @@
     "source" : "core",
     "tags" : [ "alternative-branch" ],
     "to" : "(x+3)*(x+3)-4"
+  }, {
+    "assumptions" : [ ],
+    "enabledByProfile" : false,
+    "from" : "(x+3)^2-4",
+    "kind" : "rule",
+    "maturity" : "CORE",
+    "operatorId" : "",
+    "packId" : "core",
+    "rewriteMove" : {
+      "assumptions" : [ ],
+      "atomic" : true,
+      "canonicalAfter" : "(x + 3) ^ 2 - 4",
+      "canonicalBefore" : "(x + 3) ^ 2 - 4",
+      "expandedMoves" : [ ],
+      "kind" : "UNKNOWN",
+      "learnedFromPathId" : "",
+      "macro" : false,
+      "macroId" : "",
+      "macroVersion" : 0,
+      "moveId" : "UNKNOWN|ast_square_literal_split|(x + 3) ^ 2 - 4=>(x + 3) ^ 2 - 4",
+      "operatorId" : "",
+      "ordinal" : {
+        "occurrenceOrdinal" : 154047,
+        "parameterOrdinals" : [ ],
+        "ruleOrdinal" : 14
+      },
+      "parameters" : [ ],
+      "ruleId" : "ast_square_literal_split",
+      "sourceExpression" : "(x + 3) ^ 2 - 4",
+      "tags" : [ "alternative-branch", "parameters-unresolved" ],
+      "targetExpression" : "(x + 3) ^ 2 - 2 ^ 2",
+      "validationStatus" : ""
+    },
+    "ruleId" : "ast_square_literal_split",
+    "searchEffect" : [ "NORMALIZING" ],
+    "source" : "core",
+    "tags" : [ "alternative-branch" ],
+    "to" : "(x+3)^2-2^2"
   }, {
     "assumptions" : [ ],
     "enabledByProfile" : false,
@@ -1320,7 +1320,7 @@
   } ],
   "inputExpression" : "x ^ 2 + 6 * x + 5",
   "learnedMacros" : [ "macro_3bbfed5b" ],
-  "nodeCount" : 13,
+  "nodeCount" : 12,
   "nodes" : [ {
     "depth" : 0,
     "id" : "x^2+6*x+5",
@@ -1350,12 +1350,6 @@
     "id" : "x*x+6*x+5",
     "kind" : "state",
     "label" : "x * x + 6 * x + 5",
-    "tags" : [ "alternative-branch" ]
-  }, {
-    "depth" : 2,
-    "id" : "(x+1)*(x+3)+(x+1)*2",
-    "kind" : "state",
-    "label" : "(x + 1) * (x + 3) + (x + 1) * 2",
     "tags" : [ "alternative-branch" ]
   }, {
     "depth" : 2,
@@ -1413,7 +1407,7 @@
     "id" : "observation-search-trace",
     "kind" : "SEARCH_TRACE",
     "learnedMacros" : [ "macro_3bbfed5b" ],
-    "nodeCount" : 13,
+    "nodeCount" : 12,
     "outcome" : "OBSERVED",
     "pathCount" : 2,
     "reusedMacros" : [ "macro_3bbfed5b" ],

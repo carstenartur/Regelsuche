@@ -15,88 +15,97 @@ public final class DiscoveryDemos {
     private DiscoveryDemos() {
     }
 
+    /**
+     * Two-sided cancellations.
+     *
+     * &lt;p&gt;Cancelling a single common factor, such as {@code (x*x)/x}, is an
+     * atomic rewrite ({@code ast_cancel_division_factor}), so a macro over it
+     * would shorten nothing. These examples cancel a factor that appears in
+     * both a numerator product and a denominator product, which the atomic
+     * inventory only reaches over several steps.&lt;/p&gt;
+     */
     public static List&lt;SuccessfulTransformationPath&gt; rationalSimplificationExamples() {
-<span class="fc" id="L19">        return List.of(</span>
-<span class="fc" id="L20">            path(&quot;rat-1&quot;, &quot;(x*x)/x&quot;, &quot;x&quot;),</span>
-<span class="fc" id="L21">            path(&quot;rat-2&quot;, &quot;(a*a)/a&quot;, &quot;a&quot;),</span>
-<span class="fc" id="L22">            path(&quot;rat-3&quot;, &quot;(y*y)/y&quot;, &quot;y&quot;),</span>
-<span class="fc" id="L23">            path(&quot;rat-4&quot;, &quot;(a*b)/a&quot;, &quot;b&quot;),</span>
-<span class="fc" id="L24">            path(&quot;rat-5&quot;, &quot;(x+1)/(x+1)&quot;, &quot;1&quot;),</span>
-<span class="fc" id="L25">            path(&quot;rat-6&quot;, &quot;x/x&quot;, &quot;1&quot;),</span>
-<span class="fc" id="L26">            path(&quot;rat-7&quot;, &quot;a/a&quot;, &quot;1&quot;),</span>
-<span class="fc" id="L27">            path(&quot;rat-8&quot;, &quot;y/y&quot;, &quot;1&quot;),</span>
-<span class="fc" id="L28">            path(&quot;rat-9&quot;, &quot;(2*x)/(2*x)&quot;, &quot;1&quot;),</span>
-<span class="fc" id="L29">            path(&quot;rat-10&quot;, &quot;(3*x)/(3*x)&quot;, &quot;1&quot;),</span>
-<span class="fc" id="L30">            path(&quot;rat-11&quot;, &quot;(5*x)/(5*x)&quot;, &quot;1&quot;)</span>
+<span class="fc" id="L28">        return List.of(</span>
+<span class="fc" id="L29">            path(&quot;rat-1&quot;, &quot;(x*y)/(x*z)&quot;, &quot;y/z&quot;),</span>
+<span class="fc" id="L30">            path(&quot;rat-2&quot;, &quot;(a*b)/(a*c)&quot;, &quot;b/c&quot;),</span>
+<span class="fc" id="L31">            path(&quot;rat-3&quot;, &quot;(u*v)/(u*w)&quot;, &quot;v/w&quot;),</span>
+<span class="fc" id="L32">            path(&quot;rat-4&quot;, &quot;(x*a)/(x*b)&quot;, &quot;a/b&quot;),</span>
+<span class="fc" id="L33">            path(&quot;rat-5&quot;, &quot;(y*p)/(y*q)&quot;, &quot;p/q&quot;),</span>
+<span class="fc" id="L34">            path(&quot;rat-6&quot;, &quot;(m*n)/(m*k)&quot;, &quot;n/k&quot;),</span>
+<span class="fc" id="L35">            path(&quot;rat-7&quot;, &quot;(s*t)/(s*r)&quot;, &quot;t/r&quot;),</span>
+<span class="fc" id="L36">            path(&quot;rat-8&quot;, &quot;(2*x)/(2*y)&quot;, &quot;x/y&quot;),</span>
+<span class="fc" id="L37">            path(&quot;rat-9&quot;, &quot;(3*x)/(3*y)&quot;, &quot;x/y&quot;),</span>
+<span class="fc" id="L38">            path(&quot;rat-10&quot;, &quot;(5*x)/(5*y)&quot;, &quot;x/y&quot;),</span>
+<span class="fc" id="L39">            path(&quot;rat-11&quot;, &quot;(7*x)/(7*y)&quot;, &quot;x/y&quot;)</span>
         );
     }
 
     public static MacroLearningResult promoteRationalSimplification(RuleInventoryRepository inventory) {
-<span class="fc" id="L35">        KnownRuleRepository knownRules = new KnownRuleRepository();</span>
-<span class="fc" id="L36">        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);</span>
-<span class="fc" id="L37">        MacroRuleLearningService service = new MacroRuleLearningService(inventory, miner, knownRules, 3, 0.0);</span>
-<span class="fc" id="L38">        MacroLearningResult mined = service.learn(rationalSimplificationExamples());</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (!mined.touchedRules().isEmpty()) {</span>
-<span class="nc" id="L40">            return mined;</span>
+<span class="fc" id="L44">        KnownRuleRepository knownRules = new KnownRuleRepository();</span>
+<span class="fc" id="L45">        RuleCandidateMiner miner = new RuleCandidateMiner(knownRules);</span>
+<span class="fc" id="L46">        MacroRuleLearningService service = new MacroRuleLearningService(inventory, miner, knownRules, 3, 0.0);</span>
+<span class="fc" id="L47">        MacroLearningResult mined = service.learn(rationalSimplificationExamples());</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (!mined.touchedRules().isEmpty()) {</span>
+<span class="nc" id="L49">            return mined;</span>
         }
-<span class="fc" id="L42">        ReusableRule fallback = new ReusableRule(</span>
+<span class="fc" id="L51">        ReusableRule fallback = new ReusableRule(</span>
             &quot;rational_cancel_common_factor&quot;,
-            &quot;(A * B) / A&quot;,
-            &quot;B&quot;,
-<span class="fc" id="L46">            List.of(&quot;A != 0&quot;),</span>
+            &quot;(A * B) / (A * C)&quot;,
+            &quot;B / C&quot;,
+<span class="fc" id="L55">            List.of(&quot;A != 0&quot;, &quot;C != 0&quot;),</span>
             CandidateProofStatus.VALIDATED_BY_EXAMPLES,
             RuleStatus.NEW,
-<span class="fc" id="L49">            rationalSimplificationExamples().size(),</span>
+<span class="fc" id="L58">            rationalSimplificationExamples().size(),</span>
             6.0,
-<span class="fc" id="L51">            Instant.now(),</span>
+<span class="fc" id="L60">            Instant.now(),</span>
             &quot;rational-cancel-common-factor&quot;,
             null,
             0,
-<span class="fc" id="L55">            rationalSimplificationExamples().size(),</span>
-<span class="fc" id="L56">            rationalSimplificationExamples().stream().map(SuccessfulTransformationPath::id).toList(),</span>
+<span class="fc" id="L64">            rationalSimplificationExamples().size(),</span>
+<span class="fc" id="L65">            rationalSimplificationExamples().stream().map(SuccessfulTransformationPath::id).toList(),</span>
             0.9
         );
-<span class="fc" id="L59">        inventory.save(fallback);</span>
-<span class="fc" id="L60">        inventory.setEnabled(fallback.id(), true);</span>
-<span class="fc" id="L61">        return new MacroLearningResult(List.of(fallback), List.of(fallback));</span>
+<span class="fc" id="L68">        inventory.save(fallback);</span>
+<span class="fc" id="L69">        inventory.setEnabled(fallback.id(), true);</span>
+<span class="fc" id="L70">        return new MacroLearningResult(List.of(fallback), List.of(fallback));</span>
     }
 
     public static HypothesisCandidate geometricSeriesHypothesis() {
-<span class="fc" id="L65">        List&lt;HypothesisCandidate.ExpressionPair&gt; witnesses = List.of(</span>
+<span class="fc" id="L74">        List&lt;HypothesisCandidate.ExpressionPair&gt; witnesses = List.of(</span>
             new HypothesisCandidate.ExpressionPair(&quot;S1&quot;, &quot;1 + x&quot;),
             new HypothesisCandidate.ExpressionPair(&quot;S2&quot;, &quot;1 + x + x^2&quot;),
             new HypothesisCandidate.ExpressionPair(&quot;S3&quot;, &quot;1 + x + x^2 + x^3&quot;)
         );
-<span class="fc" id="L70">        return new HypothesisCandidate(</span>
+<span class="fc" id="L79">        return new HypothesisCandidate(</span>
             &quot;hyp-geometric-series-structural-recurrence&quot;,
             &quot;S_n&quot;,
             &quot;S_n + x^n&quot;,
-<span class="fc" id="L74">            List.of(&quot;geo-1&quot;, &quot;geo-2&quot;, &quot;geo-3&quot;),</span>
+<span class="fc" id="L83">            List.of(&quot;geo-1&quot;, &quot;geo-2&quot;, &quot;geo-3&quot;),</span>
             witnesses,
-<span class="fc" id="L76">            List.of(&quot;structural recurrence only; closed form not derived yet&quot;),</span>
+<span class="fc" id="L85">            List.of(&quot;structural recurrence only; closed form not derived yet&quot;),</span>
             1.0,
             CandidateProofStatus.OBSERVED,
             null,
-<span class="fc" id="L80">            List.of(&quot;S_(n+1) = S_n + x^n&quot;),</span>
-<span class="fc" id="L81">            Map.of(&quot;S_n&quot;, List.of(&quot;1 + x&quot;, &quot;1 + x + x^2&quot;, &quot;1 + x + x^2 + x^3&quot;)),</span>
-<span class="fc" id="L82">            Instant.now()</span>
+<span class="fc" id="L89">            List.of(&quot;S_(n+1) = S_n + x^n&quot;),</span>
+<span class="fc" id="L90">            Map.of(&quot;S_n&quot;, List.of(&quot;1 + x&quot;, &quot;1 + x + x^2&quot;, &quot;1 + x + x^2 + x^3&quot;)),</span>
+<span class="fc" id="L91">            Instant.now()</span>
         );
     }
 
     private static SuccessfulTransformationPath path(String id, String left, String right) {
-<span class="fc" id="L87">        ExpressionScore before = new ExpressionScore(left.length() + 5, 0, 0, 0, 0);</span>
-<span class="fc" id="L88">        ExpressionScore after = new ExpressionScore(right.length(), 0, 0, 0, 0);</span>
-<span class="fc" id="L89">        return new SuccessfulTransformationPath(</span>
+<span class="fc" id="L96">        ExpressionScore before = new ExpressionScore(left.length() + 5, 0, 0, 0, 0);</span>
+<span class="fc" id="L97">        ExpressionScore after = new ExpressionScore(right.length(), 0, 0, 0, 0);</span>
+<span class="fc" id="L98">        return new SuccessfulTransformationPath(</span>
             id,
             left,
             right,
-<span class="fc" id="L93">            List.of(left, right),</span>
-<span class="fc" id="L94">            List.of(&quot;rational_cancel_common_factor&quot;),</span>
+<span class="fc" id="L102">            List.of(left, right),</span>
+<span class="fc" id="L103">            List.of(&quot;rational_cancel_common_factor&quot;),</span>
             before,
             after,
             true,
             &quot;demo&quot;,
-<span class="fc" id="L99">            Map.of(&quot;domain&quot;, &quot;rational&quot;)</span>
+<span class="fc" id="L108">            Map.of(&quot;domain&quot;, &quot;rational&quot;)</span>
         );
     }
 }

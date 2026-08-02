@@ -4,6 +4,7 @@ import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.transform.PatternRewriteRule;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -13,51 +14,72 @@ public class KnowledgePackRegistry {
     private final Map&lt;String, KnowledgePack&gt; packsById;
 
     public KnowledgePackRegistry() {
-<span class="fc" id="L16">        this(new KnowledgePackLoader().loadClasspathPacks());</span>
-<span class="fc" id="L17">    }</span>
+<span class="fc" id="L17">        this(new KnowledgePackLoader().loadClasspathPacks());</span>
+<span class="fc" id="L18">    }</span>
 
-<span class="fc" id="L19">    public KnowledgePackRegistry(List&lt;KnowledgePack&gt; packs) {</span>
-<span class="fc" id="L20">        Map&lt;String, KnowledgePack&gt; indexed = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">        for (KnowledgePack pack : packs) {</span>
-<span class="pc bpc" id="L22" title="1 of 2 branches missed.">            if (indexed.put(pack.packId(), pack) != null) {</span>
-<span class="nc" id="L23">                throw new IllegalArgumentException(&quot;Duplicate knowledge pack id: &quot; + pack.packId());</span>
+<span class="fc" id="L20">    public KnowledgePackRegistry(List&lt;KnowledgePack&gt; packs) {</span>
+<span class="fc" id="L21">        Map&lt;String, KnowledgePack&gt; indexed = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        for (KnowledgePack pack : packs) {</span>
+<span class="pc bpc" id="L23" title="1 of 2 branches missed.">            if (indexed.put(pack.packId(), pack) != null) {</span>
+<span class="nc" id="L24">                throw new IllegalArgumentException(&quot;Duplicate knowledge pack id: &quot; + pack.packId());</span>
             }
-<span class="fc" id="L25">        }</span>
-<span class="fc" id="L26">        this.packsById = Map.copyOf(indexed);</span>
-<span class="fc" id="L27">    }</span>
+<span class="fc" id="L26">        }</span>
+<span class="fc" id="L27">        this.packsById = Map.copyOf(indexed);</span>
+<span class="fc" id="L28">    }</span>
 
     public List&lt;KnowledgePack&gt; allPacks() {
-<span class="fc" id="L30">        return packsById.values().stream().toList();</span>
+<span class="fc" id="L31">        return packsById.values().stream().toList();</span>
+    }
+
+    public List&lt;KnowledgePack&gt; packsByTier(RuleTier tier) {
+<span class="nc" id="L35">        return packsById.values().stream()</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">                .filter(pack -&gt; pack.tier() == tier)</span>
+<span class="nc" id="L37">                .toList();</span>
     }
 
     public List&lt;KnowledgePack&gt; enabledPacks(KnowledgePackSelection options) {
-<span class="fc" id="L34">        Set&lt;String&gt; defaultEnabled = packsById.values().stream()</span>
-<span class="fc" id="L35">                .filter(KnowledgePack::enabledByDefault)</span>
-<span class="fc" id="L36">                .map(KnowledgePack::packId)</span>
-<span class="fc" id="L37">                .collect(Collectors.toSet());</span>
-<span class="fc" id="L38">        Set&lt;String&gt; enabled = options.effectiveEnabledPacks(packsById.keySet(), defaultEnabled);</span>
-<span class="fc" id="L39">        Set&lt;String&gt; explicitlyEnabled = explicitlyEnabledPacks(options);</span>
-<span class="fc" id="L40">        return packsById.values().stream()</span>
-<span class="fc" id="L41">                .filter(pack -&gt; enabled.contains(pack.packId()))</span>
-<span class="fc bfc" id="L42" title="All 2 branches covered.">                .filter(pack -&gt; pack.maturity() != KnowledgePackMaturity.EXPERIMENTAL</span>
-<span class="fc bfc" id="L43" title="All 2 branches covered.">                        || explicitlyEnabled.contains(pack.packId()))</span>
-<span class="fc" id="L44">                .toList();</span>
+<span class="fc" id="L41">        rejectKernelDisable(options);</span>
+<span class="fc" id="L42">        Set&lt;String&gt; defaultEnabled = packsById.values().stream()</span>
+<span class="fc" id="L43">                .filter(KnowledgePack::enabledByDefault)</span>
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">                .filter(pack -&gt; pack.tier() == RuleTier.KERNEL || options.profile().includeFirstPartyDefaults())</span>
+<span class="fc" id="L45">                .map(KnowledgePack::packId)</span>
+<span class="fc" id="L46">                .collect(Collectors.toCollection(LinkedHashSet::new));</span>
+<span class="fc" id="L47">        packsById.values().stream()</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                .filter(pack -&gt; pack.tier() == RuleTier.KERNEL)</span>
+<span class="fc" id="L49">                .map(KnowledgePack::packId)</span>
+<span class="fc" id="L50">                .forEach(defaultEnabled::add);</span>
+<span class="fc" id="L51">        Set&lt;String&gt; enabled = options.effectiveEnabledPacks(packsById.keySet(), defaultEnabled);</span>
+<span class="fc" id="L52">        Set&lt;String&gt; explicitlyEnabled = explicitlyEnabledPacks(options);</span>
+<span class="fc" id="L53">        return packsById.values().stream()</span>
+<span class="fc" id="L54">                .filter(pack -&gt; enabled.contains(pack.packId()))</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                .filter(pack -&gt; pack.maturity() != KnowledgePackMaturity.EXPERIMENTAL</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">                        || explicitlyEnabled.contains(pack.packId()))</span>
+<span class="fc" id="L57">                .toList();</span>
     }
 
     public List&lt;PatternRewriteRule&gt; enabledRules(KnowledgePackSelection options) {
-<span class="fc" id="L48">        return enabledPacks(options).stream()</span>
-<span class="fc" id="L49">                .flatMap(pack -&gt; pack.rules().stream())</span>
-<span class="fc" id="L50">                .filter(rule -&gt; rule.descriptor().eligibleForRegistration())</span>
-<span class="fc" id="L51">                .toList();</span>
+<span class="fc" id="L61">        return enabledPacks(options).stream()</span>
+<span class="fc" id="L62">                .flatMap(pack -&gt; pack.rules().stream())</span>
+<span class="fc" id="L63">                .filter(rule -&gt; rule.descriptor().eligibleForRegistration())</span>
+<span class="fc" id="L64">                .toList();</span>
     }
 
+    private void rejectKernelDisable(KnowledgePackSelection options) {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (String packId : options.disabledPacks()) {</span>
+<span class="fc" id="L69">            KnowledgePack pack = packsById.get(packId);</span>
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">            if (pack != null &amp;&amp; pack.tier() == RuleTier.KERNEL) {</span>
+<span class="nc" id="L71">                throw new IllegalArgumentException(&quot;Kernel knowledge pack cannot be disabled: &quot; + packId);</span>
+            }
+<span class="fc" id="L73">        }</span>
+<span class="fc" id="L74">    }</span>
+
     private Set&lt;String&gt; explicitlyEnabledPacks(KnowledgePackSelection options) {
-<span class="fc" id="L55">        Set&lt;String&gt; explicit = new java.util.LinkedHashSet&lt;&gt;(options.enabledPacks());</span>
-<span class="fc" id="L56">        explicit.addAll(options.profile().enabledPackIds());</span>
-<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (options.profile().enableAllPacks()) {</span>
-<span class="fc" id="L58">            explicit.addAll(packsById.keySet());</span>
+<span class="fc" id="L77">        Set&lt;String&gt; explicit = new java.util.LinkedHashSet&lt;&gt;(options.enabledPacks());</span>
+<span class="fc" id="L78">        explicit.addAll(options.profile().enabledPackIds());</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (options.profile().enableAllPacks()) {</span>
+<span class="fc" id="L80">            explicit.addAll(packsById.keySet());</span>
         }
-<span class="fc" id="L60">        return Set.copyOf(explicit);</span>
+<span class="fc" id="L82">        return Set.copyOf(explicit);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

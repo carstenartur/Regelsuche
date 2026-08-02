@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnivariatePolynomial.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.transform</a> &gt; <span class="el_source">UnivariatePolynomial.java</span></div><h1>UnivariatePolynomial.java</h1><pre class="source lang-java linenums">package de.regelsuche.transform;
+
+import de.regelsuche.ast.BinaryExpr;
+import de.regelsuche.ast.BinaryOperator;
+import de.regelsuche.ast.Expr;
+import de.regelsuche.ast.NumberExpr;
+import de.regelsuche.ast.VariableExpr;
+import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.Objects;
+
+/**
+ * Dense univariate polynomial with exact integer-valued coefficients.
+ *
+ * &lt;p&gt;The type exists so that a rewrite rule can decide &lt;em&gt;structurally&lt;/em&gt;
+ * whether one expression divides another. It deliberately refuses everything
+ * it cannot represent exactly: a non-integer coefficient, a symbolic exponent,
+ * a second variable or any function application makes {@link #of(Expr)} return
+ * {@code null} rather than an approximation. No rewrite may be derived from a
+ * rounded value.&lt;/p&gt;
+ */
+final class UnivariatePolynomial {
+    /** Highest exponent that may be expanded from a power node. */
+    private static final int MAX_EXPONENT = 8;
+    /** Highest degree accepted, keeping the rule a local, cheap decision. */
+    private static final int MAX_DEGREE = 16;
+    /** Largest coefficient that can be represented exactly by the AST number type. */
+<span class="fc" id="L28">    private static final BigInteger MAX_ABSOLUTE_COEFFICIENT =</span>
+<span class="fc" id="L29">        BigInteger.valueOf(1_000_000_000_000L);</span>
+
+    private final String variable;
+    private final BigInteger[] coefficients;
+
+    private UnivariatePolynomial(
+        String variable,
+        BigInteger[] coefficients
+<span class="fc" id="L37">    ) {</span>
+<span class="fc" id="L38">        this.variable = variable;</span>
+<span class="fc" id="L39">        this.coefficients = trim(coefficients);</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * @param expression the subtree to interpret
+     * @return the polynomial, or {@code null} when the subtree is not an exact
+     *     univariate integer-coefficient polynomial
+     */
+    static UnivariatePolynomial of(Expr expression) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (expression == null) {</span>
+<span class="nc" id="L49">            return null;</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (expression instanceof NumberExpr number) {</span>
+<span class="fc" id="L52">            BigInteger value = exactInteger(number.value());</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            return value == null</span>
+<span class="nc" id="L54">                ? null</span>
+<span class="fc" id="L55">                : new UnivariatePolynomial(&quot;&quot;, new BigInteger[] {value});</span>
+        }
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (expression instanceof VariableExpr variable) {</span>
+<span class="fc" id="L58">            return new UnivariatePolynomial(</span>
+<span class="fc" id="L59">                variable.name(),</span>
+                new BigInteger[] {BigInteger.ZERO, BigInteger.ONE});
+        }
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (!(expression instanceof BinaryExpr binary)) {</span>
+<span class="nc" id="L63">            return null;</span>
+        }
+<span class="fc" id="L65">        UnivariatePolynomial left = of(binary.left());</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (left == null) {</span>
+<span class="nc" id="L67">            return null;</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (binary.operator() == BinaryOperator.POW) {</span>
+<span class="fc" id="L70">            return left.power(binary.right());</span>
+        }
+<span class="fc" id="L72">        UnivariatePolynomial right = of(binary.right());</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (right == null) {</span>
+<span class="nc" id="L74">            return null;</span>
+        }
+<span class="pc bpc" id="L76" title="2 of 5 branches missed.">        return switch (binary.operator()) {</span>
+<span class="fc" id="L77">            case ADD -&gt; left.combine(right, BigInteger.ONE);</span>
+<span class="fc" id="L78">            case SUB -&gt; left.combine(right, BigInteger.ONE.negate());</span>
+<span class="fc" id="L79">            case MUL -&gt; left.multiply(right);</span>
+<span class="nc" id="L80">            case DIV -&gt; left.divideByConstant(right);</span>
+<span class="nc" id="L81">            default -&gt; null;</span>
+        };
+    }
+
+    String variable() {
+<span class="nc" id="L86">        return variable;</span>
+    }
+
+    int degree() {
+<span class="fc" id="L90">        return coefficients.length - 1;</span>
+    }
+
+    boolean isConstant() {
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        return degree() == 0;</span>
+    }
+
+    boolean isZero() {
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        return isConstant() &amp;&amp; coefficients[0].signum() == 0;</span>
+    }
+
+    /**
+     * Exact division without remainder.
+     *
+     * @param divisor the divisor polynomial
+     * @return the quotient, or {@code null} when the division leaves a
+     *     remainder, produces a non-integer coefficient, or is not defined
+     */
+    UnivariatePolynomial divideExactly(UnivariatePolynomial divisor) {
+<span class="fc" id="L109">        Objects.requireNonNull(divisor, &quot;divisor&quot;);</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">        if (divisor.isZero() || !sameVariable(divisor)</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                || divisor.degree() &gt; degree()) {</span>
+<span class="fc" id="L112">            return null;</span>
+        }
+<span class="fc" id="L114">        BigInteger[] remainder = coefficients.clone();</span>
+<span class="fc" id="L115">        BigInteger[] quotient = zeroCoefficients(</span>
+<span class="fc" id="L116">            degree() - divisor.degree() + 1);</span>
+<span class="fc" id="L117">        BigInteger leading = divisor.coefficients[divisor.degree()];</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (int index = quotient.length - 1; index &gt;= 0; index--) {</span>
+<span class="fc" id="L119">            BigInteger[] division = remainder[index + divisor.degree()]</span>
+<span class="fc" id="L120">                .divideAndRemainder(leading);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (division[1].signum() != 0</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                    || !isAcceptedCoefficient(division[0])) {</span>
+<span class="nc" id="L123">                return null;</span>
+            }
+<span class="fc" id="L125">            BigInteger factor = division[0];</span>
+<span class="fc" id="L126">            quotient[index] = factor;</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (factor.signum() == 0) {</span>
+<span class="nc" id="L128">                continue;</span>
+            }
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            for (int offset = 0; offset &lt;= divisor.degree(); offset++) {</span>
+<span class="fc" id="L131">                int remainderIndex = index + offset;</span>
+<span class="fc" id="L132">                remainder[remainderIndex] = remainder[remainderIndex]</span>
+<span class="fc" id="L133">                    .subtract(factor.multiply(divisor.coefficients[offset]));</span>
+            }
+        }
+<span class="fc bfc" id="L136" title="All 4 branches covered.">        if (Arrays.stream(remainder).anyMatch(value -&gt; value.signum() != 0)) {</span>
+<span class="fc" id="L137">            return null;</span>
+        }
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        String resultVariable = variable.isEmpty() ? divisor.variable : variable;</span>
+<span class="fc" id="L140">        return build(resultVariable, quotient);</span>
+    }
+
+    /** @return the polynomial rendered back into an expression tree. */
+    Expr toExpression() {
+<span class="pc bpc" id="L145" title="2 of 4 branches missed.">        if (isZero() || variable.isEmpty()) {</span>
+<span class="nc" id="L146">            return new NumberExpr(coefficients[0].doubleValue());</span>
+        }
+<span class="fc" id="L148">        Expr result = null;</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (int exponent = degree(); exponent &gt;= 0; exponent--) {</span>
+<span class="fc" id="L150">            BigInteger coefficient = coefficients[exponent];</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (coefficient.signum() == 0) {</span>
+<span class="nc" id="L152">                continue;</span>
+            }
+<span class="fc" id="L154">            Expr term = term(coefficient.abs(), exponent);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (result == null) {</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                result = coefficient.signum() &lt; 0</span>
+<span class="nc" id="L157">                    ? new BinaryExpr(</span>
+                        new NumberExpr(0), BinaryOperator.SUB, term)
+<span class="fc" id="L159">                    : term;</span>
+            } else {
+<span class="fc" id="L161">                result = new BinaryExpr(</span>
+                    result,
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                    coefficient.signum() &lt; 0</span>
+<span class="nc" id="L164">                        ? BinaryOperator.SUB</span>
+<span class="fc" id="L165">                        : BinaryOperator.ADD,</span>
+                    term);
+            }
+        }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        return result == null ? new NumberExpr(0) : result;</span>
+    }
+
+    private Expr term(BigInteger coefficient, int exponent) {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (exponent == 0) {</span>
+<span class="fc" id="L174">            return new NumberExpr(coefficient.doubleValue());</span>
+        }
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        Expr power = exponent == 1</span>
+<span class="fc" id="L177">            ? new VariableExpr(variable)</span>
+<span class="fc" id="L178">            : new BinaryExpr(</span>
+                new VariableExpr(variable),
+                BinaryOperator.POW,
+                new NumberExpr(exponent));
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        return coefficient.equals(BigInteger.ONE)</span>
+<span class="fc" id="L183">            ? power</span>
+<span class="nc" id="L184">            : new BinaryExpr(</span>
+<span class="nc" id="L185">                new NumberExpr(coefficient.doubleValue()),</span>
+                BinaryOperator.MUL,
+                power);
+    }
+
+    private UnivariatePolynomial combine(
+        UnivariatePolynomial other,
+        BigInteger sign
+    ) {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!sameVariable(other)) {</span>
+<span class="nc" id="L195">            return null;</span>
+        }
+<span class="fc" id="L197">        BigInteger[] result = zeroCoefficients(</span>
+<span class="fc" id="L198">            Math.max(coefficients.length, other.coefficients.length));</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int index = 0; index &lt; coefficients.length; index++) {</span>
+<span class="fc" id="L200">            result[index] = result[index].add(coefficients[index]);</span>
+        }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (int index = 0; index &lt; other.coefficients.length; index++) {</span>
+<span class="fc" id="L203">            result[index] = result[index]</span>
+<span class="fc" id="L204">                .add(sign.multiply(other.coefficients[index]));</span>
+        }
+<span class="fc" id="L206">        return build(mergedVariable(other), result);</span>
+    }
+
+    private UnivariatePolynomial multiply(UnivariatePolynomial other) {
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (!sameVariable(other)</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                || degree() + other.degree() &gt; MAX_DEGREE) {</span>
+<span class="nc" id="L212">            return null;</span>
+        }
+<span class="fc" id="L214">        BigInteger[] result = zeroCoefficients(</span>
+            coefficients.length + other.coefficients.length - 1);
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (int left = 0; left &lt; coefficients.length; left++) {</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            for (int right = 0; right &lt; other.coefficients.length; right++) {</span>
+<span class="fc" id="L218">                int resultIndex = left + right;</span>
+<span class="fc" id="L219">                result[resultIndex] = result[resultIndex].add(</span>
+<span class="fc" id="L220">                    coefficients[left].multiply(other.coefficients[right]));</span>
+            }
+        }
+<span class="fc" id="L223">        return build(mergedVariable(other), result);</span>
+    }
+
+    private UnivariatePolynomial divideByConstant(
+        UnivariatePolynomial other
+    ) {
+<span class="nc bnc" id="L229" title="All 4 branches missed.">        if (!other.isConstant() || other.coefficients[0].signum() == 0) {</span>
+<span class="nc" id="L230">            return null;</span>
+        }
+<span class="nc" id="L232">        BigInteger[] result = zeroCoefficients(coefficients.length);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        for (int index = 0; index &lt; coefficients.length; index++) {</span>
+<span class="nc" id="L234">            BigInteger[] division = coefficients[index]</span>
+<span class="nc" id="L235">                .divideAndRemainder(other.coefficients[0]);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            if (division[1].signum() != 0) {</span>
+<span class="nc" id="L237">                return null;</span>
+            }
+<span class="nc" id="L239">            result[index] = division[0];</span>
+        }
+<span class="nc" id="L241">        return build(variable, result);</span>
+    }
+
+    private UnivariatePolynomial power(Expr exponentExpression) {
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (!(exponentExpression instanceof NumberExpr exponent)) {</span>
+<span class="nc" id="L246">            return null;</span>
+        }
+<span class="fc" id="L248">        BigInteger exactExponent = exactInteger(exponent.value());</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (exactExponent == null</span>
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">                || exactExponent.signum() &lt; 0</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">                || exactExponent.compareTo(</span>
+<span class="fc" id="L252">                    BigInteger.valueOf(MAX_EXPONENT)) &gt; 0) {</span>
+<span class="nc" id="L253">            return null;</span>
+        }
+<span class="fc" id="L255">        UnivariatePolynomial result = new UnivariatePolynomial(</span>
+            variable,
+            new BigInteger[] {BigInteger.ONE});
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        for (int step = 0; step &lt; exactExponent.intValue(); step++) {</span>
+<span class="fc" id="L259">            result = result.multiply(this);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            if (result == null) {</span>
+<span class="nc" id="L261">                return null;</span>
+            }
+        }
+<span class="fc" id="L264">        return result;</span>
+    }
+
+    private boolean sameVariable(UnivariatePolynomial other) {
+<span class="fc bfc" id="L268" title="All 4 branches covered.">        return variable.isEmpty() || other.variable.isEmpty()</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            || variable.equals(other.variable);</span>
+    }
+
+    private String mergedVariable(UnivariatePolynomial other) {
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        return variable.isEmpty() ? other.variable : variable;</span>
+    }
+
+    private static UnivariatePolynomial build(
+        String variable,
+        BigInteger[] coefficients
+    ) {
+<span class="fc" id="L280">        BigInteger[] trimmed = trim(coefficients);</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (trimmed.length - 1 &gt; MAX_DEGREE</span>
+<span class="fc" id="L282">                || Arrays.stream(trimmed)</span>
+<span class="pc bpc" id="L283" title="2 of 4 branches missed.">                    .anyMatch(value -&gt; !isAcceptedCoefficient(value))) {</span>
+<span class="nc" id="L284">            return null;</span>
+        }
+<span class="fc" id="L286">        return new UnivariatePolynomial(variable, trimmed);</span>
+    }
+
+    private static BigInteger[] zeroCoefficients(int length) {
+<span class="fc" id="L290">        BigInteger[] coefficients = new BigInteger[length];</span>
+<span class="fc" id="L291">        Arrays.fill(coefficients, BigInteger.ZERO);</span>
+<span class="fc" id="L292">        return coefficients;</span>
+    }
+
+    private static BigInteger[] trim(BigInteger[] coefficients) {
+<span class="fc" id="L296">        int degree = coefficients.length - 1;</span>
+<span class="pc bpc" id="L297" title="1 of 4 branches missed.">        while (degree &gt; 0 &amp;&amp; coefficients[degree].signum() == 0) {</span>
+<span class="nc" id="L298">            degree--;</span>
+        }
+<span class="fc" id="L300">        return Arrays.copyOf(coefficients, degree + 1);</span>
+    }
+
+    private static BigInteger exactInteger(double value) {
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (!Double.isFinite(value)</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">                || Math.rint(value) != value</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">                || Math.abs(value) &gt; MAX_ABSOLUTE_COEFFICIENT.doubleValue()) {</span>
+<span class="nc" id="L307">            return null;</span>
+        }
+<span class="fc" id="L309">        return BigInteger.valueOf((long) value);</span>
+    }
+
+    private static boolean isAcceptedCoefficient(BigInteger value) {
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        return value.abs().compareTo(MAX_ABSOLUTE_COEFFICIENT) &lt;= 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

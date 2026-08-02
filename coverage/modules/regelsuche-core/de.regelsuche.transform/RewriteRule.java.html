@@ -35,8 +35,22 @@ public interface RewriteRule {
 <span class="fc" id="L35">        return List.of();</span>
     }
 
+    /**
+     * @return whether this rule can introduce a symbolic side condition at all.
+     *
+     *         &lt;p&gt;Unlike {@link #assumptions(Expr)} this is a static property of
+     *         the rule and needs no subtree. Components that apply rules without
+     *         retaining per-step provenance — equality saturation, for example,
+     *         merges many rewrites into one e-class — can use it to decide
+     *         conservatively whether a produced expression may depend on an
+     *         undischarged assumption.&lt;/p&gt;
+     */
+    default boolean mayEmitAssumptions() {
+<span class="nc" id="L49">        return false;</span>
+    }
+
     default RuleDescriptor descriptor() {
-<span class="fc" id="L39">        return RuleDescriptor.core(id(), List.of());</span>
+<span class="fc" id="L53">        return RuleDescriptor.core(id(), List.of());</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

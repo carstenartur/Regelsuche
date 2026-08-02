@@ -36,7 +36,7 @@ It presents project evidence only and carries a visible
 - Macro reused: `macro_3bbfed5b`
 - Search-space excerpt: [SVG](generated/discovery/complete-square/search-space.svg)
 - Evidence JSON link: [evidence.json](generated/discovery/complete-square/evidence.json)
-- Canonical evidence ID: [`regelsuche.discovery-evidence/v1#sha256:98ad53da0459ab21e42d39419b5fd18056dcb6d4aee01f7b904afdb888ba3192`](generated/discovery/complete-square/evidence.json)
+- Canonical evidence ID: [`regelsuche.discovery-evidence/v1#sha256:217d5ca4dff3dba588f16d8451195a883378956a795259936317d3d35e8ce273`](generated/discovery/complete-square/evidence.json)
 
 <img src="generated/discovery/complete-square/search-space.svg" alt="Generated evidence search-space for complete-square-factorization">
 
@@ -61,6 +61,6 @@ It presents project evidence only and carries a visible
 
 | Scenario | Success | Oracle | States | Edges | Bridge rules | Learned macros | Reused macros |
 |---|---|---|---:|---:|---:|---:|---:|
-| Complete-square factorization | yes | unavailable | 13 | 32 | 2 | 1 | 1 |
+| Complete-square factorization | yes | unavailable | 12 | 32 | 2 | 1 | 1 |
 | Sophie-Germain hidden structure | yes | unavailable | 56 | 113 | 2 | 1 | 1 |
 

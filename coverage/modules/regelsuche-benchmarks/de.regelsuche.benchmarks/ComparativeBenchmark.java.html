@@ -32,55 +32,56 @@ public final class ComparativeBenchmark {
 <span class="fc" id="L32">        OPEN_TARGET_DISCOVERY,</span>
 <span class="fc" id="L33">        CROSS_FAMILY_TRANSFER,</span>
 <span class="fc" id="L34">        EQUALITY_VALIDATION,</span>
-<span class="fc" id="L35">        AUTONOMOUS_CAMPAIGN,</span>
-<span class="fc" id="L36">        DISCOVERY_COMPONENT_ABLATION,</span>
-<span class="fc" id="L37">        CONTROLLER_ABLATION</span>
+<span class="fc" id="L35">        SIMPLIFICATION_COMPETITION,</span>
+<span class="fc" id="L36">        AUTONOMOUS_CAMPAIGN,</span>
+<span class="fc" id="L37">        DISCOVERY_COMPONENT_ABLATION,</span>
+<span class="fc" id="L38">        CONTROLLER_ABLATION</span>
     }
 
-<span class="fc" id="L40">    public enum SystemKind {</span>
-<span class="fc" id="L41">        REGELSUCHE,</span>
-<span class="fc" id="L42">        EXTERNAL_BASELINE,</span>
-<span class="fc" id="L43">        ABLATION,</span>
-<span class="fc" id="L44">        REFERENCE</span>
+<span class="fc" id="L41">    public enum SystemKind {</span>
+<span class="fc" id="L42">        REGELSUCHE,</span>
+<span class="fc" id="L43">        EXTERNAL_BASELINE,</span>
+<span class="fc" id="L44">        ABLATION,</span>
+<span class="fc" id="L45">        REFERENCE</span>
     }
 
-<span class="fc" id="L47">    public enum Role {</span>
-<span class="fc" id="L48">        SEARCH,</span>
-<span class="fc" id="L49">        DISCOVERY,</span>
-<span class="fc" id="L50">        EQUALITY_REWRITE,</span>
-<span class="fc" id="L51">        VALIDATION,</span>
-<span class="fc" id="L52">        COUNTEREXAMPLE,</span>
-<span class="fc" id="L53">        PROOF,</span>
-<span class="fc" id="L54">        CONTROLLER</span>
+<span class="fc" id="L48">    public enum Role {</span>
+<span class="fc" id="L49">        SEARCH,</span>
+<span class="fc" id="L50">        DISCOVERY,</span>
+<span class="fc" id="L51">        EQUALITY_REWRITE,</span>
+<span class="fc" id="L52">        VALIDATION,</span>
+<span class="fc" id="L53">        COUNTEREXAMPLE,</span>
+<span class="fc" id="L54">        PROOF,</span>
+<span class="fc" id="L55">        CONTROLLER</span>
     }
 
-<span class="fc" id="L57">    public enum ExpectedVerdict {</span>
-<span class="fc" id="L58">        TARGET_REACHED,</span>
-<span class="fc" id="L59">        CONFIRMED,</span>
-<span class="fc" id="L60">        REFUTED</span>
+<span class="fc" id="L58">    public enum ExpectedVerdict {</span>
+<span class="fc" id="L59">        TARGET_REACHED,</span>
+<span class="fc" id="L60">        CONFIRMED,</span>
+<span class="fc" id="L61">        REFUTED</span>
     }
 
-<span class="fc" id="L63">    public enum ObservedVerdict {</span>
-<span class="fc" id="L64">        TARGET_REACHED,</span>
-<span class="fc" id="L65">        CONFIRMED,</span>
-<span class="fc" id="L66">        REFUTED,</span>
-<span class="fc" id="L67">        UNKNOWN,</span>
-<span class="fc" id="L68">        UNSUPPORTED,</span>
-<span class="fc" id="L69">        TIMEOUT,</span>
-<span class="fc" id="L70">        ERROR</span>
+<span class="fc" id="L64">    public enum ObservedVerdict {</span>
+<span class="fc" id="L65">        TARGET_REACHED,</span>
+<span class="fc" id="L66">        CONFIRMED,</span>
+<span class="fc" id="L67">        REFUTED,</span>
+<span class="fc" id="L68">        UNKNOWN,</span>
+<span class="fc" id="L69">        UNSUPPORTED,</span>
+<span class="fc" id="L70">        TIMEOUT,</span>
+<span class="fc" id="L71">        ERROR</span>
     }
 
-<span class="fc" id="L73">    public enum Disposition {</span>
-<span class="fc" id="L74">        EXECUTED,</span>
-<span class="fc" id="L75">        FILTERED_UNSUPPORTED,</span>
-<span class="fc" id="L76">        TIMED_OUT,</span>
-<span class="fc" id="L77">        FAILED</span>
+<span class="fc" id="L74">    public enum Disposition {</span>
+<span class="fc" id="L75">        EXECUTED,</span>
+<span class="fc" id="L76">        FILTERED_UNSUPPORTED,</span>
+<span class="fc" id="L77">        TIMED_OUT,</span>
+<span class="fc" id="L78">        FAILED</span>
     }
 
-<span class="fc" id="L80">    public enum ClaimStatus {</span>
-<span class="fc" id="L81">        SUPPORTED,</span>
-<span class="fc" id="L82">        NEGATIVE,</span>
-<span class="fc" id="L83">        INSUFFICIENT_EVIDENCE</span>
+<span class="fc" id="L81">    public enum ClaimStatus {</span>
+<span class="fc" id="L82">        SUPPORTED,</span>
+<span class="fc" id="L83">        NEGATIVE,</span>
+<span class="fc" id="L84">        INSUFFICIENT_EVIDENCE</span>
     }
 
     public record InformationParityManifest(
@@ -100,24 +101,24 @@ public final class ComparativeBenchmark {
         List&lt;String&gt; mandatoryEvaluations,
         String contentHash
     ) {
-<span class="fc" id="L103">        public InformationParityManifest {</span>
-<span class="fc" id="L104">            requireText(id, &quot;parity manifest id&quot;);</span>
-<span class="fc" id="L105">            Objects.requireNonNull(track, &quot;track&quot;);</span>
-<span class="fc" id="L106">            requireSha(inputCorpusHash, &quot;inputCorpusHash&quot;);</span>
-<span class="fc" id="L107">            requireSha(inventoryHash, &quot;inventoryHash&quot;);</span>
-<span class="fc" id="L108">            requireSha(budgetHash, &quot;budgetHash&quot;);</span>
-<span class="fc" id="L109">            requireSha(researchBriefHash, &quot;researchBriefHash&quot;);</span>
-<span class="fc" id="L110">            requireSha(qualificationSplitHash, &quot;qualificationSplitHash&quot;);</span>
-<span class="fc" id="L111">            mandatoryEvaluations = sortedStrings(mandatoryEvaluations);</span>
-<span class="fc" id="L112">            requireSha(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L113">            if (!hash(id, track, targetVisible, hiddenReferenceVisible,</span>
+<span class="fc" id="L104">        public InformationParityManifest {</span>
+<span class="fc" id="L105">            requireText(id, &quot;parity manifest id&quot;);</span>
+<span class="fc" id="L106">            Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L107">            requireSha(inputCorpusHash, &quot;inputCorpusHash&quot;);</span>
+<span class="fc" id="L108">            requireSha(inventoryHash, &quot;inventoryHash&quot;);</span>
+<span class="fc" id="L109">            requireSha(budgetHash, &quot;budgetHash&quot;);</span>
+<span class="fc" id="L110">            requireSha(researchBriefHash, &quot;researchBriefHash&quot;);</span>
+<span class="fc" id="L111">            requireSha(qualificationSplitHash, &quot;qualificationSplitHash&quot;);</span>
+<span class="fc" id="L112">            mandatoryEvaluations = sortedStrings(mandatoryEvaluations);</span>
+<span class="fc" id="L113">            requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L114">            if (!hash(id, track, targetVisible, hiddenReferenceVisible,</span>
                     familyLabelVisible, testLabelVisible, qualificationLabelVisible,
                     reviewLabelVisible, inputCorpusHash, inventoryHash, budgetHash,
                     researchBriefHash, qualificationSplitHash, mandatoryEvaluations)
-<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                    .equals(contentHash)) {</span>
-<span class="nc" id="L118">                throw new IllegalArgumentException(&quot;parity manifest hash mismatch&quot;);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                    .equals(contentHash)) {</span>
+<span class="nc" id="L119">                throw new IllegalArgumentException(&quot;parity manifest hash mismatch&quot;);</span>
             }
-<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        }</span>
 
         public static InformationParityManifest create(
             String id,
@@ -135,38 +136,38 @@ public final class ComparativeBenchmark {
             String qualificationSplitHash,
             List&lt;String&gt; mandatoryEvaluations
         ) {
-<span class="fc" id="L138">            List&lt;String&gt; evaluations = sortedStrings(mandatoryEvaluations);</span>
-<span class="fc" id="L139">            return new InformationParityManifest(</span>
+<span class="fc" id="L139">            List&lt;String&gt; evaluations = sortedStrings(mandatoryEvaluations);</span>
+<span class="fc" id="L140">            return new InformationParityManifest(</span>
                 id, track, targetVisible, hiddenReferenceVisible,
                 familyLabelVisible, testLabelVisible, qualificationLabelVisible,
                 reviewLabelVisible, inputCorpusHash, inventoryHash, budgetHash,
                 researchBriefHash, qualificationSplitHash, evaluations,
-<span class="fc" id="L144">                hash(id, track, targetVisible, hiddenReferenceVisible,</span>
+<span class="fc" id="L145">                hash(id, track, targetVisible, hiddenReferenceVisible,</span>
                     familyLabelVisible, testLabelVisible, qualificationLabelVisible,
                     reviewLabelVisible, inputCorpusHash, inventoryHash, budgetHash,
                     researchBriefHash, qualificationSplitHash, evaluations));
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L151">            return write(new JsonWriter().beginObject()).endObject().toString();</span>
+<span class="fc" id="L152">            return write(new JsonWriter().beginObject()).endObject().toString();</span>
         }
 
         JsonWriter write(JsonWriter json) {
-<span class="fc" id="L155">            return json.property(&quot;id&quot;, id)</span>
-<span class="fc" id="L156">                .property(&quot;track&quot;, track.name())</span>
-<span class="fc" id="L157">                .property(&quot;targetVisible&quot;, targetVisible)</span>
-<span class="fc" id="L158">                .property(&quot;hiddenReferenceVisible&quot;, hiddenReferenceVisible)</span>
-<span class="fc" id="L159">                .property(&quot;familyLabelVisible&quot;, familyLabelVisible)</span>
-<span class="fc" id="L160">                .property(&quot;testLabelVisible&quot;, testLabelVisible)</span>
-<span class="fc" id="L161">                .property(&quot;qualificationLabelVisible&quot;, qualificationLabelVisible)</span>
-<span class="fc" id="L162">                .property(&quot;reviewLabelVisible&quot;, reviewLabelVisible)</span>
-<span class="fc" id="L163">                .property(&quot;inputCorpusHash&quot;, inputCorpusHash)</span>
-<span class="fc" id="L164">                .property(&quot;inventoryHash&quot;, inventoryHash)</span>
-<span class="fc" id="L165">                .property(&quot;budgetHash&quot;, budgetHash)</span>
-<span class="fc" id="L166">                .property(&quot;researchBriefHash&quot;, researchBriefHash)</span>
-<span class="fc" id="L167">                .property(&quot;qualificationSplitHash&quot;, qualificationSplitHash)</span>
-<span class="fc" id="L168">                .stringArray(&quot;mandatoryEvaluations&quot;, mandatoryEvaluations)</span>
-<span class="fc" id="L169">                .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L156">            return json.property(&quot;id&quot;, id)</span>
+<span class="fc" id="L157">                .property(&quot;track&quot;, track.name())</span>
+<span class="fc" id="L158">                .property(&quot;targetVisible&quot;, targetVisible)</span>
+<span class="fc" id="L159">                .property(&quot;hiddenReferenceVisible&quot;, hiddenReferenceVisible)</span>
+<span class="fc" id="L160">                .property(&quot;familyLabelVisible&quot;, familyLabelVisible)</span>
+<span class="fc" id="L161">                .property(&quot;testLabelVisible&quot;, testLabelVisible)</span>
+<span class="fc" id="L162">                .property(&quot;qualificationLabelVisible&quot;, qualificationLabelVisible)</span>
+<span class="fc" id="L163">                .property(&quot;reviewLabelVisible&quot;, reviewLabelVisible)</span>
+<span class="fc" id="L164">                .property(&quot;inputCorpusHash&quot;, inputCorpusHash)</span>
+<span class="fc" id="L165">                .property(&quot;inventoryHash&quot;, inventoryHash)</span>
+<span class="fc" id="L166">                .property(&quot;budgetHash&quot;, budgetHash)</span>
+<span class="fc" id="L167">                .property(&quot;researchBriefHash&quot;, researchBriefHash)</span>
+<span class="fc" id="L168">                .property(&quot;qualificationSplitHash&quot;, qualificationSplitHash)</span>
+<span class="fc" id="L169">                .stringArray(&quot;mandatoryEvaluations&quot;, mandatoryEvaluations)</span>
+<span class="fc" id="L170">                .property(&quot;contentHash&quot;, contentHash);</span>
         }
 
         private static String hash(
@@ -185,9 +186,9 @@ public final class ComparativeBenchmark {
             String qualificationSplitHash,
             List&lt;String&gt; mandatoryEvaluations
         ) {
-<span class="fc" id="L188">            return SolverIr.sha256(</span>
+<span class="fc" id="L189">            return SolverIr.sha256(</span>
                 &quot;parity/v1\nid=&quot; + id
-<span class="fc" id="L190">                    + &quot;\ntrack=&quot; + track.name()</span>
+<span class="fc" id="L191">                    + &quot;\ntrack=&quot; + track.name()</span>
                     + &quot;\ntargetVisible=&quot; + targetVisible
                     + &quot;\nhiddenReferenceVisible=&quot; + hiddenReferenceVisible
                     + &quot;\nfamilyLabelVisible=&quot; + familyLabelVisible
@@ -218,28 +219,28 @@ public final class ComparativeBenchmark {
         List&lt;String&gt; limitations,
         String contentHash
     ) {
-<span class="fc" id="L221">        public Configuration {</span>
-<span class="fc" id="L222">            requireText(id, &quot;configuration id&quot;);</span>
-<span class="fc" id="L223">            Objects.requireNonNull(track, &quot;track&quot;);</span>
-<span class="fc" id="L224">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
-<span class="fc" id="L225">            roles = sortedEnums(roles);</span>
-<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            if (roles.isEmpty()) {</span>
-<span class="nc" id="L227">                throw new IllegalArgumentException(&quot;configuration roles must not be empty&quot;);</span>
+<span class="fc" id="L222">        public Configuration {</span>
+<span class="fc" id="L223">            requireText(id, &quot;configuration id&quot;);</span>
+<span class="fc" id="L224">            Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L225">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L226">            roles = sortedEnums(roles);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            if (roles.isEmpty()) {</span>
+<span class="nc" id="L228">                throw new IllegalArgumentException(&quot;configuration roles must not be empty&quot;);</span>
             }
-<span class="fc" id="L229">            requireSha(parityManifestHash, &quot;parityManifestHash&quot;);</span>
-<span class="fc" id="L230">            requireText(backendId, &quot;backendId&quot;);</span>
-<span class="fc" id="L231">            requireText(backendVersion, &quot;backendVersion&quot;);</span>
-<span class="fc" id="L232">            requireSha(policyHash, &quot;policyHash&quot;);</span>
-<span class="fc" id="L233">            requireSha(modelHash, &quot;modelHash&quot;);</span>
-<span class="fc" id="L234">            requireSha(environmentHash, &quot;environmentHash&quot;);</span>
-<span class="fc" id="L235">            limitations = sortedStrings(limitations);</span>
-<span class="fc" id="L236">            requireSha(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L237">            if (!hash(id, track, kind, roles, parityManifestHash, backendId,</span>
+<span class="fc" id="L230">            requireSha(parityManifestHash, &quot;parityManifestHash&quot;);</span>
+<span class="fc" id="L231">            requireText(backendId, &quot;backendId&quot;);</span>
+<span class="fc" id="L232">            requireText(backendVersion, &quot;backendVersion&quot;);</span>
+<span class="fc" id="L233">            requireSha(policyHash, &quot;policyHash&quot;);</span>
+<span class="fc" id="L234">            requireSha(modelHash, &quot;modelHash&quot;);</span>
+<span class="fc" id="L235">            requireSha(environmentHash, &quot;environmentHash&quot;);</span>
+<span class="fc" id="L236">            limitations = sortedStrings(limitations);</span>
+<span class="fc" id="L237">            requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L238">            if (!hash(id, track, kind, roles, parityManifestHash, backendId,</span>
                     backendVersion, policyHash, modelHash, environmentHash,
-<span class="pc bpc" id="L239" title="1 of 2 branches missed.">                    deterministic, limitations).equals(contentHash)) {</span>
-<span class="nc" id="L240">                throw new IllegalArgumentException(&quot;configuration hash mismatch&quot;);</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                    deterministic, limitations).equals(contentHash)) {</span>
+<span class="nc" id="L241">                throw new IllegalArgumentException(&quot;configuration hash mismatch&quot;);</span>
             }
-<span class="fc" id="L242">        }</span>
+<span class="fc" id="L243">        }</span>
 
         public static Configuration create(
             String id,
@@ -255,35 +256,35 @@ public final class ComparativeBenchmark {
             boolean deterministic,
             List&lt;String&gt; limitations
         ) {
-<span class="fc" id="L258">            List&lt;Role&gt; orderedRoles = sortedEnums(roles);</span>
-<span class="fc" id="L259">            List&lt;String&gt; orderedLimitations = sortedStrings(limitations);</span>
-<span class="fc" id="L260">            return new Configuration(</span>
+<span class="fc" id="L259">            List&lt;Role&gt; orderedRoles = sortedEnums(roles);</span>
+<span class="fc" id="L260">            List&lt;String&gt; orderedLimitations = sortedStrings(limitations);</span>
+<span class="fc" id="L261">            return new Configuration(</span>
                 id, track, kind, orderedRoles, parityManifestHash, backendId,
                 backendVersion, policyHash, modelHash, environmentHash,
                 deterministic, orderedLimitations,
-<span class="fc" id="L264">                hash(id, track, kind, orderedRoles, parityManifestHash, backendId,</span>
+<span class="fc" id="L265">                hash(id, track, kind, orderedRoles, parityManifestHash, backendId,</span>
                     backendVersion, policyHash, modelHash, environmentHash,
                     deterministic, orderedLimitations));
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L270">            return write(new JsonWriter().beginObject()).endObject().toString();</span>
+<span class="fc" id="L271">            return write(new JsonWriter().beginObject()).endObject().toString();</span>
         }
 
         JsonWriter write(JsonWriter json) {
-<span class="fc" id="L274">            return json.property(&quot;id&quot;, id)</span>
-<span class="fc" id="L275">                .property(&quot;track&quot;, track.name())</span>
-<span class="fc" id="L276">                .property(&quot;kind&quot;, kind.name())</span>
-<span class="fc" id="L277">                .stringArray(&quot;roles&quot;, roles.stream().map(Enum::name).toList())</span>
-<span class="fc" id="L278">                .property(&quot;parityManifestHash&quot;, parityManifestHash)</span>
-<span class="fc" id="L279">                .property(&quot;backendId&quot;, backendId)</span>
-<span class="fc" id="L280">                .property(&quot;backendVersion&quot;, backendVersion)</span>
-<span class="fc" id="L281">                .property(&quot;policyHash&quot;, policyHash)</span>
-<span class="fc" id="L282">                .property(&quot;modelHash&quot;, modelHash)</span>
-<span class="fc" id="L283">                .property(&quot;environmentHash&quot;, environmentHash)</span>
-<span class="fc" id="L284">                .property(&quot;deterministic&quot;, deterministic)</span>
-<span class="fc" id="L285">                .stringArray(&quot;limitations&quot;, limitations)</span>
-<span class="fc" id="L286">                .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L275">            return json.property(&quot;id&quot;, id)</span>
+<span class="fc" id="L276">                .property(&quot;track&quot;, track.name())</span>
+<span class="fc" id="L277">                .property(&quot;kind&quot;, kind.name())</span>
+<span class="fc" id="L278">                .stringArray(&quot;roles&quot;, roles.stream().map(Enum::name).toList())</span>
+<span class="fc" id="L279">                .property(&quot;parityManifestHash&quot;, parityManifestHash)</span>
+<span class="fc" id="L280">                .property(&quot;backendId&quot;, backendId)</span>
+<span class="fc" id="L281">                .property(&quot;backendVersion&quot;, backendVersion)</span>
+<span class="fc" id="L282">                .property(&quot;policyHash&quot;, policyHash)</span>
+<span class="fc" id="L283">                .property(&quot;modelHash&quot;, modelHash)</span>
+<span class="fc" id="L284">                .property(&quot;environmentHash&quot;, environmentHash)</span>
+<span class="fc" id="L285">                .property(&quot;deterministic&quot;, deterministic)</span>
+<span class="fc" id="L286">                .stringArray(&quot;limitations&quot;, limitations)</span>
+<span class="fc" id="L287">                .property(&quot;contentHash&quot;, contentHash);</span>
         }
 
         private static String hash(
@@ -300,10 +301,10 @@ public final class ComparativeBenchmark {
             boolean deterministic,
             List&lt;String&gt; limitations
         ) {
-<span class="fc" id="L303">            return SolverIr.sha256(</span>
+<span class="fc" id="L304">            return SolverIr.sha256(</span>
                 &quot;configuration/v1\nid=&quot; + id
-<span class="fc" id="L305">                    + &quot;\ntrack=&quot; + track.name()</span>
-<span class="fc" id="L306">                    + &quot;\nkind=&quot; + kind.name()</span>
+<span class="fc" id="L306">                    + &quot;\ntrack=&quot; + track.name()</span>
+<span class="fc" id="L307">                    + &quot;\nkind=&quot; + kind.name()</span>
                     + &quot;\nroles=&quot; + roles
                     + &quot;\nparity=&quot; + parityManifestHash
                     + &quot;\nbackend=&quot; + backendId + '@' + backendVersion
@@ -325,23 +326,23 @@ public final class ComparativeBenchmark {
         ExpectedVerdict expectedVerdict,
         String contentHash
     ) {
-<span class="fc" id="L328">        public Case {</span>
-<span class="fc" id="L329">            requireText(id, &quot;case id&quot;);</span>
-<span class="fc" id="L330">            Objects.requireNonNull(track, &quot;track&quot;);</span>
-<span class="fc" id="L331">            family = normalize(family);</span>
-<span class="fc" id="L332">            requireText(inputExpression, &quot;inputExpression&quot;);</span>
-<span class="fc" id="L333">            targetExpression = normalize(targetExpression);</span>
-<span class="fc" id="L334">            assumptions = sortedStrings(assumptions);</span>
-<span class="fc" id="L335">            Objects.requireNonNull(expectedVerdict, &quot;expectedVerdict&quot;);</span>
-<span class="pc bpc" id="L336" title="1 of 2 branches missed.">            if (targetExpression.isEmpty()) {</span>
-<span class="nc" id="L337">                throw new IllegalArgumentException(&quot;current comparative cases require a target/statement&quot;);</span>
+<span class="fc" id="L329">        public Case {</span>
+<span class="fc" id="L330">            requireText(id, &quot;case id&quot;);</span>
+<span class="fc" id="L331">            Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L332">            family = normalize(family);</span>
+<span class="fc" id="L333">            requireText(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L334">            targetExpression = normalize(targetExpression);</span>
+<span class="fc" id="L335">            assumptions = sortedStrings(assumptions);</span>
+<span class="fc" id="L336">            Objects.requireNonNull(expectedVerdict, &quot;expectedVerdict&quot;);</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">            if (targetExpression.isEmpty()) {</span>
+<span class="nc" id="L338">                throw new IllegalArgumentException(&quot;current comparative cases require a target/statement&quot;);</span>
             }
-<span class="fc" id="L339">            requireSha(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L340">            if (!hash(id, track, family, inputExpression, targetExpression,</span>
-<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                    assumptions, expectedVerdict).equals(contentHash)) {</span>
-<span class="nc" id="L342">                throw new IllegalArgumentException(&quot;case hash mismatch&quot;);</span>
+<span class="fc" id="L340">            requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L341">            if (!hash(id, track, family, inputExpression, targetExpression,</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">                    assumptions, expectedVerdict).equals(contentHash)) {</span>
+<span class="nc" id="L343">                throw new IllegalArgumentException(&quot;case hash mismatch&quot;);</span>
             }
-<span class="fc" id="L344">        }</span>
+<span class="fc" id="L345">        }</span>
 
         public static Case create(
             String id,
@@ -352,30 +353,30 @@ public final class ComparativeBenchmark {
             List&lt;String&gt; assumptions,
             ExpectedVerdict expectedVerdict
         ) {
-<span class="fc" id="L355">            String normalizedFamily = normalize(family);</span>
-<span class="fc" id="L356">            String input = normalizeRequired(inputExpression, &quot;inputExpression&quot;);</span>
-<span class="fc" id="L357">            String target = normalizeRequired(targetExpression, &quot;targetExpression&quot;);</span>
-<span class="fc" id="L358">            List&lt;String&gt; orderedAssumptions = sortedStrings(assumptions);</span>
-<span class="fc" id="L359">            return new Case(</span>
+<span class="fc" id="L356">            String normalizedFamily = normalize(family);</span>
+<span class="fc" id="L357">            String input = normalizeRequired(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L358">            String target = normalizeRequired(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="fc" id="L359">            List&lt;String&gt; orderedAssumptions = sortedStrings(assumptions);</span>
+<span class="fc" id="L360">            return new Case(</span>
                 id, track, normalizedFamily, input, target, orderedAssumptions,
                 expectedVerdict,
-<span class="fc" id="L362">                hash(id, track, normalizedFamily, input, target,</span>
+<span class="fc" id="L363">                hash(id, track, normalizedFamily, input, target,</span>
                     orderedAssumptions, expectedVerdict));
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L367">            return write(new JsonWriter().beginObject()).endObject().toString();</span>
+<span class="fc" id="L368">            return write(new JsonWriter().beginObject()).endObject().toString();</span>
         }
 
         JsonWriter write(JsonWriter json) {
-<span class="fc" id="L371">            return json.property(&quot;id&quot;, id)</span>
-<span class="fc" id="L372">                .property(&quot;track&quot;, track.name())</span>
-<span class="fc" id="L373">                .property(&quot;family&quot;, family)</span>
-<span class="fc" id="L374">                .property(&quot;inputExpression&quot;, inputExpression)</span>
-<span class="fc" id="L375">                .property(&quot;targetExpression&quot;, targetExpression)</span>
-<span class="fc" id="L376">                .stringArray(&quot;assumptions&quot;, assumptions)</span>
-<span class="fc" id="L377">                .property(&quot;expectedVerdict&quot;, expectedVerdict.name())</span>
-<span class="fc" id="L378">                .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L372">            return json.property(&quot;id&quot;, id)</span>
+<span class="fc" id="L373">                .property(&quot;track&quot;, track.name())</span>
+<span class="fc" id="L374">                .property(&quot;family&quot;, family)</span>
+<span class="fc" id="L375">                .property(&quot;inputExpression&quot;, inputExpression)</span>
+<span class="fc" id="L376">                .property(&quot;targetExpression&quot;, targetExpression)</span>
+<span class="fc" id="L377">                .stringArray(&quot;assumptions&quot;, assumptions)</span>
+<span class="fc" id="L378">                .property(&quot;expectedVerdict&quot;, expectedVerdict.name())</span>
+<span class="fc" id="L379">                .property(&quot;contentHash&quot;, contentHash);</span>
         }
 
         private static String hash(
@@ -387,14 +388,14 @@ public final class ComparativeBenchmark {
             List&lt;String&gt; assumptions,
             ExpectedVerdict expectedVerdict
         ) {
-<span class="fc" id="L390">            return SolverIr.sha256(</span>
+<span class="fc" id="L391">            return SolverIr.sha256(</span>
                 &quot;case/v1\nid=&quot; + id
-<span class="fc" id="L392">                    + &quot;\ntrack=&quot; + track.name()</span>
+<span class="fc" id="L393">                    + &quot;\ntrack=&quot; + track.name()</span>
                     + &quot;\nfamily=&quot; + family
                     + &quot;\ninput=&quot; + inputExpression
                     + &quot;\ntarget=&quot; + targetExpression
                     + &quot;\nassumptions=&quot; + assumptions
-<span class="fc" id="L397">                    + &quot;\nexpected=&quot; + expectedVerdict.name());</span>
+<span class="fc" id="L398">                    + &quot;\nexpected=&quot; + expectedVerdict.name());</span>
         }
     }
 
@@ -410,37 +411,37 @@ public final class ComparativeBenchmark {
         int mandatoryEvaluations,
         int completedMandatoryEvaluations
     ) {
-<span class="fc" id="L413">        public ResourceMetrics {</span>
-<span class="pc bpc" id="L414" title="10 of 20 branches missed.">            if (configuredWork &lt; 0 || executedWork &lt; 0 || skippedWork &lt; 0</span>
+<span class="fc" id="L414">        public ResourceMetrics {</span>
+<span class="pc bpc" id="L415" title="10 of 20 branches missed.">            if (configuredWork &lt; 0 || executedWork &lt; 0 || skippedWork &lt; 0</span>
                     || remainingWork &lt; 0 || exploredStates &lt; 0
                     || generatedSuccessors &lt; 0 || pathLength &lt; -1
                     || consumedCostUnits &lt; 0 || mandatoryEvaluations &lt; 0
                     || completedMandatoryEvaluations &lt; 0) {
-<span class="nc" id="L419">                throw new IllegalArgumentException(&quot;resource metrics must not be negative&quot;);</span>
+<span class="nc" id="L420">                throw new IllegalArgumentException(&quot;resource metrics must not be negative&quot;);</span>
             }
-<span class="fc bfc" id="L421" title="All 2 branches covered.">            if (configuredWork != executedWork + skippedWork + remainingWork) {</span>
-<span class="fc" id="L422">                throw new IllegalArgumentException(&quot;configured work must balance&quot;);</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">            if (configuredWork != executedWork + skippedWork + remainingWork) {</span>
+<span class="fc" id="L423">                throw new IllegalArgumentException(&quot;configured work must balance&quot;);</span>
             }
-<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (completedMandatoryEvaluations &gt; mandatoryEvaluations) {</span>
-<span class="nc" id="L425">                throw new IllegalArgumentException(&quot;completed mandatory evaluations exceed configured&quot;);</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            if (completedMandatoryEvaluations &gt; mandatoryEvaluations) {</span>
+<span class="nc" id="L426">                throw new IllegalArgumentException(&quot;completed mandatory evaluations exceed configured&quot;);</span>
             }
-<span class="fc" id="L427">        }</span>
+<span class="fc" id="L428">        }</span>
 
         JsonWriter write(JsonWriter json) {
-<span class="fc" id="L430">            return json.property(&quot;configuredWork&quot;, configuredWork)</span>
-<span class="fc" id="L431">                .property(&quot;executedWork&quot;, executedWork)</span>
-<span class="fc" id="L432">                .property(&quot;skippedWork&quot;, skippedWork)</span>
-<span class="fc" id="L433">                .property(&quot;remainingWork&quot;, remainingWork)</span>
-<span class="fc" id="L434">                .property(&quot;exploredStates&quot;, exploredStates)</span>
-<span class="fc" id="L435">                .property(&quot;generatedSuccessors&quot;, generatedSuccessors)</span>
-<span class="fc" id="L436">                .property(&quot;pathLength&quot;, pathLength)</span>
-<span class="fc" id="L437">                .property(&quot;consumedCostUnits&quot;, consumedCostUnits)</span>
-<span class="fc" id="L438">                .property(&quot;mandatoryEvaluations&quot;, mandatoryEvaluations)</span>
-<span class="fc" id="L439">                .property(&quot;completedMandatoryEvaluations&quot;, completedMandatoryEvaluations);</span>
+<span class="fc" id="L431">            return json.property(&quot;configuredWork&quot;, configuredWork)</span>
+<span class="fc" id="L432">                .property(&quot;executedWork&quot;, executedWork)</span>
+<span class="fc" id="L433">                .property(&quot;skippedWork&quot;, skippedWork)</span>
+<span class="fc" id="L434">                .property(&quot;remainingWork&quot;, remainingWork)</span>
+<span class="fc" id="L435">                .property(&quot;exploredStates&quot;, exploredStates)</span>
+<span class="fc" id="L436">                .property(&quot;generatedSuccessors&quot;, generatedSuccessors)</span>
+<span class="fc" id="L437">                .property(&quot;pathLength&quot;, pathLength)</span>
+<span class="fc" id="L438">                .property(&quot;consumedCostUnits&quot;, consumedCostUnits)</span>
+<span class="fc" id="L439">                .property(&quot;mandatoryEvaluations&quot;, mandatoryEvaluations)</span>
+<span class="fc" id="L440">                .property(&quot;completedMandatoryEvaluations&quot;, completedMandatoryEvaluations);</span>
         }
 
         String canonicalMaterial() {
-<span class="fc" id="L443">            return configuredWork + &quot;|&quot; + executedWork + &quot;|&quot; + skippedWork</span>
+<span class="fc" id="L444">            return configuredWork + &quot;|&quot; + executedWork + &quot;|&quot; + skippedWork</span>
                 + &quot;|&quot; + remainingWork + &quot;|&quot; + exploredStates + &quot;|&quot;
                 + generatedSuccessors + &quot;|&quot; + pathLength + &quot;|&quot;
                 + consumedCostUnits + &quot;|&quot; + mandatoryEvaluations + &quot;|&quot;
@@ -455,27 +456,27 @@ public final class ComparativeBenchmark {
         String certificateHash,
         List&lt;String&gt; unsupportedReasons
     ) {
-<span class="fc" id="L458">        public EvidenceMetrics {</span>
-<span class="fc" id="L459">            validationStatus = normalizeRequired(validationStatus, &quot;validationStatus&quot;);</span>
-<span class="fc" id="L460">            counterexampleStatus = normalizeRequired(counterexampleStatus, &quot;counterexampleStatus&quot;);</span>
-<span class="fc" id="L461">            proofStatus = normalizeRequired(proofStatus, &quot;proofStatus&quot;);</span>
-<span class="fc" id="L462">            certificateHash = normalize(certificateHash);</span>
-<span class="fc bfc" id="L463" title="All 2 branches covered.">            if (!certificateHash.isEmpty()) {</span>
-<span class="fc" id="L464">                requireSha(certificateHash, &quot;certificateHash&quot;);</span>
+<span class="fc" id="L459">        public EvidenceMetrics {</span>
+<span class="fc" id="L460">            validationStatus = normalizeRequired(validationStatus, &quot;validationStatus&quot;);</span>
+<span class="fc" id="L461">            counterexampleStatus = normalizeRequired(counterexampleStatus, &quot;counterexampleStatus&quot;);</span>
+<span class="fc" id="L462">            proofStatus = normalizeRequired(proofStatus, &quot;proofStatus&quot;);</span>
+<span class="fc" id="L463">            certificateHash = normalize(certificateHash);</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (!certificateHash.isEmpty()) {</span>
+<span class="fc" id="L465">                requireSha(certificateHash, &quot;certificateHash&quot;);</span>
             }
-<span class="fc" id="L466">            unsupportedReasons = sortedStrings(unsupportedReasons);</span>
-<span class="fc" id="L467">        }</span>
+<span class="fc" id="L467">            unsupportedReasons = sortedStrings(unsupportedReasons);</span>
+<span class="fc" id="L468">        }</span>
 
         JsonWriter write(JsonWriter json) {
-<span class="fc" id="L470">            return json.property(&quot;validationStatus&quot;, validationStatus)</span>
-<span class="fc" id="L471">                .property(&quot;counterexampleStatus&quot;, counterexampleStatus)</span>
-<span class="fc" id="L472">                .property(&quot;proofStatus&quot;, proofStatus)</span>
-<span class="fc" id="L473">                .property(&quot;certificateHash&quot;, certificateHash)</span>
-<span class="fc" id="L474">                .stringArray(&quot;unsupportedReasons&quot;, unsupportedReasons);</span>
+<span class="fc" id="L471">            return json.property(&quot;validationStatus&quot;, validationStatus)</span>
+<span class="fc" id="L472">                .property(&quot;counterexampleStatus&quot;, counterexampleStatus)</span>
+<span class="fc" id="L473">                .property(&quot;proofStatus&quot;, proofStatus)</span>
+<span class="fc" id="L474">                .property(&quot;certificateHash&quot;, certificateHash)</span>
+<span class="fc" id="L475">                .stringArray(&quot;unsupportedReasons&quot;, unsupportedReasons);</span>
         }
 
         String canonicalMaterial() {
-<span class="fc" id="L478">            return validationStatus + '|' + counterexampleStatus + '|'</span>
+<span class="fc" id="L479">            return validationStatus + '|' + counterexampleStatus + '|'</span>
                 + proofStatus + '|' + certificateHash + '|' + unsupportedReasons;
         }
     }
@@ -493,24 +494,24 @@ public final class ComparativeBenchmark {
         List&lt;String&gt; lineageHashes,
         String contentHash
     ) {
-<span class="fc" id="L496">        public Result {</span>
-<span class="fc" id="L497">            requireSha(configurationHash, &quot;configurationHash&quot;);</span>
-<span class="fc" id="L498">            requireSha(caseHash, &quot;caseHash&quot;);</span>
-<span class="fc" id="L499">            Objects.requireNonNull(track, &quot;track&quot;);</span>
-<span class="fc" id="L500">            Objects.requireNonNull(disposition, &quot;disposition&quot;);</span>
-<span class="fc" id="L501">            Objects.requireNonNull(observedVerdict, &quot;observedVerdict&quot;);</span>
-<span class="fc" id="L502">            Objects.requireNonNull(resources, &quot;resources&quot;);</span>
-<span class="fc" id="L503">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
-<span class="fc" id="L504">            trackMetrics = orderedLongMap(trackMetrics);</span>
-<span class="fc" id="L505">            lineageHashes = sortedStrings(lineageHashes);</span>
-<span class="fc" id="L506">            lineageHashes.forEach(value -&gt; requireSha(value, &quot;lineageHash&quot;));</span>
-<span class="fc" id="L507">            requireSha(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L508">            if (!hash(configurationHash, caseHash, track, disposition,</span>
+<span class="fc" id="L497">        public Result {</span>
+<span class="fc" id="L498">            requireSha(configurationHash, &quot;configurationHash&quot;);</span>
+<span class="fc" id="L499">            requireSha(caseHash, &quot;caseHash&quot;);</span>
+<span class="fc" id="L500">            Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L501">            Objects.requireNonNull(disposition, &quot;disposition&quot;);</span>
+<span class="fc" id="L502">            Objects.requireNonNull(observedVerdict, &quot;observedVerdict&quot;);</span>
+<span class="fc" id="L503">            Objects.requireNonNull(resources, &quot;resources&quot;);</span>
+<span class="fc" id="L504">            Objects.requireNonNull(evidence, &quot;evidence&quot;);</span>
+<span class="fc" id="L505">            trackMetrics = orderedLongMap(trackMetrics);</span>
+<span class="fc" id="L506">            lineageHashes = sortedStrings(lineageHashes);</span>
+<span class="fc" id="L507">            lineageHashes.forEach(value -&gt; requireSha(value, &quot;lineageHash&quot;));</span>
+<span class="fc" id="L508">            requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L509">            if (!hash(configurationHash, caseHash, track, disposition,</span>
                     observedVerdict, correct, resources, evidence,
-<span class="pc bpc" id="L510" title="1 of 2 branches missed.">                    trackMetrics, lineageHashes).equals(contentHash)) {</span>
-<span class="nc" id="L511">                throw new IllegalArgumentException(&quot;result hash mismatch&quot;);</span>
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">                    trackMetrics, lineageHashes).equals(contentHash)) {</span>
+<span class="nc" id="L512">                throw new IllegalArgumentException(&quot;result hash mismatch&quot;);</span>
             }
-<span class="fc" id="L513">        }</span>
+<span class="fc" id="L514">        }</span>
 
         public static Result create(
             Configuration configuration,
@@ -522,51 +523,51 @@ public final class ComparativeBenchmark {
             Map&lt;String, Long&gt; trackMetrics,
             List&lt;String&gt; lineageHashes
         ) {
-<span class="fc" id="L525">            Objects.requireNonNull(configuration, &quot;configuration&quot;);</span>
-<span class="fc" id="L526">            Objects.requireNonNull(benchmarkCase, &quot;benchmarkCase&quot;);</span>
-<span class="pc bpc" id="L527" title="1 of 2 branches missed.">            if (configuration.track() != benchmarkCase.track()) {</span>
-<span class="nc" id="L528">                throw new IllegalArgumentException(&quot;configuration and case track differ&quot;);</span>
+<span class="fc" id="L526">            Objects.requireNonNull(configuration, &quot;configuration&quot;);</span>
+<span class="fc" id="L527">            Objects.requireNonNull(benchmarkCase, &quot;benchmarkCase&quot;);</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">            if (configuration.track() != benchmarkCase.track()) {</span>
+<span class="nc" id="L529">                throw new IllegalArgumentException(&quot;configuration and case track differ&quot;);</span>
             }
-<span class="fc" id="L530">            boolean correct = matches(benchmarkCase.expectedVerdict(), observedVerdict);</span>
-<span class="fc" id="L531">            Map&lt;String, Long&gt; metrics = orderedLongMap(trackMetrics);</span>
-<span class="fc" id="L532">            List&lt;String&gt; lineage = sortedStrings(lineageHashes);</span>
-<span class="fc" id="L533">            return new Result(</span>
-<span class="fc" id="L534">                configuration.contentHash(), benchmarkCase.contentHash(),</span>
-<span class="fc" id="L535">                benchmarkCase.track(), disposition, observedVerdict, correct,</span>
+<span class="fc" id="L531">            boolean correct = matches(benchmarkCase.expectedVerdict(), observedVerdict);</span>
+<span class="fc" id="L532">            Map&lt;String, Long&gt; metrics = orderedLongMap(trackMetrics);</span>
+<span class="fc" id="L533">            List&lt;String&gt; lineage = sortedStrings(lineageHashes);</span>
+<span class="fc" id="L534">            return new Result(</span>
+<span class="fc" id="L535">                configuration.contentHash(), benchmarkCase.contentHash(),</span>
+<span class="fc" id="L536">                benchmarkCase.track(), disposition, observedVerdict, correct,</span>
                 resources, evidence, metrics, lineage,
-<span class="fc" id="L537">                hash(configuration.contentHash(), benchmarkCase.contentHash(),</span>
-<span class="fc" id="L538">                    benchmarkCase.track(), disposition, observedVerdict, correct,</span>
+<span class="fc" id="L538">                hash(configuration.contentHash(), benchmarkCase.contentHash(),</span>
+<span class="fc" id="L539">                    benchmarkCase.track(), disposition, observedVerdict, correct,</span>
                     resources, evidence, metrics, lineage));
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L543">            return write(new JsonWriter().beginObject()).endObject().toString();</span>
+<span class="fc" id="L544">            return write(new JsonWriter().beginObject()).endObject().toString();</span>
         }
 
         JsonWriter write(JsonWriter json) {
-<span class="fc" id="L547">            json.property(&quot;configurationHash&quot;, configurationHash)</span>
-<span class="fc" id="L548">                .property(&quot;caseHash&quot;, caseHash)</span>
-<span class="fc" id="L549">                .property(&quot;track&quot;, track.name())</span>
-<span class="fc" id="L550">                .property(&quot;disposition&quot;, disposition.name())</span>
-<span class="fc" id="L551">                .property(&quot;observedVerdict&quot;, observedVerdict.name())</span>
-<span class="fc" id="L552">                .property(&quot;correct&quot;, correct)</span>
-<span class="fc" id="L553">                .object(&quot;resources&quot;, resources::write)</span>
-<span class="fc" id="L554">                .object(&quot;evidence&quot;, evidence::write)</span>
-<span class="fc" id="L555">                .object(&quot;trackMetrics&quot;, object -&gt;</span>
-<span class="fc" id="L556">                    trackMetrics.forEach(object::property))</span>
-<span class="fc" id="L557">                .stringArray(&quot;lineageHashes&quot;, lineageHashes)</span>
-<span class="fc" id="L558">                .property(&quot;contentHash&quot;, contentHash);</span>
-<span class="fc" id="L559">            return json;</span>
+<span class="fc" id="L548">            json.property(&quot;configurationHash&quot;, configurationHash)</span>
+<span class="fc" id="L549">                .property(&quot;caseHash&quot;, caseHash)</span>
+<span class="fc" id="L550">                .property(&quot;track&quot;, track.name())</span>
+<span class="fc" id="L551">                .property(&quot;disposition&quot;, disposition.name())</span>
+<span class="fc" id="L552">                .property(&quot;observedVerdict&quot;, observedVerdict.name())</span>
+<span class="fc" id="L553">                .property(&quot;correct&quot;, correct)</span>
+<span class="fc" id="L554">                .object(&quot;resources&quot;, resources::write)</span>
+<span class="fc" id="L555">                .object(&quot;evidence&quot;, evidence::write)</span>
+<span class="fc" id="L556">                .object(&quot;trackMetrics&quot;, object -&gt;</span>
+<span class="fc" id="L557">                    trackMetrics.forEach(object::property))</span>
+<span class="fc" id="L558">                .stringArray(&quot;lineageHashes&quot;, lineageHashes)</span>
+<span class="fc" id="L559">                .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L560">            return json;</span>
         }
 
         private static boolean matches(
             ExpectedVerdict expected,
             ObservedVerdict observed
         ) {
-<span class="fc bfc" id="L566" title="All 3 branches covered.">            return switch (expected) {</span>
-<span class="pc bpc" id="L567" title="1 of 2 branches missed.">                case TARGET_REACHED -&gt; observed == ObservedVerdict.TARGET_REACHED;</span>
-<span class="fc bfc" id="L568" title="All 2 branches covered.">                case CONFIRMED -&gt; observed == ObservedVerdict.CONFIRMED;</span>
-<span class="fc bfc" id="L569" title="All 2 branches covered.">                case REFUTED -&gt; observed == ObservedVerdict.REFUTED;</span>
+<span class="fc bfc" id="L567" title="All 3 branches covered.">            return switch (expected) {</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">                case TARGET_REACHED -&gt; observed == ObservedVerdict.TARGET_REACHED;</span>
+<span class="fc bfc" id="L569" title="All 2 branches covered.">                case CONFIRMED -&gt; observed == ObservedVerdict.CONFIRMED;</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">                case REFUTED -&gt; observed == ObservedVerdict.REFUTED;</span>
             };
         }
 
@@ -582,15 +583,15 @@ public final class ComparativeBenchmark {
             Map&lt;String, Long&gt; trackMetrics,
             List&lt;String&gt; lineageHashes
         ) {
-<span class="fc" id="L585">            return SolverIr.sha256(</span>
+<span class="fc" id="L586">            return SolverIr.sha256(</span>
                 &quot;result/v1\nconfiguration=&quot; + configurationHash
                     + &quot;\ncase=&quot; + caseHash
-<span class="fc" id="L588">                    + &quot;\ntrack=&quot; + track.name()</span>
-<span class="fc" id="L589">                    + &quot;\ndisposition=&quot; + disposition.name()</span>
-<span class="fc" id="L590">                    + &quot;\nobserved=&quot; + observedVerdict.name()</span>
+<span class="fc" id="L589">                    + &quot;\ntrack=&quot; + track.name()</span>
+<span class="fc" id="L590">                    + &quot;\ndisposition=&quot; + disposition.name()</span>
+<span class="fc" id="L591">                    + &quot;\nobserved=&quot; + observedVerdict.name()</span>
                     + &quot;\ncorrect=&quot; + correct
-<span class="fc" id="L592">                    + &quot;\nresources=&quot; + resources.canonicalMaterial()</span>
-<span class="fc" id="L593">                    + &quot;\nevidence=&quot; + evidence.canonicalMaterial()</span>
+<span class="fc" id="L593">                    + &quot;\nresources=&quot; + resources.canonicalMaterial()</span>
+<span class="fc" id="L594">                    + &quot;\nevidence=&quot; + evidence.canonicalMaterial()</span>
                     + &quot;\ntrackMetrics=&quot; + trackMetrics
                     + &quot;\nlineage=&quot; + lineageHashes);
         }
@@ -605,23 +606,23 @@ public final class ComparativeBenchmark {
         List&lt;String&gt; limitations,
         String contentHash
     ) {
-<span class="fc" id="L608">        public CapabilityClaim {</span>
-<span class="fc" id="L609">            requireText(id, &quot;claim id&quot;);</span>
-<span class="fc" id="L610">            Objects.requireNonNull(track, &quot;track&quot;);</span>
-<span class="fc" id="L611">            Objects.requireNonNull(status, &quot;status&quot;);</span>
-<span class="fc" id="L612">            statement = normalizeRequired(statement, &quot;statement&quot;);</span>
-<span class="fc" id="L613">            evidenceResultHashes = sortedStrings(evidenceResultHashes);</span>
-<span class="fc" id="L614">            evidenceResultHashes.forEach(value -&gt; requireSha(value, &quot;evidenceResultHash&quot;));</span>
-<span class="fc" id="L615">            limitations = sortedStrings(limitations);</span>
-<span class="pc bpc" id="L616" title="1 of 2 branches missed.">            if (evidenceResultHashes.isEmpty()) {</span>
-<span class="nc" id="L617">                throw new IllegalArgumentException(&quot;claim requires result evidence&quot;);</span>
+<span class="fc" id="L609">        public CapabilityClaim {</span>
+<span class="fc" id="L610">            requireText(id, &quot;claim id&quot;);</span>
+<span class="fc" id="L611">            Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L612">            Objects.requireNonNull(status, &quot;status&quot;);</span>
+<span class="fc" id="L613">            statement = normalizeRequired(statement, &quot;statement&quot;);</span>
+<span class="fc" id="L614">            evidenceResultHashes = sortedStrings(evidenceResultHashes);</span>
+<span class="fc" id="L615">            evidenceResultHashes.forEach(value -&gt; requireSha(value, &quot;evidenceResultHash&quot;));</span>
+<span class="fc" id="L616">            limitations = sortedStrings(limitations);</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">            if (evidenceResultHashes.isEmpty()) {</span>
+<span class="nc" id="L618">                throw new IllegalArgumentException(&quot;claim requires result evidence&quot;);</span>
             }
-<span class="fc" id="L619">            requireSha(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L620">            if (!hash(id, track, status, statement, evidenceResultHashes, limitations)</span>
-<span class="pc bpc" id="L621" title="1 of 2 branches missed.">                    .equals(contentHash)) {</span>
-<span class="nc" id="L622">                throw new IllegalArgumentException(&quot;claim hash mismatch&quot;);</span>
+<span class="fc" id="L620">            requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L621">            if (!hash(id, track, status, statement, evidenceResultHashes, limitations)</span>
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">                    .equals(contentHash)) {</span>
+<span class="nc" id="L623">                throw new IllegalArgumentException(&quot;claim hash mismatch&quot;);</span>
             }
-<span class="fc" id="L624">        }</span>
+<span class="fc" id="L625">        }</span>
 
         public static CapabilityClaim create(
             String id,
@@ -631,21 +632,21 @@ public final class ComparativeBenchmark {
             List&lt;String&gt; evidenceResultHashes,
             List&lt;String&gt; limitations
         ) {
-<span class="fc" id="L634">            List&lt;String&gt; evidence = sortedStrings(evidenceResultHashes);</span>
-<span class="fc" id="L635">            List&lt;String&gt; orderedLimitations = sortedStrings(limitations);</span>
-<span class="fc" id="L636">            return new CapabilityClaim(</span>
+<span class="fc" id="L635">            List&lt;String&gt; evidence = sortedStrings(evidenceResultHashes);</span>
+<span class="fc" id="L636">            List&lt;String&gt; orderedLimitations = sortedStrings(limitations);</span>
+<span class="fc" id="L637">            return new CapabilityClaim(</span>
                 id, track, status, statement, evidence, orderedLimitations,
-<span class="fc" id="L638">                hash(id, track, status, statement, evidence, orderedLimitations));</span>
+<span class="fc" id="L639">                hash(id, track, status, statement, evidence, orderedLimitations));</span>
         }
 
         JsonWriter write(JsonWriter json) {
-<span class="fc" id="L642">            return json.property(&quot;id&quot;, id)</span>
-<span class="fc" id="L643">                .property(&quot;track&quot;, track.name())</span>
-<span class="fc" id="L644">                .property(&quot;status&quot;, status.name())</span>
-<span class="fc" id="L645">                .property(&quot;statement&quot;, statement)</span>
-<span class="fc" id="L646">                .stringArray(&quot;evidenceResultHashes&quot;, evidenceResultHashes)</span>
-<span class="fc" id="L647">                .stringArray(&quot;limitations&quot;, limitations)</span>
-<span class="fc" id="L648">                .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L643">            return json.property(&quot;id&quot;, id)</span>
+<span class="fc" id="L644">                .property(&quot;track&quot;, track.name())</span>
+<span class="fc" id="L645">                .property(&quot;status&quot;, status.name())</span>
+<span class="fc" id="L646">                .property(&quot;statement&quot;, statement)</span>
+<span class="fc" id="L647">                .stringArray(&quot;evidenceResultHashes&quot;, evidenceResultHashes)</span>
+<span class="fc" id="L648">                .stringArray(&quot;limitations&quot;, limitations)</span>
+<span class="fc" id="L649">                .property(&quot;contentHash&quot;, contentHash);</span>
         }
 
         private static String hash(
@@ -656,10 +657,10 @@ public final class ComparativeBenchmark {
             List&lt;String&gt; evidenceResultHashes,
             List&lt;String&gt; limitations
         ) {
-<span class="fc" id="L659">            return SolverIr.sha256(</span>
+<span class="fc" id="L660">            return SolverIr.sha256(</span>
                 &quot;claim/v1\nid=&quot; + id
-<span class="fc" id="L661">                    + &quot;\ntrack=&quot; + track.name()</span>
-<span class="fc" id="L662">                    + &quot;\nstatus=&quot; + status.name()</span>
+<span class="fc" id="L662">                    + &quot;\ntrack=&quot; + track.name()</span>
+<span class="fc" id="L663">                    + &quot;\nstatus=&quot; + status.name()</span>
                     + &quot;\nstatement=&quot; + statement
                     + &quot;\nevidence=&quot; + evidenceResultHashes
                     + &quot;\nlimitations=&quot; + limitations);
@@ -672,34 +673,34 @@ public final class ComparativeBenchmark {
         List&lt;String&gt; requiredEvidence,
         String contentHash
     ) {
-<span class="fc" id="L675">        public CoverageGap {</span>
-<span class="fc" id="L676">            Objects.requireNonNull(track, &quot;track&quot;);</span>
-<span class="fc" id="L677">            reason = normalizeRequired(reason, &quot;reason&quot;);</span>
-<span class="fc" id="L678">            requiredEvidence = sortedStrings(requiredEvidence);</span>
-<span class="pc bpc" id="L679" title="1 of 2 branches missed.">            if (requiredEvidence.isEmpty()) {</span>
-<span class="nc" id="L680">                throw new IllegalArgumentException(&quot;coverage gap needs required evidence&quot;);</span>
+<span class="fc" id="L676">        public CoverageGap {</span>
+<span class="fc" id="L677">            Objects.requireNonNull(track, &quot;track&quot;);</span>
+<span class="fc" id="L678">            reason = normalizeRequired(reason, &quot;reason&quot;);</span>
+<span class="fc" id="L679">            requiredEvidence = sortedStrings(requiredEvidence);</span>
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">            if (requiredEvidence.isEmpty()) {</span>
+<span class="nc" id="L681">                throw new IllegalArgumentException(&quot;coverage gap needs required evidence&quot;);</span>
             }
-<span class="fc" id="L682">            requireSha(contentHash, &quot;contentHash&quot;);</span>
-<span class="pc bpc" id="L683" title="1 of 2 branches missed.">            if (!hash(track, reason, requiredEvidence).equals(contentHash)) {</span>
-<span class="nc" id="L684">                throw new IllegalArgumentException(&quot;coverage gap hash mismatch&quot;);</span>
+<span class="fc" id="L683">            requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">            if (!hash(track, reason, requiredEvidence).equals(contentHash)) {</span>
+<span class="nc" id="L685">                throw new IllegalArgumentException(&quot;coverage gap hash mismatch&quot;);</span>
             }
-<span class="fc" id="L686">        }</span>
+<span class="fc" id="L687">        }</span>
 
         public static CoverageGap create(
             Track track,
             String reason,
             List&lt;String&gt; requiredEvidence
         ) {
-<span class="fc" id="L693">            List&lt;String&gt; evidence = sortedStrings(requiredEvidence);</span>
-<span class="fc" id="L694">            return new CoverageGap(</span>
-<span class="fc" id="L695">                track, reason, evidence, hash(track, reason, evidence));</span>
+<span class="fc" id="L694">            List&lt;String&gt; evidence = sortedStrings(requiredEvidence);</span>
+<span class="fc" id="L695">            return new CoverageGap(</span>
+<span class="fc" id="L696">                track, reason, evidence, hash(track, reason, evidence));</span>
         }
 
         JsonWriter write(JsonWriter json) {
-<span class="fc" id="L699">            return json.property(&quot;track&quot;, track.name())</span>
-<span class="fc" id="L700">                .property(&quot;reason&quot;, reason)</span>
-<span class="fc" id="L701">                .stringArray(&quot;requiredEvidence&quot;, requiredEvidence)</span>
-<span class="fc" id="L702">                .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L700">            return json.property(&quot;track&quot;, track.name())</span>
+<span class="fc" id="L701">                .property(&quot;reason&quot;, reason)</span>
+<span class="fc" id="L702">                .stringArray(&quot;requiredEvidence&quot;, requiredEvidence)</span>
+<span class="fc" id="L703">                .property(&quot;contentHash&quot;, contentHash);</span>
         }
 
         private static String hash(
@@ -707,8 +708,8 @@ public final class ComparativeBenchmark {
             String reason,
             List&lt;String&gt; requiredEvidence
         ) {
-<span class="fc" id="L710">            return SolverIr.sha256(</span>
-<span class="fc" id="L711">                &quot;coverage-gap/v1\ntrack=&quot; + track.name()</span>
+<span class="fc" id="L711">            return SolverIr.sha256(</span>
+<span class="fc" id="L712">                &quot;coverage-gap/v1\ntrack=&quot; + track.name()</span>
                     + &quot;\nreason=&quot; + reason
                     + &quot;\nrequiredEvidence=&quot; + requiredEvidence);
         }
@@ -726,33 +727,33 @@ public final class ComparativeBenchmark {
         String scorePolicy,
         String contentHash
     ) {
-<span class="fc" id="L729">        public Report {</span>
-<span class="pc bpc" id="L730" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L731">                throw new IllegalArgumentException(&quot;unsupported comparative benchmark schema&quot;);</span>
+<span class="fc" id="L730">        public Report {</span>
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">            if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L732">                throw new IllegalArgumentException(&quot;unsupported comparative benchmark schema&quot;);</span>
             }
-<span class="fc" id="L733">            requireText(suiteId, &quot;suiteId&quot;);</span>
-<span class="fc" id="L734">            parityManifests = sorted(parityManifests,</span>
-<span class="fc" id="L735">                Comparator.comparing(InformationParityManifest::id));</span>
-<span class="fc" id="L736">            configurations = sorted(configurations,</span>
-<span class="fc" id="L737">                Comparator.comparing(Configuration::id));</span>
-<span class="fc" id="L738">            cases = sorted(cases, Comparator.comparing(Case::id));</span>
-<span class="fc" id="L739">            results = sorted(results,</span>
-<span class="fc" id="L740">                Comparator.comparing(Result::configurationHash)</span>
-<span class="fc" id="L741">                    .thenComparing(Result::caseHash));</span>
-<span class="fc" id="L742">            claims = sorted(claims, Comparator.comparing(CapabilityClaim::id));</span>
-<span class="fc" id="L743">            coverageGaps = sorted(coverageGaps,</span>
-<span class="fc" id="L744">                Comparator.comparing(item -&gt; item.track().name()));</span>
-<span class="fc bfc" id="L745" title="All 2 branches covered.">            if (!SCORE_POLICY.equals(scorePolicy)) {</span>
-<span class="fc" id="L746">                throw new IllegalArgumentException(&quot;universal scores are not permitted&quot;);</span>
+<span class="fc" id="L734">            requireText(suiteId, &quot;suiteId&quot;);</span>
+<span class="fc" id="L735">            parityManifests = sorted(parityManifests,</span>
+<span class="fc" id="L736">                Comparator.comparing(InformationParityManifest::id));</span>
+<span class="fc" id="L737">            configurations = sorted(configurations,</span>
+<span class="fc" id="L738">                Comparator.comparing(Configuration::id));</span>
+<span class="fc" id="L739">            cases = sorted(cases, Comparator.comparing(Case::id));</span>
+<span class="fc" id="L740">            results = sorted(results,</span>
+<span class="fc" id="L741">                Comparator.comparing(Result::configurationHash)</span>
+<span class="fc" id="L742">                    .thenComparing(Result::caseHash));</span>
+<span class="fc" id="L743">            claims = sorted(claims, Comparator.comparing(CapabilityClaim::id));</span>
+<span class="fc" id="L744">            coverageGaps = sorted(coverageGaps,</span>
+<span class="fc" id="L745">                Comparator.comparing(item -&gt; item.track().name()));</span>
+<span class="fc bfc" id="L746" title="All 2 branches covered.">            if (!SCORE_POLICY.equals(scorePolicy)) {</span>
+<span class="fc" id="L747">                throw new IllegalArgumentException(&quot;universal scores are not permitted&quot;);</span>
             }
-<span class="fc" id="L748">            validateReferences(parityManifests, configurations, cases, results,</span>
+<span class="fc" id="L749">            validateReferences(parityManifests, configurations, cases, results,</span>
                 claims, coverageGaps);
-<span class="fc" id="L750">            requireSha(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L751">            if (!hash(suiteId, parityManifests, configurations, cases, results,</span>
-<span class="pc bpc" id="L752" title="1 of 2 branches missed.">                    claims, coverageGaps).equals(contentHash)) {</span>
-<span class="nc" id="L753">                throw new IllegalArgumentException(&quot;report hash mismatch&quot;);</span>
+<span class="fc" id="L751">            requireSha(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L752">            if (!hash(suiteId, parityManifests, configurations, cases, results,</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">                    claims, coverageGaps).equals(contentHash)) {</span>
+<span class="nc" id="L754">                throw new IllegalArgumentException(&quot;report hash mismatch&quot;);</span>
             }
-<span class="fc" id="L755">        }</span>
+<span class="fc" id="L756">        }</span>
 
         public static Report create(
             String suiteId,
@@ -763,46 +764,46 @@ public final class ComparativeBenchmark {
             List&lt;CapabilityClaim&gt; claims,
             List&lt;CoverageGap&gt; coverageGaps
         ) {
-<span class="fc" id="L766">            List&lt;InformationParityManifest&gt; manifests = sorted(parityManifests,</span>
-<span class="fc" id="L767">                Comparator.comparing(InformationParityManifest::id));</span>
-<span class="fc" id="L768">            List&lt;Configuration&gt; configs = sorted(configurations,</span>
-<span class="fc" id="L769">                Comparator.comparing(Configuration::id));</span>
-<span class="fc" id="L770">            List&lt;Case&gt; orderedCases = sorted(cases, Comparator.comparing(Case::id));</span>
-<span class="fc" id="L771">            List&lt;Result&gt; orderedResults = sorted(results,</span>
-<span class="fc" id="L772">                Comparator.comparing(Result::configurationHash)</span>
-<span class="fc" id="L773">                    .thenComparing(Result::caseHash));</span>
-<span class="fc" id="L774">            List&lt;CapabilityClaim&gt; orderedClaims = sorted(claims,</span>
-<span class="fc" id="L775">                Comparator.comparing(CapabilityClaim::id));</span>
-<span class="fc" id="L776">            List&lt;CoverageGap&gt; gaps = sorted(coverageGaps,</span>
-<span class="fc" id="L777">                Comparator.comparing(item -&gt; item.track().name()));</span>
-<span class="fc" id="L778">            validateReferences(manifests, configs, orderedCases, orderedResults,</span>
+<span class="fc" id="L767">            List&lt;InformationParityManifest&gt; manifests = sorted(parityManifests,</span>
+<span class="fc" id="L768">                Comparator.comparing(InformationParityManifest::id));</span>
+<span class="fc" id="L769">            List&lt;Configuration&gt; configs = sorted(configurations,</span>
+<span class="fc" id="L770">                Comparator.comparing(Configuration::id));</span>
+<span class="fc" id="L771">            List&lt;Case&gt; orderedCases = sorted(cases, Comparator.comparing(Case::id));</span>
+<span class="fc" id="L772">            List&lt;Result&gt; orderedResults = sorted(results,</span>
+<span class="fc" id="L773">                Comparator.comparing(Result::configurationHash)</span>
+<span class="fc" id="L774">                    .thenComparing(Result::caseHash));</span>
+<span class="fc" id="L775">            List&lt;CapabilityClaim&gt; orderedClaims = sorted(claims,</span>
+<span class="fc" id="L776">                Comparator.comparing(CapabilityClaim::id));</span>
+<span class="fc" id="L777">            List&lt;CoverageGap&gt; gaps = sorted(coverageGaps,</span>
+<span class="fc" id="L778">                Comparator.comparing(item -&gt; item.track().name()));</span>
+<span class="fc" id="L779">            validateReferences(manifests, configs, orderedCases, orderedResults,</span>
                 orderedClaims, gaps);
-<span class="fc" id="L780">            return new Report(</span>
+<span class="fc" id="L781">            return new Report(</span>
                 SCHEMA, suiteId, manifests, configs, orderedCases,
                 orderedResults, orderedClaims, gaps, SCORE_POLICY,
-<span class="fc" id="L783">                hash(suiteId, manifests, configs, orderedCases, orderedResults,</span>
+<span class="fc" id="L784">                hash(suiteId, manifests, configs, orderedCases, orderedResults,</span>
                     orderedClaims, gaps));
         }
 
         public String toCanonicalJson() {
-<span class="fc" id="L788">            JsonWriter json = new JsonWriter().beginObject()</span>
-<span class="fc" id="L789">                .property(&quot;schema&quot;, schema)</span>
-<span class="fc" id="L790">                .property(&quot;suiteId&quot;, suiteId)</span>
-<span class="fc" id="L791">                .array(&quot;parityManifests&quot;, array -&gt; parityManifests.forEach(item -&gt;</span>
-<span class="fc" id="L792">                    array.objectValue(item::write)))</span>
-<span class="fc" id="L793">                .array(&quot;configurations&quot;, array -&gt; configurations.forEach(item -&gt;</span>
-<span class="fc" id="L794">                    array.objectValue(item::write)))</span>
-<span class="fc" id="L795">                .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
-<span class="fc" id="L796">                    array.objectValue(item::write)))</span>
-<span class="fc" id="L797">                .array(&quot;results&quot;, array -&gt; results.forEach(item -&gt;</span>
-<span class="fc" id="L798">                    array.objectValue(item::write)))</span>
-<span class="fc" id="L799">                .array(&quot;claims&quot;, array -&gt; claims.forEach(item -&gt;</span>
-<span class="fc" id="L800">                    array.objectValue(item::write)))</span>
-<span class="fc" id="L801">                .array(&quot;coverageGaps&quot;, array -&gt; coverageGaps.forEach(item -&gt;</span>
-<span class="fc" id="L802">                    array.objectValue(item::write)))</span>
-<span class="fc" id="L803">                .property(&quot;scorePolicy&quot;, scorePolicy)</span>
-<span class="fc" id="L804">                .property(&quot;contentHash&quot;, contentHash);</span>
-<span class="fc" id="L805">            return json.endObject().toString();</span>
+<span class="fc" id="L789">            JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L790">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L791">                .property(&quot;suiteId&quot;, suiteId)</span>
+<span class="fc" id="L792">                .array(&quot;parityManifests&quot;, array -&gt; parityManifests.forEach(item -&gt;</span>
+<span class="fc" id="L793">                    array.objectValue(item::write)))</span>
+<span class="fc" id="L794">                .array(&quot;configurations&quot;, array -&gt; configurations.forEach(item -&gt;</span>
+<span class="fc" id="L795">                    array.objectValue(item::write)))</span>
+<span class="fc" id="L796">                .array(&quot;cases&quot;, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L797">                    array.objectValue(item::write)))</span>
+<span class="fc" id="L798">                .array(&quot;results&quot;, array -&gt; results.forEach(item -&gt;</span>
+<span class="fc" id="L799">                    array.objectValue(item::write)))</span>
+<span class="fc" id="L800">                .array(&quot;claims&quot;, array -&gt; claims.forEach(item -&gt;</span>
+<span class="fc" id="L801">                    array.objectValue(item::write)))</span>
+<span class="fc" id="L802">                .array(&quot;coverageGaps&quot;, array -&gt; coverageGaps.forEach(item -&gt;</span>
+<span class="fc" id="L803">                    array.objectValue(item::write)))</span>
+<span class="fc" id="L804">                .property(&quot;scorePolicy&quot;, scorePolicy)</span>
+<span class="fc" id="L805">                .property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L806">            return json.endObject().toString();</span>
         }
 
         private static void validateReferences(
@@ -813,70 +814,70 @@ public final class ComparativeBenchmark {
             List&lt;CapabilityClaim&gt; claims,
             List&lt;CoverageGap&gt; gaps
         ) {
-<span class="fc" id="L816">            unique(manifests.stream().map(InformationParityManifest::id).toList(),</span>
+<span class="fc" id="L817">            unique(manifests.stream().map(InformationParityManifest::id).toList(),</span>
                 &quot;parity manifest id&quot;);
-<span class="fc" id="L818">            unique(configurations.stream().map(Configuration::id).toList(),</span>
+<span class="fc" id="L819">            unique(configurations.stream().map(Configuration::id).toList(),</span>
                 &quot;configuration id&quot;);
-<span class="fc" id="L820">            unique(cases.stream().map(Case::id).toList(), &quot;case id&quot;);</span>
-<span class="fc" id="L821">            unique(claims.stream().map(CapabilityClaim::id).toList(), &quot;claim id&quot;);</span>
-<span class="fc" id="L822">            unique(gaps.stream().map(item -&gt; item.track().name()).toList(),</span>
+<span class="fc" id="L821">            unique(cases.stream().map(Case::id).toList(), &quot;case id&quot;);</span>
+<span class="fc" id="L822">            unique(claims.stream().map(CapabilityClaim::id).toList(), &quot;claim id&quot;);</span>
+<span class="fc" id="L823">            unique(gaps.stream().map(item -&gt; item.track().name()).toList(),</span>
                 &quot;coverage gap track&quot;);
 
-<span class="fc" id="L825">            Map&lt;String, InformationParityManifest&gt; manifestByHash = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L826">            manifests.forEach(item -&gt; manifestByHash.put(item.contentHash(), item));</span>
-<span class="fc" id="L827">            Map&lt;String, Configuration&gt; configurationByHash = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L828">            configurations.forEach(item -&gt; configurationByHash.put(item.contentHash(), item));</span>
-<span class="fc" id="L829">            Map&lt;String, Case&gt; caseByHash = new HashMap&lt;&gt;();</span>
-<span class="fc" id="L830">            cases.forEach(item -&gt; caseByHash.put(item.contentHash(), item));</span>
-<span class="fc" id="L831">            Set&lt;String&gt; resultHashes = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L826">            Map&lt;String, InformationParityManifest&gt; manifestByHash = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L827">            manifests.forEach(item -&gt; manifestByHash.put(item.contentHash(), item));</span>
+<span class="fc" id="L828">            Map&lt;String, Configuration&gt; configurationByHash = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L829">            configurations.forEach(item -&gt; configurationByHash.put(item.contentHash(), item));</span>
+<span class="fc" id="L830">            Map&lt;String, Case&gt; caseByHash = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L831">            cases.forEach(item -&gt; caseByHash.put(item.contentHash(), item));</span>
+<span class="fc" id="L832">            Set&lt;String&gt; resultHashes = new HashSet&lt;&gt;();</span>
 
-<span class="fc bfc" id="L833" title="All 2 branches covered.">            for (Configuration configuration : configurations) {</span>
-<span class="fc" id="L834">                InformationParityManifest manifest = manifestByHash.get(</span>
-<span class="fc" id="L835">                    configuration.parityManifestHash());</span>
-<span class="pc bpc" id="L836" title="2 of 4 branches missed.">                if (manifest == null || manifest.track() != configuration.track()) {</span>
-<span class="nc" id="L837">                    throw new IllegalArgumentException(</span>
+<span class="fc bfc" id="L834" title="All 2 branches covered.">            for (Configuration configuration : configurations) {</span>
+<span class="fc" id="L835">                InformationParityManifest manifest = manifestByHash.get(</span>
+<span class="fc" id="L836">                    configuration.parityManifestHash());</span>
+<span class="pc bpc" id="L837" title="2 of 4 branches missed.">                if (manifest == null || manifest.track() != configuration.track()) {</span>
+<span class="nc" id="L838">                    throw new IllegalArgumentException(</span>
                         &quot;configuration references missing or wrong-track parity manifest&quot;);
                 }
-<span class="fc" id="L840">            }</span>
-<span class="fc" id="L841">            Set&lt;String&gt; resultPairs = new HashSet&lt;&gt;();</span>
-<span class="fc bfc" id="L842" title="All 2 branches covered.">            for (Result result : results) {</span>
-<span class="fc" id="L843">                Configuration configuration = configurationByHash.get(</span>
-<span class="fc" id="L844">                    result.configurationHash());</span>
-<span class="fc" id="L845">                Case benchmarkCase = caseByHash.get(result.caseHash());</span>
-<span class="pc bpc" id="L846" title="2 of 4 branches missed.">                if (configuration == null || benchmarkCase == null</span>
-<span class="pc bpc" id="L847" title="1 of 2 branches missed.">                        || configuration.track() != result.track()</span>
-<span class="pc bpc" id="L848" title="1 of 2 branches missed.">                        || benchmarkCase.track() != result.track()) {</span>
-<span class="nc" id="L849">                    throw new IllegalArgumentException(&quot;result references invalid configuration/case&quot;);</span>
+<span class="fc" id="L841">            }</span>
+<span class="fc" id="L842">            Set&lt;String&gt; resultPairs = new HashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L843" title="All 2 branches covered.">            for (Result result : results) {</span>
+<span class="fc" id="L844">                Configuration configuration = configurationByHash.get(</span>
+<span class="fc" id="L845">                    result.configurationHash());</span>
+<span class="fc" id="L846">                Case benchmarkCase = caseByHash.get(result.caseHash());</span>
+<span class="pc bpc" id="L847" title="2 of 4 branches missed.">                if (configuration == null || benchmarkCase == null</span>
+<span class="pc bpc" id="L848" title="1 of 2 branches missed.">                        || configuration.track() != result.track()</span>
+<span class="pc bpc" id="L849" title="1 of 2 branches missed.">                        || benchmarkCase.track() != result.track()) {</span>
+<span class="nc" id="L850">                    throw new IllegalArgumentException(&quot;result references invalid configuration/case&quot;);</span>
                 }
-<span class="fc" id="L851">                String pair = result.configurationHash() + '|' + result.caseHash();</span>
-<span class="pc bpc" id="L852" title="1 of 2 branches missed.">                if (!resultPairs.add(pair)) {</span>
-<span class="nc" id="L853">                    throw new IllegalArgumentException(&quot;duplicate configuration/case result&quot;);</span>
+<span class="fc" id="L852">                String pair = result.configurationHash() + '|' + result.caseHash();</span>
+<span class="pc bpc" id="L853" title="1 of 2 branches missed.">                if (!resultPairs.add(pair)) {</span>
+<span class="nc" id="L854">                    throw new IllegalArgumentException(&quot;duplicate configuration/case result&quot;);</span>
                 }
-<span class="fc" id="L855">                resultHashes.add(result.contentHash());</span>
-<span class="fc" id="L856">            }</span>
-<span class="fc bfc" id="L857" title="All 2 branches covered.">            for (CapabilityClaim claim : claims) {</span>
-<span class="pc bpc" id="L858" title="1 of 2 branches missed.">                if (!resultHashes.containsAll(claim.evidenceResultHashes())) {</span>
-<span class="nc" id="L859">                    throw new IllegalArgumentException(&quot;claim references missing result evidence&quot;);</span>
+<span class="fc" id="L856">                resultHashes.add(result.contentHash());</span>
+<span class="fc" id="L857">            }</span>
+<span class="fc bfc" id="L858" title="All 2 branches covered.">            for (CapabilityClaim claim : claims) {</span>
+<span class="pc bpc" id="L859" title="1 of 2 branches missed.">                if (!resultHashes.containsAll(claim.evidenceResultHashes())) {</span>
+<span class="nc" id="L860">                    throw new IllegalArgumentException(&quot;claim references missing result evidence&quot;);</span>
                 }
-<span class="fc" id="L861">                boolean wrongTrack = claim.evidenceResultHashes().stream()</span>
-<span class="fc" id="L862">                    .map(hash -&gt; results.stream()</span>
-<span class="fc" id="L863">                        .filter(result -&gt; result.contentHash().equals(hash))</span>
-<span class="fc" id="L864">                        .findFirst().orElseThrow())</span>
-<span class="fc bfc" id="L865" title="All 2 branches covered.">                    .anyMatch(result -&gt; result.track() != claim.track());</span>
-<span class="fc bfc" id="L866" title="All 2 branches covered.">                if (wrongTrack) {</span>
-<span class="fc" id="L867">                    throw new IllegalArgumentException(&quot;claim mixes benchmark tracks&quot;);</span>
+<span class="fc" id="L862">                boolean wrongTrack = claim.evidenceResultHashes().stream()</span>
+<span class="fc" id="L863">                    .map(hash -&gt; results.stream()</span>
+<span class="fc" id="L864">                        .filter(result -&gt; result.contentHash().equals(hash))</span>
+<span class="fc" id="L865">                        .findFirst().orElseThrow())</span>
+<span class="fc bfc" id="L866" title="All 2 branches covered.">                    .anyMatch(result -&gt; result.track() != claim.track());</span>
+<span class="fc bfc" id="L867" title="All 2 branches covered.">                if (wrongTrack) {</span>
+<span class="fc" id="L868">                    throw new IllegalArgumentException(&quot;claim mixes benchmark tracks&quot;);</span>
                 }
-<span class="fc" id="L869">            }</span>
-<span class="fc bfc" id="L870" title="All 2 branches covered.">            for (Case benchmarkCase : cases) {</span>
-<span class="fc" id="L871">                InformationParityManifest manifest = manifests.stream()</span>
-<span class="fc bfc" id="L872" title="All 2 branches covered.">                    .filter(item -&gt; item.track() == benchmarkCase.track())</span>
-<span class="fc" id="L873">                    .findFirst().orElse(null);</span>
-<span class="pc bpc" id="L874" title="2 of 4 branches missed.">                if (manifest != null &amp;&amp; manifest.targetVisible()</span>
-<span class="pc bpc" id="L875" title="1 of 2 branches missed.">                        &amp;&amp; benchmarkCase.targetExpression().isBlank()) {</span>
-<span class="nc" id="L876">                    throw new IllegalArgumentException(&quot;visible target case lacks target&quot;);</span>
+<span class="fc" id="L870">            }</span>
+<span class="fc bfc" id="L871" title="All 2 branches covered.">            for (Case benchmarkCase : cases) {</span>
+<span class="fc" id="L872">                InformationParityManifest manifest = manifests.stream()</span>
+<span class="fc bfc" id="L873" title="All 2 branches covered.">                    .filter(item -&gt; item.track() == benchmarkCase.track())</span>
+<span class="fc" id="L874">                    .findFirst().orElse(null);</span>
+<span class="pc bpc" id="L875" title="1 of 4 branches missed.">                if (manifest != null &amp;&amp; manifest.targetVisible()</span>
+<span class="pc bpc" id="L876" title="1 of 2 branches missed.">                        &amp;&amp; benchmarkCase.targetExpression().isBlank()) {</span>
+<span class="nc" id="L877">                    throw new IllegalArgumentException(&quot;visible target case lacks target&quot;);</span>
                 }
-<span class="fc" id="L878">            }</span>
-<span class="fc" id="L879">        }</span>
+<span class="fc" id="L879">            }</span>
+<span class="fc" id="L880">        }</span>
 
         private static String hash(
             String suiteId,
@@ -887,92 +888,92 @@ public final class ComparativeBenchmark {
             List&lt;CapabilityClaim&gt; claims,
             List&lt;CoverageGap&gt; gaps
         ) {
-<span class="fc" id="L890">            return SolverIr.sha256(</span>
+<span class="fc" id="L891">            return SolverIr.sha256(</span>
                 SCHEMA + &quot;\nsuite=&quot; + suiteId
-<span class="fc" id="L892">                    + &quot;\nmanifests=&quot; + manifests.stream()</span>
-<span class="fc" id="L893">                        .map(InformationParityManifest::contentHash).toList()</span>
-<span class="fc" id="L894">                    + &quot;\nconfigurations=&quot; + configurations.stream()</span>
-<span class="fc" id="L895">                        .map(Configuration::contentHash).toList()</span>
-<span class="fc" id="L896">                    + &quot;\ncases=&quot; + cases.stream().map(Case::contentHash).toList()</span>
-<span class="fc" id="L897">                    + &quot;\nresults=&quot; + results.stream().map(Result::contentHash).toList()</span>
-<span class="fc" id="L898">                    + &quot;\nclaims=&quot; + claims.stream()</span>
-<span class="fc" id="L899">                        .map(CapabilityClaim::contentHash).toList()</span>
-<span class="fc" id="L900">                    + &quot;\ngaps=&quot; + gaps.stream().map(CoverageGap::contentHash).toList()</span>
+<span class="fc" id="L893">                    + &quot;\nmanifests=&quot; + manifests.stream()</span>
+<span class="fc" id="L894">                        .map(InformationParityManifest::contentHash).toList()</span>
+<span class="fc" id="L895">                    + &quot;\nconfigurations=&quot; + configurations.stream()</span>
+<span class="fc" id="L896">                        .map(Configuration::contentHash).toList()</span>
+<span class="fc" id="L897">                    + &quot;\ncases=&quot; + cases.stream().map(Case::contentHash).toList()</span>
+<span class="fc" id="L898">                    + &quot;\nresults=&quot; + results.stream().map(Result::contentHash).toList()</span>
+<span class="fc" id="L899">                    + &quot;\nclaims=&quot; + claims.stream()</span>
+<span class="fc" id="L900">                        .map(CapabilityClaim::contentHash).toList()</span>
+<span class="fc" id="L901">                    + &quot;\ngaps=&quot; + gaps.stream().map(CoverageGap::contentHash).toList()</span>
                     + &quot;\nscorePolicy=&quot; + SCORE_POLICY);
         }
     }
 
     private static Map&lt;String, Long&gt; orderedLongMap(Map&lt;String, Long&gt; values) {
-<span class="fc" id="L906">        TreeMap&lt;String, Long&gt; result = new TreeMap&lt;&gt;();</span>
-<span class="pc bpc" id="L907" title="1 of 2 branches missed.">        if (values != null) {</span>
-<span class="fc" id="L908">            values.forEach((key, value) -&gt; {</span>
-<span class="fc" id="L909">                requireText(key, &quot;metric name&quot;);</span>
-<span class="pc bpc" id="L910" title="2 of 4 branches missed.">                if (value == null || value &lt; 0L) {</span>
-<span class="nc" id="L911">                    throw new IllegalArgumentException(&quot;metric values must not be negative&quot;);</span>
+<span class="fc" id="L907">        TreeMap&lt;String, Long&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="pc bpc" id="L908" title="1 of 2 branches missed.">        if (values != null) {</span>
+<span class="fc" id="L909">            values.forEach((key, value) -&gt; {</span>
+<span class="fc" id="L910">                requireText(key, &quot;metric name&quot;);</span>
+<span class="pc bpc" id="L911" title="2 of 4 branches missed.">                if (value == null || value &lt; 0L) {</span>
+<span class="nc" id="L912">                    throw new IllegalArgumentException(&quot;metric values must not be negative&quot;);</span>
                 }
-<span class="fc" id="L913">                result.put(key, value);</span>
-<span class="fc" id="L914">            });</span>
+<span class="fc" id="L914">                result.put(key, value);</span>
+<span class="fc" id="L915">            });</span>
         }
-<span class="fc" id="L916">        return java.util.Collections.unmodifiableMap(result);</span>
+<span class="fc" id="L917">        return java.util.Collections.unmodifiableMap(result);</span>
     }
 
     private static List&lt;String&gt; sortedStrings(List&lt;String&gt; values) {
-<span class="pc bpc" id="L920" title="1 of 2 branches missed.">        if (values == null) {</span>
-<span class="nc" id="L921">            return List.of();</span>
+<span class="pc bpc" id="L921" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L922">            return List.of();</span>
         }
-<span class="fc" id="L923">        return values.stream()</span>
-<span class="fc" id="L924">            .filter(Objects::nonNull)</span>
-<span class="fc" id="L925">            .map(ComparativeBenchmark::normalize)</span>
-<span class="pc bpc" id="L926" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isEmpty())</span>
-<span class="fc" id="L927">            .distinct()</span>
-<span class="fc" id="L928">            .sorted()</span>
-<span class="fc" id="L929">            .toList();</span>
+<span class="fc" id="L924">        return values.stream()</span>
+<span class="fc" id="L925">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L926">            .map(ComparativeBenchmark::normalize)</span>
+<span class="pc bpc" id="L927" title="1 of 2 branches missed.">            .filter(value -&gt; !value.isEmpty())</span>
+<span class="fc" id="L928">            .distinct()</span>
+<span class="fc" id="L929">            .sorted()</span>
+<span class="fc" id="L930">            .toList();</span>
     }
 
     private static &lt;E extends Enum&lt;E&gt;&gt; List&lt;E&gt; sortedEnums(List&lt;E&gt; values) {
-<span class="pc bpc" id="L933" title="1 of 2 branches missed.">        if (values == null) {</span>
-<span class="nc" id="L934">            return List.of();</span>
+<span class="pc bpc" id="L934" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L935">            return List.of();</span>
         }
-<span class="fc" id="L936">        return values.stream()</span>
-<span class="fc" id="L937">            .filter(Objects::nonNull)</span>
-<span class="fc" id="L938">            .distinct()</span>
-<span class="fc" id="L939">            .sorted(Comparator.comparing(Enum::name))</span>
-<span class="fc" id="L940">            .toList();</span>
+<span class="fc" id="L937">        return values.stream()</span>
+<span class="fc" id="L938">            .filter(Objects::nonNull)</span>
+<span class="fc" id="L939">            .distinct()</span>
+<span class="fc" id="L940">            .sorted(Comparator.comparing(Enum::name))</span>
+<span class="fc" id="L941">            .toList();</span>
     }
 
     private static &lt;T&gt; List&lt;T&gt; sorted(List&lt;T&gt; values, Comparator&lt;T&gt; comparator) {
-<span class="pc bpc" id="L944" title="1 of 2 branches missed.">        List&lt;T&gt; result = values == null ? new ArrayList&lt;&gt;() : new ArrayList&lt;&gt;(values);</span>
-<span class="fc" id="L945">        result.forEach(item -&gt; Objects.requireNonNull(item, &quot;list element&quot;));</span>
-<span class="fc" id="L946">        result.sort(comparator);</span>
-<span class="fc" id="L947">        return List.copyOf(result);</span>
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">        List&lt;T&gt; result = values == null ? new ArrayList&lt;&gt;() : new ArrayList&lt;&gt;(values);</span>
+<span class="fc" id="L946">        result.forEach(item -&gt; Objects.requireNonNull(item, &quot;list element&quot;));</span>
+<span class="fc" id="L947">        result.sort(comparator);</span>
+<span class="fc" id="L948">        return List.copyOf(result);</span>
     }
 
     private static void unique(List&lt;String&gt; values, String description) {
-<span class="pc bpc" id="L951" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
-<span class="nc" id="L952">            throw new IllegalArgumentException(&quot;duplicate &quot; + description);</span>
+<span class="pc bpc" id="L952" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
+<span class="nc" id="L953">            throw new IllegalArgumentException(&quot;duplicate &quot; + description);</span>
         }
-<span class="fc" id="L954">    }</span>
+<span class="fc" id="L955">    }</span>
 
     private static String normalize(String value) {
-<span class="pc bpc" id="L957" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
+<span class="pc bpc" id="L958" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value.trim().replaceAll(&quot;\\s+&quot;, &quot; &quot;);</span>
     }
 
     private static String normalizeRequired(String value, String name) {
-<span class="fc" id="L961">        String normalized = normalize(value);</span>
-<span class="fc" id="L962">        requireText(normalized, name);</span>
-<span class="fc" id="L963">        return normalized;</span>
+<span class="fc" id="L962">        String normalized = normalize(value);</span>
+<span class="fc" id="L963">        requireText(normalized, name);</span>
+<span class="fc" id="L964">        return normalized;</span>
     }
 
     private static void requireText(String value, String name) {
-<span class="pc bpc" id="L967" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
-<span class="nc" id="L968">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+<span class="pc bpc" id="L968" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L969">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
         }
-<span class="fc" id="L970">    }</span>
+<span class="fc" id="L971">    }</span>
 
     private static void requireSha(String value, String name) {
-<span class="pc bpc" id="L973" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
-<span class="nc" id="L974">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L974" title="2 of 4 branches missed.">        if (value == null || !value.matches(&quot;sha256:[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L975">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
         }
-<span class="fc" id="L976">    }</span>
+<span class="fc" id="L977">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

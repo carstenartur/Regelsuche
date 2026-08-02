@@ -278,7 +278,7 @@ public class MonteCarloTreeSearchStrategy implements SearchStrategy {
         // set. Updating the leaf statistics is sufficient to bias future UCB
         // decisions toward improving subtrees.
 <span class="fc" id="L280">        Node node = nodes.get(stateKey(leaf));</span>
-<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (node != null) {</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (node != null) {</span>
 <span class="fc" id="L282">            node.visits++;</span>
 <span class="fc" id="L283">            node.totalReward += reward;</span>
         }

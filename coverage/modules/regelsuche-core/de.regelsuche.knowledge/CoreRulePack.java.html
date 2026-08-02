@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CoreRulePack.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.knowledge</a> &gt; <span class="el_source">CoreRulePack.java</span></div><h1>CoreRulePack.java</h1><pre class="source lang-java linenums">package de.regelsuche.knowledge;
+
+import java.util.List;
+
+/**
+ * Declarative grouping of built-in rewrite rules.
+ *
+ * &lt;p&gt;Core packs are tags over the ordered built-in rule list rather than containers. Keeping the
+ * canonical rule order in one place means enabling every pack reproduces the historical rule
+ * sequence exactly, while disabling a pack removes exactly its rules.
+ */
+public record CoreRulePack(
+        String packId,
+        String displayName,
+        RuleTier tier,
+        boolean enabledByDefault,
+        String description,
+        List&lt;String&gt; ruleIds) {
+
+<span class="fc" id="L20">    public CoreRulePack {</span>
+<span class="pc bpc" id="L21" title="2 of 4 branches missed.">        if (packId == null || packId.isBlank()) {</span>
+<span class="nc" id="L22">            throw new IllegalArgumentException(&quot;packId is required&quot;);</span>
+        }
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">        if (displayName == null || displayName.isBlank()) {</span>
+<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;displayName is required&quot;);</span>
+        }
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (tier == null) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;tier is required&quot;);</span>
+        }
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">        if (tier == RuleTier.KERNEL &amp;&amp; !enabledByDefault) {</span>
+<span class="nc" id="L31">            throw new IllegalArgumentException(&quot;Kernel pack must be enabled by default: &quot; + packId);</span>
+        }
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        description = description == null ? &quot;&quot; : description;</span>
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        ruleIds = ruleIds == null ? List.of() : List.copyOf(ruleIds);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (ruleIds.isEmpty()) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;Core rule pack must declare at least one rule: &quot; + packId);</span>
+        }
+<span class="fc" id="L38">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

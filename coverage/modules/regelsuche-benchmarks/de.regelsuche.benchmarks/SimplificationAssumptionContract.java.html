@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimplificationAssumptionContract.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-benchmarks</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.benchmarks</a> &gt; <span class="el_source">SimplificationAssumptionContract.java</span></div><h1>SimplificationAssumptionContract.java</h1><pre class="source lang-java linenums">package de.regelsuche.benchmarks;
+
+import de.regelsuche.assumption.AssumptionSignature;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Case;
+import de.regelsuche.solver.ir.SolverIr;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+/**
+ * Canonical assumption evidence for the target-free simplification track.
+ *
+ * &lt;p&gt;The contract deliberately separates declarations from execution. Internal
+ * Regelsuche search does not receive assumptions as guidance; instead every
+ * side condition emitted by the selected path must be present in the case
+ * declarations. The external SymPy adapter receives symbol-scoped declarations
+ * it can represent and reports composite declarations as an explicit
+ * limitation. The pinned reference form is never part of this channel.&lt;/p&gt;
+ *
+ * &lt;p&gt;This is not yet an independent proof that every external output is valid
+ * under exactly the declared assumptions. That missing validator remains a
+ * published coverage gap. The contract does ensure that internal rewrite paths
+ * cannot silently rely on undeclared side conditions.&lt;/p&gt;
+ */
+final class SimplificationAssumptionContract {
+    static final String CONTRACT_ID = &quot;target-free-simplification-assumptions/v1&quot;;
+
+<span class="fc" id="L32">    private static final SimplificationAssumptionContract EMPTY =</span>
+<span class="fc" id="L33">        new SimplificationAssumptionContract(List.of());</span>
+
+    private final List&lt;Declaration&gt; declarations;
+    private final Set&lt;String&gt; declaredTexts;
+    private final String contractHash;
+
+<span class="fc" id="L39">    private SimplificationAssumptionContract(List&lt;Declaration&gt; declarations) {</span>
+<span class="fc" id="L40">        this.declarations = List.copyOf(declarations);</span>
+<span class="fc" id="L41">        this.declaredTexts = Set.copyOf(new LinkedHashSet&lt;&gt;(</span>
+<span class="fc" id="L42">            this.declarations.stream().map(Declaration::canonicalText).toList()));</span>
+<span class="fc" id="L43">        this.contractHash = SolverIr.sha256(</span>
+            CONTRACT_ID + &quot;\ndeclarations=&quot;
+<span class="fc" id="L45">                + this.declarations.stream()</span>
+<span class="fc" id="L46">                    .map(Declaration::canonicalMaterial).toList());</span>
+<span class="fc" id="L47">    }</span>
+
+    /** @return the contract carrying the declared assumptions of one case. */
+    static SimplificationAssumptionContract forCase(Case benchmarkCase) {
+<span class="fc" id="L51">        Objects.requireNonNull(benchmarkCase, &quot;benchmarkCase&quot;);</span>
+<span class="fc" id="L52">        return of(benchmarkCase.assumptions());</span>
+    }
+
+    static SimplificationAssumptionContract of(Collection&lt;String&gt; assumptions) {
+        List&lt;String&gt; canonical =
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            AssumptionSignature.ofExpressions(assumptions == null</span>
+<span class="pc" id="L58">                ? List.of() : new ArrayList&lt;&gt;(assumptions))</span>
+<span class="fc" id="L59">                .normalizedAssumptions();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (canonical.isEmpty()) {</span>
+<span class="fc" id="L61">            return EMPTY;</span>
+        }
+<span class="fc" id="L63">        List&lt;Declaration&gt; parsed = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (String text : new TreeSet&lt;&gt;(canonical)) {</span>
+<span class="fc" id="L65">            parsed.add(Declaration.parse(text));</span>
+<span class="fc" id="L66">        }</span>
+<span class="fc" id="L67">        return new SimplificationAssumptionContract(parsed);</span>
+    }
+
+    List&lt;Declaration&gt; declarations() {
+<span class="fc" id="L71">        return declarations;</span>
+    }
+
+    /** @return the canonical declaration texts associated with the case. */
+    List&lt;String&gt; declaredAssumptions() {
+<span class="fc" id="L76">        return declarations.stream().map(Declaration::canonicalText).toList();</span>
+    }
+
+    String contractHash() {
+<span class="fc" id="L80">        return contractHash;</span>
+    }
+
+    /**
+     * Side conditions an internal competitor relied on but the case never declared.
+     *
+     * @param reliedOnAssumptions side conditions the competitor emitted
+     * @return the sorted, canonical undischarged conditions, never {@code null}
+     */
+    List&lt;String&gt; undischarged(Collection&lt;String&gt; reliedOnAssumptions) {
+        List&lt;String&gt; relied =
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            AssumptionSignature.ofExpressions(reliedOnAssumptions == null</span>
+<span class="pc" id="L92">                ? List.of() : new ArrayList&lt;&gt;(reliedOnAssumptions))</span>
+<span class="fc" id="L93">                .normalizedAssumptions();</span>
+<span class="fc" id="L94">        return relied.stream()</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            .filter(text -&gt; !declaredTexts.contains(text))</span>
+<span class="fc" id="L96">            .sorted()</span>
+<span class="fc" id="L97">            .toList();</span>
+    }
+
+    boolean discharges(Collection&lt;String&gt; reliedOnAssumptions) {
+<span class="nc" id="L101">        return undischarged(reliedOnAssumptions).isEmpty();</span>
+    }
+
+    /** Classified assumption declaration from the closed contract vocabulary. */
+    record Declaration(Kind kind, String subject, String canonicalText) {
+<span class="fc" id="L106">        Declaration {</span>
+<span class="fc" id="L107">            Objects.requireNonNull(kind, &quot;kind&quot;);</span>
+<span class="fc" id="L108">            Objects.requireNonNull(subject, &quot;subject&quot;);</span>
+<span class="fc" id="L109">            Objects.requireNonNull(canonicalText, &quot;canonicalText&quot;);</span>
+<span class="fc" id="L110">        }</span>
+
+        static Declaration parse(String canonicalText) {
+<span class="fc" id="L113">            String text = canonicalText.trim();</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            for (Kind kind : Kind.values()) {</span>
+<span class="fc" id="L115">                String suffix = kind.suffix();</span>
+<span class="pc bpc" id="L116" title="2 of 4 branches missed.">                if (suffix.isEmpty() || !text.endsWith(suffix)) {</span>
+<span class="nc" id="L117">                    continue;</span>
+                }
+<span class="fc" id="L119">                String subject =</span>
+<span class="fc" id="L120">                    text.substring(0, text.length() - suffix.length()).trim();</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                if (!subject.isEmpty()) {</span>
+<span class="fc" id="L122">                    return new Declaration(kind, subject, text);</span>
+                }
+            }
+<span class="nc" id="L125">            return new Declaration(Kind.OTHER, text, text);</span>
+        }
+
+        /**
+         * @return {@code true} when the subject is a bare symbol, which is the
+         *     only shape the current external adapter can bind as a symbol assumption
+         */
+        boolean symbolScoped() {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            return kind != Kind.OTHER</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                &amp;&amp; subject.matches(&quot;[A-Za-z_][A-Za-z0-9_]*&quot;);</span>
+        }
+
+        String canonicalMaterial() {
+<span class="fc" id="L138">            return kind.name() + '|' + subject;</span>
+        }
+    }
+
+    /** Closed assumption vocabulary shared by benchmark evidence. */
+<span class="fc" id="L143">    enum Kind {</span>
+<span class="fc" id="L144">        NON_ZERO(&quot; != 0&quot;, &quot;nonzero&quot;),</span>
+<span class="fc" id="L145">        NON_NEGATIVE(&quot; &gt;= 0&quot;, &quot;nonnegative&quot;),</span>
+<span class="fc" id="L146">        POSITIVE(&quot; &gt; 0&quot;, &quot;positive&quot;),</span>
+<span class="fc" id="L147">        OTHER(&quot;&quot;, &quot;&quot;);</span>
+
+        private final String suffix;
+        private final String externalAssumptionName;
+
+<span class="fc" id="L152">        Kind(String suffix, String externalAssumptionName) {</span>
+<span class="fc" id="L153">            this.suffix = suffix;</span>
+<span class="fc" id="L154">            this.externalAssumptionName = externalAssumptionName;</span>
+<span class="fc" id="L155">        }</span>
+
+        String suffix() {
+<span class="fc" id="L158">            return suffix;</span>
+        }
+
+        /** @return the external CAS symbol-assumption name, may be empty. */
+        String externalAssumptionName() {
+<span class="nc" id="L163">            return externalAssumptionName;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

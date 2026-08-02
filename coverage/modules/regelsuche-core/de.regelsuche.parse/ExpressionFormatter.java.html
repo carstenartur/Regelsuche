@@ -28,7 +28,7 @@ public final class ExpressionFormatter {
             } else {
 <span class="fc" id="L29">                formatted = Double.toString(numberExpr.value());</span>
             }
-<span class="pc bpc" id="L31" title="3 of 4 branches missed.">            if (numberExpr.value() &lt; 0 &amp;&amp; parentPrecedence &gt; 0) {</span>
+<span class="pc bpc" id="L31" title="1 of 4 branches missed.">            if (numberExpr.value() &lt; 0 &amp;&amp; parentPrecedence &gt; 0) {</span>
 <span class="nc" id="L32">                return &quot;(&quot; + formatted + &quot;)&quot;;</span>
             }
 <span class="fc" id="L34">            return formatted;</span>

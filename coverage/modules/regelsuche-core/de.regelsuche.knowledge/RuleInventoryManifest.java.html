@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RuleInventoryManifest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-core</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.knowledge</a> &gt; <span class="el_source">RuleInventoryManifest.java</span></div><h1>RuleInventoryManifest.java</h1><pre class="source lang-java linenums">package de.regelsuche.knowledge;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Content-addressed inventory of the rules that were actually active for a run.
+ *
+ * &lt;p&gt;The manifest answers the reviewer question &quot;what exactly was enabled for this proof?&quot; with a
+ * hash instead of a directory listing: a profile id, the enabled packs per tier and a SHA-256 over
+ * the canonical serialization of the effective rule set. Pack entries retain their concrete rule
+ * ids, so moving rules between equally sized packs changes the hash.&lt;/p&gt;
+ */
+public record RuleInventoryManifest(
+        String profileId,
+        List&lt;PackEntry&gt; packs,
+        List&lt;String&gt; ruleIds,
+        String contentHash) {
+
+<span class="fc" id="L23">    public RuleInventoryManifest {</span>
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">        profileId = profileId == null || profileId.isBlank() ? RuleProfile.CORE.id() : profileId;</span>
+<span class="pc bpc" id="L25" title="1 of 2 branches missed.">        packs = packs == null ? List.of() : List.copyOf(packs);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        ruleIds = ruleIds == null ? List.of() : List.copyOf(ruleIds);</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        contentHash = contentHash == null ? &quot;&quot; : contentHash;</span>
+<span class="fc" id="L28">    }</span>
+
+    /** A single pack contributing to (or explicitly excluded from) the effective rule set. */
+    public record PackEntry(
+            String packId,
+            RuleTier tier,
+            String source,
+            boolean enabled,
+            List&lt;String&gt; ruleIds) {
+<span class="fc" id="L37">        public PackEntry {</span>
+<span class="pc bpc" id="L38" title="2 of 4 branches missed.">            if (packId == null || packId.isBlank()) {</span>
+<span class="nc" id="L39">                throw new IllegalArgumentException(&quot;packId is required&quot;);</span>
+            }
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            if (tier == null) {</span>
+<span class="nc" id="L42">                throw new IllegalArgumentException(&quot;tier is required&quot;);</span>
+            }
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">            source = source == null ? &quot;&quot; : source;</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">            ruleIds = ruleIds == null ? List.of() : ruleIds.stream()</span>
+<span class="fc" id="L46">                    .filter(java.util.Objects::nonNull)</span>
+<span class="fc" id="L47">                    .map(String::trim)</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                    .filter(value -&gt; !value.isEmpty())</span>
+<span class="fc" id="L49">                    .distinct()</span>
+<span class="fc" id="L50">                    .sorted()</span>
+<span class="fc" id="L51">                    .toList();</span>
+<span class="fc" id="L52">        }</span>
+
+        public int ruleCount() {
+<span class="nc" id="L55">            return ruleIds.size();</span>
+        }
+    }
+
+    public static RuleInventoryManifest of(String profileId, List&lt;PackEntry&gt; packs, List&lt;String&gt; ruleIds) {
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        List&lt;PackEntry&gt; packEntries = packs == null ? List.of() : List.copyOf(packs);</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        List&lt;String&gt; rules = ruleIds == null ? List.of() : List.copyOf(ruleIds);</span>
+<span class="fc" id="L62">        String canonical = canonicalText(profileId, packEntries, rules);</span>
+<span class="fc" id="L63">        return new RuleInventoryManifest(profileId, packEntries, rules, sha256(canonical));</span>
+    }
+
+    public List&lt;PackEntry&gt; enabledPacks() {
+<span class="nc" id="L67">        return packs.stream().filter(PackEntry::enabled).toList();</span>
+    }
+
+    public List&lt;PackEntry&gt; packsByTier(RuleTier tier) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        return packs.stream().filter(entry -&gt; entry.tier() == tier).toList();</span>
+    }
+
+    public String canonicalText() {
+<span class="nc" id="L75">        return canonicalText(profileId, packs, ruleIds);</span>
+    }
+
+    private static String canonicalText(String profileId, List&lt;PackEntry&gt; packs, List&lt;String&gt; ruleIds) {
+<span class="fc" id="L79">        StringBuilder builder = new StringBuilder();</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        builder.append(&quot;profile=&quot;).append(profileId == null ? &quot;&quot; : profileId).append('\n');</span>
+<span class="fc" id="L81">        List&lt;String&gt; packLines = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (PackEntry entry : packs) {</span>
+<span class="fc" id="L83">            packLines.add(&quot;pack=&quot; + entry.packId()</span>
+<span class="fc" id="L84">                    + &quot;;tier=&quot; + entry.tier().id()</span>
+<span class="fc" id="L85">                    + &quot;;source=&quot; + entry.source()</span>
+<span class="fc" id="L86">                    + &quot;;enabled=&quot; + entry.enabled()</span>
+<span class="fc" id="L87">                    + &quot;;ruleIds=&quot; + entry.ruleIds());</span>
+<span class="fc" id="L88">        }</span>
+<span class="fc" id="L89">        packLines.sort(String::compareTo);</span>
+<span class="fc" id="L90">        packLines.forEach(line -&gt; builder.append(line).append('\n'));</span>
+<span class="fc" id="L91">        List&lt;String&gt; sortedRuleIds = new ArrayList&lt;&gt;(ruleIds);</span>
+<span class="fc" id="L92">        sortedRuleIds.sort(String::compareTo);</span>
+<span class="fc" id="L93">        sortedRuleIds.forEach(ruleId -&gt; builder.append(&quot;rule=&quot;).append(ruleId).append('\n'));</span>
+<span class="fc" id="L94">        return builder.toString();</span>
+    }
+
+    private static String sha256(String value) {
+        try {
+<span class="fc" id="L99">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L100">            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L101">            StringBuilder hex = new StringBuilder(hash.length * 2);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            for (byte b : hash) {</span>
+<span class="fc" id="L103">                hex.append(Character.forDigit((b &gt;&gt; 4) &amp; 0xF, 16));</span>
+<span class="fc" id="L104">                hex.append(Character.forDigit(b &amp; 0xF, 16));</span>
+            }
+<span class="fc" id="L106">            return hex.toString();</span>
+<span class="nc" id="L107">        } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L108">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, ex);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

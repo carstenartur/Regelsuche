@@ -12,6 +12,7 @@ import de.regelsuche.benchmarks.ComparativeBenchmark.Role;
 import de.regelsuche.benchmarks.ComparativeBenchmark.SystemKind;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SimplificationSystem;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.ValidationSystem;
 import de.regelsuche.search.strategy.AStarSearchStrategy;
 import de.regelsuche.search.strategy.BeamSearchStrategy;
@@ -30,197 +31,277 @@ public final class ComparativeBenchmarkRunner {
 
     private final List&lt;SearchSystem&gt; searchSystems;
     private final List&lt;ValidationSystem&gt; validationSystems;
-<span class="fc" id="L33">    private final ComparativeBenchmarkExecutor executor =</span>
+    private final List&lt;SimplificationSystem&gt; simplificationSystems;
+<span class="fc" id="L35">    private final ComparativeBenchmarkExecutor executor =</span>
         new ComparativeBenchmarkExecutor();
 
     ComparativeBenchmarkRunner(
         List&lt;SearchSystem&gt; searchSystems,
-        List&lt;ValidationSystem&gt; validationSystems
-<span class="fc" id="L39">    ) {</span>
-<span class="fc" id="L40">        this.searchSystems = List.copyOf(</span>
-<span class="fc" id="L41">            Objects.requireNonNull(searchSystems, &quot;searchSystems&quot;));</span>
-<span class="fc" id="L42">        this.validationSystems = List.copyOf(</span>
-<span class="fc" id="L43">            Objects.requireNonNull(validationSystems, &quot;validationSystems&quot;));</span>
-<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (this.searchSystems.isEmpty()</span>
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">                || this.validationSystems.isEmpty()) {</span>
-<span class="nc" id="L46">            throw new IllegalArgumentException(</span>
+        List&lt;ValidationSystem&gt; validationSystems,
+        List&lt;SimplificationSystem&gt; simplificationSystems
+<span class="fc" id="L42">    ) {</span>
+<span class="fc" id="L43">        this.searchSystems = List.copyOf(</span>
+<span class="fc" id="L44">            Objects.requireNonNull(searchSystems, &quot;searchSystems&quot;));</span>
+<span class="fc" id="L45">        this.validationSystems = List.copyOf(</span>
+<span class="fc" id="L46">            Objects.requireNonNull(validationSystems, &quot;validationSystems&quot;));</span>
+<span class="fc" id="L47">        this.simplificationSystems = List.copyOf(</span>
+<span class="fc" id="L48">            Objects.requireNonNull(</span>
+                simplificationSystems, &quot;simplificationSystems&quot;));
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (this.searchSystems.isEmpty()</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                || this.validationSystems.isEmpty()</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                || this.simplificationSystems.isEmpty()) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(</span>
                 &quot;comparative benchmark systems must not be empty&quot;);
         }
-<span class="fc" id="L49">    }</span>
+<span class="fc" id="L56">    }</span>
 
     public static ComparativeBenchmarkRunner system() {
-<span class="nc" id="L52">        List&lt;SearchSystem&gt; search = List.of(</span>
+<span class="nc" id="L59">        List&lt;SearchSystem&gt; search = List.of(</span>
             new SearchSystem(
                 &quot;best-first&quot;,
                 &quot;1&quot;,
                 new BestFirstSearchStrategy(),
-<span class="nc" id="L57">                List.of(&quot;INTERNAL_REGELSUCHE_SEARCH&quot;)),</span>
+<span class="nc" id="L64">                List.of(&quot;INTERNAL_REGELSUCHE_SEARCH&quot;)),</span>
             new SearchSystem(
                 &quot;a-star&quot;,
                 &quot;1&quot;,
                 new AStarSearchStrategy(),
-<span class="nc" id="L62">                List.of(</span>
+<span class="nc" id="L69">                List.of(</span>
                     &quot;INTERNAL_REGELSUCHE_SEARCH&quot;,
                     &quot;HEURISTIC_NOT_CLAIMED_ADMISSIBLE&quot;)),
             new SearchSystem(
                 &quot;beam&quot;,
                 &quot;1&quot;,
                 new BeamSearchStrategy(),
-<span class="nc" id="L69">                List.of(</span>
+<span class="nc" id="L76">                List.of(</span>
                     &quot;INTERNAL_REGELSUCHE_SEARCH&quot;,
                     &quot;TARGET_NOT_USED_FOR_FRONTIER_ORDERING&quot;,
                     &quot;BEAM_WIDTH_8&quot;)));
 
-<span class="nc" id="L74">        PolynomialNormalFormSolverBackend polynomial =</span>
+<span class="nc" id="L81">        PolynomialNormalFormSolverBackend polynomial =</span>
             new PolynomialNormalFormSolverBackend();
         ExternalSymPySolverBackend.Detection sympy =
-<span class="nc" id="L77">            ExternalSymPySolverBackend.detectSystemSymPy();</span>
+<span class="nc" id="L84">            ExternalSymPySolverBackend.detectSystemSymPy();</span>
         Z3SmtSolverBackend.Detection z3 =
-<span class="nc" id="L79">            Z3SmtSolverBackend.detectSystemZ3();</span>
-<span class="nc" id="L80">        List&lt;ValidationSystem&gt; validation = List.of(</span>
+<span class="nc" id="L86">            Z3SmtSolverBackend.detectSystemZ3();</span>
+<span class="nc" id="L87">        List&lt;ValidationSystem&gt; validation = List.of(</span>
             new ValidationSystem(
                 polynomial,
                 SystemKind.REGELSUCHE,
-<span class="nc" id="L84">                List.of(Role.VALIDATION, Role.COUNTEREXAMPLE),</span>
+<span class="nc" id="L91">                List.of(Role.VALIDATION, Role.COUNTEREXAMPLE),</span>
                 true,
                 &quot;java=21\nbackend=polynomial-normal-form@1&quot;,
-<span class="nc" id="L87">                List.of(&quot;REAL_POLYNOMIAL_EQUALITY_ONLY&quot;)),</span>
+<span class="nc" id="L94">                List.of(&quot;REAL_POLYNOMIAL_EQUALITY_ONLY&quot;)),</span>
             new ValidationSystem(
-<span class="nc" id="L89">                sympy.backend(),</span>
+<span class="nc" id="L96">                sympy.backend(),</span>
                 SystemKind.EXTERNAL_BASELINE,
-<span class="nc" id="L91">                List.of(Role.EQUALITY_REWRITE, Role.VALIDATION),</span>
-<span class="nc" id="L92">                sympy.available(),</span>
-<span class="nc" id="L93">                &quot;sympy=&quot; + sympy.backend().descriptor().backendVersion(),</span>
-<span class="nc bnc" id="L94" title="All 2 branches missed.">                sympy.available()</span>
-<span class="nc" id="L95">                    ? List.of(</span>
+<span class="nc" id="L98">                List.of(Role.EQUALITY_REWRITE, Role.VALIDATION),</span>
+<span class="nc" id="L99">                sympy.available(),</span>
+<span class="nc" id="L100">                &quot;sympy=&quot; + sympy.backend().descriptor().backendVersion(),</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">                sympy.available()</span>
+<span class="nc" id="L102">                    ? List.of(</span>
                         &quot;REAL_POLYNOMIAL_EQUALITY_ONLY&quot;,
                         &quot;VALIDATION_ONLY_NOT_DISCOVERY_OR_FORMAL_PROOF&quot;)
-<span class="nc" id="L98">                    : List.of(</span>
+<span class="nc" id="L105">                    : List.of(</span>
                         &quot;BACKEND_UNAVAILABLE&quot;,
-<span class="nc" id="L100">                        sympy.detail())),</span>
+<span class="nc" id="L107">                        sympy.detail())),</span>
             new ValidationSystem(
-<span class="nc" id="L102">                z3.backend(),</span>
+<span class="nc" id="L109">                z3.backend(),</span>
                 SystemKind.EXTERNAL_BASELINE,
-<span class="nc" id="L104">                List.of(</span>
+<span class="nc" id="L111">                List.of(</span>
                     Role.VALIDATION,
                     Role.COUNTEREXAMPLE,
                     Role.PROOF),
-<span class="nc bnc" id="L108" title="All 2 branches missed.">                z3.availability() == BackendAvailability.AVAILABLE,</span>
-<span class="nc" id="L109">                &quot;z3=&quot; + z3.backend().descriptor().backendVersion(),</span>
-<span class="nc bnc" id="L110" title="All 2 branches missed.">                z3.availability() == BackendAvailability.AVAILABLE</span>
-<span class="nc" id="L111">                    ? List.of(</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                z3.availability() == BackendAvailability.AVAILABLE,</span>
+<span class="nc" id="L116">                &quot;z3=&quot; + z3.backend().descriptor().backendVersion(),</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                z3.availability() == BackendAvailability.AVAILABLE</span>
+<span class="nc" id="L118">                    ? List.of(</span>
                         &quot;SHARED_REAL_ARITHMETIC_FRAGMENT&quot;,
                         &quot;PROOF_ROLE_REPORTED_SEPARATELY_FROM_VALIDATION&quot;)
-<span class="nc" id="L114">                    : List.of(</span>
+<span class="nc" id="L121">                    : List.of(</span>
                         &quot;BACKEND_UNAVAILABLE&quot;,
-<span class="nc" id="L116">                        z3.detail())));</span>
-<span class="nc" id="L117">        return new ComparativeBenchmarkRunner(search, validation);</span>
+<span class="nc" id="L123">                        z3.detail())));</span>
+
+        ExternalSymPySimplificationBaseline simplifier =
+<span class="nc" id="L126">            ExternalSymPySimplificationBaseline.detectSystemSymPy();</span>
+<span class="nc" id="L127">        List&lt;SimplificationSystem&gt; simplification = List.of(</span>
+<span class="nc" id="L128">            SimplificationSystem.internal(</span>
+                &quot;regelsuche-untargeted-best-first&quot;,
+                &quot;1&quot;,
+                new BestFirstSearchStrategy(),
+<span class="nc" id="L132">                List.of(</span>
+                    &quot;INTERNAL_REGELSUCHE_SEARCH&quot;,
+                    &quot;NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE&quot;,
+                    &quot;EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_&quot;
+                        + SimplificationAssumptionContract.CONTRACT_ID)),
+<span class="nc" id="L137">            SimplificationSystem.external(</span>
+                simplifier,
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                simplifier.available()</span>
+<span class="nc" id="L140">                    ? List.of(</span>
+                        &quot;EXTERNAL_CAS_NATIVE_SIMPLIFIER&quot;,
+                        &quot;NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE&quot;,
+                        &quot;DECLARED_ASSUMPTIONS_PASSED_VIA_&quot;
+                            + SimplificationAssumptionContract.CONTRACT_ID,
+                        &quot;COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS&quot;,
+                        &quot;INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE&quot;,
+                        &quot;SIMPLIFICATION_IS_NOT_DISCOVERY_OR_FORMAL_PROOF&quot;)
+<span class="nc" id="L148">                    : List.of(</span>
+                        &quot;BACKEND_UNAVAILABLE&quot;,
+<span class="nc" id="L150">                        simplifier.detail())));</span>
+<span class="nc" id="L151">        return new ComparativeBenchmarkRunner(</span>
+            search, validation, simplification);
     }
 
     public Report run() {
-<span class="fc" id="L121">        List&lt;Case&gt; searchCases = ComparativeBenchmarkCatalog.searchCases();</span>
+<span class="fc" id="L156">        List&lt;Case&gt; searchCases = ComparativeBenchmarkCatalog.searchCases();</span>
         List&lt;Case&gt; validationCases =
-<span class="fc" id="L123">            ComparativeBenchmarkCatalog.validationCases();</span>
-<span class="fc" id="L124">        InformationParityManifest searchParity =</span>
-<span class="fc" id="L125">            ComparativeBenchmarkCatalog.searchParity(searchCases);</span>
-<span class="fc" id="L126">        InformationParityManifest validationParity =</span>
-<span class="fc" id="L127">            ComparativeBenchmarkCatalog.validationParity(validationCases);</span>
+<span class="fc" id="L158">            ComparativeBenchmarkCatalog.validationCases();</span>
+<span class="fc" id="L159">        InformationParityManifest searchParity =</span>
+<span class="fc" id="L160">            ComparativeBenchmarkCatalog.searchParity(searchCases);</span>
+<span class="fc" id="L161">        InformationParityManifest validationParity =</span>
+<span class="fc" id="L162">            ComparativeBenchmarkCatalog.validationParity(validationCases);</span>
+        List&lt;Case&gt; simplificationCases =
+<span class="fc" id="L164">            ComparativeBenchmarkCatalog.simplificationCases();</span>
+<span class="fc" id="L165">        InformationParityManifest simplificationParity =</span>
+<span class="fc" id="L166">            ComparativeBenchmarkCatalog.simplificationParity(</span>
+                simplificationCases);
 
-<span class="fc" id="L129">        List&lt;Configuration&gt; configurations = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L130">        List&lt;Result&gt; results = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (SearchSystem system : searchSystems) {</span>
-<span class="fc" id="L132">            Configuration configuration =</span>
-<span class="fc" id="L133">                ComparativeBenchmarkCatalog.searchConfiguration(</span>
+<span class="fc" id="L169">        List&lt;Configuration&gt; configurations = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L170">        List&lt;Result&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (SearchSystem system : searchSystems) {</span>
+<span class="fc" id="L172">            Configuration configuration =</span>
+<span class="fc" id="L173">                ComparativeBenchmarkCatalog.searchConfiguration(</span>
                     system, searchParity);
-<span class="fc" id="L135">            configurations.add(configuration);</span>
-<span class="fc bfc" id="L136" title="All 2 branches covered.">            for (Case benchmarkCase : searchCases) {</span>
-<span class="fc" id="L137">                results.add(executor.runSearch(</span>
+<span class="fc" id="L175">            configurations.add(configuration);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            for (Case benchmarkCase : searchCases) {</span>
+<span class="fc" id="L177">                results.add(executor.runSearch(</span>
                     system, configuration, benchmarkCase));
-<span class="fc" id="L139">            }</span>
-<span class="fc" id="L140">        }</span>
-<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (ValidationSystem system : validationSystems) {</span>
-<span class="fc" id="L142">            Configuration configuration =</span>
-<span class="fc" id="L143">                ComparativeBenchmarkCatalog.validationConfiguration(</span>
+<span class="fc" id="L179">            }</span>
+<span class="fc" id="L180">        }</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        for (ValidationSystem system : validationSystems) {</span>
+<span class="fc" id="L182">            Configuration configuration =</span>
+<span class="fc" id="L183">                ComparativeBenchmarkCatalog.validationConfiguration(</span>
                     system, validationParity);
-<span class="fc" id="L145">            configurations.add(configuration);</span>
-<span class="fc bfc" id="L146" title="All 2 branches covered.">            for (Case benchmarkCase : validationCases) {</span>
-<span class="fc" id="L147">                results.add(executor.runValidation(</span>
+<span class="fc" id="L185">            configurations.add(configuration);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            for (Case benchmarkCase : validationCases) {</span>
+<span class="fc" id="L187">                results.add(executor.runValidation(</span>
                     system, configuration, benchmarkCase));
-<span class="fc" id="L149">            }</span>
-<span class="fc" id="L150">        }</span>
+<span class="fc" id="L189">            }</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (SimplificationSystem system : simplificationSystems) {</span>
+<span class="fc" id="L192">            Configuration configuration =</span>
+<span class="fc" id="L193">                ComparativeBenchmarkCatalog.simplificationConfiguration(</span>
+                    system, simplificationParity);
+<span class="fc" id="L195">            configurations.add(configuration);</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            for (Case benchmarkCase : simplificationCases) {</span>
+<span class="fc" id="L197">                results.add(executor.runSimplification(</span>
+                    system, configuration, benchmarkCase));
+<span class="fc" id="L199">            }</span>
+<span class="fc" id="L200">        }</span>
 
-<span class="fc" id="L152">        List&lt;Result&gt; searchResults = results.stream()</span>
-<span class="fc bfc" id="L153" title="All 2 branches covered.">            .filter(result -&gt; result.track()</span>
+<span class="fc" id="L202">        List&lt;Result&gt; searchResults = results.stream()</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            .filter(result -&gt; result.track()</span>
                 == Track.TARGET_DIRECTED_SEARCH)
-<span class="fc" id="L155">            .toList();</span>
-<span class="fc" id="L156">        List&lt;Result&gt; validationResults = results.stream()</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            .filter(result -&gt; result.track()</span>
+<span class="fc" id="L205">            .toList();</span>
+<span class="fc" id="L206">        List&lt;Result&gt; validationResults = results.stream()</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            .filter(result -&gt; result.track()</span>
                 == Track.EQUALITY_VALIDATION)
-<span class="fc" id="L159">            .toList();</span>
-<span class="fc" id="L160">        List&lt;CapabilityClaim&gt; claims = List.of(</span>
-<span class="fc" id="L161">            searchClaim(searchResults),</span>
-<span class="fc" id="L162">            validationClaim(validationResults));</span>
-<span class="fc" id="L163">        List&lt;Case&gt; cases = new ArrayList&lt;&gt;(searchCases);</span>
-<span class="fc" id="L164">        cases.addAll(validationCases);</span>
-<span class="fc" id="L165">        return Report.create(</span>
+<span class="fc" id="L209">            .toList();</span>
+<span class="fc" id="L210">        List&lt;Result&gt; simplificationResults = results.stream()</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            .filter(result -&gt; result.track()</span>
+                == Track.SIMPLIFICATION_COMPETITION)
+<span class="fc" id="L213">            .toList();</span>
+<span class="fc" id="L214">        List&lt;CapabilityClaim&gt; claims = List.of(</span>
+<span class="fc" id="L215">            searchClaim(searchResults),</span>
+<span class="fc" id="L216">            validationClaim(validationResults),</span>
+<span class="fc" id="L217">            simplificationClaim(simplificationResults));</span>
+<span class="fc" id="L218">        List&lt;Case&gt; cases = new ArrayList&lt;&gt;(searchCases);</span>
+<span class="fc" id="L219">        cases.addAll(validationCases);</span>
+<span class="fc" id="L220">        cases.addAll(simplificationCases);</span>
+<span class="fc" id="L221">        return Report.create(</span>
             SUITE_ID,
-<span class="fc" id="L167">            List.of(searchParity, validationParity),</span>
+<span class="fc" id="L223">            List.of(searchParity, validationParity, simplificationParity),</span>
             configurations,
             cases,
             results,
             claims,
-<span class="fc" id="L172">            ComparativeBenchmarkCatalog.coverageGaps());</span>
+<span class="fc" id="L228">            ComparativeBenchmarkCatalog.coverageGaps());</span>
     }
 
     private static CapabilityClaim searchClaim(List&lt;Result&gt; results) {
-<span class="fc" id="L176">        ClaimStatus status = status(results);</span>
-<span class="fc" id="L177">        return CapabilityClaim.create(</span>
+<span class="fc" id="L232">        ClaimStatus status = status(results);</span>
+<span class="fc" id="L233">        return CapabilityClaim.create(</span>
             &quot;target-directed-shared-budget&quot;,
             Track.TARGET_DIRECTED_SEARCH,
             status,
-<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            status == ClaimStatus.SUPPORTED</span>
-<span class="fc" id="L182">                ? &quot;BestFirst, AStar and Beam each reached all three pinned simplification targets under identical inputs, target visibility, rewrite inventory and budgets.&quot;</span>
-<span class="pc" id="L183">                : &quot;The initial target-directed comparison did not establish complete shared-budget success for every configured strategy.&quot;,</span>
-<span class="fc" id="L184">            hashes(results),</span>
-<span class="fc" id="L185">            List.of(</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            status == ClaimStatus.SUPPORTED</span>
+<span class="fc" id="L238">                ? &quot;BestFirst, AStar and Beam each reached all three pinned simplification targets under identical inputs, target visibility, rewrite inventory and budgets.&quot;</span>
+<span class="pc" id="L239">                : &quot;The initial target-directed comparison did not establish complete shared-budget success for every configured strategy.&quot;,</span>
+<span class="fc" id="L240">            hashes(results),</span>
+<span class="fc" id="L241">            List.of(</span>
                 &quot;THREE_SMALL_INTERNAL_ALGEBRA_CASES_ONLY&quot;,
                 &quot;NO_RUNTIME_SUPERIORITY_CLAIM&quot;,
                 &quot;NO_UNIVERSAL_STRATEGY_RANKING&quot;));
     }
 
     private static CapabilityClaim validationClaim(List&lt;Result&gt; results) {
-<span class="fc" id="L192">        ClaimStatus status = status(results);</span>
-<span class="fc" id="L193">        return CapabilityClaim.create(</span>
+<span class="fc" id="L248">        ClaimStatus status = status(results);</span>
+<span class="fc" id="L249">        return CapabilityClaim.create(</span>
             &quot;shared-polynomial-equality-validation&quot;,
             Track.EQUALITY_VALIDATION,
             status,
-<span class="fc bfc" id="L197" title="All 2 branches covered.">            status == ClaimStatus.SUPPORTED</span>
-<span class="fc" id="L198">                ? &quot;The internal polynomial normal form, external SymPy CAS and external Z3 backend agreed with both pinned confirmed/refuted verdicts on the same polynomial statements.&quot;</span>
-<span class="fc" id="L199">                : &quot;The initial shared-fragment validation comparison lacks a complete correct result from every configured backend.&quot;,</span>
-<span class="fc" id="L200">            hashes(results),</span>
-<span class="fc" id="L201">            List.of(</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            status == ClaimStatus.SUPPORTED</span>
+<span class="fc" id="L254">                ? &quot;The internal polynomial normal form, external SymPy CAS and external Z3 backend agreed with both pinned confirmed/refuted verdicts on the same polynomial statements.&quot;</span>
+<span class="fc" id="L255">                : &quot;The initial shared-fragment validation comparison lacks a complete correct result from every configured backend.&quot;,</span>
+<span class="fc" id="L256">            hashes(results),</span>
+<span class="fc" id="L257">            List.of(</span>
                 &quot;TWO_REAL_POLYNOMIAL_EQUALITY_CASES_ONLY&quot;,
                 &quot;VALIDATION_IS_NOT_DISCOVERY&quot;,
                 &quot;ONLY_Z3_PROOF_OBJECTS_COUNT_AS_FORMAL_PROOF&quot;));
     }
 
+    /** Head-to-head claim for the target-free simplification track. */
+    private static CapabilityClaim simplificationClaim(List&lt;Result&gt; results) {
+<span class="fc" id="L265">        ClaimStatus status = status(results);</span>
+<span class="fc" id="L266">        return CapabilityClaim.create(</span>
+            &quot;target-free-simplification-head-to-head&quot;,
+            Track.SIMPLIFICATION_COMPETITION,
+            status,
+<span class="pc bpc" id="L270" title="2 of 3 branches missed.">            switch (status) {</span>
+                case SUPPORTED -&gt;
+<span class="nc" id="L272">                    &quot;Every configured competitor reached the pinned reference form of every case from the input expression alone.&quot;;</span>
+                case NEGATIVE -&gt;
+<span class="fc" id="L274">                    &quot;At least one configured competitor did not reach a pinned reference form; all per-result outcomes are retained unchanged.&quot;;</span>
+                case INSUFFICIENT_EVIDENCE -&gt;
+<span class="pc" id="L276">                    &quot;At least one configured competitor could not be executed, so no head-to-head comparison is authorized.&quot;;</span>
+            },
+<span class="fc" id="L278">            hashes(results),</span>
+<span class="fc" id="L279">            List.of(</span>
+                &quot;SEVEN_SMALL_ALGEBRAIC_CASES_ONLY&quot;,
+                &quot;PINNED_REFERENCE_FORM_IS_NOT_A_UNIVERSAL_SIMPLICITY_ORDER&quot;,
+                &quot;NO_RUNTIME_OR_SCALABILITY_CLAIM&quot;,
+                &quot;SHARED_SURFACE_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER&quot;,
+                &quot;INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE&quot;,
+                &quot;REACHING_A_REFERENCE_FORM_IS_NOT_DISCOVERY_OR_PROOF&quot;));
+    }
+
     private static ClaimStatus status(List&lt;Result&gt; results) {
-<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        boolean complete = !results.isEmpty()</span>
-<span class="fc bfc" id="L209" title="All 2 branches covered.">            &amp;&amp; results.stream().allMatch(result -&gt;</span>
-<span class="fc bfc" id="L210" title="All 2 branches covered.">                result.disposition() == Disposition.EXECUTED);</span>
-<span class="pc bpc" id="L211" title="1 of 4 branches missed.">        if (complete &amp;&amp; results.stream().allMatch(Result::correct)) {</span>
-<span class="fc" id="L212">            return ClaimStatus.SUPPORTED;</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        boolean complete = !results.isEmpty()</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">            &amp;&amp; results.stream().allMatch(result -&gt;</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">                result.disposition() == Disposition.EXECUTED);</span>
+<span class="fc bfc" id="L292" title="All 4 branches covered.">        if (complete &amp;&amp; results.stream().allMatch(Result::correct)) {</span>
+<span class="fc" id="L293">            return ClaimStatus.SUPPORTED;</span>
         }
-<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (results.stream().anyMatch(result -&gt;</span>
-<span class="fc bfc" id="L215" title="All 2 branches covered.">                result.disposition() == Disposition.EXECUTED</span>
-<span class="pc bpc" id="L216" title="1 of 2 branches missed.">                    &amp;&amp; !result.correct())) {</span>
-<span class="nc" id="L217">            return ClaimStatus.NEGATIVE;</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (results.stream().anyMatch(result -&gt;</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">                result.disposition() == Disposition.EXECUTED</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">                    &amp;&amp; !result.correct())) {</span>
+<span class="fc" id="L298">            return ClaimStatus.NEGATIVE;</span>
         }
-<span class="fc" id="L219">        return ClaimStatus.INSUFFICIENT_EVIDENCE;</span>
+<span class="fc" id="L300">        return ClaimStatus.INSUFFICIENT_EVIDENCE;</span>
     }
 
     private static List&lt;String&gt; hashes(List&lt;Result&gt; results) {
-<span class="fc" id="L223">        return results.stream().map(Result::contentHash).sorted().toList();</span>
+<span class="fc" id="L304">        return results.stream().map(Result::contentHash).sorted().toList();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

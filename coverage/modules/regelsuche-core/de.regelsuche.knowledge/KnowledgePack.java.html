@@ -14,40 +14,62 @@ public record KnowledgePack(
         String sourceReference,
         boolean enabledByDefault,
         KnowledgePackMaturity maturity,
+        RuleTier tier,
         List&lt;String&gt; categories,
         List&lt;PatternRewriteRule&gt; rules) {
 
-<span class="fc" id="L20">    public KnowledgePack {</span>
-<span class="pc bpc" id="L21" title="1 of 2 branches missed.">        if (isBlank(packId)) {</span>
-<span class="nc" id="L22">            throw new IllegalArgumentException(&quot;packId is required&quot;);</span>
+    /** Backwards compatible constructor defaulting to the {@link RuleTier#FIRST_PARTY} tier. */
+    public KnowledgePack(
+            String packId,
+            String displayName,
+            String sourceProject,
+            String license,
+            String sourceUrl,
+            String sourceVersion,
+            String sourceReference,
+            boolean enabledByDefault,
+            KnowledgePackMaturity maturity,
+            List&lt;String&gt; categories,
+            List&lt;PatternRewriteRule&gt; rules) {
+<span class="nc" id="L34">        this(packId, displayName, sourceProject, license, sourceUrl, sourceVersion, sourceReference,</span>
+                enabledByDefault, maturity, RuleTier.FIRST_PARTY, categories, rules);
+<span class="nc" id="L36">    }</span>
+
+<span class="fc" id="L38">    public KnowledgePack {</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (isBlank(packId)) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;packId is required&quot;);</span>
         }
-<span class="pc bpc" id="L24" title="1 of 2 branches missed.">        if (isBlank(displayName)) {</span>
-<span class="nc" id="L25">            throw new IllegalArgumentException(&quot;displayName is required&quot;);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (isBlank(displayName)) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;displayName is required&quot;);</span>
         }
-<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (isBlank(sourceProject)) {</span>
-<span class="nc" id="L28">            throw new IllegalArgumentException(&quot;sourceProject is required&quot;);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (isBlank(sourceProject)) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;sourceProject is required&quot;);</span>
         }
-<span class="pc bpc" id="L30" title="1 of 2 branches missed.">        if (isBlank(license)) {</span>
-<span class="nc" id="L31">            throw new IllegalArgumentException(&quot;license is required&quot;);</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (isBlank(license)) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(&quot;license is required&quot;);</span>
         }
-<span class="pc bpc" id="L33" title="1 of 2 branches missed.">        if (isBlank(sourceUrl)) {</span>
-<span class="nc" id="L34">            throw new IllegalArgumentException(&quot;sourceUrl is required&quot;);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (isBlank(sourceUrl)) {</span>
+<span class="nc" id="L52">            throw new IllegalArgumentException(&quot;sourceUrl is required&quot;);</span>
         }
-<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (isBlank(sourceVersion)) {</span>
-<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;sourceVersion is required&quot;);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (isBlank(sourceVersion)) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;sourceVersion is required&quot;);</span>
         }
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (isBlank(sourceReference)) {</span>
-<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;sourceReference is required&quot;);</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        if (isBlank(sourceReference)) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(&quot;sourceReference is required&quot;);</span>
         }
-<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (maturity == null) {</span>
-<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;maturity is required&quot;);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (maturity == null) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(&quot;maturity is required&quot;);</span>
         }
-<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        categories = categories == null ? List.of() : List.copyOf(categories);</span>
-<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        rules = rules == null ? List.of() : List.copyOf(rules);</span>
-<span class="fc" id="L47">    }</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        tier = tier == null ? RuleTier.FIRST_PARTY : tier;</span>
+<span class="pc bpc" id="L64" title="3 of 4 branches missed.">        if (tier == RuleTier.KERNEL &amp;&amp; !enabledByDefault) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;Kernel knowledge pack must be enabled by default: &quot; + packId);</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        categories = categories == null ? List.of() : List.copyOf(categories);</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        rules = rules == null ? List.of() : List.copyOf(rules);</span>
+<span class="fc" id="L69">    }</span>
 
     private static boolean isBlank(String value) {
-<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        return value == null || value.isBlank();</span>
+<span class="pc bpc" id="L72" title="2 of 4 branches missed.">        return value == null || value.isBlank();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

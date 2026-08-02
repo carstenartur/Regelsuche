@@ -147,15 +147,20 @@ public final class TrigonometricRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+<span class="nc" id="L151">            return true;</span>
+        }
+
+        @Override
         public List&lt;Assumption&gt; assumptions(Expr subtree) {
-<span class="pc bpc" id="L151" title="3 of 6 branches missed.">            if (!(subtree instanceof FunctionExpr tan) || !&quot;tan&quot;.equals(tan.name()) || tan.arguments().isEmpty()) {</span>
-<span class="nc" id="L152">                return List.of();</span>
+<span class="pc bpc" id="L156" title="3 of 6 branches missed.">            if (!(subtree instanceof FunctionExpr tan) || !&quot;tan&quot;.equals(tan.name()) || tan.arguments().isEmpty()) {</span>
+<span class="nc" id="L157">                return List.of();</span>
             }
-<span class="fc" id="L154">            Expr argument = tan.arguments().get(0);</span>
+<span class="fc" id="L159">            Expr argument = tan.arguments().get(0);</span>
             // Symbol payload contains the function-call form `cos(arg)`. The SMT
             // bridge parses function calls via `toSmtExpr`, the Lean bridge
             // emits the expression text — both targets render this correctly.
-<span class="fc" id="L158">            return List.of(Assumption.nonZero(&quot;cos(&quot; + ExpressionFormatter.format(argument) + &quot;)&quot;));</span>
+<span class="fc" id="L163">            return List.of(Assumption.nonZero(&quot;cos(&quot; + ExpressionFormatter.format(argument) + &quot;)&quot;));</span>
         }
     }
 
@@ -165,7 +170,7 @@ public final class TrigonometricRules {
      */
     @SuppressWarnings(&quot;unused&quot;)
     private static NumberExpr numberHelperPlaceholder() {
-<span class="nc" id="L168">        return new NumberExpr(0);</span>
+<span class="nc" id="L173">        return new NumberExpr(0);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -90,29 +90,34 @@ public final class LogarithmicRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+<span class="nc" id="L94">            return true;</span>
+        }
+
+        @Override
         public List&lt;Assumption&gt; assumptions(Expr subtree) {
-<span class="fc" id="L94">            BinaryExpr product = extract(subtree);</span>
-<span class="pc bpc" id="L95" title="1 of 2 branches missed.">            if (product == null) {</span>
-<span class="nc" id="L96">                return List.of();</span>
+<span class="fc" id="L99">            BinaryExpr product = extract(subtree);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            if (product == null) {</span>
+<span class="nc" id="L101">                return List.of();</span>
             }
-<span class="fc" id="L98">            return List.of(</span>
-<span class="fc" id="L99">                Assumption.positive(ExpressionFormatter.format(product.left())),</span>
-<span class="fc" id="L100">                Assumption.positive(ExpressionFormatter.format(product.right()))</span>
+<span class="fc" id="L103">            return List.of(</span>
+<span class="fc" id="L104">                Assumption.positive(ExpressionFormatter.format(product.left())),</span>
+<span class="fc" id="L105">                Assumption.positive(ExpressionFormatter.format(product.right()))</span>
             );
         }
 
         private BinaryExpr extract(Expr subtree) {
-<span class="pc bpc" id="L105" title="2 of 4 branches missed.">            if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {</span>
-<span class="nc" id="L106">                return null;</span>
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">            if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {</span>
+<span class="nc" id="L111">                return null;</span>
             }
-<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (functionExpr.arguments().size() != 1) {</span>
-<span class="nc" id="L109">                return null;</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (functionExpr.arguments().size() != 1) {</span>
+<span class="nc" id="L114">                return null;</span>
             }
-<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (functionExpr.arguments().get(0) instanceof BinaryExpr inner</span>
-<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                &amp;&amp; inner.operator() == BinaryOperator.MUL) {</span>
-<span class="fc" id="L113">                return inner;</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (functionExpr.arguments().get(0) instanceof BinaryExpr inner</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                &amp;&amp; inner.operator() == BinaryOperator.MUL) {</span>
+<span class="fc" id="L118">                return inner;</span>
             }
-<span class="nc" id="L115">            return null;</span>
+<span class="nc" id="L120">            return null;</span>
         }
     }
 
@@ -120,77 +125,82 @@ public final class LogarithmicRules {
     static final class LogQuotientRule implements RewriteRule {
         private final String name;
 
-<span class="fc" id="L123">        LogQuotientRule(String name) {</span>
-<span class="fc" id="L124">            this.name = name;</span>
-<span class="fc" id="L125">        }</span>
+<span class="fc" id="L128">        LogQuotientRule(String name) {</span>
+<span class="fc" id="L129">            this.name = name;</span>
+<span class="fc" id="L130">        }</span>
 
         @Override
         public String id() {
-<span class="nc" id="L129">            return name + &quot;_quotient_split&quot;;</span>
+<span class="nc" id="L134">            return name + &quot;_quotient_split&quot;;</span>
         }
 
         @Override
         public RewriteKind kind() {
-<span class="nc" id="L134">            return RewriteKind.EXPAND;</span>
+<span class="nc" id="L139">            return RewriteKind.EXPAND;</span>
         }
 
         @Override
         public boolean mayIncreaseComplexity() {
-<span class="nc" id="L139">            return true;</span>
+<span class="nc" id="L144">            return true;</span>
         }
 
         @Override
         public int estimatedCostDelta() {
-<span class="nc" id="L144">            return 3;</span>
+<span class="nc" id="L149">            return 3;</span>
         }
 
         @Override
         public boolean isEquivalencePreservingByConstruction() {
-<span class="nc" id="L149">            return true;</span>
+<span class="nc" id="L154">            return true;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="nc bnc" id="L154" title="All 2 branches missed.">            return extract(subtree) != null;</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            return extract(subtree) != null;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L159">            BinaryExpr quotient = extract(subtree);</span>
-<span class="nc bnc" id="L160" title="All 2 branches missed.">            if (quotient == null) {</span>
-<span class="nc" id="L161">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="nc" id="L164">            BinaryExpr quotient = extract(subtree);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (quotient == null) {</span>
+<span class="nc" id="L166">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
             }
-<span class="nc" id="L163">            return new BinaryExpr(</span>
-<span class="nc" id="L164">                new FunctionExpr(name, quotient.left()),</span>
+<span class="nc" id="L168">            return new BinaryExpr(</span>
+<span class="nc" id="L169">                new FunctionExpr(name, quotient.left()),</span>
                 BinaryOperator.SUB,
-<span class="nc" id="L166">                new FunctionExpr(name, quotient.right())</span>
+<span class="nc" id="L171">                new FunctionExpr(name, quotient.right())</span>
             );
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+<span class="nc" id="L177">            return true;</span>
+        }
+
+        @Override
         public List&lt;Assumption&gt; assumptions(Expr subtree) {
-<span class="nc" id="L172">            BinaryExpr quotient = extract(subtree);</span>
-<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (quotient == null) {</span>
-<span class="nc" id="L174">                return List.of();</span>
+<span class="nc" id="L182">            BinaryExpr quotient = extract(subtree);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (quotient == null) {</span>
+<span class="nc" id="L184">                return List.of();</span>
             }
-<span class="nc" id="L176">            return List.of(</span>
-<span class="nc" id="L177">                Assumption.positive(ExpressionFormatter.format(quotient.left())),</span>
-<span class="nc" id="L178">                Assumption.positive(ExpressionFormatter.format(quotient.right()))</span>
+<span class="nc" id="L186">            return List.of(</span>
+<span class="nc" id="L187">                Assumption.positive(ExpressionFormatter.format(quotient.left())),</span>
+<span class="nc" id="L188">                Assumption.positive(ExpressionFormatter.format(quotient.right()))</span>
             );
         }
 
         private BinaryExpr extract(Expr subtree) {
-<span class="nc bnc" id="L183" title="All 4 branches missed.">            if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {</span>
-<span class="nc" id="L184">                return null;</span>
+<span class="nc bnc" id="L193" title="All 4 branches missed.">            if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {</span>
+<span class="nc" id="L194">                return null;</span>
             }
-<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (functionExpr.arguments().size() != 1) {</span>
-<span class="nc" id="L187">                return null;</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (functionExpr.arguments().size() != 1) {</span>
+<span class="nc" id="L197">                return null;</span>
             }
-<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (functionExpr.arguments().get(0) instanceof BinaryExpr inner</span>
-<span class="nc bnc" id="L190" title="All 2 branches missed.">                &amp;&amp; inner.operator() == BinaryOperator.DIV) {</span>
-<span class="nc" id="L191">                return inner;</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            if (functionExpr.arguments().get(0) instanceof BinaryExpr inner</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                &amp;&amp; inner.operator() == BinaryOperator.DIV) {</span>
+<span class="nc" id="L201">                return inner;</span>
             }
-<span class="nc" id="L193">            return null;</span>
+<span class="nc" id="L203">            return null;</span>
         }
     }
 
@@ -198,74 +208,79 @@ public final class LogarithmicRules {
     static final class LogPowerRule implements RewriteRule {
         private final String name;
 
-<span class="fc" id="L201">        LogPowerRule(String name) {</span>
-<span class="fc" id="L202">            this.name = name;</span>
-<span class="fc" id="L203">        }</span>
+<span class="fc" id="L211">        LogPowerRule(String name) {</span>
+<span class="fc" id="L212">            this.name = name;</span>
+<span class="fc" id="L213">        }</span>
 
         @Override
         public String id() {
-<span class="nc" id="L207">            return name + &quot;_power_to_factor&quot;;</span>
+<span class="nc" id="L217">            return name + &quot;_power_to_factor&quot;;</span>
         }
 
         @Override
         public RewriteKind kind() {
-<span class="nc" id="L212">            return RewriteKind.NORMALIZE;</span>
+<span class="nc" id="L222">            return RewriteKind.NORMALIZE;</span>
         }
 
         @Override
         public boolean mayIncreaseComplexity() {
-<span class="nc" id="L217">            return false;</span>
+<span class="nc" id="L227">            return false;</span>
         }
 
         @Override
         public int estimatedCostDelta() {
-<span class="nc" id="L222">            return -1;</span>
+<span class="nc" id="L232">            return -1;</span>
         }
 
         @Override
         public boolean isEquivalencePreservingByConstruction() {
-<span class="nc" id="L227">            return true;</span>
+<span class="nc" id="L237">            return true;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="nc bnc" id="L232" title="All 2 branches missed.">            return extract(subtree) != null;</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">            return extract(subtree) != null;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc" id="L237">            BinaryExpr power = extract(subtree);</span>
-<span class="nc bnc" id="L238" title="All 2 branches missed.">            if (power == null) {</span>
-<span class="nc" id="L239">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="nc" id="L247">            BinaryExpr power = extract(subtree);</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">            if (power == null) {</span>
+<span class="nc" id="L249">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
             }
-<span class="nc" id="L241">            return new BinaryExpr(</span>
-<span class="nc" id="L242">                power.right(),</span>
+<span class="nc" id="L251">            return new BinaryExpr(</span>
+<span class="nc" id="L252">                power.right(),</span>
                 BinaryOperator.MUL,
-<span class="nc" id="L244">                new FunctionExpr(name, power.left())</span>
+<span class="nc" id="L254">                new FunctionExpr(name, power.left())</span>
             );
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+<span class="nc" id="L260">            return true;</span>
+        }
+
+        @Override
         public List&lt;Assumption&gt; assumptions(Expr subtree) {
-<span class="nc" id="L250">            BinaryExpr power = extract(subtree);</span>
-<span class="nc bnc" id="L251" title="All 2 branches missed.">            if (power == null) {</span>
-<span class="nc" id="L252">                return List.of();</span>
+<span class="nc" id="L265">            BinaryExpr power = extract(subtree);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">            if (power == null) {</span>
+<span class="nc" id="L267">                return List.of();</span>
             }
-<span class="nc" id="L254">            return List.of(Assumption.positive(ExpressionFormatter.format(power.left())));</span>
+<span class="nc" id="L269">            return List.of(Assumption.positive(ExpressionFormatter.format(power.left())));</span>
         }
 
         private BinaryExpr extract(Expr subtree) {
-<span class="nc bnc" id="L258" title="All 4 branches missed.">            if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {</span>
-<span class="nc" id="L259">                return null;</span>
+<span class="nc bnc" id="L273" title="All 4 branches missed.">            if (!(subtree instanceof FunctionExpr functionExpr) || !functionExpr.name().equals(name)) {</span>
+<span class="nc" id="L274">                return null;</span>
             }
-<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (functionExpr.arguments().size() != 1) {</span>
-<span class="nc" id="L262">                return null;</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">            if (functionExpr.arguments().size() != 1) {</span>
+<span class="nc" id="L277">                return null;</span>
             }
-<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (functionExpr.arguments().get(0) instanceof BinaryExpr inner</span>
-<span class="nc bnc" id="L265" title="All 2 branches missed.">                &amp;&amp; inner.operator() == BinaryOperator.POW) {</span>
-<span class="nc" id="L266">                return inner;</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            if (functionExpr.arguments().get(0) instanceof BinaryExpr inner</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                &amp;&amp; inner.operator() == BinaryOperator.POW) {</span>
+<span class="nc" id="L281">                return inner;</span>
             }
-<span class="nc" id="L268">            return null;</span>
+<span class="nc" id="L283">            return null;</span>
         }
     }
 
@@ -273,50 +288,50 @@ public final class LogarithmicRules {
     static final class LogOfOneRule implements RewriteRule {
         private final String name;
 
-<span class="fc" id="L276">        LogOfOneRule(String name) {</span>
-<span class="fc" id="L277">            this.name = name;</span>
-<span class="fc" id="L278">        }</span>
+<span class="fc" id="L291">        LogOfOneRule(String name) {</span>
+<span class="fc" id="L292">            this.name = name;</span>
+<span class="fc" id="L293">        }</span>
 
         @Override
         public String id() {
-<span class="nc" id="L282">            return name + &quot;_of_one_is_zero&quot;;</span>
+<span class="nc" id="L297">            return name + &quot;_of_one_is_zero&quot;;</span>
         }
 
         @Override
         public RewriteKind kind() {
-<span class="nc" id="L287">            return RewriteKind.SIMPLIFY;</span>
+<span class="nc" id="L302">            return RewriteKind.SIMPLIFY;</span>
         }
 
         @Override
         public boolean mayIncreaseComplexity() {
-<span class="nc" id="L292">            return false;</span>
+<span class="nc" id="L307">            return false;</span>
         }
 
         @Override
         public int estimatedCostDelta() {
-<span class="nc" id="L297">            return -2;</span>
+<span class="nc" id="L312">            return -2;</span>
         }
 
         @Override
         public boolean isEquivalencePreservingByConstruction() {
-<span class="nc" id="L302">            return true;</span>
+<span class="nc" id="L317">            return true;</span>
         }
 
         @Override
         public boolean matches(Expr subtree) {
-<span class="nc" id="L307">            return subtree instanceof FunctionExpr fn</span>
-<span class="nc bnc" id="L308" title="All 2 branches missed.">                &amp;&amp; fn.name().equals(name)</span>
-<span class="nc bnc" id="L309" title="All 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
-<span class="nc bnc" id="L310" title="All 2 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof de.regelsuche.ast.NumberExpr n</span>
-<span class="nc bnc" id="L311" title="All 4 branches missed.">                &amp;&amp; n.value() == 1.0;</span>
+<span class="nc" id="L322">            return subtree instanceof FunctionExpr fn</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">                &amp;&amp; fn.name().equals(name)</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">                &amp;&amp; fn.arguments().size() == 1</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                &amp;&amp; fn.arguments().get(0) instanceof de.regelsuche.ast.NumberExpr n</span>
+<span class="nc bnc" id="L326" title="All 4 branches missed.">                &amp;&amp; n.value() == 1.0;</span>
         }
 
         @Override
         public Expr apply(Expr subtree) {
-<span class="nc bnc" id="L316" title="All 2 branches missed.">            if (!matches(subtree)) {</span>
-<span class="nc" id="L317">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">            if (!matches(subtree)) {</span>
+<span class="nc" id="L332">                throw new IllegalArgumentException(&quot;Rule does not match subtree&quot;);</span>
             }
-<span class="nc" id="L319">            return new de.regelsuche.ast.NumberExpr(0);</span>
+<span class="nc" id="L334">            return new de.regelsuche.ast.NumberExpr(0);</span>
         }
     }
 }

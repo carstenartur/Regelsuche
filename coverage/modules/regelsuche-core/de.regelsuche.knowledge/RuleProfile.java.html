@@ -4,30 +4,58 @@ import java.util.Set;
 
 <span class="fc" id="L5">public enum RuleProfile {</span>
 <span class="fc" id="L6">    CORE(&quot;core&quot;, Set.of(), false),</span>
-<span class="fc" id="L7">    CORE_PLUS_SYMPY_POLYNOMIAL(&quot;core+sympy-polynomial&quot;, Set.of(&quot;sympy-polynomial-basic&quot;), false),</span>
-<span class="fc" id="L8">    EXPLORATORY(&quot;exploratory&quot;, Set.of(&quot;sympy-polynomial-basic&quot;), false),</span>
-<span class="fc" id="L9">    ALL(&quot;all&quot;, Set.of(), true);</span>
+    /** Explicit alias for the default behaviour: kernel plus all first-party packs. */
+<span class="fc" id="L8">    FULL(&quot;full&quot;, Set.of(), false),</span>
+    /** Baseline profile: kernel packs only, every ablatable pack switched off. */
+<span class="fc" id="L10">    MINIMAL_KERNEL(&quot;minimal-kernel&quot;, Set.of(), false, false),</span>
+<span class="fc" id="L11">    CORE_PLUS_SYMPY_POLYNOMIAL(&quot;core+sympy-polynomial&quot;, Set.of(&quot;sympy-polynomial-basic&quot;), false),</span>
+<span class="fc" id="L12">    EXPLORATORY(&quot;exploratory&quot;, Set.of(&quot;sympy-polynomial-basic&quot;), false),</span>
+<span class="fc" id="L13">    ALL(&quot;all&quot;, Set.of(), true);</span>
 
     private final String id;
     private final Set&lt;String&gt; enabledPackIds;
     private final boolean enableAllPacks;
+    private final boolean includeFirstPartyDefaults;
 
-<span class="fc" id="L15">    RuleProfile(String id, Set&lt;String&gt; enabledPackIds, boolean enableAllPacks) {</span>
-<span class="fc" id="L16">        this.id = id;</span>
-<span class="fc" id="L17">        this.enabledPackIds = Set.copyOf(enabledPackIds);</span>
-<span class="fc" id="L18">        this.enableAllPacks = enableAllPacks;</span>
-<span class="fc" id="L19">    }</span>
+    RuleProfile(String id, Set&lt;String&gt; enabledPackIds, boolean enableAllPacks) {
+<span class="fc" id="L21">        this(id, enabledPackIds, enableAllPacks, true);</span>
+<span class="fc" id="L22">    }</span>
+
+<span class="fc" id="L24">    RuleProfile(String id, Set&lt;String&gt; enabledPackIds, boolean enableAllPacks, boolean includeFirstPartyDefaults) {</span>
+<span class="fc" id="L25">        this.id = id;</span>
+<span class="fc" id="L26">        this.enabledPackIds = Set.copyOf(enabledPackIds);</span>
+<span class="fc" id="L27">        this.enableAllPacks = enableAllPacks;</span>
+<span class="fc" id="L28">        this.includeFirstPartyDefaults = includeFirstPartyDefaults;</span>
+<span class="fc" id="L29">    }</span>
 
     public String id() {
-<span class="nc" id="L22">        return id;</span>
+<span class="fc" id="L32">        return id;</span>
     }
 
     public Set&lt;String&gt; enabledPackIds() {
-<span class="fc" id="L26">        return enabledPackIds;</span>
+<span class="fc" id="L36">        return enabledPackIds;</span>
     }
 
     public boolean enableAllPacks() {
-<span class="fc" id="L30">        return enableAllPacks;</span>
+<span class="fc" id="L40">        return enableAllPacks;</span>
+    }
+
+    /** Whether packs marked {@code enabledByDefault} outside the kernel tier stay enabled. */
+    public boolean includeFirstPartyDefaults() {
+<span class="fc" id="L45">        return includeFirstPartyDefaults;</span>
+    }
+
+    public static RuleProfile fromId(String value) {
+<span class="nc bnc" id="L49" title="All 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;Rule profile id is required&quot;);</span>
+        }
+<span class="nc" id="L52">        String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        for (RuleProfile profile : values()) {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            if (profile.id.equals(normalized)) {</span>
+<span class="nc" id="L55">                return profile;</span>
+            }
+        }
+<span class="nc" id="L58">        throw new IllegalArgumentException(&quot;Unknown rule profile: &quot; + value);</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
