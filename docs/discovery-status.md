@@ -204,7 +204,7 @@ Public Evidence bleiben getrennte Achsen.
 Autoritativer Repository-Lebenszyklus:
 
 ```bash
-./gradlew ciCheck
+./gradlew --no-configuration-cache ciCheck
 ```
 
 Qualifizierte autonome Referenz-Campaign:
