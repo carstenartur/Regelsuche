@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramTrainCaseReferences.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramTrainCaseReferences.java</span></div><h1>EvolutionRewriteProgramTrainCaseReferences.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.DifficultyTier;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.ExpectedTerminalClass;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.RevealCase;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Derives the canonical split-manifest identities for a frozen TRAIN suite.
+ *
+ * &lt;p&gt;Each case is normalized through the same {@link RevealCase} identity
+ * implementation used by held-out material. References are then constructed
+ * per case, without applying held-out-bundle uniqueness rules inside TRAIN.
+ * Duplicate targets or signatures may be legitimate within one TRAIN split;
+ * {@link EvolutionSplitManifest} remains responsible for rejecting collisions
+ * between TRAIN, VALIDATION and FINAL TEST.&lt;/p&gt;
+ */
+public final class EvolutionRewriteProgramTrainCaseReferences {
+    private EvolutionRewriteProgramTrainCaseReferences() {
+    }
+
+    public static List&lt;EvolutionSplitManifest.CaseReference&gt; create(
+        EvolutionRewriteProgramTrainSuite suite
+    ) {
+<span class="fc" id="L26">        Objects.requireNonNull(suite, &quot;suite&quot;);</span>
+<span class="fc" id="L27">        return suite.cases().stream()</span>
+<span class="fc" id="L28">            .map(item -&gt; RevealCase.create(</span>
+<span class="fc" id="L29">                item.caseId(),</span>
+<span class="fc" id="L30">                item.familyId(),</span>
+<span class="fc" id="L31">                item.inputExpression(),</span>
+<span class="fc" id="L32">                item.targetExpression(),</span>
+<span class="fc" id="L33">                item.assumptions(),</span>
+                DifficultyTier.STANDARD,
+                ExpectedTerminalClass.CONFIRMED))
+<span class="fc" id="L36">            .map(identity -&gt; new EvolutionSplitManifest.CaseReference(</span>
+<span class="fc" id="L37">                identity.caseId(),</span>
+<span class="fc" id="L38">                identity.familyId(),</span>
+<span class="fc" id="L39">                identity.exactSignatureHash(),</span>
+<span class="fc" id="L40">                identity.alphaSignatureHash(),</span>
+<span class="fc" id="L41">                identity.inputHash(),</span>
+<span class="fc" id="L42">                identity.targetHash()))</span>
+<span class="fc" id="L43">            .toList();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
