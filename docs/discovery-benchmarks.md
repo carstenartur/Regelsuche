@@ -39,13 +39,15 @@ The equality-validation track uses external systems as validators: they receive 
 
 Neither competitor receives the pinned reference form. The parity manifest `target-free-simplification/v1` therefore sets `targetVisible=false` and `hiddenReferenceVisible=false`.
 
-Both outputs are compared by the same surface judge, `ExpressionCanonicalizer`. A case is reached when the canonical hash of a produced expression equals the canonical hash of the pinned reference form. This avoids treating notation differences such as SymPy’s `**` and Regelsuche’s `^` as different results.
+Each competitor contributes exactly one output. SymPy contributes its native `simplify` result. Regelsuche selects one state from its target-free search using a fixed policy that is part of the configuration hash: lowest `ExpressionScorer` total, then normalized expression text, then search depth. A reference-shaped state that was merely visited but not selected does not count as a hit.
+
+Both selected outputs are compared by the same surface judge, `ExpressionCanonicalizer`. A case is reached when the canonical hash of the selected expression equals the canonical hash of the pinned reference form. This avoids treating notation differences such as SymPy’s `**` and Regelsuche’s `^` as different results.
 
 The reference is intentionally called a **pinned reference form**, not “the simplest form”. The current benchmark does not define a universal simplicity ordering and therefore cannot claim that a different equivalent output is worse in general.
 
 #### Assumptions and current validation boundary
 
-Cases may declare assumptions such as `x - 1 != 0` for rational cancellation. Internal Regelsuche paths retain the side conditions emitted by their rewrite steps; a path only counts when all emitted conditions occur in the case’s canonical assumption contract.
+Cases may declare assumptions such as `x - 1 != 0` for rational cancellation. The selected Regelsuche path retains the side conditions emitted by its rewrite steps; it only counts when all emitted conditions occur in the case’s canonical assumption contract.
 
 The external adapter can bind symbol-scoped assumptions directly. Composite declarations such as `x - 1 != 0` cannot currently be represented as SymPy symbol assumptions and remain visible as a configuration limitation. An independent assumption-aware validator for every produced output is therefore still a machine-readable coverage gap. The benchmark does not claim that this gap is already closed.
 
