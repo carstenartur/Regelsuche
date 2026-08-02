@@ -132,25 +132,18 @@ public final class ComparativeBenchmarkRunner {
                 List.of(
                     "INTERNAL_REGELSUCHE_SEARCH",
                     "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
-                    "CASE_ASSUMPTIONS_INJECTED_VIA_"
+                    "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
                         + SimplificationAssumptionContract.CONTRACT_ID)),
-            SimplificationSystem.saturation(
-                new EqualitySaturationSimplificationBaseline(),
-                List.of(
-                    "INTERNAL_REGELSUCHE_EQUALITY_SATURATION",
-                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
-                    "CASE_ASSUMPTIONS_INJECTED_VIA_"
-                        + SimplificationAssumptionContract.CONTRACT_ID,
-                    "SATURATION_SIDE_CONDITIONS_APPROXIMATED_BY_RULE_IDENTITY")),
             SimplificationSystem.external(
                 simplifier,
                 simplifier.available()
                     ? List.of(
                         "EXTERNAL_CAS_NATIVE_SIMPLIFIER",
                         "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
-                        "CASE_ASSUMPTIONS_INJECTED_VIA_"
+                        "DECLARED_ASSUMPTIONS_PASSED_VIA_"
                             + SimplificationAssumptionContract.CONTRACT_ID,
                         "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS",
+                        "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE",
                         "SIMPLIFICATION_IS_NOT_DISCOVERY_OR_FORMAL_PROOF")
                     : List.of(
                         "BACKEND_UNAVAILABLE",
@@ -195,7 +188,6 @@ public final class ComparativeBenchmarkRunner {
                     system, configuration, benchmarkCase));
             }
         }
-
         for (SimplificationSystem system : simplificationSystems) {
             Configuration configuration =
                 ComparativeBenchmarkCatalog.simplificationConfiguration(
@@ -268,14 +260,7 @@ public final class ComparativeBenchmarkRunner {
                 "ONLY_Z3_PROOF_OBJECTS_COUNT_AS_FORMAL_PROOF"));
     }
 
-    /**
-     * Head-to-head claim for the target-free simplification track.
-     *
-     * <p>The claim is deliberately about the comparison, not about Regelsuche.
-     * If any configured competitor misses a reference form, the status becomes
-     * {@code NEGATIVE} and the statement names the losing competitors. A track
-     * on which Regelsuche loses is retained evidence, not a build failure.</p>
-     */
+    /** Head-to-head claim for the target-free simplification track. */
     private static CapabilityClaim simplificationClaim(List<Result> results) {
         ClaimStatus status = status(results);
         return CapabilityClaim.create(
@@ -284,18 +269,20 @@ public final class ComparativeBenchmarkRunner {
             status,
             switch (status) {
                 case SUPPORTED ->
-                    "Every configured competitor reached the reference simplest form of every pinned case from the input expression alone.";
+                    "Every configured competitor reached the pinned reference form of every case from the input expression alone.";
                 case NEGATIVE ->
-                    "At least one configured competitor did not reach the reference simplest form; the per-result reference-form outcomes are retained unchanged.";
+                    "At least one configured competitor did not reach a pinned reference form; all per-result outcomes are retained unchanged.";
                 case INSUFFICIENT_EVIDENCE ->
                     "At least one configured competitor could not be executed, so no head-to-head comparison is authorized.";
             },
             hashes(results),
             List.of(
-                "TEN_SMALL_CASES_ACROSS_ALGEBRAIC_TRIGONOMETRIC_LOGARITHMIC_AND_EXPONENTIAL_FAMILIES",
+                "SEVEN_SMALL_ALGEBRAIC_CASES_ONLY",
+                "PINNED_REFERENCE_FORM_IS_NOT_A_UNIVERSAL_SIMPLICITY_ORDER",
                 "NO_RUNTIME_OR_SCALABILITY_CLAIM",
-                "SHARED_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER",
-                "REACHING_A_SIMPLEST_FORM_IS_NOT_DISCOVERY_OR_PROOF"));
+                "SHARED_SURFACE_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER",
+                "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE",
+                "REACHING_A_REFERENCE_FORM_IS_NOT_DISCOVERY_OR_PROOF"));
     }
 
     private static ClaimStatus status(List<Result> results) {
