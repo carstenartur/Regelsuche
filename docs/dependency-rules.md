@@ -1,98 +1,207 @@
-# Dependency Rules (Teil 0)
+# Dependency-Regeln
 
-Diese Regeln definieren die erlaubten Richtungen zwischen den Gradle-Modulen und den noch logischen Zielmodulen.
+Diese Regeln definieren die zulässigen Abhängigkeitsrichtungen zwischen den
+Gradle-Modulen. In den folgenden Diagrammen bedeutet `A → B`: **A darf von B
+abhängen**.
 
-## Physisch erzwungene Hauptrichtung
+Die tatsächlichen Kanten werden durch die `build.gradle`-Dateien erzwungen.
+Diese Seite erklärt die architektonische Absicht und die fachlichen Grenzen.
 
-```text
-regelsuche-core
-  <- regelsuche-egraph
-  <- regelsuche-search
-  <- regelsuche-validation
-  <- regelsuche-solver-ir
-  <- regelsuche-solver-portfolio
-  <- regelsuche-benchmarks
+## Hauptrichtung
 
-regelsuche-search <- regelsuche-learning <- regelsuche-experiments
-regelsuche-discovery <- regelsuche-experiments
-regelsuche-experiments + regelsuche-learning <- regelsuche-autopilot
-regelsuche-persistence <- regelsuche-persistence-hibernate
-regelsuche-cli <- app
+```mermaid
+flowchart TD
+    app --> release
+    app --> autopilot
+    app --> persistenceHibernate
+    app --> portfolio
+    app --> search
+
+    release --> autopilot
+    autopilot --> experiments
+    autopilot --> learning
+
+    experiments --> discovery
+    experiments --> search
+    experiments --> validation
+    experiments --> math
+
+    benchmarks --> portfolio
+    benchmarks --> solverIr
+    benchmarks --> search
+
+    learning --> solverIr
+    learning --> search
+    learning --> validation
+
+    persistenceHibernate --> persistence
+
+    portfolio --> solverIr
+    solverIr --> search
+    solverIr --> validation
+    solverIr --> math
+
+    search --> egraph
+    search --> core
+    egraph --> core
+    validation --> core
+    math --> core
+    persistence --> core
 ```
 
-- `:regelsuche-core` darf keine Projektabhängigkeiten und keine technischen Infrastruktur-Libraries deklarieren.
-- `:regelsuche-egraph` darf nur vom Core abhängen.
-- `:regelsuche-search` darf vom Core und vom E-Graph-Modul abhängen; JSON-/Neo4j-Adapter bleiben außerhalb.
-- `:regelsuche-validation` darf vom Core abhängen; konkrete Validierungsadapter dürfen hier zusätzliche technische Libraries kapseln.
-- `:regelsuche-solver-ir` darf mathematische Kern-, Search-, Validation- und reine Algorithmusverträge verwenden. Es enthält keine Portfolio- oder Campaign-Entscheidungen.
-- `:regelsuche-solver-portfolio` darf nur auf der Solver-IR aufbauen. Sein Planner-Report ist Ausführungstelemetrie, kein Ersatz für Solver-Resultate.
-- `:regelsuche-benchmarks` darf Search, Solver-IR und Solver-Portfolio verbinden, weil Vergleichsläufe konkrete Strategien und externe Backends ausführen. Es darf keine zweite mathematische Problem-IR und keine Rückabhängigkeit in die Fachmodule einführen.
-- `:regelsuche-persistence` enthält Ports/Konfiguration ohne Hibernate/JPA/Datenbanktreiber.
-- `:regelsuche-persistence-hibernate` kapselt Hibernate/JPA/PostgreSQL und hängt von den benötigten Fachports ab.
-- `:regelsuche-learning` darf von Core, Search, Validation und der solver-neutralen IR abhängen; App-/Graph-/Inventory-Orchestrierung bleibt außerhalb.
-- `:regelsuche-experiments` darf von Search, Validation, mathematischen Algorithmen und Discovery-Metadaten abhängen; Web-/CLI-/Persistenzadapter bleiben außerhalb.
-- `:regelsuche-autopilot` ist die Composition-Schicht über Experiment- und Learning-Verträgen.
-- `:regelsuche-cli` bleibt projektabhängigkeitsfrei; app-spezifisches Routing bleibt in `:app`.
-- `:regelsuche-discovery` darf von Core, Search und Validation abhängen.
-- `:app` ist die Composition Root und darf die Module verdrahten.
+Das Diagramm zeigt die wesentlichen Schichtkanten, nicht jeden optionalen oder
+rein testbezogenen Build-Eintrag.
 
-## Solver-Regel
+## Verbindliche Modulregeln
 
-Die Solver-IR besitzt die Bedeutung einer Obligation, strukturierten Annahmen, Übersetzung, eines Ergebnisses und einer konkreten Execution. Kein Portfolio- oder Benchmark-Report darf einen `UNKNOWN`-, Search- oder Planner-Zustand in mathematische Bestätigung umetikettieren.
+### Innerer Kern
+
+- `:regelsuche-core` besitzt keine Projektabhängigkeiten.
+- Core enthält keine Hibernate-/JPA-, Web-, Docker-, Neo4j-, SymPy-, Z3- oder
+  GraalVM-Prozessintegration.
+- `:regelsuche-egraph` baut nur auf Core auf.
+- `:regelsuche-search` verwendet Core und E-Graph; technische Persistenz- und
+  Prozessadapter bleiben außerhalb.
+- `:regelsuche-validation` definiert fachliche Validation-Verträge auf Basis
+  des Core.
+
+### Mathematische Algorithmen und Solver
+
+- `:regelsuche-math-algorithms` enthält reine oder klar begrenzte mathematische
+  Verfahren und keine Campaign-Entscheidungen.
+- `:regelsuche-solver-ir` definiert Obligation, strukturierte Annahmen,
+  Übersetzung, Resultat und Execution.
+- `:regelsuche-solver-portfolio` darf Backends auswählen, budgetieren,
+  ausführen und Konflikte berichten; es darf Resultate nicht semantisch
+  umetikettieren.
+- Ein Portfolio-, Planner- oder Benchmarkstatus ersetzt niemals die konkrete
+  Solver Execution, die eine mathematische Aussage trägt.
+
+### Learning, Discovery und Experimente
+
+- `:regelsuche-learning` verwendet mathematische und Search-Verträge, kennt aber
+  keine Web- oder App-Orchestrierung.
+- `:regelsuche-discovery` enthält portable Domänen-, Pfad- und Handoff-Typen;
+  konkrete Web- und Persistenzadapter bleiben außen.
+- `:regelsuche-experiments` darf eingefrorene Inputs, Budgets, Runner und
+  Evidence-DAGs verbinden, aber keine UI- oder Deploymentverantwortung
+  übernehmen.
+- `:regelsuche-autopilot` ist eine Composition-Schicht über Experiment- und
+  Learning-Verträgen. Es darf die inneren Status- und Ressourcenbedeutungen
+  nicht neu definieren.
+
+### Persistenz
+
+- `:regelsuche-persistence` enthält Ports, Konfiguration und leichtgewichtige
+  Checkpoint-Typen ohne Hibernate, JPA oder Datenbanktreiber.
+- `:regelsuche-persistence-hibernate` kapselt relationale Entities, Migration,
+  Hibernate ORM/Search und PostgreSQL-Integration.
+- Fachmodule dürfen nicht von der Hibernate-Implementierung abhängen.
+- Abgeleitete Suchindizes sind keine Autorität für mathematische Evidence.
+
+### CLI und Anwendung
+
+- `:regelsuche-cli` bleibt frei von Fachmodulabhängigkeiten und stellt
+  wiederverwendbare Parsing-/Command-Primitiven bereit.
+- `:app` ist die äußere Composition Root und darf produktive Module verdrahten.
+- `app` darf nicht als Ablage für neue Kernsemantik verwendet werden, wenn eine
+  fachliche Capability-Grenze existiert.
+
+## Solver-Invariante
+
+Der autoritative Fluss lautet:
 
 ```text
-solver-obligation
-  -> solver-translation
-  -> solver-result
-  -> solver-execution
+Solver Obligation
+  → Backend-spezifische Translation
+  → Solver Result
+  → Solver Execution
 ```
 
-`regelsuche-solver-portfolio` wählt, budgetiert und aggregiert Backends. Der ausgewählte mathematische Nachweis bleibt stets das konkrete `solver-execution`-Artefakt.
+Ein Status wie `UNKNOWN`, `UNAVAILABLE`, Timeout oder technischer Fehler bleibt
+von `CONFIRMED`, `REFUTED` oder formaler Proof-Evidence getrennt. Kein äußerer
+Report darf diese Bedeutung überschreiben.
 
-## Benchmark-Regel
+## Benchmark-Regeln
 
-Vergleichende Benchmarks sind nach Capability und Informationsregime getrennt. Ein Benchmark darf:
+Vergleichende Benchmarks sind nach Capability und Informationsregime getrennt.
+Ein Benchmark darf:
 
-- mehrere Search-Strategien unter identischen Inputs, Targets, Inventaren und Budgets ausführen;
-- externe CAS-/SMT-/Prover-Adapter auf einem explizit gemeinsamen Fragment vergleichen;
-- Laufzeit als nichtkanonische Telemetrie erfassen;
-- ungemessene Tracks als Coverage Gaps ausweisen.
+- Suchstrategien unter identischen Inputs, Targets, Inventaren und Budgets
+  ausführen;
+- externe CAS-, SMT- oder Prover-Adapter auf einem ausdrücklich gemeinsamen
+  Fragment vergleichen;
+- Wandzeit und Durchsatz als nichtkanonische Diagnostik erfassen;
+- ungemessene oder unsupported Bereiche als Coverage Gaps retainen.
 
 Ein Benchmark darf nicht:
 
-- target-directed Search mit targetfreier Discovery in einem Score vermischen;
-- Validierung als Discovery-Erfolg zählen;
-- Search-Erfolg als Proof zählen;
-- fehlende, übersprungene, nicht unterstützte oder inconclusive Baselines aus dem Report entfernen;
-- Qualification-, TEST-, Review- oder Hidden-Reference-Informationen entgegen dem Parity Manifest verwenden;
-- interne Legacy-Verträge parallel zum autoritativen Reportformat pflegen.
+- zielgerichtete Suche und targetfreie Discovery in einem Score vermischen;
+- Validation als Candidate Formation zählen;
+- Search-Erfolg als Proof darstellen;
+- fehlende, übersprungene, unsupported oder inconclusive Fälle entfernen;
+- Qualification-, TEST-, Review- oder Hidden-Reference-Informationen entgegen
+  dem Parity Manifest verwenden;
+- eine zweite, permissivere Ergebnissemantik neben dem autoritativen Vertrag
+  pflegen.
 
-Die feste Score-Policy lautet:
+Die verbindliche Score-Policy lautet:
 
 ```text
 NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY
 ```
 
-## Verbindliche Kernregel
+## Evidence- und Claim-Regel
 
-Der mathematische Kern bleibt frei von Infrastruktur-Details:
+Abhängigkeiten dürfen keine unzulässige Informationsrückkopplung erzeugen.
+Insbesondere:
 
-- keine Hibernate-/JPA-Annotationen;
-- keine Spring-REST-Abhängigkeiten;
-- keine Docker-/Containerlogik;
-- keine Neo4j-spezifischen Klassen;
-- keine GraalVM/SymPy-/Z3-Prozessadapter.
+- Candidate Formation erhält keine FINAL-TEST-Ziele oder -Ergebnisse;
+- Validatoren und Prover beurteilen vorhandene Kandidaten und erzeugen nicht
+  verdeckt die zu bewertende Hypothese;
+- externe Novelty-Recherche beginnt erst nach dem Einfrieren des Kandidaten;
+- Promotion und Public Evidence lesen qualifizierte Upstream-Evidence, ändern
+  sie aber nicht;
+- Laufzeitdiagnostik darf kanonische Work-Zähler nicht ersetzen.
 
-Externe SymPy- und Z3-Aufrufe liegen deshalb ausschließlich in oberen Adaptermodulen.
+## Infrastrukturregel
 
-## Persistence-, Learning- und Discovery-Regeln
+Technische Adapter liegen außerhalb der mathematischen Grundlage:
 
-`:regelsuche-persistence` enthält persistenznahe, aber leichtgewichtige Ports. Datenbankgebundene Implementierungen liegen in `:regelsuche-persistence-hibernate` oder app-spezifischen Adaptern.
+- HTTP und UI in `app`;
+- Hibernate/JPA in `:regelsuche-persistence-hibernate`;
+- externe Prozessadapter in Solver-, Benchmark- oder App-Schichten;
+- Docker- und Testcontainers-Wiring in äußeren Modulen und Testquellen;
+- GitHub Actions ausschließlich als Plattformadapter.
 
-`:regelsuche-learning` enthält portable Mining-Bausteine wie `RuleCandidate`, Pattern-/Anti-Unification-Typen und `HypothesisRepository`. Promotion, Graph-Speicherung und Runtime-Orchestrierung bleiben außerhalb.
+Eine Infrastrukturabhängigkeit im Core oder Search-Modul benötigt eine
+Architekturentscheidung und ist standardmäßig abzulehnen.
 
-`:regelsuche-discovery` enthält portable Pfad- und Schritt-DTOs, Discovery-Profile und Operator-Deskriptoren. Repositories, Web-APIs und app-spezifische Orchestrierung bleiben in `:app`.
+## Interface-first für neue Capabilities
 
-## Interface-first für große Erweiterungen
+Größere Erweiterungen beginnen mit einem stabilen Port oder Vertrag. Vor einer
+neuen Implementierung sind mindestens zu klären:
 
-Neue große Komponenten starten mit stabilen Ports. Vorhandene Anknüpfungspunkte sind unter anderem `RuleIndex`, `SearchTraceStore`, `TermRuleIndex`, `CounterexampleSearchService`, `PolynomialEquivalenceService`, `CompletionService`, `CriticalPairService`, `NumericRelationService`, `MathematicalAlgorithmRegistry`, `HypothesisRepository` und `DiscoveryExperimentRunner`.
+1. fachliche Verantwortung;
+2. unterstützte Inputs und Terminalzustände;
+3. Budget- und Fehlersemantik;
+4. kanonische Identität und Evidence-Auswirkungen;
+5. zulässige Dependency-Richtung;
+6. Test- und Migrationsstrategie.
+
+Beispiele bestehender Portfamilien sind Regelindex, Search Trace Store,
+Counterexample Search, Polynomial Equivalence, Completion, Critical Pairs,
+Numeric Relations, Hypothesis Repository und Discovery Experiment Runner.
+
+## Prüfung bei Änderungen
+
+Bei jeder neuen Modulabhängigkeit ist zu prüfen:
+
+- Entsteht ein Zyklus oder eine Rückabhängigkeit in eine innere Schicht?
+- Wird eine Technologieabhängigkeit in ein Fachmodul gezogen?
+- Verändert die Kante Informationszugriff oder Claim-Autorität?
+- Kann ein Port die Abhängigkeit umkehren?
+- Sind Modulstruktur, Architektur und Tests aktualisiert?
+
+Eine rein bequeme Zugriffsmöglichkeit ist keine ausreichende Begründung für
+eine neue Kante.
