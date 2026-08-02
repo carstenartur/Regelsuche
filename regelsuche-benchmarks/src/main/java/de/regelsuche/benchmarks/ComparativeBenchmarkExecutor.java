@@ -105,10 +105,11 @@ final class ComparativeBenchmarkExecutor {
     /**
      * Runs one target-free simplification competitor on one case.
      *
-     * <p>The competitor receives the input expression, never the pinned
-     * reference form. The reference form is used afterwards by the shared
-     * canonical surface judge. Internal search paths additionally retain their
-     * emitted side conditions, which must be discharged by the case contract.</p>
+     * <p>Every competitor emits exactly one expression. The internal search
+     * explores a state set, but selects its output without access to the pinned
+     * reference: minimum {@link ExpressionScorer} total, then normalized
+     * expression text, then depth. SymPy returns its native single
+     * {@code simplify} output. The shared judge is applied only afterwards.</p>
      */
     Result runSimplification(
         SimplificationSystem system,
@@ -144,21 +145,22 @@ final class ComparativeBenchmarkExecutor {
             ComparativeBenchmarkCatalog.SEARCH_BUDGET)
             .withoutTarget();
         List<SearchState> states = system.strategy().search(problem);
-        List<SearchState> matching = states.stream()
-            .filter(state -> canonicalHash(state.expression())
-                .equals(referenceHash))
-            .sorted(Comparator.comparingInt(SearchState::depth))
-            .toList();
-        SearchState reached = matching.stream()
-            .filter(state -> contract.discharges(state.assumptions()))
-            .findFirst()
+        SearchState produced = states.stream()
+            .min(Comparator
+                .comparingInt((SearchState state) ->
+                    scorer.score(state.expression()).weightedTotal())
+                .thenComparing(state -> normalize(state.expression()))
+                .thenComparingInt(SearchState::depth))
             .orElse(null);
-        List<String> undischarged = reached != null || matching.isEmpty()
+        boolean matched = produced != null
+            && canonicalHash(produced.expression()).equals(referenceHash);
+        List<String> undischarged = produced == null
             ? List.of()
-            : contract.undischarged(matching.getFirst().assumptions());
-        ObservedVerdict verdict = reached == null
-            ? ObservedVerdict.UNKNOWN
-            : ObservedVerdict.TARGET_REACHED;
+            : contract.undischarged(produced.assumptions());
+        boolean reached = matched && undischarged.isEmpty();
+        ObservedVerdict verdict = reached
+            ? ObservedVerdict.TARGET_REACHED
+            : ObservedVerdict.UNKNOWN;
         ResourceMetrics resources = new ResourceMetrics(
             1,
             1,
@@ -166,31 +168,37 @@ final class ComparativeBenchmarkExecutor {
             0,
             states.size(),
             engine.generatedTransformations(),
-            reached == null ? -1 : reached.depth(),
+            produced == null ? -1 : produced.depth(),
             engine.invocations(),
             1,
             1);
         EvidenceMetrics evidence = new EvidenceMetrics(
-            verdict == ObservedVerdict.TARGET_REACHED
+            reached
                 ? "REFERENCE_FORM_REACHED"
-                : undischarged.isEmpty()
-                    ? "REFERENCE_FORM_NOT_REACHED"
-                    : "ASSUMPTION_NOT_DISCHARGED",
+                : matched && !undischarged.isEmpty()
+                    ? "ASSUMPTION_NOT_DISCHARGED"
+                    : "REFERENCE_FORM_NOT_REACHED",
             "NOT_REQUESTED",
             "NOT_REQUESTED",
             "",
-            undischarged.isEmpty()
-                ? List.of()
-                : List.of("ASSUMPTION_NOT_DISCHARGED"));
+            matched && !undischarged.isEmpty()
+                ? List.of("ASSUMPTION_NOT_DISCHARGED")
+                : List.of());
         String traceHash = SolverIr.sha256(
             "simplification/v1"
                 + "\nsystem=" + system.id()
                 + "\ncase=" + benchmarkCase.contentHash()
                 + "\nassumptionContract=" + contract.contractHash()
+                + "\noutputSelection=min-expression-score-then-text-then-depth/v1"
                 + "\nstates=" + states.stream()
                     .map(SearchState::expression).toList()
-                + "\nreachedPath="
-                    + (reached == null ? List.of() : reached.path()));
+                + "\nproduced="
+                    + (produced == null ? "" : produced.expression())
+                + "\nproducedScore="
+                    + (produced == null ? -1
+                        : scorer.score(produced.expression()).weightedTotal())
+                + "\nproducedPath="
+                    + (produced == null ? List.of() : produced.path()));
         return Result.create(
             configuration,
             benchmarkCase,
@@ -199,9 +207,10 @@ final class ComparativeBenchmarkExecutor {
             resources,
             evidence,
             Map.of(
-                "referenceFormReached", reached == null ? 0L : 1L,
+                "referenceFormReached", reached ? 1L : 0L,
+                "producedExpression", produced == null ? 0L : 1L,
                 "appliedRewriteSteps",
-                    reached == null ? 0L : (long) reached.depth(),
+                    produced == null ? 0L : (long) produced.depth(),
                 "declaredAssumptions",
                     (long) contract.declaredAssumptions().size(),
                 "undischargedAssumptions", (long) undischarged.size(),
@@ -265,6 +274,7 @@ final class ComparativeBenchmarkExecutor {
                 + "\nsystem=" + system.id()
                 + "\ncase=" + benchmarkCase.contentHash()
                 + "\nassumptionContract=" + contract.contractHash()
+                + "\noutputSelection=native-single-output/v1"
                 + "\noutcome=" + simplification.outcome().name()
                 + "\nproduced=" + simplification.producedExpression());
         return Result.create(
@@ -286,7 +296,6 @@ final class ComparativeBenchmarkExecutor {
         try {
             return canonicalizer.stableHash(expression);
         } catch (RuntimeException exception) {
-            // An unparsable competitor output is a miss, never a crash.
             return "UNPARSABLE:" + normalize(expression);
         }
     }
