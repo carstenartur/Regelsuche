@@ -389,165 +389,189 @@ public class CliRouter {
             return 1;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
-        switch (sub) {
-            case "list" -> {
-                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
-                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
-                String profile = options.getOrDefault("profile", "");
-                KnowledgePackSelection selection;
-                try {
-                    selection = parsePackSelection(options);
-                } catch (IllegalArgumentException ex) {
-                    out.println("ERROR " + ex.getMessage());
-                    return 1;
-                }
-                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
-                    Paths.get("plugins"),
-                    rulesDir,
-                    true,
-                    java.util.Set.of(),
-                    java.util.Set.of(),
-                    profile,
-                    selection
-                ))) {
-                    printCorePacks(selection);
-                    if (runtime.registeredRules().isEmpty()) {
-                        out.println("No plugin or rule-file rules loaded.");
-                    } else {
-                        runtime.registeredRules().forEach(rule -> out.println(rule.type() + " "
-                            + rule.id() + " (" + rule.source() + ", tier=plugin, "
-                            + (rule.enabled() ? "enabled" : "disabled") + ")"));
-                    }
-                    if (!runtime.macroRegistry().registrations().isEmpty()) {
-                        runtime.macroRegistry().registrations()
-                            .forEach(macro -> out.println("macro " + macro.id() + " (" + macro.source() + ", "
-                                + (macro.enabled() ? "enabled" : "disabled") + ")"));
-                    }
-                    printExtensions("search-strategy", runtime.searchStrategyRegistry().registrations());
-                    printExtensions("heuristic", runtime.heuristicRegistry().registrations());
-                    printExtensions("cost-function", runtime.costFunctionRegistry().registrations());
-                    printExtensions("renderer", runtime.rendererRegistry().registrations());
-                    printExtensions("explanation", runtime.explanationRegistry().registrations());
-                    printExtensions("parser-extension", runtime.parserExtensionRegistry().registrations());
-                    printExtensions("example", runtime.exampleRegistry().registrations());
-                    RuleInventoryManifest manifest = runtime.ruleInventoryManifest();
-                    out.println("rule-inventory profile=" + manifest.profileId()
-                        + " rules=" + manifest.ruleIds().size()
-                        + " hash=" + manifest.contentHash());
-                    runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
-                    return 0;
-                }
-            }
-            case "packs" -> {
-                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
-                KnowledgePackSelection selection;
-                try {
-                    selection = parsePackSelection(options);
-                } catch (IllegalArgumentException ex) {
-                    out.println("ERROR " + ex.getMessage());
-                    return 1;
-                }
-                printCorePacks(selection);
-                return 0;
-            }
-            case "validate" -> {
-                if (args.length < 2) {
-                    out.println("Usage: rules validate <file.regelsuche>");
-                    return 1;
-                }
-                Path file = Paths.get(args[1]);
-                try {
-                    new PluginRuntime.RuleFileLoader().load(file, new de.regelsuche.plugin.RuleRegistry(),
-                        new de.regelsuche.plugin.MacroRegistry());
-                    out.println("Rule file is valid: " + file.toAbsolutePath());
-                    return 0;
-                } catch (RuleFileParseException ex) {
-                    ex.diagnostics().forEach(diagnostic -> out.println(diagnostic.format()));
-                    return 2;
-                }
-            }
-            case "conflicts" -> {
-                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
-                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
-                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
-                    Paths.get("plugins"),
-                    rulesDir,
-                    true,
-                    java.util.Set.of(),
-                    java.util.Set.of()
-                ))) {
-                    if (runtime.conflicts().isEmpty() && runtime.cyclicConflicts().isEmpty()) {
-                        out.println("No rule conflicts detected.");
-                    } else {
-                        runtime.conflicts().forEach(conflict -> out.println(
-                            "CONFLICT competing rules share source pattern: "
-                                + String.join(", ", conflict.ruleIds())));
-                        runtime.cyclicConflicts().forEach(cycle -> out.println(
-                            "CYCLE inverse rules can loop indefinitely: "
-                                + String.join(", ", cycle.ruleIds())));
-                    }
-                    return 0;
-                }
-            }
-            case "profiles" -> {
-                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
-                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
-                String activeProfile = options.getOrDefault("profile", "");
-                try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
-                    Paths.get("plugins"),
-                    rulesDir,
-                    true,
-                    java.util.Set.of(),
-                    java.util.Set.of(),
-                    activeProfile
-                ))) {
-                    if (runtime.profiles().isEmpty()) {
-                        out.println("No activation profiles loaded.");
-                    } else {
-                        runtime.profiles().forEach(profile -> out.println(
-                            "profile " + profile.id()
-                                + (profile.id().equals(runtime.activeProfile()) ? " [active]" : "")
-                                + " (enable: " + String.join(", ", profile.enableTags())
-                                + "; disable: " + String.join(", ", profile.disableTags())
-                                + "; whitelist: " + String.join(", ", profile.whitelist())
-                                + "; blacklist: " + String.join(", ", profile.blacklist()) + ")"));
-                    }
-                    runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
-                    return 0;
-                }
-            }
-            case "import" -> {
-                if (args.length < 2) {
-                    out.println("Usage: rules import <file-or-dir> [--into rules/]");
-                    return 1;
-                }
-                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
-                Path source = Paths.get(args[1]);
-                Path targetDir = Paths.get(options.getOrDefault("into", "rules"));
-                return runRulesImport(source, targetDir);
-            }
-            case "export" -> {
-                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
-                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
-                Path outputDir = Paths.get(options.getOrDefault("out", "exports"));
-                String profile = options.getOrDefault("profile", "");
-                return runRulesExport(rulesDir, outputDir, profile);
-            }
-            case "debug" -> {
-                if (args.length < 2) {
-                    out.println("Usage: rules debug <expression> [--dir rules/]");
-                    return 1;
-                }
-                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
-                String expression = args[1];
-                Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
-                return runRulesDebug(expression, rulesDir);
-            }
+        String[] rest = Arrays.copyOfRange(args, 1, args.length);
+        return switch (sub) {
+            case "list" -> runRulesList(rest);
+            case "packs" -> runRulesPacks(rest);
+            case "validate" -> runRulesValidate(rest);
+            case "conflicts" -> runRulesConflicts(rest);
+            case "profiles" -> runRulesProfiles(rest);
+            case "import" -> runRulesImportCommand(rest);
+            case "export" -> runRulesExportCommand(rest);
+            case "debug" -> runRulesDebugCommand(rest);
             default -> {
                 out.println("Unknown rules command: " + sub);
-                return 1;
+                yield 1;
             }
+        };
+    }
+
+    private int runRulesList(String[] args) {
+        CliOptions options = CliOptions.parse(args);
+        Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+        String profile = options.getOrDefault("profile", "");
+        KnowledgePackSelection selection = parsePackSelectionOrReport(options);
+        if (selection == null) {
+            return 1;
         }
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            Paths.get("plugins"),
+            rulesDir,
+            true,
+            java.util.Set.of(),
+            java.util.Set.of(),
+            profile,
+            selection
+        ))) {
+            printCorePacks(selection);
+            printRuntimeRules(runtime);
+            printRuntimeExtensions(runtime);
+            RuleInventoryManifest manifest = runtime.ruleInventoryManifest();
+            out.println("rule-inventory profile=" + manifest.profileId()
+                + " rules=" + manifest.ruleIds().size()
+                + " hash=" + manifest.contentHash());
+            runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
+            return 0;
+        }
+    }
+
+    private KnowledgePackSelection parsePackSelectionOrReport(CliOptions options) {
+        try {
+            return parsePackSelection(options);
+        } catch (IllegalArgumentException ex) {
+            out.println("ERROR " + ex.getMessage());
+            return null;
+        }
+    }
+
+    private void printRuntimeRules(PluginRuntime runtime) {
+        if (runtime.registeredRules().isEmpty()) {
+            out.println("No plugin or rule-file rules loaded.");
+        } else {
+            runtime.registeredRules().forEach(rule -> out.println(rule.type() + " "
+                + rule.id() + " (" + rule.source() + ", tier=plugin, "
+                + (rule.enabled() ? "enabled" : "disabled") + ")"));
+        }
+        runtime.macroRegistry().registrations()
+            .forEach(macro -> out.println("macro " + macro.id() + " (" + macro.source() + ", "
+                + (macro.enabled() ? "enabled" : "disabled") + ")"));
+    }
+
+    private void printRuntimeExtensions(PluginRuntime runtime) {
+        printExtensions("search-strategy", runtime.searchStrategyRegistry().registrations());
+        printExtensions("heuristic", runtime.heuristicRegistry().registrations());
+        printExtensions("cost-function", runtime.costFunctionRegistry().registrations());
+        printExtensions("renderer", runtime.rendererRegistry().registrations());
+        printExtensions("explanation", runtime.explanationRegistry().registrations());
+        printExtensions("parser-extension", runtime.parserExtensionRegistry().registrations());
+        printExtensions("example", runtime.exampleRegistry().registrations());
+    }
+
+    private int runRulesPacks(String[] args) {
+        KnowledgePackSelection selection = parsePackSelectionOrReport(CliOptions.parse(args));
+        if (selection == null) {
+            return 1;
+        }
+        printCorePacks(selection);
+        return 0;
+    }
+
+    private int runRulesValidate(String[] args) {
+        if (args.length == 0) {
+            out.println("Usage: rules validate <file.regelsuche>");
+            return 1;
+        }
+        Path file = Paths.get(args[0]);
+        try {
+            new PluginRuntime.RuleFileLoader().load(file, new de.regelsuche.plugin.RuleRegistry(),
+                new de.regelsuche.plugin.MacroRegistry());
+            out.println("Rule file is valid: " + file.toAbsolutePath());
+            return 0;
+        } catch (RuleFileParseException ex) {
+            ex.diagnostics().forEach(diagnostic -> out.println(diagnostic.format()));
+            return 2;
+        }
+    }
+
+    private int runRulesConflicts(String[] args) {
+        CliOptions options = CliOptions.parse(args);
+        Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            Paths.get("plugins"),
+            rulesDir,
+            true,
+            java.util.Set.of(),
+            java.util.Set.of()
+        ))) {
+            if (runtime.conflicts().isEmpty() && runtime.cyclicConflicts().isEmpty()) {
+                out.println("No rule conflicts detected.");
+            } else {
+                runtime.conflicts().forEach(conflict -> out.println(
+                    "CONFLICT competing rules share source pattern: "
+                        + String.join(", ", conflict.ruleIds())));
+                runtime.cyclicConflicts().forEach(cycle -> out.println(
+                    "CYCLE inverse rules can loop indefinitely: "
+                        + String.join(", ", cycle.ruleIds())));
+            }
+            return 0;
+        }
+    }
+
+    private int runRulesProfiles(String[] args) {
+        CliOptions options = CliOptions.parse(args);
+        Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+        String activeProfile = options.getOrDefault("profile", "");
+        try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
+            Paths.get("plugins"),
+            rulesDir,
+            true,
+            java.util.Set.of(),
+            java.util.Set.of(),
+            activeProfile
+        ))) {
+            if (runtime.profiles().isEmpty()) {
+                out.println("No activation profiles loaded.");
+            } else {
+                runtime.profiles().forEach(profile -> out.println(
+                    "profile " + profile.id()
+                        + (profile.id().equals(runtime.activeProfile()) ? " [active]" : "")
+                        + " (enable: " + String.join(", ", profile.enableTags())
+                        + "; disable: " + String.join(", ", profile.disableTags())
+                        + "; whitelist: " + String.join(", ", profile.whitelist())
+                        + "; blacklist: " + String.join(", ", profile.blacklist()) + ")"));
+            }
+            runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
+            return 0;
+        }
+    }
+
+    private int runRulesImportCommand(String[] args) {
+        if (args.length == 0) {
+            out.println("Usage: rules import <file-or-dir> [--into rules/]");
+            return 1;
+        }
+        CliOptions options = CliOptions.parse(args);
+        Path source = Paths.get(args[0]);
+        Path targetDir = Paths.get(options.getOrDefault("into", "rules"));
+        return runRulesImport(source, targetDir);
+    }
+
+    private int runRulesExportCommand(String[] args) {
+        CliOptions options = CliOptions.parse(args);
+        Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+        Path outputDir = Paths.get(options.getOrDefault("out", "exports"));
+        String profile = options.getOrDefault("profile", "");
+        return runRulesExport(rulesDir, outputDir, profile);
+    }
+
+    private int runRulesDebugCommand(String[] args) {
+        if (args.length == 0) {
+            out.println("Usage: rules debug <expression> [--dir rules/]");
+            return 1;
+        }
+        CliOptions options = CliOptions.parse(args);
+        Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
+        return runRulesDebug(args[0], rulesDir);
     }
 
     private int runInventory(String[] args) {
@@ -914,9 +938,6 @@ public class CliRouter {
                 out.println();
             }
         }
-        // Optional report rendering: --report=<md-path> and --summary=<json-path>
-        // power the `./gradlew benchmarkReport` workflow that ships
-        // docs/benchmark-report.md and docs/assets/benchmark-summary.json.
         if (options.containsKey("report") || options.containsKey("summary")) {
             de.regelsuche.benchmark.BenchmarkReportRenderer renderer =
                 new de.regelsuche.benchmark.BenchmarkReportRenderer();
@@ -970,10 +991,6 @@ public class CliRouter {
         }
         de.regelsuche.web.WebSecurityConfig securityConfig = configBuilder.build();
 
-        // Resolve persistence: if the environment / JVM properties select a
-        // non-default mode, route the web workbench through it so the
-        // killer-demo's single Docker image can offer file-backed (or remote
-        // Neo4j) persistence without any extra wiring.
         de.regelsuche.persistence.PersistenceConfig persistenceConfig =
             de.regelsuche.persistence.PersistenceConfig.fromEnvironment();
         ExpressionGraphStore activeGraphStore = graphStore;
@@ -989,10 +1006,6 @@ public class CliRouter {
                 persistenceContext.transpositionTable());
         }
 
-        // Resolve the proof workbench. When REGELSUCHE_PROOF_ENABLED is true
-        // (the default) the scheduler is constructed with persistent JSON
-        // stores so jobs/cache/artifacts survive restarts and are exposed via
-        // /api/proof/jobs and the Workbench UI.
         de.regelsuche.proof.ProofConfig proofConfig =
             de.regelsuche.proof.ProofConfig.fromEnvironment(persistenceConfig.storagePath());
         de.regelsuche.proof.ProofWorkbenchService proofWorkbench = null;
@@ -1037,7 +1050,6 @@ public class CliRouter {
             out.println("Web workbench listening on " + scheme + "://" + host + ":" + port
                 + (securityEnabled ? " (secured)" : ""));
             out.println("Press Ctrl+C to stop.");
-            // Block forever (until interrupted).
             try {
                 Thread.currentThread().join();
             } catch (InterruptedException ex) {
