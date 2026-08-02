@@ -12,8 +12,11 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.BindMode;
@@ -127,9 +130,11 @@ class AutonomousProductionCampaignContainerTest {
         String operation,
         RuntimeException failure
     ) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
         Throwable rootCause = failure;
+        seen.add(rootCause);
         while (rootCause.getCause() != null
-                && rootCause.getCause() != rootCause) {
+                && seen.add(rootCause.getCause())) {
             rootCause = rootCause.getCause();
         }
 
