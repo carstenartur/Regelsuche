@@ -13,7 +13,7 @@ import java.util.Set;
  * Builds a {@link RuleInventoryManifest} from all three rule tiers.
  *
  * <p>Core packs, knowledge packs and plugin contributions are recorded through one path, so a
- * disabled first-party pack and a disabled plugin appear the same way in the manifest.
+ * disabled first-party pack and a disabled plugin appear the same way in the manifest.</p>
  */
 public final class RuleInventoryBuilder {
     private final KnowledgePackSelection selection;
@@ -34,7 +34,7 @@ public final class RuleInventoryBuilder {
                     pack.tier(),
                     "core",
                     packEnabled,
-                    pack.ruleIds().size()));
+                    pack.ruleIds()));
         }
         for (RewriteRule rule : AstRewriteTransformationEngine.defaultRules(selection)) {
             ruleIds.add(rule.id());
@@ -57,7 +57,7 @@ public final class RuleInventoryBuilder {
                     pack.tier(),
                     "knowledge-pack",
                     enabled.contains(pack.packId()),
-                    pack.rules().size()));
+                    pack.rules().stream().map(PatternRewriteRule::id).toList()));
         }
         for (PatternRewriteRule rule : registry.enabledRules(selection)) {
             ruleIds.add(rule.id());
@@ -73,7 +73,7 @@ public final class RuleInventoryBuilder {
                 RuleTier.PLUGIN,
                 "plugin",
                 enabled,
-                contributed.size()));
+                contributed));
         if (enabled) {
             ruleIds.addAll(contributed);
         }
