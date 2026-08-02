@@ -97,9 +97,13 @@ class CoreRuleCatalogTest {
     void experimentalExactPolynomialDivisionRequiresExplicitEnablement() {
         KnowledgePackSelection selection = KnowledgePackSelection.CORE
                 .enablePack(CoreRuleCatalog.EXACT_POLYNOMIAL_DIVISION);
-        List<String> selected = ruleIds(AstRewriteTransformationEngine.defaultRules(selection));
+        List<RewriteRule> selectedRules = AstRewriteTransformationEngine.defaultRules(selection);
+        AstRewriteTransformationEngine engine = new AstRewriteTransformationEngine(selectedRules);
 
-        assertTrue(selected.contains("ast_polynomial_exact_division"));
+        assertTrue(ruleIds(selectedRules).contains("ast_polynomial_exact_division"));
+        assertTrue(engine.transform("(x^3 - 1) / (x - 1)").stream()
+                .anyMatch(candidate -> candidate.rule().equals("ast_polynomial_exact_division")
+                        && candidate.transformedExpression().equals("x ^ 2 + x + 1")));
     }
 
     private static List<String> ruleIds(List<RewriteRule> rules) {
