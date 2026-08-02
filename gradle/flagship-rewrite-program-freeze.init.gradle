@@ -6,6 +6,7 @@ gradle.projectsEvaluated {
         dependsOn appProject.tasks.named('classes')
         classpath = appProject.sourceSets.main.runtimeClasspath
         mainClass = 'de.regelsuche.evolution.FlagshipRewriteProgramFreezeAssembler'
+        workingDir gradle.rootProject.rootDir
 
         doFirst {
             def required = [
