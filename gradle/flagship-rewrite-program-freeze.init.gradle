@@ -21,10 +21,70 @@ gradle.projectsEvaluated {
                 throw new GradleException(
                     'Missing flagship freeze properties: ' + missing.sort().join(', '))
             }
+            if (!(required.repositoryCommit ==~ /[0-9a-f]{40}/)) {
+                throw new GradleException(
+                    'flagshipRepositoryCommit must be a lowercase 40-character Git commit')
+            }
+
+            def repositoryRoot = gradle.rootProject.rootDir.toPath().toRealPath()
+            def actualCommit = appProject.providers.exec {
+                workingDir gradle.rootProject.rootDir
+                commandLine 'git', 'rev-parse', 'HEAD'
+            }.standardOutput.asText.get().trim()
+            if (actualCommit != required.repositoryCommit) {
+                throw new GradleException(
+                    'Repository commit differs from current HEAD: expected=' 
+                        + required.repositoryCommit + ', actual=' + actualCommit)
+            }
+            def dirtyState = appProject.providers.exec {
+                workingDir gradle.rootProject.rootDir
+                commandLine 'git', 'status', '--porcelain', '--untracked-files=all'
+            }.standardOutput.asText.get().trim()
+            if (!dirtyState.isEmpty()) {
+                throw new GradleException('Flagship freeze requires a clean checkout')
+            }
+
+            def resolvePath = { String raw ->
+                def candidate = java.nio.file.Path.of(raw)
+                candidate.isAbsolute()
+                    ? candidate.normalize()
+                    : repositoryRoot.resolve(candidate).normalize()
+            }
+            def validationPath = resolvePath(required.validationPrivate).toRealPath()
+            def finalTestPath = resolvePath(required.finalTestPrivate).toRealPath()
+            [validationPath, finalTestPath].each { privatePath ->
+                if (!java.nio.file.Files.isRegularFile(privatePath)) {
+                    throw new GradleException(
+                        'Private held-out bundle is not a regular file: ' + privatePath)
+                }
+                if (privatePath.startsWith(repositoryRoot)) {
+                    throw new GradleException(
+                        'Private held-out bundle must remain outside the checkout: '
+                            + privatePath)
+                }
+            }
+
+            def outputPath = resolvePath(required.output)
+            if (java.nio.file.Files.exists(outputPath)) {
+                if (!java.nio.file.Files.isDirectory(outputPath)) {
+                    throw new GradleException(
+                        'Flagship freeze output exists and is not a directory: '
+                            + outputPath)
+                }
+                def nonEmpty
+                java.nio.file.Files.list(outputPath).withCloseable { stream ->
+                    nonEmpty = stream.findAny().isPresent()
+                }
+                if (nonEmpty) {
+                    throw new GradleException(
+                        'Flagship freeze output directory must be empty: ' + outputPath)
+                }
+            }
+
             args required.repositoryCommit,
-                required.validationPrivate,
-                required.finalTestPrivate,
-                required.output
+                validationPath.toString(),
+                finalTestPath.toString(),
+                outputPath.toString()
         }
     }
 }
