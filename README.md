@@ -133,12 +133,13 @@ Regelsuche hält exemplarische Discovery-Läufe als generierte, nachvollziehbare
 Evidence fest. Die Beispiele belegen Suchpfade, Bridge-Bildung und
 Makrowiederverwendung; sie sind keine Behauptung externer mathematischer Neuheit.
 
-| Szenario | Evidence | Visuelle Einordnung |
-| --- | --- | --- |
-| Quadratische Ergänzung | [generiertes Evidence-Objekt](docs/generated/discovery/complete-square/evidence.json) | [Discovery Gallery](docs/demo-gallery.md) |
-| Sophie-Germain-Identität | [generiertes Evidence-Objekt](docs/generated/discovery/sophie-germain/evidence.json) | [Discovery Gallery](docs/demo-gallery.md) |
+| Scenario | Bridge | Macro learned | Macro reused | Evidence |
+|---|---:|---:|---:|---|
+| Complete square | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:217d5ca4dff3dba588f16d8451195a883378956a795259936317d3d35e8ce273](docs/generated/discovery/complete-square/evidence.json) |
+| Sophie-Germain | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31](docs/generated/discovery/sophie-germain/evidence.json) |
 
-Die Gallery zeigt ausschließlich aus Tests beziehungsweise Evidence-Generatoren
+Die [Discovery Gallery](docs/demo-gallery.md) ordnet beide Beispiele visuell ein.
+Sie zeigt ausschließlich aus Tests beziehungsweise Evidence-Generatoren
 abgeleitete Darstellungen. Manuell nachgezeichnete Erfolgsbilder sind kein
 Ersatz für gebundene Artefakte.
 
