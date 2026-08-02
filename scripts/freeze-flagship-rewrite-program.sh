@@ -54,6 +54,13 @@ for raw in sys.argv[2:]:
         )
 PY
 
+validation_private=$(python3 -c \
+  'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' \
+  "${validation_private}")
+final_test_private=$(python3 -c \
+  'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' \
+  "${final_test_private}")
+
 if [[ -e ${output_directory} && ! -d ${output_directory} ]]; then
   echo "flagship freeze output exists and is not a directory: ${output_directory}" >&2
   exit 2
@@ -69,6 +76,6 @@ exec ./gradlew \
   -I gradle/flagship-rewrite-program-freeze.init.gradle \
   :app:freezeFlagshipRewriteProgram \
   -PflagshipRepositoryCommit="${repository_commit}" \
-  -PflagshipValidationPrivate="$(realpath "${validation_private}")" \
-  -PflagshipFinalTestPrivate="$(realpath "${final_test_private}")" \
+  -PflagshipValidationPrivate="${validation_private}" \
+  -PflagshipFinalTestPrivate="${final_test_private}" \
   -PflagshipFreezeOutput="${output_directory}"
