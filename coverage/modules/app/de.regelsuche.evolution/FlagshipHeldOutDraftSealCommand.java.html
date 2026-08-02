@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FlagshipHeldOutDraftSealCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">FlagshipHeldOutDraftSealCommand.java</span></div><h1>FlagshipHeldOutDraftSealCommand.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutCommitment.Split;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.DifficultyTier;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.ExpectedTerminalClass;
+import de.regelsuche.evolution.EvolutionRewriteProgramHeldOutRevealBundle.RevealCase;
+import de.regelsuche.math.algorithms.equivalence.RationalFunctionNormalFormEquivalencePortAdapter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Trusted local command that validates private held-out material with the exact
+ * rational evaluator before any seal artifact is written.
+ */
+public final class FlagshipHeldOutDraftSealCommand {
+<span class="fc" id="L24">    private static final ObjectMapper JSON = new ObjectMapper()</span>
+<span class="fc" id="L25">        .findAndRegisterModules()</span>
+<span class="fc" id="L26">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);</span>
+
+    private final AssumptionAwareEquivalenceService equivalence;
+    private final EvolutionRewriteProgramHeldOutSealTool sealTool;
+
+    public FlagshipHeldOutDraftSealCommand() {
+<span class="fc" id="L32">        this(</span>
+            new RationalFunctionNormalFormEquivalencePortAdapter(),
+            new EvolutionRewriteProgramHeldOutSealTool());
+<span class="fc" id="L35">    }</span>
+
+    FlagshipHeldOutDraftSealCommand(
+        AssumptionAwareEquivalenceService equivalence,
+        EvolutionRewriteProgramHeldOutSealTool sealTool
+<span class="fc" id="L40">    ) {</span>
+<span class="fc" id="L41">        this.equivalence = Objects.requireNonNull(equivalence, &quot;equivalence&quot;);</span>
+<span class="fc" id="L42">        this.sealTool = Objects.requireNonNull(sealTool, &quot;sealTool&quot;);</span>
+<span class="fc" id="L43">    }</span>
+
+    public ValidatedSealResult validateAndSeal(
+        Path draftInput,
+        Path privateBundleOutput,
+        Path commitmentOutput,
+        Path splitReferencesOutput
+    ) {
+<span class="fc" id="L51">        DraftDto draft = readDraft(draftInput);</span>
+<span class="fc" id="L52">        List&lt;RevealCase&gt; normalizedCases = draft.cases().stream()</span>
+<span class="fc" id="L53">            .map(CaseDto::toRuntime)</span>
+<span class="fc" id="L54">            .toList();</span>
+<span class="fc" id="L55">        List&lt;CaseValidation&gt; validations = normalizedCases.stream()</span>
+<span class="fc" id="L56">            .map(this::validateCase)</span>
+<span class="fc" id="L57">            .toList();</span>
+<span class="fc" id="L58">        sealTool.seal(</span>
+            draftInput,
+            privateBundleOutput,
+            commitmentOutput,
+            splitReferencesOutput);
+<span class="fc" id="L63">        return new ValidatedSealResult(</span>
+<span class="fc" id="L64">            draft.studyId(),</span>
+<span class="fc" id="L65">            draft.split(),</span>
+            validations);
+    }
+
+    private CaseValidation validateCase(RevealCase heldOutCase) {
+<span class="fc" id="L70">        AssumptionAwareEquivalenceService.Evaluation evaluation =</span>
+<span class="fc" id="L71">            equivalence.evaluate(</span>
+<span class="fc" id="L72">                heldOutCase.inputExpression(),</span>
+<span class="fc" id="L73">                heldOutCase.targetExpression(),</span>
+<span class="fc" id="L74">                heldOutCase.assumptions());</span>
+<span class="fc" id="L75">        ExpectedTerminalClass actual = ExpectedTerminalClass.valueOf(</span>
+<span class="fc" id="L76">            evaluation.status().name());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (actual != heldOutCase.expectedTerminalClass()) {</span>
+<span class="fc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;held-out case terminal-class mismatch for &quot;
+<span class="fc" id="L80">                    + heldOutCase.caseId()</span>
+<span class="fc" id="L81">                    + &quot;: expected=&quot; + heldOutCase.expectedTerminalClass()</span>
+                    + &quot;, actual=&quot; + actual);
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (actual == ExpectedTerminalClass.CONFIRMED</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                &amp;&amp; (!evaluation.missingAssumptions().isEmpty()</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                    || !evaluation.unsupportedAssumptions().isEmpty())) {</span>
+<span class="fc" id="L87">            throw new IllegalArgumentException(</span>
+                &quot;confirmed held-out case retains unresolved assumptions: &quot;
+<span class="fc" id="L89">                    + heldOutCase.caseId());</span>
+        }
+<span class="fc" id="L91">        return new CaseValidation(</span>
+<span class="fc" id="L92">            heldOutCase.caseId(),</span>
+            actual,
+<span class="fc" id="L94">            EvolutionGenome.hash(evaluation.leftNormalForm()),</span>
+<span class="fc" id="L95">            EvolutionGenome.hash(evaluation.rightNormalForm()));</span>
+    }
+
+    private static DraftDto readDraft(Path input) {
+<span class="fc" id="L99">        Path normalized = Objects.requireNonNull(input, &quot;input&quot;)</span>
+<span class="fc" id="L100">            .toAbsolutePath()</span>
+<span class="fc" id="L101">            .normalize();</span>
+        try {
+<span class="fc" id="L103">            DraftDto dto = JSON.readValue(</span>
+<span class="fc" id="L104">                Files.readString(normalized, StandardCharsets.UTF_8),</span>
+                DraftDto.class);
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (!EvolutionRewriteProgramHeldOutSealTool.DRAFT_SCHEMA.equals(</span>
+<span class="fc" id="L107">                    dto.schema())) {</span>
+<span class="fc" id="L108">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported held-out reveal draft schema: expected=&quot;
+                        + EvolutionRewriteProgramHeldOutSealTool.DRAFT_SCHEMA
+<span class="fc" id="L111">                        + &quot;, actual=&quot; + dto.schema());</span>
+            }
+<span class="fc" id="L113">            return dto;</span>
+<span class="nc" id="L114">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L115">            throw new IllegalArgumentException(</span>
+                &quot;invalid held-out reveal draft JSON&quot;, exception);
+<span class="nc" id="L117">        } catch (IOException exception) {</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(</span>
+                &quot;unable to read held-out reveal draft&quot;, exception);
+        }
+    }
+
+    public static void main(String[] args) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (args.length != 4) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;private-draft.json&gt; &lt;sealed-private.json&gt; &quot;
+                    + &quot;&lt;public-commitment.json&gt; &lt;public-split-references.json&gt;&quot;);
+        }
+<span class="nc" id="L129">        new FlagshipHeldOutDraftSealCommand().validateAndSeal(</span>
+<span class="nc" id="L130">            Path.of(args[0]),</span>
+<span class="nc" id="L131">            Path.of(args[1]),</span>
+<span class="nc" id="L132">            Path.of(args[2]),</span>
+<span class="nc" id="L133">            Path.of(args[3]));</span>
+<span class="nc" id="L134">    }</span>
+
+    public record CaseValidation(
+        String caseId,
+        ExpectedTerminalClass terminalClass,
+        String leftNormalFormHash,
+        String rightNormalFormHash
+    ) {
+<span class="fc" id="L142">        public CaseValidation {</span>
+<span class="fc" id="L143">            Objects.requireNonNull(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L144">            Objects.requireNonNull(terminalClass, &quot;terminalClass&quot;);</span>
+<span class="fc" id="L145">            EvolutionGenome.requireSha256(</span>
+                leftNormalFormHash, &quot;leftNormalFormHash&quot;);
+<span class="fc" id="L147">            EvolutionGenome.requireSha256(</span>
+                rightNormalFormHash, &quot;rightNormalFormHash&quot;);
+<span class="fc" id="L149">        }</span>
+    }
+
+    /**
+     * Privacy-minimal validation receipt. Output paths and sealing metadata are
+     * intentionally absent; callers already possess the paths they supplied.
+     */
+    public record ValidatedSealResult(
+        String studyId,
+        Split split,
+        List&lt;CaseValidation&gt; cases
+    ) {
+<span class="fc" id="L161">        public ValidatedSealResult {</span>
+<span class="fc" id="L162">            Objects.requireNonNull(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L163">            Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L164">            cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L165">        }</span>
+    }
+
+    private record DraftDto(
+        String schema,
+        String studyId,
+        Split split,
+        List&lt;CaseDto&gt; cases
+    ) {
+<span class="fc" id="L174">        private DraftDto {</span>
+<span class="fc" id="L175">            Objects.requireNonNull(schema, &quot;schema&quot;);</span>
+<span class="fc" id="L176">            Objects.requireNonNull(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L177">            Objects.requireNonNull(split, &quot;split&quot;);</span>
+<span class="fc" id="L178">            cases = List.copyOf(Objects.requireNonNull(cases, &quot;cases&quot;));</span>
+<span class="fc" id="L179">        }</span>
+    }
+
+    private record CaseDto(
+        String caseId,
+        String familyId,
+        String inputExpression,
+        String targetExpression,
+        List&lt;String&gt; assumptions,
+        DifficultyTier difficultyTier,
+        ExpectedTerminalClass expectedTerminalClass
+    ) {
+<span class="fc" id="L191">        private CaseDto {</span>
+<span class="fc" id="L192">            Objects.requireNonNull(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L193">            Objects.requireNonNull(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L194">            Objects.requireNonNull(inputExpression, &quot;inputExpression&quot;);</span>
+<span class="fc" id="L195">            Objects.requireNonNull(targetExpression, &quot;targetExpression&quot;);</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            assumptions = assumptions == null ? List.of() : List.copyOf(assumptions);</span>
+<span class="fc" id="L197">            Objects.requireNonNull(difficultyTier, &quot;difficultyTier&quot;);</span>
+<span class="fc" id="L198">            Objects.requireNonNull(</span>
+                expectedTerminalClass, &quot;expectedTerminalClass&quot;);
+<span class="fc" id="L200">        }</span>
+
+        private RevealCase toRuntime() {
+<span class="fc" id="L203">            return RevealCase.create(</span>
+                caseId,
+                familyId,
+                inputExpression,
+                targetExpression,
+                assumptions,
+                difficultyTier,
+                expectedTerminalClass);
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

@@ -1,0 +1,764 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FlagshipRewriteProgramFreezeAssembler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">FlagshipRewriteProgramFreezeAssembler.java</span></div><h1>FlagshipRewriteProgramFreezeAssembler.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.assumption.Assumption;
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationCatalog;
+import de.regelsuche.evolution.DeterministicRewriteProgramMutator.RepeatBounds;
+import de.regelsuche.evolution.EvolutionGenome.AssumptionTemplate;
+import de.regelsuche.evolution.EvolutionGenome.EvidenceObligation;
+import de.regelsuche.evolution.EvolutionGenome.FeatureWeight;
+import de.regelsuche.evolution.EvolutionGenome.FitnessSignal;
+import de.regelsuche.evolution.EvolutionGenome.GuardPolicy;
+import de.regelsuche.evolution.EvolutionGenome.Objective;
+import de.regelsuche.evolution.EvolutionGenome.ResourceBudget;
+import de.regelsuche.evolution.EvolutionGenome.RewriteGene;
+import de.regelsuche.evolution.EvolutionRewriteProgramBaselineAblationPlan.Track;
+import de.regelsuche.evolution.EvolutionRewriteProgramBaselineAblationPlan.TrackKind;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.FirstApplicable;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Priority;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Requirement;
+import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Source;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessWeight;
+import de.regelsuche.evolution.EvolutionStudyPlan.PopulationPolicy;
+import de.regelsuche.evolution.EvolutionStudyPlan.StudyBudget;
+import de.regelsuche.json.JsonWriter;
+import de.regelsuche.transform.RewriteKind;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Productive, pre-execution assembler for the flagship rewrite-program study.
+ *
+ * &lt;p&gt;The assembler consumes two already validated private reveal bundles in a
+ * trusted local process and emits only public commitments, split identities,
+ * frozen plans and the final {@code FROZEN_NOT_RUN} receipt. It never writes
+ * concrete held-out expressions or assumptions.&lt;/p&gt;
+ */
+public final class FlagshipRewriteProgramFreezeAssembler {
+    public static final String FREEZE_ID = &quot;flagship_rewrite_program_freeze_v1&quot;;
+    public static final String STATIC_CONTRACT_SCHEMA =
+        &quot;regelsuche.flagship-rewrite-program-static-contract/v1&quot;;
+
+<span class="fc" id="L52">    private static final List&lt;EvidenceObligation&gt; OBLIGATIONS =</span>
+<span class="fc" id="L53">        Arrays.asList(EvidenceObligation.values());</span>
+
+    private FlagshipRewriteProgramFreezeAssembler() {
+    }
+
+    public static FreezeInputs assemble(
+        String repositoryCommit,
+        EvolutionRewriteProgramHeldOutRevealBundle validation,
+        EvolutionRewriteProgramHeldOutRevealBundle finalTest
+    ) {
+<span class="fc" id="L63">        EvolutionSplitManifest manifest =</span>
+<span class="fc" id="L64">            FlagshipRewriteProgramSplitManifest.create(validation, finalTest);</span>
+        EvolutionRewriteProgramTrainSuite train =
+<span class="fc" id="L66">            FlagshipRewriteProgramTrainCorpus.create();</span>
+        EvolutionRewriteProgramEvaluationProtocol protocol =
+            EvolutionRewriteProgramEvaluationProtocol
+<span class="fc" id="L69">                .informationParityExactRationalV1();</span>
+<span class="fc" id="L70">        EvolutionGenome genome = genome(manifest);</span>
+<span class="fc" id="L71">        List&lt;EvolutionRewriteProgramCandidate&gt; seeds = seeds(genome);</span>
+<span class="fc" id="L72">        MutationCatalog mutationCatalog = mutationCatalog(genome);</span>
+<span class="fc" id="L73">        EvolutionRewriteProgramStudyPlan study =</span>
+<span class="fc" id="L74">            EvolutionRewriteProgramStudyPlan.create(</span>
+<span class="fc" id="L75">                manifest.studyId(),</span>
+                manifest,
+                train,
+                protocol,
+                mutationCatalog,
+                seeds,
+<span class="fc" id="L81">                Arrays.asList(EvolutionRewriteProgramMutationKind.values()),</span>
+                new PopulationPolicy(24, 12, 4, 8, 3, 4, 20260802L),
+<span class="fc" id="L83">                fitnessWeights(),</span>
+                new StudyBudget(4_096, 4_096, 24, 3, 16));
+<span class="fc" id="L85">        EvolutionRewriteProgramAcceptanceThresholds thresholds =</span>
+<span class="fc" id="L86">            EvolutionRewriteProgramAcceptanceThresholds.create(</span>
+                2,
+                2,
+                1,
+                true,
+                100,
+                3,
+                0,
+                24,
+                12,
+                2);
+
+<span class="fc" id="L98">        String primitiveInventoryJson = primitiveInventoryJson(genome.rewrites());</span>
+<span class="fc" id="L99">        String programGrammarJson = programGrammarJson();</span>
+<span class="fc" id="L100">        String mutationCatalogJson = mutationCatalogJson(mutationCatalog);</span>
+<span class="fc" id="L101">        String workBudgetPolicyJson = workBudgetPolicyJson(train);</span>
+<span class="fc" id="L102">        String schemaBundleJson = schemaBundleJson();</span>
+<span class="fc" id="L103">        String primitiveInventoryHash = contentHash(primitiveInventoryJson);</span>
+<span class="fc" id="L104">        String programGrammarHash = contentHash(programGrammarJson);</span>
+<span class="fc" id="L105">        String workBudgetPolicyHash = contentHash(workBudgetPolicyJson);</span>
+<span class="fc" id="L106">        String schemaBundleHash = contentHash(schemaBundleJson);</span>
+
+<span class="fc" id="L108">        EvolutionRewriteProgramBaselineAblationPlan baselineAblation =</span>
+<span class="fc" id="L109">            baselineAblationPlan(</span>
+                manifest,
+                protocol,
+                primitiveInventoryHash,
+                programGrammarHash,
+<span class="fc" id="L114">                mutationCatalog.contentHash(),</span>
+                workBudgetPolicyHash,
+<span class="fc" id="L116">                seeds.getLast().contentHash());</span>
+<span class="fc" id="L117">        EvolutionRewriteProgramPerformancePlan performance =</span>
+<span class="fc" id="L118">            EvolutionRewriteProgramPerformancePlan.create(</span>
+<span class="fc" id="L119">                EvolutionGenome.hash(</span>
+                    &quot;regelsuche.jmh-benchmark-revision/v1\n&quot;
+                        + &quot;allocation-and-search-baseline=5b904d6d1d0d1488353a2d28445c9ec9d3e5fc51&quot;),
+<span class="fc" id="L122">                EvolutionGenome.hash(</span>
+                    &quot;regelsuche.jmh-benchmark-suite/v2\n&quot;
+                        + &quot;primary-benchmark-count=29\n&quot;
+                        + &quot;units=us/op,ms/op&quot;),
+<span class="fc" id="L126">                EvolutionGenome.hash(</span>
+                    &quot;regelsuche.flagship-runtime-environment/v1\n&quot;
+                        + &quot;jdk=21\nos=ubuntu-22.04\njmh=1.36&quot;),
+                2,
+                3,
+                1,
+                1_000,
+                250);
+
+<span class="fc" id="L135">        EvolutionRewriteProgramHeldOutCommitment validationCommitment =</span>
+<span class="fc" id="L136">            validation.commitment();</span>
+<span class="fc" id="L137">        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment =</span>
+<span class="fc" id="L138">            finalTest.commitment();</span>
+<span class="fc" id="L139">        EvolutionRewriteProgramFreezeReceipt receipt =</span>
+<span class="fc" id="L140">            EvolutionRewriteProgramFreezeReceipt.create(</span>
+                FREEZE_ID,
+                repositoryCommit,
+                manifest,
+                train,
+                validationCommitment,
+                finalTestCommitment,
+                protocol,
+                study,
+                thresholds,
+                primitiveInventoryHash,
+                programGrammarHash,
+<span class="fc" id="L152">                baselineAblation.contentHash(),</span>
+                performance,
+                schemaBundleHash);
+
+<span class="fc" id="L156">        receipt.requireInputs(</span>
+            manifest,
+            train,
+            validationCommitment,
+            finalTestCommitment,
+            protocol,
+            study,
+            thresholds,
+            primitiveInventoryHash,
+            programGrammarHash,
+<span class="fc" id="L166">            baselineAblation.contentHash(),</span>
+            performance,
+            schemaBundleHash);
+<span class="fc" id="L169">        baselineAblation.requireInputs(</span>
+            manifest,
+            protocol,
+            primitiveInventoryHash,
+            programGrammarHash,
+<span class="fc" id="L174">            mutationCatalog.contentHash(),</span>
+            workBudgetPolicyHash);
+<span class="fc" id="L176">        study.requireInputs(</span>
+            manifest,
+            train,
+            protocol,
+            mutationCatalog,
+            seeds);
+
+<span class="fc" id="L183">        return new FreezeInputs(</span>
+            manifest,
+            train,
+            validationCommitment,
+            finalTestCommitment,
+<span class="fc" id="L188">            EvolutionRewriteProgramHeldOutSplitReferences.create(validation),</span>
+<span class="fc" id="L189">            EvolutionRewriteProgramHeldOutSplitReferences.create(finalTest),</span>
+            protocol,
+            genome,
+            seeds,
+            mutationCatalog,
+            study,
+            thresholds,
+            baselineAblation,
+            performance,
+            primitiveInventoryJson,
+            programGrammarJson,
+            mutationCatalogJson,
+            workBudgetPolicyJson,
+            schemaBundleJson,
+            receipt);
+    }
+
+    public static WrittenFreeze write(
+        Path outputDirectory,
+        String repositoryCommit,
+        Path validationPrivateBundle,
+        Path finalTestPrivateBundle
+    ) {
+<span class="fc" id="L212">        EvolutionRewriteProgramHeldOutRevealCodec codec =</span>
+            new EvolutionRewriteProgramHeldOutRevealCodec();
+<span class="fc" id="L214">        FreezeInputs inputs = assemble(</span>
+            repositoryCommit,
+<span class="fc" id="L216">            codec.readPrivate(validationPrivateBundle),</span>
+<span class="fc" id="L217">            codec.readPrivate(finalTestPrivateBundle));</span>
+<span class="fc" id="L218">        Path output = Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;)</span>
+<span class="fc" id="L219">            .toAbsolutePath()</span>
+<span class="fc" id="L220">            .normalize();</span>
+<span class="fc" id="L221">        LinkedHashMap&lt;String, String&gt; artifacts = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L222">        artifacts.put(&quot;evolution-split-manifest.json&quot;,</span>
+<span class="fc" id="L223">            inputs.manifest().toCanonicalJson());</span>
+<span class="fc" id="L224">        artifacts.put(&quot;train-suite.json&quot;, inputs.train().toCanonicalJson());</span>
+<span class="fc" id="L225">        artifacts.put(&quot;validation-commitment.json&quot;,</span>
+<span class="fc" id="L226">            inputs.validationCommitment().toCanonicalJson());</span>
+<span class="fc" id="L227">        artifacts.put(&quot;validation-split-references.json&quot;,</span>
+<span class="fc" id="L228">            inputs.validationReferences().toCanonicalJson());</span>
+<span class="fc" id="L229">        artifacts.put(&quot;final-test-commitment.json&quot;,</span>
+<span class="fc" id="L230">            inputs.finalTestCommitment().toCanonicalJson());</span>
+<span class="fc" id="L231">        artifacts.put(&quot;final-test-split-references.json&quot;,</span>
+<span class="fc" id="L232">            inputs.finalTestReferences().toCanonicalJson());</span>
+<span class="fc" id="L233">        artifacts.put(&quot;evaluation-protocol.json&quot;,</span>
+<span class="fc" id="L234">            inputs.protocol().toCanonicalJson());</span>
+<span class="fc" id="L235">        artifacts.put(&quot;seed-genome.json&quot;, inputs.genome().toCanonicalJson());</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (int index = 0; index &lt; inputs.seeds().size(); index++) {</span>
+<span class="fc" id="L237">            EvolutionRewriteProgramCandidate candidate = inputs.seeds().get(index);</span>
+<span class="fc" id="L238">            artifacts.put(&quot;seed-candidate-&quot; + (index + 1) + &quot;.json&quot;,</span>
+<span class="fc" id="L239">                candidate.toCanonicalJson());</span>
+<span class="fc" id="L240">            artifacts.put(&quot;seed-plan-&quot; + (index + 1) + &quot;.json&quot;,</span>
+<span class="fc" id="L241">                candidate.plan().toCanonicalJson());</span>
+        }
+<span class="fc" id="L243">        artifacts.put(&quot;population-study-plan.json&quot;,</span>
+<span class="fc" id="L244">            inputs.study().toCanonicalJson());</span>
+<span class="fc" id="L245">        artifacts.put(&quot;acceptance-thresholds.json&quot;,</span>
+<span class="fc" id="L246">            inputs.thresholds().toCanonicalJson());</span>
+<span class="fc" id="L247">        artifacts.put(&quot;primitive-inventory.json&quot;,</span>
+<span class="fc" id="L248">            inputs.primitiveInventoryJson());</span>
+<span class="fc" id="L249">        artifacts.put(&quot;program-grammar.json&quot;, inputs.programGrammarJson());</span>
+<span class="fc" id="L250">        artifacts.put(&quot;mutation-catalog.json&quot;, inputs.mutationCatalogJson());</span>
+<span class="fc" id="L251">        artifacts.put(&quot;work-budget-policy.json&quot;,</span>
+<span class="fc" id="L252">            inputs.workBudgetPolicyJson());</span>
+<span class="fc" id="L253">        artifacts.put(&quot;baseline-ablation-plan.json&quot;,</span>
+<span class="fc" id="L254">            inputs.baselineAblation().toCanonicalJson());</span>
+<span class="fc" id="L255">        artifacts.put(&quot;performance-plan.json&quot;,</span>
+<span class="fc" id="L256">            inputs.performance().toCanonicalJson());</span>
+<span class="fc" id="L257">        artifacts.put(&quot;schema-bundle.json&quot;, inputs.schemaBundleJson());</span>
+
+        try {
+<span class="fc" id="L260">            Files.createDirectories(output);</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; artifact : artifacts.entrySet()) {</span>
+<span class="fc" id="L262">                writeAtomic(output.resolve(artifact.getKey()), artifact.getValue());</span>
+<span class="fc" id="L263">            }</span>
+<span class="fc" id="L264">            Path receipt = output.resolve(&quot;freeze-receipt.json&quot;);</span>
+<span class="fc" id="L265">            writeAtomic(receipt, inputs.receipt().toCanonicalJson());</span>
+<span class="fc" id="L266">            return new WrittenFreeze(</span>
+                output,
+<span class="fc" id="L268">                artifacts.keySet().stream().map(output::resolve).toList(),</span>
+                receipt,
+<span class="fc" id="L270">                inputs.receipt().contentHash());</span>
+<span class="nc" id="L271">        } catch (IOException exception) {</span>
+<span class="nc" id="L272">            throw new IllegalStateException(</span>
+                &quot;unable to write flagship freeze artifacts&quot;, exception);
+        }
+    }
+
+    public static void main(String[] arguments) {
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (arguments.length != 4) {</span>
+<span class="nc" id="L279">            throw new IllegalArgumentException(</span>
+                &quot;usage: &lt;repository-commit&gt; &lt;validation-private.json&gt; &quot;
+                    + &quot;&lt;final-test-private.json&gt; &lt;public-output-directory&gt;&quot;);
+        }
+<span class="nc" id="L283">        WrittenFreeze result = write(</span>
+<span class="nc" id="L284">            Path.of(arguments[3]),</span>
+            arguments[0],
+<span class="nc" id="L286">            Path.of(arguments[1]),</span>
+<span class="nc" id="L287">            Path.of(arguments[2]));</span>
+<span class="nc" id="L288">        System.out.println(&quot;flagshipFreezeStatus=FROZEN_NOT_RUN&quot;);</span>
+<span class="nc" id="L289">        System.out.println(&quot;flagshipFreezeReceiptHash=&quot; + result.receiptHash());</span>
+<span class="nc" id="L290">        System.out.println(&quot;flagshipFreezeOutput=&quot; + result.outputDirectory());</span>
+<span class="nc" id="L291">    }</span>
+
+    private static EvolutionGenome genome(EvolutionSplitManifest manifest) {
+<span class="fc" id="L294">        return EvolutionGenome.create(</span>
+            Objective.OPEN_TARGET_OPERATOR,
+<span class="fc" id="L296">            manifest.trainingScope(),</span>
+<span class="fc" id="L297">            primitiveGenes(),</span>
+<span class="fc" id="L298">            List.of(</span>
+                new FeatureWeight(
+                    FitnessSignal.UNSEEN_TRAIN_CASES_SOLVED, 500),
+                new FeatureWeight(FitnessSignal.COUNTEREXAMPLE_RISK, -500)),
+<span class="fc" id="L302">            GuardPolicy.strictDefault(),</span>
+            new ResourceBudget(24, 512, 16, 12, 40),
+<span class="fc" id="L304">            List.of(&quot;core.ast-rewrite&quot;, &quot;math.rational-normal-form&quot;),</span>
+<span class="fc" id="L305">            List.of());</span>
+    }
+
+    private static List&lt;EvolutionRewriteProgramCandidate&gt; seeds(
+        EvolutionGenome genome
+    ) {
+<span class="fc" id="L311">        List&lt;String&gt; geneIds = genome.rewrites().stream()</span>
+<span class="fc" id="L312">            .map(RewriteGene::geneId)</span>
+<span class="fc" id="L313">            .toList();</span>
+<span class="fc" id="L314">        EvolutionRewriteProgramPlan sourcePlan =</span>
+<span class="fc" id="L315">            EvolutionRewriteProgramPlan.create(</span>
+                genome,
+                new Source(&quot;seed_all_primitives&quot;, geneIds),
+                24,
+                12);
+<span class="fc" id="L320">        EvolutionRewriteProgramPlan firstApplicablePlan =</span>
+<span class="fc" id="L321">            EvolutionRewriteProgramPlan.create(</span>
+                genome,
+                new FirstApplicable(
+                    &quot;seed_first_applicable&quot;,
+<span class="fc" id="L325">                    List.of(</span>
+                        new Source(
+                            &quot;seed_normalization_sources&quot;,
+<span class="fc" id="L328">                            List.of(</span>
+                                &quot;remove_additive_zero&quot;,
+                                &quot;remove_multiplicative_one&quot;,
+                                &quot;scaled_linear_collection&quot;)),
+                        new Source(
+                            &quot;seed_rational_sources&quot;,
+<span class="fc" id="L334">                            List.of(</span>
+                                &quot;collect_equal_denominator&quot;,
+                                &quot;subtract_mixed_denominators&quot;,
+                                &quot;cancel_common_factor&quot;,
+                                &quot;flatten_shared_denominator_division&quot;)),
+                        new Source(
+                            &quot;seed_factor_sources&quot;,
+<span class="fc" id="L341">                            List.of(&quot;factor_difference_of_squares&quot;)))),</span>
+                24,
+                12);
+<span class="fc" id="L344">        List&lt;EvolutionRewriteProgramCandidate&gt; seeds = List.of(</span>
+<span class="fc" id="L345">            EvolutionRewriteProgramCandidate.create(genome, sourcePlan),</span>
+<span class="fc" id="L346">            EvolutionRewriteProgramCandidate.create(genome, firstApplicablePlan));</span>
+<span class="fc" id="L347">        EvolutionRewriteProgramCompiler compiler =</span>
+            new EvolutionRewriteProgramCompiler();
+<span class="fc" id="L349">        seeds.forEach(candidate -&gt;</span>
+<span class="fc" id="L350">            compiler.compile(candidate.genome(), candidate.plan()));</span>
+<span class="fc" id="L351">        return seeds;</span>
+    }
+
+    private static MutationCatalog mutationCatalog(EvolutionGenome genome) {
+<span class="fc" id="L355">        List&lt;String&gt; geneIds = genome.rewrites().stream()</span>
+<span class="fc" id="L356">            .map(RewriteGene::geneId)</span>
+<span class="fc" id="L357">            .toList();</span>
+<span class="fc" id="L358">        return new MutationCatalog(</span>
+<span class="fc" id="L359">            List.of(new RepeatBounds(1, 2), new RepeatBounds(1, 3)),</span>
+<span class="fc" id="L360">            List.of(</span>
+<span class="fc" id="L361">                Requirement.equivalencePreservingByConstruction(),</span>
+<span class="fc" id="L362">                Requirement.maxEstimatedCostDelta(8),</span>
+<span class="fc" id="L363">                Requirement.maxPrimitiveSteps(6)),</span>
+<span class="fc" id="L364">            List.of(</span>
+<span class="fc" id="L365">                Priority.estimatedCostThenRule(),</span>
+<span class="fc" id="L366">                Priority.preferredGeneOrder(geneIds)),</span>
+<span class="fc" id="L367">            List.of(8, 16, 40),</span>
+            geneIds);
+    }
+
+    private static List&lt;FitnessWeight&gt; fitnessWeights() {
+<span class="fc" id="L372">        return List.of(</span>
+            new FitnessWeight(FitnessComponent.TRAIN_CASES_NEWLY_SOLVED, 350),
+            new FitnessWeight(FitnessComponent.TRAIN_PATH_LENGTH_REDUCTION, 150),
+            new FitnessWeight(
+                FitnessComponent.TRAIN_EXPLORED_STATE_REDUCTION, 100),
+            new FitnessWeight(FitnessComponent.SUPPORT, 100),
+            new FitnessWeight(FitnessComponent.STRUCTURAL_DIVERSITY, 150),
+            new FitnessWeight(FitnessComponent.ASSUMPTION_SIMPLICITY, 50),
+            new FitnessWeight(FitnessComponent.CANDIDATE_COMPLEXITY, 50),
+            new FitnessWeight(FitnessComponent.COUNTEREXAMPLE_RISK, 50));
+    }
+
+    private static List&lt;RewriteGene&gt; primitiveGenes() {
+<span class="fc" id="L385">        return List.of(</span>
+<span class="fc" id="L386">            gene(</span>
+                &quot;remove_additive_zero&quot;,
+                &quot;?a+0&quot;,
+                &quot;?a&quot;,
+                RewriteKind.SIMPLIFY,
+                true,
+                -1,
+<span class="fc" id="L393">                List.of()),</span>
+<span class="fc" id="L394">            gene(</span>
+                &quot;remove_multiplicative_one&quot;,
+                &quot;?a*1&quot;,
+                &quot;?a&quot;,
+                RewriteKind.SIMPLIFY,
+                true,
+                -1,
+<span class="fc" id="L401">                List.of()),</span>
+<span class="fc" id="L402">            gene(</span>
+                &quot;collect_equal_denominator&quot;,
+                &quot;?a/?d+?b/?d&quot;,
+                &quot;(?a+?b)/?d&quot;,
+                RewriteKind.NORMALIZE,
+                true,
+                -1,
+<span class="fc" id="L409">                List.of(nonZero(&quot;?d&quot;))),</span>
+<span class="fc" id="L410">            gene(</span>
+                &quot;subtract_mixed_denominators&quot;,
+                &quot;?a/?x-?a/?y&quot;,
+                &quot;?a*(?y-?x)/(?x*?y)&quot;,
+                RewriteKind.NORMALIZE,
+                true,
+                2,
+<span class="fc" id="L417">                List.of(nonZero(&quot;?x&quot;), nonZero(&quot;?y&quot;))),</span>
+<span class="fc" id="L418">            gene(</span>
+                &quot;cancel_common_factor&quot;,
+                &quot;(?f*?a)/(?f*?b)&quot;,
+                &quot;?a/?b&quot;,
+                RewriteKind.SIMPLIFY,
+                false,
+                -3,
+<span class="fc" id="L425">                List.of(nonZero(&quot;?f&quot;), nonZero(&quot;?b&quot;))),</span>
+<span class="fc" id="L426">            gene(</span>
+                &quot;flatten_shared_denominator_division&quot;,
+                &quot;(?a/?d)/(?b/?d)&quot;,
+                &quot;?a/?b&quot;,
+                RewriteKind.SIMPLIFY,
+                false,
+                -3,
+<span class="fc" id="L433">                List.of(nonZero(&quot;?d&quot;), nonZero(&quot;?b&quot;))),</span>
+<span class="fc" id="L434">            gene(</span>
+                &quot;factor_difference_of_squares&quot;,
+                &quot;?a^2-?b^2&quot;,
+                &quot;(?a-?b)*(?a+?b)&quot;,
+                RewriteKind.FACTOR,
+                true,
+                1,
+<span class="fc" id="L441">                List.of()),</span>
+<span class="fc" id="L442">            gene(</span>
+                &quot;scaled_linear_collection&quot;,
+                &quot;(2*?a+2*?b)/2&quot;,
+                &quot;?a+?b&quot;,
+                RewriteKind.SIMPLIFY,
+                false,
+                -3,
+<span class="fc" id="L449">                List.of()));</span>
+    }
+
+    private static RewriteGene gene(
+        String id,
+        String source,
+        String target,
+        RewriteKind kind,
+        boolean reversible,
+        int costDelta,
+        List&lt;AssumptionTemplate&gt; assumptions
+    ) {
+<span class="fc" id="L461">        return new RewriteGene(</span>
+            id,
+            source,
+            target,
+            kind,
+            reversible,
+            costDelta,
+            6,
+            12,
+            assumptions,
+            OBLIGATIONS);
+    }
+
+    private static AssumptionTemplate nonZero(String expression) {
+<span class="fc" id="L475">        return new AssumptionTemplate(</span>
+            Assumption.Kind.NON_ZERO,
+            expression + &quot; != 0&quot;,
+<span class="fc" id="L478">            List.of(expression));</span>
+    }
+
+    private static EvolutionRewriteProgramBaselineAblationPlan
+            baselineAblationPlan(
+        EvolutionSplitManifest manifest,
+        EvolutionRewriteProgramEvaluationProtocol protocol,
+        String primitiveInventoryHash,
+        String programGrammarHash,
+        String mutationCatalogHash,
+        String workBudgetPolicyHash,
+        String handWrittenProgramHash
+    ) {
+<span class="fc" id="L491">        return EvolutionRewriteProgramBaselineAblationPlan.create(</span>
+            &quot;flagship_baseline_ablation_v1&quot;,
+<span class="fc" id="L493">            manifest.studyId(),</span>
+<span class="fc" id="L494">            manifest.contentHash(),</span>
+<span class="fc" id="L495">            protocol.contentHash(),</span>
+            primitiveInventoryHash,
+            programGrammarHash,
+            mutationCatalogHash,
+            workBudgetPolicyHash,
+<span class="fc" id="L500">            Arrays.stream(TrackKind.values())</span>
+<span class="fc" id="L501">                .map(kind -&gt; track(kind, handWrittenProgramHash))</span>
+<span class="fc" id="L502">                .toList());</span>
+    }
+
+    private static Track track(
+        TrackKind kind,
+        String handWrittenProgramHash
+    ) {
+<span class="fc bfc" id="L509" title="All 8 branches covered.">        String id = switch (kind) {</span>
+<span class="fc" id="L510">            case FIXED_PRIMITIVE_BEST_FIRST -&gt; &quot;fixed_primitive_best_first&quot;;</span>
+            case EQUALITY_SATURATION_SHARED_FRAGMENT -&gt;
+<span class="fc" id="L512">                &quot;equality_saturation_shared_fragment&quot;;</span>
+<span class="fc" id="L513">            case RANDOMIZED_VALID_PROGRAM -&gt; &quot;randomized_valid_program&quot;;</span>
+<span class="fc" id="L514">            case MUTATION_ONLY_NO_TOPOLOGY -&gt; &quot;mutation_only_no_topology&quot;;</span>
+<span class="fc" id="L515">            case HAND_WRITTEN_PROGRAM -&gt; &quot;preregistered_hand_written_program&quot;;</span>
+<span class="fc" id="L516">            case NO_COMPOSITION_ABLATION -&gt; &quot;no_composition_ablation&quot;;</span>
+<span class="fc" id="L517">            case FIXED_GUARD_ABLATION -&gt; &quot;fixed_guard_ablation&quot;;</span>
+            case FLATTENED_PROGRAM_OUTER_SEARCH -&gt;
+<span class="fc" id="L519">                &quot;flattened_program_outer_search&quot;;</span>
+        };
+<span class="fc" id="L521">        return new Track(</span>
+            kind,
+            id,
+<span class="fc" id="L524">            EvolutionGenome.hash(</span>
+                &quot;regelsuche.flagship-baseline-implementation/v1\nkind=&quot;
+<span class="fc" id="L526">                    + kind.name()),</span>
+<span class="fc" id="L527">            EvolutionGenome.hash(</span>
+                &quot;regelsuche.flagship-baseline-configuration/v1\nkind=&quot;
+<span class="fc" id="L529">                    + kind.name()),</span>
+<span class="fc bfc" id="L530" title="All 2 branches covered.">            kind == TrackKind.RANDOMIZED_VALID_PROGRAM ? 20260802L : null,</span>
+<span class="fc bfc" id="L531" title="All 2 branches covered.">            kind == TrackKind.HAND_WRITTEN_PROGRAM</span>
+<span class="fc" id="L532">                ? handWrittenProgramHash</span>
+<span class="fc" id="L533">                : null);</span>
+    }
+
+    private static String primitiveInventoryJson(List&lt;RewriteGene&gt; genes) {
+<span class="fc" id="L537">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L538">            .property(&quot;schema&quot;, STATIC_CONTRACT_SCHEMA)</span>
+<span class="fc" id="L539">            .property(&quot;contract&quot;, &quot;PRIMITIVE_INVENTORY&quot;)</span>
+<span class="fc" id="L540">            .array(&quot;genes&quot;, array -&gt; genes.stream()</span>
+<span class="fc" id="L541">                .sorted(Comparator.comparing(RewriteGene::geneId))</span>
+<span class="fc" id="L542">                .forEach(gene -&gt; array.objectValue(object -&gt; object</span>
+<span class="fc" id="L543">                    .property(&quot;geneId&quot;, gene.geneId())</span>
+<span class="fc" id="L544">                    .property(&quot;sourcePattern&quot;, gene.sourcePattern())</span>
+<span class="fc" id="L545">                    .property(&quot;targetPattern&quot;, gene.targetPattern())</span>
+<span class="fc" id="L546">                    .property(&quot;kind&quot;, gene.kind().name())</span>
+<span class="fc" id="L547">                    .property(&quot;reversible&quot;, gene.reversible())</span>
+<span class="fc" id="L548">                    .property(&quot;estimatedCostDelta&quot;,</span>
+<span class="fc" id="L549">                        gene.estimatedCostDelta())</span>
+<span class="fc" id="L550">                    .property(&quot;maxApplicationsPerPath&quot;,</span>
+<span class="fc" id="L551">                        gene.maxApplicationsPerPath())</span>
+<span class="fc" id="L552">                    .property(&quot;maxAstGrowth&quot;, gene.maxAstGrowth())</span>
+<span class="fc" id="L553">                    .stringArray(&quot;assumptions&quot;, gene.assumptions().stream()</span>
+<span class="fc" id="L554">                        .map(item -&gt; item.kind().name() + &quot;:&quot; + item.expression())</span>
+<span class="fc" id="L555">                        .toList())</span>
+<span class="fc" id="L556">                    .stringArray(&quot;evidenceObligations&quot;,</span>
+<span class="fc" id="L557">                        gene.evidenceObligations().stream()</span>
+<span class="fc" id="L558">                            .map(Enum::name).toList()))));</span>
+<span class="fc" id="L559">        return withHash(json.endObject().toString());</span>
+    }
+
+    private static String programGrammarJson() {
+<span class="fc" id="L563">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L564">            .property(&quot;schema&quot;, STATIC_CONTRACT_SCHEMA)</span>
+<span class="fc" id="L565">            .property(&quot;contract&quot;, &quot;PROGRAM_GRAMMAR&quot;)</span>
+<span class="fc" id="L566">            .stringArray(&quot;nodes&quot;, List.of(</span>
+                &quot;SOURCE&quot;,
+                &quot;CHOICE&quot;,
+                &quot;FIRST_APPLICABLE&quot;,
+                &quot;SEQUENCE&quot;,
+                &quot;REPEAT&quot;,
+                &quot;REQUIRE&quot;,
+                &quot;PRIORITIZE&quot;,
+                &quot;PRUNE&quot;))
+<span class="fc" id="L575">            .property(&quot;maximumNodes&quot;, 24)</span>
+<span class="fc" id="L576">            .property(&quot;maximumDepth&quot;, 12)</span>
+<span class="fc" id="L577">            .property(&quot;maximumRepeatIterations&quot;, 3)</span>
+<span class="fc" id="L578">            .property(&quot;hiddenPruning&quot;, &quot;FORBIDDEN&quot;);</span>
+<span class="fc" id="L579">        return withHash(json.endObject().toString());</span>
+    }
+
+    private static String mutationCatalogJson(MutationCatalog catalog) {
+<span class="fc" id="L583">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L584">            .property(&quot;schema&quot;, STATIC_CONTRACT_SCHEMA)</span>
+<span class="fc" id="L585">            .property(&quot;contract&quot;, &quot;MUTATION_CATALOG&quot;)</span>
+<span class="fc" id="L586">            .property(&quot;catalogHash&quot;, catalog.contentHash())</span>
+<span class="fc" id="L587">            .stringArray(&quot;mutationKinds&quot;,</span>
+<span class="fc" id="L588">                Arrays.stream(EvolutionRewriteProgramMutationKind.values())</span>
+<span class="fc" id="L589">                    .map(Enum::name).sorted().toList())</span>
+<span class="fc" id="L590">            .stringArray(&quot;sourceGeneIds&quot;, catalog.sourceGeneIds())</span>
+<span class="fc" id="L591">            .stringArray(&quot;repeatBounds&quot;, catalog.repeatBounds().stream()</span>
+<span class="fc" id="L592">                .map(value -&gt; value.minIterations() + &quot;..&quot;</span>
+<span class="fc" id="L593">                    + value.maxIterations())</span>
+<span class="fc" id="L594">                .toList())</span>
+<span class="fc" id="L595">            .stringArray(&quot;requirements&quot;, catalog.requirements().stream()</span>
+<span class="fc" id="L596">                .map(value -&gt; value.kind().name() + &quot;:&quot; + value.threshold())</span>
+<span class="fc" id="L597">                .toList())</span>
+<span class="fc" id="L598">            .stringArray(&quot;priorities&quot;, catalog.priorities().stream()</span>
+<span class="fc" id="L599">                .map(value -&gt; value.kind().name() + &quot;:&quot;</span>
+<span class="fc" id="L600">                    + value.preferredGeneIds())</span>
+<span class="fc" id="L601">                .toList())</span>
+<span class="fc" id="L602">            .array(&quot;pruneLimits&quot;, array -&gt; catalog.pruneLimits().forEach(</span>
+<span class="fc" id="L603">                array::numberValue));</span>
+<span class="fc" id="L604">        return withHash(json.endObject().toString());</span>
+    }
+
+    private static String workBudgetPolicyJson(
+        EvolutionRewriteProgramTrainSuite train
+    ) {
+<span class="fc" id="L610">        var budget = train.primitiveWorkBudget();</span>
+<span class="fc" id="L611">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L612">            .property(&quot;schema&quot;, STATIC_CONTRACT_SCHEMA)</span>
+<span class="fc" id="L613">            .property(&quot;contract&quot;, &quot;MATCHED_WORK_POLICY&quot;)</span>
+<span class="fc" id="L614">            .property(&quot;trainSuiteHash&quot;, train.contentHash())</span>
+<span class="fc" id="L615">            .property(&quot;maximumDepth&quot;, budget.maximumDepth())</span>
+<span class="fc" id="L616">            .property(&quot;maximumVisitedExpressions&quot;,</span>
+<span class="fc" id="L617">                budget.maximumVisitedExpressions())</span>
+<span class="fc" id="L618">            .property(&quot;maximumCandidatesPerState&quot;,</span>
+<span class="fc" id="L619">                budget.maximumCandidatesPerState())</span>
+<span class="fc" id="L620">            .property(&quot;maximumExpandingSteps&quot;,</span>
+<span class="fc" id="L621">                budget.maximumExpandingSteps())</span>
+<span class="fc" id="L622">            .property(&quot;totalPrimitiveWorkUnits&quot;,</span>
+<span class="fc" id="L623">                budget.totalPrimitiveWorkUnits())</span>
+<span class="fc" id="L624">            .property(&quot;authority&quot;,</span>
+                &quot;CANONICAL_PRIMITIVE_AND_TOTAL_WORK_LEDGER&quot;);
+<span class="fc" id="L626">        return withHash(json.endObject().toString());</span>
+    }
+
+    private static String schemaBundleJson() {
+<span class="fc" id="L630">        List&lt;String&gt; schemas = List.of(</span>
+            EvolutionSplitManifest.SCHEMA,
+            EvolutionRewriteProgramTrainSuite.SCHEMA,
+            EvolutionRewriteProgramHeldOutCommitment.SCHEMA,
+            EvolutionRewriteProgramHeldOutSplitReferences.SCHEMA,
+            EvolutionRewriteProgramEvaluationProtocol.SCHEMA,
+            EvolutionGenome.SCHEMA,
+            EvolutionRewriteProgramPlan.SCHEMA,
+            EvolutionRewriteProgramCandidate.SCHEMA,
+            EvolutionRewriteProgramStudyPlan.SCHEMA,
+            EvolutionRewriteProgramAcceptanceThresholds.SCHEMA,
+            EvolutionRewriteProgramBaselineAblationPlan.SCHEMA,
+            EvolutionRewriteProgramPerformancePlan.SCHEMA,
+            EvolutionRewriteProgramFreezeReceipt.SCHEMA,
+            STATIC_CONTRACT_SCHEMA);
+<span class="fc" id="L645">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L646">            .property(&quot;schema&quot;, STATIC_CONTRACT_SCHEMA)</span>
+<span class="fc" id="L647">            .property(&quot;contract&quot;, &quot;SCHEMA_BUNDLE&quot;)</span>
+<span class="fc" id="L648">            .stringArray(&quot;schemas&quot;, schemas.stream().sorted().toList());</span>
+<span class="fc" id="L649">        return withHash(json.endObject().toString());</span>
+    }
+
+    private static String withHash(String unhashedJson) {
+<span class="fc" id="L653">        String hash = EvolutionGenome.hash(unhashedJson);</span>
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">        if (!unhashedJson.endsWith(&quot;}&quot;)) {</span>
+<span class="nc" id="L655">            throw new IllegalArgumentException(&quot;canonical JSON object required&quot;);</span>
+        }
+<span class="fc" id="L657">        return unhashedJson.substring(0, unhashedJson.length() - 1)</span>
+            + &quot;,\&quot;contentHash\&quot;:\&quot;&quot; + hash + &quot;\&quot;}&quot;;
+    }
+
+    private static String contentHash(String canonicalJson) {
+<span class="fc" id="L662">        int marker = canonicalJson.lastIndexOf(&quot;,\&quot;contentHash\&quot;:\&quot;&quot;);</span>
+<span class="pc bpc" id="L663" title="2 of 4 branches missed.">        if (marker &lt; 0 || !canonicalJson.endsWith(&quot;\&quot;}&quot;)) {</span>
+<span class="nc" id="L664">            throw new IllegalArgumentException(</span>
+                &quot;static contract lacks terminal contentHash&quot;);
+        }
+<span class="fc" id="L667">        return canonicalJson.substring(</span>
+<span class="fc" id="L668">            marker + &quot;,\&quot;contentHash\&quot;:\&quot;&quot;.length(),</span>
+<span class="fc" id="L669">            canonicalJson.length() - 2);</span>
+    }
+
+    private static void writeAtomic(Path output, String content)
+            throws IOException {
+<span class="fc" id="L674">        Path parent = output.getParent();</span>
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">        if (parent != null) {</span>
+<span class="fc" id="L676">            Files.createDirectories(parent);</span>
+        }
+<span class="fc" id="L678">        Path temporary = Files.createTempFile(</span>
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">            parent == null ? Path.of(&quot;.&quot;) : parent,</span>
+            &quot;.regelsuche-freeze-&quot;,
+            &quot;.tmp&quot;);
+        try {
+<span class="fc" id="L683">            Files.writeString(temporary, content, StandardCharsets.UTF_8);</span>
+            try {
+<span class="fc" id="L685">                Files.move(</span>
+                    temporary,
+                    output,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+<span class="nc" id="L690">            } catch (AtomicMoveNotSupportedException exception) {</span>
+<span class="nc" id="L691">                Files.move(</span>
+                    temporary,
+                    output,
+                    StandardCopyOption.REPLACE_EXISTING);
+<span class="fc" id="L695">            }</span>
+        } finally {
+<span class="fc" id="L697">            Files.deleteIfExists(temporary);</span>
+        }
+<span class="fc" id="L699">    }</span>
+
+    public record FreezeInputs(
+        EvolutionSplitManifest manifest,
+        EvolutionRewriteProgramTrainSuite train,
+        EvolutionRewriteProgramHeldOutCommitment validationCommitment,
+        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment,
+        EvolutionRewriteProgramHeldOutSplitReferences validationReferences,
+        EvolutionRewriteProgramHeldOutSplitReferences finalTestReferences,
+        EvolutionRewriteProgramEvaluationProtocol protocol,
+        EvolutionGenome genome,
+        List&lt;EvolutionRewriteProgramCandidate&gt; seeds,
+        MutationCatalog mutationCatalog,
+        EvolutionRewriteProgramStudyPlan study,
+        EvolutionRewriteProgramAcceptanceThresholds thresholds,
+        EvolutionRewriteProgramBaselineAblationPlan baselineAblation,
+        EvolutionRewriteProgramPerformancePlan performance,
+        String primitiveInventoryJson,
+        String programGrammarJson,
+        String mutationCatalogJson,
+        String workBudgetPolicyJson,
+        String schemaBundleJson,
+        EvolutionRewriteProgramFreezeReceipt receipt
+    ) {
+<span class="fc" id="L723">        public FreezeInputs {</span>
+<span class="fc" id="L724">            Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="fc" id="L725">            Objects.requireNonNull(train, &quot;train&quot;);</span>
+<span class="fc" id="L726">            Objects.requireNonNull(validationCommitment, &quot;validationCommitment&quot;);</span>
+<span class="fc" id="L727">            Objects.requireNonNull(finalTestCommitment, &quot;finalTestCommitment&quot;);</span>
+<span class="fc" id="L728">            Objects.requireNonNull(validationReferences, &quot;validationReferences&quot;);</span>
+<span class="fc" id="L729">            Objects.requireNonNull(finalTestReferences, &quot;finalTestReferences&quot;);</span>
+<span class="fc" id="L730">            Objects.requireNonNull(protocol, &quot;protocol&quot;);</span>
+<span class="fc" id="L731">            Objects.requireNonNull(genome, &quot;genome&quot;);</span>
+<span class="fc" id="L732">            seeds = List.copyOf(Objects.requireNonNull(seeds, &quot;seeds&quot;));</span>
+<span class="fc" id="L733">            Objects.requireNonNull(mutationCatalog, &quot;mutationCatalog&quot;);</span>
+<span class="fc" id="L734">            Objects.requireNonNull(study, &quot;study&quot;);</span>
+<span class="fc" id="L735">            Objects.requireNonNull(thresholds, &quot;thresholds&quot;);</span>
+<span class="fc" id="L736">            Objects.requireNonNull(baselineAblation, &quot;baselineAblation&quot;);</span>
+<span class="fc" id="L737">            Objects.requireNonNull(performance, &quot;performance&quot;);</span>
+<span class="fc" id="L738">            Objects.requireNonNull(primitiveInventoryJson,</span>
+                &quot;primitiveInventoryJson&quot;);
+<span class="fc" id="L740">            Objects.requireNonNull(programGrammarJson, &quot;programGrammarJson&quot;);</span>
+<span class="fc" id="L741">            Objects.requireNonNull(mutationCatalogJson, &quot;mutationCatalogJson&quot;);</span>
+<span class="fc" id="L742">            Objects.requireNonNull(workBudgetPolicyJson, &quot;workBudgetPolicyJson&quot;);</span>
+<span class="fc" id="L743">            Objects.requireNonNull(schemaBundleJson, &quot;schemaBundleJson&quot;);</span>
+<span class="fc" id="L744">            Objects.requireNonNull(receipt, &quot;receipt&quot;);</span>
+<span class="fc" id="L745">        }</span>
+    }
+
+    public record WrittenFreeze(
+        Path outputDirectory,
+        List&lt;Path&gt; prerequisiteArtifacts,
+        Path receiptPath,
+        String receiptHash
+    ) {
+<span class="fc" id="L754">        public WrittenFreeze {</span>
+<span class="fc" id="L755">            outputDirectory = outputDirectory.toAbsolutePath().normalize();</span>
+<span class="fc" id="L756">            prerequisiteArtifacts = prerequisiteArtifacts.stream()</span>
+<span class="fc" id="L757">                .map(path -&gt; path.toAbsolutePath().normalize())</span>
+<span class="fc" id="L758">                .toList();</span>
+<span class="fc" id="L759">            receiptPath = receiptPath.toAbsolutePath().normalize();</span>
+<span class="fc" id="L760">            EvolutionGenome.requireSha256(receiptHash, &quot;receiptHash&quot;);</span>
+<span class="fc" id="L761">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

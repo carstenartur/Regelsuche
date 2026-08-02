@@ -202,36 +202,61 @@ public record EvolutionRewriteProgramTrainSuite(
                 maxWorkUnits);
 <span class="fc" id="L203">        }</span>
 
+        /** Maximum retained primitive path depth in documentation terminology. */
+        public int maximumDepth() {
+<span class="nc" id="L207">            return maxPrimitiveSteps;</span>
+        }
+
+        /** Maximum explored expressions/states in documentation terminology. */
+        public int maximumVisitedExpressions() {
+<span class="nc" id="L212">            return maxExploredStates;</span>
+        }
+
+        /** Maximum candidates emitted for one explored state. */
+        public int maximumCandidatesPerState() {
+<span class="nc" id="L217">            return maxCandidatesPerState;</span>
+        }
+
+        /** Maximum expanding steps retained by the matched-work policy. */
+        public int maximumExpandingSteps() {
+<span class="nc" id="L222">            return maxExpandingSteps;</span>
+        }
+
+        /** Complete primitive and internal work allowance. */
+        public long totalPrimitiveWorkUnits() {
+<span class="nc" id="L227">            return maxWorkUnits;</span>
+        }
+
         static PrimitiveWorkBudget derivedFrom(SearchHeuristic heuristic) {
-<span class="fc" id="L206">            Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
-<span class="fc" id="L207">            int primitiveSteps = Math.max(1, heuristic.maxDepth());</span>
+<span class="fc" id="L231">            Objects.requireNonNull(heuristic, &quot;heuristic&quot;);</span>
+<span class="fc" id="L232">            int primitiveSteps = Math.max(1, heuristic.maxDepth());</span>
             long units;
             try {
-<span class="fc" id="L210">                units = Math.multiplyExact(</span>
-<span class="fc" id="L211">                    (long) heuristic.maxVisitedExpressions(),</span>
-<span class="fc" id="L212">                    (long) heuristic.maxCandidatesPerState() + 4L);</span>
-<span class="nc" id="L213">            } catch (ArithmeticException exception) {</span>
-<span class="nc" id="L214">                units = Long.MAX_VALUE;</span>
-<span class="fc" id="L215">            }</span>
-<span class="fc" id="L216">            units = Math.max(units, (long) primitiveSteps + 1L);</span>
-<span class="fc" id="L217">            return new PrimitiveWorkBudget(</span>
+<span class="fc" id="L235">                units = Math.multiplyExact(</span>
+<span class="fc" id="L236">                    (long) heuristic.maxVisitedExpressions(),</span>
+<span class="fc" id="L237">                    (long) heuristic.maxCandidatesPerState() + 4L);</span>
+<span class="nc" id="L238">            } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L239">                units = Long.MAX_VALUE;</span>
+<span class="fc" id="L240">            }</span>
+<span class="fc" id="L241">            units = Math.max(units, (long) primitiveSteps + 1L);</span>
+<span class="fc" id="L242">            return new PrimitiveWorkBudget(</span>
                 primitiveSteps,
-<span class="fc" id="L219">                heuristic.maxVisitedExpressions(),</span>
-<span class="fc" id="L220">                heuristic.maxCandidatesPerState(),</span>
-<span class="fc" id="L221">                heuristic.maxExpandingSteps(),</span>
+<span class="fc" id="L244">                heuristic.maxVisitedExpressions(),</span>
+<span class="fc" id="L245">                heuristic.maxCandidatesPerState(),</span>
+<span class="fc" id="L246">                heuristic.maxExpandingSteps(),</span>
                 units);
         }
 
         public long exactPathAuditReserve() {
-<span class="nc" id="L226">            return maxPrimitiveSteps;</span>
+<span class="nc" id="L251">            return maxPrimitiveSteps;</span>
         }
 
         public long mechanicalSearchWorkBudget() {
-<span class="nc" id="L230">            return maxWorkUnits - exactPathAuditReserve();</span>
+<span class="nc" id="L255">            return maxWorkUnits - exactPathAuditReserve();</span>
         }
 
         PrimitiveWorkBestFirstSearchStrategy.Budget toSearchBudget() {
-<span class="nc" id="L234">            return new PrimitiveWorkBestFirstSearchStrategy.Budget(</span>
+<span class="nc" id="L259">            return new PrimitiveWorkBestFirstSearchStrategy.Budget(</span>
                 maxPrimitiveSteps,
                 maxExploredStates,
                 maxCandidatesPerState,
@@ -247,28 +272,28 @@ public record EvolutionRewriteProgramTrainSuite(
         String targetExpression,
         List&lt;String&gt; assumptions
     ) {
-<span class="fc" id="L250">        public TrainCase {</span>
-<span class="fc" id="L251">            requireId(caseId, &quot;caseId&quot;);</span>
-<span class="fc" id="L252">            requireId(familyId, &quot;familyId&quot;);</span>
-<span class="fc" id="L253">            inputExpression = normalizeExpression(inputExpression);</span>
-<span class="fc" id="L254">            targetExpression = normalizeExpression(targetExpression);</span>
-<span class="fc" id="L255">            assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
-<span class="fc" id="L256">                .normalizedAssumptions();</span>
-<span class="fc" id="L257">        }</span>
+<span class="fc" id="L275">        public TrainCase {</span>
+<span class="fc" id="L276">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L277">            requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L278">            inputExpression = normalizeExpression(inputExpression);</span>
+<span class="fc" id="L279">            targetExpression = normalizeExpression(targetExpression);</span>
+<span class="fc" id="L280">            assumptions = AssumptionSignature.ofExpressions(assumptions)</span>
+<span class="fc" id="L281">                .normalizedAssumptions();</span>
+<span class="fc" id="L282">        }</span>
     }
 
     private static String normalizeExpression(String expression) {
-<span class="pc bpc" id="L261" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
-<span class="nc" id="L262">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">        if (expression == null || expression.isBlank()) {</span>
+<span class="nc" id="L287">            throw new IllegalArgumentException(&quot;expression must not be blank&quot;);</span>
         }
-<span class="fc" id="L264">        return ExpressionFormatter.format(</span>
-<span class="fc" id="L265">            new ExpressionParser().parseTerm(expression));</span>
+<span class="fc" id="L289">        return ExpressionFormatter.format(</span>
+<span class="fc" id="L290">            new ExpressionParser().parseTerm(expression));</span>
     }
 
     private static void requireId(String value, String name) {
-<span class="pc bpc" id="L269" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
-<span class="nc" id="L270">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
+<span class="pc bpc" id="L294" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L295">            throw new IllegalArgumentException(name + &quot; has invalid syntax&quot;);</span>
         }
-<span class="fc" id="L272">    }</span>
+<span class="fc" id="L297">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
