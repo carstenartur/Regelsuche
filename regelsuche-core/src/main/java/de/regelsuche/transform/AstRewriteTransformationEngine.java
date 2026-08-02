@@ -183,6 +183,10 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
             new FactorCommonLeftRule(),
             new FactorCommonRightRule(),
             new LinearOffsetSimplificationRule(),
+            new SquareLiteralSplitRule(),
+            new DistributeDivisionOverSumRule(),
+            new CancelDivisionFactorRule(),
+            new FoldNumericArithmeticRule(),
             new CanonicalNormalizeRule()
         );
     }
@@ -563,8 +567,230 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         }
     }
 
-    private static Power asPower(Expr expression) {
-        if (expression instanceof BinaryExpr power && power.operator() == BinaryOperator.POW
+    /**
+     * {@code (A op B) / C -> A / C op B / C} for {@code op} in
+     * {@code {+, -}}.
+     *
+     * <p>Atomic distribution of a division over a sum. The rewrite introduces
+     * no new side condition: the original expression already divides by
+     * {@code C}, so {@code C != 0} is inherited rather than assumed. Explicit
+     * zero divisors are refused at match time.</p>
+     */
+    private static final class DistributeDivisionOverSumRule extends MetadataRule {
+        private DistributeDivisionOverSumRule() {
+            super(RewriteKind.EXPAND, true, 3);
+        }
+
+        @Override
+        public String id() {
+            return "ast_distribute_division_over_sum";
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+            return distributed(subtree) != null;
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+            Expr distributed = distributed(subtree);
+            if (distributed == null) {
+                throw new IllegalArgumentException("Rule does not match subtree");
+            }
+            return distributed;
+        }
+
+        private Expr distributed(Expr subtree) {
+            if (!(subtree instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV
+                || isExplicitZero(division.right())
+                || !(division.left() instanceof BinaryExpr sum)
+                || (sum.operator() != BinaryOperator.ADD && sum.operator() != BinaryOperator.SUB)) {
+                return null;
+            }
+            return new BinaryExpr(
+                new BinaryExpr(sum.left(), BinaryOperator.DIV, division.right()),
+                sum.operator(),
+                new BinaryExpr(sum.right(), BinaryOperator.DIV, division.right())
+            );
+        }
+    }
+
+    /**
+     * {@code (A * B) / A -> B} and {@code (A * B) / B -> A}.
+     *
+     * <p>Cancelling a factor is only equivalence preserving where the
+     * cancelled factor is non-zero, so the rule surfaces that side condition
+     * through {@link RewriteRule#assumptions(Expr)}. A non-zero numeric
+     * literal needs no assumption because the condition is decided; an
+     * explicit zero divisor is refused at match time.</p>
+     */
+    private static final class CancelDivisionFactorRule extends MetadataRule {
+        private CancelDivisionFactorRule() {
+            super(RewriteKind.SIMPLIFY, false, -3);
+        }
+
+        @Override
+        public String id() {
+            return "ast_cancel_division_factor";
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+            return remainingFactor(subtree) != null;
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+            Expr remaining = remainingFactor(subtree);
+            if (remaining == null) {
+                throw new IllegalArgumentException("Rule does not match subtree");
+            }
+            return remaining;
+        }
+
+        @Override
+        public List<Assumption> assumptions(Expr subtree) {
+            if (remainingFactor(subtree) == null) {
+                return List.of();
+            }
+            Expr divisor = ((BinaryExpr) subtree).right();
+            if (divisor instanceof NumberExpr) {
+                return List.of();
+            }
+            return List.of(Assumption.nonZero(ExpressionFormatter.format(divisor)));
+        }
+
+        private Expr remainingFactor(Expr subtree) {
+            if (!(subtree instanceof BinaryExpr division) || division.operator() != BinaryOperator.DIV
+                || isExplicitZero(division.right())
+                || !(division.left() instanceof BinaryExpr product)
+                || product.operator() != BinaryOperator.MUL) {
+                return null;
+            }
+            if (product.left().equals(division.right())) {
+                return product.right();
+            }
+            if (product.right().equals(division.right())) {
+                return product.left();
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Folds an arithmetic node over two numeric literals into a single
+     * literal.
+     *
+     * <p>Folding stays inside the exact integer range: a division is only
+     * folded when it divides exactly, so no rewrite silently introduces a
+     * rounded floating-point literal.</p>
+     */
+    private static final class FoldNumericArithmeticRule extends MetadataRule {
+        private FoldNumericArithmeticRule() {
+            super(RewriteKind.SIMPLIFY, false, -2);
+        }
+
+        @Override
+        public String id() {
+            return "ast_fold_numeric_arithmetic";
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+            return folded(subtree) != null;
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+            Expr folded = folded(subtree);
+            if (folded == null) {
+                throw new IllegalArgumentException("Rule does not match subtree");
+            }
+            return folded;
+        }
+
+        private Expr folded(Expr subtree) {
+            if (!(subtree instanceof BinaryExpr operation)
+                || !(operation.left() instanceof NumberExpr left)
+                || !(operation.right() instanceof NumberExpr right)
+                || !isInteger(left.value()) || !isInteger(right.value())) {
+                return null;
+            }
+            double value = switch (operation.operator()) {
+                case ADD -> left.value() + right.value();
+                case SUB -> left.value() - right.value();
+                case MUL -> left.value() * right.value();
+                case DIV -> right.value() == 0 ? Double.NaN : left.value() / right.value();
+                default -> Double.NaN;
+            };
+            return isInteger(value) ? new NumberExpr(value) : null;
+        }
+    }
+
+    /**
+     * {@code A ^ 2 - N -> A ^ 2 - M ^ 2} where {@code N == M * M} for a
+     * positive integer {@code M}.
+     *
+     * <p>The rule only rewrites the numeric literal; the factorisation itself
+     * stays with the existing atomic factor rule. Without this normalisation a
+     * literal such as {@code 1} is structurally invisible to a rule that
+     * matches on two squared operands.</p>
+     */
+    private static final class SquareLiteralSplitRule extends MetadataRule {
+        private SquareLiteralSplitRule() {
+            super(RewriteKind.NORMALIZE, true, 1);
+        }
+
+        @Override
+        public String id() {
+            return "ast_square_literal_split";
+        }
+
+        @Override
+        public boolean matches(Expr subtree) {
+            return split(subtree) != null;
+        }
+
+        @Override
+        public Expr apply(Expr subtree) {
+            Expr split = split(subtree);
+            if (split == null) {
+                throw new IllegalArgumentException("Rule does not match subtree");
+            }
+            return split;
+        }
+
+        private Expr split(Expr subtree) {
+            if (!(subtree instanceof BinaryExpr difference) || difference.operator() != BinaryOperator.SUB
+                || !(difference.right() instanceof NumberExpr literal)) {
+                return null;
+            }
+            Power left = asPower(difference.left());
+            if (left == null || left.exponent() != 2) {
+                return null;
+            }
+            double root = Math.sqrt(literal.value());
+            if (literal.value() <= 0 || !isInteger(root)) {
+                return null;
+            }
+            return new BinaryExpr(
+                difference.left(),
+                BinaryOperator.SUB,
+                new BinaryExpr(new NumberExpr(root), BinaryOperator.POW, new NumberExpr(2))
+            );
+        }
+    }
+
+    private static boolean isExplicitZero(Expr expression) {
+        return expression instanceof NumberExpr number && number.value() == 0;
+    }
+
+    private static boolean isInteger(double value) {
+        return Double.isFinite(value) && Math.rint(value) == value
+            && Math.abs(value) <= 1e15;
+    }
+
+    private static Power asPower(Expr expression) {        if (expression instanceof BinaryExpr power && power.operator() == BinaryOperator.POW
             && power.right() instanceof NumberExpr exponent) {
             return new Power(power.left(), exponent.value());
         }
