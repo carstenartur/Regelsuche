@@ -8,6 +8,7 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.input.InputRequest;
+import de.regelsuche.knowledge.CoreRuleCatalog;
 import de.regelsuche.knowledge.KnowledgePackRegistry;
 import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.input.InputType;
@@ -33,7 +34,7 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
     }
 
     public static AstRewriteTransformationEngine withKnowledgePacks(KnowledgePackSelection selection) {
-        List<RewriteRule> selectedRules = new ArrayList<>(defaultRules());
+        List<RewriteRule> selectedRules = new ArrayList<>(defaultRules(selection));
         selectedRules.addAll(new KnowledgePackRegistry().enabledRules(selection));
         return new AstRewriteTransformationEngine(selectedRules);
     }
@@ -145,7 +146,39 @@ public class AstRewriteTransformationEngine implements TransformationEngine {
         return results;
     }
 
+    /**
+     * Built-in rules of the packs enabled by default (kernel plus all first-party packs).
+     *
+     * <p>Equivalent to {@code defaultRules(KnowledgePackSelection.CORE)}.
+     */
     public static List<RewriteRule> defaultRules() {
+        return defaultRules(KnowledgePackSelection.CORE);
+    }
+
+    /**
+     * Built-in rules restricted to the core packs enabled by {@code selection}.
+     *
+     * <p>The canonical rule order is preserved: enabling every pack reproduces
+     * {@link #allBuiltInRules()} exactly, and disabling a pack removes exactly its rules.
+     */
+    public static List<RewriteRule> defaultRules(KnowledgePackSelection selection) {
+        Set<String> enabledPacks = CoreRuleCatalog.enabledPackIds(selection);
+        List<RewriteRule> selected = new ArrayList<>();
+        for (RewriteRule rule : allBuiltInRules()) {
+            String packId = CoreRuleCatalog.packIdForRule(rule.id());
+            if (packId == null) {
+                throw new IllegalStateException(
+                    "Built-in rule is not assigned to a core rule pack: " + rule.id());
+            }
+            if (enabledPacks.contains(packId)) {
+                selected.add(rule);
+            }
+        }
+        return List.copyOf(selected);
+    }
+
+    /** All built-in rules in canonical order, regardless of pack selection. */
+    public static List<RewriteRule> allBuiltInRules() {
         PatternExpr a = PatternExpr.var("A");
         PatternExpr b = PatternExpr.var("B");
         PatternExpr c = PatternExpr.var("C");

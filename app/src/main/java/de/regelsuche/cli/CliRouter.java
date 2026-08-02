@@ -21,6 +21,11 @@ import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleCandidateListener;
 import de.regelsuche.mining.RuleCandidateMiner;
 import de.regelsuche.mining.RuleDiscoveryService;
+import de.regelsuche.knowledge.CoreRulePack;
+import de.regelsuche.knowledge.CoreRuleCatalog;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.RuleInventoryManifest;
+import de.regelsuche.knowledge.RuleProfile;
 import de.regelsuche.notify.ConsoleNotifier;
 import de.regelsuche.plugin.PluginRuntime;
 import de.regelsuche.plugin.PluginRuntimeConfig;
@@ -345,9 +350,41 @@ public class CliRouter {
         }
     }
 
+    /**
+     * Builds a knowledge pack selection from {@code --rule-profile},
+     * {@code --enable-pack} and {@code --disable-pack} options.
+     */
+    private static KnowledgePackSelection parsePackSelection(CliOptions options) {
+        String profileId = options.getOrDefault("rule-profile", "");
+        KnowledgePackSelection selection = profileId.isBlank()
+            ? KnowledgePackSelection.CORE
+            : KnowledgePackSelection.profile(RuleProfile.fromId(profileId));
+        for (String packId : options.csv("enable-pack")) {
+            selection = selection.enablePack(packId);
+        }
+        for (String packId : options.csv("disable-pack")) {
+            selection = selection.disablePack(packId);
+        }
+        return selection;
+    }
+
+    private void printCorePacks(KnowledgePackSelection selection) {
+        java.util.Set<String> enabled = CoreRuleCatalog.enabledPackIds(selection);
+        for (CoreRulePack pack : CoreRuleCatalog.packs()) {
+            boolean packEnabled = enabled.contains(pack.packId());
+            out.println("core-pack " + pack.packId() + " (tier=" + pack.tier().id() + ", "
+                + (packEnabled ? "enabled" : "disabled") + ", rules=" + pack.ruleIds().size() + ")");
+            for (String ruleId : pack.ruleIds()) {
+                out.println("  rule " + ruleId + " (pack=" + pack.packId()
+                    + ", tier=" + pack.tier().id() + ", "
+                    + (packEnabled ? "enabled" : "disabled") + ")");
+            }
+        }
+    }
+
     private int runRules(String[] args) {
         if (args.length == 0) {
-            out.println("Usage: rules list|validate|conflicts|profiles|debug|import|export");
+            out.println("Usage: rules list|packs|validate|conflicts|profiles|debug|import|export");
             return 1;
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
@@ -356,19 +393,28 @@ public class CliRouter {
                 CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
                 Path rulesDir = Paths.get(options.getOrDefault("dir", "rules"));
                 String profile = options.getOrDefault("profile", "");
+                KnowledgePackSelection selection;
+                try {
+                    selection = parsePackSelection(options);
+                } catch (IllegalArgumentException ex) {
+                    out.println("ERROR " + ex.getMessage());
+                    return 1;
+                }
                 try (PluginRuntime runtime = new PluginRuntime(new PluginRuntimeConfig(
                     Paths.get("plugins"),
                     rulesDir,
                     true,
                     java.util.Set.of(),
                     java.util.Set.of(),
-                    profile
+                    profile,
+                    selection
                 ))) {
+                    printCorePacks(selection);
                     if (runtime.registeredRules().isEmpty()) {
                         out.println("No plugin or rule-file rules loaded.");
                     } else {
                         runtime.registeredRules().forEach(rule -> out.println(rule.type() + " "
-                            + rule.id() + " (" + rule.source() + ", "
+                            + rule.id() + " (" + rule.source() + ", tier=plugin, "
                             + (rule.enabled() ? "enabled" : "disabled") + ")"));
                     }
                     if (!runtime.macroRegistry().registrations().isEmpty()) {
@@ -383,9 +429,25 @@ public class CliRouter {
                     printExtensions("explanation", runtime.explanationRegistry().registrations());
                     printExtensions("parser-extension", runtime.parserExtensionRegistry().registrations());
                     printExtensions("example", runtime.exampleRegistry().registrations());
+                    RuleInventoryManifest manifest = runtime.ruleInventoryManifest();
+                    out.println("rule-inventory profile=" + manifest.profileId()
+                        + " rules=" + manifest.ruleIds().size()
+                        + " hash=" + manifest.contentHash());
                     runtime.diagnostics().forEach(diagnostic -> out.println("WARN " + diagnostic.message()));
                     return 0;
                 }
+            }
+            case "packs" -> {
+                CliOptions options = CliOptions.parse(Arrays.copyOfRange(args, 1, args.length));
+                KnowledgePackSelection selection;
+                try {
+                    selection = parsePackSelection(options);
+                } catch (IllegalArgumentException ex) {
+                    out.println("ERROR " + ex.getMessage());
+                    return 1;
+                }
+                printCorePacks(selection);
+                return 0;
             }
             case "validate" -> {
                 if (args.length < 2) {

@@ -4,6 +4,7 @@ import de.regelsuche.knowledge.KnowledgePackSelection;
 import de.regelsuche.transform.PatternRewriteRule;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,11 +31,23 @@ public class KnowledgePackRegistry {
         return packsById.values().stream().toList();
     }
 
+    public List<KnowledgePack> packsByTier(RuleTier tier) {
+        return packsById.values().stream()
+                .filter(pack -> pack.tier() == tier)
+                .toList();
+    }
+
     public List<KnowledgePack> enabledPacks(KnowledgePackSelection options) {
+        rejectKernelDisable(options);
         Set<String> defaultEnabled = packsById.values().stream()
                 .filter(KnowledgePack::enabledByDefault)
+                .filter(pack -> pack.tier() == RuleTier.KERNEL || options.profile().includeFirstPartyDefaults())
                 .map(KnowledgePack::packId)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        packsById.values().stream()
+                .filter(pack -> pack.tier() == RuleTier.KERNEL)
+                .map(KnowledgePack::packId)
+                .forEach(defaultEnabled::add);
         Set<String> enabled = options.effectiveEnabledPacks(packsById.keySet(), defaultEnabled);
         Set<String> explicitlyEnabled = explicitlyEnabledPacks(options);
         return packsById.values().stream()
@@ -49,6 +62,15 @@ public class KnowledgePackRegistry {
                 .flatMap(pack -> pack.rules().stream())
                 .filter(rule -> rule.descriptor().eligibleForRegistration())
                 .toList();
+    }
+
+    private void rejectKernelDisable(KnowledgePackSelection options) {
+        for (String packId : options.disabledPacks()) {
+            KnowledgePack pack = packsById.get(packId);
+            if (pack != null && pack.tier() == RuleTier.KERNEL) {
+                throw new IllegalArgumentException("Kernel knowledge pack cannot be disabled: " + packId);
+            }
+        }
     }
 
     private Set<String> explicitlyEnabledPacks(KnowledgePackSelection options) {
