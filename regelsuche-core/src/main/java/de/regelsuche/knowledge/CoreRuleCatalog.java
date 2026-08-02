@@ -11,7 +11,7 @@ import java.util.Set;
  *
  * <p>Every built-in rewrite rule belongs to exactly one pack. Kernel packs are never ablatable;
  * first-party packs can be switched off wholesale, which is how baseline/ablation runs are declared
- * instead of being deployed.
+ * instead of being deployed.</p>
  */
 public final class CoreRuleCatalog {
     public static final String IDENTITIES = "core-identities";
@@ -21,6 +21,7 @@ public final class CoreRuleCatalog {
     public static final String DISTRIBUTION = "core-distribution";
     public static final String FACTORIZATION = "core-factorization";
     public static final String POLYNOMIAL_DIVISION = "core-polynomial-division";
+    public static final String EXACT_POLYNOMIAL_DIVISION = "core-exact-polynomial-division";
 
     private static final List<CoreRulePack> PACKS = List.of(
             new CoreRulePack(
@@ -92,13 +93,18 @@ public final class CoreRuleCatalog {
                             "ast_factor_common_right")),
             new CoreRulePack(
                     POLYNOMIAL_DIVISION,
-                    "Core Polynomial Division",
+                    "Core Rational Cancellation",
                     RuleTier.FIRST_PARTY,
                     true,
-                    "Division cancellation and exact polynomial division shortcuts.",
-                    List.of(
-                            "ast_cancel_division_factor",
-                            "ast_polynomial_exact_division")));
+                    "Atomic cancellation of a numerator factor against the divisor.",
+                    List.of("ast_cancel_division_factor")),
+            new CoreRulePack(
+                    EXACT_POLYNOMIAL_DIVISION,
+                    "Experimental Exact Polynomial Division",
+                    RuleTier.FIRST_PARTY,
+                    false,
+                    "Opt-in exact univariate polynomial long division. It is excluded from the default benchmark inventory so that a benchmark-discovered gap is not silently closed inside the measured configuration.",
+                    List.of("ast_polynomial_exact_division")));
 
     private static final Map<String, CoreRulePack> BY_ID = indexById(PACKS);
     private static final Map<String, String> PACK_ID_BY_RULE_ID = indexByRuleId(PACKS);
@@ -146,7 +152,8 @@ public final class CoreRuleCatalog {
      * Resolves the enabled core packs for a selection.
      *
      * <p>Kernel packs are always enabled; attempting to disable one is rejected so that ablation
-     * runs cannot silently remove soundness-critical rules.
+     * runs cannot silently remove soundness-critical rules. First-party packs that are deliberately
+     * marked disabled by default remain opt-in even for the {@code core} and {@code full} profiles.</p>
      */
     public static Set<String> enabledPackIds(KnowledgePackSelection selection) {
         KnowledgePackSelection effective = selection == null ? KnowledgePackSelection.CORE : selection;
