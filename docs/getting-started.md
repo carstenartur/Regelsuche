@@ -155,7 +155,7 @@ Für einen gewöhnlichen Entwicklungscheck:
 Für den vollständigen, auch in CI verwendeten Lebenszyklus:
 
 ```bash
-./gradlew ciCheck
+./gradlew --no-configuration-cache ciCheck
 ```
 
 `ciCheck` ist absichtlich umfangreich. Für schnelle lokale Zyklen stehen
