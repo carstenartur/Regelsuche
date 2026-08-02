@@ -10,10 +10,10 @@ def generatedWebResources = layout.buildDirectory.dir('generated/web-resources')
 def generatedVendorRoot = generatedWebResources.map { it.dir('web/vendor') }
 
 afterEvaluate {
-    tasks.named('vendorKatexAssets').configure {
+    tasks.named('vendorKatexAssets', Sync).configure {
         into(generatedVendorRoot.map { it.dir('katex') })
     }
-    tasks.named('vendorCytoscapeAssets').configure {
+    tasks.named('vendorCytoscapeAssets', Sync).configure {
         into(generatedVendorRoot.map { it.dir('cytoscape') })
     }
     tasks.named('vendorWebAssets').configure {
@@ -37,7 +37,13 @@ afterEvaluate {
         doLast {
             def generatedRoot = generatedWebResources.get().asFile.canonicalFile.toPath()
             ['vendorKatexAssets', 'vendorCytoscapeAssets'].each { taskName ->
-                def destination = tasks.named(taskName).get().destinationDir.canonicalFile.toPath()
+                def destination = tasks.named(taskName, Sync)
+                    .get()
+                    .destinationDirectory
+                    .get()
+                    .asFile
+                    .canonicalFile
+                    .toPath()
                 if (!destination.startsWith(generatedRoot)) {
                     throw new GradleException(
                         "${taskName} must write below ${generatedRoot}, but writes to ${destination}")
