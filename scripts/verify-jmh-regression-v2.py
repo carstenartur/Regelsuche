@@ -12,6 +12,7 @@ from typing import Any
 
 POLICY_SCHEMA = "regelsuche.quality.jmh-regression-policy/v2"
 REPORT_SCHEMA = "regelsuche.quality.jmh-regression-report/v2"
+FAMILIES = {"CORE", "REWRITE_PROGRAM", "END_TO_END_SEARCH"}
 
 
 def fail(message: str) -> None:
@@ -31,6 +32,15 @@ def finite_positive(value: Any, label: str) -> float:
     number = float(value)
     if not math.isfinite(number) or number <= 0.0:
         fail(f"{label} must be finite and positive")
+    return number
+
+
+def finite_nonnegative(value: Any, label: str) -> float:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        fail(f"{label} must be numeric")
+    number = float(value)
+    if not math.isfinite(number) or number < 0.0:
+        fail(f"{label} must be finite and non-negative")
     return number
 
 
@@ -75,10 +85,16 @@ def main() -> int:
             fail("benchmark policy is missing benchmark")
         if name in policy_by_name:
             fail(f"duplicate benchmark policy: {name}")
+        family = row.get("family")
+        if family not in FAMILIES:
+            fail(f"{name}: unsupported or missing family {family}")
         unit = row.get("unit")
         if unit not in {"us/op", "ms/op"}:
             fail(f"{name}: unsupported unit {unit}")
         baseline = finite_positive(row.get("baselineScore"), f"{name} baselineScore")
+        baseline_error = finite_nonnegative(
+            row.get("baselineScoreError"), f"{name} baselineScoreError"
+        )
         maximum = finite_positive(
             row.get("maximumAllowedScore"), f"{name} maximumAllowedScore"
         )
@@ -89,7 +105,15 @@ def main() -> int:
             1e-9, maximum * 1e-9
         ):
             fail(f"{name}: inconsistent finite threshold")
-        policy_by_name[name] = row
+        policy_by_name[name] = {
+            **row,
+            "family": family,
+            "unit": unit,
+            "baselineScore": baseline,
+            "baselineScoreError": baseline_error,
+            "maximumAllowedScore": maximum,
+            "maximumMultiplier": multiplier,
+        }
 
     payload = load_json(args.result, "JMH result")
     if not isinstance(payload, list):
@@ -122,7 +146,9 @@ def main() -> int:
         if not isinstance(primary, dict):
             fail(f"{name}: primaryMetric missing")
         score = finite_positive(primary.get("score"), f"{name} score")
-        score_error = finite_positive(primary.get("scoreError"), f"{name} scoreError")
+        score_error = finite_nonnegative(
+            primary.get("scoreError"), f"{name} scoreError"
+        )
         unit = primary.get("scoreUnit")
         row_violations: list[str] = []
 
@@ -140,7 +166,7 @@ def main() -> int:
                 entry.get("measurementIterations"),
                 execution.get("measurementIterations"),
             ),
-            ("unit", unit, expected.get("unit")),
+            ("unit", unit, expected["unit"]),
         )
         for label, actual, required in checks:
             if actual != required:
