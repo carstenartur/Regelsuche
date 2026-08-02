@@ -396,7 +396,7 @@ Vor jeder neuen öffentlichen Index- oder Trust-State-Revision:
 - [ ] Provenienz, Lizenz und SBOM vorhanden;
 - [ ] API-, Core-, Capability- und Dependency-Kompatibilität geprüft;
 - [ ] reproduzierbarer Build oder begründete Abweichung dokumentiert;
-- [ ] technische und fachliche Reviewentscheidung retained;
+- [ ] technische und fachliche Reviewentscheidung nachvollziehbar dokumentiert;
 - [ ] keine widerrufene Identität erneut autorisiert;
 - [ ] Indexrevision signiert und unveränderlich;
 - [ ] Trust-State-Sequenz, Vorgänger und Checkpoint geprüft;
