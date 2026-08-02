@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Catalog of the built-in ("core") rule packs.
@@ -108,6 +109,10 @@ public final class CoreRuleCatalog {
 
     private static final Map<String, CoreRulePack> BY_ID = indexById(PACKS);
     private static final Map<String, String> PACK_ID_BY_RULE_ID = indexByRuleId(PACKS);
+    private static final Set<String> KNOWN_KNOWLEDGE_PACK_IDS =
+            new KnowledgePackRegistry().allPacks().stream()
+                    .map(KnowledgePack::packId)
+                    .collect(Collectors.toUnmodifiableSet());
 
     private CoreRuleCatalog() {
     }
@@ -157,6 +162,9 @@ public final class CoreRuleCatalog {
      */
     public static Set<String> enabledPackIds(KnowledgePackSelection selection) {
         KnowledgePackSelection effective = selection == null ? KnowledgePackSelection.CORE : selection;
+        validatePackIds(effective.enabledPacks());
+        validatePackIds(effective.disabledPacks());
+        validatePackIds(effective.profile().enabledPackIds());
         rejectKernelDisable(effective.disabledPacks());
         Set<String> defaults = new LinkedHashSet<>();
         for (CoreRulePack pack : PACKS) {
@@ -176,6 +184,14 @@ public final class CoreRuleCatalog {
             }
         }
         return Set.copyOf(ordered);
+    }
+
+    private static void validatePackIds(Set<String> packIds) {
+        for (String packId : packIds) {
+            if (!BY_ID.containsKey(packId) && !KNOWN_KNOWLEDGE_PACK_IDS.contains(packId)) {
+                throw new IllegalArgumentException("Unknown rule pack: " + packId);
+            }
+        }
     }
 
     private static void rejectKernelDisable(Set<String> disabledPacks) {
