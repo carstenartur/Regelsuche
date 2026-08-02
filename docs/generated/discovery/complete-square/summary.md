@@ -6,7 +6,7 @@
 - targetExpression: `(x + 1) * (x + 5)`
 - oracleStatus: `UNAVAILABLE`
 - promotionEligible: `true`
-- nodeCount: 13
+- nodeCount: 12
 - edgeCount: 32
 - bridgeRulesUsed: `complete_square_bridge`, `ast_square_difference_factor`
 - learnedMacros: `macro_3bbfed5b`

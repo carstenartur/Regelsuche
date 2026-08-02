@@ -48,13 +48,13 @@ Neither competitor receives the reference simplest form, so the parity manifest 
 
 Both competitors are scored by exactly one judge: Regelsuche's `ExpressionCanonicalizer`. A competitor reaches a case when the canonical hash of its produced expression equals the canonical hash of the reference form. Using the same judge for both sides prevents surface-syntax differences — for example SymPy's `**` versus Regelsuche's `^` — from being scored as mathematical differences. The judge is a normalizer, not an oracle: it never tells a competitor what to produce.
 
-Recorded case assumptions, such as the nonzero denominator of `(x^2 - 1) / (x - 1)`, are retained as evidence but are **not** injected into either competitor. This is declared as the configuration limitation `RECORDED_CASE_ASSUMPTIONS_ARE_NOT_INJECTED` and is tracked as a coverage gap.
+Recorded case assumptions, such as the nonzero denominator of `(x^2 - 1) / (x - 1)`, are retained as evidence but are **not** injected into either competitor. This is declared as the configuration limitation `RECORDED_CASE_ASSUMPTIONS_ARE_NOT_INJECTED` and is tracked as a coverage gap. A competitor that cancels a symbolic factor must therefore derive the side condition itself: `ast_cancel_division_factor` emits `x - 1 != 0` as a step assumption instead of consuming the recorded one.
 
-Reaching a simplest form is neither discovery nor proof. The track carries the limitations `SIX_SMALL_ALGEBRAIC_CASES_ONLY`, `NO_RUNTIME_OR_SCALABILITY_CLAIM`, `SHARED_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER` and `REACHING_A_SIMPLEST_FORM_IS_NOT_DISCOVERY_OR_PROOF`.
+Reaching a simplest form is neither discovery nor proof. The track carries the limitations `SEVEN_SMALL_ALGEBRAIC_CASES_ONLY`, `NO_RUNTIME_OR_SCALABILITY_CLAIM`, `SHARED_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER` and `REACHING_A_SIMPLEST_FORM_IS_NOT_DISCOVERY_OR_PROOF`.
 
 #### Retained outcome
 
-The current retained outcome is a loss for Regelsuche and is published unchanged:
+The current retained outcome is still a loss for Regelsuche and is published unchanged:
 
 | Case | Family | Regelsuche untargeted best-first | SymPy `simplify` |
 |---|---|---|---|
@@ -62,12 +62,26 @@ The current retained outcome is a loss for Regelsuche and is published unchanged
 | `x * 0 + y` → `y` | annihilator | reached | reached |
 | `(a + b) * (a + b)` → `(a + b) ^ 2` | power-folding | reached | reached |
 | `x + x` → `2 * x` | linear-combination | reached | reached |
-| `(2 * x + 4) / 2` → `x + 2` | rational-reduction | **not reached** | reached |
-| `(x^2 - 1) / (x - 1)` → `x + 1` | rational-cancellation | **not reached** | reached |
+| `(2 * x + 4) / 2` → `x + 2` | rational-reduction | reached | reached |
+| `(x^2 - 1) / (x - 1)` → `x + 1` | rational-cancellation | reached | reached |
+| `(x^3 - 1) / (x - 1)` → `x ^ 2 + x + 1` | polynomial-division | **not reached** | reached |
 
-Regelsuche reaches four of six reference forms, SymPy reaches six of six. The track claim `target-free-simplification-head-to-head` is therefore retained with status `NEGATIVE`.
+Regelsuche reaches six of seven reference forms, SymPy reaches seven of seven. The track claim `target-free-simplification-head-to-head` is therefore still retained with status `NEGATIVE`.
 
-This is consistent with [`limits.md`](limits.md): the rewrite inventory has no general polynomial division and does not automatically carry the nonzero assumptions that rational cancellation requires.
+#### What the first retained loss diagnosed
+
+The first bundle recorded `(2 * x + 4) / 2` and `(x^2 - 1) / (x - 1)` as not reached. Replaying the untargeted search showed that this was not a search-budget effect: on `(2 * x + 4) / 2` the inventory produced **no applicable rewrite at all**, and on `(x^2 - 1) / (x - 1)` only the power/product normalisation fired. Four atomic capabilities were missing, and each is now a separate rule:
+
+- `ast_distribute_division_over_sum` — `(A ± B) / C → A / C ± B / C`; introduces no side condition, because the input already divides by `C`;
+- `ast_cancel_division_factor` — `(A * B) / A → B`, retaining `A != 0` as a step assumption unless the cancelled factor is a non-zero literal;
+- `ast_fold_numeric_arithmetic` — folds a node over two integer literals, and only when a division divides exactly, so no rewrite silently introduces a rounded literal;
+- `ast_square_literal_split` — `A ^ 2 - N → A ^ 2 - M ^ 2` for `N = M * M`, which makes a literal such as `1` visible to the existing atomic factor rule.
+
+No textbook shortcut rule was added: the cancellation path is still derived step by step, and the factorisation itself remains the existing atomic `ast_square_difference_factor`.
+
+#### Why the track keeps a loss
+
+Closing a gap that a benchmark exposed must not turn the benchmark into a self-confirmation. The corpus therefore gained `(x^3 - 1) / (x - 1)`, which needs general polynomial division rather than a difference of two squares. This is consistent with [`limits.md`](limits.md): the rewrite inventory still has no general polynomial division. The track keeps producing information about a competing system instead of only about Regelsuche.
 
 ## Retaining losses instead of hiding them
 

@@ -132,6 +132,14 @@ final class ComparativeBenchmarkCatalog {
                 "(x^2 - 1) / (x - 1)",
                 "x + 1",
                 List.of("x - 1 != 0"),
+                ExpectedVerdict.TARGET_REACHED),
+            Case.create(
+                "simplify-cubic-cancellation",
+                Track.SIMPLIFICATION_COMPETITION,
+                "polynomial-division",
+                "(x^3 - 1) / (x - 1)",
+                "x ^ 2 + x + 1",
+                List.of("x - 1 != 0"),
                 ExpectedVerdict.TARGET_REACHED));
     }
 

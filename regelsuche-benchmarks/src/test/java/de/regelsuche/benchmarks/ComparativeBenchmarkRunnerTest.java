@@ -45,7 +45,7 @@ class ComparativeBenchmarkRunnerTest {
         Report first = runner.run();
         Report second = runner.run();
 
-        assertEquals(27, first.results().size());
+        assertEquals(29, first.results().size());
         assertEquals(3, first.claims().size());
         assertEquals(7, first.coverageGaps().size());
         assertTrue(first.results().stream()
@@ -103,9 +103,9 @@ class ComparativeBenchmarkRunnerTest {
             "SymPy is required for the head-to-head simplification track");
         Report report = runner(true).run();
 
-        assertEquals(6L, correctResults(report, "sympy-cas-simplifier"));
+        assertEquals(7L, correctResults(report, "sympy-cas-simplifier"));
         assertEquals(
-            4L, correctResults(report, "regelsuche-untargeted-best-first"));
+            6L, correctResults(report, "regelsuche-untargeted-best-first"));
         var claim = report.claims().stream()
             .filter(candidate ->
                 candidate.track() == Track.SIMPLIFICATION_COMPETITION)

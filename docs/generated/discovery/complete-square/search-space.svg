@@ -1,64 +1,64 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="746" viewBox="0 0 1080 746" data-generated-by="SearchSpaceGallerySvgWriter" data-scenario-id="complete-square-factorization" data-evidence="evidence.json" data-node-count="13" data-edge-count="32">
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="670" viewBox="0 0 1080 670" data-generated-by="SearchSpaceGallerySvgWriter" data-scenario-id="complete-square-factorization" data-evidence="evidence.json" data-node-count="12" data-edge-count="32">
   <rect width="100%" height="100%" fill="#f8fafc"/>
   <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#475569"/></marker></defs>
   <text x="40" y="36" font-size="16" font-weight="700">x ^ 2 + 6 * x + 5</text>
   <text x="1040" y="36" font-size="16" font-weight="700" text-anchor="end">(x + 1) * (x + 5)</text>
-  <path class="edge rule alternative" d="M 736 120 C 545 96, 545 110, 354 134" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_factor_common_left · core · core</title></path>
-<text x="491" y="119" font-size="9" fill="#475569">ast_factor_common_left<title>ast_factor_common_left</title></text>
-<path class="edge rule alternative" d="M 446 134 C 545 110, 545 96, 644 120" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_distribute_left_add · core · core</title></path>
-<text x="491" y="119" font-size="9" fill="#475569">ast_distribute_left_add<title>ast_distribute_left_add</title></text>
-<path class="edge rule alternative" d="M 446 134 C 545 110, 545 172, 644 196" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
-<text x="491" y="157" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule alternative" d="M 446 134 C 545 110, 545 172, 644 196" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_linear_offset_simplify · core · core</title></path>
-<text x="491" y="157" font-size="9" fill="#475569">ast_linear_offset_simplify<title>ast_linear_offset_simplify</title></text>
-<path class="edge rule alternative" d="M 736 348 C 690 324, 690 400, 644 424" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
-<text x="636" y="378" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule alternative" d="M 736 348 C 545 324, 545 186, 354 210" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
+  <path class="edge rule alternative" d="M 446 134 C 545 110, 545 96, 644 120" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
+<text x="491" y="119" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
+<path class="edge rule alternative" d="M 446 134 C 545 110, 545 96, 644 120" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_linear_offset_simplify · core · core</title></path>
+<text x="491" y="119" font-size="9" fill="#475569">ast_linear_offset_simplify<title>ast_linear_offset_simplify</title></text>
+<path class="edge rule alternative" d="M 736 272 C 690 248, 690 324, 644 348" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
+<text x="636" y="302" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
+<path class="edge rule alternative" d="M 736 272 C 545 248, 545 186, 354 210" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
+<text x="491" y="233" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
+<path class="edge rule alternative" d="M 736 272 C 545 248, 545 186, 354 210" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_product_to_power_two · core · core</title></path>
+<text x="491" y="233" font-size="9" fill="#475569">ast_product_to_power_two<title>ast_product_to_power_two</title></text>
+<path class="edge rule alternative" d="M 736 272 C 545 248, 545 262, 354 286" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
 <text x="491" y="271" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule alternative" d="M 736 348 C 545 324, 545 186, 354 210" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_product_to_power_two · core · core</title></path>
-<text x="491" y="271" font-size="9" fill="#475569">ast_product_to_power_two<title>ast_product_to_power_two</title></text>
 <path class="edge rule alternative" d="M 736 348 C 545 324, 545 262, 354 286" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
 <text x="491" y="309" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
+<path class="edge rule alternative" d="M 736 348 C 545 324, 545 262, 354 286" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_product_to_power_two · core · core</title></path>
+<text x="491" y="309" font-size="9" fill="#475569">ast_product_to_power_two<title>ast_product_to_power_two</title></text>
+<path class="edge rule alternative" d="M 736 424 C 545 400, 545 186, 354 210" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_product_to_power_two · core · core</title></path>
+<text x="491" y="309" font-size="9" fill="#475569">ast_product_to_power_two<title>ast_product_to_power_two</title></text>
 <path class="edge rule alternative" d="M 736 424 C 545 400, 545 262, 354 286" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
 <text x="491" y="347" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule alternative" d="M 736 424 C 545 400, 545 262, 354 286" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_product_to_power_two · core · core</title></path>
-<text x="491" y="347" font-size="9" fill="#475569">ast_product_to_power_two<title>ast_product_to_power_two</title></text>
-<path class="edge rule alternative" d="M 736 500 C 545 476, 545 186, 354 210" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_product_to_power_two · core · core</title></path>
-<text x="491" y="347" font-size="9" fill="#475569">ast_product_to_power_two<title>ast_product_to_power_two</title></text>
-<path class="edge rule alternative" d="M 736 500 C 545 476, 545 262, 354 286" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
-<text x="491" y="385" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule alternative" d="M 446 210 C 545 186, 545 324, 644 348" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_power_two_to_product · core · core</title></path>
-<text x="491" y="271" font-size="9" fill="#475569">ast_power_two_to_product<title>ast_power_two_to_product</title></text>
-<path class="edge rule alternative" d="M 446 210 C 545 186, 545 476, 644 500" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_power_two_to_product · core · core</title></path>
-<text x="491" y="347" font-size="9" fill="#475569">ast_power_two_to_product<title>ast_power_two_to_product</title></text>
+<path class="edge rule alternative" d="M 736 424 C 545 400, 545 262, 354 286" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_fold_numeric_arithmetic · core · core</title></path>
+<text x="491" y="347" font-size="9" fill="#475569">ast_fold_numeric_arithmetic<title>ast_fold_numeric_arithmetic</title></text>
+<path class="edge rule alternative" d="M 446 210 C 545 186, 545 248, 644 272" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_power_two_to_product · core · core</title></path>
+<text x="491" y="233" font-size="9" fill="#475569">ast_power_two_to_product<title>ast_power_two_to_product</title></text>
+<path class="edge rule alternative" d="M 446 210 C 545 186, 545 400, 644 424" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_power_two_to_product · core · core</title></path>
+<text x="491" y="309" font-size="9" fill="#475569">ast_power_two_to_product<title>ast_power_two_to_product</title></text>
 <path class="edge rule alternative" d="M 446 210 C 400 186, 400 262, 354 286" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
 <text x="346" y="240" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge bridge selected" d="M 446 210 C 545 186, 545 248, 644 272" fill="none" stroke="#b45309" stroke-width="3.2" marker-end="url(#arrow)"><title>ast_square_difference_factor · core · core</title></path>
-<text x="491" y="233" font-size="9" fill="#b45309" font-weight="700">ast_square_difference_factor<title>ast_square_difference_factor</title></text>
-<path class="edge rule alternative" d="M 446 210 C 545 186, 545 248, 644 272" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>sympy.poly.factor.difference_of_squares · sympy-derived · sympy-polynomial-basic</title></path>
-<text x="491" y="233" font-size="9" fill="#475569">sympy.poly.factor.difference_…<title>sympy.poly.factor.difference_of_squares</title></text>
-<path class="edge rule alternative" d="M 446 286 C 545 262, 545 400, 644 424" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_power_two_to_product · core · core</title></path>
-<text x="491" y="347" font-size="9" fill="#475569">ast_power_two_to_product<title>ast_power_two_to_product</title></text>
-<path class="edge rule alternative" d="M 736 272 C 545 248, 545 110, 354 134" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
-<text x="491" y="195" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule selected" d="M 736 272 C 545 248, 545 110, 354 134" fill="none" stroke="#5b21b6" stroke-width="3.2" marker-end="url(#arrow)"><title>ast_linear_offset_simplify · core · core</title></path>
-<text x="491" y="195" font-size="9" fill="#5b21b6" font-weight="700">ast_linear_offset_simplify<title>ast_linear_offset_simplify</title></text>
-<path class="edge rule alternative" d="M 736 272 C 690 248, 690 172, 644 196" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
-<text x="636" y="226" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule alternative" d="M 736 272 C 835 248, 835 110, 934 134" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
-<text x="781" y="195" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule alternative" d="M 736 272 C 835 248, 835 110, 934 134" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_linear_offset_simplify · core · core</title></path>
-<text x="781" y="195" font-size="9" fill="#475569">ast_linear_offset_simplify<title>ast_linear_offset_simplify</title></text>
-<path class="edge rule alternative" d="M 1026 134 C 835 110, 835 172, 644 196" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
+<path class="edge bridge selected" d="M 446 210 C 545 186, 545 172, 644 196" fill="none" stroke="#b45309" stroke-width="3.2" marker-end="url(#arrow)"><title>ast_square_difference_factor · core · core</title></path>
+<text x="491" y="195" font-size="9" fill="#b45309" font-weight="700">ast_square_difference_factor<title>ast_square_difference_factor</title></text>
+<path class="edge rule alternative" d="M 446 210 C 545 186, 545 172, 644 196" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>sympy.poly.factor.difference_of_squares · sympy-derived · sympy-polynomial-basic</title></path>
+<text x="491" y="195" font-size="9" fill="#475569">sympy.poly.factor.difference_…<title>sympy.poly.factor.difference_of_squares</title></text>
+<path class="edge rule alternative" d="M 446 286 C 545 262, 545 324, 644 348" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_power_two_to_product · core · core</title></path>
+<text x="491" y="309" font-size="9" fill="#475569">ast_power_two_to_product<title>ast_power_two_to_product</title></text>
+<path class="edge rule alternative" d="M 446 286 C 400 262, 400 186, 354 210" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_square_literal_split · core · core</title></path>
+<text x="346" y="240" font-size="9" fill="#475569">ast_square_literal_split<title>ast_square_literal_split</title></text>
+<path class="edge rule alternative" d="M 736 196 C 545 172, 545 110, 354 134" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
+<text x="491" y="157" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
+<path class="edge rule selected" d="M 736 196 C 545 172, 545 110, 354 134" fill="none" stroke="#5b21b6" stroke-width="3.2" marker-end="url(#arrow)"><title>ast_linear_offset_simplify · core · core</title></path>
+<text x="491" y="157" font-size="9" fill="#5b21b6" font-weight="700">ast_linear_offset_simplify<title>ast_linear_offset_simplify</title></text>
+<path class="edge rule alternative" d="M 736 196 C 690 172, 690 96, 644 120" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
+<text x="636" y="150" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
+<path class="edge rule alternative" d="M 736 196 C 835 172, 835 110, 934 134" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
 <text x="781" y="157" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
-<path class="edge rule alternative" d="M 1026 134 C 835 110, 835 172, 644 196" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_linear_offset_simplify · core · core</title></path>
+<path class="edge rule alternative" d="M 736 196 C 835 172, 835 110, 934 134" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_linear_offset_simplify · core · core</title></path>
 <text x="781" y="157" font-size="9" fill="#475569">ast_linear_offset_simplify<title>ast_linear_offset_simplify</title></text>
+<path class="edge rule alternative" d="M 1026 134 C 835 110, 835 96, 644 120" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_canonical_normalize · core · core</title></path>
+<text x="781" y="119" font-size="9" fill="#475569">ast_canonical_normalize<title>ast_canonical_normalize</title></text>
+<path class="edge rule alternative" d="M 1026 134 C 835 110, 835 96, 644 120" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_linear_offset_simplify · core · core</title></path>
+<text x="781" y="119" font-size="9" fill="#475569">ast_linear_offset_simplify<title>ast_linear_offset_simplify</title></text>
 <path class="edge bridge alternative" d="M 446 362 C 400 338, 400 186, 354 210" fill="none" stroke="#d97706" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>complete_square_bridge · operator · operator-derived</title></path>
 <text x="346" y="278" font-size="9" fill="#d97706">complete_square_bridge<title>complete_square_bridge</title></text>
 <path class="edge bridge alternative" d="M 446 362 C 400 338, 400 262, 354 286" fill="none" stroke="#d97706" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>complete_square_bridge · operator · operator-derived</title></path>
 <text x="346" y="316" font-size="9" fill="#d97706">complete_square_bridge<title>complete_square_bridge</title></text>
-<path class="edge rule alternative" d="M 446 362 C 545 338, 545 552, 644 576" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_factor_common_right · core · core</title></path>
-<text x="491" y="461" font-size="9" fill="#475569">ast_factor_common_right<title>ast_factor_common_right</title></text>
+<path class="edge rule alternative" d="M 446 362 C 545 338, 545 476, 644 500" fill="none" stroke="#475569" stroke-width="1.8" marker-end="url(#arrow)" stroke-opacity="0.7"><title>ast_factor_common_right · core · core</title></path>
+<text x="491" y="423" font-size="9" fill="#475569">ast_factor_common_right<title>ast_factor_common_right</title></text>
 <path class="edge macro alternative" d="M 156 88 C 255 64, 255 78, 354 102" fill="none" stroke="#7c3aed" stroke-width="2.8" marker-end="url(#arrow)" stroke-dasharray="8 5"><title>macro_3bbfed5b · macro · core</title></path>
 <text x="201" y="87" font-size="9" fill="#7c3aed">macro_3bbfed5b<title>macro_3bbfed5b</title></text>
 <path class="edge bridge selected" d="M 156 120 C 255 96, 255 186, 354 210" fill="none" stroke="#b45309" stroke-width="3.2" marker-end="url(#arrow)"><title>complete_square_bridge · operator · operator-derived</title></path>
@@ -73,16 +73,15 @@
 <g class="node state selected"><rect id="(x+3)^2-2^2" x="340" y="186" width="120" height="48" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2.8"/><title>(x + 3) ^ 2 - 2 ^ 2</title><text x="348" y="208" font-size="10">(x + 3) ^ 2 - 2 ^ 2</text><text x="348" y="223" font-size="9" fill="#64748b">selected</text></g>
 <g class="node state alternative"><rect id="(x+3)^2-4" x="340" y="262" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>(x + 3) ^ 2 - 4</title><text x="348" y="284" font-size="10">(x + 3) ^ 2 - 4</text><text x="348" y="299" font-size="9" fill="#64748b">alternative</text></g>
 <g class="node state alternative"><rect id="x*x+6*x+5" x="340" y="338" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>x * x + 6 * x + 5</title><text x="348" y="360" font-size="10">x * x + 6 * x + 5</text><text x="348" y="375" font-size="9" fill="#64748b">alternative</text></g>
-<g class="node state alternative"><rect id="(x+1)*(x+3)+(x+1)*2" x="630" y="96" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>(x + 1) * (x + 3) + (x + 1) * 2</title><text x="638" y="118" font-size="10">(x + 1) * (x + 3) + (x …</text><text x="638" y="133" font-size="9" fill="#64748b">alternative</text></g>
-<g class="node target alternative"><rect id="(x+1)*(x+5)" x="630" y="172" width="120" height="48" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2.0"/><title>(x + 1) * (x + 5)</title><text x="638" y="194" font-size="10">(x + 1) * (x + 5)</text><text x="638" y="209" font-size="9" fill="#64748b">target</text></g>
-<g class="node target selected"><rect id="(x+3-2)*(x+3+2)" x="630" y="248" width="120" height="48" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2.8"/><title>(x + 3 - 2) * (x + 3 + 2)</title><text x="638" y="270" font-size="10">(x + 3 - 2) * (x + 3 + …</text><text x="638" y="285" font-size="9" fill="#64748b">target · selected</text></g>
-<g class="node state alternative"><rect id="(x+3)*(x+3)-2^2" x="630" y="324" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>(x + 3) * (x + 3) - 2 ^ 2</title><text x="638" y="346" font-size="10">(x + 3) * (x + 3) - 2 ^…</text><text x="638" y="361" font-size="9" fill="#64748b">alternative</text></g>
-<g class="node state alternative"><rect id="(x+3)*(x+3)-4" x="630" y="400" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>(x + 3) * (x + 3) - 4</title><text x="638" y="422" font-size="10">(x + 3) * (x + 3) - 4</text><text x="638" y="437" font-size="9" fill="#64748b">alternative</text></g>
-<g class="node state alternative"><rect id="(x+3)^2-2*2" x="630" y="476" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>(x + 3) ^ 2 - 2 * 2</title><text x="638" y="498" font-size="10">(x + 3) ^ 2 - 2 * 2</text><text x="638" y="513" font-size="9" fill="#64748b">alternative</text></g>
-<g class="node state alternative dead-end"><rect id="(x+6)*x+5" x="630" y="552" width="120" height="48" rx="12" fill="#f8fafc" stroke="#ef4444" stroke-width="2.0"/><title>(x + 6) * x + 5</title><text x="638" y="574" font-size="10">(x + 6) * x + 5</text><text x="638" y="589" font-size="9" fill="#64748b">dead-end</text></g>
+<g class="node target alternative"><rect id="(x+1)*(x+5)" x="630" y="96" width="120" height="48" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2.0"/><title>(x + 1) * (x + 5)</title><text x="638" y="118" font-size="10">(x + 1) * (x + 5)</text><text x="638" y="133" font-size="9" fill="#64748b">target</text></g>
+<g class="node target selected"><rect id="(x+3-2)*(x+3+2)" x="630" y="172" width="120" height="48" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2.8"/><title>(x + 3 - 2) * (x + 3 + 2)</title><text x="638" y="194" font-size="10">(x + 3 - 2) * (x + 3 + …</text><text x="638" y="209" font-size="9" fill="#64748b">target · selected</text></g>
+<g class="node state alternative"><rect id="(x+3)*(x+3)-2^2" x="630" y="248" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>(x + 3) * (x + 3) - 2 ^ 2</title><text x="638" y="270" font-size="10">(x + 3) * (x + 3) - 2 ^…</text><text x="638" y="285" font-size="9" fill="#64748b">alternative</text></g>
+<g class="node state alternative"><rect id="(x+3)*(x+3)-4" x="630" y="324" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>(x + 3) * (x + 3) - 4</title><text x="638" y="346" font-size="10">(x + 3) * (x + 3) - 4</text><text x="638" y="361" font-size="9" fill="#64748b">alternative</text></g>
+<g class="node state alternative"><rect id="(x+3)^2-2*2" x="630" y="400" width="120" height="48" rx="12" fill="#f8fafc" stroke="#334155" stroke-width="2.0"/><title>(x + 3) ^ 2 - 2 * 2</title><text x="638" y="422" font-size="10">(x + 3) ^ 2 - 2 * 2</text><text x="638" y="437" font-size="9" fill="#64748b">alternative</text></g>
+<g class="node state alternative dead-end"><rect id="(x+6)*x+5" x="630" y="476" width="120" height="48" rx="12" fill="#f8fafc" stroke="#ef4444" stroke-width="2.0"/><title>(x + 6) * x + 5</title><text x="638" y="498" font-size="10">(x + 6) * x + 5</text><text x="638" y="513" font-size="9" fill="#64748b">dead-end</text></g>
 <g class="node target alternative"><rect id="(x+3-2)*(x+5)" x="920" y="110" width="120" height="48" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2.0"/><title>(x + 3 - 2) * (x + 5)</title><text x="928" y="132" font-size="10">(x + 3 - 2) * (x + 5)</text><text x="928" y="147" font-size="9" fill="#64748b">target</text></g>
 
-  <text x="40" y="676" font-size="12" fill="#475569">Selected path: violet · Alternatives: slate · Bridge edges: amber · Macro shortcut: purple dashed · Dead ends: red border</text>
-  <text x="40" y="698" font-size="12" fill="#475569">Visible: 13/13 nodes · 32/32 edges</text>
+  <text x="40" y="600" font-size="12" fill="#475569">Selected path: violet · Alternatives: slate · Bridge edges: amber · Macro shortcut: purple dashed · Dead ends: red border</text>
+  <text x="40" y="622" font-size="12" fill="#475569">Visible: 12/12 nodes · 32/32 edges</text>
   
 </svg>

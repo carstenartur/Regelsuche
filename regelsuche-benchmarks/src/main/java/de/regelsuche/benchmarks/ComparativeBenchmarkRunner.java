@@ -281,7 +281,7 @@ public final class ComparativeBenchmarkRunner {
             },
             hashes(results),
             List.of(
-                "SIX_SMALL_ALGEBRAIC_CASES_ONLY",
+                "SEVEN_SMALL_ALGEBRAIC_CASES_ONLY",
                 "NO_RUNTIME_OR_SCALABILITY_CLAIM",
                 "SHARED_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER",
                 "REACHING_A_SIMPLEST_FORM_IS_NOT_DISCOVERY_OR_PROOF"));
