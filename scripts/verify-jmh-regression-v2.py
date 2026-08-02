@@ -42,10 +42,18 @@ def integer(value: Any, label: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--result", required=True, type=Path)
+    parser.add_argument("--result", "--results", dest="result", required=True, type=Path)
     parser.add_argument("--policy", required=True, type=Path)
-    parser.add_argument("--json-output", required=True, type=Path)
-    parser.add_argument("--markdown-output", required=True, type=Path)
+    parser.add_argument(
+        "--json-output", "--report-json", dest="json_output", required=True, type=Path
+    )
+    parser.add_argument(
+        "--markdown-output",
+        "--report-md",
+        dest="markdown_output",
+        required=True,
+        type=Path,
+    )
     args = parser.parse_args()
 
     policy = load_json(args.policy, "policy")
