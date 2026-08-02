@@ -12,6 +12,10 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+# The verifier is imported from the checkout. Its characterization must not
+# create scripts/__pycache__ and invalidate later clean-worktree evidence.
+sys.dont_write_bytecode = True
+
 
 def write(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
