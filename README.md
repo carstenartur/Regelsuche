@@ -154,7 +154,7 @@ und [Dependency-Regeln](docs/dependency-rules.md) dokumentiert.
 | Standarddemo | Lokale Workbench ohne externe Infrastruktur | `docker run` oder `./gradlew run` |
 | Full Mode | PostgreSQL, Hibernate ORM/Search und optionale Neo4j-Provenienz | `docker compose up --build` |
 | Proof-Image | Z3 und cvc5; Lean optional | `Dockerfile.proof` |
-| Forschungsreproduktion | Evidence- und Containerverträge aus dem Checkout | `./gradlew ciCheck` und spezialisierte Reproduktionstasks |
+| Forschungsreproduktion | Evidence- und Containerverträge aus dem Checkout | `./gradlew --no-configuration-cache ciCheck` und spezialisierte Reproduktionstasks |
 
 Die lokale Demo verwendet HTTP ohne Anmeldung. Für externe Erreichbarkeit sind
 authentifiziertes TLS, eigene Zugangsdaten und eine geeignete Betriebsumgebung
@@ -165,10 +165,10 @@ erforderlich.
 Die Test- und Evidence-Logik liegt im Repository, nicht in GitHub Actions:
 
 ```bash
-./gradlew test       # alle Gradle-Testschichten
-./gradlew check      # Tests plus checkout-lokale Vertragsprüfung
-./gradlew fullCheck  # zusätzlich Docker-, Solver- und Reproduktionsverträge
-./gradlew ciCheck    # derselbe autoritative Lebenszyklus wie in CI
+./gradlew test                              # alle Gradle-Testschichten
+./gradlew check                             # Tests plus checkout-lokale Vertragsprüfung
+./gradlew fullCheck                         # zusätzlich Docker-, Solver- und Reproduktionsverträge
+./gradlew --no-configuration-cache ciCheck  # exakter autoritativer CI-Lebenszyklus
 ```
 
 GitHub Actions provisioniert nur die Umgebung und veröffentlicht bereits lokal
