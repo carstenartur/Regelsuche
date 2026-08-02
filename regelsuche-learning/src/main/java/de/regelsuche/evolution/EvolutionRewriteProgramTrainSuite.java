@@ -202,6 +202,31 @@ public record EvolutionRewriteProgramTrainSuite(
                 maxWorkUnits);
         }
 
+        /** Maximum retained primitive path depth in documentation terminology. */
+        public int maximumDepth() {
+            return maxPrimitiveSteps;
+        }
+
+        /** Maximum explored expressions/states in documentation terminology. */
+        public int maximumVisitedExpressions() {
+            return maxExploredStates;
+        }
+
+        /** Maximum candidates emitted for one explored state. */
+        public int maximumCandidatesPerState() {
+            return maxCandidatesPerState;
+        }
+
+        /** Maximum expanding steps retained by the matched-work policy. */
+        public int maximumExpandingSteps() {
+            return maxExpandingSteps;
+        }
+
+        /** Complete primitive and internal work allowance. */
+        public long totalPrimitiveWorkUnits() {
+            return maxWorkUnits;
+        }
+
         static PrimitiveWorkBudget derivedFrom(SearchHeuristic heuristic) {
             Objects.requireNonNull(heuristic, "heuristic");
             int primitiveSteps = Math.max(1, heuristic.maxDepth());
