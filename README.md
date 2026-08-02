@@ -128,6 +128,9 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
   alle Erweiterungsformen.
 - [Plugins](plugins.md) und [Plugin-API](plugin-api.md) — externe Java-JARs,
   Registries, Paketierung und Reload.
+- [Plugin-Veröffentlichung, Kompatibilität und Governance](plugin-publishing-governance.md) —
+  reproduzierbarer Publishing-Ablauf, Versionierung, Kuration, Security,
+  Incident Response und Revocation.
 - [Regeldateien](rule-files.md) — `.regelsuche`-/`.rules`-DSL, Profile,
   Import/Export und Debugging.
 - [Knowledge Packs](knowledge-packs.md) — kuratierte Regelbestände mit
