@@ -12,33 +12,19 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Symmetric assumption channel of the target-free simplification track.
+ * Canonical assumption evidence for the target-free simplification track.
  *
- * <p>Before this contract existed, a case such as {@code (x^2 - 1) / (x - 1)}
- * recorded the side condition {@code x - 1 != 0} as evidence while no
- * competitor ever received it, and no competitor's own side conditions were
- * ever checked. That asymmetry was tracked as the configuration limitation
- * {@code RECORDED_CASE_ASSUMPTIONS_ARE_NOT_INJECTED}.</p>
+ * <p>The contract deliberately separates declarations from execution. Internal
+ * Regelsuche search does not receive assumptions as guidance; instead every
+ * side condition emitted by the selected path must be present in the case
+ * declarations. The external SymPy adapter receives symbol-scoped declarations
+ * it can represent and reports composite declarations as an explicit
+ * limitation. The pinned reference form is never part of this channel.</p>
  *
- * <p>The contract closes it in both directions and identically for every
- * competitor:</p>
- * <ul>
- *   <li><b>Injection.</b> The declared assumptions of a case are handed to
- *       every configured competitor before it runs. No competitor receives
- *       more or fewer declarations than another, and no declaration reveals
- *       anything about the reference simplest form.</li>
- *   <li><b>Discharge.</b> A competitor that relies on a side condition only
- *       reaches the reference form when that condition is entailed by the
- *       declared assumptions. A cancellation performed on an undeclared
- *       side condition is recorded as {@code ASSUMPTION_NOT_DISCHARGED}
- *       instead of being silently scored as a success.</li>
- * </ul>
- *
- * <p>Declarations use a small closed vocabulary so that both an internal
- * rewrite engine and an external CAS can consume the same text. Anything
- * outside the vocabulary stays a declaration and is still injected, but it is
- * classified as {@link Kind#OTHER} and cannot be mapped onto a symbol-scoped
- * assumption of an external system.</p>
+ * <p>This is not yet an independent proof that every external output is valid
+ * under exactly the declared assumptions. That missing validator remains a
+ * published coverage gap. The contract does ensure that internal rewrite paths
+ * cannot silently rely on undeclared side conditions.</p>
  */
 final class SimplificationAssumptionContract {
     static final String CONTRACT_ID = "target-free-simplification-assumptions/v1";
@@ -85,7 +71,7 @@ final class SimplificationAssumptionContract {
         return declarations;
     }
 
-    /** @return the canonical declaration texts handed to every competitor. */
+    /** @return the canonical declaration texts associated with the case. */
     List<String> declaredAssumptions() {
         return declarations.stream().map(Declaration::canonicalText).toList();
     }
@@ -95,7 +81,7 @@ final class SimplificationAssumptionContract {
     }
 
     /**
-     * Side conditions a competitor relied on but that the case never declared.
+     * Side conditions an internal competitor relied on but the case never declared.
      *
      * @param reliedOnAssumptions side conditions the competitor emitted
      * @return the sorted, canonical undischarged conditions, never {@code null}
@@ -141,7 +127,7 @@ final class SimplificationAssumptionContract {
 
         /**
          * @return {@code true} when the subject is a bare symbol, which is the
-         *     only shape an external CAS can bind as a symbol assumption
+         *     only shape the current external adapter can bind as a symbol assumption
          */
         boolean symbolScoped() {
             return kind != Kind.OTHER
@@ -153,7 +139,7 @@ final class SimplificationAssumptionContract {
         }
     }
 
-    /** Closed assumption vocabulary shared by all configured competitors. */
+    /** Closed assumption vocabulary shared by benchmark evidence. */
     enum Kind {
         NON_ZERO(" != 0", "nonzero"),
         NON_NEGATIVE(" >= 0", "nonnegative"),
