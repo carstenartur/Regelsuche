@@ -1,110 +1,167 @@
-# Release Readiness für Regelsuche 0.2
+# Release Readiness und Evidence Profiles
 
-Regelsuche verwendet getrennte, versionierte Evidence Profiles. Ein Profil autorisiert genau den Claim, den es beschreibt. Ein erfolgreiches niedrigeres Profil darf keinen stärkeren Claim freigeben.
+Regelsuche verwendet getrennte, versionierte Evidence Profiles. Ein Profil
+entscheidet ausschließlich über den Claim, für den es definiert wurde. Ein
+erfolgreiches Profil darf keine stärkere, unabhängige Aussage freigeben.
 
-Die verwendeten Begriffe sind im zentralen [Glossar](glossary.md) definiert.
+Die öffentliche Capability-Matrix verwendet für einen vollständig erfüllten,
+reproduzierten internen Claim den Status `QUALIFIED`. Innerhalb eines einzelnen
+Release-Readiness-Reports kann das zugehörige Profil als `READY` erscheinen.
+Diese Begriffe beschreiben unterschiedliche Ebenen und sind keine Synonyme für
+externe mathematische Neuheit oder produktive Betriebsreife.
 
 ## Profile
 
-| Profil | Claim | Autorisiert den Autonomie-Claim? |
-|---|---|---:|
-| `SEARCH_REPRODUCIBILITY` | reproduzierbare targetfreie Suche unter gepinnten Inputs | nein |
+| Profil | Autorisierte Aussage | Autorisiert externe Neuheit? |
+| --- | --- | ---: |
+| `SEARCH_REPRODUCIBILITY` | reproduzierbare targetfreie Suche unter gebundenen Inputs | nein |
 | `HIDDEN_RULE_REDISCOVERY` | leak-freie Wiederentdeckung zurückgehaltener bekannter Regeln | nein |
-| `OPEN_TARGET_DISCOVERY` | targetfreie Candidate Formation mit Validation, Novelty, Proof und Lifecycle | nein |
-| `AUTONOMOUS_CAMPAIGN` | autonome Generation, unabhängige Qualifikation und Retention mathematischer Kandidaten | ja |
-| `EXTERNAL_NOVELTY_REVIEW` | extern geprüfte mathematische Novelty | nein |
+| `OPEN_TARGET_DISCOVERY` | targetfreie Candidate Formation mit getrennten Qualification-Stufen | nein |
+| `AUTONOMOUS_CAMPAIGN` | autonome Generation, unabhängige interne Qualifikation und Retention | nein |
+| `EXTERNAL_NOVELTY_REVIEW` | externe Neuheitsentscheidung innerhalb eines dokumentierten Suchumfangs | nur dieses Profil |
 
-Nur `AUTONOMOUS_CAMPAIGN` kann den Release-0.2-Autonomie-Claim autorisieren. Externe Novelty, Promotion und Public Evidence bleiben separate Entscheidungen.
+Promotion, Public Evidence, formal bestätigter Proof und unabhängig bewertete
+Interessantheit besitzen eigene Verträge.
 
-## Referenzläufe
+## Autoritative Ausführung
 
-Der Campaign-only-Diagnoselauf startet drei reale Production Campaigns mit unterschiedlichen Parallelitätsgraden und bleibt für nicht bereitgestellte Qualification Evidence fail-closed:
+### Diagnostischer Campaign-Lauf
 
 ```bash
 ./gradlew :regelsuche-release:runReleaseReadiness
 ```
 
-Der vollständige qualifizierte Referenzlauf erzeugt zusätzlich den leak-freien Hidden-Rule-Bericht und qualifiziert exakt den von der Production Campaign retained Kandidaten:
+Dieser Lauf erzeugt die Campaign- und Profilanalyse. Fehlt erforderliche
+Qualification Evidence, ist ein `BLOCKED`-Report das korrekte Ergebnis.
+
+### Qualifizierter Referenzlauf
 
 ```bash
 ./gradlew :regelsuche-release:runQualifiedReleaseReadinessWithHiddenRuleEvidence
 ```
 
-Die qualifizierte Ausgabe liegt unter:
+Der Lauf kombiniert:
+
+- die vollständige targetfreie Production Campaign;
+- leak-freie Hidden-Rule-Evidence;
+- die unabhängige Qualification des exakt retained Kandidaten;
+- gepaarte Held-out-Utility unter identischen Budgets;
+- mehrere deterministische Ausführungen.
+
+Ausgabe:
 
 ```text
 regelsuche-release/build/reports/release-readiness-qualified/
 ```
 
-Der strikte Autonomie-Gate-Befehl lautet:
+### Striktes Autonomie-Gate
 
 ```bash
 ./gradlew :regelsuche-release:verifyAutonomousCampaignRelease
 ```
 
-Er schlägt fehl, wenn `AUTONOMOUS_CAMPAIGN` nicht `READY` ist. Ein `BLOCKED`-Report des normalen Diagnoselaufs ist dagegen ein gültiges fail-closed Ergebnis.
+Das Gate schlägt fehl, wenn das Profil `AUTONOMOUS_CAMPAIGN` nicht `READY` ist.
+Es verändert keine Candidate-, Corpus- oder Threshold-Evidence.
+
+### Repositoryweiter Vertrag
+
+Release Readiness ist Teil des checkout-eigenen Verifikationssystems. Der
+vollständige CI-Aufruf lautet:
+
+```bash
+./gradlew --no-configuration-cache ciCheck
+```
+
+Es gibt keinen separaten fachlichen GitHub-Workflow für Release Readiness.
+GitHub Actions provisioniert die Umgebung, führt den Checkout-Vertrag aus und
+veröffentlicht dessen Artefakte.
 
 ## Gebundene Production-Campaign-Evidence
 
-Der Campaign-Adapter übernimmt ausschließlich Fakten aus der vollständigen Production Campaign:
+Der Release-Adapter darf ausschließlich retained Fakten übernehmen, darunter:
 
-- ein versionierter targetfreier Research Brief;
-- zwei Seed-Familien und zwölf immutable Observations;
+- versionierter targetfreier Research Brief;
+- Seed-Familien und immutable Observations;
 - Aggregate Mining mit exakter Kandidaten-Lineage;
-- ein expliziter Zero-output-Reject;
-- frische positive und negative Development-Holdouts;
+- Nullausgaben und Rejects;
+- positive und negative Development-Holdouts;
 - mehrere Counterexample-Strategien;
 - Projekt-Novelty;
-- symbolische Proof-Evidence;
+- Proof-Obligationen und vorhandene Proof-Evidence;
 - konservativer Lifecycle-Handoff;
 - vollständige Budgets, Feedback und Campaign-Manifest;
-- drei reale Clean Runs mit identischen kanonischen Outputs.
+- reproduzierte kanonische Outputs.
 
-Nicht vorhandene oder nicht gebundene Evidence wird als `false`, `0`, `NOT_EVALUATED` oder über einen versionierten `NOT_PROVIDED`-Hash retained. Kein Adapter setzt eine Release-Anforderung aufgrund eines geschlossenen Issues oder einer Dokumentationsbehauptung auf bestanden.
+Fehlende oder nicht gebundene Evidence bleibt `false`, `0`, `BLOCKED`,
+`NOT_EVALUATED` oder erhält eine explizite `NOT_PROVIDED`-Identität. Ein
+geschlossenes Issue oder eine Dokumentationsbehauptung kann keine
+Release-Anforderung erfüllen.
 
 ## Unabhängige Kandidatenqualifikation
 
-Issue #359 ergänzt für denselben retained Kandidaten genau die drei zuvor fehlenden Release-Achsen.
+Die Qualification bezieht sich exakt auf den von der Production Campaign
+retained Kandidaten. Ein nachträglicher Ersatzkandidat ist nicht zulässig.
 
-### Vollständig zurückgehaltener Strukturcluster
+### Zurückgehaltener Strukturcluster
 
-Die Qualification Suite verwendet den vorab benannten Cluster:
+Die Referenzqualifikation verwendet einen vorab gebundenen Cluster mit
+zusammengesetzten Faktoren, die weder in Candidate Formation noch in den
+Development-Holdouts vorkommen. Ein Split-Audit vergleicht unter anderem:
 
-```text
-composite-common-factor-gap-two/v1
-```
+- Fallidentitäten;
+- kanonische Werte;
+- Exact- und Alpha-Strukturen;
+- Inputs und Targets;
+- Formation- und Development-Oberflächen.
 
-Die zwölf positiven Fälle verwenden zusammengesetzte Faktoren, die weder in der Candidate Formation noch in den Development-Holdouts vorkommen. Der Split-Audit vergleicht exakte kanonische Werte und Alpha-Strukturen gegen sämtliche Upstream-Ausdrücke.
+Mathematische Äquivalenz von Input und erwartetem Target innerhalb desselben
+positiven Falls ist die Aufgabe des Falls und keine Split-Kollision. Kollisionen
+zwischen verschiedenen Fällen oder mit früheren Stufen bleiben blockierend.
 
-Input und erwartetes Target desselben positiven Falls dürfen mathematisch äquivalent sein; das ist die beabsichtigte Aufgabe des Falls. Kollisionen zwischen verschiedenen Qualification-Fällen oder mit Formation beziehungsweise Development bleiben blockierend.
+### Ausgeglichene Qualification Suite
 
-### Ausgeglichene 12/12-Suite
+Die retained Referenzsuite enthält:
 
-Die versionierte Suite enthält:
+- zwölf positive Fälle;
+- zwölf negative Fälle;
+- vollständige mandatory Ausführung;
+- null refuting Holdouts;
+- null surviving Counterexamples;
+- gebundene Split-, Evaluation- und Lineage-Hashes.
 
-- zwölf positive Fälle mit strukturell unterschiedlichen zusammengesetzten Faktoren;
-- zwölf negative Fälle mit falschem Abstand, abweichendem Koeffizienten, Subtraktion oder nicht identischen Faktoren;
-- vollständige Ausführung ohne mandatory skips;
-- null refuting holdouts;
-- null surviving counterexamples;
-- retained Split-, Evaluation- und Lineage-Hashes.
+Die Zahlen beschreiben diese konkrete Suite und dürfen nicht als allgemeine
+Fehlerrate interpretiert werden.
 
 ### Paired Held-out Utility
 
-Jeder positive Fall wird unter identischen Budgets zweimal gesucht:
+Jeder positive Fall wird unter identischen Budgets zweimal ausgeführt:
 
-1. mit dem unveränderten Baseline-Inventar;
+1. mit dem eingefrorenen Baseline-Inventar;
 2. mit genau dem retained, dynamisch kompilierten Kandidaten.
 
-Material Gain bedeutet mindestens einen neu gelösten Fall, einen kürzeren Pfad oder weniger erkundete Zustände. Jede Verschlechterung bei Erreichbarkeit, Pfadlänge oder erkundeten Zuständen wird als Correctness beziehungsweise Utility Regression sichtbar und blockiert das Gate.
+Material Gain bedeutet innerhalb dieses Vertrags mindestens eines von:
 
-### Reproduzierbarkeit
+- ein zuvor nicht erreichter Fall wird erreicht;
+- der retained Pfad wird kürzer;
+- es werden weniger Zustände erkundet.
 
-Der Release Runner führt die Production Campaign und die Kandidatenqualifikation mit Parallelitätsgraden 1, 2 und 4 aus. Qualification Evidence und Run-Hash müssen in allen drei Läufen identisch sein. Zusätzlich vergleicht CI den vollständigen Gradle- und Docker-Output byteweise.
+Regressionen bei Erreichbarkeit, Pfadlänge oder erkundeten Zuständen bleiben
+sichtbar und blockieren das Gate. Laufzeit allein autorisiert keine Utility-
+Aussage.
+
+## Reproduzierbarkeit
+
+Der qualifizierte Runner führt Campaign und Qualification mit mehreren
+Parallelitätsgraden aus. Kanonische Qualification Evidence und Run-Hash müssen
+identisch bleiben.
+
+Zusätzlich vergleicht der Checkout-Vertrag Gradle- und Runtime-Image-Ausgaben
+byteweise, soweit der jeweilige Vertrag Byteidentität fordert. Temporäre Pfade,
+Wandzeit und Plattformadressen gehören nicht in kanonische Artefakte.
 
 ## Artefakte
 
-Der qualifizierte Lauf erzeugt:
+Ein qualifizierter Lauf erzeugt unter anderem:
 
 ```text
 profiles.json
@@ -122,17 +179,13 @@ qualification/
   candidate-qualification-run.json
 ```
 
-Alle Qualification-Artefakte sind über SHA-256-Hashes mit Campaign Manifest, Research Brief, Inventar, Modell, Mining Evidence, exakter Observation Lineage und dem finalen Release Run verbunden.
+Die Qualification-Artefakte sind über SHA-256-Wurzeln mit Campaign Manifest,
+Research Brief, Inventar, Modell, Mining Evidence, Observation Lineage und dem
+finalen Release Run verbunden.
 
-Die JSON-Verträge liegen unter `docs/schemas/`:
-
-- [`regelsuche.autonomous-candidate-qualification-suite/v1`](schemas/regelsuche-autonomous-candidate-qualification-suite-v1.schema.json)
-- [`regelsuche.autonomous-candidate-qualification-split/v1`](schemas/regelsuche-autonomous-candidate-qualification-split-v1.schema.json)
-- [`regelsuche.open-target-conjecture-evaluation/v1`](schemas/regelsuche-open-target-conjecture-evaluation-v1.schema.json)
-- [`regelsuche.autonomous-candidate-qualified-utility/v1`](schemas/regelsuche-autonomous-candidate-qualified-utility-v1.schema.json)
-- [`regelsuche.autonomous-candidate-qualification/v1`](schemas/regelsuche-autonomous-candidate-qualification-v1.schema.json)
-- [`regelsuche.autonomous-candidate-qualification-run/v1`](schemas/regelsuche-autonomous-candidate-qualification-run-v1.schema.json)
-- [`regelsuche.release-readiness-run/v1`](schemas/regelsuche-release-readiness-run-v1.schema.json)
+Die maschinenlesbaren Verträge sind im
+[Schema-Katalog](schema-catalog.md) gruppiert; die vollständigen Dateien liegen
+unter [`docs/schemas/`](schemas/).
 
 ## Docker-Reproduktion
 
@@ -154,11 +207,14 @@ docker run --rm \
   --require-ready
 ```
 
-Das Runtime-Image enthält ausschließlich die Java-21-`installDist`-Ausgabe. Der Repository-Quellbaum und Gradle sind nicht Bestandteil des Runtime-Images.
+Das Runtime-Image enthält die Java-21-Distribution, nicht den Repository-
+Quellbaum und nicht Gradle. Die Ausgabe wird gegen den checkout-lokalen Lauf
+verglichen.
 
-## Aktuelle Matrix
+## Aktuelle interne Matrix
 
-Mit gebundener Hidden-Rule- und Qualification Evidence gilt:
+Für die gebundene Referenz-Evidence gilt innerhalb des Release-Readiness-
+Reports:
 
 - `SEARCH_REPRODUCIBILITY`: `READY`
 - `HIDDEN_RULE_REDISCOVERY`: `READY`
@@ -166,19 +222,39 @@ Mit gebundener Hidden-Rule- und Qualification Evidence gilt:
 - `AUTONOMOUS_CAMPAIGN`: `READY`
 - `EXTERNAL_NOVELTY_REVIEW`: `BLOCKED`
 
-Damit ist der interne, algebraische Autonomie-Claim technisch autorisiert. Das ist keine Behauptung weltweit neuer Mathematik. Externe Novelty und Public Evidence benötigen weiterhin eigenständige Review-Artefakte.
+Die generierte öffentliche Capability-Matrix bildet den internen
+Autonomie-Claim als `AUTONOMOUS_CAMPAIGN = QUALIFIED` ab.
 
-## CI-Vertrag
+Damit ist ausschließlich der eng definierte interne algebraische
+Autonomie-Claim autorisiert. Nicht autorisiert sind:
 
-Der Workflow `Release Readiness`:
+- externe mathematische Neuheit;
+- formaler Beweis des retained Produktionskandidaten, sofern nicht separat
+  bestätigt;
+- fachliche Interessantheit;
+- Promotion in einen aktiven autoritativen Bestand;
+- Public Evidence;
+- allgemeine Überlegenheit gegenüber anderen Systemen.
 
-1. erzeugt den bestehenden Hidden-Rule-Benchmarkbericht;
-2. führt drei reale Production Campaigns und drei Kandidatenqualifikationen aus;
-3. verlangt sämtliche Campaign-, Qualification- und Release-Artefakte;
-4. prüft Hidden-Rule-, Open-Target- und Autonomous-Campaign-Profile als `READY`;
-5. prüft 12/12-Ausführung, Split-Trennung, null Refutations, null Counterexamples und positive Paired Utility ohne Regression;
-6. baut `Dockerfile.release-readiness` und führt denselben qualifizierten Gate-Lauf aus;
-7. vergleicht Gradle- und Docker-Evidence byteweise;
-8. archiviert beide Evidence-Sets und Diagnosen.
+## Prüfinvarianten
 
-Promotion, Public Evidence, externe Novelty und unabhängig bewertete Interestingness bleiben außerhalb dieses Release-Gates.
+Der checkout-eigene Vertrag prüft insbesondere:
+
+1. vollständige Campaign-, Qualification- und Release-Artefakte;
+2. Profilstatus und explizite Blocker;
+3. vollständige positive und negative Qualification-Ausführung;
+4. Split-Trennung und Lineage-Bindung;
+5. null retained Refutations und Counterexamples für einen positiven Claim;
+6. gepaarte Utility ohne Regression;
+7. deterministische Mehrfachausführung;
+8. byteidentische Containerreproduktion;
+9. unveränderte Claim-Grenzen für externe Novelty, Promotion und Public
+   Evidence.
+
+## Siehe auch
+
+- [Generierte Capability-Matrix](generated/capability-status.md)
+- [Discovery- und Forschungsstand](discovery-status.md)
+- [Scientific Reproducibility](scientific-reproducibility.md)
+- [Independent Reproduction](independent-reproduction.md)
+- [Glossar](glossary.md)
