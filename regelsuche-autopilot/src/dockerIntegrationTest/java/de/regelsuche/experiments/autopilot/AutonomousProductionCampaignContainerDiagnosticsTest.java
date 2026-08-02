@@ -31,14 +31,31 @@ class AutonomousProductionCampaignContainerDiagnosticsTest {
     }
 
     @Test
-    void boundsLongDiagnostics() {
+    void boundsLongDiagnosticDetailToTheDeclaredLimit() {
         RuntimeException failure = new RuntimeException("x".repeat(400));
 
         String diagnostic = AutonomousProductionCampaignContainerTest
             .cleanupFailureSummary("stop cleanup container", failure);
+        int detailSeparator = diagnostic.indexOf("]: ");
 
-        assertTrue(diagnostic.endsWith("..."));
-        assertTrue(diagnostic.length() < 350, diagnostic);
+        assertTrue(detailSeparator >= 0, diagnostic);
+        String detail = diagnostic.substring(detailSeparator + 3);
+        assertTrue(detail.endsWith("..."));
+        assertTrue(detail.length() <= 240, detail);
+    }
+
+    @Test
+    void terminatesWhenTheCauseGraphContainsACycle() {
+        MutableCauseException first = new MutableCauseException("first");
+        MutableCauseException second = new MutableCauseException("second");
+        first.cause = second;
+        second.cause = first;
+
+        String diagnostic = AutonomousProductionCampaignContainerTest
+            .cleanupFailureSummary("stop cleanup container", first);
+
+        assertTrue(diagnostic.contains("[MutableCauseException]"));
+        assertTrue(diagnostic.endsWith("second"));
     }
 
     @Test
@@ -49,5 +66,18 @@ class AutonomousProductionCampaignContainerDiagnosticsTest {
             .cleanupFailureSummary("stop cleanup container", failure);
 
         assertTrue(diagnostic.endsWith("no diagnostic message"));
+    }
+
+    private static final class MutableCauseException extends RuntimeException {
+        private Throwable cause;
+
+        private MutableCauseException(String message) {
+            super(message, null);
+        }
+
+        @Override
+        public synchronized Throwable getCause() {
+            return cause;
+        }
     }
 }
