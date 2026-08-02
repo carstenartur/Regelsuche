@@ -11,7 +11,8 @@ import java.util.List;
  *
  * <p>The manifest answers the reviewer question "what exactly was enabled for this proof?" with a
  * hash instead of a directory listing: a profile id, the enabled packs per tier and a SHA-256 over
- * the canonical serialization of the effective rule set.
+ * the canonical serialization of the effective rule set. Pack entries retain their concrete rule
+ * ids, so moving rules between equally sized packs changes the hash.</p>
  */
 public record RuleInventoryManifest(
         String profileId,
@@ -27,7 +28,12 @@ public record RuleInventoryManifest(
     }
 
     /** A single pack contributing to (or explicitly excluded from) the effective rule set. */
-    public record PackEntry(String packId, RuleTier tier, String source, boolean enabled, int ruleCount) {
+    public record PackEntry(
+            String packId,
+            RuleTier tier,
+            String source,
+            boolean enabled,
+            List<String> ruleIds) {
         public PackEntry {
             if (packId == null || packId.isBlank()) {
                 throw new IllegalArgumentException("packId is required");
@@ -36,6 +42,17 @@ public record RuleInventoryManifest(
                 throw new IllegalArgumentException("tier is required");
             }
             source = source == null ? "" : source;
+            ruleIds = ruleIds == null ? List.of() : ruleIds.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::trim)
+                    .filter(value -> !value.isEmpty())
+                    .distinct()
+                    .sorted()
+                    .toList();
+        }
+
+        public int ruleCount() {
+            return ruleIds.size();
         }
     }
 
@@ -67,7 +84,7 @@ public record RuleInventoryManifest(
                     + ";tier=" + entry.tier().id()
                     + ";source=" + entry.source()
                     + ";enabled=" + entry.enabled()
-                    + ";rules=" + entry.ruleCount());
+                    + ";ruleIds=" + entry.ruleIds());
         }
         packLines.sort(String::compareTo);
         packLines.forEach(line -> builder.append(line).append('\n'));
