@@ -30,8 +30,8 @@ Validierungs- und Proof-Backends sowie hashgebundene Forschungsartefakte.
 
 ## Schnellstart
 
-Die Standarddemo benötigt keine Datenbank und wird ausschließlich lokal
-veröffentlicht:
+Die **Standarddemo läuft ohne externe Infrastruktur**. Sie benötigt weder eine
+Datenbank noch einen externen Solver und wird ausschließlich lokal veröffentlicht:
 
 ```bash
 docker build -t regelsuche .
@@ -42,14 +42,36 @@ Danach `http://127.0.0.1:8080/` öffnen und eine der geführten Demos starten.
 Suchgraph, gefundene Pfade, Replay, AST-Regelradar, Proof-Jobs und Exporte sind
 in derselben Workbench erreichbar.
 
+Die ungebundene Variante `docker run --rm -p 8080:8080 regelsuche` veröffentlicht
+die Demo auf allen Host-Interfaces. Sie ist für die lokale Standarddemo nicht
+empfohlen und nur in bewusst isolierten Umgebungen sinnvoll.
+
 Ohne Docker genügt mit JDK 21:
 
 ```bash
 ./gradlew run
 ```
 
-Der vollständige Einstieg einschließlich Full Mode, Sicherheitshinweisen und
+Der vollständige Einstieg einschließlich Sicherheitshinweisen und
 Fehlerdiagnose steht in [Getting Started](docs/getting-started.md).
+
+## Optional: Full Mode
+
+Docker Compose ist **nur optional** und **keine Voraussetzung** für die
+Standarddemo. Der Full Mode ergänzt PostgreSQL, Hibernate ORM/Search,
+persistente Volumes und optional Neo4j-Provenienz:
+
+```bash
+docker compose up --build
+```
+
+Das optionale Neo4j-Profil startet mit:
+
+```bash
+docker compose --profile neo4j up --build
+```
+
+Details und Produktionsgrenzen stehen in [Persistenz und Full Mode](docs/persistence.md).
 
 ## Mathematik als Spiel
 
@@ -104,6 +126,21 @@ Standardinventar sechs von sieben Referenzformen; SymPy erreicht sieben von
 sieben. Dieser Track bleibt deshalb korrekt als **negatives Vergleichsergebnis**
 retained. Die vollständige Fallmatrix, Abgrenzung und Reproduktion stehen unter
 [Comparative Discovery Benchmarks](docs/discovery-benchmarks.md).
+
+## Discovery evidence
+
+Regelsuche hält exemplarische Discovery-Läufe als generierte, nachvollziehbare
+Evidence fest. Die Beispiele belegen Suchpfade, Bridge-Bildung und
+Makrowiederverwendung; sie sind keine Behauptung externer mathematischer Neuheit.
+
+| Szenario | Evidence | Visuelle Einordnung |
+| --- | --- | --- |
+| Quadratische Ergänzung | [generiertes Evidence-Objekt](docs/generated/discovery/complete-square/evidence.json) | [Discovery Gallery](docs/demo-gallery.md) |
+| Sophie-Germain-Identität | [generiertes Evidence-Objekt](docs/generated/discovery/sophie-germain/evidence.json) | [Discovery Gallery](docs/demo-gallery.md) |
+
+Die Gallery zeigt ausschließlich aus Tests beziehungsweise Evidence-Generatoren
+abgeleitete Darstellungen. Manuell nachgezeichnete Erfolgsbilder sind kein
+Ersatz für gebundene Artefakte.
 
 <!-- capability-status:start -->
 ## Verifizierter Capability- und Claim-Status
