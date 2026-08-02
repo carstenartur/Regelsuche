@@ -133,17 +133,25 @@ retained Pfads nicht verändern.
 
 ### PostgreSQL
 
-Ein logisches Backup kann beispielsweise mit `pg_dump` erzeugt werden:
+`POSTGRES_URL` ist eine JDBC-URL und kann nicht direkt an `pg_dump` übergeben
+werden. Verwende die PostgreSQL-Clientvariablen oder eine libpq-kompatible URL:
 
 ```bash
-pg_dump --dbname="$POSTGRES_URL" \
-  --username="$POSTGRES_USER" \
+export PGHOST=127.0.0.1
+export PGPORT=5432
+export PGDATABASE=regelsuche
+export PGUSER=regelsuche
+export PGPASSWORD='replace-with-a-secret'
+
+pg_dump \
   --format=custom \
   --file=regelsuche-metadata.dump
 ```
 
-Die Wiederherstellung muss in einer getrennten Umgebung getestet werden. Ein
-vorhandener Dump allein ist noch kein nachgewiesener Restore-Prozess.
+`PGPASSWORD` sollte in einem realen Betrieb durch eine geeignete Secret- oder
+`.pgpass`-Lösung ersetzt werden. Die Wiederherstellung muss in einer getrennten
+Umgebung getestet werden. Ein vorhandener Dump allein ist noch kein
+nachgewiesener Restore-Prozess.
 
 ### Dateibasierte Artefakte
 
