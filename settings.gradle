@@ -125,6 +125,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/app-evidence-determinism.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/generated-web-assets.gradle')
     }
 }
 
