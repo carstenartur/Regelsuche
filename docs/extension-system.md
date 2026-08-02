@@ -1,125 +1,203 @@
 # Erweiterungssystem
 
-Regelsuche besitzt mehrere Erweiterungsflächen mit unterschiedlichen Aufgaben und Vertrauensgrenzen. Sie sind absichtlich **nicht** zu einem einzigen universellen Plugin-Mechanismus zusammengefasst.
+Regelsuche besitzt mehrere Erweiterungsflächen mit unterschiedlichen Aufgaben,
+Ausführungsrechten und Vertrauensgrenzen. Sie sind absichtlich nicht zu einem
+universellen Plugin-Mechanismus zusammengefasst.
 
-## Überblick
+## Auswahl auf einen Blick
 
-| Erweiterungsfläche | Typischer Autor | Ladeweg | Darf Suchkanten beitragen? | Qualitäts-/Trust-Gate |
-|---|---|---|---:|---|
-| Java-Plugin | Java-Entwickler | JAR in `plugins/`, `ServiceLoader`, `PluginRuntime` | ja | API-/Core-Kompatibilität, Abhängigkeiten, Laufzeitdiagnosen; externe Signaturen werden noch nicht kryptografisch verifiziert |
-| Regeldatei | Anwender oder Regelautor | `.regelsuche` / `.rules` in `rules/` | ja | Parser, typisiertes internes Modell, Profile, Konflikt-/Zykluserkennung und Debug-Diagnosen |
-| Knowledge Pack | Kurator oder Domänenautor | eingebaute YAML-Packs unter `rules/packs/` | ja, nach Registrierung | Provenance, Lizenz, Reviewstatus, Risiko und Validierungsbeispiele; nur freigegebene Einträge werden registriert |
-| Deklaratives Makro | Regelautor | `macro`-Eintrag in Regeldatei | ja, als `macro.<id>` | dieselben Profil-, Konflikt- und Laufzeitgrenzen wie Regeldateien |
-| Gelerntes/promoviertes Makro | Discovery-Pipeline | Mining, Validierung und Inventar-Promotion | ja, nach Promotion | Holdouts, Gegenbeispielsuche, Novelty, Proof-/Promotion- und Public-Evidence-Gates |
-| Discovery-Operator | Core- oder Plugin-Entwickler | `HypothesisOperatorRegistry` beziehungsweise expliziter Plugin-Beitrag | erzeugt Hypothesenkandidaten | operatorspezifische Bounds; Kandidaten durchlaufen anschließend die normalen Discovery-Gates |
-| Mathematische Capability | Backend-Entwickler | `MathematicalAlgorithmRegistry` / Capability-Registry | nein, validiert oder beweist | deklarierte Fähigkeiten, unterstützte Domänen und Ergebnissemantik; Solverorchestrierung bleibt separat |
-| Autopilot-Capability | Campaign-Autor | erlaubte Capability-Namen im Research Brief | nein | begrenzt erlaubte Arbeit; ist weder Plugin-, Proof- noch Novelty-Status |
+| Bedarf | Passende Erweiterung |
+| --- | --- |
+| einzelne Transformation ohne Java | Regeldatei |
+| feste mehrstufige Strategie deklarieren | deklaratives Makro |
+| kuratierten First-Party-Regelbestand beitragen | Knowledge Pack |
+| eigene Java-Logik oder neue Suchkomponente | Java-Plugin |
+| Hypothesenkandidaten aus Beobachtungen erzeugen | Discovery-Operator |
+| externen Validator oder Solver anbinden | mathematische Capability |
+| wiederkehrenden Suchpfad automatisch wiederverwenden | gelernter Kandidat nach eigenen Gates |
+| reproduzierbares Experimentinventar variieren | Regelprofil und Pack-Ablation |
 
-## 1. Java-Plugins
+## Erweiterungsflächen
 
-Java-Plugins implementieren `de.regelsuche.plugin.RegelsuchePlugin`. Die Laufzeit lädt Classpath-Plugins und externe JARs über `ServiceLoader`; `PluginRuntime` unterstützt Reload, Diff, Diagnosen und einen Verzeichnis-Watcher.
+| Fläche | Kann Suchkanten beitragen? | Aktivierung | Maßgebliche Grenze |
+| --- | ---: | --- | --- |
+| Java-Plugin | ja | lokal installiertes, kompatibles Plugin | Artefaktvertrauen, API-Kompatibilität und Laufzeitdiagnose |
+| Regeldatei | ja | Parser und Aktivierungsprofil | Syntax, Konflikte, Zyklen und deklarierte Annahmen |
+| Knowledge Pack | ja | kuratierter Reviewstatus und Regelprofil | Provenienz, Lizenz, Risiko und Validierungsbeispiele |
+| deklaratives Makro | ja | Regeldatei und Profil | explizit vom Autor vorgegebene Strategie |
+| gelernter Kandidat / Makro | erst nach eigenem Gate | Qualification und gegebenenfalls Promotion | Holdouts, Counterexamples, Novelty, Proof und Utility bleiben getrennt |
+| Discovery-Operator | erzeugt Kandidaten | begrenzte Operator-Registry | keine automatische Wahrheit oder Promotion |
+| mathematische Capability | üblicherweise nein | capability-aware Auswahl | validiert oder beweist eine vorhandene Obligation |
+| Autopilot-Capability | nein | Research Brief | erlaubt Arbeit, lädt aber keinen Code und autorisiert keinen Claim |
 
-Plugins können insbesondere Regeln, Transformationen, AST-Visitor, Makros, Suchstrategien, Heuristiken, Kostenfunktionen, Renderer, Erklärungen, Parser-Erweiterungen und Beispiele registrieren. Eine Plugin-Transformation erscheint als normale Kante im Suchgraphen.
+## Regel-Tiers und reproduzierbare Inventare
 
-Wichtige Grenze: Nicht jede interne Registry ist automatisch ein öffentlicher JAR-Erweiterungspunkt. Discovery-, Proof- und Solverkomponenten bleiben nur dann extern ladbar, wenn dafür ein ausdrücklich dokumentierter Plugin-Vertrag existiert.
+Eingebaute Regeln werden nach ihrer Rolle klassifiziert:
 
-Siehe [Plugins](plugins.md) und [Plugin-API](plugin-api.md).
+- **Kernel:** minimaler, stabiler Regelkern;
+- **First-Party-Packs:** kuratierte, bewusst aktivierbare Fähigkeiten;
+- **Plugins und Regeldateien:** externe oder lokale Erweiterungen;
+- **gelernte Kandidaten:** zunächst quarantänisierte Ergebnisse.
 
-## 2. Regeldateien und deklarative Makros
+Profile wie `minimal-kernel`, `core` und `full` bestimmen den aktiven Bestand.
+Zusätzliche Packs können explizit aktiviert oder deaktiviert werden. Ein
+content-addressed Regelinventar-Manifest bindet Profil, Pack-Zuordnung und
+konkrete Regelidentitäten an den Lauf.
 
-Regeldateien verwenden die mathematisch orientierte `.regelsuche`-/`.rules`-DSL. `RuleFileParser` überführt sie in ein typisiertes internes Modell. Unterstützt werden Regeln, Makros und Aktivierungsprofile.
+Damit lassen sich Ablationen durchführen, ohne ein Ergebnis nachträglich durch
+einen veränderten Regelbestand umzudeuten. Siehe
+[Regel-Tiers und Ablation](rule-tiers.md).
 
-Regeldateien bieten den niedrigschwelligen Erweiterungsweg:
+## Java-Plugins
 
-- keine Java-Kompilierung,
-- verständliche Parser- und Validierungsdiagnosen,
-- Prioritäten und Tags,
-- Whitelist/Blacklist und Profile,
-- Konflikt- und Zykluserkennung,
+Java-Plugins werden über den dokumentierten Plugin-Vertrag und `ServiceLoader`
+geladen. Unterstützte Beiträge umfassen unter anderem Regeln, Transformationen,
+Suchstrategien, Heuristiken, Kostenfunktionen, Renderer, Erklärungen,
+Parser-Erweiterungen und Beispiele.
+
+Nicht jede interne Registry ist automatisch ein öffentlicher Plugin-Endpunkt.
+Discovery-, Proof-, Solver- und Release-Komponenten sind nur extern erweiterbar,
+wenn dafür ein eigener dokumentierter Vertrag existiert.
+
+Details: [Plugins](plugins.md) und [Plugin-API](plugin-api.md).
+
+## Regeldateien und deklarative Makros
+
+Die `.regelsuche`-/`.rules`-DSL ist der niedrigschwellige Weg für lokale Regeln
+und feste Makros. Sie bietet:
+
+- typisiertes Parsing und verständliche Diagnosen;
+- Prioritäten, Tags und Aktivierungsprofile;
+- Whitelist und Blacklist;
+- Konflikt- und Zykluserkennung;
 - Import, Export und Debug-Ausgabe.
 
-Deklarative Makros sind dabei vom Discovery-Lernen zu unterscheiden: Sie werden vom Autor vorgegeben und direkt als einstufige Transformationskante registriert.
+Ein deklaratives Makro ist eine vom Autor vorgegebene Strategie. Es ist nicht
+mit einer aus Suchbeobachtungen gelernten und anschließend qualifizierten Regel
+gleichzusetzen.
 
-Siehe [Regeldateien](rule-files.md) und [Makros](macros.md).
+Details: [Regeldateien](rule-files.md) und [Makros](macros.md).
 
-## 3. Knowledge Packs
+## Knowledge Packs
 
-Knowledge Packs sind kuratierte, eingebaute YAML-Pakete. Sie tragen neben Pattern und Replacement zusätzliche Governance-Metadaten wie Provenance, Lizenz, Reviewstatus, Risiko und Validierungsbeispiele.
+Knowledge Packs sind kuratierte First-Party-Pakete mit zusätzlichen
+Governance-Metadaten:
 
-Sie sind kein Ersatz für externe Java-Plugins oder die anwenderorientierte Regel-DSL. Ihr Zweck ist ein nachvollziehbares, reviewbares Core-Inventar. Kandidaten bleiben deaktiviert, bis ihr Status die Registrierung erlaubt.
+- Herkunft und Autorenschaft;
+- Lizenz;
+- Reviewstatus;
+- Risikoklassifikation;
+- Validierungsbeispiele;
+- Pack- und Tier-Zuordnung.
 
-Eingebaute Core-Regeln und Knowledge Packs sind zusätzlich in Tiers klassifiziert. Kernel-Packs
-sind nicht abschaltbar, First-Party-Packs lassen sich für Basisbeweise wegschalten. Das dafür
-verwendete Profil und der Manifest-Hash machen einen Ablationslauf nachprüfbar.
+Sie eignen sich für reviewbare Domänenfähigkeiten, die nicht zwingend zum
+minimalen Kernel gehören. Eine vorhandene Implementierung wird nicht allein
+durch ihre Existenz Teil des gemessenen Standardinventars.
 
-Siehe [Knowledge Packs](knowledge-packs.md) und [Regel-Tiers und Ablation](rule-tiers.md).
+Details: [Knowledge Packs](knowledge-packs.md).
 
-## 4. Gelernte und promovierte Makros
+## Gelernte Kandidaten und Makros
 
-Die Discovery-Pipeline kann aus wiederkehrenden realen Suchpfaden generalisierte Makroregeln gewinnen. Diese Regeln werden nicht durch bloßes Auftreten aktiv. Vor einer Promotion stehen unter anderem:
+Regelsuche kann wiederkehrende Pfade oder Strukturen zu parametrisierten
+Kandidaten verdichten. Candidate Formation ist jedoch nur der Beginn eines
+eigenen Evidence-Zweigs.
 
-- strukturelle Generalisierung,
-- frische positive und negative Holdouts,
-- Gegenbeispielsuche,
-- projektinterne Novelty,
-- Proof-Evidenz,
-- gepaarter Suchnutzen,
-- Promotion- und Public-Evidence-Gates.
+Mögliche nachgelagerte Stufen sind:
 
-Erst danach darf ein Kandidat als wiederverwendbarer `MacroMove` in den Suchpfad zurückkehren. Damit bleibt gelerntes Wissen von benutzerdefinierten Regeldateien und ungeprüften Plugin-Beiträgen unterscheidbar.
+1. strukturelle Generalisierung und Lineage-Prüfung;
+2. positive und negative Holdouts;
+3. Counterexample Search;
+4. Projekt-Novelty;
+5. Proof-Evidence;
+6. gepaarter Suchnutzen;
+7. Qualification, Promotion und Public Evidence.
 
-Siehe [Makroregeln und emergente Identitäten](macro-rules.md) und [Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md).
+Keine erfolgreiche Stufe ersetzt die anderen. Ein Kandidat darf erst nach dem
+für seinen Einsatz erforderlichen Gate in einen autoritativen aktiven Bestand
+zurückkehren.
 
-## 5. Discovery-Operatoren
+Details: [Makroregeln und emergente Identitäten](macro-rules.md) und
+[Von Umformungen zu mathematischen Entdeckungen](from-transformations-to-discovery.md).
 
-Discovery-Operatoren erzeugen begrenzte Hypothesenkandidaten aus einem Ausdruck oder Suchgraphen. Sie sind keine Wahrheitsorakel und keine automatische Promotion. Ein Operator kann im Core registriert oder über einen ausdrücklich dafür vorgesehenen Plugin-Beitrag geliefert werden.
+## Discovery-Operatoren
 
-Jeder erzeugte Kandidat muss danach dieselben Falsifikations-, Novelty-, Proof- und Promotion-Gates durchlaufen wie andere Open-Target-Kandidaten.
+Discovery-Operatoren erzeugen begrenzte Hypothesenkandidaten aus Ausdrücken,
+Suchgraphen oder retained Observations. Sie sind weder Wahrheitsorakel noch
+automatische Promotion.
 
-## 6. Mathematische Capabilities und Solver
+Jeder Kandidat durchläuft die normalen Validierungs-, Falsifikations-, Novelty-
+und Proof-Grenzen. Ein Operator muss seine Inputs, Bounds und Herkunft
+explizit machen.
 
-Mathematische Algorithmen und Solver werden als Fähigkeiten mit klarer Ergebnissemantik behandelt. Sie validieren, falsifizieren oder beweisen eine bereits gebildete Obligation; sie dürfen nicht unbemerkt den Discovery-Pfad oder die erwartete Antwort konstruieren.
+## Mathematische Capabilities und Solver
 
-Die heutigen Capability-Registries sind deshalb nicht pauschal identisch mit `PluginRuntime`. Eine capability-aware Auswahl und die solver-neutrale Obligations-/Proof-IR werden in den separaten Issues #233 und #234 entwickelt.
+Solver und mathematische Algorithmen werden anhand deklarierter Fähigkeiten und
+unterstützter Domänen ausgewählt. Sie erhalten eine bereits formulierte,
+versionierte Obligation und liefern ein strukturiertes Ergebnis.
 
-Siehe [Mathematical Algorithms](mathematical-algorithms.md) und [Proof Bridge](proof-bridge.md).
+Ein Validator oder Prover darf nicht unbemerkt die zu bewertende Hypothese oder
+die erwartete Antwort konstruieren. Candidate Formation und Beurteilung bleiben
+getrennte Informationsrollen.
 
-## 7. Autopilot
+Details: [Mathematical Algorithms](mathematical-algorithms.md),
+[Solver-neutrale IR](solver-neutral-ir.md) und
+[Solver-Portfolio](solver-portfolio.md).
 
-Der Autopilot Research Brief enthält erlaubte Capability-Namen, Domänen, Generatoren und Budgets. Diese Angaben begrenzen, welche Arbeit eine Campaign planen und ausführen darf. Sie laden selbst keinen Code und sind kein Vertrauensnachweis für ein Plugin oder Backend.
+## Autopilot-Capabilities
 
-Planner- und Executor-Entscheidungen bleiben Telemetrie. Sie sind weder mathematische Evidenz noch Novelty-, Proof-, Promotion- oder Public-Evidence-Status.
+Ein Research Brief benennt erlaubte Domänen, Generatoren, Capabilities und
+Budgets. Diese Angaben begrenzen eine Campaign; sie installieren keinen Code
+und sind kein Trust-, Proof- oder Novelty-Status.
 
-Siehe [Autopilot](autopilot-planner.md).
+Planner-Entscheidungen und Ressourcenallokation sind operative Evidence, aber
+keine mathematische Bestätigung. Siehe [Autopilot](autopilot-planner.md).
 
-## Vertrauensmodell
+## Artefakt- und Indexvertrauen
 
-Für externe Java-Plugins sind Herkunfts- und Signaturmetadaten sichtbar. Aktuell gilt jedoch:
+Die lokale Trust-Grundlage ist implementiert:
 
-- `signaturePresent` bedeutet nur, dass Metadaten vorhanden sind;
-- `signatureVerified` bleibt ohne kryptografischen Verifizierer `false`;
-- externe JARs bleiben ohne Trust Store oder Allowlist untrusted;
-- Classpath-/Built-in-Beiträge gelten als bekannte Quelle, nicht automatisch als mathematisch korrekt;
-- mathematische Korrektheit und Artefaktvertrauen sind getrennte Fragen.
+- Detached-Ed25519-Manifeste binden Artefaktbytes, Publisher und Key;
+- ein Publisher-Trust-Store modelliert aktive, rotierte und widerrufene Keys;
+- JAR-Bytes werden begrenzt und symlink-sicher gelesen;
+- geladen werden exakt die zuvor verifizierten Bytes;
+- ein unveränderlicher Artifact Index bindet Versionen, Kompatibilität,
+  Abhängigkeiten, Provenienz und Content-Hashes;
+- Indexrevisionen werden durch Curator-Signaturen authentisiert;
+- Trust-State-Revisionen bilden eine signierte monotone Hashkette mit lokalem
+  Checkpoint gegen Replay, Lücken und Forks;
+- Verifikation und Gate-Entscheidungen erzeugen kanonische Evidence.
 
-Echte Signaturprüfung, Publisher-Identität, Schlüsselrotation, Sperrlisten und reproduzierbare Installation/Updates gehören zum offenen Plugin-Ökosystem in Issue #104.
+Diese Fähigkeiten trennen Artefaktvertrauen von mathematischer Korrektheit. Ein
+korrekt signiertes Plugin ist nicht automatisch mathematisch richtig; eine
+mathematisch gültige Regel ist nicht automatisch aus einer vertrauenswürdigen
+Quelle installiert.
 
-## Auswahlhilfe
+Details:
 
-- Eine eigene Transformation ohne Java schreiben: **Regeldatei**.
-- Eine feste mehrstufige Abkürzung deklarieren: **Regeldatei-Makro**.
-- Kuratierte Core-Regeln mit Governance-Metadaten beitragen: **Knowledge Pack**.
-- Eigene Java-Logik, AST-Hooks oder Suchkomponenten bereitstellen: **Java-Plugin**.
-- Eine neue Hypothesengenerierung implementieren: **Discovery-Operator**, danach normale Discovery-Gates.
-- Einen neuen Solver oder Validator anbinden: **mathematische Capability**, nicht automatisch allgemeines Plugin-JAR.
-- Wiederkehrende Suchpfade automatisch wiederverwenden: **gelernte/promovierte Makroregel**.
+- [Plugin Artifact Trust](plugin-artifact-trust.md)
+- [Plugin Artifact Index](plugin-artifact-index.md)
+- [Plugin Trust Store Revisions](plugin-trust-store-revisions.md)
 
-## Offener Ökosystemumfang
+## Was noch nicht als öffentliches Ökosystem qualifiziert ist
 
-Die technische Grundlage aus Issue #74 ist abgeschlossen. Offen bleibt in Issue #104 insbesondere:
+`PUBLIC_PLUGIN_DISTRIBUTION` bleibt `BLOCKED`. Noch fehlen insbesondere:
 
-- öffentlicher oder föderierter Plugin-/Paketindex,
-- separat baubare Beispielprojekte,
-- reproduzierbare Installation, Update und Rollback,
-- echte kryptografische Signaturprüfung und Trust-Policy,
-- Publishing-, Security- und Review-Dokumentation.
+- ein real betriebener kuratierter oder föderierter Indextransport;
+- authentisierter Client-Abruf von Index- und Trust-State-Revisionen;
+- transaktional rollback-geschützte Übernahme lokaler Checkpoints;
+- Download exakt der indexgebundenen Bytes unter Zeit-, Größen- und
+  Redirect-Grenzen;
+- atomare Installation, Update, Entfernung und Rollback;
+- unabhängig baubare externe Beispielprojekte gegen veröffentlichte API-
+  Artefakte;
+- vollständige Publishing-, Review-, Incident- und Revocation-Prozesse.
+
+Die vorhandenen lokalen kryptografischen Verträge dürfen durch diese spätere
+Verteilungsschicht nicht permissiver werden.
+
+## Entscheidungsregel
+
+Wähle die kleinste Erweiterungsfläche, die die gewünschte Verantwortung trägt.
+Eine neue mathematische Regel benötigt nicht automatisch ein Java-Plugin; ein
+neuer Solver ist nicht automatisch eine Suchkante; ein gelernter Kandidat ist
+nicht automatisch aktives Wissen.
