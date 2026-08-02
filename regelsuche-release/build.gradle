@@ -194,6 +194,10 @@ def runAutonomousDiscoveryWalkthrough = tasks.register(
     }
 }
 
+tasks.named('dockerIntegrationTest') {
+    dependsOn runAutonomousDiscoveryWalkthrough
+}
+
 def independentReproductionArtifactRoot = rootProject.layout.buildDirectory.dir(
     'independent-reproduction/artifact-a')
 def independentReproductionArchitecture = providers.gradleProperty(
