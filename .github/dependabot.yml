@@ -1,24 +1,31 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
 version: 2
+
 registries:
   gradle-plugin-portal:
     type: maven-repository
     url: https://plugins.gradle.org/m2
-    username: dummy # Required by dependabot
-    password: dummy # Required by dependabot
+    username: dummy # Required by Dependabot for a declared Maven registry.
+    password: dummy # The public plugin portal does not authenticate this value.
+
 updates:
-  - package-ecosystem: "gradle"
+  # The root Gradle build includes every subproject through settings.gradle.
+  # No allow-list is used: public plugins and libraries actually referenced by
+  # the checkout must not silently fall outside dependency update coverage.
+  - package-ecosystem: gradle
     directory: "/"
-    allow:
-      - dependency-name: "com.gradle*"
     registries:
       - gradle-plugin-portal
     schedule:
-      interval: "weekly"
+      interval: weekly
+    groups:
+      gradle-dependencies:
+        patterns:
+          - "*"
+
+  # Keep all action families used by the ordinary CI and release workflows in
+  # scope, including actions/*, gradle/actions, peaceiris/actions-gh-pages and
+  # peter-evans/create-pull-request. Immutable SHA pins remain visible and are
+  # updated together with their readable version comments.
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
@@ -27,6 +34,3 @@ updates:
       workflow-actions:
         patterns:
           - "*"
-    allow:
-      - dependency-name: "actions/*"
-      - dependency-name: "redhat-actions/*"
