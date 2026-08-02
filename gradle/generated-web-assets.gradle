@@ -1,0 +1,52 @@
+// Keep dependency-derived browser assets out of the source checkout.
+//
+// The app's vendor tasks are part of the ordinary resource lifecycle. Their
+// outputs therefore belong below build/, just like compiled classes and other
+// generated resources. Writing them into src/main/resources makes dependency
+// upgrades mutate tracked files during `ciCheck` and invalidates clean-checkout
+// reproduction for reasons unrelated to the code under test.
+
+def generatedWebResources = layout.buildDirectory.dir('generated/web-resources')
+def generatedVendorRoot = generatedWebResources.map { it.dir('web/vendor') }
+
+afterEvaluate {
+    tasks.named('vendorKatexAssets').configure {
+        into(generatedVendorRoot.map { it.dir('katex') })
+    }
+    tasks.named('vendorCytoscapeAssets').configure {
+        into(generatedVendorRoot.map { it.dir('cytoscape') })
+    }
+    tasks.named('vendorWebAssets').configure {
+        description = 'Vendors KaTeX and Cytoscape assets from WebJars into build/generated/web-resources.'
+    }
+
+    // Keep the historical checked-in snapshots available for provenance and
+    // direct inspection, but do not package them. Runtime resources always
+    // come from the declared, resolved WebJar versions.
+    sourceSets.main.resources.exclude 'web/vendor/katex/**'
+    sourceSets.main.resources.exclude 'web/vendor/cytoscape/**'
+
+    tasks.named('processResources').configure {
+        from(generatedWebResources)
+    }
+
+    def verifyWebAssetGenerationIsolation = tasks.register('verifyWebAssetGenerationIsolation') {
+        group = 'verification'
+        description = 'Fails when dependency-derived web assets are generated outside the app build directory.'
+        dependsOn tasks.named('vendorWebAssets')
+        doLast {
+            def generatedRoot = generatedWebResources.get().asFile.canonicalFile.toPath()
+            ['vendorKatexAssets', 'vendorCytoscapeAssets'].each { taskName ->
+                def destination = tasks.named(taskName).get().destinationDir.canonicalFile.toPath()
+                if (!destination.startsWith(generatedRoot)) {
+                    throw new GradleException(
+                        "${taskName} must write below ${generatedRoot}, but writes to ${destination}")
+                }
+            }
+        }
+    }
+
+    tasks.named('check').configure {
+        dependsOn verifyWebAssetGenerationIsolation
+    }
+}
