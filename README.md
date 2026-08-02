@@ -51,9 +51,25 @@ Ohne Docker genügt mit JDK 21:
 Der vollständige Einstieg einschließlich Full Mode, Sicherheitshinweisen und
 Fehlerdiagnose steht in [Getting Started](docs/getting-started.md).
 
+## Mathematik als Spiel
+
+Das Projekt folgt einem einfachen Modell:
+
+- ein mathematischer Ausdruck ist eine **Position**;
+- eine anwendbare Transformationsregel ist ein **legaler Zug**;
+- eine Folge von Transformationen ist eine **Spielvariante** beziehungsweise
+  ein Rechenweg;
+- ein Suchverfahren untersucht mögliche Varianten unter expliziten Budgets;
+- wiederkehrende erfolgreiche Varianten können zu höheren Strategien werden.
+
+Der mathematische Raum ist im Gegensatz zu einem Brettspiel nicht endlich.
+Regelsuche enumeriert deshalb nicht Ausdrücke naiv, sondern erkennt
+parametrisierte Muster in abstrakten Syntaxbäumen. Eine endliche Regel kann so
+für unendlich viele konkrete Ausdrücke stehen.
+
 ## Was sich mit Regelsuche untersuchen lässt
 
-- **Transformationsräume durchsuchen:** Best-First, Beam, A*, Monte Carlo und
+- **Transformationsräume durchsuchen:** Best-First, Beam, `A*`, Monte Carlo und
   Equality Saturation arbeiten auf denselben expliziten Zuständen und Kanten.
 - **Rechenwege erklären:** Jeder retained Pfad enthält Regelherkunft,
   AST-Position, Bindungen, Annahmen und Kosten.
@@ -182,7 +198,7 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
 
 Änderungen sollen lokal reproduzierbar bleiben. Der
 [Developer Guide](docs/developer-guide.md) enthält den empfohlenen Ablauf; die
-[Dokumentationskonvention](docs/documentation-conventions.md) und die
+[Dokumentationskonventionen](docs/documentation-conventions.md) und die
 [Qualitätscheckliste](docs/documentation-quality-checklist.md) gelten für
 README, Handbücher, Forschungsseiten und generierte Dokumentation.
 
