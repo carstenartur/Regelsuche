@@ -116,7 +116,7 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
   Änderungstypen.
 - [Testing](testing.md) — autoritative Gradle-Lebenszyklen und Diagnose.
 - [Testing-Strategie](testing-strategy.md) — Testschichten und Zuständigkeiten.
-- [Documentation Conventions](documentation-conventions.md) — Seitentypen,
+- [Dokumentationskonventionen](documentation-conventions.md) — Seitentypen,
   Quellen der Wahrheit und Claim-Regeln.
 - [Documentation Quality Checklist](documentation-quality-checklist.md) —
   Review-Raster für alle Dokumenttypen.
