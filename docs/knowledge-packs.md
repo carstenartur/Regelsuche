@@ -8,6 +8,10 @@ Provenance, Lizenz, Reviewstatus, Risikostufe und Validierungsbeispiele. Erweite
 SymPy-Packs existieren für polynomiale, trigonometrische, rationale und
 logarithmische Identitäten.
 
+Jedes Pack trägt zusätzlich ein `tier`-Feld (`kernel` oder `first-party`, Standard
+`first-party`). Kernel-Packs lassen sich nicht abschalten; First-Party-Packs sind für
+Baseline-/Ablationsläufe abschaltbar. Details stehen unter [Regel-Tiers und Ablation](rule-tiers.md).
+
 Nur Regeln mit freigegebenem Status wie `VALIDATED` oder `REVIEWED` dürfen
 registriert werden. Kandidaten bleiben deaktiviert, bis die Review- und
 Validierungsanforderungen erfüllt sind.

@@ -288,7 +288,8 @@ davon getrennte, noch nicht qualifizierte Capabilities.
 👉 **[Erweiterungssystem und Auswahlhilfe](docs/extension-system.md)** ·
 [Plugins](docs/plugins.md) ·
 [Regeldateien](docs/rule-files.md) ·
-[Knowledge Packs](docs/knowledge-packs.md)
+[Knowledge Packs](docs/knowledge-packs.md) ·
+[Regel-Tiers und Ablation](docs/rule-tiers.md)
 
 ## Quickstart-Varianten
 

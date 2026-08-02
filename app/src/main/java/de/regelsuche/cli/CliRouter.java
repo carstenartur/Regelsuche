@@ -365,6 +365,7 @@ public class CliRouter {
         for (String packId : options.csv("disable-pack")) {
             selection = selection.disablePack(packId);
         }
+        CoreRuleCatalog.enabledPackIds(selection);
         return selection;
     }
 
