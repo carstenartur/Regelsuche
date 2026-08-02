@@ -124,6 +124,11 @@ public final class JsonWriter {
         return this;
     }
 
+    /** Emit an explicitly numeric value inside an array context. */
+    public JsonWriter numberValue(int value) {
+        return value(value);
+    }
+
     public JsonWriter value(boolean value) {
         comma();
         builder.append(value);
