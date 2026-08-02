@@ -51,6 +51,62 @@ final class ComparativeBenchmarkSystems {
         }
     }
 
+    /**
+     * One competitor in the target-free simplification track.
+     *
+     * <p>Exactly one of {@code strategy} and {@code externalSimplifier} is set.
+     * Both competitor kinds receive the input expression only.</p>
+     */
+    record SimplificationSystem(
+        String id,
+        String version,
+        SystemKind kind,
+        SearchStrategy strategy,
+        ExternalSymPySimplificationBaseline externalSimplifier,
+        boolean available,
+        String environmentIdentity,
+        List<String> limitations
+    ) {
+        SimplificationSystem {
+            requireText(id, "simplification system id");
+            requireText(version, "simplification system version");
+            Objects.requireNonNull(kind, "kind");
+            if ((strategy == null) == (externalSimplifier == null)) {
+                throw new IllegalArgumentException(
+                    "exactly one simplification competitor implementation is required");
+            }
+            requireText(environmentIdentity, "environmentIdentity");
+            limitations = clean(limitations);
+        }
+
+        static SimplificationSystem internal(
+            String id,
+            String version,
+            SearchStrategy strategy,
+            List<String> limitations
+        ) {
+            return new SimplificationSystem(
+                id, version, SystemKind.REGELSUCHE, strategy, null, true,
+                "java=21\nsearch-kernel=regelsuche-search/v1", limitations);
+        }
+
+        static SimplificationSystem external(
+            ExternalSymPySimplificationBaseline simplifier,
+            List<String> limitations
+        ) {
+            Objects.requireNonNull(simplifier, "simplifier");
+            return new SimplificationSystem(
+                simplifier.backendId(),
+                simplifier.backendVersion(),
+                SystemKind.EXTERNAL_BASELINE,
+                null,
+                simplifier,
+                simplifier.available(),
+                simplifier.environmentIdentity(),
+                limitations);
+        }
+    }
+
     private static List<String> clean(List<String> values) {
         if (values == null) {
             return List.of();

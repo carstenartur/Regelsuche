@@ -7,12 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.benchmarks.ComparativeBenchmark.CapabilityClaim;
 import de.regelsuche.benchmarks.ComparativeBenchmark.ClaimStatus;
+import de.regelsuche.benchmarks.ComparativeBenchmark.Disposition;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Report;
 import de.regelsuche.benchmarks.ComparativeBenchmark.ResourceMetrics;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Role;
 import de.regelsuche.benchmarks.ComparativeBenchmark.SystemKind;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SimplificationSystem;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.ValidationSystem;
 import de.regelsuche.search.strategy.AStarSearchStrategy;
 import de.regelsuche.search.strategy.BeamSearchStrategy;
@@ -31,6 +33,7 @@ import de.regelsuche.solver.ir.SolverIr.TranslationStatus;
 import de.regelsuche.solver.ir.SolverTranslation;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 class ComparativeBenchmarkRunnerTest {
@@ -42,12 +45,15 @@ class ComparativeBenchmarkRunnerTest {
         Report first = runner.run();
         Report second = runner.run();
 
-        assertEquals(15, first.results().size());
-        assertEquals(2, first.claims().size());
-        assertEquals(6, first.coverageGaps().size());
-        assertTrue(first.results().stream().allMatch(result -> result.correct()));
-        assertTrue(first.claims().stream().allMatch(claim ->
-            claim.status() == ClaimStatus.SUPPORTED));
+        assertEquals(27, first.results().size());
+        assertEquals(3, first.claims().size());
+        assertEquals(7, first.coverageGaps().size());
+        assertTrue(first.results().stream()
+            .filter(result -> result.track() != Track.SIMPLIFICATION_COMPETITION)
+            .allMatch(result -> result.correct()));
+        assertTrue(first.claims().stream()
+            .filter(claim -> claim.track() != Track.SIMPLIFICATION_COMPETITION)
+            .allMatch(claim -> claim.status() == ClaimStatus.SUPPORTED));
         assertEquals(ComparativeBenchmark.SCORE_POLICY, first.scorePolicy());
         assertEquals(first.contentHash(), second.contentHash());
         assertEquals(first.toCanonicalJson(), second.toCanonicalJson());
@@ -66,6 +72,107 @@ class ComparativeBenchmarkRunnerTest {
             .findFirst()
             .orElseThrow();
         assertEquals(ClaimStatus.INSUFFICIENT_EVIDENCE, validation.status());
+    }
+
+    @Test
+    void simplificationCompetitorsNeverSeeTheReferenceForm() {
+        Report report = runner(true).run();
+
+        var parity = report.parityManifests().stream()
+            .filter(manifest ->
+                manifest.track() == Track.SIMPLIFICATION_COMPETITION)
+            .findFirst()
+            .orElseThrow();
+        assertFalse(parity.targetVisible());
+        assertFalse(parity.hiddenReferenceVisible());
+        assertEquals(2L, report.configurations().stream()
+            .filter(configuration ->
+                configuration.track() == Track.SIMPLIFICATION_COMPETITION)
+            .count());
+        assertTrue(report.configurations().stream()
+            .filter(configuration ->
+                configuration.track() == Track.SIMPLIFICATION_COMPETITION)
+            .anyMatch(configuration ->
+                configuration.kind() == SystemKind.EXTERNAL_BASELINE));
+    }
+
+    @Test
+    void externalCompetitorOutperformsUntargetedRegelsucheSearch() {
+        Assumptions.assumeTrue(
+            ExternalSymPySimplificationBaseline.detectSystemSymPy().available(),
+            "SymPy is required for the head-to-head simplification track");
+        Report report = runner(true).run();
+
+        assertEquals(6L, correctResults(report, "sympy-cas-simplifier"));
+        assertEquals(
+            4L, correctResults(report, "regelsuche-untargeted-best-first"));
+        var claim = report.claims().stream()
+            .filter(candidate ->
+                candidate.track() == Track.SIMPLIFICATION_COMPETITION)
+            .findFirst()
+            .orElseThrow();
+        assertEquals(ClaimStatus.NEGATIVE, claim.status());
+    }
+
+    @Test
+    void losingHeadToHeadResultsAreRetainedInsteadOfFailingTheGate() {
+        Assumptions.assumeTrue(
+            ExternalSymPySimplificationBaseline.detectSystemSymPy().available(),
+            "SymPy is required for the head-to-head simplification track");
+        Report report = runner(true).run();
+
+        assertTrue(report.results().stream()
+            .filter(result ->
+                result.track() == Track.SIMPLIFICATION_COMPETITION)
+            .anyMatch(result -> !result.correct()));
+        assertTrue(report.results().stream()
+            .filter(result ->
+                result.track() == Track.SIMPLIFICATION_COMPETITION)
+            .allMatch(result ->
+                result.disposition() == Disposition.EXECUTED));
+        ComparativeBenchmarkMain.verify(report);
+    }
+
+    @Test
+    void aClaimStrongerThanItsOwnTrackIsRejected() {
+        Assumptions.assumeTrue(
+            ExternalSymPySimplificationBaseline.detectSystemSymPy().available(),
+            "SymPy is required for the head-to-head simplification track");
+        Report report = runner(true).run();
+        List<CapabilityClaim> overclaimed = report.claims().stream()
+            .map(claim -> claim.track() == Track.SIMPLIFICATION_COMPETITION
+                ? CapabilityClaim.create(
+                    claim.id(),
+                    claim.track(),
+                    ClaimStatus.SUPPORTED,
+                    claim.statement(),
+                    claim.evidenceResultHashes(),
+                    claim.limitations())
+                : claim)
+            .toList();
+        Report overclaiming = Report.create(
+            report.suiteId(),
+            report.parityManifests(),
+            report.configurations(),
+            report.cases(),
+            report.results(),
+            overclaimed,
+            report.coverageGaps());
+
+        assertThrows(IllegalStateException.class, () ->
+            ComparativeBenchmarkMain.verify(overclaiming));
+    }
+
+    private static long correctResults(Report report, String backendId) {
+        var configuration = report.configurations().stream()
+            .filter(candidate -> candidate.backendId().equals(backendId))
+            .findFirst()
+            .orElseThrow();
+        return report.results().stream()
+            .filter(result -> result.configurationHash()
+                .equals(configuration.contentHash()))
+            .filter(result -> result.correct())
+            .count();
     }
 
     @Test
@@ -126,7 +233,20 @@ class ComparativeBenchmarkRunnerTest {
             system("internal-polynomial", SystemKind.REGELSUCHE, true),
             system("external-cas", SystemKind.EXTERNAL_BASELINE, externalAvailable),
             system("external-prover", SystemKind.EXTERNAL_BASELINE, true));
-        return new ComparativeBenchmarkRunner(search, validation);
+        return new ComparativeBenchmarkRunner(
+            search, validation, simplificationSystems());
+    }
+
+    private static List<SimplificationSystem> simplificationSystems() {
+        return List.of(
+            SimplificationSystem.internal(
+                "regelsuche-untargeted-best-first",
+                "test",
+                new BestFirstSearchStrategy(),
+                List.of()),
+            SimplificationSystem.external(
+                ExternalSymPySimplificationBaseline.detectSystemSymPy(),
+                List.of()));
     }
 
     private static ValidationSystem system(

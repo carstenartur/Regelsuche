@@ -8,6 +8,7 @@ import de.regelsuche.benchmarks.ComparativeBenchmark.ObservedVerdict;
 import de.regelsuche.benchmarks.ComparativeBenchmark.ResourceMetrics;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Result;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SimplificationSystem;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.ValidationSystem;
 import de.regelsuche.canonical.ExpressionCanonicalizer;
 import de.regelsuche.scoring.ExpressionScorer;
@@ -23,6 +24,7 @@ import de.regelsuche.solver.ir.SolverObligationFactory;
 import de.regelsuche.transform.AstRewriteTransformationEngine;
 import de.regelsuche.transform.Transformation;
 import de.regelsuche.transform.TransformationEngine;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -98,6 +100,173 @@ final class ComparativeBenchmarkExecutor {
                 "reachedDepth", reached == null ? 0L : (long) reached.depth(),
                 "engineInvocations", (long) engine.invocations()),
             List.of(traceHash));
+    }
+
+    /**
+     * Runs one target-free simplification competitor on one case.
+     *
+     * <p>The competitor receives {@code benchmarkCase.inputExpression()} only.
+     * The reference simplest form is used afterwards by a single shared judge —
+     * Regelsuche's canonicalizer — applied identically to every competitor's
+     * output, so the judge cannot favour one implementation's surface syntax.
+     * </p>
+     */
+    Result runSimplification(
+        SimplificationSystem system,
+        Configuration configuration,
+        Case benchmarkCase
+    ) {
+        String referenceHash =
+            canonicalizer.stableHash(benchmarkCase.targetExpression());
+        return system.strategy() == null
+            ? runExternalSimplification(
+                system, configuration, benchmarkCase, referenceHash)
+            : runInternalSimplification(
+                system, configuration, benchmarkCase, referenceHash);
+    }
+
+    private Result runInternalSimplification(
+        SimplificationSystem system,
+        Configuration configuration,
+        Case benchmarkCase,
+        String referenceHash
+    ) {
+        CountingEngine engine = new CountingEngine(
+            new AstRewriteTransformationEngine());
+        SearchProblem problem = new SearchProblem(
+            benchmarkCase.inputExpression(),
+            engine,
+            scorer,
+            canonicalizer,
+            ComparativeBenchmarkCatalog.SEARCH_BUDGET)
+            .withoutTarget();
+        List<SearchState> states = system.strategy().search(problem);
+        SearchState reached = states.stream()
+            .filter(state -> canonicalHash(state.expression())
+                .equals(referenceHash))
+            .min(Comparator.comparingInt(SearchState::depth))
+            .orElse(null);
+        ObservedVerdict verdict = reached == null
+            ? ObservedVerdict.UNKNOWN
+            : ObservedVerdict.TARGET_REACHED;
+        ResourceMetrics resources = new ResourceMetrics(
+            1,
+            1,
+            0,
+            0,
+            states.size(),
+            engine.generatedTransformations(),
+            reached == null ? -1 : reached.depth(),
+            engine.invocations(),
+            1,
+            1);
+        EvidenceMetrics evidence = new EvidenceMetrics(
+            verdict == ObservedVerdict.TARGET_REACHED
+                ? "REFERENCE_FORM_REACHED"
+                : "REFERENCE_FORM_NOT_REACHED",
+            "NOT_REQUESTED",
+            "NOT_REQUESTED",
+            "",
+            List.of());
+        String traceHash = SolverIr.sha256(
+            "simplification/v1"
+                + "\nsystem=" + system.id()
+                + "\ncase=" + benchmarkCase.contentHash()
+                + "\nstates=" + states.stream()
+                    .map(SearchState::expression).toList()
+                + "\nreachedPath="
+                    + (reached == null ? List.of() : reached.path()));
+        return Result.create(
+            configuration,
+            benchmarkCase,
+            Disposition.EXECUTED,
+            verdict,
+            resources,
+            evidence,
+            Map.of(
+                "referenceFormReached", reached == null ? 0L : 1L,
+                "appliedRewriteSteps",
+                    reached == null ? 0L : (long) reached.depth(),
+                "engineInvocations", (long) engine.invocations()),
+            List.of(traceHash));
+    }
+
+    private Result runExternalSimplification(
+        SimplificationSystem system,
+        Configuration configuration,
+        Case benchmarkCase,
+        String referenceHash
+    ) {
+        ExternalSymPySimplificationBaseline.Simplification simplification =
+            system.externalSimplifier().simplify(
+                benchmarkCase.inputExpression());
+        boolean produced = simplification.outcome()
+            == ExternalSymPySimplificationBaseline.Outcome.PRODUCED;
+        boolean matched = produced
+            && referenceHash.equals(
+                canonicalHash(simplification.producedExpression()));
+        Disposition disposition = switch (simplification.outcome()) {
+            case PRODUCED -> Disposition.EXECUTED;
+            case UNAVAILABLE -> Disposition.FILTERED_UNSUPPORTED;
+            case TIMEOUT -> Disposition.TIMED_OUT;
+            case ERROR -> Disposition.FAILED;
+        };
+        ObservedVerdict verdict = switch (simplification.outcome()) {
+            case PRODUCED -> matched
+                ? ObservedVerdict.TARGET_REACHED : ObservedVerdict.UNKNOWN;
+            case UNAVAILABLE -> ObservedVerdict.UNSUPPORTED;
+            case TIMEOUT -> ObservedVerdict.TIMEOUT;
+            case ERROR -> ObservedVerdict.ERROR;
+        };
+        int executedWork = produced ? 1 : 0;
+        int skippedWork = disposition == Disposition.FILTERED_UNSUPPORTED
+            ? 1 : 0;
+        ResourceMetrics resources = new ResourceMetrics(
+            1,
+            executedWork,
+            skippedWork,
+            1 - executedWork - skippedWork,
+            0,
+            0,
+            -1,
+            executedWork,
+            1,
+            executedWork);
+        EvidenceMetrics evidence = new EvidenceMetrics(
+            matched
+                ? "REFERENCE_FORM_REACHED"
+                : produced ? "REFERENCE_FORM_NOT_REACHED"
+                    : simplification.outcome().name(),
+            "NOT_REQUESTED",
+            "NOT_REQUESTED",
+            "",
+            simplification.issues());
+        String traceHash = SolverIr.sha256(
+            "simplification/v1"
+                + "\nsystem=" + system.id()
+                + "\ncase=" + benchmarkCase.contentHash()
+                + "\noutcome=" + simplification.outcome().name()
+                + "\nproduced=" + simplification.producedExpression());
+        return Result.create(
+            configuration,
+            benchmarkCase,
+            disposition,
+            verdict,
+            resources,
+            evidence,
+            Map.of(
+                "referenceFormReached", matched ? 1L : 0L,
+                "producedExpression", produced ? 1L : 0L),
+            List.of(traceHash));
+    }
+
+    private String canonicalHash(String expression) {
+        try {
+            return canonicalizer.stableHash(expression);
+        } catch (RuntimeException exception) {
+            // An unparsable competitor output is a miss, never a crash.
+            return "UNPARSABLE:" + normalize(expression);
+        }
     }
 
     Result runValidation(

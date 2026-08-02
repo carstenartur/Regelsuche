@@ -25,7 +25,12 @@ EXPECTED_VALIDATION_BACKENDS = {
     "sympy-cas-equality",
     "z3-smt-proof",
 }
+EXPECTED_SIMPLIFICATION_BACKENDS = {
+    "regelsuche-untargeted-best-first",
+    "sympy-cas-simplifier",
+}
 EXPECTED_COVERAGE_GAPS = {
+    "SIMPLIFICATION_COMPETITION",
     "HIDDEN_RULE_REDISCOVERY",
     "OPEN_TARGET_DISCOVERY",
     "CROSS_FAMILY_TRANSFER",
@@ -65,6 +70,13 @@ def load_all(directory: Path) -> list[dict]:
     return [load(path) for path in paths]
 
 
+def configurations_by_hash_track(report: dict, result: dict) -> str:
+    for configuration in report["configurations"]:
+        if configuration.get("contentHash") == result.get("configurationHash"):
+            return configuration.get("track")
+    return ""
+
+
 def validate(root: Path) -> None:
     try:
         installed = version("jsonschema")
@@ -82,23 +94,33 @@ def validate(root: Path) -> None:
     validator.validate(report)
 
     require(report.get("scorePolicy") == EXPECTED_SCORE_POLICY, "score policy drift")
-    require(len(report.get("parityManifests", [])) == 2, "parity manifest count drift")
-    require(len(report.get("configurations", [])) == 6, "configuration count drift")
-    require(len(report.get("cases", [])) == 5, "case count drift")
-    require(len(report.get("results", [])) == 15, "result count drift")
-    require(len(report.get("claims", [])) == 2, "claim count drift")
+    require(len(report.get("parityManifests", [])) == 3, "parity manifest count drift")
+    require(len(report.get("configurations", [])) == 8, "configuration count drift")
+    require(len(report.get("cases", [])) == 11, "case count drift")
+    require(len(report.get("results", [])) == 27, "result count drift")
+    require(len(report.get("claims", [])) == 3, "claim count drift")
     require(
         all(result.get("disposition") == "EXECUTED" for result in report["results"]),
         "not every result was executed",
     )
-    require(
-        all(result.get("correct") is True for result in report["results"]),
-        "incorrect comparative result retained",
-    )
-    require(
-        all(claim.get("status") == "SUPPORTED" for claim in report["claims"]),
-        "unsupported comparative claim retained",
-    )
+
+    # An incorrect result is retained evidence about a configured competitor and
+    # must stay visible. What is forbidden is a claim that is stronger than the
+    # results of its own track.
+    for claim in report["claims"]:
+        track_results = [
+            result for result in report["results"] if result.get("track") == claim.get("track")
+        ]
+        require(track_results, f"claim without track evidence: {claim.get('id')}")
+        derived = (
+            "SUPPORTED"
+            if all(result.get("correct") is True for result in track_results)
+            else "NEGATIVE"
+        )
+        require(
+            claim.get("status") == derived,
+            f"claim {claim.get('id')} declares {claim.get('status')} but its track implies {derived}",
+        )
 
     configurations = indexed(report["configurations"], "configuration")
     cases = indexed(report["cases"], "case")
@@ -133,8 +155,52 @@ def validate(root: Path) -> None:
         for result in report["results"]
         if result.get("track") == "EQUALITY_VALIDATION"
     ]
+    simplification_results = [
+        result
+        for result in report["results"]
+        if result.get("track") == "SIMPLIFICATION_COMPETITION"
+    ]
     require(len(search_results) == 9, "target-directed result count drift")
     require(len(validation_results) == 6, "equality-validation result count drift")
+    require(
+        len(simplification_results) == 12,
+        "simplification-competition result count drift",
+    )
+
+    simplification_backends = {
+        item.get("backendId")
+        for item in report["configurations"]
+        if item.get("track") == "SIMPLIFICATION_COMPETITION"
+    }
+    require(
+        simplification_backends == EXPECTED_SIMPLIFICATION_BACKENDS,
+        f"simplification competitor set drift: {sorted(simplification_backends)}",
+    )
+
+    # The head-to-head track is only informative when no competitor is handed
+    # the reference simplest form.
+    simplification_parity = [
+        manifest
+        for manifest in report["parityManifests"]
+        if manifest.get("track") == "SIMPLIFICATION_COMPETITION"
+    ]
+    require(len(simplification_parity) == 1, "simplification parity manifest drift")
+    require(
+        simplification_parity[0].get("targetVisible") is False,
+        "simplification competitors must not see the reference form",
+    )
+    require(
+        simplification_parity[0].get("hiddenReferenceVisible") is False,
+        "simplification competitors must not see a hidden reference",
+    )
+    require(
+        all(
+            result.get("configurationHash")
+            and configurations_by_hash_track(report, result) == "SIMPLIFICATION_COMPETITION"
+            for result in simplification_results
+        ),
+        "simplification result references a foreign track configuration",
+    )
 
     for result in report["results"]:
         configuration_hash = result.get("configurationHash")
@@ -208,7 +274,12 @@ def validate(root: Path) -> None:
     )
 
     invalid_result = copy.deepcopy(report)
-    invalid_result["results"][0]["disposition"] = "FILTERED_UNSUPPORTED"
+    correct_index = next(
+        index
+        for index, result in enumerate(invalid_result["results"])
+        if result.get("correct") is True
+    )
+    invalid_result["results"][correct_index]["disposition"] = "FILTERED_UNSUPPORTED"
     require(
         bool(list(validator.iter_errors(invalid_result))),
         "schema accepted a correct filtered result",

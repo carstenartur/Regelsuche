@@ -9,6 +9,7 @@ import de.regelsuche.benchmarks.ComparativeBenchmark.Role;
 import de.regelsuche.benchmarks.ComparativeBenchmark.SystemKind;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SimplificationSystem;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.ValidationSystem;
 import de.regelsuche.search.SearchHeuristic;
 import de.regelsuche.solver.ir.SolverIr;
@@ -71,6 +72,69 @@ final class ComparativeBenchmarkCatalog {
                 ExpectedVerdict.REFUTED));
     }
 
+    /**
+     * Target-free simplification corpus.
+     *
+     * <p>The stored target expression is the reference simplest form. It is the
+     * shared judge's answer key and is never handed to a competitor: the parity
+     * manifest for this track sets {@code targetVisible=false}.</p>
+     *
+     * <p>The corpus deliberately spans families that Regelsuche's rewrite
+     * inventory does not cover, so that an external competitor can win. A track
+     * where every configured competitor succeeds would carry no information.</p>
+     */
+    static List<Case> simplificationCases() {
+        return List.of(
+            Case.create(
+                "simplify-identity-collapse",
+                Track.SIMPLIFICATION_COMPETITION,
+                "identity",
+                "(x + 0) * 1",
+                "x",
+                List.of(),
+                ExpectedVerdict.TARGET_REACHED),
+            Case.create(
+                "simplify-annihilator",
+                Track.SIMPLIFICATION_COMPETITION,
+                "annihilator",
+                "x * 0 + y",
+                "y",
+                List.of(),
+                ExpectedVerdict.TARGET_REACHED),
+            Case.create(
+                "simplify-square-folding",
+                Track.SIMPLIFICATION_COMPETITION,
+                "power-folding",
+                "(a + b) * (a + b)",
+                "(a + b) ^ 2",
+                List.of(),
+                ExpectedVerdict.TARGET_REACHED),
+            Case.create(
+                "simplify-like-terms",
+                Track.SIMPLIFICATION_COMPETITION,
+                "linear-combination",
+                "x + x",
+                "2 * x",
+                List.of(),
+                ExpectedVerdict.TARGET_REACHED),
+            Case.create(
+                "simplify-constant-fraction",
+                Track.SIMPLIFICATION_COMPETITION,
+                "rational-reduction",
+                "(2 * x + 4) / 2",
+                "x + 2",
+                List.of(),
+                ExpectedVerdict.TARGET_REACHED),
+            Case.create(
+                "simplify-factor-cancellation",
+                Track.SIMPLIFICATION_COMPETITION,
+                "rational-cancellation",
+                "(x^2 - 1) / (x - 1)",
+                "x + 1",
+                List.of("x - 1 != 0"),
+                ExpectedVerdict.TARGET_REACHED));
+    }
+
     static InformationParityManifest searchParity(List<Case> cases) {
         return InformationParityManifest.create(
             "target-directed-shared-budget/v1",
@@ -113,6 +177,28 @@ final class ComparativeBenchmarkCatalog {
             List.of("EQUALITY_DECISION"));
     }
 
+    static InformationParityManifest simplificationParity(List<Case> cases) {
+        return InformationParityManifest.create(
+            "target-free-simplification/v1",
+            Track.SIMPLIFICATION_COMPETITION,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            corpusHash(cases),
+            SolverIr.sha256(
+                "regelsuche-inventory=" + searchInventoryHash()
+                    + "\nexternal-inventory=CAS_NATIVE_SIMPLIFIER"),
+            SolverIr.sha256(
+                "regelsuche-budget=" + searchBudgetHash()
+                    + "\nexternal-timeoutMillis=20000"),
+            notApplicable("research-brief"),
+            notApplicable("qualification-split"),
+            List.of("REFERENCE_FORM_REACHABILITY"));
+    }
+
     static Configuration searchConfiguration(
         SearchSystem system,
         InformationParityManifest parity
@@ -153,6 +239,31 @@ final class ComparativeBenchmarkCatalog {
             system.limitations());
     }
 
+    static Configuration simplificationConfiguration(
+        SimplificationSystem system,
+        InformationParityManifest parity
+    ) {
+        return Configuration.create(
+            "simplify-" + system.id(),
+            Track.SIMPLIFICATION_COMPETITION,
+            system.kind(),
+            List.of(Role.EQUALITY_REWRITE),
+            parity.contentHash(),
+            system.id(),
+            system.version(),
+            SolverIr.sha256(
+                "target-free-simplification/v1\nimplementation="
+                    + (system.strategy() == null
+                        ? "external:"
+                            + system.externalSimplifier().configurationHash()
+                        : "internal:"
+                            + system.strategy().getClass().getName())),
+            SolverIr.sha256("NO_MODEL"),
+            SolverIr.sha256(system.environmentIdentity()),
+            true,
+            system.limitations());
+    }
+
     static List<CoverageGap> coverageGaps() {
         return List.of(
             CoverageGap.create(
@@ -169,6 +280,14 @@ final class ComparativeBenchmarkCatalog {
                     "TARGET_FREE_EXTERNAL_BASELINE",
                     "ZERO_TO_MANY_CANDIDATE_OUTPUTS",
                     "PROJECT_NOVELTY_AND_FALSIFICATION")),
+            CoverageGap.create(
+                Track.SIMPLIFICATION_COMPETITION,
+                "The head-to-head simplification corpus is small, single-domain and does not yet include an equality-saturation or randomized-valid competitor.",
+                List.of(
+                    "EQUALITY_SATURATION_COMPETITOR",
+                    "RANDOMIZED_VALID_COMPETITOR",
+                    "MULTI_DOMAIN_SIMPLIFICATION_CORPUS",
+                    "ASSUMPTION_AWARE_CANCELLATION_CONTRACT")),
             CoverageGap.create(
                 Track.CROSS_FAMILY_TRANSFER,
                 "The fully held-out #222 transfer split is not part of the first executable slice.",
