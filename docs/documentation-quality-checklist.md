@@ -1,132 +1,167 @@
 # Documentation Quality Checklist
 
-Diese Checkliste gilt für alle nutzerseitigen Texte: Demo-Gallery,
-Web-Workbench-UI, Replay-Karten, Summary-Panels und Export-Berichte.
-Sie ergänzt die in der Demo-Gallery angewandten Strukturregeln um
-ein einheitliches Review-Raster.
+Diese Checkliste gilt für README, Handbücher, Architektur- und
+Entwicklerseiten, Forschungsberichte, Betriebsdokumentation und generierte
+Ergebnisse. Nicht jeder Punkt ist für jeden Seitentyp relevant; nicht
+zutreffende Punkte werden bewusst als solche behandelt.
 
-## Inhaltliche Kriterien
+## 1. Rolle und Zielgruppe
 
-- [ ] **Lokaler Bezug** — Jede Information, die im Kontext einer Demo
-      angezeigt wird, hat einen klaren lokalen Bezug zu dieser Demo.
-      Globale, demo-übergreifende Inhalte stehen ausschließlich in
-      *Suchgedächtnis → Universelle Muster* und sind dort als solche
-      gekennzeichnet.
-- [ ] **Klare Trennung global ↔ lokal** — In Demo-Kontexten heißt der
-      Regel-Abschnitt „Für diese Demo verwendete Regeln“ bzw.
-      „Relevante Regeln dieses Rechenwegs“, nicht „Erkannte
-      Identitäten“ und nicht „Inventar“.
-- [ ] **Relevanzfilter aktiv** — Es werden nur Regeln gezeigt, die
-      tatsächlich im Replay verwendet wurden, in einem alternativen
-      Pfad derselben Suche vorkommen, als Makroregel für diese Demo
-      aktiviert wurden oder für den Proof relevant sind.
-- [ ] **Eingabe ≠ Ergebnis** — Eingabe und Ergebnis sind in jeder
-      Demo getrennt dargestellt; der Rechenweg liegt sichtbar
-      dazwischen.
-- [ ] **Annahmen sichtbar** — Voraussetzungen (z. B. `x ≠ 0`) sind
-      sichtbar erklärt, bevor das Ergebnis steht.
-- [ ] **Proof-Status verständlich** — Der Proof-Status nutzt
-      verständliche Bezeichnungen statt interner Konstantennamen,
-      und der Unterschied zwischen *echtem Prover* und
-      *E2E-Test-Prover* ist klar benannt, wo relevant.
+- [ ] Die Seite besitzt eine erkennbare primäre Rolle: Einstieg, Handbuch,
+      Architektur, Forschung, Betrieb, Referenz oder generierter Bericht.
+- [ ] Zielgruppe und erwartetes Vorwissen sind aus Titel und Einleitung klar.
+- [ ] Die Seite beantwortet eine konkrete Nutzer- oder Entwicklungsfrage.
+- [ ] Detailtiefe und Begriffe passen zur Zielgruppe.
+- [ ] Historische Inhalte sind als historisch gekennzeichnet und nicht Teil des
+      aktuellen Hauptpfads.
 
-## API- und GUI-Dokumentation
+## 2. Quelle der Wahrheit
 
-- [ ] **Swagger/OpenAPI ist die Vertragsquelle** — HTTP-Methoden, Pfade,
-      Parameter, Payloads, Responses und Statuscodes werden nicht in
-      Nutzerseiten parallel gepflegt.
-- [ ] **GUI zuerst** — Eine nutzerbezogene Funktionsbeschreibung beginnt
-      mit Tab, Panel oder Schaltfläche und erklärt den sichtbaren Ablauf,
-      nicht den auslösenden Request.
-- [ ] **Sichtbares Ergebnis beschrieben** — Die Dokumentation sagt, was
-      nach der Aktion in der Oberfläche erscheint und wie damit
-      weitergearbeitet wird.
-- [ ] **Zustände beschrieben** — Bereit-, Lade-, Leer-, Erfolgs- und
-      Fehlerzustände sind für den jeweiligen Bedienfluss nachvollziehbar.
-- [ ] **Keine Endpoint-Kataloge** — Nutzerseiten enthalten keine Tabellen
-      oder Listen, die Swagger durch eine Auswahl von REST-Endpunkten
-      ersetzen.
-- [ ] **Keine rohen Request-Beispiele als Nutzerweg** — `curl`, rohe
-      HTTP-Blöcke und JSON-Payloads stehen nur in ausdrücklich
-      programmatischen Integrationsleitfäden.
-- [ ] **Technische Zuordnung bleibt knapp** — Falls hilfreich, nennt die
-      Nutzerseite nur den Swagger-Tag oder die `operationId`; sie kopiert
-      den Vertrag nicht.
-- [ ] **GUI-Lücke wird als Produktlücke behandelt** — Existiert für eine
-      öffentlich nutzbare REST-Funktion keine grafische Bedienmöglichkeit,
-      wird nicht ersatzweise mehr REST-Prosa geschrieben. Stattdessen wird
-      die fehlende GUI-Funktion als eigener Produktpunkt dokumentiert.
+- [ ] Die Seite dupliziert keinen Vertrag, der an anderer Stelle autoritativ
+      gepflegt wird.
+- [ ] REST-Methoden, Pfade, Payloads und Statuscodes verweisen auf OpenAPI.
+- [ ] Capability- und Claim-Status stammen aus generierter, gebundener Evidence.
+- [ ] Der aktuelle Forschungsstand steht auf der datierten Statusseite.
+- [ ] Schema-Details verweisen auf versionierte Dateien unter `docs/schemas/`.
+- [ ] Test- und CI-Aussagen entsprechen den checkout-eigenen Gradle-Tasks.
 
-## Sprachliche Kriterien
+## 3. Struktur und Navigation
 
-- [ ] **Keine internen Klassennamen** — Texte für Nutzerinnen und
-      Nutzer enthalten keine internen Klassennamen, Service-Namen,
-      CSS-Klassen oder Job-Worker-Namen.
-      *Beispiele, die vermieden werden:* `MacroRuleLearningService`,
-      `StubAlwaysSucceedsWorker`, `replay-flip-notice`.
-      *Gewählt wird stattdessen* eine kurze, lesbare Umschreibung,
-      z. B. „Eine Makroregel wurde aus mehreren Beispielen gelernt“,
-      „Der Proof-Test nutzt im E2E-Modus einen deterministischen
-      Test-Prover“, „Der kritische Schritt wird im Replay hervorgehoben“.
-- [ ] **Tooltips / Glossar für Fachbegriffe** — Begriffe wie
-      *Makroregel*, *Suchgraph*, *Replay*, *Proof-Status*,
-      *Universelle Muster*, *Equality Saturation*, *Suchgedächtnis*
-      sind im Glossar erklärt und werden in der UI als Tooltip oder
-      Info-Text angeboten.
-- [ ] **Einheitliche mathematische Notation** — Pro Feld wird genau
-      eine Form verwendet: Anzeigeform in Unicode/LaTeX
-      (z. B. `(x + 3)²`, `x²`), technische Eingabe im Codeblock
-      (z. B. `(x+3)^2`). Keine Mischung von `·` und `*` im selben
-      Feld; keine Mischung von `x²` und `x^2` im selben Feld.
+- [ ] Die Einleitung benennt Zweck und Ergebnis der Seite.
+- [ ] Überschriften bilden einen nachvollziehbaren Aufgaben- oder Systemfluss.
+- [ ] Lange Linklisten wurden in zielgerichtete Gruppen oder Referenzseiten
+      ausgelagert.
+- [ ] Die Seite enthält nur wenige relevante nächste Schritte.
+- [ ] Relative Links, Anker und Asset-Pfade sind gültig.
+- [ ] Der zentrale Dokumentationsindex verweist auf die Seite, wenn sie ein
+      unterstützter Einstieg ist.
 
-## Visuelle Kriterien
+## 4. Sprache und Verständlichkeit
 
-- [ ] **Screenshots mit Bildunterschrift** — Unter jedem Screenshot
-      steht ein Satz, der das Bild beschreibt, damit die Seite auch
-      ohne Bild verständlich bleibt
-      (z. B. „Der Screenshot zeigt den Suchgraphen mit hervorgehobenem
-      besten Rechenweg.“).
-- [ ] **Aussagekräftiger Alt-Text** — Bilder haben einen Alt-Text,
-      der nicht nur die Bilddatei benennt, sondern beschreibt, was
-      zu sehen wäre.
-- [ ] **Exportformate nach Nutzen** — Das Export-Bundle wird über den
-      *Nutzen* der enthaltenen Formate erklärt, nicht über eine reine
-      Dateiliste (z. B. „Markdown für Dokumentation“,
-      „LaTeX für mathematische Texte“, „JSON für maschinelle
-      Weiterverarbeitung“).
+- [ ] Die Seite verwendet überwiegend eine Sprache; technische IDs bleiben
+      unverändert.
+- [ ] Sätze sind vollständig, konkret und aktiv formuliert.
+- [ ] Interne Klassen- oder Servicenamen erscheinen nur in Entwicklerseiten.
+- [ ] Fachbegriffe sind im [Glossar](glossary.md) erklärt oder lokal definiert.
+- [ ] Statusbegriffe wie `QUALIFIED`, `BLOCKED` und `NOT_EVALUATED` werden nicht
+      vermischt.
+- [ ] Marketingaussagen sind entfernt oder durch einen benannten Vertrag
+      begrenzt.
 
-## Strukturelle Kriterien
+## 5. Nutzerhandbücher und UI
 
-- [ ] **Einheitliche Demo-Struktur** — Jede Demo folgt derselben
-      Reihenfolge: Kurzbeschreibung, Eingabe, Ergebnis, Rechenweg,
-      Verwendete Regeln, Annahmen, Proof-Status, Export. Leere
-      Abschnitte werden weggelassen.
-- [ ] **Produktstory pro Demo** — Jede Demo enthält einen Abschnitt
-      „Warum ist das interessant?“, der die Demo in 1–3 Sätzen aus
-      Nutzersicht einordnet.
-- [ ] **Demo-Gallery als geführte Tour** — Die Gallery beginnt mit
-      einer empfohlenen Tour und ist als Produktdemo lesbar, nicht
-      als Asset-Liste.
-- [ ] **Geprüfte Links und Asset-Pfade** — Alle Links innerhalb der
-      Dokumentation und alle Screenshot-Pfade sind erreichbar; tote
-      Links und fehlende Assets gelten als Fehler.
-- [ ] **GUI und Browser-E2E gemeinsam aktualisiert** — Ändert sich ein
-      sichtbarer Bedienfluss, werden Dokumentation, Screenshot und
-      zugehöriger Browserflow zusammen angepasst.
+- [ ] Der Ablauf beginnt mit Tab, Panel, Schaltfläche oder sichtbarem Einstieg.
+- [ ] Voraussetzungen und erforderliche Eingaben sind beschrieben.
+- [ ] Das sichtbare Ergebnis und der nächste Schritt sind erklärt.
+- [ ] Bereit-, Lade-, Leer-, Erfolgs- und Fehlerzustände sind nachvollziehbar.
+- [ ] Die Seite beschreibt den fachlichen Flow, nicht die interne Requestfolge.
+- [ ] Eine fehlende GUI wird als Produktlücke behandelt und nicht durch mehr
+      REST-Prosa kaschiert.
+- [ ] UI-Bezeichnungen stimmen mit der aktuellen Oberfläche überein.
+- [ ] Änderungen am Flow sind durch Browser-E2E abgedeckt.
+
+## 6. Mathematische Darstellung
+
+- [ ] Eingabe, Ergebnis und Rechenweg sind getrennt dargestellt.
+- [ ] Annahmen und Definitionsbereiche stehen sichtbar bei der Aussage.
+- [ ] Unicode-/LaTeX-Anzeige und technische Eingabesyntax werden nicht im selben
+      Feld vermischt.
+- [ ] `*`/`·`, `^`/Hochstellung und Klammerung werden konsistent verwendet.
+- [ ] Ein Suchpfad wird nicht ohne Proof-Evidence als formaler Beweis bezeichnet.
+- [ ] Validierung, Refutation und Nichtausführung sind sprachlich getrennt.
+
+## 7. Forschungs- und Statusseiten
+
+- [ ] Die Seite trägt einen Datums- oder Versionsstand.
+- [ ] Corpus, Track, Informationsgrenze und Ressourcenbudget sind benannt oder
+      verlinkt.
+- [ ] Konfigurierte, ausgeführte, übersprungene und verbleibende Arbeit bleibt
+      sichtbar.
+- [ ] Negative Ergebnisse und Nullresultate werden vollständig berichtet.
+- [ ] Projekt-Neuheit ist von externer mathematischer Neuheit getrennt.
+- [ ] Search Improvement, Validation, Proof, Utility, Interestingness,
+      Promotion und Public Evidence werden nicht zu einem Erfolgsflag
+      zusammengezogen.
+- [ ] Messwerte besitzen Einheit, Vergleichsbasis und Reproduktionsverweis.
+- [ ] Wandzeitangaben nennen Umgebung und ersetzen keine kanonische
+      Work-Bilanz.
+- [ ] Schlussfolgerungen überschreiten den autorisierten Claim nicht.
+
+## 8. Architektur- und Entwicklerseiten
+
+- [ ] Verantwortungen und Abhängigkeitsrichtungen sind klar.
+- [ ] Diagramme stimmen mit `settings.gradle`, Modulstruktur und
+      Dependency-Regeln überein.
+- [ ] Technologieabhängigkeiten sind an äußeren Adaptern verortet oder
+      begründet.
+- [ ] Trust- und Informationsgrenzen sind explizit.
+- [ ] Änderungskriterien und erforderliche Tests sind genannt.
+- [ ] Beispiele beschreiben unterstützte Patterns und keine zufälligen
+      Implementierungsdetails.
+
+## 9. Betrieb und Sicherheit
+
+- [ ] Demo-, Entwicklungs- und Produktionsannahmen sind getrennt.
+- [ ] Bind-Adressen, Authentifizierung, TLS und Zugangsdaten werden nicht
+      missverständlich dargestellt.
+- [ ] Persistenz-, Backup-, Migrations- und Diagnosegrenzen sind benannt, soweit
+      relevant.
+- [ ] Unsichere Fallbacks sind als lokale Demo-Defaults gekennzeichnet.
+- [ ] Fehler- und Recovery-Verhalten ist beschrieben.
+
+## 10. Bilder, Diagramme und Medien
+
+- [ ] Bilder besitzen aussagekräftigen Alt-Text.
+- [ ] Der umgebende Text erklärt die relevante Aussage des Bildes.
+- [ ] Screenshots werden aus dem zugehörigen Browser-E2E-Flow erzeugt.
+- [ ] Diagramme sind auch ohne Farbinformation verständlich.
+- [ ] Bilder ersetzen keine notwendigen Zahlen, Grenzen oder Textaussagen.
+- [ ] Exportformate werden nach ihrem Nutzen erklärt, nicht nur aufgelistet.
+
+## 11. Generierte Dokumentation
+
+- [ ] Generierte Dateien oder markierte Abschnitte wurden nicht manuell editiert.
+- [ ] Quelle, Generator und Verifier sind auffindbar.
+- [ ] Marker sind eindeutig und vollständig.
+- [ ] Manueller Text widerspricht dem generierten Status nicht.
+- [ ] Ein Regenerationslauf ist deterministisch oder dokumentiert diagnostische
+      Abweichungen ausdrücklich.
+- [ ] Source-Tree-Dateien werden durch einen normalen Build nicht als
+      Nebeneffekt verändert.
+
+## 12. Reproduktion und Review
+
+- [ ] Ausführbare Befehle verwenden den Gradle Wrapper oder dokumentierte
+      Checkout-Skripte.
+- [ ] Voraussetzungen sind vollständig.
+- [ ] Erwartete Outputs oder Artefaktpfade sind beschrieben.
+- [ ] Der kleinste passende Verifikationstask wurde ausgeführt.
+- [ ] Link- und Mathematikprüfung ist grün.
+- [ ] Bei Änderungen an Claims oder Evidence ist der zugehörige unabhängige
+      Verifier grün.
+- [ ] Der Checkout bleibt nach normaler Verifikation sauber.
+
+## Mindestkriterien nach Seitentyp
+
+| Seitentyp | Unverzichtbar |
+| --- | --- |
+| README / Einstieg | klare Projektbeschreibung, Schnellstart, Statusgrenze, zielgruppenbezogene Navigation |
+| Nutzerhandbuch | sichtbarer Flow, Zustände, Ergebnis, Browser-E2E |
+| Architektur | Verantwortung, Schichten, Abhängigkeiten, Trust-Grenzen |
+| Forschung | Datum, Track, Evidence, negatives Accounting, Claim und Nicht-Claims |
+| Betrieb | Voraussetzungen, Sicherheit, Persistenz und Diagnose |
+| Referenz | stabile Begriffe, Links zur autoritativen Maschine-Quelle |
+| Generierter Bericht | Quelle, Hashbindung, Generator, Verifier und Nicht-Editierbarkeit |
 
 ## Akzeptanzkriterium
 
-Die Demo-Gallery, die UI und ihre Nutzerdokumentation gelten als bereinigt, wenn:
+Eine Seite gilt als professionell gepflegt, wenn sie:
 
-1. keine fremden oder globalen Identitäten mehr unter lokalen Demos erscheinen,
-2. jede angezeigte Regel begründet lokal relevant ist,
-3. jede Demo Eingabe, Ergebnis, Rechenweg und Annahmen klar trennt,
-4. Proof-Informationen nicht missverständlich sind,
-5. keine internen Klassennamen in Nutzertexten auftauchen,
-6. die Demo-Gallery wie eine geführte Produktdemo wirkt,
-7. Nutzerseiten GUI-Abläufe statt REST-Verträge dokumentieren,
-8. Swagger/OpenAPI die einzige parallel gepflegte REST-Referenz bleibt.
-
-> Der wichtigste Punkt ist: **Alles, was im Demo-Kontext angezeigt
-> wird, muss lokal erklärbar sein — und alles, was eine Nutzeraktion
-> beschreibt, muss in der sichtbaren Oberfläche auffindbar sein.**
+1. eine eindeutige Rolle besitzt;
+2. keine konkurrierende Quelle der Wahrheit erzeugt;
+3. für ihre Zielgruppe handlungsfähig und verständlich ist;
+4. Claims, Status und Grenzen präzise wiedergibt;
+5. reproduzierbar geprüft werden kann;
+6. in die zentrale Navigation eingeordnet ist;
+7. durch normale Verifikation keinen unbeabsichtigten Source-Tree-Change
+   erzeugt.

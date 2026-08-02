@@ -1,73 +1,209 @@
 # Web-Workbench
 
-Die Web-Workbench (`de.regelsuche.web.WebWorkbenchServer`) verwendet den im JDK eingebauten `com.sun.net.httpserver.HttpServer` und bringt damit keine zusätzliche Web-Framework-Abhängigkeit ins Projekt. Start per CLI:
+Die Web-Workbench ist die grafische Oberfläche für Suche, Erklärung, Discovery,
+Proof-Jobs und Export. Diese Seite beschreibt den sichtbaren Produktfluss.
+Technische HTTP-Verträge stehen ausschließlich in der mitgelieferten
+Swagger/OpenAPI-Referenz.
+
+## Start
 
 ```bash
 ./gradlew run --args="serve --port 8080 --host 127.0.0.1"
 ```
 
-Danach ist die Oberfläche unter `http://127.0.0.1:8080/` erreichbar.
+Öffne anschließend `http://127.0.0.1:8080/`.
 
-## Zweck der Oberfläche
+Für den schnellsten Einstieg kann alternativ das Standard-Dockerimage verwendet
+werden; siehe [Getting Started](getting-started.md).
 
-Die Web-Workbench ist die grafische Bedienoberfläche für die Funktionen, die der Server auch über seine REST-API bereitstellt. Diese Seite beschreibt deshalb den sichtbaren Produktfluss. Methoden, Pfade, Payloads, Responses und Statuscodes werden nicht parallel gepflegt, sondern stehen ausschließlich in Swagger/OpenAPI.
+## Empfohlener erster Ablauf
 
-## Bedienbereiche
+1. **Demo auswählen.** Starte zum Beispiel die Binomische Formel oder eine
+   Bruchkürzung.
+2. **Ergebnis überblicken.** Die Workbench zeigt Zusammenfassung und
+   weiterführende Bereiche erst nach dem ersten Lauf.
+3. **Pfade und Graph prüfen.** Vergleiche den besten Rechenweg mit den
+   erkundeten Alternativen.
+4. **Replay abspielen.** Prüfe jeden Schritt, die verwendete Regel und sichtbare
+   Annahmen.
+5. **AST-Regelradar öffnen.** Wähle eine Baumposition und untersuche dort
+   anwendbare Regeln sowie den vollständigen Folgeausdruck.
+6. **Ergebnis weiterverwenden.** Erzeuge ein Export-Bundle oder starte eine
+   passende Proof-Obligation.
 
-| Bereich | Grafische Funktion | Sichtbares Ergebnis | Swagger-Bereich |
-| --- | --- | --- | --- |
-| **Demo-Bereich** | Eine vorbereitete mathematische Aufgabe mit einem Klick ausführen | Zusammenfassung, bester Rechenweg, Graph, Replay, Identität und Exportzugänge | Demo, Search, Exports |
-| **Workbench** | Ausdruck, Typ, Profil, Ziel und Regel-Domänen wählen und die Suche starten | Suchstatus und Ergebniszusammenfassung; nach dem ersten Lauf werden die weiterführenden Tabs sichtbar | Search |
-| **Pfade** | Gefundene Rechenwege aktualisieren, Darstellungsform wählen und einen Pfad öffnen | Sortierte Alternativen und eine lesbare Detail-Erklärung | Paths, Explain |
-| **Graph** | Suchraum laden, Ansichtsmodus und Filter wählen, Knoten untersuchen | Interaktiver Suchgraph mit Hauptpfad, Alternativen, Clustern und Inspector; Mermaid bleibt als Fallback verfügbar | Search Graph, Graph |
-| **Regelkandidaten** | Aus der Suche abgeleitete Kandidaten prüfen und nach Evidenz einordnen | Pattern, Beispiele, Bewertung, Status, Proof-Status und Annahmen | Candidates |
-| **Identitäten** | Wiederkehrende oder emergente Strukturen prüfen und geeignete Ergebnisse übernehmen | Identitätskarten mit Evidenz und Übernahmeaktion | Identities, Inventory |
-| **Dashboard** | Kennzahlen des aktuellen Suchraums überblicken | Knoten, Kanten, Sackgassen, Tiefe, Verzweigung, nützliche Regeln und Kandidaten | Search Graph |
-| **Benchmark** | Reproduzierbare Qualitätsszenarien ausführen und vergleichen | Ampelstatus und fachliche sowie technische Qualitätsmetriken pro Szenario | Benchmark |
-| **Replay** | Einen Rechenweg abspielen, anhalten und schrittweise untersuchen | Mathematische Zwischenschritte, hervorgehobene Änderungen, Regelhinweise und Annahmen | Paths, Replay |
-| **Vergleich** | Zwei Ergebnisse oder Pfade nebeneinander betrachten | Unterschiede in Ergebnisform, Länge, Bewertung und didaktischer Eignung | Paths, Compare |
-| **Inventar** | Wiederverwendbare Regeln durchsuchen, aktivieren und mit Tags ordnen | Aktueller Regelbestand und sichtbare Bestätigung der Änderung | Inventory |
-| **Suchgedächtnis** | Wiederkehrende Zustände und universelle Muster über mehrere Läufe untersuchen | Universality Score, Rule-Coverage und wiederverwendbare Strukturen | Memory |
-| **Proof-Jobs** | Beweisauftrag einreichen, Status verfolgen, abbrechen und Artefakte öffnen | Persistenter Jobstatus sowie Lean-/SMT-Artefakte, Ausgaben und Metadaten | Proof Jobs |
-| **Exporte** | Ergebnisse in geeigneter Form weiterverwenden | Downloads für Dokumentation, mathematische Texte, Graphwerkzeuge und maschinelle Verarbeitung | Exports |
-| **Didaktik** | Erklär- und Bewertungsfunktionen für Lernwege verwenden | Unterrichtsnahe Darstellung und didaktische Qualitätsinformationen | Didactics |
-| **AST-Regelradar** | Ausdruck als AST untersuchen, einen Knoten wählen, dort anwendbare Züge prüfen und eine Anwendung zunächst als Vorschau betrachten | Zoombarer Ausdrucksbaum mit positionsgebundenen Grund-, Erweiterungs- und Makroregeln, Bindungen, Annahmen, Folgeausdruck sowie Auswahl-, Anwendungs- und Pruningstatus | Rule Radar |
-| **Hilfe** | Syntax, Begriffe und Bedienhinweise nachschlagen; technische Referenz öffnen | Kontextnahe Kurzhilfe sowie direkte Links zur lokalen Swagger-UI und OpenAPI-Spezifikation | — |
+Die [Demo Gallery](demo-gallery.md) zeigt diesen Ablauf mit testgenerierten
+Screenshots.
 
-Die Namen in der letzten Spalte sind fachliche Zuordnungen. Die verbindlichen Operationen und Schemata stehen in der Swagger/OpenAPI-Dokumentation der laufenden Installation.
+## Bereiche der Workbench
 
-## Typischer Bedienfluss
+| Bereich | Aufgabe | Sichtbares Ergebnis |
+| --- | --- | --- |
+| **Demo-Bereich** | vorbereitete mathematische Aufgabe ausführen | Zusammenfassung, Pfade, Graph, Replay und Exportzugänge |
+| **Workbench** | Ausdruck, optionales Ziel, Profil und Regelbereiche festlegen | Suchstatus und Ergebniszusammenfassung |
+| **Pfade** | gefundene Rechenwege laden und vergleichen | sortierte Alternativen mit lesbarer Erklärung |
+| **Graph** | erkundeten Suchraum untersuchen | interaktiver Graph mit Hauptpfad, Alternativen und Inspector |
+| **Replay** | ausgewählten Pfad schrittweise abspielen | Zwischenausdrücke, Änderungen, Regeln und Annahmen |
+| **AST-Regelradar** | lokale Züge an einer AST-Position untersuchen | Regelkandidaten, Bindungen, Annahmen und Vorschau des Folgeausdrucks |
+| **Regelkandidaten** | aus Suchbeobachtungen gebildete Kandidaten bewerten | Pattern, Unterstützung, Status und Evidence |
+| **Identitäten** | wiederkehrende Strukturen untersuchen | Identitätskarten und mögliche Weiterverwendung |
+| **Dashboard** | aktuellen Suchraum zusammenfassen | Knoten, Kanten, Tiefe, Verzweigung und Qualitätskennzahlen |
+| **Benchmark** | eingefrorene Szenarien ausführen | track-spezifische Ergebnisse und Diagnosemetriken |
+| **Vergleich** | zwei Pfade oder Ergebnisse gegenüberstellen | Unterschiede in Form, Länge, Bewertung und Eignung |
+| **Inventar** | aktiven Regelbestand untersuchen | Regeln, Herkunft, Tags, Packs und Aktivierungsstatus |
+| **Suchgedächtnis** | wiederkehrende Zustände und Muster über Läufe prüfen | Coverage und wiederverwendbare Strukturen |
+| **Proof-Jobs** | Obligation einreichen und Ausführung verfolgen | Jobstatus, Solver-Ausgabe und Artefakte |
+| **Exporte** | Ergebnisse weiterverwenden | Formate für Dokumentation, mathematische Texte, Graphanalyse und Maschinenverarbeitung |
+| **Didaktik** | Lern- und Erklärperspektiven prüfen | didaktisch aufbereitete Rechenwege und Bewertungen |
+| **Hilfe** | Syntax und Begriffe nachschlagen | kontextnahe Hinweise sowie Links zu Swagger und OpenAPI |
 
-1. Im Demo-Bereich eine Aufgabe wählen oder im Tab **Workbench** eine eigene Suche starten.
-2. In **Pfade**, **Graph** und **Replay** nachvollziehen, wie die Umformung zustande kam.
-3. Im **AST-Regelradar** untersuchen, welche konkreten lokalen Züge an einer ausgewählten Baumposition möglich waren und welche davon die Suche verwendet oder verworfen hat.
-4. In **Regelkandidaten**, **Identitäten**, **Dashboard** und **Benchmark** Evidenz und Qualität beurteilen.
-5. In **Inventar**, **Suchgedächtnis** oder **Proof-Jobs** mit dem Ergebnis weiterarbeiten.
-6. In **Exporte** das passende Ausgabeformat herunterladen.
+Nicht jeder Bereich ist vor der ersten Suche sichtbar. Die Oberfläche reduziert
+den Einstieg bewusst auf einen Hauptfluss und blendet Detailbereiche erst ein,
+wenn passende Daten vorhanden sind.
 
-## Zustände und Rückmeldungen
+## Workbench: eigene Suche
 
-Jeder auslösende Bereich soll mindestens folgende Zustände verständlich darstellen:
+### Voraussetzungen
 
-- **bereit:** benötigte Eingaben und Voraussetzungen sind erkennbar;
-- **läuft:** eine Suche, Auswertung oder ein Proof-Job ist sichtbar in Bearbeitung;
-- **erfolgreich:** Ergebnis und nächster sinnvoller Schritt werden angeboten;
-- **leer:** es wird erklärt, warum noch keine Daten vorhanden sind und welche Aktion sie erzeugt;
-- **fehlgeschlagen:** die Oberfläche zeigt eine nutzbare Fehlermeldung, ohne rohe Serverantworten als Benutzerdokumentation zu verwenden.
+Keine. Für eine zielgerichtete Suche werden Ausdruck und Ziel benötigt; für
+eine targetfreie Suche bleibt das Zielfeld leer und die entsprechende Policy
+entscheidet über das retained Ergebnis.
 
-## Technische REST-Referenz
+### Eingaben
 
-Für direkte REST-Nutzung gilt ausschließlich Swagger/OpenAPI. Nutzer- und Feature-Dokumente verweisen höchstens auf den fachlichen Swagger-Bereich oder eine `operationId`; sie wiederholen keine Endpoint-Tabellen oder JSON-Verträge. Siehe [Dokumentationskonvention](documentation-conventions.md).
+- mathematischer Ausdruck;
+- Aufgabentyp beziehungsweise Domäne;
+- optionaler Zielausdruck;
+- Suchprofil und Budget;
+- aktive Regelbereiche oder Packs.
 
-Nach dem Start der Workbench stehen zwei stabile lokale Zugänge bereit:
+### Sichtbares Ergebnis
 
-- **Swagger UI:** `http://127.0.0.1:8080/static/openapi/index.html`
-- **OpenAPI 3.1 JSON:** `http://127.0.0.1:8080/static/openapi/openapi.json`
+Während der Ausführung zeigt die Workbench den Suchstatus. Nach Abschluss sind
+Zusammenfassung, Pfade und Graph verfügbar. Ein leerer oder budgeterschöpfter
+Lauf bleibt als solcher sichtbar und wird nicht als technischer Erfolg mit
+mathematischem Ergebnis dargestellt.
 
-Die Swagger-Oberfläche, ihre JavaScript- und CSS-Dateien sowie Lizenz- und Hinweisdateien werden vollständig aus dem gestarteten Checkout ausgeliefert. Für die API-Referenz ist weder ein CDN noch eine Internetverbindung erforderlich.
+## Pfade, Graph und Replay
 
-Die Spezifikation ist zugleich ausführbarer Routenvertrag: Beim Serverstart müssen ihre öffentlichen API-Kontexte exakt zu den registrierten Handlern passen. Vor der fachlichen Verarbeitung prüft die Workbench außerdem HTTP-Methode und konkretes Pfadtemplate. Nicht dokumentierte Unterpfade werden mit `404`, für einen bekannten Pfad nicht erlaubte Methoden mit `405` und einem `Allow`-Header abgewiesen.
+### Pfade
 
-## Statische Assets
+Der Pfadbereich zeigt retained Rechenwege. Ein Pfad besteht aus konkreten
+Regelanwendungen und ist nicht nur eine Liste von Ausdrücken. Zu jedem Schritt
+gehören Herkunft, Position, Bindungen, Annahmen und Kosten.
 
-Die Oberfläche unter `/` lädt ihre HTML-, CSS- und JavaScript-Ressourcen aus dem Classpath-Verzeichnis `app/src/main/resources/web/`. KaTeX, Cytoscape und die gepinnte Swagger UI werden selbst gehostet; die Benutzung der Workbench und ihrer technischen API-Referenz erfordert keine externen CDN-Zugriffe.
+### Graph
+
+Der Suchgraph enthält vollständige Ausdruckszustände. Filter dürfen die Ansicht
+vereinfachen, ändern aber nicht die retained Evidence. Ein AST innerhalb eines
+Zustands und der Graph zwischen Zuständen sind unterschiedliche Strukturen.
+
+### Replay
+
+Replay stellt einen ausgewählten Pfad erneut dar. Änderungen werden
+hervorgehoben; Annahmen bleiben beim betroffenen Schritt sichtbar. Replay ist
+nachvollziehbare Ableitungsevidence, aber kein automatischer formaler Beweis.
+
+## AST-Regelradar
+
+### Einstieg
+
+Öffne nach einer Suche den Bereich **AST-Regelradar** und wähle einen Knoten im
+Ausdrucksbaum.
+
+### Sichtbares Ergebnis
+
+Die Workbench zeigt die an dieser Position ausführbaren Grund-, Pack-, Plugin-
+und Makroregeln. Für jede Anwendung werden soweit verfügbar dargestellt:
+
+- Regelherkunft und Identität;
+- gebundene Platzhalter;
+- erforderliche oder emittierte Annahmen;
+- vollständiger Folgeausdruck;
+- Auswahl-, Ausführungs- oder Pruningstatus im zugehörigen Suchlauf;
+- bei Makros die zugrunde liegenden primitiven Schritte.
+
+Eine Vorschau verändert weder den aktiven Ausdruck noch das Inventar. Erst die
+explizite Anwendung erzeugt einen neuen Zustand.
+
+## Kandidaten, Identitäten und Inventar
+
+Diese Bereiche unterscheiden drei Ebenen:
+
+1. **Beobachtung:** eine Struktur wurde in einem Lauf gefunden;
+2. **Kandidat:** eine verallgemeinerte Regel besitzt eigene Lineage und
+   Prüfpflichten;
+3. **aktive Regel:** ein autoritativer Bestand hat den Kandidaten nach seinen
+   Gates übernommen.
+
+Ein Kandidat wird nicht allein durch häufiges Auftreten promoted. Validation,
+Counterexample Search, Proof, Novelty und Promotion bleiben getrennte Stufen.
+
+## Proof-Jobs
+
+### Voraussetzungen
+
+Eine formulierte Obligation und ein aktiviertes Proof-Backend.
+
+### Ablauf
+
+1. Obligation und Annahmen eingeben oder aus einem geeigneten Pfad übernehmen.
+2. Job einreichen.
+3. Status und Solver-Ausführung verfolgen.
+4. Bei Abschluss Artefakte und Ausgaben öffnen.
+
+`FORMALLY_PROVED` wird nur angezeigt, wenn das konfigurierte Backend den
+entsprechenden Vertrag tatsächlich bestätigt. Ein technischer Fehler oder ein
+nicht verfügbares Backend ist kein mathematischer Gegenbeweis.
+
+## Exporte
+
+Das Export-Bundle bietet Formate nach Verwendungszweck:
+
+- **Markdown** für Dokumentation und Reviews;
+- **LaTeX** für mathematische Texte;
+- **JSON** für maschinelle Weiterverarbeitung;
+- **Mermaid und GraphML** für Graphdarstellung und Analyse;
+- **Rule Inventory** für die reproduzierbare Einordnung des aktiven
+  Regelbestands.
+
+Ein Export bindet den aktuellen Lauf; er ist keine allgemeine Freigabe eines
+Kandidaten als aktive Regel.
+
+## Zustände und Fehlermeldungen
+
+Jeder auslösende Bereich soll folgende Zustände unterscheiden:
+
+- **bereit:** Eingaben und Voraussetzungen sind erkennbar;
+- **läuft:** die Operation ist sichtbar aktiv;
+- **erfolgreich:** Ergebnis und nächster Schritt werden angeboten;
+- **leer:** es wird erklärt, welche Aktion Daten erzeugt;
+- **budgeterschöpft oder ohne Ergebnis:** fachlicher Terminalzustand bleibt
+  sichtbar;
+- **fehlgeschlagen:** verständliche Diagnose ohne rohe Serverantwort als
+  Benutzertext.
+
+## REST-Referenz
+
+Nach dem Start stehen lokal bereit:
+
+- Swagger UI: `http://127.0.0.1:8080/static/openapi/index.html`
+- OpenAPI 3.1 JSON: `http://127.0.0.1:8080/static/openapi/openapi.json`
+
+Die Referenz wird vollständig selbst gehostet. Methoden, konkrete Pfade,
+Payloads, Statuscodes und technische Beispiele werden ausschließlich dort
+gepflegt. Siehe [Dokumentationskonventionen](documentation-conventions.md).
+
+## Sicherheit
+
+Die lokale Standarddemo verwendet HTTP ohne Anmeldung. Sie ist an
+`127.0.0.1` zu binden. Eine extern erreichbare Installation benötigt
+mindestens authentifiziertes TLS, eigene Zugangsdaten, Größen- und
+Ressourcengrenzen sowie ein Betriebskonzept.
+
+## Siehe auch
+
+- [Web-Workbench-Benutzerhandbuch](web-ui-user-guide.md)
+- [User Workflows](user-workflows.md)
+- [AST-Regelradar](ast-rule-radar.md)
+- [Proof Workbench](proof-workbench.md)
+- [Getting Started](getting-started.md)

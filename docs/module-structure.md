@@ -1,64 +1,139 @@
-# Module Structure (Teil 0)
+# Modulstruktur
 
-Regelsuche nutzt echte Gradle-Subprojekte für die sauber trennbaren Schichten. Die restlichen Zielmodule bleiben bewusst in `app`, bis ihre heutigen Import-Zyklen über die eingeführten Ports aufgelöst sind.
+Regelsuche ist ein Gradle-Multi-Projekt. Fachliche Verantwortungen werden in
+eigenständigen Modulen gehalten; `app` bleibt die äußere Composition Root für
+Web, konkrete CLI, Bootstrap und technische Adapter.
 
-| Gradle-Projekt | Paketbasis | Verantwortung | Abhängigkeiten |
-| --- | --- | --- | --- |
-| `:regelsuche-core` | `de.regelsuche.ast`, `parse`, `canonical`, `rules`, `transform` (ohne `SymPyTransformationEngine`), `assumption`, `input`, `algebra`, `calculus`, `linalg`, `json`, `notify`, `util` | AST, Parser, kanonische Form, Rewrite-Regeln/Pattern-Ausdrücke, deterministische Mathematik-Helfer | keine Projektabhängigkeiten, keine Infrastruktur-Libraries |
-| `:regelsuche-egraph` | `de.regelsuche.egraph` | E-Graph, Equality Saturation, Pattern-Matching | `:regelsuche-core` |
-| `:regelsuche-search` | `de.regelsuche.search` (ohne `TransformationSearchService`, `TeachingPathScorer`), `search.strategy`, `search.memory` (ohne JSON/Neo4j-Adapter), `scoring`, `scoring.cost` | Suchprofile, Strategien, CostModels, SearchMemory und TranspositionTable-Port/InMemory-Implementierung | `:regelsuche-core`, `:regelsuche-egraph` |
-| `:regelsuche-validation` | `de.regelsuche.equivalence`, `validation` | Äquivalenzchecks, Gegenbeispiel-/Validierungsports, Registry/Ports für mathematische Algorithmen | `:regelsuche-core` |
-| `:regelsuche-solver-ir` | `de.regelsuche.solver.ir` | Solver-neutrale Obligation-, Translation-, Result- und Execution-Verträge sowie exakte interne Referenzbackends | `:regelsuche-core`, `:regelsuche-search`, `:regelsuche-validation`, `:regelsuche-math-algorithms` |
-| `:regelsuche-solver-portfolio` | `de.regelsuche.solver.portfolio` | Capability-basierte Solver-Auswahl, Budgets, Timeouts, Cache, Konflikte und externer Z3-Adapter | `:regelsuche-solver-ir` |
-| `:regelsuche-benchmarks` | `de.regelsuche.benchmarks` | Track-spezifische Vergleichsverträge, Informationsparität, externe SymPy-/Z3-Baselines und kanonische Benchmark-Evidence | `:regelsuche-search`, `:regelsuche-solver-ir`, `:regelsuche-solver-portfolio` |
-| `:regelsuche-math-algorithms` | `de.regelsuche.math.algorithms` | Reine Java-Implementierungen (direkte Polynom-Normalform-Identitäten, kleine Gröbner-Idealreduktion, Knuth-Bendix/Critical-Pairs, PSLQ-ähnliche numerische Relationssuche) | `:regelsuche-core`, `:regelsuche-validation` |
-| `:regelsuche-math-jas` | `de.regelsuche.math.jas` | Optional isolierte Adapter-Schicht für JAS-nahe Backends | `:regelsuche-validation` |
-| `:regelsuche-persistence` | `de.regelsuche.persistence.PersistenceConfig`, `GraphPersistenceMode`; `de.regelsuche.checkpoint` | Persistenz-Ports/-Konfiguration und checkpointfähige Suchjob-Snapshots ohne Datenbanktreiber | `:regelsuche-core` |
-| `:regelsuche-persistence-hibernate` | `de.regelsuche.persistence.relational` | PostgreSQL-/Hibernate-ORM-Entities, MigrationRunner, Repositories und Hibernate-Search-Facettenindex | `:regelsuche-persistence`, `:regelsuche-learning`, `:regelsuche-validation`, `:regelsuche-core` |
-| `:regelsuche-learning` | portable Teile von `de.regelsuche.mining` | Hypothesis-/Rule-Candidate-Mining und Anti-Unification-Primitiven ohne App-Orchestrierung | `:regelsuche-core`, `:regelsuche-search`, `:regelsuche-validation`, `:regelsuche-solver-ir` |
-| `:regelsuche-experiments` | `de.regelsuche.benchmark`, `de.regelsuche.example`, portable Autopilot-Kernverträge | Experiment-/Benchmark-Primitiven, wissenschaftliches Seed-Corpus, reproduzierbarer Runner sowie Plan-, Budget- und Evidence-DAG-Verträge | `:regelsuche-search`, `:regelsuche-validation`, `:regelsuche-math-algorithms`, `:regelsuche-discovery` |
-| `:regelsuche-autopilot` | Composition-Anteile von `de.regelsuche.experiments.autopilot` | Verbindung der unabhängigen Autopilot-Verträge mit Mining, Project-Novelty, Proof, Lifecycle und äußeren Campaign-Artefakten | `:regelsuche-experiments`, `:regelsuche-learning` |
-| `:regelsuche-release` | `de.regelsuche.release` | Fail-closed Releaseprofile, Kandidatenqualifikation und gepaarte Utility | Autopilot-/Learning-/Search-/Solver-Evidence nach explizitem Build-Vertrag |
-| `:regelsuche-cli` | `de.regelsuche.cli.core` | CLI-neutrale Command-Registry und Optionsparser-Primitiven | keine Projektabhängigkeiten |
-| `:regelsuche-discovery` | `de.regelsuche.discovery` | Portable Discovery-Pfad-DTOs, Discovery-Optionen/Profile und Hypothesenoperator-Metadaten | `:regelsuche-core`, `:regelsuche-search`, `:regelsuche-validation` |
-| `:app` | Runtime-Wiring, Web/CLI, Bootstrap und noch zyklische obere Schichten | Composition Root, Web/API/Docker/Bootstrap-Wiring | die produktiven Fachmodule plus technische Adapter |
+`settings.gradle` und die jeweiligen `build.gradle`-Dateien sind die
+maßgebliche technische Quelle. Diese Seite erklärt die beabsichtigte
+Verantwortung und darf keine abweichende zweite Dependency-Definition erzeugen.
+
+## Modulübersicht
+
+| Gradle-Projekt | Verantwortung | Typische direkte Grundlagen |
+| --- | --- | --- |
+| `:regelsuche-core` | AST, Parser, kanonische Identität, Annahmen und atomare Transformationen | keine Projektabhängigkeit |
+| `:regelsuche-egraph` | E-Graph, Equality Saturation und E-Matching | Core |
+| `:regelsuche-search` | Suchprobleme, Strategien, Budgets, Scoring und Search Memory | Core, E-Graph |
+| `:regelsuche-validation` | Äquivalenz-, Validation- und Counterexample-Verträge | Core |
+| `:regelsuche-math-algorithms` | reine mathematische Algorithmen und interne Referenzverfahren | Core, Validation |
+| `:regelsuche-math-jas` | optional isolierte JAS-nahe Adapter | Validation |
+| `:regelsuche-solver-ir` | solver-neutrale Obligationen, Übersetzungen, Ergebnisse und Executions | Core, Search, Validation, Math Algorithms |
+| `:regelsuche-solver-portfolio` | capability-aware Backend-Auswahl, Budgets, Cache und Konflikte | Solver IR |
+| `:regelsuche-learning` | Mining, Anti-Unification, Kandidaten und Rewrite-Program-Lernen | Core, Search, Validation, Solver IR |
+| `:regelsuche-discovery` | domänenneutrale Discovery-Typen, Profile und Lifecycle-Handoff | Core, Search, Validation |
+| `:regelsuche-experiments` | Experiment-, Corpus-, Budget- und Evidence-DAG-Verträge | Search, Validation, Discovery, Math Algorithms |
+| `:regelsuche-benchmarks` | track-spezifische Vergleiche und Informationsparität | Search, Solver IR, Solver Portfolio |
+| `:regelsuche-persistence` | technologiearme Persistenzports, Konfiguration und Checkpoints | Core |
+| `:regelsuche-persistence-hibernate` | PostgreSQL, Hibernate ORM/Search, Migrationen und relationale Repositories | Persistence und benötigte Fachmodule |
+| `:regelsuche-autopilot` | Composition von Experiment-, Learning- und Campaign-Verträgen | Experiments, Learning |
+| `:regelsuche-release` | Qualification, Evidence Profiles, Utility und Reproduktionsartefakte | explizite obere Fachmodule |
+| `:regelsuche-cli` | projektunabhängige CLI-Primitiven und Optionsverarbeitung | keine Projektabhängigkeit |
+| `:app` | Composition Root, Web-Workbench, konkrete CLI, Docker-/Runtime-Wiring | produktive Fachmodule und Adapter |
+| `:ai-knowledge-verification` | optionaler Consumer-Vertrag des externen AI-Knowledge-Extractors | nur bei expliziter Aktivierung |
+
+## Schichten
+
+```mermaid
+flowchart TD
+    app[app / Runtime Composition]
+    release[Release / Autopilot / Benchmarks]
+    capability[Learning / Discovery / Experiments / Persistence / Solver Portfolio]
+    foundation[Search / Validation / Solver IR / Math Algorithms]
+    core[Core / E-Graph]
+
+    app --> release
+    app --> capability
+    release --> capability
+    capability --> foundation
+    foundation --> core
+```
+
+Die Darstellung zeigt Verantwortungsebenen, nicht jede einzelne direkte
+Gradle-Kante. Verbindliche Richtungen stehen in
+[Dependency-Regeln](dependency-rules.md).
+
+## Mathematischer Kern
+
+`:regelsuche-core` bildet die innerste Grenze. Es enthält keine
+Datenbanktreiber, Webserver, Containerlogik oder externen Prozessadapter.
+
+`:regelsuche-egraph`, `:regelsuche-search` und `:regelsuche-validation` bauen auf
+dieser Grundlage auf, ohne die äußere Runtime zu kennen. Dadurch können
+Suchsemantik und mathematische Regeln unabhängig von Web und Persistenz getestet
+werden.
 
 ## Solver- und Benchmark-Grenze
 
-`:regelsuche-solver-ir` definiert mathematische Problem- und Ergebnisverträge. `:regelsuche-solver-portfolio` entscheidet nur über Ausführung; seine Reports sind Telemetrie und keine mathematische Evidenz. `:regelsuche-benchmarks` verwendet beide Schichten, darf aber keine zweite Solver-IR und keinen universellen Capability-Score einführen.
+`:regelsuche-solver-ir` definiert mathematische Problem- und Ergebnisverträge.
+`:regelsuche-solver-portfolio` entscheidet über Backend-Ausführung, Budget und
+Aggregation. Ein Portfolio-Report ist Ausführungsevidence; mathematische
+Bestätigung bleibt an eine konkrete Solver Execution gebunden.
 
-Externe SymPy-/Z3-Prozesse bleiben Benchmark- beziehungsweise Solver-Adapter. Sie dürfen weder in `:regelsuche-core` noch in `:regelsuche-search` einsickern. Fehlende Verfügbarkeit, Übersetzungsverlust und mathematische Widerlegung bleiben getrennte Zustände.
+`:regelsuche-benchmarks` darf Suchstrategien und externe Backends unter einem
+expliziten Parity-Vertrag verbinden. Es darf keine zweite Solver-IR und keinen
+universellen Capability-Score einführen.
 
-## Autopilot-Grenze
+## Learning, Discovery und Experimente
 
-Die Autopilot-Kernverträge bleiben in `:regelsuche-experiments`, weil sie nur Research Briefs, Budgets, unveränderliche Beobachtungsbranches, Aggregate-Entscheidungen, Receipts und Evidence-DAG-Provenienz beschreiben. Sie dürfen nicht von konkreten Mining-, Novelty-, Proof- oder Lifecycle-Implementierungen abhängen.
+- `:regelsuche-learning` enthält portable Candidate- und Programmlernlogik;
+- `:regelsuche-discovery` enthält domänenneutrale Discovery- und Handoff-
+  Verträge;
+- `:regelsuche-experiments` beschreibt eingefrorene Inputs, Budgets, Runner und
+  Evidence-DAGs;
+- `:regelsuche-autopilot` komponiert diese Bausteine zu einer begrenzten
+  Campaign, ohne die inneren Verträge umzudefinieren.
 
-`:regelsuche-autopilot` ist die schmale Composition-Schicht darüber. Nur dort werden Open-Target-Evidence, Novelty-/Proof-Reports und der konservative Hypothesis-Handoff an die generischen Verträge gebunden.
+## Persistenzgrenze
 
-## Noch nicht physisch getrennte Zielmodule
+`:regelsuche-persistence` enthält Ports und Konfiguration ohne Hibernate oder
+Datenbanktreiber. Relationale Implementierung, Migration und Suchindex liegen
+in `:regelsuche-persistence-hibernate`.
 
-Das Zielmodul `regelsuche-web` bleibt vorerst in `app`, weil der aktuelle Code noch eine obere SCC enthält. `regelsuche-cli` existiert bereits für CLI-neutrale Primitiven; der app-spezifische `CliRouter` bleibt bis zur weiteren Entkopplung in `app`. `regelsuche-discovery` enthält portable Discovery-Pfad-DTOs; Graph-/Export-/Web-Orchestrierung bleibt in `app`.
+Datei-, Graph- und Webadapter, die nur für die konkrete Anwendung nötig sind,
+dürfen in `app` verbleiben, bis eine stabile allgemeine Portgrenze vorhanden
+ist.
 
-Für die nächste Architekturwelle sind die Zielmodule `regelsuche-search-index`, `regelsuche-discovery-ranking`, `regelsuche-provenance`, `regelsuche-symbolic-regression`, `regelsuche-cas`, `regelsuche-cas-jas`, `regelsuche-cas-singular` und `regelsuche-dashboard` vorbereitet, aber noch nicht physisch eingeschaltet.
+## Composition Root
 
-## Aktuelle Hauptrichtung
+`app` darf Fachmodule verdrahten und konkrete Adapter auswählen. Es soll jedoch
+keine neue mathematische Kernsemantik beherbergen, nur weil dort bereits alle
+Abhängigkeiten verfügbar sind.
 
-```text
-regelsuche-core
-  → regelsuche-egraph / regelsuche-search / regelsuche-validation
-  → regelsuche-solver-ir
-  → regelsuche-solver-portfolio
-  → regelsuche-benchmarks
+Neue Logik gehört in `app`, wenn sie tatsächlich eine der folgenden Rollen hat:
 
-regelsuche-learning / regelsuche-discovery
-  → portable Ports und DTOs
+- HTTP- oder UI-Adapter;
+- konkrete CLI-Komposition;
+- Runtime-Konfiguration;
+- Prozess- oder Infrastrukturadapter;
+- Bootstrap und Lifecycle-Wiring.
 
-regelsuche-experiments
-  → unabhängige Experiment-, Planner- und Evidence-DAG-Verträge
+## Noch nicht eigenständig modularisierte Bereiche
 
-regelsuche-autopilot
-  → regelsuche-experiments + regelsuche-learning Composition
+Web, einzelne Search-Index-, Provenienz-, CAS- und Dashboard-Anteile sind
+teilweise noch in `app` oder bestehenden Adaptermodulen enthalten. Eine
+physische Auslagerung ist erst sinnvoll, wenn:
 
-app
-  → Composition Root, Web/API/Docker/Bootstrap-Wiring
-```
+1. die Verantwortung stabil benannt ist;
+2. ein technologiearmer Port existiert;
+3. keine Rückabhängigkeit in innere Module entsteht;
+4. Tests die neue Grenze unabhängig charakterisieren;
+5. der Nutzen die zusätzliche Modulkomplexität rechtfertigt.
+
+Vorgesehene Modulnamen sind keine implementierte Capability und werden nicht
+als Architekturstatus geführt.
+
+## Regeln für neue Module
+
+Ein neues Gradle-Modul benötigt:
+
+- eine eindeutige fachliche Verantwortung;
+- eine gerichtete, azyklische Dependency-Position;
+- einen öffentlichen Port oder klar begrenzte API;
+- unabhängige Tests;
+- dokumentierte Auswirkungen auf Evidence und Versionierung;
+- Aktualisierung von `settings.gradle`, dieser Seite und
+  [Dependency-Regeln](dependency-rules.md).
+
+Reine Verzeichnisorganisation oder die Umgehung eines bestehenden Zyklus ohne
+fachliche Grenze ist kein ausreichender Grund für ein neues Modul.
