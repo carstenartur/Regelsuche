@@ -10,7 +10,7 @@ NO_UNIVERSAL_SCORE_TRACK_SCOPED_CLAIMS_ONLY
 
 ## First executable slice
 
-The initial suite `comparative-baselines-initial/v1` measures two separate tracks.
+The initial suite `comparative-baselines-initial/v1` measures three separate tracks.
 
 ### Target-directed search
 
@@ -35,11 +35,58 @@ Validation is not discovery. A backend that only checks equality is not scored a
 
 The SymPy adapter rejects assumptions, division, calls and unsupported exponent forms before process invocation. A missing executable, timeout, translation rejection and mathematical refutation remain distinct outcomes.
 
+### Target-free simplification competition
+
+The equality-validation track uses external systems as *validators*: they receive both sides of a statement and decide equality. That role can never produce information about how Regelsuche compares as a rewriting system, because a validator is not attempting the task.
+
+The `SIMPLIFICATION_COMPETITION` track therefore uses an external system as a *competitor*. Two configurations receive the input expression and nothing else:
+
+1. Regelsuche untargeted best-first search over the default rewrite inventory, run through `SearchProblem.withoutTarget()`;
+2. external SymPy in its native `simplify` role, pinned in the same verification environment.
+
+Neither competitor receives the reference simplest form, so the parity manifest `target-free-simplification/v1` sets `targetVisible=false` and `hiddenReferenceVisible=false`. The reference form stored on each case is the shared judge's answer key.
+
+Both competitors are scored by exactly one judge: Regelsuche's `ExpressionCanonicalizer`. A competitor reaches a case when the canonical hash of its produced expression equals the canonical hash of the reference form. Using the same judge for both sides prevents surface-syntax differences — for example SymPy's `**` versus Regelsuche's `^` — from being scored as mathematical differences. The judge is a normalizer, not an oracle: it never tells a competitor what to produce.
+
+Recorded case assumptions, such as the nonzero denominator of `(x^2 - 1) / (x - 1)`, are retained as evidence but are **not** injected into either competitor. This is declared as the configuration limitation `RECORDED_CASE_ASSUMPTIONS_ARE_NOT_INJECTED` and is tracked as a coverage gap.
+
+Reaching a simplest form is neither discovery nor proof. The track carries the limitations `SIX_SMALL_ALGEBRAIC_CASES_ONLY`, `NO_RUNTIME_OR_SCALABILITY_CLAIM`, `SHARED_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER` and `REACHING_A_SIMPLEST_FORM_IS_NOT_DISCOVERY_OR_PROOF`.
+
+#### Retained outcome
+
+The current retained outcome is a loss for Regelsuche and is published unchanged:
+
+| Case | Family | Regelsuche untargeted best-first | SymPy `simplify` |
+|---|---|---|---|
+| `(x + 0) * 1` → `x` | identity | reached | reached |
+| `x * 0 + y` → `y` | annihilator | reached | reached |
+| `(a + b) * (a + b)` → `(a + b) ^ 2` | power-folding | reached | reached |
+| `x + x` → `2 * x` | linear-combination | reached | reached |
+| `(2 * x + 4) / 2` → `x + 2` | rational-reduction | **not reached** | reached |
+| `(x^2 - 1) / (x - 1)` → `x + 1` | rational-cancellation | **not reached** | reached |
+
+Regelsuche reaches four of six reference forms, SymPy reaches six of six. The track claim `target-free-simplification-head-to-head` is therefore retained with status `NEGATIVE`.
+
+This is consistent with [`limits.md`](limits.md): the rewrite inventory has no general polynomial division and does not automatically carry the nonzero assumptions that rational cancellation requires.
+
+## Retaining losses instead of hiding them
+
+The publication gate is **claim consistency**, not success. A comparative benchmark that can only be published when the local system wins every case cannot produce information about competing systems.
+
+The gate is fail-closed in these ways:
+
+- every configured evaluation must exist — the writer requires the complete Cartesian matrix per track;
+- every result must have disposition `EXECUTED`; an unavailable, timed-out or crashed system means the evidence was never produced and must not replace a prior complete bundle;
+- a claim status must equal the status derived from its own track's results, so a track containing an incorrect result cannot carry a `SUPPORTED` claim;
+- every measured track must carry a retained claim.
+
+An `EXECUTED` but incorrect result is legitimate retained evidence. Deleting it would be exactly the selective reporting that [`../paper/limitations.md`](../paper/limitations.md) forbids.
+
 ## Information parity
 
 Each track has one `InformationParityManifest` containing visibility flags and hashes for the input corpus, inventory, budget, Research Brief, qualification split and mandatory evaluations. Each configuration references exactly one same-track manifest.
 
-The first slice keeps all hidden-reference, family-label, TEST-label, qualification-label and review-label visibility flags false. Target visibility is true only because both measured tracks explicitly compare target/equality-directed capabilities.
+The first slice keeps all hidden-reference, family-label, TEST-label, qualification-label and review-label visibility flags false. Target visibility is true for the target-directed search and equality-validation tracks only, because those tracks explicitly compare target/equality-directed capabilities. The simplification-competition track sets it false: a competitor that saw the reference form would not be simplifying.
 
 ## Canonical evidence
 
@@ -71,6 +118,7 @@ Repeated runs with the fixed environment must produce byte-identical bundles. Th
 
 Unmeasured tracks are not omitted. The report currently retains machine-readable gaps for:
 
+- an equality-saturation competitor, a randomized-valid competitor, a multi-domain corpus and an assumption-aware cancellation contract for the simplification-competition track;
 - hidden-rule rediscovery using the #227 leakage controls;
 - open-target discovery with an information-equivalent external generator;
 - fully held-out cross-family transfer;
