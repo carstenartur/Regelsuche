@@ -5,7 +5,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Catalog of the built-in ("core") rule packs.
@@ -153,14 +152,12 @@ public final class CoreRuleCatalog {
      * Resolves the enabled core packs for a selection.
      *
      * <p>Kernel packs are always enabled; attempting to disable one is rejected so that ablation
-     * runs cannot silently remove soundness-critical rules. First-party packs that are deliberately
-     * marked disabled by default remain opt-in even for the {@code core} and {@code full} profiles.</p>
+     * runs cannot silently remove soundness-critical rules. Selection ids not owned by this catalog
+     * are deliberately ignored here because scenario and plugin runtimes may contribute additional
+     * packs. User-facing validation belongs at the boundary that knows the complete catalog.</p>
      */
     public static Set<String> enabledPackIds(KnowledgePackSelection selection) {
         KnowledgePackSelection effective = selection == null ? KnowledgePackSelection.CORE : selection;
-        validatePackIds(effective.enabledPacks());
-        validatePackIds(effective.disabledPacks());
-        validatePackIds(effective.profile().enabledPackIds());
         rejectKernelDisable(effective.disabledPacks());
         Set<String> defaults = new LinkedHashSet<>();
         for (CoreRulePack pack : PACKS) {
@@ -180,22 +177,6 @@ public final class CoreRuleCatalog {
             }
         }
         return Set.copyOf(ordered);
-    }
-
-    private static void validatePackIds(Set<String> packIds) {
-        for (String packId : packIds) {
-            if (!BY_ID.containsKey(packId) && !KnowledgePackIdsHolder.IDS.contains(packId)) {
-                throw new IllegalArgumentException("Unknown rule pack: " + packId);
-            }
-        }
-    }
-
-    /** Loads YAML pack ids only when a selection explicitly references a non-core pack. */
-    private static final class KnowledgePackIdsHolder {
-        private static final Set<String> IDS =
-                new KnowledgePackRegistry().allPacks().stream()
-                        .map(KnowledgePack::packId)
-                        .collect(Collectors.toUnmodifiableSet());
     }
 
     private static void rejectKernelDisable(Set<String> disabledPacks) {
