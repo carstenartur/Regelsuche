@@ -1,0 +1,277 @@
+{
+  "baselineArtifactDigest": "sha256:7a8877c8aa5feff1a5b6769f1f8a2948e3980bc5fbf6272110615d0437583e83",
+  "baselineRevision": "5b904d6d1d0d1488353a2d28445c9ec9d3e5fc51",
+  "benchmarks": [
+    {
+      "baselineScore": 2.968339677,
+      "baselineScoreError": 0.122097284,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeBinomial",
+      "family": "CORE",
+      "maximumAllowedScore": 4.452509515,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 8.280014442,
+      "baselineScoreError": 0.957093038,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.canonicalizeMedium",
+      "family": "CORE",
+      "maximumAllowedScore": 12.420021663,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 3442.912294261,
+      "baselineScoreError": 151.826398881,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildLarge",
+      "family": "CORE",
+      "maximumAllowedScore": 5164.368441391,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 6.294498201,
+      "baselineScoreError": 0.118420735,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphAddAndRebuildMedium",
+      "family": "CORE",
+      "maximumAllowedScore": 9.441747302,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 1796.003483267,
+      "baselineScoreError": 100.189490192,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchFullScanLarge",
+      "family": "CORE",
+      "maximumAllowedScore": 2694.005224901,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 474.587770137,
+      "baselineScoreError": 30.176176377,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphPatternMatchIndexedLarge",
+      "family": "CORE",
+      "maximumAllowedScore": 711.881655206,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 2.082758038,
+      "baselineScoreError": 0.086957993,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.egraphRebuildSmall",
+      "family": "CORE",
+      "maximumAllowedScore": 3.124137056,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 92.368514822,
+      "baselineScoreError": 5.464045893,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllBinomial",
+      "family": "CORE",
+      "maximumAllowedScore": 138.552772233,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 207.391126027,
+      "baselineScoreError": 58.914151399,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.rewriteApplyAllMedium",
+      "family": "CORE",
+      "maximumAllowedScore": 311.086689041,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 985.616185565,
+      "baselineScoreError": 87.793268022,
+      "benchmark": "de.regelsuche.benchmark.CoreBenchmarks.termRuleIndexGrowingInventory",
+      "family": "CORE",
+      "maximumAllowedScore": 1478.424278348,
+      "maximumMultiplier": 1.5,
+      "unit": "us/op"
+    },
+    {
+      "baselineScore": 17.079114672,
+      "baselineScoreError": 63.159409098,
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedFixedWorkSearch",
+      "family": "END_TO_END_SEARCH",
+      "maximumAllowedScore": 34.158229343,
+      "maximumMultiplier": 2.0,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.364931409,
+      "baselineScoreError": 0.846555046,
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.preparedTargetedSearch",
+      "family": "END_TO_END_SEARCH",
+      "maximumAllowedScore": 0.729862817,
+      "maximumMultiplier": 2.0,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 29.446024096,
+      "baselineScoreError": 82.966720231,
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceFixedWorkSearch",
+      "family": "END_TO_END_SEARCH",
+      "maximumAllowedScore": 58.892048192,
+      "maximumMultiplier": 2.0,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.751385935,
+      "baselineScoreError": 2.640183118,
+      "benchmark": "de.regelsuche.benchmark.PreparedAstSearchBenchmarks.referenceTargetedSearch",
+      "family": "END_TO_END_SEARCH",
+      "maximumAllowedScore": 1.502771869,
+      "maximumMultiplier": 2.0,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.207535664,
+      "baselineScoreError": 0.093452476,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.directAstRewriteSource",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.363187412,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 6.1774e-05,
+      "baselineScoreError": 3.579e-06,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.directSyntheticSource",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.000108104,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.211117888,
+      "baselineScoreError": 0.186586342,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedAstRewriteSource",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.369456304,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.001147931,
+      "baselineScoreError": 0.000106653,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedChoiceTwoAlternatives",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.00200888,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.000563748,
+      "baselineScoreError": 2.8484e-05,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedFirstApplicableSecondAlternative",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.000986559,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.004029276,
+      "baselineScoreError": 0.000158438,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedNestedControlFlow",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.007051233,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.001370758,
+      "baselineScoreError": 6.8601e-05,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedPrioritizeTwoCandidates",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.002398826,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.001220642,
+      "baselineScoreError": 0.00015176,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedPruneTwoCandidatesToOne",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.002136124,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.003010427,
+      "baselineScoreError": 0.000558791,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedRepeatThreeIterations",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.005268247,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.001342636,
+      "baselineScoreError": 1.9939e-05,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedRequireFilter",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.002349613,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.001325011,
+      "baselineScoreError": 3.1319e-05,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedSequenceTwoSteps",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.002318769,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.00041223,
+      "baselineScoreError": 9.4327e-05,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.interpretedSingleSource",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.000721402,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.086478533,
+      "baselineScoreError": 0.011595104,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.preparedAstRewriteSource",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.151337433,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.214607218,
+      "baselineScoreError": 0.349560119,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.programmedAstRewriteSource",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.375562631,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    },
+    {
+      "baselineScore": 0.00064946,
+      "baselineScoreError": 3.2243e-05,
+      "benchmark": "de.regelsuche.benchmark.RewriteProgramBenchmarks.programmedSingleSource",
+      "family": "REWRITE_PROGRAM",
+      "maximumAllowedScore": 0.001136555,
+      "maximumMultiplier": 1.75,
+      "unit": "ms/op"
+    }
+  ],
+  "claimBoundary": "Shared-runner average-time ratchet. It detects finite material regressions; it does not establish cross-hardware absolute performance.",
+  "execution": {
+    "forks": 1,
+    "jdkMajor": 21,
+    "jmhVersion": "1.36",
+    "measurementIterations": 3,
+    "mode": "avgt",
+    "warmupIterations": 2
+  },
+  "schema": "regelsuche.quality.jmh-regression-policy/v2"
+}
