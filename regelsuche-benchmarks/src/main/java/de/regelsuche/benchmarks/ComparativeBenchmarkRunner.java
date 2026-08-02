@@ -12,6 +12,7 @@ import de.regelsuche.benchmarks.ComparativeBenchmark.Role;
 import de.regelsuche.benchmarks.ComparativeBenchmark.SystemKind;
 import de.regelsuche.benchmarks.ComparativeBenchmark.Track;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SearchSystem;
+import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.SimplificationSystem;
 import de.regelsuche.benchmarks.ComparativeBenchmarkSystems.ValidationSystem;
 import de.regelsuche.search.strategy.AStarSearchStrategy;
 import de.regelsuche.search.strategy.BeamSearchStrategy;
@@ -30,19 +31,25 @@ public final class ComparativeBenchmarkRunner {
 
     private final List<SearchSystem> searchSystems;
     private final List<ValidationSystem> validationSystems;
+    private final List<SimplificationSystem> simplificationSystems;
     private final ComparativeBenchmarkExecutor executor =
         new ComparativeBenchmarkExecutor();
 
     ComparativeBenchmarkRunner(
         List<SearchSystem> searchSystems,
-        List<ValidationSystem> validationSystems
+        List<ValidationSystem> validationSystems,
+        List<SimplificationSystem> simplificationSystems
     ) {
         this.searchSystems = List.copyOf(
             Objects.requireNonNull(searchSystems, "searchSystems"));
         this.validationSystems = List.copyOf(
             Objects.requireNonNull(validationSystems, "validationSystems"));
+        this.simplificationSystems = List.copyOf(
+            Objects.requireNonNull(
+                simplificationSystems, "simplificationSystems"));
         if (this.searchSystems.isEmpty()
-                || this.validationSystems.isEmpty()) {
+                || this.validationSystems.isEmpty()
+                || this.simplificationSystems.isEmpty()) {
             throw new IllegalArgumentException(
                 "comparative benchmark systems must not be empty");
         }
@@ -114,7 +121,35 @@ public final class ComparativeBenchmarkRunner {
                     : List.of(
                         "BACKEND_UNAVAILABLE",
                         z3.detail())));
-        return new ComparativeBenchmarkRunner(search, validation);
+
+        ExternalSymPySimplificationBaseline simplifier =
+            ExternalSymPySimplificationBaseline.detectSystemSymPy();
+        List<SimplificationSystem> simplification = List.of(
+            SimplificationSystem.internal(
+                "regelsuche-untargeted-best-first",
+                "1",
+                new BestFirstSearchStrategy(),
+                List.of(
+                    "INTERNAL_REGELSUCHE_SEARCH",
+                    "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                    "EMITTED_SIDE_CONDITIONS_CHECKED_AGAINST_"
+                        + SimplificationAssumptionContract.CONTRACT_ID)),
+            SimplificationSystem.external(
+                simplifier,
+                simplifier.available()
+                    ? List.of(
+                        "EXTERNAL_CAS_NATIVE_SIMPLIFIER",
+                        "NO_TARGET_AND_NO_REFERENCE_FORM_VISIBLE",
+                        "DECLARED_ASSUMPTIONS_PASSED_VIA_"
+                            + SimplificationAssumptionContract.CONTRACT_ID,
+                        "COMPOSITE_SIDE_CONDITIONS_NOT_BINDABLE_AS_SYMBOL_ASSUMPTIONS",
+                        "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE",
+                        "SIMPLIFICATION_IS_NOT_DISCOVERY_OR_FORMAL_PROOF")
+                    : List.of(
+                        "BACKEND_UNAVAILABLE",
+                        simplifier.detail())));
+        return new ComparativeBenchmarkRunner(
+            search, validation, simplification);
     }
 
     public Report run() {
@@ -125,6 +160,11 @@ public final class ComparativeBenchmarkRunner {
             ComparativeBenchmarkCatalog.searchParity(searchCases);
         InformationParityManifest validationParity =
             ComparativeBenchmarkCatalog.validationParity(validationCases);
+        List<Case> simplificationCases =
+            ComparativeBenchmarkCatalog.simplificationCases();
+        InformationParityManifest simplificationParity =
+            ComparativeBenchmarkCatalog.simplificationParity(
+                simplificationCases);
 
         List<Configuration> configurations = new ArrayList<>();
         List<Result> results = new ArrayList<>();
@@ -148,6 +188,16 @@ public final class ComparativeBenchmarkRunner {
                     system, configuration, benchmarkCase));
             }
         }
+        for (SimplificationSystem system : simplificationSystems) {
+            Configuration configuration =
+                ComparativeBenchmarkCatalog.simplificationConfiguration(
+                    system, simplificationParity);
+            configurations.add(configuration);
+            for (Case benchmarkCase : simplificationCases) {
+                results.add(executor.runSimplification(
+                    system, configuration, benchmarkCase));
+            }
+        }
 
         List<Result> searchResults = results.stream()
             .filter(result -> result.track()
@@ -157,14 +207,20 @@ public final class ComparativeBenchmarkRunner {
             .filter(result -> result.track()
                 == Track.EQUALITY_VALIDATION)
             .toList();
+        List<Result> simplificationResults = results.stream()
+            .filter(result -> result.track()
+                == Track.SIMPLIFICATION_COMPETITION)
+            .toList();
         List<CapabilityClaim> claims = List.of(
             searchClaim(searchResults),
-            validationClaim(validationResults));
+            validationClaim(validationResults),
+            simplificationClaim(simplificationResults));
         List<Case> cases = new ArrayList<>(searchCases);
         cases.addAll(validationCases);
+        cases.addAll(simplificationCases);
         return Report.create(
             SUITE_ID,
-            List.of(searchParity, validationParity),
+            List.of(searchParity, validationParity, simplificationParity),
             configurations,
             cases,
             results,
@@ -202,6 +258,31 @@ public final class ComparativeBenchmarkRunner {
                 "TWO_REAL_POLYNOMIAL_EQUALITY_CASES_ONLY",
                 "VALIDATION_IS_NOT_DISCOVERY",
                 "ONLY_Z3_PROOF_OBJECTS_COUNT_AS_FORMAL_PROOF"));
+    }
+
+    /** Head-to-head claim for the target-free simplification track. */
+    private static CapabilityClaim simplificationClaim(List<Result> results) {
+        ClaimStatus status = status(results);
+        return CapabilityClaim.create(
+            "target-free-simplification-head-to-head",
+            Track.SIMPLIFICATION_COMPETITION,
+            status,
+            switch (status) {
+                case SUPPORTED ->
+                    "Every configured competitor reached the pinned reference form of every case from the input expression alone.";
+                case NEGATIVE ->
+                    "At least one configured competitor did not reach a pinned reference form; all per-result outcomes are retained unchanged.";
+                case INSUFFICIENT_EVIDENCE ->
+                    "At least one configured competitor could not be executed, so no head-to-head comparison is authorized.";
+            },
+            hashes(results),
+            List.of(
+                "SEVEN_SMALL_ALGEBRAIC_CASES_ONLY",
+                "PINNED_REFERENCE_FORM_IS_NOT_A_UNIVERSAL_SIMPLICITY_ORDER",
+                "NO_RUNTIME_OR_SCALABILITY_CLAIM",
+                "SHARED_SURFACE_JUDGE_IS_THE_REGELSUCHE_CANONICALIZER",
+                "INDEPENDENT_ASSUMPTION_AWARE_OUTPUT_VALIDATION_NOT_YET_AVAILABLE",
+                "REACHING_A_REFERENCE_FORM_IS_NOT_DISCOVERY_OR_PROOF"));
     }
 
     private static ClaimStatus status(List<Result> results) {

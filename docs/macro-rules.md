@@ -198,15 +198,20 @@ nutzen `InMemoryRuleInventoryRepository` und `InMemoryHypothesisRepository`.
 `DiscoveryDemos.rationalSimplificationExamples()` enthält u. a.:
 
 ```text
-(x*x)/x       → x
-(a*b)/a       → b
-(x+1)/(x+1)   → 1
+(x*y)/(x*z)   → y/z
+(a*b)/(a*c)   → b/c
+(2*x)/(2*y)   → x/y
 ```
 
 `DiscoveryDemos.promoteRationalSimplification(...)` promoted eine
-Rational-Kürzungsregel in das Inventar. Ein nachfolgender Suchlauf mit
-`MacroMoveTransformationEngine` erreicht `(x*x)/x → x` in einer Suchkante,
-während der atomare Default-Search bei Tiefe 1 nicht kürzt.
+Rational-Kürzungsregel `(A * B) / (A * C) → B / C` in das Inventar. Ein
+nachfolgender Suchlauf mit `MacroMoveTransformationEngine` erreicht
+`(x*y)/(x*z) → y/z` in einer Suchkante, während der atomare Default-Search bei
+Tiefe 1 nicht kürzt.
+
+Das einseitige Kürzen `(x*x)/x → x` taugt dafür nicht mehr als Beispiel: es ist
+seit der atomaren Regel `ast_cancel_division_factor` selbst eine einzige
+Suchkante, ein Makro darüber würde also nichts verkürzen.
 
 ### Geometrische Reihe
 

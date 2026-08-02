@@ -78,6 +78,11 @@ public final class CalculusBasicRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
         public List<Assumption> assumptions(Expr subtree) {
             Expr inner = inner(subtree);
             if (inner == null) {

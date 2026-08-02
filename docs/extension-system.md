@@ -48,7 +48,11 @@ Knowledge Packs sind kuratierte, eingebaute YAML-Pakete. Sie tragen neben Patter
 
 Sie sind kein Ersatz für externe Java-Plugins oder die anwenderorientierte Regel-DSL. Ihr Zweck ist ein nachvollziehbares, reviewbares Core-Inventar. Kandidaten bleiben deaktiviert, bis ihr Status die Registrierung erlaubt.
 
-Siehe [Knowledge Packs](knowledge-packs.md).
+Eingebaute Core-Regeln und Knowledge Packs sind zusätzlich in Tiers klassifiziert. Kernel-Packs
+sind nicht abschaltbar, First-Party-Packs lassen sich für Basisbeweise wegschalten. Das dafür
+verwendete Profil und der Manifest-Hash machen einen Ablationslauf nachprüfbar.
+
+Siehe [Knowledge Packs](knowledge-packs.md) und [Regel-Tiers und Ablation](rule-tiers.md).
 
 ## 4. Gelernte und promovierte Makros
 

@@ -137,6 +137,11 @@ public final class RadicalRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
         public List<Assumption> assumptions(Expr subtree) {
             BinaryExpr product = extract(subtree);
             if (product == null) {

@@ -185,7 +185,7 @@ class DiscoveryIntegrationTest {
         InMemoryRuleInventoryRepository inventory = new InMemoryRuleInventoryRepository();
         DiscoveryDemos.promoteRationalSimplification(inventory);
 
-        String root = "(x * x) / x";
+        String root = "(x * y) / (x * z)";
         ExpressionScorer scorer = new ExpressionScorer();
         ExpressionCanonicalizer canonicalizer = new ExpressionCanonicalizer();
         SearchProblem atomicOnly = new SearchProblem(
@@ -195,9 +195,10 @@ class DiscoveryIntegrationTest {
             canonicalizer,
             new SearchHeuristic(1, 80, 1, 4, 80, 20)
         );
-        boolean atomicFindsXAtDepthOne = new BestFirstSearchStrategy().search(atomicOnly).stream()
-            .anyMatch(state -> state.expression().equals("x"));
-        assertFalse(atomicFindsXAtDepthOne, "atomic-only search should not cancel in one edge");
+        boolean atomicCancelsAtDepthOne = new BestFirstSearchStrategy().search(atomicOnly).stream()
+            .anyMatch(state -> state.expression().equals("y / z"));
+        assertFalse(atomicCancelsAtDepthOne,
+            "atomic-only search should not cancel a two-sided common factor in one edge");
 
         MacroMoveTransformationEngine macroEngine = new MacroMoveTransformationEngine(
             new AstRewriteTransformationEngine(),
@@ -211,7 +212,7 @@ class DiscoveryIntegrationTest {
             new SearchHeuristic(1, 80, 1, 4, 80, 20)
         );
         assertTrue(new BestFirstSearchStrategy().search(withMacro).stream()
-            .anyMatch(state -> state.expression().equals("x") && state.depth() == 1),
+            .anyMatch(state -> state.expression().equals("y / z") && state.depth() == 1),
             "promoted rational macro should shorten later search to one edge");
     }
 

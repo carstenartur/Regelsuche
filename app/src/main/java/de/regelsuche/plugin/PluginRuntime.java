@@ -1,5 +1,9 @@
 package de.regelsuche.plugin;
 
+import de.regelsuche.knowledge.KnowledgePackRegistry;
+import de.regelsuche.knowledge.KnowledgePackSelection;
+import de.regelsuche.knowledge.RuleInventoryBuilder;
+import de.regelsuche.knowledge.RuleInventoryManifest;
 import de.regelsuche.mining.RulePatternParser;
 import de.regelsuche.transform.PatternExpr;
 import de.regelsuche.transform.PatternRewriteRule;
@@ -218,7 +222,10 @@ public final class PluginRuntime implements AutoCloseable {
     }
 
     public PluginAwareAstRewriteTransformationEngine createTransformationEngine() {
-        List<RewriteRule> combined = new ArrayList<>(de.regelsuche.transform.AstRewriteTransformationEngine.defaultRules());
+        KnowledgePackSelection selection = config.knowledgePackSelection();
+        List<RewriteRule> combined = new ArrayList<>(
+            de.regelsuche.transform.AstRewriteTransformationEngine.defaultRules(selection));
+        combined.addAll(new KnowledgePackRegistry().enabledRules(selection));
         combined.addAll(ruleRegistry.enabledRules());
         combined.addAll(transformationRegistry.enabledTransformations());
         combined.addAll(macroTransformations);
@@ -229,6 +236,42 @@ public final class PluginRuntime implements AutoCloseable {
             80,
             debugMetadata
         );
+    }
+
+    public KnowledgePackSelection knowledgePackSelection() {
+        return config.knowledgePackSelection();
+    }
+
+    /**
+     * Content-addressed inventory of every rule tier that is active in this runtime.
+     *
+     * <p>Core packs, knowledge packs and plugin contributions are recorded through a single path so
+     * that an ablation run can be declared by profile id plus manifest hash.
+     */
+    public RuleInventoryManifest ruleInventoryManifest() {
+        KnowledgePackSelection selection = config.knowledgePackSelection();
+        RuleInventoryBuilder builder = new RuleInventoryBuilder(selection)
+            .withCorePacks()
+            .withKnowledgePacks(new KnowledgePackRegistry());
+        Map<String, List<String>> enabledRuleIdsByPlugin = new LinkedHashMap<>();
+        Map<String, List<String>> disabledRuleIdsByPlugin = new LinkedHashMap<>();
+        for (RegisteredRuleView rule : registeredRules()) {
+            Map<String, List<String>> target = rule.enabled() ? enabledRuleIdsByPlugin : disabledRuleIdsByPlugin;
+            target.computeIfAbsent(rule.source(), key -> new ArrayList<>()).add(rule.id());
+        }
+        Set<String> sources = new LinkedHashSet<>(enabledRuleIdsByPlugin.keySet());
+        sources.addAll(disabledRuleIdsByPlugin.keySet());
+        for (String source : sources) {
+            List<String> enabled = enabledRuleIdsByPlugin.getOrDefault(source, List.of());
+            if (!enabled.isEmpty()) {
+                builder.addPluginPack(source, enabled, true);
+            }
+            List<String> disabled = disabledRuleIdsByPlugin.getOrDefault(source, List.of());
+            if (!disabled.isEmpty()) {
+                builder.addPluginPack(source + " (disabled)", disabled, false);
+            }
+        }
+        return builder.build();
     }
 
     public List<PatternTransformation> macroTransformations() {

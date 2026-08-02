@@ -94,9 +94,20 @@ public class KnowledgePackLoader {
             }
             return new KnowledgePack(yaml.packId, yaml.displayName, yaml.sourceProject, yaml.license,
                     yaml.sourceUrl, yaml.sourceVersion, yaml.sourceReference, yaml.enabledByDefault,
-                    yaml.maturity, packCategories, rules);
+                    yaml.maturity, tier(yaml, path), packCategories, rules);
         } catch (IOException ex) {
             throw new IllegalArgumentException("Invalid knowledge pack YAML: " + path, ex);
+        }
+    }
+
+    private static RuleTier tier(PackYaml yaml, Path path) {
+        if (yaml.tier == null || yaml.tier.isBlank()) {
+            return RuleTier.FIRST_PARTY;
+        }
+        try {
+            return RuleTier.fromId(yaml.tier);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid tier in " + path + ": " + yaml.tier, ex);
         }
     }
 
@@ -192,6 +203,7 @@ public class KnowledgePackLoader {
         public String sourceReference;
         public boolean enabledByDefault;
         public KnowledgePackMaturity maturity;
+        public String tier;
         public List<String> categories;
         public List<RuleYaml> rules;
     }

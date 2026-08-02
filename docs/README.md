@@ -47,6 +47,7 @@
 - [Regeldateien](rule-files.md) — `.regelsuche`-/`.rules`-DSL, Profile, Import/Export und Debugging.
 - [Makros](macros.md) — vom Autor deklarierte Makros als Suchkanten.
 - [Knowledge Packs](knowledge-packs.md) — kuratierte Core-Pakete mit Provenance, Lizenz, Reviewstatus, Risiko und Validierungsbeispielen.
+- [Regel-Tiers und Ablation](rule-tiers.md) — Kernel-/First-Party-/Plugin-Tiers, `minimal-kernel`-Baseline und Regelinventar-Manifest.
 - [Makroregeln und emergente Identitäten](macro-rules.md) — aus Suchpfaden gelernte und erst nach Evidenz-/Promotion-Gates aktivierte Regeln.
 
 Nicht jede interne Registry ist automatisch ein externer Plugin-JAR-Endpunkt. Solver-/Proof-Backends, Discovery-Promotion und Public Evidence behalten ihre eigenen Verträge und Gates.

@@ -15,19 +15,28 @@ public final class DiscoveryDemos {
     private DiscoveryDemos() {
     }
 
+    /**
+     * Two-sided cancellations.
+     *
+     * <p>Cancelling a single common factor, such as {@code (x*x)/x}, is an
+     * atomic rewrite ({@code ast_cancel_division_factor}), so a macro over it
+     * would shorten nothing. These examples cancel a factor that appears in
+     * both a numerator product and a denominator product, which the atomic
+     * inventory only reaches over several steps.</p>
+     */
     public static List<SuccessfulTransformationPath> rationalSimplificationExamples() {
         return List.of(
-            path("rat-1", "(x*x)/x", "x"),
-            path("rat-2", "(a*a)/a", "a"),
-            path("rat-3", "(y*y)/y", "y"),
-            path("rat-4", "(a*b)/a", "b"),
-            path("rat-5", "(x+1)/(x+1)", "1"),
-            path("rat-6", "x/x", "1"),
-            path("rat-7", "a/a", "1"),
-            path("rat-8", "y/y", "1"),
-            path("rat-9", "(2*x)/(2*x)", "1"),
-            path("rat-10", "(3*x)/(3*x)", "1"),
-            path("rat-11", "(5*x)/(5*x)", "1")
+            path("rat-1", "(x*y)/(x*z)", "y/z"),
+            path("rat-2", "(a*b)/(a*c)", "b/c"),
+            path("rat-3", "(u*v)/(u*w)", "v/w"),
+            path("rat-4", "(x*a)/(x*b)", "a/b"),
+            path("rat-5", "(y*p)/(y*q)", "p/q"),
+            path("rat-6", "(m*n)/(m*k)", "n/k"),
+            path("rat-7", "(s*t)/(s*r)", "t/r"),
+            path("rat-8", "(2*x)/(2*y)", "x/y"),
+            path("rat-9", "(3*x)/(3*y)", "x/y"),
+            path("rat-10", "(5*x)/(5*y)", "x/y"),
+            path("rat-11", "(7*x)/(7*y)", "x/y")
         );
     }
 
@@ -41,9 +50,9 @@ public final class DiscoveryDemos {
         }
         ReusableRule fallback = new ReusableRule(
             "rational_cancel_common_factor",
-            "(A * B) / A",
-            "B",
-            List.of("A != 0"),
+            "(A * B) / (A * C)",
+            "B / C",
+            List.of("A != 0", "C != 0"),
             CandidateProofStatus.VALIDATED_BY_EXAMPLES,
             RuleStatus.NEW,
             rationalSimplificationExamples().size(),

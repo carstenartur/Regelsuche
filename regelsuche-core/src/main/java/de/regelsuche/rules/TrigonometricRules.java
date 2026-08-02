@@ -147,6 +147,11 @@ public final class TrigonometricRules {
         }
 
         @Override
+        public boolean mayEmitAssumptions() {
+            return true;
+        }
+
+        @Override
         public List<Assumption> assumptions(Expr subtree) {
             if (!(subtree instanceof FunctionExpr tan) || !"tan".equals(tan.name()) || tan.arguments().isEmpty()) {
                 return List.of();
