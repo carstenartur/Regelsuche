@@ -24,6 +24,8 @@ class RulePackCliRouterTest {
         assertTrue(text.contains("core-pack core-factorization (tier=first-party, enabled,"), () -> text);
         assertTrue(text.contains("rule ast_square_difference_factor (pack=core-factorization, tier=first-party, enabled)"),
             () -> text);
+        assertTrue(text.contains("core-pack core-exact-polynomial-division (tier=first-party, disabled, rules=1)"),
+            () -> text);
     }
 
     @Test
@@ -51,6 +53,19 @@ class RulePackCliRouterTest {
     }
 
     @Test
+    void explicitlyEnablingTheExperimentalPackListsItAsEnabled() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        int exit = router(output).run(new String[]{
+            "rules", "packs", "--enable-pack", "core-exact-polynomial-division"
+        });
+
+        assertEquals(0, exit);
+        assertTrue(output.toString().contains(
+            "core-pack core-exact-polynomial-division (tier=first-party, enabled, rules=1)"),
+            output::toString);
+    }
+
+    @Test
     void disablingAKernelPackIsRejected() {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         int exit = router(output).run(
@@ -67,6 +82,17 @@ class RulePackCliRouterTest {
 
         assertEquals(1, exit);
         assertTrue(output.toString().contains("Unknown rule profile"), output::toString);
+    }
+
+    @Test
+    void unknownRulePackIsRejected() {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        int exit = router(output).run(new String[]{
+            "rules", "packs", "--enable-pack", "does-not-exist"
+        });
+
+        assertEquals(1, exit);
+        assertTrue(output.toString().contains("Unknown rule pack"), output::toString);
     }
 
     @Test
