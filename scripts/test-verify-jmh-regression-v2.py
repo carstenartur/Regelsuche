@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Characterize the JMH v2 verifier with two passes and four fail-closed cases."""
+"""Characterize the JMH v2 verifier with two passes and six fail-closed cases."""
 
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.util
 import json
 import sys
@@ -47,6 +48,28 @@ def load_verifier(path: Path):
     return module
 
 
+def arguments(
+    root: Path,
+    label: str,
+    policy_path: Path,
+    legacy_options: bool = False,
+) -> list[str]:
+    result_option = "--results" if legacy_options else "--result"
+    json_option = "--report-json" if legacy_options else "--json-output"
+    markdown_option = "--report-md" if legacy_options else "--markdown-output"
+    return [
+        "verify-jmh-regression-v2.py",
+        result_option,
+        str(root / f"{label}-result.json"),
+        "--policy",
+        str(policy_path),
+        json_option,
+        str(root / f"{label}-report.json"),
+        markdown_option,
+        str(root / f"{label}-report.md"),
+    ]
+
+
 def execute(
     verifier,
     root: Path,
@@ -57,23 +80,9 @@ def execute(
 ) -> None:
     result_path = root / f"{label}-result.json"
     json_output = root / f"{label}-report.json"
-    markdown_output = root / f"{label}-report.md"
     write(result_path, result)
-    result_option = "--results" if legacy_options else "--result"
-    json_option = "--report-json" if legacy_options else "--json-output"
-    markdown_option = "--report-md" if legacy_options else "--markdown-output"
     previous = sys.argv
-    sys.argv = [
-        "verify-jmh-regression-v2.py",
-        result_option,
-        str(result_path),
-        "--policy",
-        str(root / "policy.json"),
-        json_option,
-        str(json_output),
-        markdown_option,
-        str(markdown_output),
-    ]
+    sys.argv = arguments(root, label, root / "policy.json", legacy_options)
     try:
         try:
             return_code = verifier.main()
@@ -89,6 +98,33 @@ def execute(
         raise SystemExit(
             f"{label}: expected status {expected_status}, found {report.get('status')}"
         )
+
+
+def execute_policy_failure(
+    verifier,
+    root: Path,
+    label: str,
+    policy: dict,
+    expected_message: str,
+) -> None:
+    policy_path = root / f"{label}-policy.json"
+    write(policy_path, policy)
+    write(root / f"{label}-result.json", [benchmark()])
+    previous = sys.argv
+    sys.argv = arguments(root, label, policy_path)
+    try:
+        try:
+            verifier.main()
+        except SystemExit as error:
+            message = str(error.code)
+            if expected_message not in message:
+                raise SystemExit(
+                    f"{label}: expected diagnostic {expected_message!r}, found {message!r}"
+                )
+        else:
+            raise SystemExit(f"{label}: malformed policy was accepted")
+    finally:
+        sys.argv = previous
 
 
 def main() -> None:
@@ -114,7 +150,7 @@ def main() -> None:
             "benchmarks": [
                 {
                     "benchmark": "example.Benchmark.work",
-                    "family": "SYNTHETIC",
+                    "family": "CORE",
                     "unit": "us/op",
                     "baselineScore": 1.0,
                     "baselineScoreError": 0.1,
@@ -143,7 +179,26 @@ def main() -> None:
         )
         execute(verifier, root, "wrong-unit", [benchmark(unit="ms/op")], 1)
         execute(verifier, root, "regression", [benchmark(score=1.6)], 1)
-    print("JMH regression verifier characterization passed: 2 positive, 4 negative")
+
+        missing_family = copy.deepcopy(policy)
+        del missing_family["benchmarks"][0]["family"]
+        execute_policy_failure(
+            verifier,
+            root,
+            "missing-family",
+            missing_family,
+            "unsupported or missing family",
+        )
+        missing_error = copy.deepcopy(policy)
+        del missing_error["benchmarks"][0]["baselineScoreError"]
+        execute_policy_failure(
+            verifier,
+            root,
+            "missing-baseline-error",
+            missing_error,
+            "baselineScoreError must be numeric",
+        )
+    print("JMH regression verifier characterization passed: 2 positive, 6 negative")
 
 
 if __name__ == "__main__":
