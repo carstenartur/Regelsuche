@@ -78,7 +78,7 @@ class FlagshipHeldOutDraftSealCommandTest {
             "shifted_factor_family",
             "((u + 3) * a) / ((u + 3) * b)",
             "a / b",
-            List.of("u + 3 != 0", "b != 0"),
+            List.of(" b != 0 ", "u+3!=0"),
             DifficultyTier.STANDARD,
             ExpectedTerminalClass.CONFIRMED);
         AtomicReference<String> actualLeft = new AtomicReference<>();
