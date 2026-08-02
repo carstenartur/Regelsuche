@@ -56,9 +56,9 @@ final class ComparativeBenchmarkSystems {
      *
      * <p>Exactly one of {@code strategy} and {@code externalSimplifier} is set:
      * either a path-based internal search or an external CAS simplifier. Both
-     * receive the input expression without the pinned reference form. Declared
-     * case assumptions belong to the shared post-run evidence contract; an
-     * implementation only consumes the subset it can represent explicitly.</p>
+     * receive the input expression without the pinned reference form and emit
+     * exactly one expression under the output policy encoded in
+     * {@link #implementationIdentity()}.</p>
      */
     record SimplificationSystem(
         String id,
@@ -82,12 +82,14 @@ final class ComparativeBenchmarkSystems {
             limitations = clean(limitations);
         }
 
-        /** @return the stable identity of the competitor implementation. */
+        /** @return the stable identity of implementation and target-free output selection. */
         String implementationIdentity() {
             if (strategy != null) {
-                return "internal:" + strategy.getClass().getName();
+                return "internal:" + strategy.getClass().getName()
+                    + "\noutputSelection=min-expression-score-then-text-then-depth/v1";
             }
-            return "external:" + externalSimplifier.configurationHash();
+            return "external:" + externalSimplifier.configurationHash()
+                + "\noutputSelection=native-single-output/v1";
         }
 
         static SimplificationSystem internal(
