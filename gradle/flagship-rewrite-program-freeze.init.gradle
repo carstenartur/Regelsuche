@@ -1,0 +1,30 @@
+gradle.projectsEvaluated {
+    def appProject = gradle.rootProject.project(':app')
+    appProject.tasks.register('freezeFlagshipRewriteProgram', JavaExec) {
+        group = 'research'
+        description = 'Validates sealed private held-out bundles and writes the public FROZEN_NOT_RUN flagship preregistration.'
+        dependsOn appProject.tasks.named('classes')
+        classpath = appProject.sourceSets.main.runtimeClasspath
+        mainClass = 'de.regelsuche.evolution.FlagshipRewriteProgramFreezeAssembler'
+        workingDir gradle.rootProject.rootDir
+
+        doFirst {
+            def required = [
+                repositoryCommit: appProject.providers.gradleProperty('flagshipRepositoryCommit').orNull,
+                validationPrivate: appProject.providers.gradleProperty('flagshipValidationPrivate').orNull,
+                finalTestPrivate: appProject.providers.gradleProperty('flagshipFinalTestPrivate').orNull,
+                output: appProject.providers.gradleProperty('flagshipFreezeOutput').orNull
+            ]
+            def missing = required.findAll { key, value -> value == null || value.trim().isEmpty() }
+                .keySet()
+            if (!missing.isEmpty()) {
+                throw new GradleException(
+                    'Missing flagship freeze properties: ' + missing.sort().join(', '))
+            }
+            args required.repositoryCommit,
+                required.validationPrivate,
+                required.finalTestPrivate,
+                required.output
+        }
+    }
+}
