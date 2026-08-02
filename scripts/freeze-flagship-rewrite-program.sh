@@ -35,7 +35,7 @@ if [[ -n $(git -C "${repository_root}" status --porcelain --untracked-files=all)
 fi
 
 for private_file in "${validation_private}" "${final_test_private}"; do
-  if [[ ! -f ${private_file} ]]; then
+  if [[ ! -f "${private_file}" ]]; then
     echo "private held-out bundle is not a regular file: ${private_file}" >&2
     exit 2
   fi
@@ -61,11 +61,11 @@ final_test_private=$(python3 -c \
   'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' \
   "${final_test_private}")
 
-if [[ -e ${output_directory} && ! -d ${output_directory} ]]; then
+if [[ -e "${output_directory}" && ! -d "${output_directory}" ]]; then
   echo "flagship freeze output exists and is not a directory: ${output_directory}" >&2
   exit 2
 fi
-if [[ -d ${output_directory} ]] \
+if [[ -d "${output_directory}" ]] \
     && [[ -n $(find "${output_directory}" -mindepth 1 -maxdepth 1 -print -quit) ]]; then
   echo "flagship freeze output directory must be absent or empty: ${output_directory}" >&2
   exit 2
