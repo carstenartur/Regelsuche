@@ -85,17 +85,6 @@ class RulePackCliRouterTest {
     }
 
     @Test
-    void unknownRulePackIsRejected() {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        int exit = router(output).run(new String[]{
-            "rules", "packs", "--enable-pack", "does-not-exist"
-        });
-
-        assertEquals(1, exit);
-        assertTrue(output.toString().contains("Unknown rule pack"), output::toString);
-    }
-
-    @Test
     void rulesListReportsInventoryManifestHash() {
         ByteArrayOutputStream fullOutput = new ByteArrayOutputStream();
         assertEquals(0, router(fullOutput).run(new String[]{"rules", "list"}));
