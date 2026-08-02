@@ -83,7 +83,8 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Autonomous Discovery Result Card](autonomous-discovery-walkthrough.md)
 - [Independent Reproduction Artifact](independent-reproduction.md)
 - [Candidate-independent Benchmark](candidate-independent-benchmark.md)
-- [Discovery Cost and Amortized Utility](discovery-cost-and-amortized-utility.md)
+- [Discovery Cost Ledger](discovery-cost-ledger.md)
+- [Vector Amortization Report](vector-amortization-report.md)
 
 ### Flagship und evolutionäre Programme
 
