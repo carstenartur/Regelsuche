@@ -12,8 +12,11 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.BindMode;
@@ -25,6 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 /** Checkout-local Docker reproduction for the complete Autopilot campaign. */
 @Testcontainers(disabledWithoutDocker = true)
 class AutonomousProductionCampaignContainerTest {
+    private static final int MAX_CLEANUP_DIAGNOSTIC_LENGTH = 240;
     private static final Path PROJECT_ROOT = Path.of(System.getProperty(
         "regelsuche.projectRoot",
         Path.of("").toAbsolutePath().toString()
@@ -119,9 +123,36 @@ class AutonomousProductionCampaignContainerTest {
         String operation,
         RuntimeException failure
     ) {
-        System.err.println("Autopilot Testcontainers cleanup could not " + operation
-            + ": " + failure.getMessage());
-        failure.printStackTrace(System.err);
+        System.err.println(cleanupFailureSummary(operation, failure));
+    }
+
+    static String cleanupFailureSummary(
+        String operation,
+        RuntimeException failure
+    ) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable rootCause = failure;
+        seen.add(rootCause);
+        while (rootCause.getCause() != null
+                && seen.add(rootCause.getCause())) {
+            rootCause = rootCause.getCause();
+        }
+
+        String detail = rootCause.getMessage();
+        if (detail == null || detail.isBlank()) {
+            detail = failure.getMessage();
+        }
+        if (detail == null || detail.isBlank()) {
+            detail = "no diagnostic message";
+        }
+        detail = detail.replace('\r', ' ').replace('\n', ' ').trim();
+        if (detail.length() > MAX_CLEANUP_DIAGNOSTIC_LENGTH) {
+            detail = detail.substring(0, MAX_CLEANUP_DIAGNOSTIC_LENGTH - 3)
+                + "...";
+        }
+
+        return "Autopilot Testcontainers cleanup could not " + operation
+            + " [" + rootCause.getClass().getSimpleName() + "]: " + detail;
     }
 
     private static Path createTrackedBuildContext(Path temporaryDirectory)
