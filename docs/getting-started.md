@@ -119,7 +119,7 @@ Search und persistente Volumes. Anwendung und Datenbank werden standardmäßig
 nur lokal gebunden.
 
 Die in `docker-compose.yml` vorhandenen Fallback-Zugangsdaten dienen
- ausschließlich der lokalen Demo. Vor jeder anderen Verwendung müssen eigene
+ausschließlich der lokalen Demo. Vor jeder anderen Verwendung müssen eigene
 Credentials, authentifiziertes TLS, Netzwerkgrenzen, Backup und Betriebskonzept
 festgelegt werden.
 
