@@ -96,7 +96,7 @@ Generated examples:
 
 | Scenario | Bridge | Macro learned | Macro reused | Evidence |
 |---|---:|---:|---:|---|
-| Complete square | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:98ad53da0459ab21e42d39419b5fd18056dcb6d4aee01f7b904afdb888ba3192](docs/generated/discovery/complete-square/evidence.json) |
+| Complete square | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:217d5ca4dff3dba588f16d8451195a883378956a795259936317d3d35e8ce273](docs/generated/discovery/complete-square/evidence.json) |
 | Sophie-Germain | yes | yes | yes | [regelsuche.discovery-evidence/v1#sha256:ad5a70e80124c9154f03c870b1f1b6d26fe482463eeb991d805f14eef38a1f31](docs/generated/discovery/sophie-germain/evidence.json) |
 
 ## 30 Sekunden (Demo Standard)

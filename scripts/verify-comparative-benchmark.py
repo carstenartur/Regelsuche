@@ -163,7 +163,7 @@ def validate(root: Path) -> None:
     require(len(search_results) == 9, "target-directed result count drift")
     require(len(validation_results) == 6, "equality-validation result count drift")
     require(
-        len(simplification_results) == 12,
+        len(simplification_results) == 14,
         "simplification-competition result count drift",
     )
 
