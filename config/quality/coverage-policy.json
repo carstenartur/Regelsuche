@@ -1,0 +1,27 @@
+{
+  "schema": "regelsuche.quality.coverage-policy/v1",
+  "ratchetPolicy": "Floors may only increase after a green retained ciCheck run. Any decrease requires a documented repository issue and an explicit policy revision.",
+  "aggregate": {
+    "lineMinimumPercent": 79.0,
+    "branchMinimumPercent": 58.0
+  },
+  "modules": {
+    "app": { "lineMinimumPercent": 79.0, "branchMinimumPercent": 60.0 },
+    "regelsuche-autopilot": { "lineMinimumPercent": 89.0, "branchMinimumPercent": 50.0 },
+    "regelsuche-benchmarks": { "lineMinimumPercent": 79.0, "branchMinimumPercent": 50.0 },
+    "regelsuche-cli": { "lineMinimumPercent": 90.0, "branchMinimumPercent": 78.0 },
+    "regelsuche-core": { "lineMinimumPercent": 69.0, "branchMinimumPercent": 54.0 },
+    "regelsuche-discovery": { "lineMinimumPercent": 87.0, "branchMinimumPercent": 59.0 },
+    "regelsuche-egraph": { "lineMinimumPercent": 84.0, "branchMinimumPercent": 73.0 },
+    "regelsuche-experiments": { "lineMinimumPercent": 87.0, "branchMinimumPercent": 61.0 },
+    "regelsuche-learning": { "lineMinimumPercent": 83.0, "branchMinimumPercent": 58.0 },
+    "regelsuche-math-algorithms": { "lineMinimumPercent": 87.0, "branchMinimumPercent": 66.0 },
+    "regelsuche-persistence": { "lineMinimumPercent": 79.0, "branchMinimumPercent": 61.0 },
+    "regelsuche-persistence-hibernate": { "lineMinimumPercent": 19.0, "branchMinimumPercent": 18.0 },
+    "regelsuche-release": { "lineMinimumPercent": 70.0, "branchMinimumPercent": 41.0 },
+    "regelsuche-search": { "lineMinimumPercent": 76.0, "branchMinimumPercent": 56.0 },
+    "regelsuche-solver-ir": { "lineMinimumPercent": 75.0, "branchMinimumPercent": 53.0 },
+    "regelsuche-solver-portfolio": { "lineMinimumPercent": 74.0, "branchMinimumPercent": 54.0 },
+    "regelsuche-validation": { "lineMinimumPercent": 66.7, "branchMinimumPercent": 49.0 }
+  }
+}

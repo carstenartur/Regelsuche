@@ -1,0 +1,19 @@
+{
+  "schema": "regelsuche.visual-regression-policy/v1",
+  "environment": {
+    "containerImage": "mcr.microsoft.com/playwright/java:v1.60.0-noble",
+    "playwrightVersion": "1.60.0",
+    "browser": "chromium",
+    "viewportWidth": 1400,
+    "viewportHeight": 900,
+    "deviceScaleFactor": 1.0,
+    "locale": "en-US",
+    "timezoneId": "UTC"
+  },
+  "comparison": {
+    "channelTolerance": 12,
+    "maxDiffRatio": 0.002,
+    "changedPixelArgb": "ffff00ff"
+  },
+  "baselines": {}
+}

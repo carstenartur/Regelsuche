@@ -113,6 +113,9 @@ gradle.beforeProject { candidate ->
             'gradle/macro-candidate-panel-verification.gradle')
         candidate.apply from: new File(
             settingsDir,
+            'gradle/quality-gates.gradle')
+        candidate.apply from: new File(
+            settingsDir,
             'gradle/ci-verification.gradle')
     }
     if (candidate.path == ':app') {

@@ -1,0 +1,73 @@
+/*
+ * Finite checkout-owned non-visual quality gates for issue #514.
+ *
+ * GitHub Actions only provisions tools and calls ciCheck. Baselines,
+ * thresholds, reports and failure decisions remain versioned in the checkout.
+ */
+
+def qualityRepositoryRoot = layout.projectDirectory
+def qualityVerificationVenv = layout.buildDirectory.dir('verification-venv')
+def qualityVerificationPython = providers.provider {
+    def executable = System.getProperty('os.name').toLowerCase(Locale.ROOT)
+        .contains('windows') ? 'Scripts/python.exe' : 'bin/python'
+    new File(qualityVerificationVenv.get().asFile, executable)
+}
+
+def verifyCoverageRegression = tasks.register('verifyCoverageRegression', Exec) {
+    group = 'verification'
+    description = 'Fails when aggregate/module JaCoCo floors regress or a covered module disappears.'
+    dependsOn 'prepareVerificationEnvironment', 'test'
+    mustRunAfter 'test'
+    workingDir qualityRepositoryRoot
+    inputs.file qualityRepositoryRoot.file('config/quality/coverage-policy.json')
+    inputs.file qualityRepositoryRoot.file('scripts/verify-coverage-regression.py')
+    outputs.file layout.buildDirectory.file('reports/quality/coverage-report.json')
+    outputs.file layout.buildDirectory.file('reports/quality/coverage-report.md')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualityVerificationPython.get().absolutePath,
+            'scripts/verify-coverage-regression.py',
+            '--root', qualityRepositoryRoot.asFile.absolutePath
+    }
+}
+
+def verifyContainerImagePolicy = tasks.register('verifyContainerImagePolicy', Exec) {
+    group = 'verification'
+    description = 'Rejects undeclared Dockerfiles and floating or unapproved base images.'
+    dependsOn 'prepareVerificationEnvironment'
+    workingDir qualityRepositoryRoot
+    inputs.file qualityRepositoryRoot.file('config/quality/container-image-policy.json')
+    inputs.file qualityRepositoryRoot.file('scripts/verify-container-image-policy.py')
+    outputs.file layout.buildDirectory.file('reports/quality/container-image-report.json')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualityVerificationPython.get().absolutePath,
+            'scripts/verify-container-image-policy.py',
+            '--root', qualityRepositoryRoot.asFile.absolutePath
+    }
+}
+
+def reportSlowTests = tasks.register('reportSlowTests', Exec) {
+    group = 'reporting'
+    description = 'Renders deterministic slow-test evidence from all checkout JUnit XML reports.'
+    dependsOn 'prepareVerificationEnvironment', 'test'
+    mustRunAfter 'test'
+    workingDir qualityRepositoryRoot
+    inputs.file qualityRepositoryRoot.file('scripts/report-slowest-tests.py')
+    outputs.file layout.buildDirectory.file('reports/quality/slow-tests.json')
+    outputs.file layout.buildDirectory.file('reports/quality/slow-tests.md')
+    outputs.upToDateWhen { false }
+    doFirst {
+        commandLine qualityVerificationPython.get().absolutePath,
+            'scripts/report-slowest-tests.py',
+            '--root', qualityRepositoryRoot.asFile.absolutePath
+    }
+}
+
+tasks.matching { candidate -> candidate.name == 'check' }.configureEach {
+    dependsOn verifyCoverageRegression, verifyContainerImagePolicy
+}
+
+tasks.matching { candidate -> candidate.name == 'ciCheck' }.configureEach {
+    dependsOn reportSlowTests
+}

@@ -1,0 +1,32 @@
+{
+  "schema": "regelsuche.quality.container-image-policy/v1",
+  "policy": "Every tracked Dockerfile must be declared. External FROM references must match this contract exactly. Digest pins are preferred; exact component versions are accepted and floating, major-only or latest tags are rejected.",
+  "files": {
+    "Dockerfile": [
+      "eclipse-temurin:21.0.11_10-jdk-noble",
+      "eclipse-temurin:21.0.11_10-jre-noble"
+    ],
+    "Dockerfile.autopilot": [
+      "eclipse-temurin:21.0.11_10-jdk-noble",
+      "eclipse-temurin:21.0.11_10-jre-noble"
+    ],
+    "Dockerfile.comparative-benchmarks": [
+      "eclipse-temurin:21.0.11_10-jdk-noble",
+      "eclipse-temurin:21.0.11_10-jre-noble"
+    ],
+    "Dockerfile.proof": [
+      "eclipse-temurin:21.0.11_10-jdk-noble",
+      "eclipse-temurin:21.0.11_10-jre-noble"
+    ],
+    "Dockerfile.release-readiness": [
+      "eclipse-temurin:21.0.11_10-jdk-noble",
+      "eclipse-temurin:21.0.11_10-jre-noble"
+    ],
+    "Dockerfile.visual-regression": [
+      "mcr.microsoft.com/playwright/java:v1.60.0-noble"
+    ],
+    "reproduction/Dockerfile.reproduction": [
+      "eclipse-temurin:21.0.11_10-jdk-noble@sha256:35685c7e23352983a48882d97cd9875f5284c228db71d1e2476e5e6c1bab1080"
+    ]
+  }
+}
