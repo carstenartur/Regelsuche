@@ -16,17 +16,43 @@ class RuleInventoryManifestTest {
         RuleInventoryManifest first = RuleInventoryManifest.of(
                 "full",
                 List.of(
-                        new RuleInventoryManifest.PackEntry("a", RuleTier.KERNEL, "core", true, 2),
-                        new RuleInventoryManifest.PackEntry("b", RuleTier.FIRST_PARTY, "core", true, 1)),
+                        new RuleInventoryManifest.PackEntry(
+                                "a", RuleTier.KERNEL, "core", true, List.of("r1", "r2")),
+                        new RuleInventoryManifest.PackEntry(
+                                "b", RuleTier.FIRST_PARTY, "core", true, List.of("r3"))),
                 List.of("r1", "r2", "r3"));
         RuleInventoryManifest second = RuleInventoryManifest.of(
                 "full",
                 List.of(
-                        new RuleInventoryManifest.PackEntry("b", RuleTier.FIRST_PARTY, "core", true, 1),
-                        new RuleInventoryManifest.PackEntry("a", RuleTier.KERNEL, "core", true, 2)),
+                        new RuleInventoryManifest.PackEntry(
+                                "b", RuleTier.FIRST_PARTY, "core", true, List.of("r3")),
+                        new RuleInventoryManifest.PackEntry(
+                                "a", RuleTier.KERNEL, "core", true, List.of("r2", "r1"))),
                 List.of("r3", "r1", "r2"));
         assertEquals(first.contentHash(), second.contentHash());
         assertFalse(first.contentHash().isBlank());
+    }
+
+    @Test
+    void movingRulesBetweenEquallySizedPacksChangesTheHash() {
+        RuleInventoryManifest first = RuleInventoryManifest.of(
+                "full",
+                List.of(
+                        new RuleInventoryManifest.PackEntry(
+                                "a", RuleTier.FIRST_PARTY, "core", true, List.of("r1")),
+                        new RuleInventoryManifest.PackEntry(
+                                "b", RuleTier.FIRST_PARTY, "core", true, List.of("r2"))),
+                List.of("r1", "r2"));
+        RuleInventoryManifest second = RuleInventoryManifest.of(
+                "full",
+                List.of(
+                        new RuleInventoryManifest.PackEntry(
+                                "a", RuleTier.FIRST_PARTY, "core", true, List.of("r2")),
+                        new RuleInventoryManifest.PackEntry(
+                                "b", RuleTier.FIRST_PARTY, "core", true, List.of("r1"))),
+                List.of("r1", "r2"));
+
+        assertNotEquals(first.contentHash(), second.contentHash());
     }
 
     @Test
