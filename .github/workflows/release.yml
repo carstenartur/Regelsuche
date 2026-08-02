@@ -1,8 +1,8 @@
 name: Release
 
-# Gradle-native, resumable release workflow for Regelsuche.
-# It keeps release metadata aligned, publishes artifacts, updates the maintenance
-# branch and opens a follow-up PR for the next development version.
+# One checkout-owned release path. The ordinary project verification remains in
+# Gradle; this workflow only provisions the pinned environment and performs the
+# GitHub-specific tag, release, maintenance-branch and follow-up-PR mutations.
 
 on:
   workflow_dispatch:
@@ -22,26 +22,23 @@ on:
           - minor
           - major
       skip_tests:
-        description: 'Skip ./gradlew test during the release build'
+        description: 'Skip the checkout-owned ciCheck before packaging'
         required: false
         type: boolean
         default: false
       dry_run:
-        description: 'Dry run: build and validate but do not create a tag, release or follow-up PR'
+        description: 'Build and validate release artifacts without pushing a tag, release, branch or pull request'
         required: false
         type: boolean
         default: false
   push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/release.yml'
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: write
   pull-requests: write
+  packages: read
 
 env:
   GH_TOKEN: ${{ github.token }}
@@ -50,43 +47,32 @@ concurrency:
   group: regelsuche-release
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  preflight:
-    name: Preflight Checks
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      startsWith(github.ref, 'refs/tags/') ||
-      (github.event_name == 'push' &&
-       github.ref == 'refs/heads/main' &&
-       contains(github.event.head_commit.message, '[release]'))
-    runs-on: ubuntu-latest
-    outputs:
-      release_version: ${{ steps.resolve.outputs.release_version }}
-      next_development_version: ${{ steps.resolve.outputs.next_development_version }}
-      tag_name: ${{ steps.resolve.outputs.tag_name }}
-      maintenance_branch: ${{ steps.resolve.outputs.maintenance_branch }}
-      dry_run: ${{ steps.resolve.outputs.dry_run }}
-      skip_tests: ${{ steps.resolve.outputs.skip_tests }}
-      managed_release: ${{ steps.resolve.outputs.managed_release }}
-      tag_exists: ${{ steps.state.outputs.tag_exists }}
-      github_release_exists: ${{ steps.state.outputs.github_release_exists }}
-      build_ref: ${{ steps.state.outputs.build_ref }}
-      needs_next_pr: ${{ steps.metadata.outputs.needs_next_pr }}
+  release:
+    name: Verify, package and publish
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    env:
+      AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout authoritative main or immutable tag
+      - name: Checkout authoritative source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'main' }}
 
-      - name: Resolve release version from repository state
-        id: resolve
+      - name: Resolve versions and remote state
+        id: release-state
         env:
           INPUT_EXACT_NEXT: ${{ inputs.next_development_version }}
           INPUT_NEXT_INCREMENT: ${{ inputs.next_version_increment }}
           INPUT_DRY_RUN: ${{ inputs.dry_run }}
           INPUT_SKIP_TESTS: ${{ inputs.skip_tests }}
-          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
 
@@ -106,65 +92,52 @@ jobs:
             esac
           }
 
-          MANAGED_RELEASE="false"
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAG_NAME="${GITHUB_REF_NAME}"
-            RELEASE_VERSION="${TAG_NAME#v}"
-            DRY_RUN="false"
-            SKIP_TESTS="false"
-            NEXT_VERSION=""
+            MANAGED_RELEASE=false
+            TAG="${GITHUB_REF_NAME}"
+            RELEASE_VERSION="${TAG#v}"
+            EXACT_NEXT=''
+            INCREMENT=patch
+            DRY_RUN=false
+            SKIP_TESTS=false
           else
-            CURRENT=$(grep -E '^version=' release.properties | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
-            if [[ -z "${CURRENT}" || "${CURRENT}" != *-SNAPSHOT ]]; then
-              echo "::error::release.properties must contain a development SNAPSHOT version"
+            MANAGED_RELEASE=true
+            CURRENT=$(sed -n 's/^version=//p' release.properties | head -n 1 | tr -d '[:space:]')
+            if [[ -z "$CURRENT" || "$CURRENT" != *-SNAPSHOT ]]; then
+              echo "::error::release.properties must contain exactly one development SNAPSHOT version"
               exit 1
             fi
             RELEASE_VERSION="${CURRENT%-SNAPSHOT}"
-            TAG_NAME="v${RELEASE_VERSION}"
-            MANAGED_RELEASE="true"
-
-            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-              EXACT_NEXT=$(python3 - <<'PY'
+            TAG="v${RELEASE_VERSION}"
+            EXACT_NEXT=$(python3 - <<'PY'
           import os
           print(os.environ.get('INPUT_EXACT_NEXT', '').strip())
           PY
-              )
-              if [[ -n "$EXACT_NEXT" ]]; then
-                NEXT_VERSION="$EXACT_NEXT"
-              else
-                NEXT_VERSION=$(next_from_increment "${RELEASE_VERSION}" "${INPUT_NEXT_INCREMENT}")
-              fi
-              DRY_RUN="${INPUT_DRY_RUN}"
-              SKIP_TESTS="${INPUT_SKIP_TESTS}"
-            else
-              if [[ "${HEAD_COMMIT_MESSAGE}" =~ \[next=([0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT)\] ]]; then
-                NEXT_VERSION="${BASH_REMATCH[1]}"
-              else
-                NEXT_VERSION=""
-              fi
-              DRY_RUN="false"
-              SKIP_TESTS="false"
-            fi
+            )
+            INCREMENT="${INPUT_NEXT_INCREMENT:-patch}"
+            DRY_RUN="${INPUT_DRY_RUN:-false}"
+            SKIP_TESTS="${INPUT_SKIP_TESTS:-false}"
           fi
 
-          if ! [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Invalid repository release version: '${RELEASE_VERSION}' (expected X.Y.Z)"
+          if ! [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid release version '$RELEASE_VERSION'; expected X.Y.Z"
             exit 1
           fi
 
-          if [[ -z "${NEXT_VERSION}" ]]; then
-            NEXT_VERSION=$(next_from_increment "${RELEASE_VERSION}" patch)
+          if [[ -n "$EXACT_NEXT" ]]; then
+            NEXT_VERSION="$EXACT_NEXT"
+          else
+            NEXT_VERSION=$(next_from_increment "$RELEASE_VERSION" "$INCREMENT")
           fi
-          if ! [[ "${NEXT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
-            echo "::error::Invalid next development version: '${NEXT_VERSION}'"
+          if ! [[ "$NEXT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
+            echo "::error::Invalid next development version '$NEXT_VERSION'"
             exit 1
           fi
+
           RELEASE_VERSION="$RELEASE_VERSION" NEXT_VERSION="$NEXT_VERSION" python3 - <<'PY'
           import os
           release = tuple(map(int, os.environ['RELEASE_VERSION'].split('.')))
-          next_version = tuple(
-              map(int, os.environ['NEXT_VERSION'].removesuffix('-SNAPSHOT').split('.'))
-          )
+          next_version = tuple(map(int, os.environ['NEXT_VERSION'].removesuffix('-SNAPSHOT').split('.')))
           if next_version <= release:
               raise SystemExit(
                   f"::error::Next development version {os.environ['NEXT_VERSION']} "
@@ -172,295 +145,265 @@ jobs:
               )
           PY
 
-          MAJOR_MINOR="${RELEASE_VERSION%.*}"
-          echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "next_development_version=${NEXT_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
-          echo "maintenance_branch=maintenance/${MAJOR_MINOR}.x" >> "$GITHUB_OUTPUT"
-          echo "dry_run=${DRY_RUN}" >> "$GITHUB_OUTPUT"
-          echo "skip_tests=${SKIP_TESTS}" >> "$GITHUB_OUTPUT"
-          echo "managed_release=${MANAGED_RELEASE}" >> "$GITHUB_OUTPUT"
-          echo "build_ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Inspect remote release state
-        id: state
-        env:
-          TAG: ${{ steps.resolve.outputs.tag_name }}
-          RESOLVED_HEAD: ${{ steps.resolve.outputs.build_ref }}
-        run: |
-          set -euo pipefail
-
-          TAG_EXISTS="false"
-          GITHUB_RELEASE_EXISTS="false"
-          BUILD_REF="${RESOLVED_HEAD}"
-
+          TAG_EXISTS=false
+          RELEASE_EXISTS=false
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            TAG_EXISTS="true"
-            BUILD_REF="${TAG}"
+            TAG_EXISTS=true
             git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
           fi
-
-          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            GITHUB_RELEASE_EXISTS="true"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            RELEASE_EXISTS=true
           fi
 
-          echo "tag_exists=${TAG_EXISTS}" >> "$GITHUB_OUTPUT"
-          echo "github_release_exists=${GITHUB_RELEASE_EXISTS}" >> "$GITHUB_OUTPUT"
-          echo "build_ref=${BUILD_REF}" >> "$GITHUB_OUTPUT"
-
-      - name: Validate release metadata
-        id: metadata
-        env:
-          MANAGED_RELEASE: ${{ steps.resolve.outputs.managed_release }}
-          TAG_EXISTS: ${{ steps.state.outputs.tag_exists }}
-          TAG: ${{ steps.resolve.outputs.tag_name }}
-          RELEASE_VERSION: ${{ steps.resolve.outputs.release_version }}
-          NEXT_VERSION: ${{ steps.resolve.outputs.next_development_version }}
-          DRY_RUN: ${{ steps.resolve.outputs.dry_run }}
-        run: |
-          set -euo pipefail
-          echo "needs_next_pr=false" >> "$GITHUB_OUTPUT"
-
-          if [[ "${MANAGED_RELEASE}" != "true" ]]; then
-            exit 0
-          fi
-
-          CURRENT=$(grep -E '^version=' release.properties | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
-          if [[ -z "${CURRENT}" ]]; then
-            echo "::error::release.properties must contain version=..."
-            exit 1
-          fi
-
-          if [[ "${TAG_EXISTS}" == "true" ]]; then
+          if [[ "$TAG_EXISTS" == true ]]; then
+            git checkout --detach "$TAG"
             TAG_VERSION=$(git show "${TAG}^{commit}:release.properties" |
-              grep -E '^version=' | head -n 1 | cut -d'=' -f2 | tr -d '[:space:]')
-            if [[ "${TAG_VERSION}" != "${RELEASE_VERSION}" ]]; then
-              echo "::error::Existing tag ${TAG} contains release version '${TAG_VERSION}', expected '${RELEASE_VERSION}'"
+              sed -n 's/^version=//p' | head -n 1 | tr -d '[:space:]')
+            if [[ "$TAG_VERSION" != "$RELEASE_VERSION" ]]; then
+              echo "::error::Tag $TAG contains version '$TAG_VERSION', expected '$RELEASE_VERSION'"
               exit 1
             fi
-
-            if [[ "${CURRENT}" == "${RELEASE_VERSION}-SNAPSHOT" ]]; then
-              echo "needs_next_pr=true" >> "$GITHUB_OUTPUT"
-            elif [[ "${CURRENT}" == "${NEXT_VERSION}" ]]; then
-              echo "Next development metadata is already present on main"
-            else
-              echo "Main is at ${CURRENT}; release recovery will not rewrite development metadata"
-            fi
-            exit 0
           fi
 
-          if [[ "${CURRENT}" != *-SNAPSHOT ]]; then
-            echo "::error::release.properties must contain a development SNAPSHOT version"
-            exit 1
-          fi
-          if [[ "${CURRENT%-SNAPSHOT}" != "${RELEASE_VERSION}" && "${DRY_RUN}" != "true" ]]; then
-            echo "::error::Derived release version does not match release.properties base version (${CURRENT%-SNAPSHOT})"
-            exit 1
-          fi
-
-          grep -q "version: \"${CURRENT}\"" CITATION.cff
-          grep -q "Version ${CURRENT}." CITATION.md
-          grep -q "version      = {${CURRENT}}," CITATION.md
-          grep -q "\"version\": \"${CURRENT}\"" .zenodo.json
-          grep -q "\"version\": \"${CURRENT}\"" codemeta.json
-          echo "needs_next_pr=true" >> "$GITHUB_OUTPUT"
-
-      - name: Preflight summary
-        run: |
+          SERIES="${RELEASE_VERSION%.*}"
           {
-            echo "## Preflight";
-            echo "";
-            echo "| Field | Value |";
-            echo "|-------|-------|";
-            echo "| Trigger | ${{ github.event_name }} |";
-            echo "| Release version | ${{ steps.resolve.outputs.release_version }} |";
-            echo "| Next development version | ${{ steps.resolve.outputs.next_development_version }} |";
-            echo "| Tag | ${{ steps.resolve.outputs.tag_name }} |";
-            echo "| Tag exists | ${{ steps.state.outputs.tag_exists }} |";
-            echo "| GitHub Release exists | ${{ steps.state.outputs.github_release_exists }} |";
-            echo "| Build ref | ${{ steps.state.outputs.build_ref }} |";
-            echo "| Maintenance branch | ${{ steps.resolve.outputs.maintenance_branch }} |";
-            echo "| Follow-up metadata required | ${{ steps.metadata.outputs.needs_next_pr }} |";
-            echo "| Dry run | ${{ steps.resolve.outputs.dry_run }} |";
-            echo "| Skip tests | ${{ steps.resolve.outputs.skip_tests }} |";
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "managed_release=$MANAGED_RELEASE"
+            echo "release_version=$RELEASE_VERSION"
+            echo "next_version=$NEXT_VERSION"
+            echo "tag=$TAG"
+            echo "tag_exists=$TAG_EXISTS"
+            echo "release_exists=$RELEASE_EXISTS"
+            echo "maintenance_branch=maintenance/${SERIES}.x"
+            echo "dry_run=$DRY_RUN"
+            echo "skip_tests=$SKIP_TESTS"
+          } >> "$GITHUB_OUTPUT"
 
-  build:
-    name: Build & Verify
-    needs: preflight
-    if: >-
-      needs.preflight.outputs.dry_run == 'true' ||
-      needs.preflight.outputs.github_release_exists != 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      artifact_name: ${{ steps.collect.outputs.artifact_name }}
-    steps:
-      - name: Checkout release source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.preflight.outputs.build_ref }}
+      - name: Validate development metadata
+        if: steps.release-state.outputs.managed_release == 'true' && steps.release-state.outputs.tag_exists != 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release-state.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          CURRENT="${RELEASE_VERSION}-SNAPSHOT"
+          test "$(sed -n 's/^version=//p' release.properties | head -n 1 | tr -d '[:space:]')" = "$CURRENT"
+          grep -Fq "version: \"${CURRENT}\"" CITATION.cff
+          grep -Fq "Version ${CURRENT}." CITATION.md
+          grep -Fq "version      = {${CURRENT}}," CITATION.md
+          grep -Fq "\"version\": \"${CURRENT}\"" .zenodo.json
+          grep -Fq "\"version\": \"${CURRENT}\"" codemeta.json
 
       - name: Set up JDK 21
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
+          distribution: temurin
           java-version: '21'
-          distribution: 'temurin'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        with:
+          cache-cleanup: on-success
 
-      - name: Gradle build
-        run: |
-          if [[ "${{ needs.preflight.outputs.skip_tests }}" == "true" ]]; then
-            ./gradlew --no-daemon assemble
-          else
-            ./gradlew --no-daemon build
-          fi
-
-      - name: Collect distribution artifacts
-        id: collect
+      - name: Install checkout prerequisites
+        if: steps.release-state.outputs.skip_tests != 'true'
         run: |
           set -euo pipefail
-          mkdir -p release-artifacts
-          shopt -s nullglob
-          for f in app/build/distributions/*.zip app/build/distributions/*.tar app/build/libs/*.jar; do
-            cp "$f" release-artifacts/
-          done
-          shopt -u nullglob
-          if ! compgen -G 'release-artifacts/*' > /dev/null; then
-            echo "::error::No release artifacts were found"
-            exit 1
-          fi
-          (cd release-artifacts && sha256sum * > SHA256SUMS.txt)
-          ls -la release-artifacts/
-          echo "artifact_name=regelsuche-${{ needs.preflight.outputs.release_version }}-artifacts" >> "$GITHUB_OUTPUT"
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3-venv \
+            z3=4.8.12-1
+          ./gradlew --no-daemon \
+            :app:installPlaywrightHostDependencies \
+            --console=plain
 
-      - name: Upload release artifacts (workflow run)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: ${{ steps.collect.outputs.artifact_name }}
-          path: release-artifacts/**
-
-  release:
-    name: Complete GitHub Release
-    needs: [preflight, build]
-    if: >-
-      always() &&
-      needs.preflight.result == 'success' &&
-      needs.preflight.outputs.dry_run != 'true' &&
-      (needs.build.result == 'success' || needs.build.result == 'skipped')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout main release controller
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          ref: main
-
-      - name: Download release artifacts
-        if: needs.preflight.outputs.github_release_exists != 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: ${{ needs.build.outputs.artifact_name }}
-          path: release-artifacts
-
-      - name: Create release metadata commit
-        if: >-
-          needs.preflight.outputs.managed_release == 'true' &&
-          needs.preflight.outputs.tag_exists != 'true'
+      - name: Run checkout-owned verification
+        if: steps.release-state.outputs.skip_tests != 'true'
         run: |
           set -euo pipefail
-          VERSION="${{ needs.preflight.outputs.release_version }}"
+          mkdir -p build/logs
+          set -o pipefail
+          env -u GITHUB_SHA ./gradlew \
+            --no-daemon \
+            --no-configuration-cache \
+            ciCheck \
+            --console=plain \
+            --stacktrace \
+            2>&1 | tee build/logs/release-ci-check.log
+          test -z "$(git status --porcelain)"
+
+      - name: Run assembly-only verification
+        if: steps.release-state.outputs.skip_tests == 'true'
+        run: |
+          set -euo pipefail
+          ./gradlew \
+            --no-daemon \
+            --no-configuration-cache \
+            assemble \
+            --console=plain
+          test -z "$(git status --porcelain)"
+
+      - name: Prepare release metadata commit
+        if: steps.release-state.outputs.tag_exists != 'true'
+        env:
+          VERSION: ${{ steps.release-state.outputs.release_version }}
+        run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          python3 .github/scripts/update-release-metadata.py "${VERSION}" --release
+          python3 .github/scripts/update-release-metadata.py "$VERSION" --release
           git add CITATION.cff CITATION.md .zenodo.json codemeta.json release.properties
+          git diff --cached --check
           git commit -m "Release version ${VERSION}"
 
-      - name: Create git tag
-        if: >-
-          needs.preflight.outputs.managed_release == 'true' &&
-          needs.preflight.outputs.tag_exists != 'true'
+      - name: Validate release metadata
+        env:
+          VERSION: ${{ steps.release-state.outputs.release_version }}
         run: |
           set -euo pipefail
-          TAG="${{ needs.preflight.outputs.tag_name }}"
-          git tag -a "${TAG}" -m "Release ${{ needs.preflight.outputs.release_version }}"
-          git push origin "${TAG}"
+          test "$(sed -n 's/^version=//p' release.properties | head -n 1 | tr -d '[:space:]')" = "$VERSION"
+          grep -Fq "version: \"${VERSION}\"" CITATION.cff
+          grep -Fq "Version ${VERSION}." CITATION.md
+          grep -Fq "version      = {${VERSION}}," CITATION.md
+          grep -Fq "\"version\": \"${VERSION}\"" .zenodo.json
+          grep -Fq "\"version\": \"${VERSION}\"" codemeta.json
+          test -z "$(git status --porcelain)"
+
+      - name: Build release distributions from release metadata
+        run: |
+          set -euo pipefail
+          ./gradlew \
+            --no-daemon \
+            --no-configuration-cache \
+            :app:distZip \
+            :app:distTar \
+            :app:jar \
+            --console=plain
+
+      - name: Collect release artifacts
+        id: artifacts
+        env:
+          VERSION: ${{ steps.release-state.outputs.release_version }}
+          TAG: ${{ steps.release-state.outputs.tag }}
+        run: |
+          set -euo pipefail
+          rm -rf release-artifacts
+          mkdir -p release-artifacts
+          shopt -s nullglob
+          files=(app/build/distributions/*.zip app/build/distributions/*.tar app/build/libs/*.jar)
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No release artifacts were produced"
+            exit 1
+          fi
+          cp "${files[@]}" release-artifacts/
+          {
+            echo "version=${VERSION}"
+            echo "tag=${TAG}"
+            echo "source_commit=$(git rev-parse HEAD)"
+            echo "release_properties_sha256=$(sha256sum release.properties | awk '{print $1}')"
+          } > release-artifacts/RELEASE-MANIFEST.txt
+          (cd release-artifacts && sha256sum -- * > SHA256SUMS.txt)
+          echo "name=regelsuche-${VERSION}-artifacts" >> "$GITHUB_OUTPUT"
+
+      - name: Retain release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ${{ steps.artifacts.outputs.name }}
+          path: release-artifacts/**
+          if-no-files-found: error
+
+      - name: Create and push release tag
+        if: steps.release-state.outputs.dry_run != 'true' && steps.release-state.outputs.tag_exists != 'true'
+        env:
+          TAG: ${{ steps.release-state.outputs.tag }}
+          VERSION: ${{ steps.release-state.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          git tag -a "$TAG" -m "Release $VERSION"
+          git push origin "$TAG"
 
       - name: Update maintenance branch
-        if: needs.preflight.outputs.managed_release == 'true'
+        if: steps.release-state.outputs.dry_run != 'true'
         env:
-          TAG: ${{ needs.preflight.outputs.tag_name }}
-          BRANCH: ${{ needs.preflight.outputs.maintenance_branch }}
-          RELEASE_VERSION: ${{ needs.preflight.outputs.release_version }}
+          TAG: ${{ steps.release-state.outputs.tag }}
+          BRANCH: ${{ steps.release-state.outputs.maintenance_branch }}
+          VERSION: ${{ steps.release-state.outputs.release_version }}
         run: |
           set -euo pipefail
-          SERIES="${RELEASE_VERSION%.*}"
-
           if ! git rev-parse --verify "${TAG}^{commit}" >/dev/null 2>&1; then
             git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
           fi
           TARGET_SHA=$(git rev-parse "${TAG}^{commit}")
           OLD_SHA=$(git ls-remote --heads origin "refs/heads/${BRANCH}" | awk '{print $1}')
-
-          if [[ -z "${OLD_SHA}" ]]; then
+          if [[ -z "$OLD_SHA" ]]; then
             git push origin "${TARGET_SHA}:refs/heads/${BRANCH}"
-            exit 0
-          fi
-
-          if [[ "${OLD_SHA}" == "${TARGET_SHA}" ]]; then
+          elif [[ "$OLD_SHA" == "$TARGET_SHA" ]]; then
             echo "Maintenance branch ${BRANCH} already points to ${TAG}"
-            exit 0
+          else
+            SERIES="${VERSION%.*}"
+            git fetch --force --tags origin
+            if ! git tag --contains "$OLD_SHA" --list "v${SERIES}.*" | grep -q .; then
+              echo "::error::Refusing to replace ${BRANCH}: ${OLD_SHA} is not preserved by a v${SERIES}.* tag"
+              exit 1
+            fi
+            git push \
+              --force-with-lease="refs/heads/${BRANCH}:${OLD_SHA}" \
+              origin "${TARGET_SHA}:refs/heads/${BRANCH}"
           fi
-
-          git fetch --force --tags origin
-          if ! git tag --contains "${OLD_SHA}" --list "v${SERIES}.*" | grep -q .; then
-            echo "::error::Refusing to replace ${BRANCH}: its current tip ${OLD_SHA} is not preserved by a v${SERIES}.* tag"
-            exit 1
-          fi
-
-          git push \
-            --force-with-lease="refs/heads/${BRANCH}:${OLD_SHA}" \
-            origin "${TARGET_SHA}:refs/heads/${BRANCH}"
 
       - name: Create GitHub Release
-        if: needs.preflight.outputs.github_release_exists != 'true'
+        if: steps.release-state.outputs.dry_run != 'true' && steps.release-state.outputs.release_exists != 'true'
         env:
-          TAG: ${{ needs.preflight.outputs.tag_name }}
-          VERSION: ${{ needs.preflight.outputs.release_version }}
+          TAG: ${{ steps.release-state.outputs.tag }}
+          VERSION: ${{ steps.release-state.outputs.release_version }}
         run: |
           set -euo pipefail
-          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            echo "GitHub Release ${TAG} already exists"
-          else
-            gh release create "${TAG}" \
-              --repo "${GITHUB_REPOSITORY}" \
-              --title "Regelsuche ${VERSION}" \
-              --generate-notes \
-              release-artifacts/*
-          fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Regelsuche ${VERSION}" \
+            --generate-notes \
+            release-artifacts/*
+
+      - name: Restore authoritative main for follow-up
+        if: steps.release-state.outputs.dry_run != 'true' && steps.release-state.outputs.managed_release == 'true'
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          git reset --hard origin/main
+          git clean -fd
 
       - name: Prepare next development metadata
-        if: >-
-          needs.preflight.outputs.managed_release == 'true' &&
-          needs.preflight.outputs.needs_next_pr == 'true'
+        id: next-development
+        if: steps.release-state.outputs.dry_run != 'true' && steps.release-state.outputs.managed_release == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release-state.outputs.release_version }}
+          NEXT_VERSION: ${{ steps.release-state.outputs.next_version }}
         run: |
-          python3 .github/scripts/update-release-metadata.py "${{ needs.preflight.outputs.next_development_version }}"
+          set -euo pipefail
+          CURRENT=$(sed -n 's/^version=//p' release.properties | head -n 1 | tr -d '[:space:]')
+          if [[ "$CURRENT" == "$NEXT_VERSION" ]]; then
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "Main already contains ${NEXT_VERSION}"
+          elif [[ "$CURRENT" == "${RELEASE_VERSION}-SNAPSHOT" ]]; then
+            python3 .github/scripts/update-release-metadata.py "$NEXT_VERSION"
+            git diff --check
+            echo "required=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "required=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Main is at ${CURRENT}; not creating a follow-up version PR"
+          fi
 
       - name: Open next development metadata PR
-        if: >-
-          needs.preflight.outputs.managed_release == 'true' &&
-          needs.preflight.outputs.needs_next_pr == 'true'
+        if: steps.next-development.outputs.required == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
-          branch: release/prepare-next-${{ needs.preflight.outputs.next_development_version }}
+          branch: release/prepare-next-${{ steps.release-state.outputs.next_version }}
           base: main
           delete-branch: false
-          commit-message: Prepare next development version ${{ needs.preflight.outputs.next_development_version }}
-          title: Prepare next development version ${{ needs.preflight.outputs.next_development_version }}
+          commit-message: Prepare next development version ${{ steps.release-state.outputs.next_version }}
+          title: Prepare next development version ${{ steps.release-state.outputs.next_version }}
           body: |
-            Automated follow-up after release ${{ needs.preflight.outputs.release_version }}.
+            Automated follow-up after release ${{ steps.release-state.outputs.release_version }}.
 
             Changes:
             - update release.properties
@@ -476,38 +419,20 @@ jobs:
             codemeta.json
             release.properties
 
-  complete-summary:
-    name: Release completion summary
-    needs: [preflight, build, release]
-    if: >-
-      always() &&
-      needs.preflight.result == 'success' &&
-      needs.preflight.outputs.dry_run != 'true' &&
-      needs.release.result == 'success'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report completion
+      - name: Release summary
+        if: always()
         run: |
           {
-            echo "## Release completed";
+            echo "## Release workflow";
             echo "";
-            echo "Tag: **${{ needs.preflight.outputs.tag_name }}**";
-            echo "GitHub Release, artifacts and maintenance branch are complete.";
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  dry-run-summary:
-    name: Dry-run summary
-    needs: [preflight, build]
-    if: needs.preflight.outputs.dry_run == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report dry run
-        run: |
-          {
-            echo "## Dry run completed";
-            echo "";
-            echo "Would have completed tag **${{ needs.preflight.outputs.tag_name }}** and its GitHub Release";
-            echo "with artifacts uploaded from job *Build & Verify* (artifact name:";
-            echo "`${{ needs.build.outputs.artifact_name }}`).";
-            echo "Would have updated **${{ needs.preflight.outputs.maintenance_branch }}**.";
+            echo "| Field | Value |";
+            echo "|-------|-------|";
+            echo "| Version | ${{ steps.release-state.outputs.release_version }} |";
+            echo "| Tag | ${{ steps.release-state.outputs.tag }} |";
+            echo "| Existing tag at start | ${{ steps.release-state.outputs.tag_exists }} |";
+            echo "| Existing GitHub Release at start | ${{ steps.release-state.outputs.release_exists }} |";
+            echo "| Next development version | ${{ steps.release-state.outputs.next_version }} |";
+            echo "| Maintenance branch | ${{ steps.release-state.outputs.maintenance_branch }} |";
+            echo "| Dry run | ${{ steps.release-state.outputs.dry_run }} |";
+            echo "| Tests skipped | ${{ steps.release-state.outputs.skip_tests }} |";
           } >> "$GITHUB_STEP_SUMMARY"
