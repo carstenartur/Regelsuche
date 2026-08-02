@@ -29,7 +29,6 @@ class ComparativeBenchmarkArchitectureBoundaryTest {
         }
 
         assertEquals(Set.of(
-            ":regelsuche-egraph",
             ":regelsuche-search",
             ":regelsuche-solver-ir",
             ":regelsuche-solver-portfolio"), actual);
