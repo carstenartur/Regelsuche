@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Experimental prepared variant of {@link AstRewriteTransformationEngine}.
+ * Prepared variant of {@link AstRewriteTransformationEngine}.
  *
  * <p>It deliberately keeps the public string-based transformation boundary so
  * search semantics remain comparable, but removes avoidable work inside one
@@ -39,9 +39,10 @@ import java.util.Set;
  * <p>Subclasses of {@code PatternRewriteRule} deliberately retain the ordinary
  * {@link RewriteRule} dispatch so overridden behavior is never bypassed.</p>
  *
- * <p>This class is an evidence-gathering backend for #530, not yet the default
- * production engine. Differential tests require exact ordered transformation
- * parity with the reference implementation.</p>
+ * <p>This is the production backend for repeated rewrite-program execution after
+ * the matched-work, end-to-end and allocation measurements from #530. The
+ * reference implementation remains selectable as the executable semantic
+ * oracle, and differential tests require exact ordered transformation parity.</p>
  */
 public final class PreparedAstRewriteTransformationEngine
         implements TransformationEngine {
