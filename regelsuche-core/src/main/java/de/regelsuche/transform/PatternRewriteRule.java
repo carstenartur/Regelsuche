@@ -2,6 +2,7 @@ package de.regelsuche.transform;
 
 import de.regelsuche.ast.Expr;
 import de.regelsuche.knowledge.RuleDescriptor;
+import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -15,6 +16,8 @@ public class PatternRewriteRule implements RewriteRule {
     private final boolean equivalencePreservingByConstruction;
     private final RuleDescriptor descriptor;
     private final RecognitionProfile recognitionProfile;
+    private final ThreadLocal<WeakReference<PreparedMatch>> preparedMatch =
+        new ThreadLocal<>();
 
     public PatternRewriteRule(String id, PatternExpr source, PatternExpr target) {
         this(id, source, target, RewriteKind.NORMALIZE, false, 0, true);
@@ -155,15 +158,31 @@ public class PatternRewriteRule implements RewriteRule {
 
     @Override
     public boolean matches(Expr subtree) {
-        return EquivalenceAwarePatternMatcher.match(source, subtree, new HashMap<>(), recognitionProfile);
+        preparedMatch.remove();
+        Map<String, Expr> bindings = new HashMap<>();
+        if (!EquivalenceAwarePatternMatcher.match(source, subtree, bindings, recognitionProfile)) {
+            return false;
+        }
+        preparedMatch.set(new WeakReference<>(
+            new PreparedMatch(subtree, Map.copyOf(bindings))));
+        return true;
     }
 
     @Override
     public Expr apply(Expr subtree) {
+        WeakReference<PreparedMatch> reference = preparedMatch.get();
+        preparedMatch.remove();
+        PreparedMatch prepared = reference == null ? null : reference.get();
+        if (prepared != null && prepared.subtree() == subtree) {
+            return target.instantiate(prepared.bindings());
+        }
         Map<String, Expr> bindings = new HashMap<>();
         if (!EquivalenceAwarePatternMatcher.match(source, subtree, bindings, recognitionProfile)) {
             throw new IllegalArgumentException("Rule does not match subtree");
         }
         return target.instantiate(bindings);
+    }
+
+    private record PreparedMatch(Expr subtree, Map<String, Expr> bindings) {
     }
 }
