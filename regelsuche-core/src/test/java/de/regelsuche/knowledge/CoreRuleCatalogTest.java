@@ -34,13 +34,17 @@ class CoreRuleCatalogTest {
     }
 
     @Test
-    void defaultRulesAreUnchangedByTheTierSplit() {
-        List<RewriteRule> defaults = AstRewriteTransformationEngine.defaultRules();
-        assertEquals(ruleIds(AstRewriteTransformationEngine.allBuiltInRules()), ruleIds(defaults));
-        assertEquals(
-                ruleIds(defaults),
-                ruleIds(AstRewriteTransformationEngine.defaultRules(
-                        KnowledgePackSelection.profile(RuleProfile.FULL))));
+    void defaultRulesExcludeExperimentalOptInPacks() {
+        List<String> defaults = ruleIds(AstRewriteTransformationEngine.defaultRules());
+        List<String> fullAlias = ruleIds(AstRewriteTransformationEngine.defaultRules(
+                KnowledgePackSelection.profile(RuleProfile.FULL)));
+        List<String> all = ruleIds(AstRewriteTransformationEngine.defaultRules(
+                KnowledgePackSelection.profile(RuleProfile.ALL)));
+
+        assertEquals(defaults, fullAlias);
+        assertFalse(defaults.contains("ast_polynomial_exact_division"));
+        assertTrue(all.contains("ast_polynomial_exact_division"));
+        assertTrue(all.containsAll(defaults));
     }
 
     @Test
@@ -87,6 +91,15 @@ class CoreRuleCatalogTest {
         List<String> ruleIds = ruleIds(AstRewriteTransformationEngine.defaultRules(selection));
         assertTrue(ruleIds.containsAll(CoreRuleCatalog.pack(CoreRuleCatalog.DISTRIBUTION).ruleIds()));
         assertFalse(ruleIds.contains("ast_square_difference_factor"));
+    }
+
+    @Test
+    void experimentalExactPolynomialDivisionRequiresExplicitEnablement() {
+        KnowledgePackSelection selection = KnowledgePackSelection.CORE
+                .enablePack(CoreRuleCatalog.EXACT_POLYNOMIAL_DIVISION);
+        List<String> selected = ruleIds(AstRewriteTransformationEngine.defaultRules(selection));
+
+        assertTrue(selected.contains("ast_polynomial_exact_division"));
     }
 
     private static List<String> ruleIds(List<RewriteRule> rules) {
