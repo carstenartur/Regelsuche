@@ -5,6 +5,7 @@ import de.regelsuche.ast.BinaryOperator;
 import de.regelsuche.ast.Expr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -23,11 +24,17 @@ final class UnivariatePolynomial {
     private static final int MAX_EXPONENT = 8;
     /** Highest degree accepted, keeping the rule a local, cheap decision. */
     private static final int MAX_DEGREE = 16;
+    /** Largest coefficient that can be represented exactly by the AST number type. */
+    private static final BigInteger MAX_ABSOLUTE_COEFFICIENT =
+        BigInteger.valueOf(1_000_000_000_000L);
 
     private final String variable;
-    private final double[] coefficients;
+    private final BigInteger[] coefficients;
 
-    private UnivariatePolynomial(String variable, double[] coefficients) {
+    private UnivariatePolynomial(
+        String variable,
+        BigInteger[] coefficients
+    ) {
         this.variable = variable;
         this.coefficients = trim(coefficients);
     }
@@ -42,13 +49,15 @@ final class UnivariatePolynomial {
             return null;
         }
         if (expression instanceof NumberExpr number) {
-            return isExactInteger(number.value())
-                ? new UnivariatePolynomial("", new double[] {number.value()})
-                : null;
+            BigInteger value = exactInteger(number.value());
+            return value == null
+                ? null
+                : new UnivariatePolynomial("", new BigInteger[] {value});
         }
         if (expression instanceof VariableExpr variable) {
             return new UnivariatePolynomial(
-                variable.name(), new double[] {0.0, 1.0});
+                variable.name(),
+                new BigInteger[] {BigInteger.ZERO, BigInteger.ONE});
         }
         if (!(expression instanceof BinaryExpr binary)) {
             return null;
@@ -65,8 +74,8 @@ final class UnivariatePolynomial {
             return null;
         }
         return switch (binary.operator()) {
-            case ADD -> left.combine(right, 1.0);
-            case SUB -> left.combine(right, -1.0);
+            case ADD -> left.combine(right, BigInteger.ONE);
+            case SUB -> left.combine(right, BigInteger.ONE.negate());
             case MUL -> left.multiply(right);
             case DIV -> left.divideByConstant(right);
             default -> null;
@@ -86,7 +95,7 @@ final class UnivariatePolynomial {
     }
 
     boolean isZero() {
-        return isConstant() && coefficients[0] == 0.0;
+        return isConstant() && coefficients[0].signum() == 0;
     }
 
     /**
@@ -102,62 +111,67 @@ final class UnivariatePolynomial {
                 || divisor.degree() > degree()) {
             return null;
         }
-        double[] remainder = coefficients.clone();
-        double[] quotient = new double[degree() - divisor.degree() + 1];
-        double leading = divisor.coefficients[divisor.degree()];
+        BigInteger[] remainder = coefficients.clone();
+        BigInteger[] quotient = zeroCoefficients(
+            degree() - divisor.degree() + 1);
+        BigInteger leading = divisor.coefficients[divisor.degree()];
         for (int index = quotient.length - 1; index >= 0; index--) {
-            double factor = remainder[index + divisor.degree()] / leading;
-            if (!isExactInteger(factor)) {
+            BigInteger[] division = remainder[index + divisor.degree()]
+                .divideAndRemainder(leading);
+            if (division[1].signum() != 0
+                    || !isAcceptedCoefficient(division[0])) {
                 return null;
             }
+            BigInteger factor = division[0];
             quotient[index] = factor;
-            if (factor == 0.0) {
+            if (factor.signum() == 0) {
                 continue;
             }
             for (int offset = 0; offset <= divisor.degree(); offset++) {
-                remainder[index + offset] -=
-                    factor * divisor.coefficients[offset];
+                int remainderIndex = index + offset;
+                remainder[remainderIndex] = remainder[remainderIndex]
+                    .subtract(factor.multiply(divisor.coefficients[offset]));
             }
         }
-        for (int index = 0; index < divisor.degree(); index++) {
-            if (remainder[index] != 0.0) {
-                return null;
-            }
+        if (Arrays.stream(remainder).anyMatch(value -> value.signum() != 0)) {
+            return null;
         }
         String resultVariable = variable.isEmpty() ? divisor.variable : variable;
-        return new UnivariatePolynomial(resultVariable, quotient);
+        return build(resultVariable, quotient);
     }
 
     /** @return the polynomial rendered back into an expression tree. */
     Expr toExpression() {
         if (isZero() || variable.isEmpty()) {
-            return new NumberExpr(coefficients[0]);
+            return new NumberExpr(coefficients[0].doubleValue());
         }
         Expr result = null;
         for (int exponent = degree(); exponent >= 0; exponent--) {
-            double coefficient = coefficients[exponent];
-            if (coefficient == 0.0) {
+            BigInteger coefficient = coefficients[exponent];
+            if (coefficient.signum() == 0) {
                 continue;
             }
-            Expr term = term(Math.abs(coefficient), exponent);
+            Expr term = term(coefficient.abs(), exponent);
             if (result == null) {
-                result = coefficient < 0.0
+                result = coefficient.signum() < 0
                     ? new BinaryExpr(
                         new NumberExpr(0), BinaryOperator.SUB, term)
                     : term;
             } else {
                 result = new BinaryExpr(
                     result,
-                    coefficient < 0.0 ? BinaryOperator.SUB : BinaryOperator.ADD,
+                    coefficient.signum() < 0
+                        ? BinaryOperator.SUB
+                        : BinaryOperator.ADD,
                     term);
             }
         }
         return result == null ? new NumberExpr(0) : result;
     }
 
-    private Expr term(double coefficient, int exponent) {
+    private Expr term(BigInteger coefficient, int exponent) {
         if (exponent == 0) {
-            return new NumberExpr(coefficient);
+            return new NumberExpr(coefficient.doubleValue());
         }
         Expr power = exponent == 1
             ? new VariableExpr(variable)
@@ -165,66 +179,83 @@ final class UnivariatePolynomial {
                 new VariableExpr(variable),
                 BinaryOperator.POW,
                 new NumberExpr(exponent));
-        return coefficient == 1.0
+        return coefficient.equals(BigInteger.ONE)
             ? power
             : new BinaryExpr(
-                new NumberExpr(coefficient), BinaryOperator.MUL, power);
+                new NumberExpr(coefficient.doubleValue()),
+                BinaryOperator.MUL,
+                power);
     }
 
     private UnivariatePolynomial combine(
         UnivariatePolynomial other,
-        double sign
+        BigInteger sign
     ) {
         if (!sameVariable(other)) {
             return null;
         }
-        double[] result = new double[
-            Math.max(coefficients.length, other.coefficients.length)];
+        BigInteger[] result = zeroCoefficients(
+            Math.max(coefficients.length, other.coefficients.length));
         for (int index = 0; index < coefficients.length; index++) {
-            result[index] += coefficients[index];
+            result[index] = result[index].add(coefficients[index]);
         }
         for (int index = 0; index < other.coefficients.length; index++) {
-            result[index] += sign * other.coefficients[index];
+            result[index] = result[index]
+                .add(sign.multiply(other.coefficients[index]));
         }
         return build(mergedVariable(other), result);
     }
 
     private UnivariatePolynomial multiply(UnivariatePolynomial other) {
-        if (!sameVariable(other)) {
+        if (!sameVariable(other)
+                || degree() + other.degree() > MAX_DEGREE) {
             return null;
         }
-        double[] result =
-            new double[coefficients.length + other.coefficients.length - 1];
+        BigInteger[] result = zeroCoefficients(
+            coefficients.length + other.coefficients.length - 1);
         for (int left = 0; left < coefficients.length; left++) {
             for (int right = 0; right < other.coefficients.length; right++) {
-                result[left + right] +=
-                    coefficients[left] * other.coefficients[right];
+                int resultIndex = left + right;
+                result[resultIndex] = result[resultIndex].add(
+                    coefficients[left].multiply(other.coefficients[right]));
             }
         }
         return build(mergedVariable(other), result);
     }
 
-    private UnivariatePolynomial divideByConstant(UnivariatePolynomial other) {
-        if (!other.isConstant() || other.coefficients[0] == 0.0) {
+    private UnivariatePolynomial divideByConstant(
+        UnivariatePolynomial other
+    ) {
+        if (!other.isConstant() || other.coefficients[0].signum() == 0) {
             return null;
         }
-        double[] result = new double[coefficients.length];
+        BigInteger[] result = zeroCoefficients(coefficients.length);
         for (int index = 0; index < coefficients.length; index++) {
-            result[index] = coefficients[index] / other.coefficients[0];
+            BigInteger[] division = coefficients[index]
+                .divideAndRemainder(other.coefficients[0]);
+            if (division[1].signum() != 0) {
+                return null;
+            }
+            result[index] = division[0];
         }
         return build(variable, result);
     }
 
     private UnivariatePolynomial power(Expr exponentExpression) {
-        if (!(exponentExpression instanceof NumberExpr exponent)
-                || !isExactInteger(exponent.value())
-                || exponent.value() < 0.0
-                || exponent.value() > MAX_EXPONENT) {
+        if (!(exponentExpression instanceof NumberExpr exponent)) {
             return null;
         }
-        UnivariatePolynomial result =
-            new UnivariatePolynomial(variable, new double[] {1.0});
-        for (int step = 0; step < (int) exponent.value(); step++) {
+        BigInteger exactExponent = exactInteger(exponent.value());
+        if (exactExponent == null
+                || exactExponent.signum() < 0
+                || exactExponent.compareTo(
+                    BigInteger.valueOf(MAX_EXPONENT)) > 0) {
+            return null;
+        }
+        UnivariatePolynomial result = new UnivariatePolynomial(
+            variable,
+            new BigInteger[] {BigInteger.ONE});
+        for (int step = 0; step < exactExponent.intValue(); step++) {
             result = result.multiply(this);
             if (result == null) {
                 return null;
@@ -244,30 +275,41 @@ final class UnivariatePolynomial {
 
     private static UnivariatePolynomial build(
         String variable,
-        double[] coefficients
+        BigInteger[] coefficients
     ) {
-        double[] trimmed = trim(coefficients);
-        if (trimmed.length - 1 > MAX_DEGREE) {
+        BigInteger[] trimmed = trim(coefficients);
+        if (trimmed.length - 1 > MAX_DEGREE
+                || Arrays.stream(trimmed)
+                    .anyMatch(value -> !isAcceptedCoefficient(value))) {
             return null;
-        }
-        for (double coefficient : trimmed) {
-            if (!isExactInteger(coefficient)) {
-                return null;
-            }
         }
         return new UnivariatePolynomial(variable, trimmed);
     }
 
-    private static double[] trim(double[] coefficients) {
+    private static BigInteger[] zeroCoefficients(int length) {
+        BigInteger[] coefficients = new BigInteger[length];
+        Arrays.fill(coefficients, BigInteger.ZERO);
+        return coefficients;
+    }
+
+    private static BigInteger[] trim(BigInteger[] coefficients) {
         int degree = coefficients.length - 1;
-        while (degree > 0 && coefficients[degree] == 0.0) {
+        while (degree > 0 && coefficients[degree].signum() == 0) {
             degree--;
         }
         return Arrays.copyOf(coefficients, degree + 1);
     }
 
-    private static boolean isExactInteger(double value) {
-        return Double.isFinite(value) && Math.rint(value) == value
-            && Math.abs(value) <= 1e12;
+    private static BigInteger exactInteger(double value) {
+        if (!Double.isFinite(value)
+                || Math.rint(value) != value
+                || Math.abs(value) > MAX_ABSOLUTE_COEFFICIENT.doubleValue()) {
+            return null;
+        }
+        return BigInteger.valueOf((long) value);
+    }
+
+    private static boolean isAcceptedCoefficient(BigInteger value) {
+        return value.abs().compareTo(MAX_ABSOLUTE_COEFFICIENT) <= 0;
     }
 }
