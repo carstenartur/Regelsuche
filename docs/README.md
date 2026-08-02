@@ -161,6 +161,8 @@ Verträge und Gates.
 
 - [Schema-Katalog](schema-catalog.md) — gruppierter Einstieg in die
   maschinenlesbaren Verträge.
+- [Capability-Status-Schema](schemas/regelsuche-capability-status-v1.schema.json) —
+  verbindlicher Vertrag der generierten öffentlichen Capability-Matrix.
 - [`docs/schemas/`](schemas/) — vollständiger, versionierter Schema-Bestand.
 - [`docs/generated/`](generated/) — aus Evidence erzeugte Status- und
   Ergebnisdokumente; nicht manuell editieren.
