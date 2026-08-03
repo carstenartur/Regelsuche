@@ -169,8 +169,10 @@ Verträge und Gates.
 - [`docs/schemas/`](schemas/) — vollständiger, versionierter Schema-Bestand.
 - [`docs/generated/`](generated/) — aus Evidence erzeugte Status- und
   Ergebnisdokumente; nicht manuell editieren.
-- [Benchmark Report](benchmark-report.md) — aus dem Checkout erzeugter
-  Qualitäts- und Benchmarkbericht.
+- [Benchmark Report](https://carstenartur.github.io/Regelsuche/benchmark-report.md) —
+  aus dem Checkout erzeugter Qualitäts- und Benchmarkbericht (nicht ins
+  Repository eingecheckt; wird von `./gradlew benchmarkReport` erzeugt und als
+  CI-Artefakt bereitgestellt).
 
 ## Historische Dokumentation
 

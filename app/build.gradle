@@ -210,15 +210,15 @@ tasks.register('installPlaywrightHostDependencies', JavaExec) {
 }
 
 tasks.register('benchmarkReport', JavaExec) {
-    description = 'Runs the benchmark suite and writes docs/benchmark-report.md ' +
-        '+ docs/assets/benchmark-summary.json (the quality dashboard).'
+    description = 'Runs the benchmark suite and writes benchmark report and summary ' +
+        'under app/build/reports/benchmark (the quality dashboard).'
     group = 'documentation'
     dependsOn tasks.named('classes')
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.regelsuche.App'
     args 'benchmark',
-        '--report=' + rootProject.file('docs/benchmark-report.md').absolutePath,
-        '--summary=' + rootProject.file('docs/assets/benchmark-summary.json').absolutePath,
+        '--report=' + layout.buildDirectory.file('reports/benchmark/benchmark-report.md').get().asFile.absolutePath,
+        '--summary=' + layout.buildDirectory.file('reports/benchmark/benchmark-summary.json').get().asFile.absolutePath,
         '--quiet'
 }
 
