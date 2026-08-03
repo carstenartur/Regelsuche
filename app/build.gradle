@@ -211,7 +211,7 @@ tasks.register('installPlaywrightHostDependencies', JavaExec) {
 
 tasks.register('benchmarkReport', JavaExec) {
     description = 'Runs the benchmark suite and writes benchmark report and summary ' +
-        'under build/reports/benchmark (the quality dashboard).'
+        'under app/build/reports/benchmark (the quality dashboard).'
     group = 'documentation'
     dependsOn tasks.named('classes')
     classpath = sourceSets.main.runtimeClasspath
