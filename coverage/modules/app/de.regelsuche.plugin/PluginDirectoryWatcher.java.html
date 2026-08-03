@@ -89,8 +89,8 @@ public final class PluginDirectoryWatcher implements Closeable {
 
     private void scheduleReload() {
 <span class="fc" id="L91">        ScheduledFuture&lt;?&gt; existing = pending;</span>
-<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (existing != null) {</span>
-<span class="fc" id="L93">            existing.cancel(false);</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (existing != null) {</span>
+<span class="nc" id="L93">            existing.cancel(false);</span>
         }
 <span class="fc" id="L95">        pending = scheduler.schedule(() -&gt; {</span>
             try {
