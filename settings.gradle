@@ -116,6 +116,9 @@ gradle.beforeProject { candidate ->
             'gradle/quality-gates.gradle')
         candidate.apply from: new File(
             settingsDir,
+            'gradle/coverage-policy-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
             'gradle/ci-verification.gradle')
     }
     if (candidate.path == ':app') {
