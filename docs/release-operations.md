@@ -110,8 +110,9 @@ Nach dem echten Lauf sind folgende Punkte zu prüfen:
 - Tag `vX.Y.Z` existiert und zeigt auf den Release-Metadaten-Commit;
 - der GitHub Release enthält alle erwarteten Artefakte und Prüfsummen;
 - `maintenance/X.Y.x` zeigt auf denselben getaggten Commit;
-- der Folge-PR enthält ausschließlich die nächste Entwicklungsversion in den
-  fünf Metadatendateien;
+- der Folge-PR enthält ausschließlich die nächste Entwicklungsversion in
+  `release.properties`, `CITATION.cff`, `CITATION.md`, `.zenodo.json` und
+  `codemeta.json`;
 - nach Merge des Folge-PRs ist `main` erneut grün;
 - die veröffentlichte Version ist in Zitiermetadaten und Release-Artefakten
   konsistent.
