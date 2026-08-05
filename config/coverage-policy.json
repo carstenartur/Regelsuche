@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "regelsuche.coverage-policy/v1",
+  "ratchetingPolicy": "Thresholds may increase with retained evidence. Any decrease requires an explicit rationale in the pull request and an updated reference measurement.",
+  "aggregate": {
+    "lineMinimum": 0.75,
+    "branchMinimum": 0.55
+  },
+  "modules": {
+    "regelsuche-persistence-hibernate": {
+      "required": true,
+      "lineMinimum": 0.18
+    }
+  }
+}
