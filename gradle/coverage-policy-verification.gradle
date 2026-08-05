@@ -1,0 +1,46 @@
+/*
+ * Checkout-owned, fail-closed JaCoCo coverage policy.
+ *
+ * The verifier consumes module XML reports, rejects missing required modules,
+ * checks aggregate and module-specific floors, and writes one machine-readable
+ * report for CI retention. Thresholds live in config/coverage-policy.json so
+ * every change is reviewable and can be ratcheted independently of this task.
+ */
+
+def coveragePolicyReports = providers.provider {
+    subprojects.findAll { candidate ->
+        candidate.plugins.hasPlugin('jacoco') && candidate.tasks.findByName('jacocoTestReport') != null
+    }.collect { candidate ->
+        candidate.tasks.named('jacocoTestReport')
+    }
+}
+
+def verifyCoveragePolicy = tasks.register('verifyCoveragePolicy', Exec) {
+    group = 'verification'
+    description = 'Fails when aggregate/module JaCoCo coverage drops below the versioned policy.'
+    workingDir layout.projectDirectory
+    inputs.file layout.projectDirectory.file('config/coverage-policy.json')
+    inputs.file layout.projectDirectory.file('scripts/verify-coverage-policy.py')
+    outputs.file layout.buildDirectory.file(
+        'reports/coverage-policy/coverage-policy-report.json')
+    outputs.upToDateWhen { false }
+
+    doFirst {
+        dependsOn coveragePolicyReports.get()
+        commandLine providers.gradleProperty('pythonExecutable').getOrElse('python3'),
+            'scripts/verify-coverage-policy.py',
+            '--root', layout.projectDirectory.asFile.absolutePath,
+            '--policy', 'config/coverage-policy.json',
+            '--output', 'build/reports/coverage-policy/coverage-policy-report.json'
+    }
+}
+
+gradle.projectsEvaluated {
+    verifyCoveragePolicy.configure {
+        dependsOn coveragePolicyReports.get()
+    }
+}
+
+tasks.matching { candidate -> candidate.name in ['check', 'ciCheck'] }.configureEach {
+    dependsOn verifyCoveragePolicy
+}
