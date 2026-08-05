@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,9 +70,11 @@ class ProofJobSchedulerTest {
     void cancellationOfQueuedJobWorks() throws InterruptedException {
         CountDownLatch workerStarted = new CountDownLatch(1);
         CountDownLatch releaseWorker = new CountDownLatch(1);
+        AtomicInteger workerCalls = new AtomicInteger();
         ProofWorker slow = new ProofWorker() {
             @Override
             public ProofWorker.Result prove(RuleCandidate c, List<Assumption> a) {
+                workerCalls.incrementAndGet();
                 workerStarted.countDown();
                 awaitRelease(releaseWorker);
                 return new ProofWorker.Result(c, c.proofStatus(), "", "slow", 0L);
@@ -87,14 +90,22 @@ class ProofJobSchedulerTest {
             slow, slowRepo, new InMemoryProofCache(), null, Duration.ofSeconds(10));
         slowScheduler.start();
         try {
-            slowScheduler.submit(candidate("x", "x"), List.of(), 0);
+            String first = slowScheduler.submit(candidate("x", "x"), List.of(), 0);
             assertTrue(workerStarted.await(3, TimeUnit.SECONDS),
                 "first proof worker did not start");
+            assertEquals(ProofJobStatus.RUNNING,
+                slowRepo.findById(first).orElseThrow().status());
 
             String second = slowScheduler.submit(candidate("y", "y"), List.of(), 1);
+            assertEquals(ProofJobStatus.QUEUED,
+                slowRepo.findById(second).orElseThrow().status(),
+                "second job must still be queued while the first worker is blocked");
+
             Optional<ProofJob> cancelled = slowScheduler.cancel(second);
             assertTrue(cancelled.isPresent());
             assertEquals(ProofJobStatus.CANCELLED, cancelled.get().status());
+            assertEquals(1, workerCalls.get(),
+                "queued cancellation must not dispatch a second worker invocation");
         } finally {
             releaseWorker.countDown();
             slowScheduler.close();
