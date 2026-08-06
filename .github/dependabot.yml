@@ -12,7 +12,7 @@ updates:
   # No allow-list is used: public plugins and libraries actually referenced by
   # the checkout must not silently fall outside dependency update coverage.
   - package-ecosystem: gradle
-    directory: "/"
+    directory: /
     registries:
       - gradle-plugin-portal
     schedule:
@@ -27,10 +27,20 @@ updates:
   # peter-evans/create-pull-request. Immutable SHA pins remain visible and are
   # updated together with their readable version comments.
   - package-ecosystem: github-actions
-    directory: "/"
+    directory: /
     schedule:
-      interval: monthly
+      interval: weekly
     groups:
       workflow-actions:
+        patterns:
+          - "*"
+
+  # Keep the root Dockerfile base images current.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      docker-base-images:
         patterns:
           - "*"
