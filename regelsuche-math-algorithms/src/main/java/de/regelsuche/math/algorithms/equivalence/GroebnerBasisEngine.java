@@ -1,5 +1,7 @@
 package de.regelsuche.math.algorithms.equivalence;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 public final class GroebnerBasisEngine {
@@ -11,64 +13,168 @@ public final class GroebnerBasisEngine {
         this.order = order;
     }
 
-    public EngineResult normalFormModuloIdeal(Polynomial polynomial, List<Polynomial> generators, int maxSteps, int maxPairs) {
-        BuchbergerAlgorithm.BasisComputation basis = buchberger.computeBasis(generators, order, maxSteps, maxPairs);
+    public EngineResult normalFormModuloIdeal(
+        Polynomial polynomial,
+        List<Polynomial> generators,
+        int maxSteps,
+        int maxPairs
+    ) {
+        BuchbergerAlgorithm.BasisComputation basis = buchberger.computeBasis(
+            generators,
+            order,
+            maxSteps,
+            maxPairs
+        );
         if (basis.budgetExhausted()) {
-            return new EngineResult(
-                basis.basis(),
-                reducedBasis(basis.basis(), Math.max(0, maxSteps - basis.steps())),
+            return result(
+                basis,
+                List.of(),
                 Polynomial.zero(),
-                order.name(),
                 basis.steps(),
                 basis.budgetStatus(),
-                true
+                true,
+                "NOT_COMPUTED"
             );
         }
+
         int remainingSteps = Math.max(0, maxSteps - basis.steps());
-        PolynomialReducer.ReductionResult reduction = reducer.reduce(polynomial, basis.basis(), order, remainingSteps);
+        PolynomialReducer.ReductionResult reduction = reducer.reduce(
+            polynomial,
+            basis.basis(),
+            order,
+            remainingSteps
+        );
         int totalSteps = basis.steps() + reduction.steps();
         boolean budgetExhausted = reduction.budgetExhausted() || totalSteps > maxSteps;
-        String budgetStatus = budgetExhausted ? "BUDGET_EXHAUSTED" : "OK";
-        List<Polynomial> reducedBasis = reducedBasis(basis.basis(), Math.max(0, maxSteps - totalSteps));
-        return new EngineResult(
+        if (budgetExhausted) {
+            return result(
+                basis,
+                List.of(),
+                reduction.remainder(),
+                totalSteps,
+                "BUDGET_EXHAUSTED",
+                true,
+                "NOT_COMPUTED"
+            );
+        }
+
+        InterreductionResult interreduction = reducedBasis(
             basis.basis(),
-            reducedBasis,
+            Math.max(0, maxSteps - totalSteps)
+        );
+        return result(
+            basis,
+            interreduction.basis(),
             reduction.remainder(),
-            order.name(),
-            totalSteps,
-            budgetStatus,
-            budgetExhausted
+            totalSteps + interreduction.steps(),
+            "OK",
+            false,
+            interreduction.complete() ? "COMPLETE" : "BUDGET_EXHAUSTED"
         );
     }
 
-    public boolean reducesToZeroModuloIdeal(Polynomial polynomial, List<Polynomial> generators, int maxSteps, int maxPairs) {
+    public boolean reducesToZeroModuloIdeal(
+        Polynomial polynomial,
+        List<Polynomial> generators,
+        int maxSteps,
+        int maxPairs
+    ) {
         EngineResult result = normalFormModuloIdeal(polynomial, generators, maxSteps, maxPairs);
         return !result.budgetExhausted() && result.remainder().isZero();
     }
 
-    private List<Polynomial> reducedBasis(List<Polynomial> basis, int maxSteps) {
-        if (basis == null || basis.isEmpty()) {
-            return List.of();
+    private EngineResult result(
+        BuchbergerAlgorithm.BasisComputation basis,
+        List<Polynomial> reducedBasis,
+        Polynomial remainder,
+        int steps,
+        String budgetStatus,
+        boolean budgetExhausted,
+        String reducedBasisStatus
+    ) {
+        return new EngineResult(
+            basis.basis(),
+            reducedBasis,
+            remainder,
+            order.name(),
+            steps,
+            budgetStatus,
+            budgetExhausted,
+            reducedBasisStatus,
+            basis.pairsConsidered(),
+            basis.pairsReduced(),
+            basis.pairsSkippedByProductCriterion(),
+            basis.pairsSkippedByChainCriterion(),
+            basis.maxPendingPairs()
+        );
+    }
+
+    private InterreductionResult reducedBasis(List<Polynomial> basis, int maxSteps) {
+        List<Polynomial> current = new ArrayList<>(normalizedBasis(basis));
+        if (current.size() <= 1) {
+            return new InterreductionResult(List.copyOf(current), 0, true);
         }
-        java.util.ArrayList<Polynomial> reduced = new java.util.ArrayList<>();
-        int remainingSteps = Math.max(0, maxSteps);
-        for (int i = 0; i < basis.size(); i++) {
-            java.util.ArrayList<Polynomial> others = new java.util.ArrayList<>(basis);
-            Polynomial current = others.remove(i);
-            PolynomialReducer.ReductionResult reduction = reducer.reduce(current, others, order, remainingSteps);
-            remainingSteps = Math.max(0, remainingSteps - reduction.steps());
-            Polynomial remainder = reduction.remainder();
-            if (!remainder.isZero()) {
-                reduced.add(remainder.monic(order));
+
+        int steps = 0;
+        int index = 0;
+        while (index < current.size()) {
+            Polynomial polynomial = current.get(index);
+            List<Polynomial> others = new ArrayList<>(current);
+            others.remove(index);
+            if (!requiresReduction(polynomial, others)) {
+                index++;
+                continue;
             }
+
+            PolynomialReducer.ReductionResult reduction = reducer.reduce(
+                polynomial,
+                others,
+                order,
+                Math.max(0, maxSteps - steps)
+            );
             if (reduction.budgetExhausted()) {
-                break;
+                return new InterreductionResult(normalizedBasis(current), steps + reduction.steps(), false);
+            }
+            steps += reduction.steps();
+            Polynomial remainder = reduction.remainder();
+            if (remainder.isZero()) {
+                current.remove(index);
+            } else {
+                current.set(index, remainder.monic(order));
+            }
+            current = new ArrayList<>(normalizedBasis(current));
+            index = 0;
+        }
+        return new InterreductionResult(List.copyOf(current), steps, true);
+    }
+
+    private boolean requiresReduction(Polynomial polynomial, List<Polynomial> others) {
+        List<Monomial> leadingMonomials = others.stream()
+            .filter(other -> !other.isZero())
+            .map(other -> other.leadingTerm(order).orElseThrow().monomial())
+            .toList();
+        for (Monomial monomial : polynomial.terms().keySet()) {
+            for (Monomial leadingMonomial : leadingMonomials) {
+                if (leadingMonomial.divides(monomial)) {
+                    return true;
+                }
             }
         }
-        return reduced.stream()
+        return false;
+    }
+
+    private List<Polynomial> normalizedBasis(List<Polynomial> basis) {
+        return basis.stream()
+            .filter(polynomial -> !polynomial.isZero())
+            .map(polynomial -> polynomial.monic(order))
             .distinct()
-            .sorted(java.util.Comparator
-                .comparing((Polynomial polynomial) -> polynomial.leadingTerm(order).map(Term::monomial).orElse(Monomial.constant()), order)
+            .sorted(Comparator
+                .comparing(
+                    (Polynomial polynomial) -> polynomial.leadingTerm(order)
+                        .map(Term::monomial)
+                        .orElse(Monomial.constant()),
+                    order
+                )
                 .thenComparing(polynomial -> polynomial.toCanonicalString(order)))
             .toList();
     }
@@ -80,7 +186,16 @@ public final class GroebnerBasisEngine {
         String monomialOrder,
         int steps,
         String budgetStatus,
-        boolean budgetExhausted
+        boolean budgetExhausted,
+        String reducedBasisStatus,
+        int pairsConsidered,
+        int pairsReduced,
+        int pairsSkippedByProductCriterion,
+        int pairsSkippedByChainCriterion,
+        int maxPendingPairs
     ) {
+    }
+
+    private record InterreductionResult(List<Polynomial> basis, int steps, boolean complete) {
     }
 }

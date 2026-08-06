@@ -147,8 +147,16 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         payload.put("reducedBasis", result.reducedBasis().stream()
             .map(polynomial -> polynomial.toCanonicalString(monomialOrder))
             .toList());
+        payload.put("reducedBasisStatus", result.reducedBasisStatus());
         payload.put("remainder", result.remainder().toCanonicalString(monomialOrder));
         payload.put("monomialOrder", result.monomialOrder());
+        payload.put("pairSelectionStrategy", "lcm-total-degree");
+        payload.put("buchbergerCriteria", List.of("product", "chain"));
+        payload.put("pairsConsidered", result.pairsConsidered());
+        payload.put("pairsReduced", result.pairsReduced());
+        payload.put("pairsSkippedByProductCriterion", result.pairsSkippedByProductCriterion());
+        payload.put("pairsSkippedByChainCriterion", result.pairsSkippedByChainCriterion());
+        payload.put("maxPendingPairs", result.maxPendingPairs());
         payload.put("steps", result.steps());
         payload.put("budgetStatus", result.budgetStatus());
         return Map.copyOf(payload);
