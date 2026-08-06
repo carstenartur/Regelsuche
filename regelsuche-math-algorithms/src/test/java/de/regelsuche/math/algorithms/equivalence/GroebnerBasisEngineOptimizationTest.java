@@ -179,7 +179,7 @@ class GroebnerBasisEngineOptimizationTest {
         }
     }
 
-    private void assertInterreduced(list<Polynomial> basis, MonomialOrder order) {
+    private void assertInterreduced(List<Polynomial> basis, MonomialOrder order) {
         for (int i = 0; i < basis.size(); i++) {
             Polynomial polynomial = basis.get(i);
             assertTrue(polynomial.leadingTerm(order).orElseThrow().coefficient().isOne());
