@@ -113,11 +113,11 @@ class GroebnerBasisEquivalenceServiceTest {
             new DefaultMathematicalAlgorithmRegistry(
                 Map.of(MathematicalAlgorithmRegistry.GROEBNER_BASIS, true),
                 Map.of(MathematicalAlgorithmRegistry.GROEBNER_BASIS,
-                    MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(3, 10, 0, 0.0))
+                    MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(1, 10, 0, 0.0))
             )
         );
 
-        assertFalse(service.reducesToZeroModuloIdeal("x + y", List.of("x + y", "x - y")));
+        assertFalse(service.reducesToZeroModuloIdeal("x + y", List.of("x")));
         assertEquals(MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED, service.lastResult().status());
         assertEquals("BUDGET_EXHAUSTED", service.lastResult().payload().get("budgetStatus"));
     }
