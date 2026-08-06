@@ -1,17 +1,22 @@
 package de.regelsuche.proof;
 
+import static de.regelsuche.testsupport.ConditionAwaiter.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
 import de.regelsuche.inventory.InMemoryRuleInventoryRepository;
-import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,15 +68,15 @@ class ProofJobSchedulerTest {
 
     @Test
     void cancellationOfQueuedJobWorks() throws InterruptedException {
-        // Saturate the scheduler with a no-op worker so the next job stays QUEUED
+        CountDownLatch workerStarted = new CountDownLatch(1);
+        CountDownLatch releaseWorker = new CountDownLatch(1);
+        AtomicInteger workerCalls = new AtomicInteger();
         ProofWorker slow = new ProofWorker() {
             @Override
             public ProofWorker.Result prove(RuleCandidate c, List<Assumption> a) {
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
+                workerCalls.incrementAndGet();
+                workerStarted.countDown();
+                awaitRelease(releaseWorker);
                 return new ProofWorker.Result(c, c.proofStatus(), "", "slow", 0L);
             }
 
@@ -80,35 +85,44 @@ class ProofJobSchedulerTest {
                 return "slow";
             }
         };
-        // Create a separate scheduler with the slow worker
         InMemoryProofJobRepository slowRepo = new InMemoryProofJobRepository();
         ProofJobScheduler slowScheduler = new ProofJobScheduler(
             slow, slowRepo, new InMemoryProofCache(), null, Duration.ofSeconds(10));
         slowScheduler.start();
         try {
             String first = slowScheduler.submit(candidate("x", "x"), List.of(), 0);
+            assertTrue(workerStarted.await(3, TimeUnit.SECONDS),
+                "first proof worker did not start");
+            assertEquals(ProofJobStatus.RUNNING,
+                slowRepo.findById(first).orElseThrow().status());
+
             String second = slowScheduler.submit(candidate("y", "y"), List.of(), 1);
-            // Cancel the second before it starts
-            Thread.sleep(100);
+            assertEquals(ProofJobStatus.QUEUED,
+                slowRepo.findById(second).orElseThrow().status(),
+                "second job must still be queued while the first worker is blocked");
+
             Optional<ProofJob> cancelled = slowScheduler.cancel(second);
             assertTrue(cancelled.isPresent());
             assertEquals(ProofJobStatus.CANCELLED, cancelled.get().status());
+            assertEquals(1, workerCalls.get(),
+                "queued cancellation must not dispatch a second worker invocation");
         } finally {
+            releaseWorker.countDown();
             slowScheduler.close();
         }
     }
 
     @Test
     void cancellationOfRunningJobStaysCancelled() throws InterruptedException {
+        CountDownLatch workerStarted = new CountDownLatch(1);
+        CountDownLatch releaseWorker = new CountDownLatch(1);
         ProofWorker slow = new ProofWorker() {
             @Override
             public ProofWorker.Result prove(RuleCandidate c, List<Assumption> a) {
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                }
-                return new ProofWorker.Result(c, CandidateProofStatus.FORMALLY_PROVABLE, "", "slow", 0L);
+                workerStarted.countDown();
+                awaitRelease(releaseWorker);
+                return new ProofWorker.Result(
+                    c, CandidateProofStatus.FORMALLY_PROVABLE, "", "slow", 0L);
             }
 
             @Override
@@ -123,21 +137,24 @@ class ProofJobSchedulerTest {
         slowScheduler.start();
         try {
             String jobId = slowScheduler.submit(candidate("x", "x"), List.of(), 0);
+            assertTrue(workerStarted.await(3, TimeUnit.SECONDS),
+                "proof worker did not start");
             assertEventually(() -> repo.findById(jobId)
                 .map(job -> job.status() == ProofJobStatus.RUNNING)
                 .orElse(false), 3000);
+
             slowScheduler.cancel(jobId);
             assertEventually(() -> repo.findById(jobId)
                 .map(job -> job.status() == ProofJobStatus.CANCELLED)
                 .orElse(false), 3000);
         } finally {
+            releaseWorker.countDown();
             slowScheduler.close();
         }
     }
 
     @Test
     void cacheHitSkipsWorker() throws InterruptedException {
-        // Pre-populate the cache
         ProofCacheKey key = ProofCacheKey.of("A*1", "A", List.of(), "lean4");
         cache.put(key, CandidateProofStatus.FORMALLY_PROVED);
 
@@ -155,9 +172,6 @@ class ProofJobSchedulerTest {
 
     @Test
     void priorityOrderRespected() throws InterruptedException {
-        // Submit two jobs with different priorities; the low-priority one is submitted first
-        // but the high-priority one should be processed first.
-        // Since the scheduler processes one at a time this is verifiable via ordering.
         String lowPrioId = scheduler.submit(candidate("x+y", "y+x"), List.of(), 10);
         String highPrioId = scheduler.submit(candidate("x*1", "x"), List.of(), 0);
 
@@ -250,18 +264,18 @@ class ProofJobSchedulerTest {
 
     private static void assertEventually(BooleanSupplier condition, long timeoutMillis)
         throws InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMillis;
-        while (System.currentTimeMillis() < deadline) {
-            if (condition.check()) {
-                return;
-            }
-            Thread.sleep(100);
-        }
-        assertTrue(condition.check(), "condition not met within " + timeoutMillis + "ms");
+        await(
+            Duration.ofMillis(timeoutMillis),
+            condition,
+            "condition not met"
+        );
     }
 
-    @FunctionalInterface
-    interface BooleanSupplier {
-        boolean check();
+    private static void awaitRelease(CountDownLatch releaseWorker) {
+        try {
+            releaseWorker.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

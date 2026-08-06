@@ -1,13 +1,14 @@
 package de.regelsuche.proof;
 
+import static de.regelsuche.testsupport.ConditionAwaiter.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.assumption.Assumption;
-import de.regelsuche.validation.CandidateProofStatus;
 import de.regelsuche.mining.RuleCandidate;
 import de.regelsuche.mining.RuleStatus;
+import de.regelsuche.validation.CandidateProofStatus;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -54,20 +55,18 @@ class ProofJobSchedulerLifecycleTest {
         );
         scheduler.start();
         try {
-            // Submit multiple jobs sequentially — the shared workerExecutor
-            // should service all of them without creating new executors.
             List<String> jobIds = new java.util.ArrayList<>();
             for (int i = 0; i < 5; i++) {
                 jobIds.add(scheduler.submit(candidate(), List.of(), i));
             }
-            long deadline = System.currentTimeMillis() + 10_000L;
-            while (System.currentTimeMillis() < deadline) {
-                boolean allDone = jobIds.stream()
+            await(
+                Duration.ofSeconds(10),
+                () -> jobIds.stream()
                     .map(repo::findById)
-                    .allMatch(o -> o.isPresent() && o.get().status().isTerminal());
-                if (allDone) break;
-                Thread.sleep(100);
-            }
+                    .allMatch(job -> job.isPresent() && job.get().status().isTerminal()),
+                "not all submitted proof jobs reached a terminal state"
+            );
+
             for (String jobId : jobIds) {
                 Optional<ProofJob> job = repo.findById(jobId);
                 assertTrue(job.isPresent() && job.get().status().isTerminal(),
@@ -83,10 +82,10 @@ class ProofJobSchedulerLifecycleTest {
     }
 
     @Test
-    void proofJobsSurviveRestart(@TempDir Path tempDir) throws IOException, InterruptedException {
+    void proofJobsSurviveRestart(@TempDir Path tempDir)
+        throws IOException, InterruptedException {
         Path jobFile = tempDir.resolve("jobs.json");
 
-        // Phase 1: persistent repo, save a job, close it
         JsonFileProofJobRepository repo1 = new JsonFileProofJobRepository(jobFile);
         ProofJobScheduler scheduler1 = new ProofJobScheduler(
             new LeanProofWorker(),
@@ -96,18 +95,21 @@ class ProofJobSchedulerLifecycleTest {
             Duration.ofSeconds(5)
         );
         scheduler1.start();
-        String jobId = scheduler1.submit(candidate(), List.of(Assumption.nonZero("b")), 0);
-        // Wait until done
-        long deadline = System.currentTimeMillis() + 5_000L;
-        while (System.currentTimeMillis() < deadline) {
-            if (repo1.findById(jobId).map(j -> j.status().isTerminal()).orElse(false)) {
-                break;
-            }
-            Thread.sleep(100);
+        String jobId;
+        try {
+            jobId = scheduler1.submit(
+                candidate(), List.of(Assumption.nonZero("b")), 0);
+            await(
+                Duration.ofSeconds(5),
+                () -> repo1.findById(jobId)
+                    .map(job -> job.status().isTerminal())
+                    .orElse(false),
+                "proof job did not finish before restart"
+            );
+        } finally {
+            scheduler1.close();
         }
-        scheduler1.close();
 
-        // Phase 2: reload from disk into a fresh repo
         JsonFileProofJobRepository repo2 = new JsonFileProofJobRepository(jobFile);
         Optional<ProofJob> reloaded = repo2.findById(jobId);
         assertTrue(reloaded.isPresent(), "job must survive restart");
@@ -119,10 +121,10 @@ class ProofJobSchedulerLifecycleTest {
     }
 
     @Test
-    void queuedJobsAreResumedAfterRestart(@TempDir Path tempDir) throws IOException, InterruptedException {
+    void queuedJobsAreResumedAfterRestart(@TempDir Path tempDir)
+        throws IOException, InterruptedException {
         Path jobFile = tempDir.resolve("jobs.json");
 
-        // Phase 1: write a QUEUED job manually (simulate JVM death before run)
         JsonFileProofJobRepository repo1 = new JsonFileProofJobRepository(jobFile);
         ProofJob queued = new ProofJob(
             "test-job-1",
@@ -134,18 +136,17 @@ class ProofJobSchedulerLifecycleTest {
         );
         repo1.save(queued);
 
-        // Also persist a RUNNING job — restart should flip it back to QUEUED
         ProofJob running = new ProofJob("test-job-2", "B+0", "B",
             List.of(), 1, "lean4").withStatus(ProofJobStatus.RUNNING);
         repo1.save(running);
 
-        // Phase 2: reload — the RUNNING job becomes QUEUED again
         JsonFileProofJobRepository repo2 = new JsonFileProofJobRepository(jobFile);
-        assertEquals(ProofJobStatus.QUEUED, repo2.findById("test-job-1").orElseThrow().status());
-        assertEquals(ProofJobStatus.QUEUED, repo2.findById("test-job-2").orElseThrow().status(),
+        assertEquals(ProofJobStatus.QUEUED,
+            repo2.findById("test-job-1").orElseThrow().status());
+        assertEquals(ProofJobStatus.QUEUED,
+            repo2.findById("test-job-2").orElseThrow().status(),
             "RUNNING jobs at JVM-death time must be requeued on restart");
 
-        // Phase 3: scheduler on top of reloaded repo executes them
         ProofJobScheduler scheduler = new ProofJobScheduler(
             new LeanProofWorker(),
             repo2,
@@ -155,13 +156,16 @@ class ProofJobSchedulerLifecycleTest {
         );
         scheduler.start();
         try {
-            long deadline = System.currentTimeMillis() + 5_000L;
-            while (System.currentTimeMillis() < deadline) {
-                boolean bothDone = repo2.findById("test-job-1").map(j -> j.status().isTerminal()).orElse(false)
-                    && repo2.findById("test-job-2").map(j -> j.status().isTerminal()).orElse(false);
-                if (bothDone) break;
-                Thread.sleep(100);
-            }
+            await(
+                Duration.ofSeconds(5),
+                () -> repo2.findById("test-job-1")
+                    .map(job -> job.status().isTerminal())
+                    .orElse(false)
+                    && repo2.findById("test-job-2")
+                        .map(job -> job.status().isTerminal())
+                        .orElse(false),
+                "requeued proof jobs did not finish after restart"
+            );
             assertEquals(ProofJobStatus.DONE,
                 repo2.findById("test-job-1").orElseThrow().status());
             assertEquals(ProofJobStatus.DONE,
