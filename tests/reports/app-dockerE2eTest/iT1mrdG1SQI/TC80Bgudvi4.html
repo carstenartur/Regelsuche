@@ -63,7 +63,7 @@
 </td>
 <td>
 <div class="infoBox duration">
-<div class="counter">5.587s</div>
+<div class="counter">5.550s</div>
 <p>duration</p>
 </div>
 </td>
@@ -85,13 +85,13 @@
 <div class="tab">
 <h2>error output</h2>
 <span class="code">
-<pre id="root-0-test-stderr-fullModeBootsWithPostgresWithoutNeo4j()">Aug 06, 2026 12:54:43 AM org.hibernate.jpa.internal.util.LogHelper logPersistenceUnitInformation
+<pre id="root-0-test-stderr-fullModeBootsWithPostgresWithoutNeo4j()">Aug 06, 2026 1:52:31 AM org.hibernate.jpa.internal.util.LogHelper logPersistenceUnitInformation
 INFO: HHH008540: Processing PersistenceUnitInfo [name: regelsuche-postgresql]
-Aug 06, 2026 12:54:43 AM org.hibernate.Version logVersion
+Aug 06, 2026 1:52:31 AM org.hibernate.Version logVersion
 INFO: HHH000001: Hibernate ORM core version 7.4.0.Final
-Aug 06, 2026 12:54:44 AM org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProvider configure
+Aug 06, 2026 1:52:32 AM org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProvider configure
 WARN: HHH10001002: Using built-in connection pool (not intended for production use)
-Aug 06, 2026 12:54:44 AM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator logConnectionInfo
+Aug 06, 2026 1:52:32 AM org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator logConnectionInfo
 INFO: HHH10001005: Database info:
 	Database JDBC URL [jdbc:postgresql://localhost:32769/regelsuche]
 	Database driver: PostgreSQL JDBC Driver
@@ -104,32 +104,30 @@ INFO: HHH10001005: Database info:
 	Pool: DriverManagerConnectionProvider
 	Minimum pool size: 1
 	Maximum pool size: 20
-Aug 06, 2026 12:54:44 AM org.hibernate.search.mapper.orm.bootstrap.impl.HibernateSearchPreIntegrationService$Initiator initiateService
+Aug 06, 2026 1:52:32 AM org.hibernate.search.mapper.orm.bootstrap.impl.HibernateSearchPreIntegrationService$Initiator initiateService
 INFO: HSEARCH000034: Hibernate Search version 8.4.0.Final
-Aug 06, 2026 12:54:45 AM org.hibernate.validator.internal.util.Version &lt;clinit&gt;
+Aug 06, 2026 1:52:33 AM org.hibernate.validator.internal.util.Version &lt;clinit&gt;
 INFO: HV000001: Hibernate Validator 9.1.0.Final
-Aug 06, 2026 12:54:46 AM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
+Aug 06, 2026 1:52:34 AM org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator initiateService
 INFO: HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
-Aug 06, 2026 12:54:47 AM org.hibernate.search.backend.lucene.impl.LuceneBackendFactory getLuceneVersion
-WARN: HSEARCH000075: Missing value for configuration property 'hibernate.search.backend.lucene_version': using LATEST (currently '9.12.3'). Context: default backend
-Aug 06, 2026 12:54:47 AM org.apache.lucene.internal.vectorization.VectorizationProvider lookup
+Aug 06, 2026 1:52:35 AM org.apache.lucene.internal.vectorization.VectorizationProvider lookup
 WARNING: Java vector incubator module is not readable. For optimal vector performance, pass '--add-modules jdk.incubator.vector' to enable Vector API.
-Aug 06, 2026 12:54:47 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-147641458923842035/hibernate-search/BenchmarkResultEntity'
+Aug 06, 2026 1:52:35 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-7492318311613306726/hibernate-search/BenchmarkResultEntity'
 WARNING: A restricted method in java.lang.foreign.Linker has been called
 WARNING: java.lang.foreign.Linker::downcallHandle has been called by the unnamed module
 WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for this module
 
-Aug 06, 2026 12:54:48 AM org.apache.lucene.store.MemorySegmentIndexInputProvider &lt;init&gt;
+Aug 06, 2026 1:52:35 AM org.apache.lucene.store.MemorySegmentIndexInputProvider &lt;init&gt;
 INFO: Using MemorySegmentIndexInput and native madvise support with Java 21 or later; to disable start with -Dorg.apache.lucene.store.MMapDirectory.enableMemorySegments=false
-Aug 06, 2026 12:54:48 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-147641458923842035/hibernate-search/ExportReportEntity'
-Aug 06, 2026 12:54:48 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-147641458923842035/hibernate-search/HypothesisCandidateEntity'
-Aug 06, 2026 12:54:48 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-147641458923842035/hibernate-search/SearchIndexDocument'
-Aug 06, 2026 12:54:48 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
-INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-147641458923842035/hibernate-search/SeedExpressionEntity'
+Aug 06, 2026 1:52:35 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-7492318311613306726/hibernate-search/ExportReportEntity'
+Aug 06, 2026 1:52:35 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-7492318311613306726/hibernate-search/HypothesisCandidateEntity'
+Aug 06, 2026 1:52:35 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-7492318311613306726/hibernate-search/SearchIndexDocument'
+Aug 06, 2026 1:52:35 AM org.hibernate.search.backend.lucene.lowlevel.directory.impl.FileSystemUtils initializeWriteableDirectory
+INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-7492318311613306726/hibernate-search/SeedExpressionEntity'
 </pre>
 <button class="clipboard-copy-btn" aria-label="Copy to clipboard" data-copy-element-id="root-0-test-stderr-fullModeBootsWithPostgresWithoutNeo4j()">Copy</button>
 </span>
@@ -144,7 +142,7 @@ INFO: HSEARCH000041: Index directory does not exist, creating: '/tmp/junit-14764
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="https://www.gradle.org">Gradle 9.5.1</a> at Aug 6, 2026, 12:57:59 AM</p>
+<a href="https://www.gradle.org">Gradle 9.5.1</a> at Aug 6, 2026, 1:56:17 AM</p>
 </div>
 </div>
 </body>
