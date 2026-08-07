@@ -6,17 +6,24 @@ import java.util.List;
 import java.util.Optional;
 
 public final class PolynomialReducer {
+    public PreparedBasis prepare(List<Polynomial> basis, MonomialOrder order) {
+        return new PreparedBasis(indexedReducers(basis, order), order);
+    }
+
     public ReductionResult reduce(Polynomial polynomial, List<Polynomial> basis, MonomialOrder order, int maxSteps) {
+        return reduce(polynomial, prepare(basis, order), maxSteps);
+    }
+
+    public ReductionResult reduce(Polynomial polynomial, PreparedBasis preparedBasis, int maxSteps) {
         Polynomial remainder = Polynomial.zero();
         Polynomial current = polynomial;
-        List<Reduction> reducers = indexedReducers(basis, order);
         int steps = 0;
         while (!current.isZero()) {
             if (steps >= maxSteps) {
                 return new ReductionResult(remainder, steps, true);
             }
-            Term currentLeadingTerm = current.leadingTerm(order).orElseThrow();
-            Optional<Reduction> reduction = firstReduction(currentLeadingTerm, reducers);
+            Term currentLeadingTerm = current.leadingTerm(preparedBasis.order()).orElseThrow();
+            Optional<Reduction> reduction = firstReduction(currentLeadingTerm, preparedBasis.reducers());
             if (reduction.isPresent()) {
                 Reduction divisor = reduction.orElseThrow();
                 current = current.subtract(divisor.polynomial().multiply(
@@ -72,6 +79,24 @@ public final class PolynomialReducer {
     }
 
     public record ReductionResult(Polynomial remainder, int steps, boolean budgetExhausted) {
+    }
+
+    public static final class PreparedBasis {
+        private final List<Reduction> reducers;
+        private final MonomialOrder order;
+
+        private PreparedBasis(List<Reduction> reducers, MonomialOrder order) {
+            this.reducers = reducers;
+            this.order = order;
+        }
+
+        private List<Reduction> reducers() {
+            return reducers;
+        }
+
+        private MonomialOrder order() {
+            return order;
+        }
     }
 
     private record Reduction(Polynomial polynomial, Term leadingTerm) {
