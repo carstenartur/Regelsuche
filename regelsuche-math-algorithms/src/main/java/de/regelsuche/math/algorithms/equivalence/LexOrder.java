@@ -1,6 +1,7 @@
 package de.regelsuche.math.algorithms.equivalence;
 
-import java.util.TreeSet;
+import java.util.Iterator;
+import java.util.Map;
 
 public final class LexOrder implements MonomialOrder {
     @Override
@@ -10,15 +11,39 @@ public final class LexOrder implements MonomialOrder {
 
     @Override
     public int compare(Monomial left, Monomial right) {
-        TreeSet<String> variables = new TreeSet<>();
-        variables.addAll(left.powers().keySet());
-        variables.addAll(right.powers().keySet());
-        for (String variable : variables) {
-            int comparison = Integer.compare(right.exponentOf(variable), left.exponentOf(variable));
-            if (comparison != 0) {
-                return comparison;
+        if (left == right) {
+            return 0;
+        }
+        Iterator<Map.Entry<String, Integer>> leftEntries = left.orderedPowers().entrySet().iterator();
+        Iterator<Map.Entry<String, Integer>> rightEntries = right.orderedPowers().entrySet().iterator();
+        Map.Entry<String, Integer> leftEntry = next(leftEntries);
+        Map.Entry<String, Integer> rightEntry = next(rightEntries);
+
+        while (leftEntry != null || rightEntry != null) {
+            if (rightEntry == null) {
+                return -1;
             }
+            if (leftEntry == null) {
+                return 1;
+            }
+            int variableComparison = leftEntry.getKey().compareTo(rightEntry.getKey());
+            if (variableComparison < 0) {
+                return -1;
+            }
+            if (variableComparison > 0) {
+                return 1;
+            }
+            int exponentComparison = Integer.compare(rightEntry.getValue(), leftEntry.getValue());
+            if (exponentComparison != 0) {
+                return exponentComparison;
+            }
+            leftEntry = next(leftEntries);
+            rightEntry = next(rightEntries);
         }
         return 0;
+    }
+
+    private static Map.Entry<String, Integer> next(Iterator<Map.Entry<String, Integer>> entries) {
+        return entries.hasNext() ? entries.next() : null;
     }
 }
