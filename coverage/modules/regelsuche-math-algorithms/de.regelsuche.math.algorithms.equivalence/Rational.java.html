@@ -6,91 +6,195 @@ import java.math.BigInteger;
 public record Rational(BigInteger numerator, BigInteger denominator) implements Comparable&lt;Rational&gt; {
 <span class="fc" id="L7">    public static final Rational ZERO = new Rational(BigInteger.ZERO, BigInteger.ONE);</span>
 <span class="fc" id="L8">    public static final Rational ONE = new Rational(BigInteger.ONE, BigInteger.ONE);</span>
+<span class="fc" id="L9">    public static final Rational NEGATIVE_ONE = new Rational(BigInteger.ONE.negate(), BigInteger.ONE);</span>
 
-<span class="fc" id="L10">    public Rational {</span>
-<span class="pc bpc" id="L11" title="2 of 4 branches missed.">        if (denominator == null || denominator.signum() == 0) {</span>
-<span class="nc" id="L12">            throw new IllegalArgumentException(&quot;denominator must not be zero&quot;);</span>
+<span class="fc" id="L11">    public Rational {</span>
+<span class="pc bpc" id="L12" title="2 of 4 branches missed.">        if (denominator == null || denominator.signum() == 0) {</span>
+<span class="nc" id="L13">            throw new IllegalArgumentException(&quot;denominator must not be zero&quot;);</span>
         }
-<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        if (numerator == null) {</span>
-<span class="nc" id="L15">            throw new IllegalArgumentException(&quot;numerator must not be null&quot;);</span>
+<span class="pc bpc" id="L15" title="1 of 2 branches missed.">        if (numerator == null) {</span>
+<span class="nc" id="L16">            throw new IllegalArgumentException(&quot;numerator must not be null&quot;);</span>
         }
-<span class="fc bfc" id="L17" title="All 2 branches covered.">        if (denominator.signum() &lt; 0) {</span>
-<span class="fc" id="L18">            numerator = numerator.negate();</span>
-<span class="fc" id="L19">            denominator = denominator.negate();</span>
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        if (numerator.signum() == 0) {</span>
+<span class="fc" id="L19">            denominator = BigInteger.ONE;</span>
+        } else {
+<span class="fc bfc" id="L21" title="All 2 branches covered.">            if (denominator.signum() &lt; 0) {</span>
+<span class="fc" id="L22">                numerator = numerator.negate();</span>
+<span class="fc" id="L23">                denominator = denominator.negate();</span>
+            }
+<span class="fc bfc" id="L25" title="All 2 branches covered.">            if (!denominator.equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L26">                BigInteger gcd = numerator.gcd(denominator);</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">                if (!gcd.equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L28">                    numerator = numerator.divide(gcd);</span>
+<span class="fc" id="L29">                    denominator = denominator.divide(gcd);</span>
+                }
+            }
         }
-<span class="fc" id="L21">        BigInteger gcd = numerator.gcd(denominator);</span>
-<span class="fc" id="L22">        numerator = numerator.divide(gcd);</span>
-<span class="fc" id="L23">        denominator = denominator.divide(gcd);</span>
-<span class="fc" id="L24">    }</span>
+<span class="fc" id="L33">    }</span>
 
     public static Rational of(long value) {
-<span class="fc" id="L27">        return new Rational(BigInteger.valueOf(value), BigInteger.ONE);</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (value == 0) {</span>
+<span class="nc" id="L37">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (value == 1) {</span>
+<span class="fc" id="L40">            return ONE;</span>
+        }
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (value == -1) {</span>
+<span class="fc" id="L43">            return NEGATIVE_ONE;</span>
+        }
+<span class="fc" id="L45">        return new Rational(BigInteger.valueOf(value), BigInteger.ONE);</span>
     }
 
     public static Rational fromDouble(double value) {
-<span class="pc bpc" id="L31" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
-<span class="nc" id="L32">            throw new IllegalArgumentException(&quot;number must be finite&quot;);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (!Double.isFinite(value)) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;number must be finite&quot;);</span>
         }
-<span class="fc" id="L34">        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();</span>
-<span class="fc" id="L35">        BigInteger numerator = decimal.unscaledValue();</span>
-<span class="fc" id="L36">        BigInteger denominator = BigInteger.ONE;</span>
-<span class="fc bfc" id="L37" title="All 2 branches covered.">        if (decimal.scale() &gt; 0) {</span>
-<span class="fc" id="L38">            denominator = BigInteger.TEN.pow(decimal.scale());</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        } else if (decimal.scale() &lt; 0) {</span>
-<span class="nc" id="L40">            numerator = numerator.multiply(BigInteger.TEN.pow(-decimal.scale()));</span>
+<span class="fc" id="L52">        BigDecimal decimal = BigDecimal.valueOf(value).stripTrailingZeros();</span>
+<span class="fc" id="L53">        BigInteger numerator = decimal.unscaledValue();</span>
+<span class="fc" id="L54">        BigInteger denominator = BigInteger.ONE;</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (decimal.scale() &gt; 0) {</span>
+<span class="fc" id="L56">            denominator = BigInteger.TEN.pow(decimal.scale());</span>
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        } else if (decimal.scale() &lt; 0) {</span>
+<span class="nc" id="L58">            numerator = numerator.multiply(BigInteger.TEN.pow(-decimal.scale()));</span>
         }
-<span class="fc" id="L42">        return new Rational(numerator, denominator);</span>
+<span class="fc" id="L60">        return new Rational(numerator, denominator);</span>
     }
 
     public Rational add(Rational other) {
-<span class="fc" id="L46">        return new Rational(</span>
-<span class="fc" id="L47">            numerator.multiply(other.denominator).add(other.numerator.multiply(denominator)),</span>
-<span class="fc" id="L48">            denominator.multiply(other.denominator)</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L65">            return this;</span>
+        }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (isZero()) {</span>
+<span class="fc" id="L68">            return other;</span>
+        }
+<span class="fc" id="L70">        BigInteger denominatorGcd = denominator.gcd(other.denominator);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (denominatorGcd.equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L72">            return new Rational(</span>
+<span class="fc" id="L73">                numerator.multiply(other.denominator).add(other.numerator.multiply(denominator)),</span>
+<span class="fc" id="L74">                denominator.multiply(other.denominator)</span>
+            );
+        }
+
+<span class="fc" id="L78">        BigInteger leftMultiplier = other.denominator.divide(denominatorGcd);</span>
+<span class="fc" id="L79">        BigInteger rightMultiplier = denominator.divide(denominatorGcd);</span>
+<span class="fc" id="L80">        BigInteger sum = numerator.multiply(leftMultiplier).add(other.numerator.multiply(rightMultiplier));</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (sum.signum() == 0) {</span>
+<span class="fc" id="L82">            return ZERO;</span>
+        }
+<span class="fc" id="L84">        BigInteger cancellation = sum.abs().gcd(denominatorGcd);</span>
+<span class="fc" id="L85">        return new Rational(</span>
+<span class="fc" id="L86">            sum.divide(cancellation),</span>
+<span class="fc" id="L87">            denominator.divide(cancellation).multiply(leftMultiplier)</span>
         );
     }
 
     public Rational subtract(Rational other) {
-<span class="nc" id="L53">        return add(other.negate());</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (other.isZero()) {</span>
+<span class="fc" id="L93">            return this;</span>
+        }
+<span class="nc" id="L95">        return add(other.negate());</span>
     }
 
     public Rational multiply(Rational other) {
-<span class="fc" id="L57">        return new Rational(numerator.multiply(other.numerator), denominator.multiply(other.denominator));</span>
+<span class="pc bpc" id="L99" title="1 of 4 branches missed.">        if (isZero() || other.isZero()) {</span>
+<span class="fc" id="L100">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (isOne()) {</span>
+<span class="fc" id="L103">            return other;</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (other.isOne()) {</span>
+<span class="fc" id="L106">            return this;</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
+<span class="fc" id="L109">            return other.negate();</span>
+        }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (other.isNegativeOne()) {</span>
+<span class="fc" id="L112">            return negate();</span>
+        }
+
+<span class="fc" id="L115">        BigInteger leftCancellation = numerator.abs().gcd(other.denominator);</span>
+<span class="fc" id="L116">        BigInteger rightCancellation = other.numerator.abs().gcd(denominator);</span>
+<span class="fc" id="L117">        BigInteger reducedLeftNumerator = numerator.divide(leftCancellation);</span>
+<span class="fc" id="L118">        BigInteger reducedRightDenominator = other.denominator.divide(leftCancellation);</span>
+<span class="fc" id="L119">        BigInteger reducedRightNumerator = other.numerator.divide(rightCancellation);</span>
+<span class="fc" id="L120">        BigInteger reducedLeftDenominator = denominator.divide(rightCancellation);</span>
+<span class="fc" id="L121">        return new Rational(</span>
+<span class="fc" id="L122">            reducedLeftNumerator.multiply(reducedRightNumerator),</span>
+<span class="fc" id="L123">            reducedLeftDenominator.multiply(reducedRightDenominator)</span>
+        );
     }
 
     public Rational divide(Rational other) {
-<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (other.isZero()) {</span>
-<span class="nc" id="L62">            throw new ArithmeticException(&quot;division by zero&quot;);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L129">            throw new ArithmeticException(&quot;division by zero&quot;);</span>
         }
-<span class="fc" id="L64">        return new Rational(numerator.multiply(other.denominator), denominator.multiply(other.numerator));</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L132">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (other.isOne()) {</span>
+<span class="fc" id="L135">            return this;</span>
+        }
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (other.isNegativeOne()) {</span>
+<span class="fc" id="L138">            return negate();</span>
+        }
+
+<span class="fc" id="L141">        BigInteger numeratorCancellation = numerator.abs().gcd(other.numerator.abs());</span>
+<span class="fc" id="L142">        BigInteger denominatorCancellation = denominator.gcd(other.denominator);</span>
+<span class="fc" id="L143">        BigInteger reducedNumerator = numerator.divide(numeratorCancellation);</span>
+<span class="fc" id="L144">        BigInteger reducedDivisorNumerator = other.numerator.divide(numeratorCancellation);</span>
+<span class="fc" id="L145">        BigInteger reducedDenominator = denominator.divide(denominatorCancellation);</span>
+<span class="fc" id="L146">        BigInteger reducedDivisorDenominator = other.denominator.divide(denominatorCancellation);</span>
+<span class="fc" id="L147">        return new Rational(</span>
+<span class="fc" id="L148">            reducedNumerator.multiply(reducedDivisorDenominator),</span>
+<span class="fc" id="L149">            reducedDenominator.multiply(reducedDivisorNumerator)</span>
+        );
     }
 
     public Rational negate() {
-<span class="fc" id="L68">        return new Rational(numerator.negate(), denominator);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L155">            return ZERO;</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (isOne()) {</span>
+<span class="fc" id="L158">            return NEGATIVE_ONE;</span>
+        }
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (isNegativeOne()) {</span>
+<span class="fc" id="L161">            return ONE;</span>
+        }
+<span class="fc" id="L163">        return new Rational(numerator.negate(), denominator);</span>
     }
 
     public Rational abs() {
-<span class="fc bfc" id="L72" title="All 2 branches covered.">        return numerator.signum() &lt; 0 ? negate() : this;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        return numerator.signum() &lt; 0 ? negate() : this;</span>
     }
 
     public boolean isZero() {
-<span class="fc bfc" id="L76" title="All 2 branches covered.">        return numerator.signum() == 0;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        return numerator.signum() == 0;</span>
     }
 
     public boolean isOne() {
-<span class="fc bfc" id="L80" title="All 4 branches covered.">        return numerator.equals(BigInteger.ONE) &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+<span class="fc bfc" id="L175" title="All 4 branches covered.">        return numerator.equals(BigInteger.ONE) &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+    }
+
+    public boolean isNegativeOne() {
+<span class="fc bfc" id="L179" title="All 4 branches covered.">        return numerator.equals(BigInteger.ONE.negate()) &amp;&amp; denominator.equals(BigInteger.ONE);</span>
     }
 
     @Override
     public int compareTo(Rational other) {
-<span class="fc" id="L85">        return numerator.multiply(other.denominator).compareTo(other.numerator.multiply(denominator));</span>
+<span class="pc bpc" id="L184" title="2 of 4 branches missed.">        if (this == other || equals(other)) {</span>
+<span class="nc" id="L185">            return 0;</span>
+        }
+<span class="fc" id="L187">        BigInteger denominatorGcd = denominator.gcd(other.denominator);</span>
+<span class="fc" id="L188">        return numerator.multiply(other.denominator.divide(denominatorGcd))</span>
+<span class="fc" id="L189">            .compareTo(other.numerator.multiply(denominator.divide(denominatorGcd)));</span>
     }
 
     @Override
     public String toString() {
-<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (denominator.equals(BigInteger.ONE)) {</span>
-<span class="fc" id="L91">            return numerator.toString();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (denominator.equals(BigInteger.ONE)) {</span>
+<span class="fc" id="L195">            return numerator.toString();</span>
         }
-<span class="fc" id="L93">        return numerator + &quot;/&quot; + denominator;</span>
+<span class="fc" id="L197">        return numerator + &quot;/&quot; + denominator;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
