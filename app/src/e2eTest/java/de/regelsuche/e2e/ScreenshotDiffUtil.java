@@ -13,10 +13,14 @@ import javax.imageio.ImageIO;
 
 final class ScreenshotDiffUtil {
 
+    static final int CHANNEL_TOLERANCE = 12;
+    static final double MAX_DIFF_RATIO = 0.002;
+    static final int CHANGED_PIXEL_ARGB = 0xFFFF00FF;
+
+    private static final String REPORT_DIRECTORY_ENVIRONMENT_VARIABLE =
+        "REGELSUCHE_VISUAL_REPORT_DIR";
     private static final boolean UPDATE_BASELINES = Boolean.parseBoolean(
         System.getProperty("regelsuche.updateScreenshots", "false"));
-    private static final int CHANNEL_TOLERANCE = 12;
-    private static final double MAX_DIFF_RATIO = 0.002;
 
     private ScreenshotDiffUtil() {
     }
@@ -29,11 +33,14 @@ final class ScreenshotDiffUtil {
         locator.screenshot(new Locator.ScreenshotOptions()
             .setPath(actual)
             .setType(ScreenshotType.PNG));
-        if (UPDATE_BASELINES || !Files.exists(baseline)) {
+        if (UPDATE_BASELINES) {
             Files.createDirectories(baseline.getParent());
             Files.copy(actual, baseline, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             return;
         }
+        assertTrue(Files.isRegularFile(baseline),
+            "Missing committed screenshot baseline " + baseline
+                + "; refresh it only with regelsuche.updateScreenshots=true in the pinned container");
         BufferedImage expectedImage = ImageIO.read(baseline.toFile());
         BufferedImage actualImage = ImageIO.read(actual.toFile());
         assertTrue(expectedImage != null, "Unable to read baseline screenshot " + baseline);
@@ -54,7 +61,7 @@ final class ScreenshotDiffUtil {
                 int actualRgb = actualImage.getRGB(x, y);
                 if (!withinTolerance(expectedRgb, actualRgb)) {
                     changed++;
-                    diffImage.setRGB(x, y, 0xFFFF00FF);
+                    diffImage.setRGB(x, y, CHANGED_PIXEL_ARGB);
                 } else {
                     diffImage.setRGB(x, y, actualRgb);
                 }
@@ -90,6 +97,10 @@ final class ScreenshotDiffUtil {
     }
 
     private static Path reportDir() {
+        String configuredDirectory = System.getenv(REPORT_DIRECTORY_ENVIRONMENT_VARIABLE);
+        if (configuredDirectory != null && !configuredDirectory.isBlank()) {
+            return Path.of(configuredDirectory).toAbsolutePath().normalize();
+        }
         return locatePath(List.of(
             Path.of("build", "reports", "e2eTest", "screenshots"),
             Path.of("app", "build", "reports", "e2eTest", "screenshots")

@@ -1,7 +1,7 @@
 # Playwright Java image pins browser binaries, system libraries and fonts to the
 # exact Playwright version used by app/build.gradle. The project dependency is
 # still resolved from the checkout; the image only supplies the runtime stack.
-FROM mcr.microsoft.com/playwright/java:v1.60.0-noble
+FROM mcr.microsoft.com/playwright/java:v1.60.0-noble@sha256:69df3611cec973e9f7d2c7a9d9d75d9f9553261eb8484ffe37a52af608f9f766
 
 WORKDIR /workspace
 COPY . .
@@ -10,4 +10,4 @@ RUN chmod +x ./gradlew
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     REGELSUCHE_VISUAL_REPORT_DIR=/output
 
-ENTRYPOINT ["./gradlew", "--no-daemon", "--no-configuration-cache", ":app:e2eTest", "-Pregelsuche.runVisualTests=true", "-Pregelsuche.skipPlaywrightInstall=true", "--console=plain"]
+ENTRYPOINT ["./gradlew", "--no-daemon", "--no-configuration-cache", "-Pregelsuche.runVisualTests=true", "-Pregelsuche.skipPlaywrightInstall=true", ":app:e2eTest", "--tests", "de.regelsuche.e2e.MathRenderingVisualTest", "--tests", "de.regelsuche.e2e.VisualRegressionContractTest", "--console=plain"]

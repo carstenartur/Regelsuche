@@ -10,6 +10,7 @@ import com.microsoft.playwright.Playwright;
 import com.microsoft.playwright.options.LoadState;
 import com.microsoft.playwright.options.WaitForSelectorState;
 import java.io.IOException;
+import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,26 +22,25 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 /**
  * Pixel-level visual regression tests for the math-rendering pipeline.
  *
- * <p>These tests are intentionally gated behind the
- * {@code regelsuche.runVisualTests} system property (default {@code false}).
- * They compare rendered KaTeX output against committed PNG baselines, which
- * is inherently sensitive to:</p>
- * <ul>
- *   <li>Font hinting / sub-pixel anti-aliasing differences between local
- *       (typically macOS / Linux desktop) and CI (Ubuntu headless) Chromium
- *       installs;</li>
- *   <li>Chromium / KaTeX upgrades that legitimately change layout pixels.</li>
- * </ul>
+ * <p>The tests are gated behind the {@code regelsuche.runVisualTests} system
+ * property so ordinary local browser tests do not accidentally compare pixels
+ * across unrelated host rendering stacks. The checkout-owned CI lifecycle runs
+ * this class in {@code Dockerfile.visual-regression}, which pins the Playwright
+ * browser image and exports actual and diff images as retained evidence.</p>
  *
- * <p>Run locally with
- * {@code ./gradlew :app:e2eTest -Pregelsuche.runVisualTests=true} and refresh
- * baselines with the additional {@code -Pregelsuche.updateScreenshots=true}
- * flag whenever the rendering change is intentional. CI keeps the suite
- * green by default; promoting these to a CI gate requires a dedicated
- * stable-font runner (see commit history of this file for context).</p>
+ * <p>Refresh baselines only in that pinned container by using the explicit
+ * {@code regelsuche.updateScreenshots=true} property. The versioned visual
+ * regression policy and its contract test bind the environment, tolerances and
+ * exact baseline identities.</p>
  */
 @EnabledIfSystemProperty(named = "regelsuche.runVisualTests", matches = "true")
 class MathRenderingVisualTest {
+
+    static final int VIEWPORT_WIDTH = 1400;
+    static final int VIEWPORT_HEIGHT = 900;
+    static final double DEVICE_SCALE_FACTOR = 1.0;
+    static final String LOCALE = "en-US";
+    static final String TIMEZONE_ID = "UTC";
 
     private static RegelsucheAppEnvironment app;
     private static Playwright playwright;
@@ -67,7 +67,10 @@ class MathRenderingVisualTest {
     @BeforeEach
     void openContext() {
         context = browser.newContext(new Browser.NewContextOptions()
-            .setViewportSize(1400, 900));
+            .setViewportSize(VIEWPORT_WIDTH, VIEWPORT_HEIGHT)
+            .setDeviceScaleFactor(DEVICE_SCALE_FACTOR)
+            .setLocale(LOCALE)
+            .setTimezoneId(TIMEZONE_ID));
         page = context.newPage();
         page.navigate(app.baseUrl());
         page.waitForLoadState(LoadState.NETWORKIDLE);
@@ -80,21 +83,23 @@ class MathRenderingVisualTest {
     }
 
     @Test
-    @DisplayName("Visual baseline: demo summary math rendering stays stable")
+    @DisplayName("Visual baseline: deterministic matrix panel stays stable")
     void demoSummaryMatchesBaseline() throws IOException {
         openDemo("math-matrix");
         page.waitForSelector("#demoSummary .math-matrix-panel .katex",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(15_000));
-        ScreenshotDiffUtil.assertMatchesBaseline(page.locator("#demoSummary"), "demo-summary");
+        ScreenshotDiffUtil.assertMatchesBaseline(
+            page.locator("#demoSummary .math-matrix-panel"),
+            "demo-summary");
     }
 
     @Test
     @DisplayName("Visual baseline: replay block math rendering stays stable")
     void replayBlockMatchesBaseline() throws IOException {
         openDemo("binomial");
-        openReplayForLatestPath();
+        openReplayForSelectedDemoPath();
         page.waitForSelector("#replayCanvas .katex",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)
@@ -128,11 +133,13 @@ class MathRenderingVisualTest {
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(15_000));
         page.evaluate("() => { const cy = window.__cyForTests; if (cy && cy.nodes().length) { cy.nodes()[0].emit('tap'); } }");
-        page.waitForSelector("#graphInspector .katex",
+        page.waitForSelector("#graphInspector .graph-inspector-math .katex",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(15_000));
-        ScreenshotDiffUtil.assertMatchesBaseline(page.locator("#graphInspector"), "inspector");
+        ScreenshotDiffUtil.assertMatchesBaseline(
+            page.locator("#graphInspector .graph-inspector-math .katex").first(),
+            "inspector");
     }
 
     private void openDemo(String demoId) {
@@ -144,25 +151,64 @@ class MathRenderingVisualTest {
             new Page.WaitForFunctionOptions().setTimeout(60_000));
     }
 
-    private void openReplayForLatestPath() {
+    @SuppressWarnings("unchecked")
+    private void openReplayForSelectedDemoPath() {
+        String pathId = (String) page.evaluate(
+            "() => window.__lastSelectedPathId == null"
+                + " ? null : String(window.__lastSelectedPathId)");
+        assertTrue(pathId != null && !pathId.isBlank(),
+            "Demo must expose its selected path id");
+
+        // Prevent the tab's first-use lazy loader from racing with the exact
+        // path selection below and replacing the selector after our fetch.
+        page.evaluate("() => {"
+            + " const select = document.querySelector('#replayPathSelect');"
+            + " if (select) select.dataset.loaded = '1';"
+            + "}");
         page.locator(".tab[data-tab='replay']").click();
         page.waitForSelector("#tab-replay.active",
             new Page.WaitForSelectorOptions().setTimeout(5_000));
-        page.evaluate(
-            "async () => {"
-                + " var s = document.querySelector('#replayPathSelect');"
-                + " var r = await fetch('/api/paths?sort=score');"
-                + " var d = await r.json();"
-                + " s.innerHTML = '';"
-                + " (d.transformations || []).forEach(function(p) {"
-                + "   var o = document.createElement('option');"
-                + "   o.value = p.id; o.textContent = p.id;"
-                + "   s.appendChild(o);"
-                + " });"
-                + " s.selectedIndex = s.options.length - 1;"
-                + " s.dispatchEvent(new Event('change', { bubbles: true }));"
-                + "}");
+
+        Map<String, Object> selection = (Map<String, Object>) page.evaluate(
+            "async pathId => {"
+                + " const select = document.querySelector('#replayPathSelect');"
+                + " if (!select) return { ok: false, diagnostic: 'missing replay selector' };"
+                + " const response = await fetch('/api/paths?sort=score');"
+                + " const raw = await response.text();"
+                + " if (!response.ok) return { ok: false, diagnostic: 'HTTP '"
+                + "   + response.status + ': ' + raw };"
+                + " let data;"
+                + " try { data = JSON.parse(raw); }"
+                + " catch (error) { return { ok: false, diagnostic: 'invalid JSON: ' + error }; }"
+                + " const path = (data.transformations || []).find(candidate =>"
+                + "   String(candidate.id) === String(pathId));"
+                + " if (!path) return { ok: false, diagnostic: 'path not found: ' + pathId };"
+                + " select.innerHTML = '';"
+                + " const option = document.createElement('option');"
+                + " option.value = String(path.id);"
+                + " option.textContent = String(path.id);"
+                + " select.appendChild(option);"
+                + " select.value = String(path.id);"
+                + " select.dispatchEvent(new Event('change', { bubbles: true }));"
+                + " window.__regelsucheReplayReady = false;"
+                + " const canvas = document.querySelector('#replayCanvas');"
+                + " if (canvas) canvas.innerHTML = '';"
+                + " return { ok: true, pathId: String(path.id) };"
+                + "}",
+            pathId);
+        assertTrue(Boolean.TRUE.equals(selection.get("ok")),
+            "Could not select exact replay path " + pathId + ": "
+                + selection.get("diagnostic"));
+
         page.locator("#replayLoad").click();
+        page.waitForFunction(
+            "pathId => {"
+                + " const select = document.querySelector('#replayPathSelect');"
+                + " return window.__regelsucheReplayReady === true"
+                + "   && select && String(select.value) === String(pathId);"
+                + "}",
+            pathId,
+            new Page.WaitForFunctionOptions().setTimeout(15_000));
         page.waitForSelector(".replay-step",
             new Page.WaitForSelectorOptions()
                 .setState(WaitForSelectorState.VISIBLE)

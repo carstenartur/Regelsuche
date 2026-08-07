@@ -1,7 +1,7 @@
 {
   "schema": "regelsuche.visual-regression-policy/v1",
   "environment": {
-    "containerImage": "mcr.microsoft.com/playwright/java:v1.60.0-noble",
+    "containerImage": "mcr.microsoft.com/playwright/java:v1.60.0-noble@sha256:69df3611cec973e9f7d2c7a9d9d75d9f9553261eb8484ffe37a52af608f9f766",
     "playwrightVersion": "1.60.0",
     "browser": "chromium",
     "viewportWidth": 1400,
@@ -15,5 +15,22 @@
     "maxDiffRatio": 0.002,
     "changedPixelArgb": "ffff00ff"
   },
-  "baselines": {}
+  "baselines": {
+    "demo-summary.png": {
+      "gitBlobSha": "f19c6dbf4187acf34f7e8f92d8c6c822ffcbc5b5",
+      "byteLength": 6737
+    },
+    "inspector.png": {
+      "gitBlobSha": "bfd265083f4407f6909db0661d85964ac9341b1a",
+      "byteLength": 1224
+    },
+    "replay-block.png": {
+      "gitBlobSha": "f0ae96994c6dda6f959facaa5d9e26d9d119d8f3",
+      "byteLength": 30834
+    },
+    "search-graph-overlay.png": {
+      "gitBlobSha": "fedcf206b12d4d8f7933f9784c67465e72e9030b",
+      "byteLength": 1802
+    }
+  }
 }
