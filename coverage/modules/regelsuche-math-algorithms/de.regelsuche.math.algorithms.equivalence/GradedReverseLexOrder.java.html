@@ -11,8 +11,8 @@ import java.util.Map;
 
     @Override
     public int compare(Monomial left, Monomial right) {
-<span class="pc bpc" id="L14" title="1 of 2 branches missed.">        if (left == right) {</span>
-<span class="nc" id="L15">            return 0;</span>
+<span class="fc bfc" id="L14" title="All 2 branches covered.">        if (left == right) {</span>
+<span class="fc" id="L15">            return 0;</span>
         }
 <span class="fc" id="L17">        int degreeComparison = Integer.compare(right.totalDegree(), left.totalDegree());</span>
 <span class="fc bfc" id="L18" title="All 2 branches covered.">        if (degreeComparison != 0) {</span>

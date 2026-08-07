@@ -251,24 +251,29 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
 <span class="fc" id="L251">        payload.put(&quot;pairsSkippedByChainCriterion&quot;, result.pairsSkippedByChainCriterion());</span>
 <span class="fc" id="L252">        payload.put(&quot;maxPendingPairs&quot;, result.maxPendingPairs());</span>
 <span class="fc" id="L253">        payload.put(&quot;basisCacheHit&quot;, result.basisCacheHit());</span>
-<span class="fc" id="L254">        payload.put(&quot;basisReuseMode&quot;, reuseDecision.mode());</span>
-<span class="fc" id="L255">        payload.put(&quot;basisCacheSize&quot;, basisCache.size());</span>
-<span class="fc" id="L256">        payload.put(&quot;basisCacheCapacity&quot;, basisCache.capacity());</span>
-<span class="fc" id="L257">        payload.put(&quot;incrementalBaseGeneratorCount&quot;, reuseDecision.baseGeneratorCount());</span>
-<span class="fc" id="L258">        payload.put(&quot;incrementalBaseSize&quot;, result.incrementalBaseSize());</span>
-<span class="fc" id="L259">        payload.put(&quot;incrementalCandidatePairUpperBound&quot;, reuseDecision.incrementalPairUpperBound());</span>
-<span class="fc" id="L260">        payload.put(&quot;coldInitialPairUpperBound&quot;, reuseDecision.coldPairUpperBound());</span>
-<span class="fc" id="L261">        payload.put(&quot;incrementalReuseRejectedReason&quot;, reuseDecision.rejectionReason());</span>
-<span class="fc" id="L262">        payload.put(&quot;extensionGeneratorsConsidered&quot;, result.extensionGeneratorsConsidered());</span>
-<span class="fc" id="L263">        payload.put(&quot;extensionGeneratorsReduced&quot;, result.extensionGeneratorsReduced());</span>
-<span class="fc" id="L264">        payload.put(&quot;extensionGeneratorsEliminated&quot;, result.extensionGeneratorsEliminated());</span>
-<span class="fc" id="L265">        payload.put(&quot;basisPreparationSteps&quot;, result.basisPreparationSteps());</span>
-<span class="fc" id="L266">        payload.put(&quot;basisPreparationStepsSaved&quot;, result.basisPreparationStepsSaved());</span>
-<span class="fc" id="L267">        payload.put(&quot;queryReductionSteps&quot;, result.queryReductionSteps());</span>
-<span class="fc" id="L268">        payload.put(&quot;interreductionSteps&quot;, result.interreductionSteps());</span>
-<span class="fc" id="L269">        payload.put(&quot;steps&quot;, result.steps());</span>
-<span class="fc" id="L270">        payload.put(&quot;budgetStatus&quot;, result.budgetStatus());</span>
-<span class="fc" id="L271">        return Map.copyOf(payload);</span>
+<span class="fc" id="L254">        payload.put(&quot;reducedBasisCacheHit&quot;, result.reducedBasisCacheHit());</span>
+<span class="fc" id="L255">        payload.put(&quot;basisReuseMode&quot;, reuseDecision.mode());</span>
+<span class="fc" id="L256">        payload.put(&quot;basisCacheSize&quot;, basisCache.size());</span>
+<span class="fc" id="L257">        payload.put(&quot;basisCacheCapacity&quot;, basisCache.capacity());</span>
+<span class="fc" id="L258">        payload.put(&quot;incrementalBaseGeneratorCount&quot;, reuseDecision.baseGeneratorCount());</span>
+<span class="fc" id="L259">        payload.put(&quot;incrementalBaseSize&quot;, result.incrementalBaseSize());</span>
+<span class="fc" id="L260">        payload.put(&quot;incrementalCandidatePairUpperBound&quot;, reuseDecision.incrementalPairUpperBound());</span>
+<span class="fc" id="L261">        payload.put(&quot;coldInitialPairUpperBound&quot;, reuseDecision.coldPairUpperBound());</span>
+<span class="fc" id="L262">        payload.put(&quot;incrementalReuseRejectedReason&quot;, reuseDecision.rejectionReason());</span>
+<span class="fc" id="L263">        payload.put(&quot;initialGeneratorsConsidered&quot;, result.initialGeneratorsConsidered());</span>
+<span class="fc" id="L264">        payload.put(&quot;initialGeneratorsReduced&quot;, result.initialGeneratorsReduced());</span>
+<span class="fc" id="L265">        payload.put(&quot;initialGeneratorsEliminated&quot;, result.initialGeneratorsEliminated());</span>
+<span class="fc" id="L266">        payload.put(&quot;extensionGeneratorsConsidered&quot;, result.extensionGeneratorsConsidered());</span>
+<span class="fc" id="L267">        payload.put(&quot;extensionGeneratorsReduced&quot;, result.extensionGeneratorsReduced());</span>
+<span class="fc" id="L268">        payload.put(&quot;extensionGeneratorsEliminated&quot;, result.extensionGeneratorsEliminated());</span>
+<span class="fc" id="L269">        payload.put(&quot;basisPreparationSteps&quot;, result.basisPreparationSteps());</span>
+<span class="fc" id="L270">        payload.put(&quot;basisPreparationStepsSaved&quot;, result.basisPreparationStepsSaved());</span>
+<span class="fc" id="L271">        payload.put(&quot;queryReductionSteps&quot;, result.queryReductionSteps());</span>
+<span class="fc" id="L272">        payload.put(&quot;interreductionSteps&quot;, result.interreductionSteps());</span>
+<span class="fc" id="L273">        payload.put(&quot;reducedBasisStepsSaved&quot;, result.reducedBasisStepsSaved());</span>
+<span class="fc" id="L274">        payload.put(&quot;steps&quot;, result.steps());</span>
+<span class="fc" id="L275">        payload.put(&quot;budgetStatus&quot;, result.budgetStatus());</span>
+<span class="fc" id="L276">        return Map.copyOf(payload);</span>
     }
 
     private Optional&lt;String&gt; unsupportedByHardLimits(
@@ -276,81 +281,81 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         List&lt;Polynomial&gt; generators,
         MathematicalAlgorithmRegistry.AlgorithmBudget budget
     ) {
-<span class="fc" id="L279">        List&lt;Polynomial&gt; all = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L280">        all.add(polynomial);</span>
-<span class="fc" id="L281">        all.addAll(generators);</span>
-<span class="fc" id="L282">        int termCount = all.stream().mapToInt(Polynomial::termCount).sum();</span>
-<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        if (termCount &gt; budget.maxTerms()) {</span>
-<span class="nc" id="L284">            return Optional.of(&quot;maxTerms&quot;);</span>
+<span class="fc" id="L284">        List&lt;Polynomial&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L285">        all.add(polynomial);</span>
+<span class="fc" id="L286">        all.addAll(generators);</span>
+<span class="fc" id="L287">        int termCount = all.stream().mapToInt(Polynomial::termCount).sum();</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (termCount &gt; budget.maxTerms()) {</span>
+<span class="nc" id="L289">            return Optional.of(&quot;maxTerms&quot;);</span>
         }
-<span class="fc" id="L286">        int degree = all.stream().mapToInt(Polynomial::totalDegree).max().orElse(0);</span>
-<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (degree &gt; budget.maxDegree()) {</span>
-<span class="fc" id="L288">            return Optional.of(&quot;maxDegree&quot;);</span>
+<span class="fc" id="L291">        int degree = all.stream().mapToInt(Polynomial::totalDegree).max().orElse(0);</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (degree &gt; budget.maxDegree()) {</span>
+<span class="fc" id="L293">            return Optional.of(&quot;maxDegree&quot;);</span>
         }
-<span class="fc" id="L290">        Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L291">        all.forEach(value -&gt; variables.addAll(value.variables()));</span>
-<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (variables.size() &gt; budget.maxVariables()) {</span>
-<span class="fc" id="L293">            return Optional.of(&quot;maxVariables&quot;);</span>
+<span class="fc" id="L295">        Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L296">        all.forEach(value -&gt; variables.addAll(value.variables()));</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (variables.size() &gt; budget.maxVariables()) {</span>
+<span class="fc" id="L298">            return Optional.of(&quot;maxVariables&quot;);</span>
         }
-<span class="pc bpc" id="L295" title="3 of 4 branches missed.">        if (budget.maxCoefficient() &gt; 0 &amp;&amp; all.stream().anyMatch(value -&gt; value.coefficientMagnitudeExceeds(budget.maxCoefficient()))) {</span>
-<span class="nc" id="L296">            return Optional.of(&quot;maxCoefficient&quot;);</span>
+<span class="pc bpc" id="L300" title="3 of 4 branches missed.">        if (budget.maxCoefficient() &gt; 0 &amp;&amp; all.stream().anyMatch(value -&gt; value.coefficientMagnitudeExceeds(budget.maxCoefficient()))) {</span>
+<span class="nc" id="L301">            return Optional.of(&quot;maxCoefficient&quot;);</span>
         }
-<span class="fc" id="L298">        return Optional.empty();</span>
+<span class="fc" id="L303">        return Optional.empty();</span>
     }
 
     private MathematicalAlgorithmRegistry.AlgorithmExecutionResult unsupported(String detail, String reason) {
-<span class="fc" id="L302">        return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(</span>
+<span class="fc" id="L307">        return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(</span>
             MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN,
             MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
             detail,
-<span class="fc" id="L306">            basePayload(reason)</span>
+<span class="fc" id="L311">            basePayload(reason)</span>
         );
     }
 
     private Map&lt;String, Object&gt; basePayload(String unsupportedReason) {
-<span class="fc" id="L311">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L312">        payload.put(&quot;capability&quot;, MathematicalAlgorithmRegistry.GROEBNER_BASIS);</span>
-<span class="fc" id="L313">        boolean jasRequested = registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND);</span>
-<span class="fc bfc" id="L314" title="All 2 branches covered.">        payload.put(&quot;requestedBackend&quot;, jasRequested ? &quot;jas&quot; : &quot;pureJavaSmallGroebner&quot;);</span>
-<span class="fc" id="L315">        payload.put(&quot;backend&quot;, &quot;pureJavaSmallGroebner&quot;);</span>
-<span class="fc" id="L316">        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
-<span class="fc" id="L317">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
-<span class="fc" id="L318">            .orElse(SAFE_DEFAULT_BUDGET);</span>
-<span class="fc" id="L319">        payload.put(&quot;maxTerms&quot;, budget.maxTerms());</span>
-<span class="fc" id="L320">        payload.put(&quot;maxDegree&quot;, budget.maxDegree());</span>
-<span class="fc" id="L321">        payload.put(&quot;maxVariables&quot;, budget.maxVariables());</span>
-<span class="fc" id="L322">        payload.put(&quot;maxPairs&quot;, registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
-<span class="fc" id="L323">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
-<span class="fc" id="L324">            .map(MathematicalAlgorithmRegistry.AlgorithmBudget::maxStates)</span>
-<span class="fc" id="L325">            .orElse(SAFE_DEFAULT_BUDGET.maxStates()));</span>
-<span class="fc" id="L326">        payload.put(&quot;basisCacheCapacity&quot;, basisCache.capacity());</span>
-<span class="fc" id="L327">        payload.put(&quot;timeoutMillis&quot;, 0);</span>
-<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        payload.put(&quot;unsupportedReason&quot;, unsupportedReason == null ? &quot;&quot; : unsupportedReason);</span>
-<span class="fc" id="L329">        return payload;</span>
+<span class="fc" id="L316">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L317">        payload.put(&quot;capability&quot;, MathematicalAlgorithmRegistry.GROEBNER_BASIS);</span>
+<span class="fc" id="L318">        boolean jasRequested = registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND);</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        payload.put(&quot;requestedBackend&quot;, jasRequested ? &quot;jas&quot; : &quot;pureJavaSmallGroebner&quot;);</span>
+<span class="fc" id="L320">        payload.put(&quot;backend&quot;, &quot;pureJavaSmallGroebner&quot;);</span>
+<span class="fc" id="L321">        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
+<span class="fc" id="L322">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L323">            .orElse(SAFE_DEFAULT_BUDGET);</span>
+<span class="fc" id="L324">        payload.put(&quot;maxTerms&quot;, budget.maxTerms());</span>
+<span class="fc" id="L325">        payload.put(&quot;maxDegree&quot;, budget.maxDegree());</span>
+<span class="fc" id="L326">        payload.put(&quot;maxVariables&quot;, budget.maxVariables());</span>
+<span class="fc" id="L327">        payload.put(&quot;maxPairs&quot;, registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
+<span class="fc" id="L328">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L329">            .map(MathematicalAlgorithmRegistry.AlgorithmBudget::maxStates)</span>
+<span class="fc" id="L330">            .orElse(SAFE_DEFAULT_BUDGET.maxStates()));</span>
+<span class="fc" id="L331">        payload.put(&quot;basisCacheCapacity&quot;, basisCache.capacity());</span>
+<span class="fc" id="L332">        payload.put(&quot;timeoutMillis&quot;, 0);</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        payload.put(&quot;unsupportedReason&quot;, unsupportedReason == null ? &quot;&quot; : unsupportedReason);</span>
+<span class="fc" id="L334">        return payload;</span>
     }
 
     private static long pairCount(int count) {
-<span class="fc bfc" id="L333" title="All 2 branches covered.">        return count &lt; 2 ? 0 : ((long) count * (count - 1)) / 2;</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        return count &lt; 2 ? 0 : ((long) count * (count - 1)) / 2;</span>
     }
 
     private static long incrementalPairUpperBound(int basisSize, int additionalGeneratorCount) {
-<span class="fc" id="L337">        return (long) basisSize * additionalGeneratorCount + pairCount(additionalGeneratorCount);</span>
+<span class="fc" id="L342">        return (long) basisSize * additionalGeneratorCount + pairCount(additionalGeneratorCount);</span>
     }
 
     private record IdealCacheKey(String monomialOrder, List&lt;String&gt; canonicalGenerators) {
-<span class="fc" id="L341">        private IdealCacheKey {</span>
-<span class="fc" id="L342">            canonicalGenerators = List.copyOf(canonicalGenerators);</span>
-<span class="fc" id="L343">        }</span>
+<span class="fc" id="L346">        private IdealCacheKey {</span>
+<span class="fc" id="L347">            canonicalGenerators = List.copyOf(canonicalGenerators);</span>
+<span class="fc" id="L348">        }</span>
     }
 
-<span class="fc" id="L346">    private record CachedBasis(</span>
+<span class="fc" id="L351">    private record CachedBasis(</span>
         IdealCacheKey key,
         GroebnerBasisEngine.BasisPreparation preparation,
         long pairUpperBound
     ) {
     }
 
-<span class="fc" id="L353">    private record ReuseDecision(</span>
+<span class="fc" id="L358">    private record ReuseDecision(</span>
         String mode,
         int baseGeneratorCount,
         long incrementalPairUpperBound,
@@ -361,88 +366,88 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
 
     private static final class BasisCache {
         private final int capacity;
-<span class="fc" id="L364">        private final LinkedHashMap&lt;IdealCacheKey, GroebnerBasisEngine.BasisPreparation&gt; entries =</span>
+<span class="fc" id="L369">        private final LinkedHashMap&lt;IdealCacheKey, GroebnerBasisEngine.BasisPreparation&gt; entries =</span>
             new LinkedHashMap&lt;&gt;(16, 0.75f, true);
 
-<span class="fc" id="L367">        private BasisCache(int capacity) {</span>
-<span class="fc" id="L368">            this.capacity = capacity;</span>
-<span class="fc" id="L369">        }</span>
+<span class="fc" id="L372">        private BasisCache(int capacity) {</span>
+<span class="fc" id="L373">            this.capacity = capacity;</span>
+<span class="fc" id="L374">        }</span>
 
         private synchronized GroebnerBasisEngine.BasisPreparation get(IdealCacheKey key) {
-<span class="fc" id="L372">            return entries.get(key);</span>
+<span class="fc" id="L377">            return entries.get(key);</span>
         }
 
         private synchronized CachedBasis findBestExtensionBase(IdealCacheKey target) {
-<span class="fc" id="L376">            IdealCacheKey bestKey = null;</span>
-<span class="fc" id="L377">            GroebnerBasisEngine.BasisPreparation bestPreparation = null;</span>
-<span class="fc" id="L378">            long bestPairUpperBound = Long.MAX_VALUE;</span>
-<span class="fc bfc" id="L379" title="All 2 branches covered.">            for (Map.Entry&lt;IdealCacheKey, GroebnerBasisEngine.BasisPreparation&gt; entry : entries.entrySet()) {</span>
-<span class="fc" id="L380">                IdealCacheKey candidate = entry.getKey();</span>
-<span class="pc bpc" id="L381" title="1 of 2 branches missed.">                if (!candidate.monomialOrder().equals(target.monomialOrder())) {</span>
-<span class="nc" id="L382">                    continue;</span>
+<span class="fc" id="L381">            IdealCacheKey bestKey = null;</span>
+<span class="fc" id="L382">            GroebnerBasisEngine.BasisPreparation bestPreparation = null;</span>
+<span class="fc" id="L383">            long bestPairUpperBound = Long.MAX_VALUE;</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            for (Map.Entry&lt;IdealCacheKey, GroebnerBasisEngine.BasisPreparation&gt; entry : entries.entrySet()) {</span>
+<span class="fc" id="L385">                IdealCacheKey candidate = entry.getKey();</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">                if (!candidate.monomialOrder().equals(target.monomialOrder())) {</span>
+<span class="nc" id="L387">                    continue;</span>
                 }
-<span class="fc bfc" id="L384" title="All 2 branches covered.">                if (candidate.canonicalGenerators().size() &gt;= target.canonicalGenerators().size()) {</span>
-<span class="fc" id="L385">                    continue;</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">                if (candidate.canonicalGenerators().size() &gt;= target.canonicalGenerators().size()) {</span>
+<span class="fc" id="L390">                    continue;</span>
                 }
-<span class="pc bpc" id="L387" title="1 of 2 branches missed.">                if (!isSortedSubset(candidate.canonicalGenerators(), target.canonicalGenerators())) {</span>
-<span class="nc" id="L388">                    continue;</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">                if (!isSortedSubset(candidate.canonicalGenerators(), target.canonicalGenerators())) {</span>
+<span class="nc" id="L393">                    continue;</span>
                 }
-<span class="fc" id="L390">                int additionalGeneratorCount = target.canonicalGenerators().size()</span>
-<span class="fc" id="L391">                    - candidate.canonicalGenerators().size();</span>
-<span class="fc" id="L392">                long pairUpperBound = incrementalPairUpperBound(</span>
-<span class="fc" id="L393">                    entry.getValue().basis().size(),</span>
+<span class="fc" id="L395">                int additionalGeneratorCount = target.canonicalGenerators().size()</span>
+<span class="fc" id="L396">                    - candidate.canonicalGenerators().size();</span>
+<span class="fc" id="L397">                long pairUpperBound = incrementalPairUpperBound(</span>
+<span class="fc" id="L398">                    entry.getValue().basis().size(),</span>
                     additionalGeneratorCount
                 );
-<span class="pc bpc" id="L396" title="5 of 6 branches missed.">                if (bestKey == null</span>
+<span class="pc bpc" id="L401" title="5 of 6 branches missed.">                if (bestKey == null</span>
                     || pairUpperBound &lt; bestPairUpperBound
                     || (pairUpperBound == bestPairUpperBound
-<span class="nc bnc" id="L399" title="All 2 branches missed.">                        &amp;&amp; candidate.canonicalGenerators().size() &gt; bestKey.canonicalGenerators().size())) {</span>
-<span class="fc" id="L400">                    bestKey = candidate;</span>
-<span class="fc" id="L401">                    bestPreparation = entry.getValue();</span>
-<span class="fc" id="L402">                    bestPairUpperBound = pairUpperBound;</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                        &amp;&amp; candidate.canonicalGenerators().size() &gt; bestKey.canonicalGenerators().size())) {</span>
+<span class="fc" id="L405">                    bestKey = candidate;</span>
+<span class="fc" id="L406">                    bestPreparation = entry.getValue();</span>
+<span class="fc" id="L407">                    bestPairUpperBound = pairUpperBound;</span>
                 }
-<span class="fc" id="L404">            }</span>
-<span class="fc bfc" id="L405" title="All 2 branches covered.">            if (bestKey == null) {</span>
-<span class="fc" id="L406">                return null;</span>
+<span class="fc" id="L409">            }</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            if (bestKey == null) {</span>
+<span class="fc" id="L411">                return null;</span>
             }
-<span class="fc" id="L408">            entries.get(bestKey);</span>
-<span class="fc" id="L409">            return new CachedBasis(bestKey, bestPreparation, bestPairUpperBound);</span>
+<span class="fc" id="L413">            entries.get(bestKey);</span>
+<span class="fc" id="L414">            return new CachedBasis(bestKey, bestPreparation, bestPairUpperBound);</span>
         }
 
         private boolean isSortedSubset(List&lt;String&gt; candidate, List&lt;String&gt; target) {
-<span class="fc" id="L413">            int candidateIndex = 0;</span>
-<span class="fc" id="L414">            int targetIndex = 0;</span>
-<span class="pc bpc" id="L415" title="1 of 4 branches missed.">            while (candidateIndex &lt; candidate.size() &amp;&amp; targetIndex &lt; target.size()) {</span>
-<span class="fc" id="L416">                int comparison = candidate.get(candidateIndex).compareTo(target.get(targetIndex));</span>
-<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                if (comparison == 0) {</span>
-<span class="fc" id="L418">                    candidateIndex++;</span>
-<span class="fc" id="L419">                    targetIndex++;</span>
-<span class="nc bnc" id="L420" title="All 2 branches missed.">                } else if (comparison &gt; 0) {</span>
-<span class="nc" id="L421">                    targetIndex++;</span>
+<span class="fc" id="L418">            int candidateIndex = 0;</span>
+<span class="fc" id="L419">            int targetIndex = 0;</span>
+<span class="pc bpc" id="L420" title="1 of 4 branches missed.">            while (candidateIndex &lt; candidate.size() &amp;&amp; targetIndex &lt; target.size()) {</span>
+<span class="fc" id="L421">                int comparison = candidate.get(candidateIndex).compareTo(target.get(targetIndex));</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">                if (comparison == 0) {</span>
+<span class="fc" id="L423">                    candidateIndex++;</span>
+<span class="fc" id="L424">                    targetIndex++;</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">                } else if (comparison &gt; 0) {</span>
+<span class="nc" id="L426">                    targetIndex++;</span>
                 } else {
-<span class="nc" id="L423">                    return false;</span>
+<span class="nc" id="L428">                    return false;</span>
                 }
-<span class="fc" id="L425">            }</span>
-<span class="pc bpc" id="L426" title="1 of 2 branches missed.">            return candidateIndex == candidate.size();</span>
+<span class="fc" id="L430">            }</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">            return candidateIndex == candidate.size();</span>
         }
 
         private synchronized void put(IdealCacheKey key, GroebnerBasisEngine.BasisPreparation preparation) {
-<span class="pc bpc" id="L430" title="1 of 2 branches missed.">            if (capacity == 0) {</span>
-<span class="nc" id="L431">                return;</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">            if (capacity == 0) {</span>
+<span class="nc" id="L436">                return;</span>
             }
-<span class="fc" id="L433">            entries.put(key, preparation);</span>
-<span class="fc bfc" id="L434" title="All 2 branches covered.">            while (entries.size() &gt; capacity) {</span>
-<span class="fc" id="L435">                IdealCacheKey eldest = entries.keySet().iterator().next();</span>
-<span class="fc" id="L436">                entries.remove(eldest);</span>
-<span class="fc" id="L437">            }</span>
-<span class="fc" id="L438">        }</span>
+<span class="fc" id="L438">            entries.put(key, preparation);</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">            while (entries.size() &gt; capacity) {</span>
+<span class="fc" id="L440">                IdealCacheKey eldest = entries.keySet().iterator().next();</span>
+<span class="fc" id="L441">                entries.remove(eldest);</span>
+<span class="fc" id="L442">            }</span>
+<span class="fc" id="L443">        }</span>
 
         private synchronized int size() {
-<span class="fc" id="L441">            return entries.size();</span>
+<span class="fc" id="L446">            return entries.size();</span>
         }
 
         private int capacity() {
-<span class="fc" id="L445">            return capacity;</span>
+<span class="fc" id="L450">            return capacity;</span>
         }
     }
 }

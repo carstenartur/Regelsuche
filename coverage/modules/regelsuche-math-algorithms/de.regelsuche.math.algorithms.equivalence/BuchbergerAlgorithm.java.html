@@ -11,20 +11,35 @@ import java.util.Set;
 <span class="fc" id="L11">    private final PolynomialReducer reducer = new PolynomialReducer();</span>
 
     public BasisComputation computeBasis(List&lt;Polynomial&gt; generators, MonomialOrder order, int maxSteps, int maxPairs) {
-<span class="fc" id="L14">        List&lt;Polynomial&gt; basis = normalizedPolynomials(generators, order);</span>
-<span class="fc" id="L15">        List&lt;Monomial&gt; leadingMonomials = leadingMonomials(basis, order);</span>
-<span class="fc" id="L16">        PriorityQueue&lt;CriticalPair&gt; pairs = new PriorityQueue&lt;&gt;(pairComparator(order));</span>
-<span class="fc" id="L17">        Set&lt;PairKey&gt; resolvedPairs = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L18">        Statistics statistics = new Statistics();</span>
+<span class="fc" id="L14">        Statistics statistics = new Statistics();</span>
+<span class="fc" id="L15">        PreprocessingResult preprocessing = preprocessGenerators(generators, order, maxSteps, statistics);</span>
+<span class="pc bpc" id="L16" title="1 of 2 branches missed.">        if (preprocessing.budgetExhausted()) {</span>
+<span class="nc" id="L17">            return exhausted(preprocessing.basis(), order, preprocessing.steps(), statistics);</span>
+        }
 
-<span class="fc bfc" id="L20" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
-<span class="fc bfc" id="L21" title="All 2 branches covered.">            for (int j = i + 1; j &lt; basis.size(); j++) {</span>
-<span class="pc bpc" id="L22" title="1 of 2 branches missed.">                if (!enqueuePair(i, j, leadingMonomials, pairs, resolvedPairs, statistics, maxPairs)) {</span>
-<span class="nc" id="L23">                    return exhausted(basis, order, 0, statistics);</span>
+<span class="fc" id="L20">        List&lt;Polynomial&gt; basis = preprocessing.basis();</span>
+<span class="fc" id="L21">        List&lt;Monomial&gt; leadingMonomials = preprocessing.leadingMonomials();</span>
+<span class="fc" id="L22">        PriorityQueue&lt;CriticalPair&gt; pairs = new PriorityQueue&lt;&gt;(pairComparator(order));</span>
+<span class="fc" id="L23">        Set&lt;PairKey&gt; resolvedPairs = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L25" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
+<span class="fc bfc" id="L26" title="All 2 branches covered.">            for (int j = i + 1; j &lt; basis.size(); j++) {</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">                if (!enqueuePair(i, j, leadingMonomials, pairs, resolvedPairs, statistics, maxPairs)) {</span>
+<span class="nc" id="L28">                    return exhausted(basis, order, preprocessing.steps(), statistics);</span>
                 }
             }
         }
-<span class="fc" id="L27">        return processPairs(basis, leadingMonomials, pairs, resolvedPairs, order, 0, maxSteps, maxPairs, statistics);</span>
+<span class="fc" id="L32">        return processPairs(</span>
+            basis,
+            leadingMonomials,
+            pairs,
+            resolvedPairs,
+            order,
+<span class="fc" id="L38">            preprocessing.steps(),</span>
+            maxSteps,
+            maxPairs,
+            statistics
+        );
     }
 
     public BasisComputation extendBasis(
@@ -34,58 +49,64 @@ import java.util.Set;
         int maxSteps,
         int maxPairs
     ) {
-<span class="fc" id="L37">        List&lt;Polynomial&gt; basis = normalizedPolynomials(completedBasis, order);</span>
-<span class="fc" id="L38">        List&lt;Monomial&gt; leadingMonomials = leadingMonomials(basis, order);</span>
-<span class="fc" id="L39">        PriorityQueue&lt;CriticalPair&gt; pairs = new PriorityQueue&lt;&gt;(pairComparator(order));</span>
-<span class="fc" id="L40">        Set&lt;PairKey&gt; resolvedPairs = new HashSet&lt;&gt;();</span>
-<span class="fc" id="L41">        Statistics statistics = new Statistics();</span>
+<span class="fc" id="L52">        List&lt;Polynomial&gt; basis = normalizedPolynomials(completedBasis, order);</span>
+<span class="fc" id="L53">        Set&lt;Polynomial&gt; basisSet = new HashSet&lt;&gt;(basis);</span>
+<span class="fc" id="L54">        List&lt;Monomial&gt; leadingMonomials = leadingMonomials(basis, order);</span>
+<span class="fc" id="L55">        PriorityQueue&lt;CriticalPair&gt; pairs = new PriorityQueue&lt;&gt;(pairComparator(order));</span>
+<span class="fc" id="L56">        Set&lt;PairKey&gt; resolvedPairs = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L57">        Statistics statistics = new Statistics();</span>
+<span class="fc" id="L58">        PolynomialReducer.PreparedBasis preparedBasis = null;</span>
+<span class="fc" id="L59">        int preparedBasisSize = -1;</span>
 
         // Every old-old pair belongs to a basis that was already completed, so it is safe
         // to treat those pairs as resolved for the chain criterion.
-<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">            for (int j = i + 1; j &lt; basis.size(); j++) {</span>
-<span class="fc" id="L47">                resolvedPairs.add(PairKey.create(i, j));</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (int i = 0; i &lt; basis.size(); i++) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (int j = i + 1; j &lt; basis.size(); j++) {</span>
+<span class="fc" id="L65">                resolvedPairs.add(PairKey.create(i, j));</span>
             }
         }
 
-<span class="fc" id="L51">        int steps = 0;</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (Polynomial generator : normalizedPolynomials(additionalGenerators, order)) {</span>
-<span class="fc" id="L53">            statistics.extensionGeneratorsConsidered++;</span>
-<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (basis.contains(generator)) {</span>
-<span class="fc" id="L55">                statistics.extensionGeneratorsEliminated++;</span>
-<span class="fc" id="L56">                continue;</span>
+<span class="fc" id="L69">        int steps = 0;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (Polynomial generator : orderedMonicPolynomials(additionalGenerators, order)) {</span>
+<span class="fc" id="L71">            statistics.extensionGeneratorsConsidered++;</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">            if (basisSet.contains(generator)) {</span>
+<span class="nc" id="L73">                statistics.extensionGeneratorsEliminated++;</span>
+<span class="nc" id="L74">                continue;</span>
             }
 
-<span class="fc" id="L59">            Polynomial remainder = generator;</span>
-<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (requiresReduction(generator, leadingMonomials)) {</span>
-<span class="fc" id="L61">                statistics.extensionGeneratorsReduced++;</span>
-<span class="fc" id="L62">                PolynomialReducer.ReductionResult reduction = reducer.reduce(</span>
-                    generator,
-                    basis,
-                    order,
-<span class="fc" id="L66">                    Math.max(0, maxSteps - steps)</span>
-                );
-<span class="fc" id="L68">                steps += reduction.steps();</span>
-<span class="pc bpc" id="L69" title="2 of 4 branches missed.">                if (reduction.budgetExhausted() || steps &gt; maxSteps) {</span>
-<span class="nc" id="L70">                    return exhausted(basis, order, steps, statistics);</span>
+<span class="fc" id="L77">            Polynomial remainder = generator;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (requiresReduction(generator, leadingMonomials)) {</span>
+<span class="fc" id="L79">                statistics.extensionGeneratorsReduced++;</span>
+<span class="pc bpc" id="L80" title="3 of 4 branches missed.">                if (preparedBasis == null || preparedBasisSize != basis.size()) {</span>
+<span class="fc" id="L81">                    preparedBasis = reducer.prepare(basis, order);</span>
+<span class="fc" id="L82">                    preparedBasisSize = basis.size();</span>
                 }
-<span class="fc" id="L72">                remainder = reduction.remainder();</span>
+<span class="fc" id="L84">                PolynomialReducer.ReductionResult reduction = reducer.reduce(</span>
+                    generator,
+                    preparedBasis,
+<span class="fc" id="L87">                    Math.max(0, maxSteps - steps)</span>
+                );
+<span class="fc" id="L89">                steps += reduction.steps();</span>
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">                if (reduction.budgetExhausted() || steps &gt; maxSteps) {</span>
+<span class="nc" id="L91">                    return exhausted(basis, order, steps, statistics);</span>
+                }
+<span class="fc" id="L93">                remainder = reduction.remainder();</span>
             }
-<span class="fc bfc" id="L74" title="All 2 branches covered.">            if (remainder.isZero()) {</span>
-<span class="fc" id="L75">                statistics.extensionGeneratorsEliminated++;</span>
-<span class="fc" id="L76">                continue;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (remainder.isZero()) {</span>
+<span class="fc" id="L96">                statistics.extensionGeneratorsEliminated++;</span>
+<span class="fc" id="L97">                continue;</span>
             }
 
-<span class="fc" id="L79">            Polynomial monicRemainder = remainder.monic(order);</span>
-<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            if (basis.contains(monicRemainder)) {</span>
-<span class="nc" id="L81">                statistics.extensionGeneratorsEliminated++;</span>
-<span class="nc" id="L82">                continue;</span>
+<span class="fc" id="L100">            Polynomial monicRemainder = remainder.monic(order);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (!basisSet.add(monicRemainder)) {</span>
+<span class="nc" id="L102">                statistics.extensionGeneratorsEliminated++;</span>
+<span class="nc" id="L103">                continue;</span>
             }
-<span class="fc" id="L84">            int nextIndex = basis.size();</span>
-<span class="fc" id="L85">            basis.add(monicRemainder);</span>
-<span class="fc" id="L86">            leadingMonomials.add(monicRemainder.leadingTerm(order).orElseThrow().monomial());</span>
-<span class="fc bfc" id="L87" title="All 2 branches covered.">            for (int i = 0; i &lt; nextIndex; i++) {</span>
-<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (!enqueuePair(</span>
+<span class="fc" id="L105">            int nextIndex = basis.size();</span>
+<span class="fc" id="L106">            basis.add(monicRemainder);</span>
+<span class="fc" id="L107">            leadingMonomials.add(monicRemainder.leadingTerm(order).orElseThrow().monomial());</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int i = 0; i &lt; nextIndex; i++) {</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">                if (!enqueuePair(</span>
                     i,
                     nextIndex,
                     leadingMonomials,
@@ -94,12 +115,12 @@ import java.util.Set;
                     statistics,
                     maxPairs
                 )) {
-<span class="nc" id="L97">                    return exhausted(basis, order, steps, statistics);</span>
+<span class="nc" id="L118">                    return exhausted(basis, order, steps, statistics);</span>
                 }
             }
-<span class="fc" id="L100">        }</span>
+<span class="fc" id="L121">        }</span>
 
-<span class="fc" id="L102">        return processPairs(</span>
+<span class="fc" id="L123">        return processPairs(</span>
             basis,
             leadingMonomials,
             pairs,
@@ -110,6 +131,65 @@ import java.util.Set;
             maxPairs,
             statistics
         );
+    }
+
+    private PreprocessingResult preprocessGenerators(
+        List&lt;Polynomial&gt; generators,
+        MonomialOrder order,
+        int maxSteps,
+        Statistics statistics
+    ) {
+<span class="fc" id="L142">        List&lt;Polynomial&gt; basis = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L143">        Set&lt;Polynomial&gt; basisSet = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L144">        List&lt;Monomial&gt; leadingMonomials = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L145">        PolynomialReducer.PreparedBasis preparedBasis = null;</span>
+<span class="fc" id="L146">        int preparedBasisSize = -1;</span>
+<span class="fc" id="L147">        int steps = 0;</span>
+
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        for (Polynomial generator : orderedMonicPolynomials(generators, order)) {</span>
+<span class="fc" id="L150">            statistics.initialGeneratorsConsidered++;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (basisSet.contains(generator)) {</span>
+<span class="fc" id="L152">                statistics.initialGeneratorsEliminated++;</span>
+<span class="fc" id="L153">                continue;</span>
+            }
+
+<span class="fc" id="L156">            Polynomial remainder = generator;</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (requiresReduction(generator, leadingMonomials)) {</span>
+<span class="fc" id="L158">                statistics.initialGeneratorsReduced++;</span>
+<span class="fc bfc" id="L159" title="All 4 branches covered.">                if (preparedBasis == null || preparedBasisSize != basis.size()) {</span>
+<span class="fc" id="L160">                    preparedBasis = reducer.prepare(basis, order);</span>
+<span class="fc" id="L161">                    preparedBasisSize = basis.size();</span>
+                }
+<span class="fc" id="L163">                PolynomialReducer.ReductionResult reduction = reducer.reduce(</span>
+                    generator,
+                    preparedBasis,
+<span class="fc" id="L166">                    Math.max(0, maxSteps - steps)</span>
+                );
+<span class="fc" id="L168">                steps += reduction.steps();</span>
+<span class="pc bpc" id="L169" title="2 of 4 branches missed.">                if (reduction.budgetExhausted() || steps &gt; maxSteps) {</span>
+<span class="nc" id="L170">                    return new PreprocessingResult(</span>
+                        basis,
+                        leadingMonomials,
+                        steps,
+                        true
+                    );
+                }
+<span class="fc" id="L177">                remainder = reduction.remainder();</span>
+            }
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (remainder.isZero()) {</span>
+<span class="fc" id="L180">                statistics.initialGeneratorsEliminated++;</span>
+<span class="fc" id="L181">                continue;</span>
+            }
+
+<span class="fc" id="L184">            Polynomial monicRemainder = remainder.monic(order);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">            if (!basisSet.add(monicRemainder)) {</span>
+<span class="nc" id="L186">                statistics.initialGeneratorsEliminated++;</span>
+<span class="nc" id="L187">                continue;</span>
+            }
+<span class="fc" id="L189">            basis.add(monicRemainder);</span>
+<span class="fc" id="L190">            leadingMonomials.add(monicRemainder.leadingTerm(order).orElseThrow().monomial());</span>
+<span class="fc" id="L191">        }</span>
+<span class="fc" id="L192">        return new PreprocessingResult(basis, leadingMonomials, steps, false);</span>
     }
 
     private BasisComputation processPairs(
@@ -123,44 +203,49 @@ import java.util.Set;
         int maxPairs,
         Statistics statistics
     ) {
-<span class="fc" id="L126">        int steps = initialSteps;</span>
-<span class="fc bfc" id="L127" title="All 2 branches covered.">        while (!pairs.isEmpty()) {</span>
-<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (steps &gt;= maxSteps) {</span>
-<span class="fc" id="L129">                return exhausted(basis, order, steps, statistics);</span>
+<span class="fc" id="L206">        int steps = initialSteps;</span>
+<span class="fc" id="L207">        PolynomialReducer.PreparedBasis preparedBasis = null;</span>
+<span class="fc" id="L208">        int preparedBasisSize = -1;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        while (!pairs.isEmpty()) {</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            if (steps &gt;= maxSteps) {</span>
+<span class="fc" id="L211">                return exhausted(basis, order, steps, statistics);</span>
             }
-<span class="fc" id="L131">            CriticalPair pair = pairs.remove();</span>
-<span class="fc bfc" id="L132" title="All 2 branches covered.">            if (chainCriterionApplies(pair, leadingMonomials, resolvedPairs)) {</span>
-<span class="fc" id="L133">                statistics.pairsSkippedByChainCriterion++;</span>
-<span class="fc" id="L134">                resolvedPairs.add(pair.key());</span>
-<span class="fc" id="L135">                continue;</span>
+<span class="fc" id="L213">            CriticalPair pair = pairs.remove();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            if (chainCriterionApplies(pair, leadingMonomials, resolvedPairs)) {</span>
+<span class="fc" id="L215">                statistics.pairsSkippedByChainCriterion++;</span>
+<span class="fc" id="L216">                resolvedPairs.add(pair.key());</span>
+<span class="fc" id="L217">                continue;</span>
             }
 
-<span class="fc" id="L138">            Polynomial sPolynomial = reducer.sPolynomial(</span>
-<span class="fc" id="L139">                basis.get(pair.left()),</span>
-<span class="fc" id="L140">                basis.get(pair.right()),</span>
+<span class="fc" id="L220">            Polynomial sPolynomial = reducer.sPolynomial(</span>
+<span class="fc" id="L221">                basis.get(pair.left()),</span>
+<span class="fc" id="L222">                basis.get(pair.right()),</span>
                 order
             );
-<span class="fc" id="L143">            PolynomialReducer.ReductionResult reduction = reducer.reduce(</span>
+<span class="fc bfc" id="L225" title="All 4 branches covered.">            if (preparedBasis == null || preparedBasisSize != basis.size()) {</span>
+<span class="fc" id="L226">                preparedBasis = reducer.prepare(basis, order);</span>
+<span class="fc" id="L227">                preparedBasisSize = basis.size();</span>
+            }
+<span class="fc" id="L229">            PolynomialReducer.ReductionResult reduction = reducer.reduce(</span>
                 sPolynomial,
-                basis,
-                order,
+                preparedBasis,
                 maxSteps - steps
             );
-<span class="fc" id="L149">            statistics.pairsReduced++;</span>
-<span class="fc" id="L150">            steps += reduction.steps();</span>
-<span class="pc bpc" id="L151" title="2 of 4 branches missed.">            if (reduction.budgetExhausted() || steps &gt; maxSteps) {</span>
-<span class="nc" id="L152">                return exhausted(basis, order, steps, statistics);</span>
+<span class="fc" id="L234">            statistics.pairsReduced++;</span>
+<span class="fc" id="L235">            steps += reduction.steps();</span>
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">            if (reduction.budgetExhausted() || steps &gt; maxSteps) {</span>
+<span class="nc" id="L237">                return exhausted(basis, order, steps, statistics);</span>
             }
 
-<span class="fc" id="L155">            resolvedPairs.add(pair.key());</span>
-<span class="fc" id="L156">            Polynomial remainder = reduction.remainder();</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (!remainder.isZero()) {</span>
-<span class="fc" id="L158">                Polynomial monicRemainder = remainder.monic(order);</span>
-<span class="fc" id="L159">                int nextIndex = basis.size();</span>
-<span class="fc" id="L160">                basis.add(monicRemainder);</span>
-<span class="fc" id="L161">                leadingMonomials.add(monicRemainder.leadingTerm(order).orElseThrow().monomial());</span>
-<span class="fc bfc" id="L162" title="All 2 branches covered.">                for (int i = 0; i &lt; nextIndex; i++) {</span>
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                    if (!enqueuePair(</span>
+<span class="fc" id="L240">            resolvedPairs.add(pair.key());</span>
+<span class="fc" id="L241">            Polynomial remainder = reduction.remainder();</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (!remainder.isZero()) {</span>
+<span class="fc" id="L243">                Polynomial monicRemainder = remainder.monic(order);</span>
+<span class="fc" id="L244">                int nextIndex = basis.size();</span>
+<span class="fc" id="L245">                basis.add(monicRemainder);</span>
+<span class="fc" id="L246">                leadingMonomials.add(monicRemainder.leadingTerm(order).orElseThrow().monomial());</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                for (int i = 0; i &lt; nextIndex; i++) {</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                    if (!enqueuePair(</span>
                         i,
                         nextIndex,
                         leadingMonomials,
@@ -169,12 +254,12 @@ import java.util.Set;
                         statistics,
                         maxPairs
                     )) {
-<span class="nc" id="L172">                        return exhausted(basis, order, steps, statistics);</span>
+<span class="nc" id="L257">                        return exhausted(basis, order, steps, statistics);</span>
                     }
                 }
             }
-<span class="fc" id="L176">        }</span>
-<span class="fc" id="L177">        return completed(basis, order, steps, statistics);</span>
+<span class="fc" id="L261">        }</span>
+<span class="fc" id="L262">        return completed(basis, order, steps, statistics);</span>
     }
 
     private boolean enqueuePair(
@@ -186,27 +271,27 @@ import java.util.Set;
         Statistics statistics,
         int maxPairs
     ) {
-<span class="fc" id="L189">        CriticalPair pair = CriticalPair.create(left, right, leadingMonomials);</span>
-<span class="fc" id="L190">        statistics.pairsConsidered++;</span>
-<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (leadingMonomials.get(pair.left()).isRelativelyPrimeTo(leadingMonomials.get(pair.right()))) {</span>
-<span class="fc" id="L192">            statistics.pairsSkippedByProductCriterion++;</span>
-<span class="fc" id="L193">            resolvedPairs.add(pair.key());</span>
-<span class="fc" id="L194">            return true;</span>
+<span class="fc" id="L274">        CriticalPair pair = CriticalPair.create(left, right, leadingMonomials);</span>
+<span class="fc" id="L275">        statistics.pairsConsidered++;</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (leadingMonomials.get(pair.left()).isRelativelyPrimeTo(leadingMonomials.get(pair.right()))) {</span>
+<span class="fc" id="L277">            statistics.pairsSkippedByProductCriterion++;</span>
+<span class="fc" id="L278">            resolvedPairs.add(pair.key());</span>
+<span class="fc" id="L279">            return true;</span>
         }
-<span class="fc" id="L196">        pairs.add(pair);</span>
-<span class="fc" id="L197">        statistics.maxPendingPairs = Math.max(statistics.maxPendingPairs, pairs.size());</span>
-<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        return pairs.size() &lt;= maxPairs;</span>
+<span class="fc" id="L281">        pairs.add(pair);</span>
+<span class="fc" id="L282">        statistics.maxPendingPairs = Math.max(statistics.maxPendingPairs, pairs.size());</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">        return pairs.size() &lt;= maxPairs;</span>
     }
 
     private boolean requiresReduction(Polynomial polynomial, List&lt;Monomial&gt; leadingMonomials) {
-<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (Monomial monomial : polynomial.terms().keySet()) {</span>
-<span class="fc bfc" id="L203" title="All 2 branches covered.">            for (Monomial leadingMonomial : leadingMonomials) {</span>
-<span class="fc bfc" id="L204" title="All 2 branches covered.">                if (leadingMonomial.divides(monomial)) {</span>
-<span class="fc" id="L205">                    return true;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        for (Monomial monomial : polynomial.terms().keySet()) {</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            for (Monomial leadingMonomial : leadingMonomials) {</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                if (leadingMonomial.divides(monomial)) {</span>
+<span class="fc" id="L290">                    return true;</span>
                 }
-<span class="fc" id="L207">            }</span>
-<span class="fc" id="L208">        }</span>
-<span class="fc" id="L209">        return false;</span>
+<span class="fc" id="L292">            }</span>
+<span class="fc" id="L293">        }</span>
+<span class="fc" id="L294">        return false;</span>
     }
 
     private boolean chainCriterionApplies(
@@ -214,22 +299,22 @@ import java.util.Set;
         List&lt;Monomial&gt; leadingMonomials,
         Set&lt;PairKey&gt; resolvedPairs
     ) {
-<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int middle = 0; middle &lt; leadingMonomials.size(); middle++) {</span>
-<span class="fc bfc" id="L218" title="All 4 branches covered.">            if (middle == pair.left() || middle == pair.right()) {</span>
-<span class="fc" id="L219">                continue;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        for (int middle = 0; middle &lt; leadingMonomials.size(); middle++) {</span>
+<span class="fc bfc" id="L303" title="All 4 branches covered.">            if (middle == pair.left() || middle == pair.right()) {</span>
+<span class="fc" id="L304">                continue;</span>
             }
-<span class="fc" id="L221">            PairKey leftChain = PairKey.create(pair.left(), middle);</span>
-<span class="fc" id="L222">            PairKey rightChain = PairKey.create(middle, pair.right());</span>
-<span class="fc bfc" id="L223" title="All 4 branches covered.">            if (!resolvedPairs.contains(leftChain) || !resolvedPairs.contains(rightChain)) {</span>
-<span class="fc" id="L224">                continue;</span>
+<span class="fc" id="L306">            PairKey leftChain = PairKey.create(pair.left(), middle);</span>
+<span class="fc" id="L307">            PairKey rightChain = PairKey.create(middle, pair.right());</span>
+<span class="fc bfc" id="L308" title="All 4 branches covered.">            if (!resolvedPairs.contains(leftChain) || !resolvedPairs.contains(rightChain)) {</span>
+<span class="fc" id="L309">                continue;</span>
             }
-<span class="fc" id="L226">            Monomial leftLcm = leadingMonomials.get(pair.left()).lcm(leadingMonomials.get(middle));</span>
-<span class="fc" id="L227">            Monomial rightLcm = leadingMonomials.get(middle).lcm(leadingMonomials.get(pair.right()));</span>
-<span class="pc bpc" id="L228" title="1 of 4 branches missed.">            if (leftLcm.divides(pair.lcm()) &amp;&amp; rightLcm.divides(pair.lcm())) {</span>
-<span class="fc" id="L229">                return true;</span>
+<span class="fc" id="L311">            Monomial leftLcm = leadingMonomials.get(pair.left()).lcm(leadingMonomials.get(middle));</span>
+<span class="fc" id="L312">            Monomial rightLcm = leadingMonomials.get(middle).lcm(leadingMonomials.get(pair.right()));</span>
+<span class="pc bpc" id="L313" title="1 of 4 branches missed.">            if (leftLcm.divides(pair.lcm()) &amp;&amp; rightLcm.divides(pair.lcm())) {</span>
+<span class="fc" id="L314">                return true;</span>
             }
         }
-<span class="fc" id="L232">        return false;</span>
+<span class="fc" id="L317">        return false;</span>
     }
 
     private BasisComputation completed(
@@ -238,8 +323,8 @@ import java.util.Set;
         int steps,
         Statistics statistics
     ) {
-<span class="fc" id="L241">        return new BasisComputation(</span>
-<span class="fc" id="L242">            orderedBasis(basis, order),</span>
+<span class="fc" id="L326">        return new BasisComputation(</span>
+<span class="fc" id="L327">            orderedBasis(basis, order),</span>
             steps,
             false,
             &quot;OK&quot;,
@@ -248,6 +333,9 @@ import java.util.Set;
             statistics.pairsSkippedByProductCriterion,
             statistics.pairsSkippedByChainCriterion,
             statistics.maxPendingPairs,
+            statistics.initialGeneratorsConsidered,
+            statistics.initialGeneratorsReduced,
+            statistics.initialGeneratorsEliminated,
             statistics.extensionGeneratorsConsidered,
             statistics.extensionGeneratorsReduced,
             statistics.extensionGeneratorsEliminated
@@ -260,8 +348,8 @@ import java.util.Set;
         int steps,
         Statistics statistics
     ) {
-<span class="fc" id="L263">        return new BasisComputation(</span>
-<span class="fc" id="L264">            orderedBasis(basis, order),</span>
+<span class="fc" id="L351">        return new BasisComputation(</span>
+<span class="fc" id="L352">            orderedBasis(basis, order),</span>
             steps,
             true,
             &quot;BUDGET_EXHAUSTED&quot;,
@@ -270,51 +358,62 @@ import java.util.Set;
             statistics.pairsSkippedByProductCriterion,
             statistics.pairsSkippedByChainCriterion,
             statistics.maxPendingPairs,
+            statistics.initialGeneratorsConsidered,
+            statistics.initialGeneratorsReduced,
+            statistics.initialGeneratorsEliminated,
             statistics.extensionGeneratorsConsidered,
             statistics.extensionGeneratorsReduced,
             statistics.extensionGeneratorsEliminated
         );
     }
 
+    private List&lt;Polynomial&gt; orderedMonicPolynomials(List&lt;Polynomial&gt; polynomials, MonomialOrder order) {
+<span class="fc" id="L371">        return polynomials.stream()</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">            .filter(polynomial -&gt; !polynomial.isZero())</span>
+<span class="fc" id="L373">            .map(polynomial -&gt; polynomial.monic(order))</span>
+<span class="fc" id="L374">            .sorted(Comparator</span>
+<span class="fc" id="L375">                .comparingInt((Polynomial polynomial) -&gt; polynomial.leadingTerm(order)</span>
+<span class="fc" id="L376">                    .orElseThrow().monomial().totalDegree())</span>
+<span class="fc" id="L377">                .thenComparing(basisComparator(order)))</span>
+<span class="fc" id="L378">            .toList();</span>
+    }
+
     private List&lt;Polynomial&gt; normalizedPolynomials(List&lt;Polynomial&gt; polynomials, MonomialOrder order) {
-<span class="fc" id="L280">        return polynomials.stream()</span>
-<span class="pc bpc" id="L281" title="1 of 2 branches missed.">            .filter(polynomial -&gt; !polynomial.isZero())</span>
-<span class="fc" id="L282">            .map(polynomial -&gt; polynomial.monic(order))</span>
-<span class="fc" id="L283">            .distinct()</span>
-<span class="fc" id="L284">            .sorted(basisComparator(order))</span>
-<span class="fc" id="L285">            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);</span>
+<span class="fc" id="L382">        return orderedMonicPolynomials(polynomials, order).stream()</span>
+<span class="fc" id="L383">            .distinct()</span>
+<span class="fc" id="L384">            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);</span>
     }
 
     private List&lt;Monomial&gt; leadingMonomials(List&lt;Polynomial&gt; basis, MonomialOrder order) {
-<span class="fc" id="L289">        return basis.stream()</span>
-<span class="fc" id="L290">            .map(polynomial -&gt; polynomial.leadingTerm(order).orElseThrow().monomial())</span>
-<span class="fc" id="L291">            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);</span>
+<span class="fc" id="L388">        return basis.stream()</span>
+<span class="fc" id="L389">            .map(polynomial -&gt; polynomial.leadingTerm(order).orElseThrow().monomial())</span>
+<span class="fc" id="L390">            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);</span>
     }
 
     private Comparator&lt;CriticalPair&gt; pairComparator(MonomialOrder order) {
-<span class="fc" id="L295">        return Comparator</span>
-<span class="fc" id="L296">            .comparingInt(CriticalPair::lcmDegree)</span>
-<span class="fc" id="L297">            .thenComparing(CriticalPair::lcm, order)</span>
-<span class="fc" id="L298">            .thenComparingInt(CriticalPair::left)</span>
-<span class="fc" id="L299">            .thenComparingInt(CriticalPair::right);</span>
+<span class="fc" id="L394">        return Comparator</span>
+<span class="fc" id="L395">            .comparingInt(CriticalPair::lcmDegree)</span>
+<span class="fc" id="L396">            .thenComparing(CriticalPair::lcm, order)</span>
+<span class="fc" id="L397">            .thenComparingInt(CriticalPair::left)</span>
+<span class="fc" id="L398">            .thenComparingInt(CriticalPair::right);</span>
     }
 
     private List&lt;Polynomial&gt; orderedBasis(List&lt;Polynomial&gt; basis, MonomialOrder order) {
-<span class="fc" id="L303">        return basis.stream().sorted(basisComparator(order)).toList();</span>
+<span class="fc" id="L402">        return basis.stream().sorted(basisComparator(order)).toList();</span>
     }
 
     private Comparator&lt;Polynomial&gt; basisComparator(MonomialOrder order) {
-<span class="fc" id="L307">        return Comparator</span>
-<span class="fc" id="L308">            .comparing(</span>
-<span class="fc" id="L309">                (Polynomial polynomial) -&gt; polynomial.leadingTerm(order)</span>
-<span class="fc" id="L310">                    .map(Term::monomial)</span>
-<span class="fc" id="L311">                    .orElse(Monomial.constant()),</span>
+<span class="fc" id="L406">        return Comparator</span>
+<span class="fc" id="L407">            .comparing(</span>
+<span class="fc" id="L408">                (Polynomial polynomial) -&gt; polynomial.leadingTerm(order)</span>
+<span class="fc" id="L409">                    .map(Term::monomial)</span>
+<span class="fc" id="L410">                    .orElse(Monomial.constant()),</span>
                 order
             )
-<span class="fc" id="L314">            .thenComparing(polynomial -&gt; polynomial.toCanonicalString(order));</span>
+<span class="fc" id="L413">            .thenComparing(polynomial -&gt; polynomial.toCanonicalString(order));</span>
     }
 
-<span class="fc" id="L317">    public record BasisComputation(</span>
+<span class="fc" id="L416">    public record BasisComputation(</span>
         List&lt;Polynomial&gt; basis,
         int steps,
         boolean budgetExhausted,
@@ -324,6 +423,9 @@ import java.util.Set;
         int pairsSkippedByProductCriterion,
         int pairsSkippedByChainCriterion,
         int maxPendingPairs,
+        int initialGeneratorsConsidered,
+        int initialGeneratorsReduced,
+        int initialGeneratorsEliminated,
         int extensionGeneratorsConsidered,
         int extensionGeneratorsReduced,
         int extensionGeneratorsEliminated
@@ -336,26 +438,37 @@ import java.util.Set;
         private int pairsSkippedByProductCriterion;
         private int pairsSkippedByChainCriterion;
         private int maxPendingPairs;
+        private int initialGeneratorsConsidered;
+        private int initialGeneratorsReduced;
+        private int initialGeneratorsEliminated;
         private int extensionGeneratorsConsidered;
         private int extensionGeneratorsReduced;
         private int extensionGeneratorsEliminated;
     }
 
-<span class="fc" id="L344">    private record CriticalPair(int left, int right, Monomial lcm, int lcmDegree) {</span>
+<span class="fc" id="L449">    private record PreprocessingResult(</span>
+        List&lt;Polynomial&gt; basis,
+        List&lt;Monomial&gt; leadingMonomials,
+        int steps,
+        boolean budgetExhausted
+    ) {
+    }
+
+<span class="fc" id="L457">    private record CriticalPair(int left, int right, Monomial lcm, int lcmDegree) {</span>
         private static CriticalPair create(int first, int second, List&lt;Monomial&gt; leadingMonomials) {
-<span class="fc" id="L346">            PairKey key = PairKey.create(first, second);</span>
-<span class="fc" id="L347">            Monomial lcm = leadingMonomials.get(key.left()).lcm(leadingMonomials.get(key.right()));</span>
-<span class="fc" id="L348">            return new CriticalPair(key.left(), key.right(), lcm, lcm.totalDegree());</span>
+<span class="fc" id="L459">            PairKey key = PairKey.create(first, second);</span>
+<span class="fc" id="L460">            Monomial lcm = leadingMonomials.get(key.left()).lcm(leadingMonomials.get(key.right()));</span>
+<span class="fc" id="L461">            return new CriticalPair(key.left(), key.right(), lcm, lcm.totalDegree());</span>
         }
 
         private PairKey key() {
-<span class="fc" id="L352">            return new PairKey(left, right);</span>
+<span class="fc" id="L465">            return new PairKey(left, right);</span>
         }
     }
 
-<span class="fc" id="L356">    private record PairKey(int left, int right) {</span>
+<span class="fc" id="L469">    private record PairKey(int left, int right) {</span>
         private static PairKey create(int first, int second) {
-<span class="fc bfc" id="L358" title="All 2 branches covered.">            return first &lt; second ? new PairKey(first, second) : new PairKey(second, first);</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">            return first &lt; second ? new PairKey(first, second) : new PairKey(second, first);</span>
         }
     }
 }

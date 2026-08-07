@@ -92,8 +92,8 @@ public record Monomial(Map&lt;String, Integer&gt; powers) {
     }
 
     public Monomial lcm(Monomial other) {
-<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (powers.isEmpty()) {</span>
-<span class="fc" id="L96">            return other;</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (powers.isEmpty()) {</span>
+<span class="nc" id="L96">            return other;</span>
         }
 <span class="fc bfc" id="L98" title="All 2 branches covered.">        if (other.powers.isEmpty()) {</span>
 <span class="fc" id="L99">            return this;</span>
