@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public final class PolynomialReducer {
     public PreparedBasis prepare(List<Polynomial> basis, MonomialOrder order) {
@@ -23,7 +25,7 @@ public final class PolynomialReducer {
                 return new ReductionResult(remainder, steps, true);
             }
             Term currentLeadingTerm = current.leadingTerm(preparedBasis.order()).orElseThrow();
-            Optional<Reduction> reduction = firstReduction(currentLeadingTerm, preparedBasis.reducers());
+            Optional<Reduction> reduction = firstReduction(currentLeadingTerm, preparedBasis);
             if (reduction.isPresent()) {
                 Reduction divisor = reduction.orElseThrow();
                 current = current.subtract(divisor.polynomial().multiply(
@@ -58,7 +60,13 @@ public final class PolynomialReducer {
         List<Reduction> reductions = new ArrayList<>();
         for (Polynomial polynomial : basis) {
             if (!polynomial.isZero()) {
-                reductions.add(new Reduction(polynomial, polynomial.leadingTerm(order).orElseThrow()));
+                Term leadingTerm = polynomial.leadingTerm(order).orElseThrow();
+                reductions.add(new Reduction(
+                    polynomial,
+                    leadingTerm,
+                    leadingTerm.monomial().totalDegree(),
+                    supportMask(leadingTerm.monomial())
+                ));
             }
         }
         reductions.sort(Comparator
@@ -67,15 +75,34 @@ public final class PolynomialReducer {
         return List.copyOf(reductions);
     }
 
-    private Optional<Reduction> firstReduction(Term leadingTerm, List<Reduction> reducers) {
-        int leadingDegree = leadingTerm.monomial().totalDegree();
-        for (Reduction reduction : reducers) {
-            Monomial divisor = reduction.leadingTerm().monomial();
-            if (divisor.totalDegree() <= leadingDegree && divisor.divides(leadingTerm.monomial())) {
+    private Optional<Reduction> firstReduction(Term leadingTerm, PreparedBasis preparedBasis) {
+        Monomial target = leadingTerm.monomial();
+        int leadingDegree = target.totalDegree();
+        long targetSupportMask = supportMask(target);
+        for (Reduction reduction : preparedBasis.reducersForDegree(leadingDegree)) {
+            if ((reduction.supportMask() & ~targetSupportMask) != 0L) {
+                continue;
+            }
+            if (reduction.leadingTerm().monomial().divides(target)) {
                 return Optional.of(reduction);
             }
         }
         return Optional.empty();
+    }
+
+    private static long supportMask(Monomial monomial) {
+        long mask = 0L;
+        for (String variable : monomial.powers().keySet()) {
+            int hash = variable.hashCode();
+            int firstBit = hash & 63;
+            int secondBit = Integer.rotateRight(hash, 16) & 63;
+            if (secondBit == firstBit) {
+                secondBit = (secondBit + 1) & 63;
+            }
+            mask |= 1L << firstBit;
+            mask |= 1L << secondBit;
+        }
+        return mask;
     }
 
     public record ReductionResult(Polynomial remainder, int steps, boolean budgetExhausted) {
@@ -84,14 +111,37 @@ public final class PolynomialReducer {
     public static final class PreparedBasis {
         private final List<Reduction> reducers;
         private final MonomialOrder order;
+        private final int maxReducerDegree;
+        private final ConcurrentMap<Integer, List<Reduction>> reducersByMaximumDegree = new ConcurrentHashMap<>();
 
         private PreparedBasis(List<Reduction> reducers, MonomialOrder order) {
             this.reducers = reducers;
             this.order = order;
+            this.maxReducerDegree = reducers.stream()
+                .mapToInt(Reduction::leadingDegree)
+                .max()
+                .orElse(-1);
         }
 
-        private List<Reduction> reducers() {
-            return reducers;
+        private List<Reduction> reducersForDegree(int maximumDegree) {
+            if (maximumDegree >= maxReducerDegree) {
+                return reducers;
+            }
+            return reducersByMaximumDegree.computeIfAbsent(maximumDegree, degree -> reducers.stream()
+                .filter(reduction -> reduction.leadingDegree() <= degree)
+                .toList());
+        }
+
+        int reducerCount() {
+            return reducers.size();
+        }
+
+        int eligibleReducerCount(int maximumDegree) {
+            return reducersForDegree(maximumDegree).size();
+        }
+
+        int cachedDegreeViewCount() {
+            return reducersByMaximumDegree.size();
         }
 
         private MonomialOrder order() {
@@ -99,6 +149,11 @@ public final class PolynomialReducer {
         }
     }
 
-    private record Reduction(Polynomial polynomial, Term leadingTerm) {
+    private record Reduction(
+        Polynomial polynomial,
+        Term leadingTerm,
+        int leadingDegree,
+        long supportMask
+    ) {
     }
 }
