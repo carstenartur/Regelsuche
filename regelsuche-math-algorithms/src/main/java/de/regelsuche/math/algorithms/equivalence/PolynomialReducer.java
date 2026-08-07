@@ -1,5 +1,7 @@
 package de.regelsuche.math.algorithms.equivalence;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -7,13 +9,14 @@ public final class PolynomialReducer {
     public ReductionResult reduce(Polynomial polynomial, List<Polynomial> basis, MonomialOrder order, int maxSteps) {
         Polynomial remainder = Polynomial.zero();
         Polynomial current = polynomial;
+        List<Reduction> reducers = indexedReducers(basis, order);
         int steps = 0;
         while (!current.isZero()) {
-            if (steps++ >= maxSteps) {
+            if (steps >= maxSteps) {
                 return new ReductionResult(remainder, steps, true);
             }
             Term currentLeadingTerm = current.leadingTerm(order).orElseThrow();
-            Optional<Reduction> reduction = firstReduction(currentLeadingTerm, basis, order);
+            Optional<Reduction> reduction = firstReduction(currentLeadingTerm, reducers);
             if (reduction.isPresent()) {
                 Reduction divisor = reduction.orElseThrow();
                 current = current.subtract(divisor.polynomial().multiply(
@@ -21,10 +24,14 @@ public final class PolynomialReducer {
                     currentLeadingTerm.coefficient().divide(divisor.leadingTerm().coefficient())
                 ));
             } else {
-                Polynomial leadingPolynomial = Polynomial.term(currentLeadingTerm.monomial(), currentLeadingTerm.coefficient());
+                Polynomial leadingPolynomial = Polynomial.term(
+                    currentLeadingTerm.monomial(),
+                    currentLeadingTerm.coefficient()
+                );
                 remainder = remainder.add(leadingPolynomial);
                 current = current.subtract(leadingPolynomial);
             }
+            steps++;
         }
         return new ReductionResult(remainder, steps, false);
     }
@@ -40,11 +47,28 @@ public final class PolynomialReducer {
         return normalizedLeft.subtract(normalizedRight);
     }
 
-    private Optional<Reduction> firstReduction(Term leadingTerm, List<Polynomial> basis, MonomialOrder order) {
-        return basis.stream()
-            .map(polynomial -> new Reduction(polynomial, polynomial.leadingTerm(order).orElseThrow()))
-            .filter(reduction -> reduction.leadingTerm().monomial().divides(leadingTerm.monomial()))
-            .findFirst();
+    private List<Reduction> indexedReducers(List<Polynomial> basis, MonomialOrder order) {
+        List<Reduction> reductions = new ArrayList<>();
+        for (Polynomial polynomial : basis) {
+            if (!polynomial.isZero()) {
+                reductions.add(new Reduction(polynomial, polynomial.leadingTerm(order).orElseThrow()));
+            }
+        }
+        reductions.sort(Comparator
+            .comparing((Reduction reduction) -> reduction.leadingTerm().monomial(), order)
+            .thenComparing(reduction -> reduction.polynomial().toCanonicalString(order)));
+        return List.copyOf(reductions);
+    }
+
+    private Optional<Reduction> firstReduction(Term leadingTerm, List<Reduction> reducers) {
+        int leadingDegree = leadingTerm.monomial().totalDegree();
+        for (Reduction reduction : reducers) {
+            Monomial divisor = reduction.leadingTerm().monomial();
+            if (divisor.totalDegree() <= leadingDegree && divisor.divides(leadingTerm.monomial())) {
+                return Optional.of(reduction);
+            }
+        }
+        return Optional.empty();
     }
 
     public record ReductionResult(Polynomial remainder, int steps, boolean budgetExhausted) {

@@ -42,6 +42,10 @@ public record Monomial(Map<String, Integer> powers) {
             .allMatch(entry -> other.exponentOf(entry.getKey()) >= entry.getValue());
     }
 
+    public boolean isRelativelyPrimeTo(Monomial other) {
+        return powers.keySet().stream().noneMatch(variable -> other.exponentOf(variable) > 0);
+    }
+
     public Monomial divideBy(Monomial divisor) {
         if (!divisor.divides(this)) {
             throw new ArithmeticException("monomial is not divisible by divisor");
