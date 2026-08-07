@@ -35,11 +35,17 @@ updates:
         patterns:
           - "*"
 
-  # Keep the root Dockerfile base images current.
+  # Keep Docker base images current without silently changing the project's
+  # declared Java major. Java 21 image patch/minor and security updates remain
+  # eligible; a future Java-major migration requires an explicit reviewed change.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types:
+          - "version-update:semver-major"
     groups:
       docker-base-images:
         patterns:
