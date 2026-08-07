@@ -11,15 +11,8 @@ public final class BuchbergerAlgorithm {
     private final PolynomialReducer reducer = new PolynomialReducer();
 
     public BasisComputation computeBasis(List<Polynomial> generators, MonomialOrder order, int maxSteps, int maxPairs) {
-        List<Polynomial> basis = generators.stream()
-            .filter(generator -> !generator.isZero())
-            .map(generator -> generator.monic(order))
-            .distinct()
-            .sorted(basisComparator(order))
-            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
-        List<Monomial> leadingMonomials = basis.stream()
-            .map(polynomial -> polynomial.leadingTerm(order).orElseThrow().monomial())
-            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+        List<Polynomial> basis = normalizedPolynomials(generators, order);
+        List<Monomial> leadingMonomials = leadingMonomials(basis, order);
         PriorityQueue<CriticalPair> pairs = new PriorityQueue<>(pairComparator(order));
         Set<PairKey> resolvedPairs = new HashSet<>();
         Statistics statistics = new Statistics();
@@ -31,8 +24,106 @@ public final class BuchbergerAlgorithm {
                 }
             }
         }
+        return processPairs(basis, leadingMonomials, pairs, resolvedPairs, order, 0, maxSteps, maxPairs, statistics);
+    }
+
+    public BasisComputation extendBasis(
+        List<Polynomial> completedBasis,
+        List<Polynomial> additionalGenerators,
+        MonomialOrder order,
+        int maxSteps,
+        int maxPairs
+    ) {
+        List<Polynomial> basis = normalizedPolynomials(completedBasis, order);
+        List<Monomial> leadingMonomials = leadingMonomials(basis, order);
+        PriorityQueue<CriticalPair> pairs = new PriorityQueue<>(pairComparator(order));
+        Set<PairKey> resolvedPairs = new HashSet<>();
+        Statistics statistics = new Statistics();
+
+        // Every old-old pair belongs to a basis that was already completed, so it is safe
+        // to treat those pairs as resolved for the chain criterion.
+        for (int i = 0; i < basis.size(); i++) {
+            for (int j = i + 1; j < basis.size(); j++) {
+                resolvedPairs.add(PairKey.create(i, j));
+            }
+        }
 
         int steps = 0;
+        for (Polynomial generator : normalizedPolynomials(additionalGenerators, order)) {
+            statistics.extensionGeneratorsConsidered++;
+            if (basis.contains(generator)) {
+                statistics.extensionGeneratorsEliminated++;
+                continue;
+            }
+
+            Polynomial remainder = generator;
+            if (requiresReduction(generator, leadingMonomials)) {
+                statistics.extensionGeneratorsReduced++;
+                PolynomialReducer.ReductionResult reduction = reducer.reduce(
+                    generator,
+                    basis,
+                    order,
+                    Math.max(0, maxSteps - steps)
+                );
+                steps += reduction.steps();
+                if (reduction.budgetExhausted() || steps > maxSteps) {
+                    return exhausted(basis, order, steps, statistics);
+                }
+                remainder = reduction.remainder();
+            }
+            if (remainder.isZero()) {
+                statistics.extensionGeneratorsEliminated++;
+                continue;
+            }
+
+            Polynomial monicRemainder = remainder.monic(order);
+            if (basis.contains(monicRemainder)) {
+                statistics.extensionGeneratorsEliminated++;
+                continue;
+            }
+            int nextIndex = basis.size();
+            basis.add(monicRemainder);
+            leadingMonomials.add(monicRemainder.leadingTerm(order).orElseThrow().monomial());
+            for (int i = 0; i < nextIndex; i++) {
+                if (!enqueuePair(
+                    i,
+                    nextIndex,
+                    leadingMonomials,
+                    pairs,
+                    resolvedPairs,
+                    statistics,
+                    maxPairs
+                )) {
+                    return exhausted(basis, order, steps, statistics);
+                }
+            }
+        }
+
+        return processPairs(
+            basis,
+            leadingMonomials,
+            pairs,
+            resolvedPairs,
+            order,
+            steps,
+            maxSteps,
+            maxPairs,
+            statistics
+        );
+    }
+
+    private BasisComputation processPairs(
+        List<Polynomial> basis,
+        List<Monomial> leadingMonomials,
+        PriorityQueue<CriticalPair> pairs,
+        Set<PairKey> resolvedPairs,
+        MonomialOrder order,
+        int initialSteps,
+        int maxSteps,
+        int maxPairs,
+        Statistics statistics
+    ) {
+        int steps = initialSteps;
         while (!pairs.isEmpty()) {
             if (steps >= maxSteps) {
                 return exhausted(basis, order, steps, statistics);
@@ -107,6 +198,17 @@ public final class BuchbergerAlgorithm {
         return pairs.size() <= maxPairs;
     }
 
+    private boolean requiresReduction(Polynomial polynomial, List<Monomial> leadingMonomials) {
+        for (Monomial monomial : polynomial.terms().keySet()) {
+            for (Monomial leadingMonomial : leadingMonomials) {
+                if (leadingMonomial.divides(monomial)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private boolean chainCriterionApplies(
         CriticalPair pair,
         List<Monomial> leadingMonomials,
@@ -145,7 +247,10 @@ public final class BuchbergerAlgorithm {
             statistics.pairsReduced,
             statistics.pairsSkippedByProductCriterion,
             statistics.pairsSkippedByChainCriterion,
-            statistics.maxPendingPairs
+            statistics.maxPendingPairs,
+            statistics.extensionGeneratorsConsidered,
+            statistics.extensionGeneratorsReduced,
+            statistics.extensionGeneratorsEliminated
         );
     }
 
@@ -164,8 +269,26 @@ public final class BuchbergerAlgorithm {
             statistics.pairsReduced,
             statistics.pairsSkippedByProductCriterion,
             statistics.pairsSkippedByChainCriterion,
-            statistics.maxPendingPairs
+            statistics.maxPendingPairs,
+            statistics.extensionGeneratorsConsidered,
+            statistics.extensionGeneratorsReduced,
+            statistics.extensionGeneratorsEliminated
         );
+    }
+
+    private List<Polynomial> normalizedPolynomials(List<Polynomial> polynomials, MonomialOrder order) {
+        return polynomials.stream()
+            .filter(polynomial -> !polynomial.isZero())
+            .map(polynomial -> polynomial.monic(order))
+            .distinct()
+            .sorted(basisComparator(order))
+            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
+    }
+
+    private List<Monomial> leadingMonomials(List<Polynomial> basis, MonomialOrder order) {
+        return basis.stream()
+            .map(polynomial -> polynomial.leadingTerm(order).orElseThrow().monomial())
+            .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
     }
 
     private Comparator<CriticalPair> pairComparator(MonomialOrder order) {
@@ -200,7 +323,10 @@ public final class BuchbergerAlgorithm {
         int pairsReduced,
         int pairsSkippedByProductCriterion,
         int pairsSkippedByChainCriterion,
-        int maxPendingPairs
+        int maxPendingPairs,
+        int extensionGeneratorsConsidered,
+        int extensionGeneratorsReduced,
+        int extensionGeneratorsEliminated
     ) {
     }
 
@@ -210,6 +336,9 @@ public final class BuchbergerAlgorithm {
         private int pairsSkippedByProductCriterion;
         private int pairsSkippedByChainCriterion;
         private int maxPendingPairs;
+        private int extensionGeneratorsConsidered;
+        private int extensionGeneratorsReduced;
+        private int extensionGeneratorsEliminated;
     }
 
     private record CriticalPair(int left, int right, Monomial lcm, int lcmDegree) {

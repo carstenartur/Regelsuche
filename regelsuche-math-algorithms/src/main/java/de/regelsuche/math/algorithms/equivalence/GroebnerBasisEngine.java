@@ -14,12 +14,40 @@ public final class GroebnerBasisEngine {
     }
 
     public BasisPreparation prepareIdeal(List<Polynomial> generators, int maxSteps, int maxPairs) {
-        BuchbergerAlgorithm.BasisComputation basis = buchberger.computeBasis(
-            generators,
-            order,
-            maxSteps,
-            maxPairs
+        return preparationFrom(
+            buchberger.computeBasis(generators, order, maxSteps, maxPairs),
+            0,
+            0
         );
+    }
+
+    public BasisPreparation extendIdeal(
+        BasisPreparation completedPreparation,
+        List<Polynomial> additionalGenerators,
+        int maxSteps,
+        int maxPairs
+    ) {
+        if (completedPreparation.budgetExhausted()) {
+            throw new IllegalArgumentException("only completed Gröbner bases can be extended incrementally");
+        }
+        return preparationFrom(
+            buchberger.extendBasis(
+                completedPreparation.basis(),
+                additionalGenerators,
+                order,
+                maxSteps,
+                maxPairs
+            ),
+            completedPreparation.basis().size(),
+            completedPreparation.reusablePreparationSteps()
+        );
+    }
+
+    private BasisPreparation preparationFrom(
+        BuchbergerAlgorithm.BasisComputation basis,
+        int incrementalBaseSize,
+        int reusableBaseSteps
+    ) {
         PolynomialReducer.PreparedBasis preparedReducers = basis.budgetExhausted()
             ? null
             : reducer.prepare(basis.basis(), order);
@@ -27,13 +55,18 @@ public final class GroebnerBasisEngine {
             basis.basis(),
             preparedReducers,
             basis.steps(),
+            reusableBaseSteps + basis.steps(),
             basis.budgetStatus(),
             basis.budgetExhausted(),
             basis.pairsConsidered(),
             basis.pairsReduced(),
             basis.pairsSkippedByProductCriterion(),
             basis.pairsSkippedByChainCriterion(),
-            basis.maxPendingPairs()
+            basis.maxPendingPairs(),
+            incrementalBaseSize,
+            basis.extensionGeneratorsConsidered(),
+            basis.extensionGeneratorsReduced(),
+            basis.extensionGeneratorsEliminated()
         );
     }
 
@@ -54,7 +87,9 @@ public final class GroebnerBasisEngine {
         boolean basisCacheHit
     ) {
         int basisPreparationSteps = basisCacheHit ? 0 : preparation.steps();
-        int basisPreparationStepsSaved = basisCacheHit ? preparation.steps() : 0;
+        int basisPreparationStepsSaved = basisCacheHit
+            ? preparation.reusablePreparationSteps()
+            : Math.max(0, preparation.reusablePreparationSteps() - preparation.steps());
         if (preparation.budgetExhausted()) {
             return result(
                 preparation,
@@ -155,7 +190,11 @@ public final class GroebnerBasisEngine {
             basisPreparationSteps,
             basisPreparationStepsSaved,
             queryReductionSteps,
-            interreductionSteps
+            interreductionSteps,
+            preparation.incrementalBaseSize(),
+            preparation.extensionGeneratorsConsidered(),
+            preparation.extensionGeneratorsReduced(),
+            preparation.extensionGeneratorsEliminated()
         );
     }
 
@@ -233,13 +272,18 @@ public final class GroebnerBasisEngine {
         List<Polynomial> basis,
         PolynomialReducer.PreparedBasis preparedReducers,
         int steps,
+        int reusablePreparationSteps,
         String budgetStatus,
         boolean budgetExhausted,
         int pairsConsidered,
         int pairsReduced,
         int pairsSkippedByProductCriterion,
         int pairsSkippedByChainCriterion,
-        int maxPendingPairs
+        int maxPendingPairs,
+        int incrementalBaseSize,
+        int extensionGeneratorsConsidered,
+        int extensionGeneratorsReduced,
+        int extensionGeneratorsEliminated
     ) {
         public BasisPreparation {
             basis = List.copyOf(basis);
@@ -264,7 +308,11 @@ public final class GroebnerBasisEngine {
         int basisPreparationSteps,
         int basisPreparationStepsSaved,
         int queryReductionSteps,
-        int interreductionSteps
+        int interreductionSteps,
+        int incrementalBaseSize,
+        int extensionGeneratorsConsidered,
+        int extensionGeneratorsReduced,
+        int extensionGeneratorsEliminated
     ) {
     }
 

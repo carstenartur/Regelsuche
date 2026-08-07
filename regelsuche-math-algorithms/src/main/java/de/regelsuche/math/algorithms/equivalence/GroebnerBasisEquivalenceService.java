@@ -3,11 +3,13 @@ package de.regelsuche.math.algorithms.equivalence;
 import de.regelsuche.equivalence.PolynomialEquivalenceService;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -133,10 +135,42 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         }
 
         IdealCacheKey cacheKey = idealCacheKey(generators);
+        long coldPairUpperBound = pairCount(cacheKey.canonicalGenerators().size());
         GroebnerBasisEngine.BasisPreparation preparation = basisCache.get(cacheKey);
+        ReuseDecision reuseDecision;
         boolean basisCacheHit = preparation != null;
-        if (!basisCacheHit) {
-            preparation = engine.prepareIdeal(generators, budget.maxSteps(), budget.maxStates());
+        if (basisCacheHit) {
+            reuseDecision = new ReuseDecision("EXACT_CACHE", 0, 0, coldPairUpperBound, "");
+        } else {
+            CachedBasis cachedSubset = basisCache.findBestExtensionBase(cacheKey);
+            if (cachedSubset == null) {
+                preparation = engine.prepareIdeal(generators, budget.maxSteps(), budget.maxStates());
+                reuseDecision = new ReuseDecision("COLD", 0, 0, coldPairUpperBound, "no-cached-subset");
+            } else if (cachedSubset.pairUpperBound() <= coldPairUpperBound) {
+                List<Polynomial> additionalGenerators = additionalGenerators(generators, cachedSubset.key());
+                preparation = engine.extendIdeal(
+                    cachedSubset.preparation(),
+                    additionalGenerators,
+                    budget.maxSteps(),
+                    budget.maxStates()
+                );
+                reuseDecision = new ReuseDecision(
+                    "INCREMENTAL_EXTENSION",
+                    cachedSubset.key().canonicalGenerators().size(),
+                    cachedSubset.pairUpperBound(),
+                    coldPairUpperBound,
+                    ""
+                );
+            } else {
+                preparation = engine.prepareIdeal(generators, budget.maxSteps(), budget.maxStates());
+                reuseDecision = new ReuseDecision(
+                    "COLD",
+                    0,
+                    cachedSubset.pairUpperBound(),
+                    coldPairUpperBound,
+                    "incremental-pair-upper-bound"
+                );
+            }
             if (!preparation.budgetExhausted()) {
                 basisCache.put(cacheKey, preparation);
             }
@@ -153,7 +187,7 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
                 MathematicalAlgorithmRegistry.ExecutionStatus.BUDGET_EXHAUSTED,
                 MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
                 "Gröbner basis computation exceeded budget",
-                resultPayload(result)
+                resultPayload(result, reuseDecision)
             );
             return Optional.empty();
         }
@@ -163,7 +197,7 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
             MathematicalAlgorithmRegistry.ExecutionStatus.SUCCESS,
             zero ? MathematicalAlgorithmRegistry.ResultType.PROOF : MathematicalAlgorithmRegistry.ResultType.REFUTATION,
             zero ? "polynomial reduces to 0 modulo Gröbner basis" : "non-zero remainder modulo Gröbner basis",
-            resultPayload(result)
+            resultPayload(result, reuseDecision)
         );
         return Optional.of(result.remainder().toCanonicalString(monomialOrder));
     }
@@ -178,7 +212,29 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         return new IdealCacheKey(monomialOrder.name(), canonicalGenerators);
     }
 
-    private Map<String, Object> resultPayload(GroebnerBasisEngine.EngineResult result) {
+    private List<Polynomial> additionalGenerators(List<Polynomial> generators, IdealCacheKey cachedKey) {
+        Set<String> cachedGenerators = new HashSet<>(cachedKey.canonicalGenerators());
+        Map<String, Polynomial> byCanonicalGenerator = new TreeMap<>();
+        for (Polynomial generator : generators) {
+            if (generator.isZero()) {
+                continue;
+            }
+            Polynomial monic = generator.monic(monomialOrder);
+            byCanonicalGenerator.putIfAbsent(monic.toCanonicalString(monomialOrder), monic);
+        }
+        List<Polynomial> additional = new ArrayList<>();
+        for (Map.Entry<String, Polynomial> entry : byCanonicalGenerator.entrySet()) {
+            if (!cachedGenerators.contains(entry.getKey())) {
+                additional.add(entry.getValue());
+            }
+        }
+        return List.copyOf(additional);
+    }
+
+    private Map<String, Object> resultPayload(
+        GroebnerBasisEngine.EngineResult result,
+        ReuseDecision reuseDecision
+    ) {
         Map<String, Object> payload = basePayload("");
         payload.put("basis", result.basis().stream().map(polynomial -> polynomial.toCanonicalString(monomialOrder)).toList());
         payload.put("reducedBasis", result.reducedBasis().stream()
@@ -195,8 +251,17 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         payload.put("pairsSkippedByChainCriterion", result.pairsSkippedByChainCriterion());
         payload.put("maxPendingPairs", result.maxPendingPairs());
         payload.put("basisCacheHit", result.basisCacheHit());
+        payload.put("basisReuseMode", reuseDecision.mode());
         payload.put("basisCacheSize", basisCache.size());
         payload.put("basisCacheCapacity", basisCache.capacity());
+        payload.put("incrementalBaseGeneratorCount", reuseDecision.baseGeneratorCount());
+        payload.put("incrementalBaseSize", result.incrementalBaseSize());
+        payload.put("incrementalCandidatePairUpperBound", reuseDecision.incrementalPairUpperBound());
+        payload.put("coldInitialPairUpperBound", reuseDecision.coldPairUpperBound());
+        payload.put("incrementalReuseRejectedReason", reuseDecision.rejectionReason());
+        payload.put("extensionGeneratorsConsidered", result.extensionGeneratorsConsidered());
+        payload.put("extensionGeneratorsReduced", result.extensionGeneratorsReduced());
+        payload.put("extensionGeneratorsEliminated", result.extensionGeneratorsEliminated());
         payload.put("basisPreparationSteps", result.basisPreparationSteps());
         payload.put("basisPreparationStepsSaved", result.basisPreparationStepsSaved());
         payload.put("queryReductionSteps", result.queryReductionSteps());
@@ -264,10 +329,34 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         return payload;
     }
 
+    private static long pairCount(int count) {
+        return count < 2 ? 0 : ((long) count * (count - 1)) / 2;
+    }
+
+    private static long incrementalPairUpperBound(int basisSize, int additionalGeneratorCount) {
+        return (long) basisSize * additionalGeneratorCount + pairCount(additionalGeneratorCount);
+    }
+
     private record IdealCacheKey(String monomialOrder, List<String> canonicalGenerators) {
         private IdealCacheKey {
             canonicalGenerators = List.copyOf(canonicalGenerators);
         }
+    }
+
+    private record CachedBasis(
+        IdealCacheKey key,
+        GroebnerBasisEngine.BasisPreparation preparation,
+        long pairUpperBound
+    ) {
+    }
+
+    private record ReuseDecision(
+        String mode,
+        int baseGeneratorCount,
+        long incrementalPairUpperBound,
+        long coldPairUpperBound,
+        String rejectionReason
+    ) {
     }
 
     private static final class BasisCache {
@@ -281,6 +370,60 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
 
         private synchronized GroebnerBasisEngine.BasisPreparation get(IdealCacheKey key) {
             return entries.get(key);
+        }
+
+        private synchronized CachedBasis findBestExtensionBase(IdealCacheKey target) {
+            IdealCacheKey bestKey = null;
+            GroebnerBasisEngine.BasisPreparation bestPreparation = null;
+            long bestPairUpperBound = Long.MAX_VALUE;
+            for (Map.Entry<IdealCacheKey, GroebnerBasisEngine.BasisPreparation> entry : entries.entrySet()) {
+                IdealCacheKey candidate = entry.getKey();
+                if (!candidate.monomialOrder().equals(target.monomialOrder())) {
+                    continue;
+                }
+                if (candidate.canonicalGenerators().size() >= target.canonicalGenerators().size()) {
+                    continue;
+                }
+                if (!isSortedSubset(candidate.canonicalGenerators(), target.canonicalGenerators())) {
+                    continue;
+                }
+                int additionalGeneratorCount = target.canonicalGenerators().size()
+                    - candidate.canonicalGenerators().size();
+                long pairUpperBound = incrementalPairUpperBound(
+                    entry.getValue().basis().size(),
+                    additionalGeneratorCount
+                );
+                if (bestKey == null
+                    || pairUpperBound < bestPairUpperBound
+                    || (pairUpperBound == bestPairUpperBound
+                        && candidate.canonicalGenerators().size() > bestKey.canonicalGenerators().size())) {
+                    bestKey = candidate;
+                    bestPreparation = entry.getValue();
+                    bestPairUpperBound = pairUpperBound;
+                }
+            }
+            if (bestKey == null) {
+                return null;
+            }
+            entries.get(bestKey);
+            return new CachedBasis(bestKey, bestPreparation, bestPairUpperBound);
+        }
+
+        private boolean isSortedSubset(List<String> candidate, List<String> target) {
+            int candidateIndex = 0;
+            int targetIndex = 0;
+            while (candidateIndex < candidate.size() && targetIndex < target.size()) {
+                int comparison = candidate.get(candidateIndex).compareTo(target.get(targetIndex));
+                if (comparison == 0) {
+                    candidateIndex++;
+                    targetIndex++;
+                } else if (comparison > 0) {
+                    targetIndex++;
+                } else {
+                    return false;
+                }
+            }
+            return candidateIndex == candidate.size();
         }
 
         private synchronized void put(IdealCacheKey key, GroebnerBasisEngine.BasisPreparation preparation) {
