@@ -1,5 +1,6 @@
 package de.regelsuche.math.algorithms.equivalence;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -8,7 +9,9 @@ public record Monomial(Map<String, Integer> powers) {
     public Monomial {
         TreeMap<String, Integer> normalized = new TreeMap<>();
         if (powers != null) {
-            powers.forEach((variable, exponent) -> {
+            for (Map.Entry<String, Integer> entry : powers.entrySet()) {
+                String variable = entry.getKey();
+                Integer exponent = entry.getValue();
                 if (variable == null || variable.isBlank()) {
                     throw new IllegalArgumentException("variable must not be blank");
                 }
@@ -18,9 +21,9 @@ public record Monomial(Map<String, Integer> powers) {
                 if (exponent > 0) {
                     normalized.put(variable, exponent);
                 }
-            });
+            }
         }
-        powers = Map.copyOf(normalized);
+        powers = Collections.unmodifiableMap(normalized);
     }
 
     public static Monomial constant() {
@@ -32,32 +35,72 @@ public record Monomial(Map<String, Integer> powers) {
     }
 
     public Monomial multiply(Monomial other) {
+        if (powers.isEmpty()) {
+            return other;
+        }
+        if (other.powers.isEmpty()) {
+            return this;
+        }
         Map<String, Integer> merged = new HashMap<>(powers);
-        other.powers.forEach((variable, exponent) -> merged.merge(variable, exponent, Integer::sum));
+        for (Map.Entry<String, Integer> entry : other.powers.entrySet()) {
+            merged.merge(entry.getKey(), entry.getValue(), Integer::sum);
+        }
         return new Monomial(merged);
     }
 
     public boolean divides(Monomial other) {
-        return powers.entrySet().stream()
-            .allMatch(entry -> other.exponentOf(entry.getKey()) >= entry.getValue());
+        if (powers.size() > other.powers.size()) {
+            return false;
+        }
+        for (Map.Entry<String, Integer> entry : powers.entrySet()) {
+            if (other.exponentOf(entry.getKey()) < entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public boolean isRelativelyPrimeTo(Monomial other) {
-        return powers.keySet().stream().noneMatch(variable -> other.exponentOf(variable) > 0);
+        Map<String, Integer> smaller = powers.size() <= other.powers.size() ? powers : other.powers;
+        Map<String, Integer> larger = smaller == powers ? other.powers : powers;
+        for (String variable : smaller.keySet()) {
+            if (larger.containsKey(variable)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public Monomial divideBy(Monomial divisor) {
         if (!divisor.divides(this)) {
             throw new ArithmeticException("monomial is not divisible by divisor");
         }
+        if (divisor.powers.isEmpty()) {
+            return this;
+        }
         Map<String, Integer> quotient = new HashMap<>(powers);
-        divisor.powers.forEach((variable, exponent) -> quotient.compute(variable, (ignored, current) -> current - exponent));
+        for (Map.Entry<String, Integer> entry : divisor.powers.entrySet()) {
+            int exponent = quotient.get(entry.getKey()) - entry.getValue();
+            if (exponent == 0) {
+                quotient.remove(entry.getKey());
+            } else {
+                quotient.put(entry.getKey(), exponent);
+            }
+        }
         return new Monomial(quotient);
     }
 
     public Monomial lcm(Monomial other) {
+        if (powers.isEmpty()) {
+            return other;
+        }
+        if (other.powers.isEmpty()) {
+            return this;
+        }
         Map<String, Integer> merged = new HashMap<>(powers);
-        other.powers.forEach((variable, exponent) -> merged.merge(variable, exponent, Math::max));
+        for (Map.Entry<String, Integer> entry : other.powers.entrySet()) {
+            merged.merge(entry.getKey(), entry.getValue(), Math::max);
+        }
         return new Monomial(merged);
     }
 
@@ -75,20 +118,24 @@ public record Monomial(Map<String, Integer> powers) {
     }
 
     public int totalDegree() {
-        return powers.values().stream().mapToInt(Integer::intValue).sum();
+        int degree = 0;
+        for (int exponent : powers.values()) {
+            degree += exponent;
+        }
+        return degree;
     }
 
     public String key() {
         StringBuilder builder = new StringBuilder();
-        new TreeMap<>(powers).forEach((name, exponent) -> {
+        for (Map.Entry<String, Integer> entry : powers.entrySet()) {
             if (builder.length() > 0) {
                 builder.append('*');
             }
-            builder.append(name);
-            if (exponent != 1) {
-                builder.append('^').append(exponent);
+            builder.append(entry.getKey());
+            if (entry.getValue() != 1) {
+                builder.append('^').append(entry.getValue());
             }
-        });
+        }
         return builder.toString();
     }
 }
