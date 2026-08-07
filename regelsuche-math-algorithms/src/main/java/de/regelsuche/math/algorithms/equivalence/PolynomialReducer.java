@@ -28,17 +28,17 @@ public final class PolynomialReducer {
             Optional<Reduction> reduction = firstReduction(currentLeadingTerm, preparedBasis);
             if (reduction.isPresent()) {
                 Reduction divisor = reduction.orElseThrow();
-                current = current.subtract(divisor.polynomial().multiply(
+                current = current.subtractMultiple(
+                    divisor.polynomial(),
                     currentLeadingTerm.monomial().divideBy(divisor.leadingTerm().monomial()),
                     currentLeadingTerm.coefficient().divide(divisor.leadingTerm().coefficient())
-                ));
+                );
             } else {
-                Polynomial leadingPolynomial = Polynomial.term(
+                remainder = remainder.addTerm(
                     currentLeadingTerm.monomial(),
                     currentLeadingTerm.coefficient()
                 );
-                remainder = remainder.add(leadingPolynomial);
-                current = current.subtract(leadingPolynomial);
+                current = current.withoutTerm(currentLeadingTerm.monomial());
             }
             steps++;
         }
