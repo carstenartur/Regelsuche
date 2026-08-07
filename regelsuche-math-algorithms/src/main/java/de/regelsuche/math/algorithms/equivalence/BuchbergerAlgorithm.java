@@ -11,20 +11,35 @@ public final class BuchbergerAlgorithm {
     private final PolynomialReducer reducer = new PolynomialReducer();
 
     public BasisComputation computeBasis(List<Polynomial> generators, MonomialOrder order, int maxSteps, int maxPairs) {
-        List<Polynomial> basis = normalizedPolynomials(generators, order);
-        List<Monomial> leadingMonomials = leadingMonomials(basis, order);
+        Statistics statistics = new Statistics();
+        PreprocessingResult preprocessing = preprocessGenerators(generators, order, maxSteps, statistics);
+        if (preprocessing.budgetExhausted()) {
+            return exhausted(preprocessing.basis(), order, preprocessing.steps(), statistics);
+        }
+
+        List<Polynomial> basis = preprocessing.basis();
+        List<Monomial> leadingMonomials = preprocessing.leadingMonomials();
         PriorityQueue<CriticalPair> pairs = new PriorityQueue<>(pairComparator(order));
         Set<PairKey> resolvedPairs = new HashSet<>();
-        Statistics statistics = new Statistics();
 
         for (int i = 0; i < basis.size(); i++) {
             for (int j = i + 1; j < basis.size(); j++) {
                 if (!enqueuePair(i, j, leadingMonomials, pairs, resolvedPairs, statistics, maxPairs)) {
-                    return exhausted(basis, order, 0, statistics);
+                    return exhausted(basis, order, preprocessing.steps(), statistics);
                 }
             }
         }
-        return processPairs(basis, leadingMonomials, pairs, resolvedPairs, order, 0, maxSteps, maxPairs, statistics);
+        return processPairs(
+            basis,
+            leadingMonomials,
+            pairs,
+            resolvedPairs,
+            order,
+            preprocessing.steps(),
+            maxSteps,
+            maxPairs,
+            statistics
+        );
     }
 
     public BasisComputation extendBasis(
@@ -35,10 +50,13 @@ public final class BuchbergerAlgorithm {
         int maxPairs
     ) {
         List<Polynomial> basis = normalizedPolynomials(completedBasis, order);
+        Set<Polynomial> basisSet = new HashSet<>(basis);
         List<Monomial> leadingMonomials = leadingMonomials(basis, order);
         PriorityQueue<CriticalPair> pairs = new PriorityQueue<>(pairComparator(order));
         Set<PairKey> resolvedPairs = new HashSet<>();
         Statistics statistics = new Statistics();
+        PolynomialReducer.PreparedBasis preparedBasis = null;
+        int preparedBasisSize = -1;
 
         // Every old-old pair belongs to a basis that was already completed, so it is safe
         // to treat those pairs as resolved for the chain criterion.
@@ -49,9 +67,9 @@ public final class BuchbergerAlgorithm {
         }
 
         int steps = 0;
-        for (Polynomial generator : normalizedPolynomials(additionalGenerators, order)) {
+        for (Polynomial generator : orderedMonicPolynomials(additionalGenerators, order)) {
             statistics.extensionGeneratorsConsidered++;
-            if (basis.contains(generator)) {
+            if (basisSet.contains(generator)) {
                 statistics.extensionGeneratorsEliminated++;
                 continue;
             }
@@ -59,10 +77,13 @@ public final class BuchbergerAlgorithm {
             Polynomial remainder = generator;
             if (requiresReduction(generator, leadingMonomials)) {
                 statistics.extensionGeneratorsReduced++;
+                if (preparedBasis == null || preparedBasisSize != basis.size()) {
+                    preparedBasis = reducer.prepare(basis, order);
+                    preparedBasisSize = basis.size();
+                }
                 PolynomialReducer.ReductionResult reduction = reducer.reduce(
                     generator,
-                    basis,
-                    order,
+                    preparedBasis,
                     Math.max(0, maxSteps - steps)
                 );
                 steps += reduction.steps();
@@ -77,7 +98,7 @@ public final class BuchbergerAlgorithm {
             }
 
             Polynomial monicRemainder = remainder.monic(order);
-            if (basis.contains(monicRemainder)) {
+            if (!basisSet.add(monicRemainder)) {
                 statistics.extensionGeneratorsEliminated++;
                 continue;
             }
@@ -112,6 +133,65 @@ public final class BuchbergerAlgorithm {
         );
     }
 
+    private PreprocessingResult preprocessGenerators(
+        List<Polynomial> generators,
+        MonomialOrder order,
+        int maxSteps,
+        Statistics statistics
+    ) {
+        List<Polynomial> basis = new ArrayList<>();
+        Set<Polynomial> basisSet = new HashSet<>();
+        List<Monomial> leadingMonomials = new ArrayList<>();
+        PolynomialReducer.PreparedBasis preparedBasis = null;
+        int preparedBasisSize = -1;
+        int steps = 0;
+
+        for (Polynomial generator : orderedMonicPolynomials(generators, order)) {
+            statistics.initialGeneratorsConsidered++;
+            if (basisSet.contains(generator)) {
+                statistics.initialGeneratorsEliminated++;
+                continue;
+            }
+
+            Polynomial remainder = generator;
+            if (requiresReduction(generator, leadingMonomials)) {
+                statistics.initialGeneratorsReduced++;
+                if (preparedBasis == null || preparedBasisSize != basis.size()) {
+                    preparedBasis = reducer.prepare(basis, order);
+                    preparedBasisSize = basis.size();
+                }
+                PolynomialReducer.ReductionResult reduction = reducer.reduce(
+                    generator,
+                    preparedBasis,
+                    Math.max(0, maxSteps - steps)
+                );
+                steps += reduction.steps();
+                if (reduction.budgetExhausted() || steps > maxSteps) {
+                    return new PreprocessingResult(
+                        basis,
+                        leadingMonomials,
+                        steps,
+                        true
+                    );
+                }
+                remainder = reduction.remainder();
+            }
+            if (remainder.isZero()) {
+                statistics.initialGeneratorsEliminated++;
+                continue;
+            }
+
+            Polynomial monicRemainder = remainder.monic(order);
+            if (!basisSet.add(monicRemainder)) {
+                statistics.initialGeneratorsEliminated++;
+                continue;
+            }
+            basis.add(monicRemainder);
+            leadingMonomials.add(monicRemainder.leadingTerm(order).orElseThrow().monomial());
+        }
+        return new PreprocessingResult(basis, leadingMonomials, steps, false);
+    }
+
     private BasisComputation processPairs(
         List<Polynomial> basis,
         List<Monomial> leadingMonomials,
@@ -124,6 +204,8 @@ public final class BuchbergerAlgorithm {
         Statistics statistics
     ) {
         int steps = initialSteps;
+        PolynomialReducer.PreparedBasis preparedBasis = null;
+        int preparedBasisSize = -1;
         while (!pairs.isEmpty()) {
             if (steps >= maxSteps) {
                 return exhausted(basis, order, steps, statistics);
@@ -140,10 +222,13 @@ public final class BuchbergerAlgorithm {
                 basis.get(pair.right()),
                 order
             );
+            if (preparedBasis == null || preparedBasisSize != basis.size()) {
+                preparedBasis = reducer.prepare(basis, order);
+                preparedBasisSize = basis.size();
+            }
             PolynomialReducer.ReductionResult reduction = reducer.reduce(
                 sPolynomial,
-                basis,
-                order,
+                preparedBasis,
                 maxSteps - steps
             );
             statistics.pairsReduced++;
@@ -248,6 +333,9 @@ public final class BuchbergerAlgorithm {
             statistics.pairsSkippedByProductCriterion,
             statistics.pairsSkippedByChainCriterion,
             statistics.maxPendingPairs,
+            statistics.initialGeneratorsConsidered,
+            statistics.initialGeneratorsReduced,
+            statistics.initialGeneratorsEliminated,
             statistics.extensionGeneratorsConsidered,
             statistics.extensionGeneratorsReduced,
             statistics.extensionGeneratorsEliminated
@@ -270,18 +358,29 @@ public final class BuchbergerAlgorithm {
             statistics.pairsSkippedByProductCriterion,
             statistics.pairsSkippedByChainCriterion,
             statistics.maxPendingPairs,
+            statistics.initialGeneratorsConsidered,
+            statistics.initialGeneratorsReduced,
+            statistics.initialGeneratorsEliminated,
             statistics.extensionGeneratorsConsidered,
             statistics.extensionGeneratorsReduced,
             statistics.extensionGeneratorsEliminated
         );
     }
 
-    private List<Polynomial> normalizedPolynomials(List<Polynomial> polynomials, MonomialOrder order) {
+    private List<Polynomial> orderedMonicPolynomials(List<Polynomial> polynomials, MonomialOrder order) {
         return polynomials.stream()
             .filter(polynomial -> !polynomial.isZero())
             .map(polynomial -> polynomial.monic(order))
+            .sorted(Comparator
+                .comparingInt((Polynomial polynomial) -> polynomial.leadingTerm(order)
+                    .orElseThrow().monomial().totalDegree())
+                .thenComparing(basisComparator(order)))
+            .toList();
+    }
+
+    private List<Polynomial> normalizedPolynomials(List<Polynomial> polynomials, MonomialOrder order) {
+        return orderedMonicPolynomials(polynomials, order).stream()
             .distinct()
-            .sorted(basisComparator(order))
             .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
     }
 
@@ -324,6 +423,9 @@ public final class BuchbergerAlgorithm {
         int pairsSkippedByProductCriterion,
         int pairsSkippedByChainCriterion,
         int maxPendingPairs,
+        int initialGeneratorsConsidered,
+        int initialGeneratorsReduced,
+        int initialGeneratorsEliminated,
         int extensionGeneratorsConsidered,
         int extensionGeneratorsReduced,
         int extensionGeneratorsEliminated
@@ -336,9 +438,20 @@ public final class BuchbergerAlgorithm {
         private int pairsSkippedByProductCriterion;
         private int pairsSkippedByChainCriterion;
         private int maxPendingPairs;
+        private int initialGeneratorsConsidered;
+        private int initialGeneratorsReduced;
+        private int initialGeneratorsEliminated;
         private int extensionGeneratorsConsidered;
         private int extensionGeneratorsReduced;
         private int extensionGeneratorsEliminated;
+    }
+
+    private record PreprocessingResult(
+        List<Polynomial> basis,
+        List<Monomial> leadingMonomials,
+        int steps,
+        boolean budgetExhausted
+    ) {
     }
 
     private record CriticalPair(int left, int right, Monomial lcm, int lcmDegree) {
