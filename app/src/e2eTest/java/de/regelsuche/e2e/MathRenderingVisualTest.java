@@ -41,6 +41,7 @@ class MathRenderingVisualTest {
     static final double DEVICE_SCALE_FACTOR = 1.0;
     static final String LOCALE = "en-US";
     static final String TIMEZONE_ID = "UTC";
+    static final int GRAPH_OVERLAY_STABLE_MILLIS = 250;
 
     private static RegelsucheAppEnvironment app;
     private static Playwright playwright;
@@ -114,10 +115,6 @@ class MathRenderingVisualTest {
     void searchGraphOverlayMatchesBaseline() throws IOException {
         openDemo("binomial");
         openInteractiveGraph();
-        page.waitForSelector(".graph-overlay-layer .graph-node-math .katex",
-            new Page.WaitForSelectorOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
         ScreenshotDiffUtil.assertMatchesBaseline(
             page.locator(".graph-overlay-layer .graph-node-math").first(),
             "search-graph-overlay");
@@ -128,10 +125,6 @@ class MathRenderingVisualTest {
     void inspectorMatchesBaseline() throws IOException {
         openDemo("binomial");
         openInteractiveGraph();
-        page.waitForSelector(".graph-overlay-layer .graph-node-math .katex",
-            new Page.WaitForSelectorOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(15_000));
         page.evaluate("() => { const cy = window.__cyForTests; if (cy && cy.nodes().length) { cy.nodes()[0].emit('tap'); } }");
         page.waitForSelector("#graphInspector .graph-inspector-math .katex",
             new Page.WaitForSelectorOptions()
@@ -224,5 +217,33 @@ class MathRenderingVisualTest {
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(15_000));
         assertTrue(page.locator("#graphCanvas").isVisible());
+        page.waitForSelector(".graph-overlay-layer .graph-node-math .katex",
+            new Page.WaitForSelectorOptions()
+                .setState(WaitForSelectorState.VISIBLE)
+                .setTimeout(15_000));
+        waitForGraphOverlayToSettle();
+    }
+
+    private void waitForGraphOverlayToSettle() {
+        page.waitForFunction(
+            "settleMillis => {"
+                + " const host = document.querySelector("
+                + "   '.graph-overlay-layer .graph-node-math');"
+                + " if (!host || !host.querySelector('.katex')) return false;"
+                + " const rect = host.getBoundingClientRect();"
+                + " const style = window.getComputedStyle(host);"
+                + " const signature = [style.transform, style.opacity,"
+                + "   rect.left.toFixed(3), rect.top.toFixed(3),"
+                + "   rect.width.toFixed(3), rect.height.toFixed(3)].join('|');"
+                + " const now = performance.now();"
+                + " const state = window.__regelsucheVisualOverlayStability;"
+                + " if (!state || state.signature !== signature) {"
+                + "   window.__regelsucheVisualOverlayStability = { signature, since: now };"
+                + "   return false;"
+                + " }"
+                + " return now - state.since >= settleMillis;"
+                + "}",
+            GRAPH_OVERLAY_STABLE_MILLIS,
+            new Page.WaitForFunctionOptions().setTimeout(15_000));
     }
 }
