@@ -6,12 +6,64 @@ import de.regelsuche.ast.FunctionExpr;
 import de.regelsuche.ast.NumberExpr;
 import de.regelsuche.ast.VariableExpr;
 import de.regelsuche.parse.ExpressionParser;
+import java.util.LinkedHashMap;
 import java.util.Optional;
 
 final class PolynomialArithmetic {
+    private static final int DEFAULT_PARSE_CACHE_CAPACITY = 2_048;
     private final ExpressionParser parser = new ExpressionParser();
+    private final int parseCacheCapacity;
+    private final LinkedHashMap<String, Optional<Polynomial>> parseCache =
+        new LinkedHashMap<>(64, 0.75f, true);
+
+    PolynomialArithmetic() {
+        this(DEFAULT_PARSE_CACHE_CAPACITY);
+    }
+
+    PolynomialArithmetic(int parseCacheCapacity) {
+        if (parseCacheCapacity < 0) {
+            throw new IllegalArgumentException("parseCacheCapacity must be non-negative");
+        }
+        this.parseCacheCapacity = parseCacheCapacity;
+    }
 
     Optional<Polynomial> parse(String expression) {
+        if (parseCacheCapacity == 0) {
+            return parseUncached(expression);
+        }
+        synchronized (parseCache) {
+            Optional<Polynomial> cached = parseCache.get(expression);
+            if (cached != null) {
+                return cached;
+            }
+        }
+
+        Optional<Polynomial> parsed = parseUncached(expression);
+        synchronized (parseCache) {
+            Optional<Polynomial> cached = parseCache.get(expression);
+            if (cached != null) {
+                return cached;
+            }
+            parseCache.put(expression, parsed);
+            while (parseCache.size() > parseCacheCapacity) {
+                String eldest = parseCache.keySet().iterator().next();
+                parseCache.remove(eldest);
+            }
+            return parsed;
+        }
+    }
+
+    int parseCacheSize() {
+        synchronized (parseCache) {
+            return parseCache.size();
+        }
+    }
+
+    int parseCacheCapacity() {
+        return parseCacheCapacity;
+    }
+
+    private Optional<Polynomial> parseUncached(String expression) {
         try {
             Expr expr = parser.parseTerm(expression);
             return asPolynomial(expr);
