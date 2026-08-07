@@ -34,8 +34,8 @@ import java.util.Set;
 
 <span class="fc" id="L35">        int steps = 0;</span>
 <span class="fc bfc" id="L36" title="All 2 branches covered.">        while (!pairs.isEmpty()) {</span>
-<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (steps &gt;= maxSteps) {</span>
-<span class="nc" id="L38">                return exhausted(basis, order, steps, statistics);</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            if (steps &gt;= maxSteps) {</span>
+<span class="fc" id="L38">                return exhausted(basis, order, steps, statistics);</span>
             }
 <span class="fc" id="L40">            CriticalPair pair = pairs.remove();</span>
 <span class="fc bfc" id="L41" title="All 2 branches covered.">            if (chainCriterionApplies(pair, leadingMonomials, resolvedPairs)) {</span>
@@ -155,8 +155,8 @@ import java.util.Set;
         int steps,
         Statistics statistics
     ) {
-<span class="nc" id="L158">        return new BasisComputation(</span>
-<span class="nc" id="L159">            orderedBasis(basis, order),</span>
+<span class="fc" id="L158">        return new BasisComputation(</span>
+<span class="fc" id="L159">            orderedBasis(basis, order),</span>
             steps,
             true,
             &quot;BUDGET_EXHAUSTED&quot;,

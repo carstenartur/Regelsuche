@@ -6,75 +6,100 @@ import java.util.List;
 import java.util.Optional;
 
 <span class="fc" id="L8">public final class PolynomialReducer {</span>
+    public PreparedBasis prepare(List&lt;Polynomial&gt; basis, MonomialOrder order) {
+<span class="fc" id="L10">        return new PreparedBasis(indexedReducers(basis, order), order);</span>
+    }
+
     public ReductionResult reduce(Polynomial polynomial, List&lt;Polynomial&gt; basis, MonomialOrder order, int maxSteps) {
-<span class="fc" id="L10">        Polynomial remainder = Polynomial.zero();</span>
-<span class="fc" id="L11">        Polynomial current = polynomial;</span>
-<span class="fc" id="L12">        List&lt;Reduction&gt; reducers = indexedReducers(basis, order);</span>
-<span class="fc" id="L13">        int steps = 0;</span>
-<span class="fc bfc" id="L14" title="All 2 branches covered.">        while (!current.isZero()) {</span>
-<span class="fc bfc" id="L15" title="All 2 branches covered.">            if (steps &gt;= maxSteps) {</span>
-<span class="fc" id="L16">                return new ReductionResult(remainder, steps, true);</span>
+<span class="fc" id="L14">        return reduce(polynomial, prepare(basis, order), maxSteps);</span>
+    }
+
+    public ReductionResult reduce(Polynomial polynomial, PreparedBasis preparedBasis, int maxSteps) {
+<span class="fc" id="L18">        Polynomial remainder = Polynomial.zero();</span>
+<span class="fc" id="L19">        Polynomial current = polynomial;</span>
+<span class="fc" id="L20">        int steps = 0;</span>
+<span class="fc bfc" id="L21" title="All 2 branches covered.">        while (!current.isZero()) {</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            if (steps &gt;= maxSteps) {</span>
+<span class="fc" id="L23">                return new ReductionResult(remainder, steps, true);</span>
             }
-<span class="fc" id="L18">            Term currentLeadingTerm = current.leadingTerm(order).orElseThrow();</span>
-<span class="fc" id="L19">            Optional&lt;Reduction&gt; reduction = firstReduction(currentLeadingTerm, reducers);</span>
-<span class="fc bfc" id="L20" title="All 2 branches covered.">            if (reduction.isPresent()) {</span>
-<span class="fc" id="L21">                Reduction divisor = reduction.orElseThrow();</span>
-<span class="fc" id="L22">                current = current.subtract(divisor.polynomial().multiply(</span>
-<span class="fc" id="L23">                    currentLeadingTerm.monomial().divideBy(divisor.leadingTerm().monomial()),</span>
-<span class="fc" id="L24">                    currentLeadingTerm.coefficient().divide(divisor.leadingTerm().coefficient())</span>
+<span class="fc" id="L25">            Term currentLeadingTerm = current.leadingTerm(preparedBasis.order()).orElseThrow();</span>
+<span class="fc" id="L26">            Optional&lt;Reduction&gt; reduction = firstReduction(currentLeadingTerm, preparedBasis.reducers());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">            if (reduction.isPresent()) {</span>
+<span class="fc" id="L28">                Reduction divisor = reduction.orElseThrow();</span>
+<span class="fc" id="L29">                current = current.subtract(divisor.polynomial().multiply(</span>
+<span class="fc" id="L30">                    currentLeadingTerm.monomial().divideBy(divisor.leadingTerm().monomial()),</span>
+<span class="fc" id="L31">                    currentLeadingTerm.coefficient().divide(divisor.leadingTerm().coefficient())</span>
                 ));
-<span class="fc" id="L26">            } else {</span>
-<span class="fc" id="L27">                Polynomial leadingPolynomial = Polynomial.term(</span>
-<span class="fc" id="L28">                    currentLeadingTerm.monomial(),</span>
-<span class="fc" id="L29">                    currentLeadingTerm.coefficient()</span>
+<span class="fc" id="L33">            } else {</span>
+<span class="fc" id="L34">                Polynomial leadingPolynomial = Polynomial.term(</span>
+<span class="fc" id="L35">                    currentLeadingTerm.monomial(),</span>
+<span class="fc" id="L36">                    currentLeadingTerm.coefficient()</span>
                 );
-<span class="fc" id="L31">                remainder = remainder.add(leadingPolynomial);</span>
-<span class="fc" id="L32">                current = current.subtract(leadingPolynomial);</span>
+<span class="fc" id="L38">                remainder = remainder.add(leadingPolynomial);</span>
+<span class="fc" id="L39">                current = current.subtract(leadingPolynomial);</span>
             }
-<span class="fc" id="L34">            steps++;</span>
-<span class="fc" id="L35">        }</span>
-<span class="fc" id="L36">        return new ReductionResult(remainder, steps, false);</span>
+<span class="fc" id="L41">            steps++;</span>
+<span class="fc" id="L42">        }</span>
+<span class="fc" id="L43">        return new ReductionResult(remainder, steps, false);</span>
     }
 
     public Polynomial sPolynomial(Polynomial left, Polynomial right, MonomialOrder order) {
-<span class="fc" id="L40">        Term leftTerm = left.leadingTerm(order).orElseThrow();</span>
-<span class="fc" id="L41">        Term rightTerm = right.leadingTerm(order).orElseThrow();</span>
-<span class="fc" id="L42">        Monomial lcm = leftTerm.monomial().lcm(rightTerm.monomial());</span>
-<span class="fc" id="L43">        Monomial leftMultiplier = lcm.divideBy(leftTerm.monomial());</span>
-<span class="fc" id="L44">        Monomial rightMultiplier = lcm.divideBy(rightTerm.monomial());</span>
-<span class="fc" id="L45">        Polynomial normalizedLeft = left.multiply(leftMultiplier, Rational.ONE.divide(leftTerm.coefficient()));</span>
-<span class="fc" id="L46">        Polynomial normalizedRight = right.multiply(rightMultiplier, Rational.ONE.divide(rightTerm.coefficient()));</span>
-<span class="fc" id="L47">        return normalizedLeft.subtract(normalizedRight);</span>
+<span class="fc" id="L47">        Term leftTerm = left.leadingTerm(order).orElseThrow();</span>
+<span class="fc" id="L48">        Term rightTerm = right.leadingTerm(order).orElseThrow();</span>
+<span class="fc" id="L49">        Monomial lcm = leftTerm.monomial().lcm(rightTerm.monomial());</span>
+<span class="fc" id="L50">        Monomial leftMultiplier = lcm.divideBy(leftTerm.monomial());</span>
+<span class="fc" id="L51">        Monomial rightMultiplier = lcm.divideBy(rightTerm.monomial());</span>
+<span class="fc" id="L52">        Polynomial normalizedLeft = left.multiply(leftMultiplier, Rational.ONE.divide(leftTerm.coefficient()));</span>
+<span class="fc" id="L53">        Polynomial normalizedRight = right.multiply(rightMultiplier, Rational.ONE.divide(rightTerm.coefficient()));</span>
+<span class="fc" id="L54">        return normalizedLeft.subtract(normalizedRight);</span>
     }
 
     private List&lt;Reduction&gt; indexedReducers(List&lt;Polynomial&gt; basis, MonomialOrder order) {
-<span class="fc" id="L51">        List&lt;Reduction&gt; reductions = new ArrayList&lt;&gt;();</span>
-<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (Polynomial polynomial : basis) {</span>
-<span class="pc bpc" id="L53" title="1 of 2 branches missed.">            if (!polynomial.isZero()) {</span>
-<span class="fc" id="L54">                reductions.add(new Reduction(polynomial, polynomial.leadingTerm(order).orElseThrow()));</span>
+<span class="fc" id="L58">        List&lt;Reduction&gt; reductions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (Polynomial polynomial : basis) {</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            if (!polynomial.isZero()) {</span>
+<span class="fc" id="L61">                reductions.add(new Reduction(polynomial, polynomial.leadingTerm(order).orElseThrow()));</span>
             }
-<span class="fc" id="L56">        }</span>
-<span class="fc" id="L57">        reductions.sort(Comparator</span>
-<span class="fc" id="L58">            .comparing((Reduction reduction) -&gt; reduction.leadingTerm().monomial(), order)</span>
-<span class="fc" id="L59">            .thenComparing(reduction -&gt; reduction.polynomial().toCanonicalString(order)));</span>
-<span class="fc" id="L60">        return List.copyOf(reductions);</span>
+<span class="fc" id="L63">        }</span>
+<span class="fc" id="L64">        reductions.sort(Comparator</span>
+<span class="fc" id="L65">            .comparing((Reduction reduction) -&gt; reduction.leadingTerm().monomial(), order)</span>
+<span class="fc" id="L66">            .thenComparing(reduction -&gt; reduction.polynomial().toCanonicalString(order)));</span>
+<span class="fc" id="L67">        return List.copyOf(reductions);</span>
     }
 
     private Optional&lt;Reduction&gt; firstReduction(Term leadingTerm, List&lt;Reduction&gt; reducers) {
-<span class="fc" id="L64">        int leadingDegree = leadingTerm.monomial().totalDegree();</span>
-<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (Reduction reduction : reducers) {</span>
-<span class="fc" id="L66">            Monomial divisor = reduction.leadingTerm().monomial();</span>
-<span class="fc bfc" id="L67" title="All 4 branches covered.">            if (divisor.totalDegree() &lt;= leadingDegree &amp;&amp; divisor.divides(leadingTerm.monomial())) {</span>
-<span class="fc" id="L68">                return Optional.of(reduction);</span>
+<span class="fc" id="L71">        int leadingDegree = leadingTerm.monomial().totalDegree();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (Reduction reduction : reducers) {</span>
+<span class="fc" id="L73">            Monomial divisor = reduction.leadingTerm().monomial();</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">            if (divisor.totalDegree() &lt;= leadingDegree &amp;&amp; divisor.divides(leadingTerm.monomial())) {</span>
+<span class="fc" id="L75">                return Optional.of(reduction);</span>
             }
-<span class="fc" id="L70">        }</span>
-<span class="fc" id="L71">        return Optional.empty();</span>
+<span class="fc" id="L77">        }</span>
+<span class="fc" id="L78">        return Optional.empty();</span>
     }
 
-<span class="fc" id="L74">    public record ReductionResult(Polynomial remainder, int steps, boolean budgetExhausted) {</span>
+<span class="fc" id="L81">    public record ReductionResult(Polynomial remainder, int steps, boolean budgetExhausted) {</span>
     }
 
-<span class="fc" id="L77">    private record Reduction(Polynomial polynomial, Term leadingTerm) {</span>
+    public static final class PreparedBasis {
+        private final List&lt;Reduction&gt; reducers;
+        private final MonomialOrder order;
+
+<span class="fc" id="L88">        private PreparedBasis(List&lt;Reduction&gt; reducers, MonomialOrder order) {</span>
+<span class="fc" id="L89">            this.reducers = reducers;</span>
+<span class="fc" id="L90">            this.order = order;</span>
+<span class="fc" id="L91">        }</span>
+
+        private List&lt;Reduction&gt; reducers() {
+<span class="fc" id="L94">            return reducers;</span>
+        }
+
+        private MonomialOrder order() {
+<span class="fc" id="L98">            return order;</span>
+        }
+    }
+
+<span class="fc" id="L102">    private record Reduction(Polynomial polynomial, Term leadingTerm) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
