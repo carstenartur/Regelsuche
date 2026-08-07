@@ -1,0 +1,1278 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvolutionRewriteProgramCheckpointArtifact.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">EvolutionRewriteProgramCheckpointArtifact.java</span></div><h1>EvolutionRewriteProgramCheckpointArtifact.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.CandidateEvaluation;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.GenerationOutcome;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.GenerationReport;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.LineageEdge;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.MutationRejection;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.PopulationCheckpoint;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import de.regelsuche.json.JsonWriter;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Durable, manifest-bound persistence for TRAIN-only rewrite-program population
+ * checkpoints.
+ *
+ * &lt;p&gt;The population engine remains the authority for checkpoint semantics. This
+ * class adds only a strict process-independent byte boundary. The canonical
+ * checkpoint header and the complete resumable state are committed atomically;
+ * the manifest is written last, so its absence denotes an incomplete export.&lt;/p&gt;
+ */
+<span class="fc" id="L54">public final class EvolutionRewriteProgramCheckpointArtifact {</span>
+    public static final String MANIFEST_SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-checkpoint-artifact/v1&quot;;
+    public static final String STATE_SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-checkpoint-state/v1&quot;;
+    public static final String COMMIT_PROTOCOL = &quot;MANIFEST_LAST_ATOMIC_RENAME&quot;;
+    public static final String MANIFEST_FILE_NAME = &quot;checkpoint-artifact-manifest.json&quot;;
+    public static final String CHECKPOINT_FILE_NAME = &quot;checkpoint.json&quot;;
+    public static final String STATE_FILE_NAME = &quot;state.json&quot;;
+    private static final long MAX_MANIFEST_BYTES = 256L * 1024L;
+    private static final long MAX_PAYLOAD_BYTES = 32L * 1024L * 1024L;
+<span class="fc" id="L65">    private static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L66">        JsonFactory.builder()</span>
+<span class="fc" id="L67">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L68">            .build())</span>
+<span class="fc" id="L69">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);</span>
+<span class="fc" id="L70">    private static final EvolutionGenomeCodec GENOME_CODEC = new EvolutionGenomeCodec();</span>
+<span class="fc" id="L71">    private static final EvolutionRewriteProgramPlanCodec PLAN_CODEC =</span>
+        new EvolutionRewriteProgramPlanCodec();
+
+    public CheckpointArtifactManifest write(
+        Path outputDirectory,
+        PopulationCheckpoint checkpoint
+    ) {
+<span class="fc" id="L78">        Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L79">        Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+
+<span class="fc" id="L81">        CheckpointState state = CheckpointState.create(checkpoint);</span>
+<span class="fc" id="L82">        List&lt;Payload&gt; payloads = List.of(</span>
+<span class="fc" id="L83">            payload(</span>
+                ArtifactRole.CHECKPOINT,
+<span class="fc" id="L85">                checkpoint.contentHash(),</span>
+<span class="fc" id="L86">                checkpoint.toCanonicalJson()),</span>
+<span class="fc" id="L87">            payload(</span>
+                ArtifactRole.STATE,
+<span class="fc" id="L89">                state.contentHash(),</span>
+<span class="fc" id="L90">                state.toCanonicalJson()));</span>
+<span class="fc" id="L91">        CheckpointArtifactManifest manifest = CheckpointArtifactManifest.create(</span>
+<span class="fc" id="L92">            checkpoint.contentHash(),</span>
+<span class="fc" id="L93">            state.contentHash(),</span>
+<span class="fc" id="L94">            payloads.stream().map(Payload::artifact).toList());</span>
+
+<span class="fc" id="L96">        Path directory = outputDirectory.toAbsolutePath().normalize();</span>
+        try {
+<span class="fc" id="L98">            requireSafeAncestry(directory);</span>
+<span class="fc" id="L99">            Files.createDirectories(directory);</span>
+<span class="fc" id="L100">            requireSafeAncestry(directory);</span>
+<span class="fc" id="L101">            requireOnlyKnownEntries(directory, false);</span>
+<span class="fc" id="L102">            Files.deleteIfExists(directory.resolve(MANIFEST_FILE_NAME));</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            for (Payload value : payloads.stream()</span>
+<span class="fc" id="L104">                    .sorted(Comparator.comparing(item -&gt; item.artifact().fileName()))</span>
+<span class="fc" id="L105">                    .toList()) {</span>
+<span class="fc" id="L106">                atomicWrite(</span>
+<span class="fc" id="L107">                    directory.resolve(value.artifact().fileName()),</span>
+<span class="fc" id="L108">                    value.content());</span>
+<span class="fc" id="L109">            }</span>
+<span class="fc" id="L110">            atomicWrite(</span>
+<span class="fc" id="L111">                directory.resolve(MANIFEST_FILE_NAME),</span>
+<span class="fc" id="L112">                manifest.toCanonicalJson());</span>
+<span class="fc" id="L113">            requireOnlyKnownEntries(directory, true);</span>
+<span class="fc" id="L114">            return manifest;</span>
+<span class="nc" id="L115">        } catch (IOException exception) {</span>
+<span class="nc" id="L116">            throw new UncheckedIOException(</span>
+                &quot;Could not commit rewrite-program checkpoint artifact&quot;,
+                exception);
+        }
+    }
+
+    public LoadedCheckpoint read(Path inputDirectory) {
+<span class="fc" id="L123">        Objects.requireNonNull(inputDirectory, &quot;inputDirectory&quot;);</span>
+<span class="fc" id="L124">        Path directory = inputDirectory.toAbsolutePath().normalize();</span>
+        try {
+<span class="fc" id="L126">            requireSafeAncestry(directory);</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (!Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L128">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint artifact directory does not exist&quot;);
+            }
+<span class="fc" id="L131">            requireOnlyKnownEntries(directory, true);</span>
+
+<span class="fc" id="L133">            String manifestJson = readUtf8Bounded(</span>
+<span class="fc" id="L134">                directory.resolve(MANIFEST_FILE_NAME),</span>
+                MAX_MANIFEST_BYTES);
+<span class="fc" id="L136">            CheckpointArtifactManifest manifest = parseManifest(manifestJson);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            if (!manifest.toCanonicalJson().equals(manifestJson)) {</span>
+<span class="nc" id="L138">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint artifact manifest is not canonical&quot;);
+            }
+
+<span class="fc" id="L142">            Map&lt;ArtifactRole, String&gt; payloads = new EnumMap&lt;&gt;(ArtifactRole.class);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            for (CheckpointArtifact artifact : manifest.artifacts()) {</span>
+<span class="fc" id="L144">                String text = readUtf8Bounded(</span>
+<span class="fc" id="L145">                    directory.resolve(artifact.fileName()),</span>
+                    MAX_PAYLOAD_BYTES);
+<span class="fc" id="L147">                byte[] bytes = text.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">                if (bytes.length != artifact.byteLength()</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">                        || !sha256(bytes).equals(artifact.byteHash())) {</span>
+<span class="fc" id="L150">                    throw new IllegalArgumentException(</span>
+                        &quot;checkpoint artifact bytes do not match manifest for &quot;
+<span class="fc" id="L152">                            + artifact.fileName());</span>
+                }
+<span class="fc" id="L154">                payloads.put(artifact.role(), text);</span>
+<span class="fc" id="L155">            }</span>
+
+<span class="fc" id="L157">            String checkpointJson = requiredPayload(payloads, ArtifactRole.CHECKPOINT);</span>
+<span class="fc" id="L158">            CheckpointHeader header = parseCheckpointHeader(checkpointJson);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (!manifest.checkpointHash().equals(header.contentHash())) {</span>
+<span class="nc" id="L160">                throw new IllegalArgumentException(</span>
+                    &quot;manifest checkpoint root does not match checkpoint payload&quot;);
+            }
+<span class="fc" id="L163">            requireRoleRoot(</span>
+<span class="fc" id="L164">                manifest.artifacts(), ArtifactRole.CHECKPOINT, header.contentHash());</span>
+
+<span class="fc" id="L166">            String stateJson = requiredPayload(payloads, ArtifactRole.STATE);</span>
+<span class="fc" id="L167">            CheckpointState state = parseState(stateJson);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (!manifest.stateHash().equals(state.contentHash())) {</span>
+<span class="nc" id="L169">                throw new IllegalArgumentException(</span>
+                    &quot;manifest state root does not match state payload&quot;);
+            }
+<span class="fc" id="L172">            requireRoleRoot(</span>
+<span class="fc" id="L173">                manifest.artifacts(), ArtifactRole.STATE, state.contentHash());</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (!header.contentHash().equals(state.checkpointHash())) {</span>
+<span class="nc" id="L175">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint state does not bind the checkpoint root&quot;);
+            }
+<span class="fc" id="L178">            requireCheckpointBinding(header, state);</span>
+
+<span class="fc" id="L180">            PopulationCheckpoint checkpoint = new PopulationCheckpoint(</span>
+<span class="fc" id="L181">                header.schema(),</span>
+<span class="fc" id="L182">                header.studyPlanHash(),</span>
+<span class="fc" id="L183">                header.trainSuiteHash(),</span>
+<span class="fc" id="L184">                header.mutationCatalogHash(),</span>
+<span class="fc" id="L185">                header.seedCandidateHashes(),</span>
+<span class="fc" id="L186">                header.completedGeneration(),</span>
+<span class="fc" id="L187">                state.candidates().stream()</span>
+<span class="fc" id="L188">                    .map(PopulationCandidate::candidate)</span>
+<span class="fc" id="L189">                    .toList(),</span>
+<span class="fc" id="L190">                state.evaluations(),</span>
+<span class="fc" id="L191">                state.generationReports(),</span>
+<span class="fc" id="L192">                header.mutationAttempts(),</span>
+<span class="fc" id="L193">                header.trainEvaluations(),</span>
+<span class="fc" id="L194">                header.validationStatus(),</span>
+<span class="fc" id="L195">                header.finalTestStatus(),</span>
+<span class="fc" id="L196">                header.contentHash());</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            if (!checkpoint.toCanonicalJson().equals(checkpointJson)) {</span>
+<span class="nc" id="L198">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint payload is not canonical&quot;);
+            }
+<span class="fc" id="L201">            return new LoadedCheckpoint(checkpoint, manifest);</span>
+<span class="nc" id="L202">        } catch (IOException exception) {</span>
+<span class="nc" id="L203">            throw new IllegalArgumentException(</span>
+                &quot;Could not read rewrite-program checkpoint artifact&quot;,
+                exception);
+        }
+    }
+
+    private static void requireCheckpointBinding(
+        CheckpointHeader header,
+        CheckpointState state
+    ) {
+<span class="fc" id="L213">        List&lt;String&gt; populationHashes = state.candidates().stream()</span>
+<span class="fc" id="L214">            .map(PopulationCandidate::candidateHash)</span>
+<span class="fc" id="L215">            .toList();</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!header.populationCandidateHashes().equals(populationHashes)) {</span>
+<span class="nc" id="L217">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint population roots do not match durable state&quot;);
+        }
+<span class="fc" id="L220">        List&lt;String&gt; evaluationHashes = state.evaluations().stream()</span>
+<span class="fc" id="L221">            .map(CandidateEvaluation::contentHash)</span>
+<span class="fc" id="L222">            .toList();</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (!header.evaluationHashes().equals(evaluationHashes)) {</span>
+<span class="nc" id="L224">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint evaluation roots do not match durable state&quot;);
+        }
+<span class="fc" id="L227">        List&lt;String&gt; generationHashes = state.generationReports().stream()</span>
+<span class="fc" id="L228">            .map(GenerationReport::contentHash)</span>
+<span class="fc" id="L229">            .toList();</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (!header.generationReportHashes().equals(generationHashes)) {</span>
+<span class="nc" id="L231">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint generation roots do not match durable state&quot;);
+        }
+<span class="fc" id="L234">    }</span>
+
+    private static Payload payload(
+        ArtifactRole role,
+        String sourceContentHash,
+        String content
+    ) {
+<span class="fc" id="L241">        byte[] bytes = Objects.requireNonNull(content, &quot;content&quot;)</span>
+<span class="fc" id="L242">            .getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L243">        return new Payload(</span>
+            new CheckpointArtifact(
+<span class="fc" id="L245">                role.fileName(),</span>
+                role,
+                sourceContentHash,
+<span class="fc" id="L248">                sha256(bytes),</span>
+                bytes.length),
+            content);
+    }
+
+    private static String requiredPayload(
+        Map&lt;ArtifactRole, String&gt; payloads,
+        ArtifactRole role
+    ) {
+<span class="fc" id="L257">        String value = payloads.get(role);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L259">            throw new IllegalArgumentException(</span>
+                &quot;missing checkpoint artifact payload for &quot; + role);
+        }
+<span class="fc" id="L262">        return value;</span>
+    }
+
+    private static CheckpointHeader parseCheckpointHeader(String json) {
+        try {
+<span class="fc" id="L267">            ObjectNode root = object(JSON.readTree(json), &quot;checkpoint&quot;);</span>
+<span class="fc" id="L268">            requireExactFields(root, Set.of(</span>
+                &quot;schema&quot;,
+                &quot;studyPlanHash&quot;,
+                &quot;trainSuiteHash&quot;,
+                &quot;mutationCatalogHash&quot;,
+                &quot;seedCandidateHashes&quot;,
+                &quot;completedGeneration&quot;,
+                &quot;populationCandidateHashes&quot;,
+                &quot;evaluationHashes&quot;,
+                &quot;generationReportHashes&quot;,
+                &quot;mutationAttempts&quot;,
+                &quot;trainEvaluations&quot;,
+                &quot;validationStatus&quot;,
+                &quot;finalTestStatus&quot;,
+                &quot;contentHash&quot;), &quot;checkpoint&quot;);
+<span class="fc" id="L283">            return new CheckpointHeader(</span>
+<span class="fc" id="L284">                text(root, &quot;schema&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L285">                text(root, &quot;studyPlanHash&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L286">                text(root, &quot;trainSuiteHash&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L287">                text(root, &quot;mutationCatalogHash&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L288">                strings(root, &quot;seedCandidateHashes&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L289">                integer(root, &quot;completedGeneration&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L290">                strings(root, &quot;populationCandidateHashes&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L291">                strings(root, &quot;evaluationHashes&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L292">                strings(root, &quot;generationReportHashes&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L293">                integer(root, &quot;mutationAttempts&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L294">                integer(root, &quot;trainEvaluations&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L295">                text(root, &quot;validationStatus&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L296">                text(root, &quot;finalTestStatus&quot;, &quot;checkpoint&quot;),</span>
+<span class="fc" id="L297">                text(root, &quot;contentHash&quot;, &quot;checkpoint&quot;));</span>
+<span class="nc" id="L298">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L299">            throw new IllegalArgumentException(&quot;Invalid checkpoint JSON&quot;, exception);</span>
+        }
+    }
+
+    private static CheckpointState parseState(String json) {
+        try {
+<span class="fc" id="L305">            ObjectNode root = object(JSON.readTree(json), &quot;checkpoint state&quot;);</span>
+<span class="fc" id="L306">            requireExactFields(root, Set.of(</span>
+                &quot;schema&quot;,
+                &quot;checkpointHash&quot;,
+                &quot;candidates&quot;,
+                &quot;evaluations&quot;,
+                &quot;generationReports&quot;,
+                &quot;contentHash&quot;), &quot;checkpoint state&quot;);
+
+<span class="fc" id="L314">            List&lt;PopulationCandidate&gt; candidates = parseCandidates(</span>
+<span class="fc" id="L315">                required(root, &quot;candidates&quot;, &quot;checkpoint state&quot;));</span>
+<span class="fc" id="L316">            List&lt;CandidateEvaluation&gt; evaluations = parseEvaluations(</span>
+<span class="fc" id="L317">                required(root, &quot;evaluations&quot;, &quot;checkpoint state&quot;));</span>
+<span class="fc" id="L318">            List&lt;GenerationReport&gt; generations = parseGenerations(</span>
+<span class="fc" id="L319">                required(root, &quot;generationReports&quot;, &quot;checkpoint state&quot;),</span>
+                evaluations);
+<span class="fc" id="L321">            CheckpointState state = new CheckpointState(</span>
+<span class="fc" id="L322">                text(root, &quot;schema&quot;, &quot;checkpoint state&quot;),</span>
+<span class="fc" id="L323">                text(root, &quot;checkpointHash&quot;, &quot;checkpoint state&quot;),</span>
+                candidates,
+                evaluations,
+                generations,
+<span class="fc" id="L327">                text(root, &quot;contentHash&quot;, &quot;checkpoint state&quot;));</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (!state.toCanonicalJson().equals(json)) {</span>
+<span class="nc" id="L329">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint state payload is not canonical&quot;);
+            }
+<span class="fc" id="L332">            return state;</span>
+<span class="nc" id="L333">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L334">            throw new IllegalArgumentException(</span>
+                &quot;Invalid checkpoint state JSON&quot;, exception);
+        }
+    }
+
+    private static List&lt;PopulationCandidate&gt; parseCandidates(JsonNode values) {
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (!values.isArray()) {</span>
+<span class="nc" id="L341">            throw new IllegalArgumentException(&quot;checkpoint candidates must be an array&quot;);</span>
+        }
+<span class="fc" id="L343">        List&lt;PopulationCandidate&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        for (JsonNode value : values) {</span>
+<span class="fc" id="L345">            ObjectNode item = object(value, &quot;checkpoint candidate&quot;);</span>
+<span class="fc" id="L346">            requireExactFields(item, Set.of(</span>
+                &quot;candidateHash&quot;,
+                &quot;alphaStructuralHash&quot;,
+                &quot;genomeJson&quot;,
+                &quot;planJson&quot;), &quot;checkpoint candidate&quot;);
+<span class="fc" id="L351">            result.add(new PopulationCandidate(</span>
+<span class="fc" id="L352">                text(item, &quot;candidateHash&quot;, &quot;checkpoint candidate&quot;),</span>
+<span class="fc" id="L353">                text(item, &quot;alphaStructuralHash&quot;, &quot;checkpoint candidate&quot;),</span>
+<span class="fc" id="L354">                text(item, &quot;genomeJson&quot;, &quot;checkpoint candidate&quot;),</span>
+<span class="fc" id="L355">                text(item, &quot;planJson&quot;, &quot;checkpoint candidate&quot;)));</span>
+<span class="fc" id="L356">        }</span>
+<span class="fc" id="L357">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;CandidateEvaluation&gt; parseEvaluations(JsonNode values) {
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if (!values.isArray()) {</span>
+<span class="nc" id="L362">            throw new IllegalArgumentException(&quot;checkpoint evaluations must be an array&quot;);</span>
+        }
+<span class="fc" id="L364">        List&lt;CandidateEvaluation&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        for (JsonNode value : values) {</span>
+<span class="fc" id="L366">            ObjectNode item = object(value, &quot;candidate evaluation&quot;);</span>
+<span class="fc" id="L367">            requireExactFields(item, Set.of(</span>
+                &quot;candidateHash&quot;,
+                &quot;alphaStructuralHash&quot;,
+                &quot;rawComponents&quot;,
+                &quot;blockers&quot;,
+                &quot;scalarFitness&quot;,
+                &quot;evidenceHash&quot;,
+                &quot;contentHash&quot;), &quot;candidate evaluation&quot;);
+<span class="fc" id="L375">            ObjectNode components = object(</span>
+<span class="fc" id="L376">                required(item, &quot;rawComponents&quot;, &quot;candidate evaluation&quot;),</span>
+                &quot;candidate evaluation rawComponents&quot;);
+<span class="fc" id="L378">            Map&lt;FitnessComponent, Integer&gt; raw = new EnumMap&lt;&gt;(FitnessComponent.class);</span>
+<span class="fc" id="L379">            Iterator&lt;Map.Entry&lt;String, JsonNode&gt;&gt; fields = components.fields();</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            while (fields.hasNext()) {</span>
+<span class="fc" id="L381">                Map.Entry&lt;String, JsonNode&gt; field = fields.next();</span>
+<span class="fc" id="L382">                FitnessComponent component = enumValue(</span>
+<span class="fc" id="L383">                    FitnessComponent.class, field.getKey());</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                if (!field.getValue().isIntegralNumber()</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">                        || !field.getValue().canConvertToInt()) {</span>
+<span class="nc" id="L386">                    throw new IllegalArgumentException(</span>
+                        &quot;fitness component value must be an integer&quot;);
+                }
+<span class="fc" id="L389">                raw.put(component, field.getValue().intValue());</span>
+<span class="fc" id="L390">            }</span>
+<span class="fc" id="L391">            result.add(new CandidateEvaluation(</span>
+<span class="fc" id="L392">                text(item, &quot;candidateHash&quot;, &quot;candidate evaluation&quot;),</span>
+<span class="fc" id="L393">                text(item, &quot;alphaStructuralHash&quot;, &quot;candidate evaluation&quot;),</span>
+                raw,
+<span class="fc" id="L395">                strings(item, &quot;blockers&quot;, &quot;candidate evaluation&quot;),</span>
+<span class="fc" id="L396">                integer(item, &quot;scalarFitness&quot;, &quot;candidate evaluation&quot;),</span>
+<span class="fc" id="L397">                nullableText(item, &quot;evidenceHash&quot;, &quot;candidate evaluation&quot;),</span>
+<span class="fc" id="L398">                text(item, &quot;contentHash&quot;, &quot;candidate evaluation&quot;)));</span>
+<span class="fc" id="L399">        }</span>
+<span class="fc" id="L400">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;GenerationReport&gt; parseGenerations(
+        JsonNode values,
+        List&lt;CandidateEvaluation&gt; evaluations
+    ) {
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">        if (!values.isArray()) {</span>
+<span class="nc" id="L408">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint generationReports must be an array&quot;);
+        }
+<span class="fc" id="L411">        Map&lt;String, CandidateEvaluation&gt; byHash = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L412">        evaluations.forEach(value -&gt; byHash.put(value.contentHash(), value));</span>
+<span class="fc" id="L413">        List&lt;GenerationReport&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        for (JsonNode value : values) {</span>
+<span class="fc" id="L415">            ObjectNode item = object(value, &quot;generation report&quot;);</span>
+<span class="fc" id="L416">            requireExactFields(item, Set.of(</span>
+                &quot;schema&quot;,
+                &quot;generation&quot;,
+                &quot;evaluationHashes&quot;,
+                &quot;selectedCandidateHashes&quot;,
+                &quot;lineage&quot;,
+                &quot;rejections&quot;,
+                &quot;distinctAlphaStructures&quot;,
+                &quot;cumulativeMutationAttempts&quot;,
+                &quot;cumulativeTrainEvaluations&quot;,
+                &quot;outcome&quot;,
+                &quot;contentHash&quot;), &quot;generation report&quot;);
+<span class="fc" id="L428">            List&lt;CandidateEvaluation&gt; retained = strings(</span>
+<span class="fc" id="L429">                item, &quot;evaluationHashes&quot;, &quot;generation report&quot;).stream()</span>
+<span class="fc" id="L430">                .map(hash -&gt; {</span>
+<span class="fc" id="L431">                    CandidateEvaluation evaluation = byHash.get(hash);</span>
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">                    if (evaluation == null) {</span>
+<span class="nc" id="L433">                        throw new IllegalArgumentException(</span>
+                            &quot;generation references unknown evaluation: &quot; + hash);
+                    }
+<span class="fc" id="L436">                    return evaluation;</span>
+                })
+<span class="fc" id="L438">                .toList();</span>
+<span class="fc" id="L439">            result.add(new GenerationReport(</span>
+<span class="fc" id="L440">                text(item, &quot;schema&quot;, &quot;generation report&quot;),</span>
+<span class="fc" id="L441">                integer(item, &quot;generation&quot;, &quot;generation report&quot;),</span>
+                retained,
+<span class="fc" id="L443">                strings(item, &quot;selectedCandidateHashes&quot;, &quot;generation report&quot;),</span>
+<span class="fc" id="L444">                parseLineage(required(item, &quot;lineage&quot;, &quot;generation report&quot;)),</span>
+<span class="fc" id="L445">                parseRejections(required(item, &quot;rejections&quot;, &quot;generation report&quot;)),</span>
+<span class="fc" id="L446">                integer(item, &quot;distinctAlphaStructures&quot;, &quot;generation report&quot;),</span>
+<span class="fc" id="L447">                integer(item, &quot;cumulativeMutationAttempts&quot;, &quot;generation report&quot;),</span>
+<span class="fc" id="L448">                integer(item, &quot;cumulativeTrainEvaluations&quot;, &quot;generation report&quot;),</span>
+<span class="fc" id="L449">                enumValue(</span>
+                    GenerationOutcome.class,
+<span class="fc" id="L451">                    text(item, &quot;outcome&quot;, &quot;generation report&quot;)),</span>
+<span class="fc" id="L452">                text(item, &quot;contentHash&quot;, &quot;generation report&quot;)));</span>
+<span class="fc" id="L453">        }</span>
+<span class="fc" id="L454">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;LineageEdge&gt; parseLineage(JsonNode values) {
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">        if (!values.isArray()) {</span>
+<span class="nc" id="L459">            throw new IllegalArgumentException(&quot;generation lineage must be an array&quot;);</span>
+        }
+<span class="fc" id="L461">        List&lt;LineageEdge&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">        for (JsonNode value : values) {</span>
+<span class="fc" id="L463">            ObjectNode item = object(value, &quot;lineage edge&quot;);</span>
+<span class="fc" id="L464">            requireExactFields(item, Set.of(</span>
+                &quot;parentCandidateHash&quot;,
+                &quot;childCandidateHash&quot;,
+                &quot;childPlanHash&quot;,
+                &quot;childAlphaStructuralHash&quot;,
+                &quot;mutationKind&quot;,
+                &quot;proposalKey&quot;), &quot;lineage edge&quot;);
+<span class="fc" id="L471">            result.add(new LineageEdge(</span>
+<span class="fc" id="L472">                text(item, &quot;parentCandidateHash&quot;, &quot;lineage edge&quot;),</span>
+<span class="fc" id="L473">                text(item, &quot;childCandidateHash&quot;, &quot;lineage edge&quot;),</span>
+<span class="fc" id="L474">                text(item, &quot;childPlanHash&quot;, &quot;lineage edge&quot;),</span>
+<span class="fc" id="L475">                text(item, &quot;childAlphaStructuralHash&quot;, &quot;lineage edge&quot;),</span>
+<span class="fc" id="L476">                enumValue(</span>
+                    EvolutionRewriteProgramMutationKind.class,
+<span class="fc" id="L478">                    text(item, &quot;mutationKind&quot;, &quot;lineage edge&quot;)),</span>
+<span class="fc" id="L479">                text(item, &quot;proposalKey&quot;, &quot;lineage edge&quot;)));</span>
+<span class="fc" id="L480">        }</span>
+<span class="fc" id="L481">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;MutationRejection&gt; parseRejections(JsonNode values) {
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">        if (!values.isArray()) {</span>
+<span class="nc" id="L486">            throw new IllegalArgumentException(&quot;generation rejections must be an array&quot;);</span>
+        }
+<span class="fc" id="L488">        List&lt;MutationRejection&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        for (JsonNode value : values) {</span>
+<span class="fc" id="L490">            ObjectNode item = object(value, &quot;mutation rejection&quot;);</span>
+<span class="fc" id="L491">            requireExactFields(item, Set.of(</span>
+                &quot;parentCandidateHash&quot;,
+                &quot;mutationKind&quot;,
+                &quot;proposalKey&quot;,
+                &quot;childPlanHash&quot;,
+                &quot;childAlphaStructuralHash&quot;,
+                &quot;blockers&quot;), &quot;mutation rejection&quot;);
+<span class="fc" id="L498">            result.add(new MutationRejection(</span>
+<span class="fc" id="L499">                text(item, &quot;parentCandidateHash&quot;, &quot;mutation rejection&quot;),</span>
+<span class="fc" id="L500">                enumValue(</span>
+                    EvolutionRewriteProgramMutationKind.class,
+<span class="fc" id="L502">                    text(item, &quot;mutationKind&quot;, &quot;mutation rejection&quot;)),</span>
+<span class="fc" id="L503">                text(item, &quot;proposalKey&quot;, &quot;mutation rejection&quot;),</span>
+<span class="fc" id="L504">                nullableText(item, &quot;childPlanHash&quot;, &quot;mutation rejection&quot;),</span>
+<span class="fc" id="L505">                nullableText(item, &quot;childAlphaStructuralHash&quot;, &quot;mutation rejection&quot;),</span>
+<span class="fc" id="L506">                strings(item, &quot;blockers&quot;, &quot;mutation rejection&quot;)));</span>
+<span class="fc" id="L507">        }</span>
+<span class="fc" id="L508">        return List.copyOf(result);</span>
+    }
+
+    private static CheckpointArtifactManifest parseManifest(String json) {
+        try {
+<span class="fc" id="L513">            ObjectNode root = object(JSON.readTree(json), &quot;checkpoint artifact manifest&quot;);</span>
+<span class="fc" id="L514">            requireExactFields(root, Set.of(</span>
+                &quot;schema&quot;,
+                &quot;checkpointHash&quot;,
+                &quot;stateHash&quot;,
+                &quot;artifacts&quot;,
+                &quot;commitProtocol&quot;,
+                &quot;contentHash&quot;), &quot;checkpoint artifact manifest&quot;);
+<span class="fc" id="L521">            JsonNode values = required(root, &quot;artifacts&quot;, &quot;checkpoint artifact manifest&quot;);</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            if (!values.isArray()) {</span>
+<span class="nc" id="L523">                throw new IllegalArgumentException(&quot;manifest artifacts must be an array&quot;);</span>
+            }
+<span class="fc" id="L525">            List&lt;CheckpointArtifact&gt; artifacts = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">            for (JsonNode value : values) {</span>
+<span class="fc" id="L527">                ObjectNode item = object(value, &quot;checkpoint artifact&quot;);</span>
+<span class="fc" id="L528">                requireExactFields(item, Set.of(</span>
+                    &quot;fileName&quot;,
+                    &quot;role&quot;,
+                    &quot;sourceContentHash&quot;,
+                    &quot;byteHash&quot;,
+                    &quot;byteLength&quot;), &quot;checkpoint artifact&quot;);
+<span class="fc" id="L534">                artifacts.add(new CheckpointArtifact(</span>
+<span class="fc" id="L535">                    text(item, &quot;fileName&quot;, &quot;checkpoint artifact&quot;),</span>
+<span class="fc" id="L536">                    enumValue(</span>
+                        ArtifactRole.class,
+<span class="fc" id="L538">                        text(item, &quot;role&quot;, &quot;checkpoint artifact&quot;)),</span>
+<span class="fc" id="L539">                    text(item, &quot;sourceContentHash&quot;, &quot;checkpoint artifact&quot;),</span>
+<span class="fc" id="L540">                    text(item, &quot;byteHash&quot;, &quot;checkpoint artifact&quot;),</span>
+<span class="fc" id="L541">                    longInteger(item, &quot;byteLength&quot;, &quot;checkpoint artifact&quot;)));</span>
+<span class="fc" id="L542">            }</span>
+<span class="fc" id="L543">            return new CheckpointArtifactManifest(</span>
+<span class="fc" id="L544">                text(root, &quot;schema&quot;, &quot;checkpoint artifact manifest&quot;),</span>
+<span class="fc" id="L545">                text(root, &quot;checkpointHash&quot;, &quot;checkpoint artifact manifest&quot;),</span>
+<span class="fc" id="L546">                text(root, &quot;stateHash&quot;, &quot;checkpoint artifact manifest&quot;),</span>
+                artifacts,
+<span class="fc" id="L548">                text(root, &quot;commitProtocol&quot;, &quot;checkpoint artifact manifest&quot;),</span>
+<span class="fc" id="L549">                text(root, &quot;contentHash&quot;, &quot;checkpoint artifact manifest&quot;));</span>
+<span class="nc" id="L550">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L551">            throw new IllegalArgumentException(</span>
+                &quot;Invalid checkpoint artifact manifest JSON&quot;, exception);
+        }
+    }
+
+    private static void requireOnlyKnownEntries(
+        Path directory,
+        boolean complete
+    ) throws IOException {
+<span class="fc" id="L560">        Set&lt;String&gt; allowed = Set.of(</span>
+            CHECKPOINT_FILE_NAME,
+            STATE_FILE_NAME,
+            MANIFEST_FILE_NAME);
+<span class="fc" id="L564">        Set&lt;String&gt; actual = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L565">        try (var entries = Files.list(directory)) {</span>
+<span class="fc" id="L566">            entries.forEach(path -&gt; {</span>
+<span class="fc" id="L567">                String name = path.getFileName().toString();</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">                if (!allowed.contains(name)) {</span>
+<span class="fc" id="L569">                    throw new IllegalArgumentException(</span>
+                        &quot;unexpected checkpoint artifact file: &quot; + name);
+                }
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">                if (Files.isSymbolicLink(path)</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">                        || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L574">                    throw new IllegalArgumentException(</span>
+                        &quot;checkpoint artifact entry must be a regular non-symlink file: &quot;
+                            + name);
+                }
+<span class="fc" id="L578">                actual.add(name);</span>
+<span class="fc" id="L579">            });</span>
+        }
+<span class="fc bfc" id="L581" title="All 4 branches covered.">        if (complete &amp;&amp; !actual.equals(allowed)) {</span>
+<span class="fc" id="L582">            Set&lt;String&gt; missing = new HashSet&lt;&gt;(allowed);</span>
+<span class="fc" id="L583">            missing.removeAll(actual);</span>
+<span class="fc" id="L584">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact is incomplete; missing=&quot; + missing);
+        }
+<span class="fc" id="L587">    }</span>
+
+    private static void requireSafeAncestry(Path path) {
+<span class="fc" id="L590">        Path absolute = path.toAbsolutePath().normalize();</span>
+<span class="fc" id="L591">        Path current = absolute.getRoot();</span>
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">        if (current == null) {</span>
+<span class="nc" id="L593">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact path must have a filesystem root&quot;);
+        }
+<span class="fc bfc" id="L596" title="All 2 branches covered.">        for (Path component : absolute) {</span>
+<span class="fc" id="L597">            current = current.resolve(component);</span>
+<span class="fc bfc" id="L598" title="All 2 branches covered.">            if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)</span>
+<span class="pc bpc" id="L599" title="1 of 2 branches missed.">                    &amp;&amp; Files.isSymbolicLink(current)) {</span>
+<span class="nc" id="L600">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint artifact path must not traverse symbolic links&quot;);
+            }
+<span class="fc" id="L603">        }</span>
+<span class="fc" id="L604">    }</span>
+
+    private static String readUtf8Bounded(Path file, long maxBytes) throws IOException {
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">        if (Files.isSymbolicLink(file)</span>
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">                || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {</span>
+<span class="nc" id="L609">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact payload must be a regular non-symlink file&quot;);
+        }
+<span class="fc" id="L612">        long size = Files.size(file);</span>
+<span class="pc bpc" id="L613" title="2 of 4 branches missed.">        if (size &lt;= 0L || size &gt; maxBytes) {</span>
+<span class="nc" id="L614">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact payload size is outside the allowed bound&quot;);
+        }
+<span class="fc" id="L617">        byte[] bytes = Files.readAllBytes(file);</span>
+<span class="pc bpc" id="L618" title="1 of 2 branches missed.">        if (bytes.length != size) {</span>
+<span class="nc" id="L619">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact payload changed while reading&quot;);
+        }
+        try {
+<span class="fc" id="L623">            return StandardCharsets.UTF_8.newDecoder()</span>
+<span class="fc" id="L624">                .onMalformedInput(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L625">                .onUnmappableCharacter(CodingErrorAction.REPORT)</span>
+<span class="fc" id="L626">                .decode(ByteBuffer.wrap(bytes))</span>
+<span class="fc" id="L627">                .toString();</span>
+<span class="nc" id="L628">        } catch (CharacterCodingException exception) {</span>
+<span class="nc" id="L629">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact payload is not valid UTF-8&quot;, exception);
+        }
+    }
+
+    private static void atomicWrite(Path target, String content) throws IOException {
+<span class="fc" id="L635">        Path directory = target.getParent();</span>
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">        if (directory == null) {</span>
+<span class="nc" id="L637">            throw new IOException(&quot;checkpoint artifact target requires a parent directory&quot;);</span>
+        }
+<span class="fc" id="L639">        Path temporary = Files.createTempFile(</span>
+            directory,
+<span class="fc" id="L641">            &quot;.&quot; + target.getFileName() + &quot;.&quot;,</span>
+            &quot;.tmp&quot;);
+        try {
+<span class="fc" id="L644">            Files.writeString(</span>
+                temporary,
+                content,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+<span class="fc" id="L650">            try (FileChannel channel = FileChannel.open(</span>
+                    temporary, StandardOpenOption.WRITE)) {
+<span class="fc" id="L652">                channel.force(true);</span>
+            }
+<span class="fc" id="L654">            Files.move(</span>
+                temporary,
+                target,
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+<span class="fc" id="L660">            Files.deleteIfExists(temporary);</span>
+        }
+<span class="fc" id="L662">    }</span>
+
+    private static String sha256(byte[] bytes) {
+        try {
+<span class="fc" id="L666">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;).digest(bytes);</span>
+<span class="fc" id="L667">            return &quot;sha256:&quot; + java.util.HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L668">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L669">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static ObjectNode object(JsonNode value, String context) {
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">        if (!(value instanceof ObjectNode object)) {</span>
+<span class="nc" id="L675">            throw new IllegalArgumentException(context + &quot; must be an object&quot;);</span>
+        }
+<span class="fc" id="L677">        return object;</span>
+    }
+
+    private static JsonNode required(
+        ObjectNode object,
+        String field,
+        String context
+    ) {
+<span class="fc" id="L685">        JsonNode value = object.get(field);</span>
+<span class="pc bpc" id="L686" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L687">            throw new IllegalArgumentException(context + &quot;.&quot; + field + &quot; is required&quot;);</span>
+        }
+<span class="fc" id="L689">        return value;</span>
+    }
+
+    private static String text(
+        ObjectNode object,
+        String field,
+        String context
+    ) {
+<span class="fc" id="L697">        JsonNode value = required(object, field, context);</span>
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">        if (!value.isTextual()) {</span>
+<span class="nc" id="L699">            throw new IllegalArgumentException(context + &quot;.&quot; + field + &quot; must be a string&quot;);</span>
+        }
+<span class="fc" id="L701">        return value.textValue();</span>
+    }
+
+    private static String nullableText(
+        ObjectNode object,
+        String field,
+        String context
+    ) {
+<span class="fc" id="L709">        JsonNode value = required(object, field, context);</span>
+<span class="pc bpc" id="L710" title="1 of 2 branches missed.">        if (value.isNull()) {</span>
+<span class="nc" id="L711">            return null;</span>
+        }
+<span class="pc bpc" id="L713" title="1 of 2 branches missed.">        if (!value.isTextual()) {</span>
+<span class="nc" id="L714">            throw new IllegalArgumentException(</span>
+                context + &quot;.&quot; + field + &quot; must be a string or null&quot;);
+        }
+<span class="fc" id="L717">        return value.textValue();</span>
+    }
+
+    private static int integer(
+        ObjectNode object,
+        String field,
+        String context
+    ) {
+<span class="fc" id="L725">        JsonNode value = required(object, field, context);</span>
+<span class="pc bpc" id="L726" title="2 of 4 branches missed.">        if (!value.isIntegralNumber() || !value.canConvertToInt()) {</span>
+<span class="nc" id="L727">            throw new IllegalArgumentException(context + &quot;.&quot; + field + &quot; must be an integer&quot;);</span>
+        }
+<span class="fc" id="L729">        return value.intValue();</span>
+    }
+
+    private static long longInteger(
+        ObjectNode object,
+        String field,
+        String context
+    ) {
+<span class="fc" id="L737">        JsonNode value = required(object, field, context);</span>
+<span class="pc bpc" id="L738" title="2 of 4 branches missed.">        if (!value.isIntegralNumber() || !value.canConvertToLong()) {</span>
+<span class="nc" id="L739">            throw new IllegalArgumentException(context + &quot;.&quot; + field + &quot; must be an integer&quot;);</span>
+        }
+<span class="fc" id="L741">        return value.longValue();</span>
+    }
+
+    private static List&lt;String&gt; strings(
+        ObjectNode object,
+        String field,
+        String context
+    ) {
+<span class="fc" id="L749">        JsonNode value = required(object, field, context);</span>
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">        if (!value.isArray()) {</span>
+<span class="nc" id="L751">            throw new IllegalArgumentException(context + &quot;.&quot; + field + &quot; must be an array&quot;);</span>
+        }
+<span class="fc" id="L753">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">        for (JsonNode item : value) {</span>
+<span class="pc bpc" id="L755" title="1 of 2 branches missed.">            if (!item.isTextual()) {</span>
+<span class="nc" id="L756">                throw new IllegalArgumentException(</span>
+                    context + &quot;.&quot; + field + &quot; must contain strings&quot;);
+            }
+<span class="fc" id="L759">            result.add(item.textValue());</span>
+<span class="fc" id="L760">        }</span>
+<span class="fc" id="L761">        return List.copyOf(result);</span>
+    }
+
+    private static void requireExactFields(
+        ObjectNode object,
+        Set&lt;String&gt; expected,
+        String context
+    ) {
+<span class="fc" id="L769">        Set&lt;String&gt; actual = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc" id="L770">        object.fieldNames().forEachRemaining(actual::add);</span>
+<span class="pc bpc" id="L771" title="3 of 4 branches missed.">        if (!actual.equals(expected) &amp;&amp; !Set.copyOf(actual).equals(expected)) {</span>
+<span class="nc" id="L772">            Set&lt;String&gt; missing = new LinkedHashSet&lt;&gt;(expected);</span>
+<span class="nc" id="L773">            missing.removeAll(actual);</span>
+<span class="nc" id="L774">            Set&lt;String&gt; unexpected = new LinkedHashSet&lt;&gt;(actual);</span>
+<span class="nc" id="L775">            unexpected.removeAll(expected);</span>
+<span class="nc" id="L776">            throw new IllegalArgumentException(</span>
+                context + &quot; fields differ; missing=&quot; + missing
+                    + &quot;, unexpected=&quot; + unexpected);
+        }
+<span class="fc" id="L780">    }</span>
+
+    private static &lt;E extends Enum&lt;E&gt;&gt; E enumValue(
+        Class&lt;E&gt; type,
+        String value
+    ) {
+        try {
+<span class="fc" id="L787">            return Enum.valueOf(type, value);</span>
+<span class="nc" id="L788">        } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L789">            throw new IllegalArgumentException(</span>
+<span class="nc" id="L790">                &quot;Unsupported &quot; + type.getSimpleName() + &quot;: &quot; + value,</span>
+                exception);
+        }
+    }
+
+    private static List&lt;String&gt; orderedUniqueHashes(
+        List&lt;String&gt; values,
+        boolean requireNonEmpty,
+        String name
+    ) {
+<span class="pc bpc" id="L800" title="1 of 2 branches missed.">        List&lt;String&gt; result = values == null ? List.of() : List.copyOf(values);</span>
+<span class="pc bpc" id="L801" title="2 of 4 branches missed.">        if (requireNonEmpty &amp;&amp; result.isEmpty()) {</span>
+<span class="nc" id="L802">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="pc bpc" id="L804" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(result).size() != result.size()) {</span>
+<span class="nc" id="L805">            throw new IllegalArgumentException(name + &quot; must be unique&quot;);</span>
+        }
+<span class="fc" id="L807">        result.forEach(value -&gt; EvolutionGenome.requireSha256(value, name));</span>
+<span class="fc" id="L808">        return result;</span>
+    }
+
+    private static List&lt;CheckpointArtifact&gt; normalizeArtifacts(
+        List&lt;CheckpointArtifact&gt; values
+    ) {
+<span class="pc bpc" id="L814" title="2 of 4 branches missed.">        if (values == null || values.isEmpty()) {</span>
+<span class="nc" id="L815">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact manifest requires artifacts&quot;);
+        }
+<span class="fc" id="L818">        List&lt;CheckpointArtifact&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L819">        Set&lt;String&gt; names = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L820">        EnumSet&lt;ArtifactRole&gt; roles = EnumSet.noneOf(ArtifactRole.class);</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">        for (CheckpointArtifact value : values) {</span>
+<span class="fc" id="L822">            CheckpointArtifact artifact = Objects.requireNonNull(</span>
+                value, &quot;checkpoint artifact&quot;);
+<span class="pc bpc" id="L824" title="1 of 2 branches missed.">            if (!names.add(artifact.fileName())) {</span>
+<span class="nc" id="L825">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L826">                    &quot;duplicate checkpoint artifact file: &quot; + artifact.fileName());</span>
+            }
+<span class="pc bpc" id="L828" title="1 of 2 branches missed.">            if (!roles.add(artifact.role())) {</span>
+<span class="nc" id="L829">                throw new IllegalArgumentException(</span>
+<span class="nc" id="L830">                    &quot;duplicate checkpoint artifact role: &quot; + artifact.role());</span>
+            }
+<span class="fc" id="L832">            result.add(artifact);</span>
+<span class="fc" id="L833">        }</span>
+<span class="pc bpc" id="L834" title="1 of 2 branches missed.">        if (!roles.equals(EnumSet.allOf(ArtifactRole.class))) {</span>
+<span class="nc" id="L835">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact manifest must contain every payload role&quot;);
+        }
+<span class="fc" id="L838">        result.sort(Comparator.comparing(CheckpointArtifact::fileName));</span>
+<span class="fc" id="L839">        return List.copyOf(result);</span>
+    }
+
+    private static String manifestHash(
+        String checkpointHash,
+        String stateHash,
+        List&lt;CheckpointArtifact&gt; artifacts
+    ) {
+<span class="fc" id="L847">        return EvolutionGenome.hash(</span>
+            MANIFEST_SCHEMA
+                + &quot;\ncheckpointHash=&quot; + checkpointHash
+                + &quot;\nstateHash=&quot; + stateHash
+<span class="fc" id="L851">                + &quot;\nartifacts=&quot; + artifacts.stream()</span>
+<span class="fc" id="L852">                    .map(CheckpointArtifact::canonicalMaterial).toList()</span>
+                + &quot;\ncommitProtocol=&quot; + COMMIT_PROTOCOL);
+    }
+
+<span class="fc" id="L856">    public enum ArtifactRole {</span>
+<span class="fc" id="L857">        CHECKPOINT(CHECKPOINT_FILE_NAME),</span>
+<span class="fc" id="L858">        STATE(STATE_FILE_NAME);</span>
+
+        private final String fileName;
+
+<span class="fc" id="L862">        ArtifactRole(String fileName) {</span>
+<span class="fc" id="L863">            this.fileName = fileName;</span>
+<span class="fc" id="L864">        }</span>
+
+        public String fileName() {
+<span class="fc" id="L867">            return fileName;</span>
+        }
+    }
+
+    public record CheckpointArtifact(
+        String fileName,
+        ArtifactRole role,
+        String sourceContentHash,
+        String byteHash,
+        long byteLength
+    ) {
+<span class="fc" id="L878">        public CheckpointArtifact {</span>
+<span class="fc" id="L879">            Objects.requireNonNull(role, &quot;role&quot;);</span>
+<span class="pc bpc" id="L880" title="1 of 2 branches missed.">            if (!role.fileName().equals(fileName)</span>
+<span class="pc bpc" id="L881" title="1 of 2 branches missed.">                    || fileName.contains(&quot;/&quot;)</span>
+<span class="pc bpc" id="L882" title="1 of 2 branches missed.">                    || fileName.contains(&quot;\\&quot;)</span>
+<span class="pc bpc" id="L883" title="1 of 2 branches missed.">                    || MANIFEST_FILE_NAME.equals(fileName)) {</span>
+<span class="nc" id="L884">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint artifact file name must match its canonical role name&quot;);
+            }
+<span class="fc" id="L887">            EvolutionGenome.requireSha256(</span>
+                sourceContentHash, &quot;sourceContentHash&quot;);
+<span class="fc" id="L889">            EvolutionGenome.requireSha256(byteHash, &quot;byteHash&quot;);</span>
+<span class="pc bpc" id="L890" title="2 of 4 branches missed.">            if (byteLength &lt;= 0L || byteLength &gt; MAX_PAYLOAD_BYTES) {</span>
+<span class="nc" id="L891">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint artifact byteLength is outside the allowed bound&quot;);
+            }
+<span class="fc" id="L894">        }</span>
+
+        String canonicalMaterial() {
+<span class="fc" id="L897">            return fileName + '|' + role.name() + '|' + sourceContentHash</span>
+                + '|' + byteHash + '|' + byteLength;
+        }
+    }
+
+    public record CheckpointArtifactManifest(
+        String schema,
+        String checkpointHash,
+        String stateHash,
+        List&lt;CheckpointArtifact&gt; artifacts,
+        String commitProtocol,
+        String contentHash
+    ) {
+<span class="fc" id="L910">        public CheckpointArtifactManifest {</span>
+<span class="pc bpc" id="L911" title="1 of 2 branches missed.">            if (!MANIFEST_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L912">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported checkpoint artifact manifest schema&quot;);
+            }
+<span class="fc" id="L915">            EvolutionGenome.requireSha256(checkpointHash, &quot;checkpointHash&quot;);</span>
+<span class="fc" id="L916">            EvolutionGenome.requireSha256(stateHash, &quot;stateHash&quot;);</span>
+<span class="fc" id="L917">            artifacts = normalizeArtifacts(artifacts);</span>
+<span class="pc bpc" id="L918" title="1 of 2 branches missed.">            if (!COMMIT_PROTOCOL.equals(commitProtocol)) {</span>
+<span class="nc" id="L919">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported checkpoint artifact commit protocol&quot;);
+            }
+<span class="fc" id="L922">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L923">            String expected = manifestHash(checkpointHash, stateHash, artifacts);</span>
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L925">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint artifact manifest contentHash mismatch&quot;);
+            }
+<span class="fc" id="L928">            requireRoleRoot(artifacts, ArtifactRole.CHECKPOINT, checkpointHash);</span>
+<span class="fc" id="L929">            requireRoleRoot(artifacts, ArtifactRole.STATE, stateHash);</span>
+<span class="fc" id="L930">        }</span>
+
+        static CheckpointArtifactManifest create(
+            String checkpointHash,
+            String stateHash,
+            List&lt;CheckpointArtifact&gt; artifacts
+        ) {
+<span class="fc" id="L937">            List&lt;CheckpointArtifact&gt; normalized = normalizeArtifacts(artifacts);</span>
+<span class="fc" id="L938">            return new CheckpointArtifactManifest(</span>
+                MANIFEST_SCHEMA,
+                checkpointHash,
+                stateHash,
+                normalized,
+                COMMIT_PROTOCOL,
+<span class="fc" id="L944">                manifestHash(checkpointHash, stateHash, normalized));</span>
+        }
+
+        public String toCanonicalJson() {
+<span class="fc" id="L948">            return new JsonWriter().beginObject()</span>
+<span class="fc" id="L949">                .property(&quot;schema&quot;, schema)</span>
+<span class="fc" id="L950">                .property(&quot;checkpointHash&quot;, checkpointHash)</span>
+<span class="fc" id="L951">                .property(&quot;stateHash&quot;, stateHash)</span>
+<span class="fc" id="L952">                .array(&quot;artifacts&quot;, array -&gt; artifacts.forEach(artifact -&gt;</span>
+<span class="fc" id="L953">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L954">                        .property(&quot;fileName&quot;, artifact.fileName())</span>
+<span class="fc" id="L955">                        .property(&quot;role&quot;, artifact.role().name())</span>
+<span class="fc" id="L956">                        .property(&quot;sourceContentHash&quot;, artifact.sourceContentHash())</span>
+<span class="fc" id="L957">                        .property(&quot;byteHash&quot;, artifact.byteHash())</span>
+<span class="fc" id="L958">                        .property(&quot;byteLength&quot;, artifact.byteLength()))))</span>
+<span class="fc" id="L959">                .property(&quot;commitProtocol&quot;, commitProtocol)</span>
+<span class="fc" id="L960">                .property(&quot;contentHash&quot;, contentHash)</span>
+<span class="fc" id="L961">                .endObject()</span>
+<span class="fc" id="L962">                .toString();</span>
+        }
+    }
+
+    private static void requireRoleRoot(
+        List&lt;CheckpointArtifact&gt; artifacts,
+        ArtifactRole role,
+        String expectedRoot
+    ) {
+<span class="fc" id="L971">        CheckpointArtifact artifact = artifacts.stream()</span>
+<span class="fc bfc" id="L972" title="All 2 branches covered.">            .filter(value -&gt; value.role() == role)</span>
+<span class="fc" id="L973">            .findFirst()</span>
+<span class="fc" id="L974">            .orElseThrow();</span>
+<span class="pc bpc" id="L975" title="1 of 2 branches missed.">        if (!artifact.sourceContentHash().equals(expectedRoot)) {</span>
+<span class="nc" id="L976">            throw new IllegalArgumentException(</span>
+                &quot;checkpoint artifact role root mismatch for &quot; + role);
+        }
+<span class="fc" id="L979">    }</span>
+
+    public record LoadedCheckpoint(
+        PopulationCheckpoint checkpoint,
+        CheckpointArtifactManifest manifest
+    ) {
+<span class="fc" id="L985">        public LoadedCheckpoint {</span>
+<span class="fc" id="L986">            Objects.requireNonNull(checkpoint, &quot;checkpoint&quot;);</span>
+<span class="fc" id="L987">            Objects.requireNonNull(manifest, &quot;manifest&quot;);</span>
+<span class="pc bpc" id="L988" title="1 of 2 branches missed.">            if (!checkpoint.contentHash().equals(manifest.checkpointHash())) {</span>
+<span class="nc" id="L989">                throw new IllegalArgumentException(</span>
+                    &quot;loaded checkpoint does not match artifact manifest&quot;);
+            }
+<span class="fc" id="L992">        }</span>
+    }
+
+<span class="fc" id="L995">    private record Payload(CheckpointArtifact artifact, String content) {</span>
+    }
+
+    private record CheckpointHeader(
+        String schema,
+        String studyPlanHash,
+        String trainSuiteHash,
+        String mutationCatalogHash,
+        List&lt;String&gt; seedCandidateHashes,
+        int completedGeneration,
+        List&lt;String&gt; populationCandidateHashes,
+        List&lt;String&gt; evaluationHashes,
+        List&lt;String&gt; generationReportHashes,
+        int mutationAttempts,
+        int trainEvaluations,
+        String validationStatus,
+        String finalTestStatus,
+        String contentHash
+    ) {
+<span class="fc" id="L1014">        private CheckpointHeader {</span>
+<span class="pc bpc" id="L1015" title="1 of 2 branches missed.">            if (!EvolutionRewriteProgramPopulationEngine.CHECKPOINT_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L1016">                throw new IllegalArgumentException(&quot;unsupported checkpoint schema&quot;);</span>
+            }
+<span class="fc" id="L1018">            EvolutionGenome.requireSha256(studyPlanHash, &quot;studyPlanHash&quot;);</span>
+<span class="fc" id="L1019">            EvolutionGenome.requireSha256(trainSuiteHash, &quot;trainSuiteHash&quot;);</span>
+<span class="fc" id="L1020">            EvolutionGenome.requireSha256(mutationCatalogHash, &quot;mutationCatalogHash&quot;);</span>
+<span class="fc" id="L1021">            seedCandidateHashes = orderedUniqueHashes(</span>
+                seedCandidateHashes, true, &quot;seedCandidateHashes&quot;);
+<span class="fc" id="L1023">            populationCandidateHashes = orderedUniqueHashes(</span>
+                populationCandidateHashes, true, &quot;populationCandidateHashes&quot;);
+<span class="fc" id="L1025">            evaluationHashes = orderedUniqueHashes(</span>
+                evaluationHashes, true, &quot;evaluationHashes&quot;);
+<span class="fc" id="L1027">            generationReportHashes = orderedUniqueHashes(</span>
+                generationReportHashes, true, &quot;generationReportHashes&quot;);
+<span class="pc bpc" id="L1029" title="3 of 6 branches missed.">            if (completedGeneration &lt; 1 || mutationAttempts &lt; 0 || trainEvaluations &lt; 0) {</span>
+<span class="nc" id="L1030">                throw new IllegalArgumentException(&quot;invalid checkpoint counters&quot;);</span>
+            }
+<span class="pc bpc" id="L1032" title="1 of 2 branches missed.">            if (!&quot;NOT_EVALUATED&quot;.equals(validationStatus)</span>
+<span class="pc bpc" id="L1033" title="1 of 2 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(finalTestStatus)) {</span>
+<span class="nc" id="L1034">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint artifact cannot contain later-stage outcomes&quot;);
+            }
+<span class="fc" id="L1037">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L1038">        }</span>
+    }
+
+    private record PopulationCandidate(
+        String candidateHash,
+        String alphaStructuralHash,
+        String genomeJson,
+        String planJson
+    ) {
+<span class="fc" id="L1047">        private PopulationCandidate {</span>
+<span class="fc" id="L1048">            EvolutionGenome.requireSha256(candidateHash, &quot;candidateHash&quot;);</span>
+<span class="fc" id="L1049">            EvolutionGenome.requireSha256(</span>
+                alphaStructuralHash, &quot;alphaStructuralHash&quot;);
+<span class="pc bpc" id="L1051" title="3 of 6 branches missed.">            if (genomeJson == null || genomeJson.isBlank()</span>
+<span class="pc bpc" id="L1052" title="1 of 2 branches missed.">                    || planJson == null || planJson.isBlank()) {</span>
+<span class="nc" id="L1053">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint candidate requires genome and plan JSON&quot;);
+            }
+<span class="fc" id="L1056">            EvolutionGenome genome = GENOME_CODEC.read(genomeJson);</span>
+<span class="fc" id="L1057">            EvolutionRewriteProgramPlan plan = PLAN_CODEC.read(planJson);</span>
+<span class="pc bpc" id="L1058" title="1 of 2 branches missed.">            if (!GENOME_CODEC.write(genome).equals(genomeJson)</span>
+<span class="pc bpc" id="L1059" title="1 of 2 branches missed.">                    || !PLAN_CODEC.write(plan).equals(planJson)) {</span>
+<span class="nc" id="L1060">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint candidate genome/plan JSON is not canonical&quot;);
+            }
+<span class="fc" id="L1063">            EvolutionRewriteProgramCandidate reconstructed =</span>
+<span class="fc" id="L1064">                EvolutionRewriteProgramCandidate.create(genome, plan);</span>
+<span class="pc bpc" id="L1065" title="1 of 2 branches missed.">            if (!candidateHash.equals(reconstructed.contentHash())</span>
+<span class="pc bpc" id="L1066" title="1 of 2 branches missed.">                    || !alphaStructuralHash.equals(</span>
+<span class="fc" id="L1067">                        reconstructed.alphaStructuralHash())) {</span>
+<span class="nc" id="L1068">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint candidate identities do not match genome/plan payloads&quot;);
+            }
+<span class="fc" id="L1071">        }</span>
+
+        static PopulationCandidate from(EvolutionRewriteProgramCandidate candidate) {
+<span class="fc" id="L1074">            return new PopulationCandidate(</span>
+<span class="fc" id="L1075">                candidate.contentHash(),</span>
+<span class="fc" id="L1076">                candidate.alphaStructuralHash(),</span>
+<span class="fc" id="L1077">                GENOME_CODEC.write(candidate.genome()),</span>
+<span class="fc" id="L1078">                PLAN_CODEC.write(candidate.plan()));</span>
+        }
+
+        EvolutionRewriteProgramCandidate candidate() {
+<span class="fc" id="L1082">            return EvolutionRewriteProgramCandidate.create(</span>
+<span class="fc" id="L1083">                GENOME_CODEC.read(genomeJson),</span>
+<span class="fc" id="L1084">                PLAN_CODEC.read(planJson));</span>
+        }
+    }
+
+    private record CheckpointState(
+        String schema,
+        String checkpointHash,
+        List&lt;PopulationCandidate&gt; candidates,
+        List&lt;CandidateEvaluation&gt; evaluations,
+        List&lt;GenerationReport&gt; generationReports,
+        String contentHash
+    ) {
+<span class="fc" id="L1096">        private CheckpointState {</span>
+<span class="pc bpc" id="L1097" title="1 of 2 branches missed.">            if (!STATE_SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L1098">                throw new IllegalArgumentException(</span>
+                    &quot;unsupported checkpoint state schema&quot;);
+            }
+<span class="fc" id="L1101">            EvolutionGenome.requireSha256(checkpointHash, &quot;checkpointHash&quot;);</span>
+<span class="pc bpc" id="L1102" title="1 of 2 branches missed.">            candidates = candidates == null ? List.of() : candidates.stream()</span>
+<span class="fc" id="L1103">                .map(value -&gt; Objects.requireNonNull(value, &quot;checkpoint candidate&quot;))</span>
+<span class="fc" id="L1104">                .sorted(Comparator.comparing(PopulationCandidate::candidateHash))</span>
+<span class="fc" id="L1105">                .toList();</span>
+<span class="pc bpc" id="L1106" title="1 of 2 branches missed.">            evaluations = evaluations == null ? List.of() : evaluations.stream()</span>
+<span class="fc" id="L1107">                .map(value -&gt; Objects.requireNonNull(value, &quot;candidate evaluation&quot;))</span>
+<span class="fc" id="L1108">                .sorted(Comparator.comparing(CandidateEvaluation::candidateHash))</span>
+<span class="fc" id="L1109">                .toList();</span>
+<span class="pc bpc" id="L1110" title="1 of 2 branches missed.">            generationReports = generationReports == null</span>
+<span class="pc" id="L1111">                ? List.of() : List.copyOf(generationReports);</span>
+<span class="pc bpc" id="L1112" title="1 of 2 branches missed.">            if (candidates.isEmpty()</span>
+<span class="pc bpc" id="L1113" title="1 of 2 branches missed.">                    || evaluations.isEmpty()</span>
+<span class="pc bpc" id="L1114" title="1 of 2 branches missed.">                    || generationReports.isEmpty()) {</span>
+<span class="nc" id="L1115">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint state requires candidates, evaluations and generations&quot;);
+            }
+<span class="fc" id="L1118">            if (new HashSet&lt;&gt;(candidates.stream()</span>
+<span class="fc" id="L1119">                    .map(PopulationCandidate::candidateHash).toList()).size()</span>
+<span class="pc bpc" id="L1120" title="1 of 2 branches missed.">                    != candidates.size()) {</span>
+<span class="nc" id="L1121">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint state candidates must be unique&quot;);
+            }
+<span class="fc" id="L1124">            if (new HashSet&lt;&gt;(evaluations.stream()</span>
+<span class="fc" id="L1125">                    .map(CandidateEvaluation::candidateHash).toList()).size()</span>
+<span class="pc bpc" id="L1126" title="1 of 2 branches missed.">                    != evaluations.size()) {</span>
+<span class="nc" id="L1127">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint state evaluations must be unique&quot;);
+            }
+<span class="fc bfc" id="L1130" title="All 2 branches covered.">            for (int index = 0; index &lt; generationReports.size(); index++) {</span>
+<span class="pc bpc" id="L1131" title="1 of 2 branches missed.">                if (generationReports.get(index).generation() != index + 1) {</span>
+<span class="nc" id="L1132">                    throw new IllegalArgumentException(</span>
+                        &quot;checkpoint generations must be complete and ordered&quot;);
+                }
+            }
+<span class="fc" id="L1136">            EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L1137">            String expected = EvolutionGenome.hash(render(</span>
+                checkpointHash,
+                candidates,
+                evaluations,
+                generationReports,
+                null));
+<span class="pc bpc" id="L1143" title="1 of 2 branches missed.">            if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L1144">                throw new IllegalArgumentException(</span>
+                    &quot;checkpoint state contentHash mismatch&quot;);
+            }
+<span class="fc" id="L1147">        }</span>
+
+        static CheckpointState create(PopulationCheckpoint checkpoint) {
+<span class="fc" id="L1150">            List&lt;PopulationCandidate&gt; candidates = checkpoint.population().stream()</span>
+<span class="fc" id="L1151">                .map(PopulationCandidate::from)</span>
+<span class="fc" id="L1152">                .toList();</span>
+<span class="fc" id="L1153">            String hash = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L1154">                checkpoint.contentHash(),</span>
+                candidates,
+<span class="fc" id="L1156">                checkpoint.evaluations(),</span>
+<span class="fc" id="L1157">                checkpoint.generationReports(),</span>
+                null));
+<span class="fc" id="L1159">            return new CheckpointState(</span>
+                STATE_SCHEMA,
+<span class="fc" id="L1161">                checkpoint.contentHash(),</span>
+                candidates,
+<span class="fc" id="L1163">                checkpoint.evaluations(),</span>
+<span class="fc" id="L1164">                checkpoint.generationReports(),</span>
+                hash);
+        }
+
+        String toCanonicalJson() {
+<span class="fc" id="L1169">            return render(</span>
+                checkpointHash,
+                candidates,
+                evaluations,
+                generationReports,
+                contentHash);
+        }
+
+        private static String render(
+            String checkpointHash,
+            List&lt;PopulationCandidate&gt; candidates,
+            List&lt;CandidateEvaluation&gt; evaluations,
+            List&lt;GenerationReport&gt; reports,
+            String contentHash
+        ) {
+<span class="fc" id="L1184">            JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L1185">                .property(&quot;schema&quot;, STATE_SCHEMA)</span>
+<span class="fc" id="L1186">                .property(&quot;checkpointHash&quot;, checkpointHash)</span>
+<span class="fc" id="L1187">                .array(&quot;candidates&quot;, array -&gt; candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L1188">                    array.objectValue(object -&gt; object</span>
+<span class="fc" id="L1189">                        .property(&quot;candidateHash&quot;, candidate.candidateHash())</span>
+<span class="fc" id="L1190">                        .property(&quot;alphaStructuralHash&quot;, candidate.alphaStructuralHash())</span>
+<span class="fc" id="L1191">                        .property(&quot;genomeJson&quot;, candidate.genomeJson())</span>
+<span class="fc" id="L1192">                        .property(&quot;planJson&quot;, candidate.planJson()))))</span>
+<span class="fc" id="L1193">                .array(&quot;evaluations&quot;, array -&gt; evaluations.forEach(evaluation -&gt;</span>
+<span class="fc" id="L1194">                    array.objectValue(object -&gt; {</span>
+<span class="fc" id="L1195">                        object.property(&quot;candidateHash&quot;, evaluation.candidateHash())</span>
+<span class="fc" id="L1196">                            .property(&quot;alphaStructuralHash&quot;, evaluation.alphaStructuralHash())</span>
+<span class="fc" id="L1197">                            .object(&quot;rawComponents&quot;, components -&gt; {</span>
+<span class="fc bfc" id="L1198" title="All 2 branches covered.">                                for (FitnessComponent component : FitnessComponent.values()) {</span>
+<span class="fc" id="L1199">                                    Integer value = evaluation.rawComponents().get(component);</span>
+<span class="fc bfc" id="L1200" title="All 2 branches covered.">                                    if (value != null) {</span>
+<span class="fc" id="L1201">                                        components.property(component.name(), value);</span>
+                                    }
+                                }
+<span class="fc" id="L1204">                            })</span>
+<span class="fc" id="L1205">                            .stringArray(&quot;blockers&quot;, evaluation.blockers())</span>
+<span class="fc" id="L1206">                            .property(&quot;scalarFitness&quot;, evaluation.scalarFitness());</span>
+<span class="pc bpc" id="L1207" title="1 of 2 branches missed.">                        if (evaluation.evidenceHash() == null) {</span>
+<span class="nc" id="L1208">                            object.nullProperty(&quot;evidenceHash&quot;);</span>
+                        } else {
+<span class="fc" id="L1210">                            object.property(&quot;evidenceHash&quot;, evaluation.evidenceHash());</span>
+                        }
+<span class="fc" id="L1212">                        object.property(&quot;contentHash&quot;, evaluation.contentHash());</span>
+<span class="fc" id="L1213">                    })))</span>
+<span class="fc" id="L1214">                .array(&quot;generationReports&quot;, array -&gt; reports.forEach(report -&gt;</span>
+<span class="fc" id="L1215">                    array.objectValue(object -&gt; {</span>
+<span class="fc" id="L1216">                        object.property(&quot;schema&quot;, report.schema())</span>
+<span class="fc" id="L1217">                            .property(&quot;generation&quot;, report.generation())</span>
+<span class="fc" id="L1218">                            .stringArray(&quot;evaluationHashes&quot;, report.evaluations().stream()</span>
+<span class="fc" id="L1219">                                .map(CandidateEvaluation::contentHash).toList())</span>
+<span class="fc" id="L1220">                            .stringArray(</span>
+                                &quot;selectedCandidateHashes&quot;,
+<span class="fc" id="L1222">                                report.selectedCandidateHashes())</span>
+<span class="fc" id="L1223">                            .array(&quot;lineage&quot;, lineage -&gt; report.lineage().forEach(edge -&gt;</span>
+<span class="fc" id="L1224">                                lineage.objectValue(item -&gt; item</span>
+<span class="fc" id="L1225">                                    .property(&quot;parentCandidateHash&quot;, edge.parentCandidateHash())</span>
+<span class="fc" id="L1226">                                    .property(&quot;childCandidateHash&quot;, edge.childCandidateHash())</span>
+<span class="fc" id="L1227">                                    .property(&quot;childPlanHash&quot;, edge.childPlanHash())</span>
+<span class="fc" id="L1228">                                    .property(</span>
+                                        &quot;childAlphaStructuralHash&quot;,
+<span class="fc" id="L1230">                                        edge.childAlphaStructuralHash())</span>
+<span class="fc" id="L1231">                                    .property(&quot;mutationKind&quot;, edge.mutationKind().name())</span>
+<span class="fc" id="L1232">                                    .property(&quot;proposalKey&quot;, edge.proposalKey()))))</span>
+<span class="fc" id="L1233">                            .array(&quot;rejections&quot;, rejections -&gt;</span>
+<span class="fc" id="L1234">                                report.rejections().forEach(rejection -&gt;</span>
+<span class="fc" id="L1235">                                    rejections.objectValue(item -&gt; {</span>
+<span class="fc" id="L1236">                                        item.property(</span>
+                                                &quot;parentCandidateHash&quot;,
+<span class="fc" id="L1238">                                                rejection.parentCandidateHash())</span>
+<span class="fc" id="L1239">                                            .property(</span>
+                                                &quot;mutationKind&quot;,
+<span class="fc" id="L1241">                                                rejection.mutationKind().name())</span>
+<span class="fc" id="L1242">                                            .property(&quot;proposalKey&quot;, rejection.proposalKey());</span>
+<span class="pc bpc" id="L1243" title="1 of 2 branches missed.">                                        if (rejection.childPlanHash() == null) {</span>
+<span class="nc" id="L1244">                                            item.nullProperty(&quot;childPlanHash&quot;);</span>
+                                        } else {
+<span class="fc" id="L1246">                                            item.property(</span>
+                                                &quot;childPlanHash&quot;,
+<span class="fc" id="L1248">                                                rejection.childPlanHash());</span>
+                                        }
+<span class="pc bpc" id="L1250" title="1 of 2 branches missed.">                                        if (rejection.childAlphaStructuralHash() == null) {</span>
+<span class="nc" id="L1251">                                            item.nullProperty(&quot;childAlphaStructuralHash&quot;);</span>
+                                        } else {
+<span class="fc" id="L1253">                                            item.property(</span>
+                                                &quot;childAlphaStructuralHash&quot;,
+<span class="fc" id="L1255">                                                rejection.childAlphaStructuralHash());</span>
+                                        }
+<span class="fc" id="L1257">                                        item.stringArray(&quot;blockers&quot;, rejection.blockers());</span>
+<span class="fc" id="L1258">                                    })))</span>
+<span class="fc" id="L1259">                            .property(</span>
+                                &quot;distinctAlphaStructures&quot;,
+<span class="fc" id="L1261">                                report.distinctAlphaStructures())</span>
+<span class="fc" id="L1262">                            .property(</span>
+                                &quot;cumulativeMutationAttempts&quot;,
+<span class="fc" id="L1264">                                report.cumulativeMutationAttempts())</span>
+<span class="fc" id="L1265">                            .property(</span>
+                                &quot;cumulativeTrainEvaluations&quot;,
+<span class="fc" id="L1267">                                report.cumulativeTrainEvaluations())</span>
+<span class="fc" id="L1268">                            .property(&quot;outcome&quot;, report.outcome().name())</span>
+<span class="fc" id="L1269">                            .property(&quot;contentHash&quot;, report.contentHash());</span>
+<span class="fc" id="L1270">                    })));</span>
+<span class="fc bfc" id="L1271" title="All 2 branches covered.">            if (contentHash != null) {</span>
+<span class="fc" id="L1272">                json.property(&quot;contentHash&quot;, contentHash);</span>
+            }
+<span class="fc" id="L1274">            return json.endObject().toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
