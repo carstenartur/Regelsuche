@@ -24,10 +24,10 @@ dependencies {
     implementation project(':regelsuche-experiments')
     implementation project(':regelsuche-cli')
     implementation project(':regelsuche-discovery')
-    implementation 'org.neo4j.driver:neo4j-java-driver:6.1.0'
+    implementation 'org.neo4j.driver:neo4j-java-driver:6.2.0'
     implementation 'jakarta.persistence:jakarta.persistence-api:3.2.0'
-    implementation 'org.graalvm.polyglot:polyglot:24.2.1'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.0'
+    implementation 'org.graalvm.polyglot:polyglot:25.2.4'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.1'
 
     testImplementation project(':regelsuche-solver-portfolio')
     testImplementation libs.junit.jupiter
@@ -175,20 +175,20 @@ tasks.named('processE2eTestResources') {
 }
 
 dependencies {
-    e2eTestImplementation 'com.microsoft.playwright:playwright:1.60.0'
+    e2eTestImplementation 'com.microsoft.playwright:playwright:1.62.0'
     e2eTestImplementation platform(libs.testcontainers.bom)
     e2eTestImplementation libs.testcontainers.core
     e2eTestImplementation libs.testcontainers.junit
     dockerE2eTestImplementation platform(libs.testcontainers.bom)
     dockerE2eTestImplementation libs.testcontainers.core
     dockerE2eTestImplementation libs.testcontainers.junit
-    dockerE2eTestImplementation 'com.microsoft.playwright:playwright:1.60.0'
+    dockerE2eTestImplementation 'com.microsoft.playwright:playwright:1.62.0'
     dockerE2eTestImplementation libs.junit.jupiter
     dockerE2eTestRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-    webAssets 'org.webjars.npm:katex:0.16.47'
+    webAssets 'org.webjars.npm:katex:0.17.0'
     // 3.28.1 is not published as a WebJar on Maven Central; 3.27.0 is the
     // closest available self-hostable npm WebJar.
-    webAssets 'org.webjars.npm:cytoscape:3.27.0'
+    webAssets 'org.webjars.npm:cytoscape:3.34.0'
 }
 
 tasks.register('installPlaywrightBrowsers', JavaExec) {
