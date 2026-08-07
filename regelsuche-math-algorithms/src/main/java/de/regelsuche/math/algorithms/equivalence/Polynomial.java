@@ -132,6 +132,15 @@ public final class Polynomial {
         return owned(merged);
     }
 
+    Polynomial addTerm(Monomial monomial, Rational coefficient) {
+        if (coefficient.isZero()) {
+            return this;
+        }
+        Map<Monomial, Rational> merged = new HashMap<>(terms);
+        mergeTerm(merged, monomial, coefficient);
+        return owned(merged);
+    }
+
     public Polynomial subtract(Polynomial other) {
         if (other.isZero()) {
             return this;
@@ -144,6 +153,37 @@ public final class Polynomial {
             mergeTerm(merged, entry.getKey(), entry.getValue().negate());
         }
         return owned(merged);
+    }
+
+    Polynomial subtractMultiple(Polynomial other, Monomial monomial, Rational coefficient) {
+        if (other.isZero() || coefficient.isZero()) {
+            return this;
+        }
+        if (monomial.powers().isEmpty() && coefficient.isOne()) {
+            return subtract(other);
+        }
+        Rational negatedCoefficient = coefficient.negate();
+        Map<Monomial, Rational> merged = new HashMap<>(terms);
+        for (Map.Entry<Monomial, Rational> entry : other.terms.entrySet()) {
+            mergeTerm(
+                merged,
+                entry.getKey().multiply(monomial),
+                entry.getValue().multiply(negatedCoefficient)
+            );
+        }
+        return owned(merged);
+    }
+
+    Polynomial withoutTerm(Monomial monomial) {
+        if (!terms.containsKey(monomial)) {
+            return this;
+        }
+        if (terms.size() == 1) {
+            return ZERO;
+        }
+        Map<Monomial, Rational> reduced = new HashMap<>(terms);
+        reduced.remove(monomial);
+        return owned(reduced);
     }
 
     public Polynomial multiply(Rational scalar) {
@@ -280,6 +320,12 @@ public final class Polynomial {
     private static Polynomial owned(Map<Monomial, Rational> normalizedTerms) {
         if (normalizedTerms.isEmpty()) {
             return ZERO;
+        }
+        if (normalizedTerms.size() == 1) {
+            Map.Entry<Monomial, Rational> only = normalizedTerms.entrySet().iterator().next();
+            if (only.getKey().powers().isEmpty() && only.getValue().isOne()) {
+                return ONE;
+            }
         }
         return new Polynomial(normalizedTerms, true);
     }
