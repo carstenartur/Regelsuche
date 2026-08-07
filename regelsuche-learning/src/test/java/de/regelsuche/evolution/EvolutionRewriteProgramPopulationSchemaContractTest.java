@@ -18,6 +18,10 @@ class EvolutionRewriteProgramPopulationSchemaContractTest {
             "regelsuche-evolution-rewrite-program-population-run-v1.schema.json");
         String checkpoint = readSchema(
             "regelsuche-evolution-rewrite-program-population-checkpoint-v1.schema.json");
+        String checkpointArtifact = readSchema(
+            "regelsuche-evolution-rewrite-program-checkpoint-artifact-v1.schema.json");
+        String checkpointState = readSchema(
+            "regelsuche-evolution-rewrite-program-checkpoint-state-v1.schema.json");
 
         assertTrue(study.contains(
             "regelsuche.evolution-rewrite-program-study-plan/v1"));
@@ -31,11 +35,15 @@ class EvolutionRewriteProgramPopulationSchemaContractTest {
                 kind.name());
             assertTrue(generation.contains("\"" + kind.name() + "\""),
                 kind.name());
+            assertTrue(checkpointState.contains("\"" + kind.name() + "\""),
+                kind.name());
         }
         for (EvolutionStudyPlan.FitnessComponent component :
                 EvolutionStudyPlan.FitnessComponent.values()) {
             assertTrue(study.contains("\"" + component.name() + "\""),
                 component.name());
+            assertTrue(checkpointState.contains(
+                "\"" + component.name() + "\""), component.name());
         }
 
         assertTrue(generation.contains(
@@ -47,6 +55,8 @@ class EvolutionRewriteProgramPopulationSchemaContractTest {
                 EvolutionRewriteProgramPopulationEngine.GenerationOutcome.values()) {
             assertTrue(generation.contains("\"" + outcome.name() + "\""),
                 outcome.name());
+            assertTrue(checkpointState.contains(
+                "\"" + outcome.name() + "\""), outcome.name());
         }
 
         assertTrue(run.contains(
@@ -67,6 +77,29 @@ class EvolutionRewriteProgramPopulationSchemaContractTest {
         assertTrue(checkpoint.contains("\"generationReportHashes\""));
         assertTrue(checkpoint.contains("\"const\": \"NOT_EVALUATED\""));
         assertTrue(checkpoint.contains("\"additionalProperties\": false"));
+
+        assertTrue(checkpointArtifact.contains(
+            "regelsuche.evolution-rewrite-program-checkpoint-artifact/v1"));
+        assertTrue(checkpointArtifact.contains(
+            "\"const\": \"checkpoint.json\""));
+        assertTrue(checkpointArtifact.contains(
+            "\"const\": \"CHECKPOINT\""));
+        assertTrue(checkpointArtifact.contains(
+            "\"const\": \"state.json\""));
+        assertTrue(checkpointArtifact.contains(
+            "\"const\": \"STATE\""));
+        assertTrue(checkpointArtifact.contains(
+            "\"const\": \"MANIFEST_LAST_ATOMIC_RENAME\""));
+        assertTrue(checkpointArtifact.contains("\"additionalProperties\": false"));
+
+        assertTrue(checkpointState.contains(
+            "regelsuche.evolution-rewrite-program-checkpoint-state/v1"));
+        assertTrue(checkpointState.contains("\"checkpointHash\""));
+        assertTrue(checkpointState.contains("\"candidates\""));
+        assertTrue(checkpointState.contains("\"evaluations\""));
+        assertTrue(checkpointState.contains("\"generationReports\""));
+        assertTrue(checkpointState.contains("\"propertyNames\""));
+        assertTrue(checkpointState.contains("\"additionalProperties\": false"));
     }
 
     private static String readSchema(String fileName) throws Exception {

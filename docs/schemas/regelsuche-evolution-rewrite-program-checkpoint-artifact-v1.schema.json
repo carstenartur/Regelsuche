@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.dev/schemas/regelsuche-evolution-rewrite-program-checkpoint-artifact-v1.schema.json",
+  "title": "Regelsuche durable rewrite-program checkpoint artifact manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "checkpointHash",
+    "stateHash",
+    "artifacts",
+    "commitProtocol",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-checkpoint-artifact/v1"
+    },
+    "checkpointHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "stateHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/checkpointArtifact"
+          },
+          {
+            "$ref": "#/$defs/stateArtifact"
+          }
+        ]
+      }
+    },
+    "commitProtocol": {
+      "const": "MANIFEST_LAST_ATOMIC_RENAME"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "checkpointArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fileName",
+        "role",
+        "sourceContentHash",
+        "byteHash",
+        "byteLength"
+      ],
+      "properties": {
+        "fileName": {
+          "const": "checkpoint.json"
+        },
+        "role": {
+          "const": "CHECKPOINT"
+        },
+        "sourceContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 33554432
+        }
+      }
+    },
+    "stateArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fileName",
+        "role",
+        "sourceContentHash",
+        "byteHash",
+        "byteLength"
+      ],
+      "properties": {
+        "fileName": {
+          "const": "state.json"
+        },
+        "role": {
+          "const": "STATE"
+        },
+        "sourceContentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 33554432
+        }
+      }
+    }
+  }
+}
