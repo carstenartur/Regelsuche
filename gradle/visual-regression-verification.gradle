@@ -1,0 +1,83 @@
+/*
+ * Pinned visual-regression verification.
+ *
+ * The ordinary browser suite intentionally skips pixel comparisons on arbitrary
+ * hosts. This task builds the checkout-owned Playwright image, executes the
+ * visual suite and its contract test, then retains actual/diff images outside
+ * the container.
+ */
+
+def repositoryRoot = layout.projectDirectory
+def visualRegressionImage = 'regelsuche-visual-regression:verification'
+def visualRegressionReport = layout.buildDirectory.dir('reports/visual-regression')
+def visualRegressionPolicy = repositoryRoot.file(
+    'app/src/e2eTest/resources/screenshots/visual-regression-policy.json')
+def expectedVisualBaselines = providers.provider {
+    def policy = new groovy.json.JsonSlurper().parse(visualRegressionPolicy.asFile)
+    def names = policy.baselines.keySet().collect { fileName ->
+        if (!fileName.endsWith('.png')) {
+            throw new GradleException(
+                "Visual baseline policy entry must end in .png: ${fileName}")
+        }
+        fileName.substring(0, fileName.length() - '.png'.length())
+    }.sort()
+    if (names.isEmpty()) {
+        throw new GradleException('Visual baseline policy must not be empty')
+    }
+    names
+}
+
+def buildVisualRegressionImage = tasks.register(
+    'buildVisualRegressionImage', Exec) {
+    group = 'verification'
+    description = 'Builds the pinned Playwright image used for math screenshot regression.'
+    workingDir repositoryRoot
+    inputs.file repositoryRoot.file('Dockerfile.visual-regression')
+    inputs.file visualRegressionPolicy
+    inputs.dir repositoryRoot.dir(
+        'app/src/e2eTest/resources/screenshots/baseline')
+    outputs.upToDateWhen { false }
+    commandLine 'docker', 'build',
+        '-f', 'Dockerfile.visual-regression',
+        '-t', visualRegressionImage, '.'
+}
+
+def verifyVisualRegression = tasks.register(
+    'verifyVisualRegression', Exec) {
+    group = 'verification'
+    description = 'Runs pinned math screenshot comparisons and exports actual/diff evidence.'
+    dependsOn buildVisualRegressionImage
+    workingDir repositoryRoot
+    outputs.dir visualRegressionReport
+    outputs.upToDateWhen { false }
+    doFirst {
+        def report = visualRegressionReport.get().asFile
+        delete report
+        report.mkdirs()
+        report.setReadable(true, false)
+        report.setWritable(true, false)
+        report.setExecutable(true, false)
+        commandLine 'docker', 'run', '--rm',
+            '-v', "${report.absolutePath}:/output",
+            visualRegressionImage
+    }
+    doLast {
+        def report = visualRegressionReport.get().asFile
+        def baselines = expectedVisualBaselines.get()
+        def missing = baselines.findAll { baseline ->
+            !new File(report, "${baseline}.actual.png").isFile()
+        }
+        if (!missing.isEmpty()) {
+            throw new GradleException(
+                'Visual regression run did not export actual screenshots for: '
+                    + missing.join(', '))
+        }
+        println "visualRegressionStatus=PASSED"
+        println "visualRegressionBaselines=${baselines.size()}"
+        println "visualRegressionReport=${report.absolutePath}"
+    }
+}
+
+tasks.matching { candidate -> candidate.name == 'fullCheck' }.configureEach {
+    dependsOn verifyVisualRegression
+}

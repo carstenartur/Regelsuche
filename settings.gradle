@@ -117,6 +117,9 @@ gradle.beforeProject { candidate ->
         candidate.apply from: new File(
             settingsDir,
             'gradle/ci-verification.gradle')
+        candidate.apply from: new File(
+            settingsDir,
+            'gradle/visual-regression-verification.gradle')
     }
     if (candidate.path == ':app') {
         candidate.apply from: new File(
