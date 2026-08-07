@@ -9,8 +9,9 @@ registries:
 
 updates:
   # The root Gradle build includes every subproject through settings.gradle.
-  # No allow-list is used: public plugins and libraries actually referenced by
-  # the checkout must not silently fall outside dependency update coverage.
+  # Bundle only routine minor/patch maintenance with similar risk. Dependencies
+  # not matched by these groups remain eligible for their own reviewable PRs,
+  # including major, UI-sensitive, GraalVM and Playwright updates.
   - package-ecosystem: gradle
     directory: /
     registries:
@@ -18,9 +19,24 @@ updates:
     schedule:
       interval: weekly
     groups:
-      gradle-dependencies:
+      runtime-maintenance:
         patterns:
-          - "*"
+          - "com.fasterxml.jackson.*:*"
+          - "org.neo4j.driver:*"
+          - "com.google.guava:*"
+          - "org.junit.jupiter:*"
+          - "org.postgresql:*"
+          - "org.hibernate.*:*"
+          - "org.eclipse:yasson"
+        update-types:
+          - "minor"
+          - "patch"
+      build-tooling-maintenance:
+        patterns:
+          - "gradle-wrapper"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Keep all action families used by the ordinary CI and release workflows in
   # scope, including actions/*, gradle/actions, peaceiris/actions-gh-pages and
@@ -35,12 +51,24 @@ updates:
         patterns:
           - "*"
 
-  # Keep the root Dockerfile base images current.
+  # Keep the declared Java major explicit. Java-21 image patch/minor updates are
+  # grouped; a Java-major migration remains intentionally blocked until the
+  # project itself changes its Java contract. Other Docker images, especially
+  # Playwright, remain eligible for separate PRs. The visual-regression contract
+  # then fails closed until a Playwright image update is synchronized with the
+  # matching Java dependency update.
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "eclipse-temurin"
+        update-types:
+          - "version-update:semver-major"
     groups:
-      docker-base-images:
+      java-base-images:
         patterns:
-          - "*"
+          - "eclipse-temurin"
+        update-types:
+          - "minor"
+          - "patch"
