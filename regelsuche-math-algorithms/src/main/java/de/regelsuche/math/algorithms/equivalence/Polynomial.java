@@ -108,10 +108,14 @@ public final class Polynomial {
 
     public Polynomial monic(MonomialOrder order) {
         Optional<Term> leading = leadingTerm(order);
-        if (leading.isEmpty() || leading.orElseThrow().coefficient().isOne()) {
+        if (leading.isEmpty()) {
             return this;
         }
-        return multiply(Rational.ONE.divide(leading.orElseThrow().coefficient()));
+        Term leadingTerm = leading.orElseThrow();
+        if (leadingTerm.coefficient().isOne()) {
+            return this;
+        }
+        return multiply(Rational.ONE.divide(leadingTerm.coefficient()));
     }
 
     public Polynomial add(Polynomial other) {
