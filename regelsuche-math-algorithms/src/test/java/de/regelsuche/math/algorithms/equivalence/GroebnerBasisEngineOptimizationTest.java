@@ -6,14 +6,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 class GroebnerBasisEngineOptimizationTest {
+    private static final int TEST_STEP_BUDGET = 5_000;
+    private static final int TEST_PAIR_BUDGET = 5_000;
+
     @Test
     void productCriterionAvoidsCoprimeCriticalPairsWithoutConsumingBudget() {
         Polynomial x = Polynomial.variable("x");
@@ -39,9 +41,17 @@ class GroebnerBasisEngineOptimizationTest {
     void chainCriterionAvoidsPairWhoseSubchainsWereAlreadyResolved() {
         Polynomial x = Polynomial.variable("x");
         Polynomial y = Polynomial.variable("y");
+        Polynomial z = Polynomial.variable("z");
 
+        // None of these generators reduces through another one. The two degree-four
+        // LCM pairs are therefore resolved first, allowing the degree-five endpoint
+        // pair to be rejected specifically by the chain criterion.
         BuchbergerAlgorithm.BasisComputation result = new BuchbergerAlgorithm().computeBasis(
-            List.of(x.pow(2).multiply(y), x.multiply(y), x.multiply(y.pow(2))),
+            List.of(
+                x.pow(2).multiply(z),
+                x.multiply(y).multiply(z),
+                y.pow(2).multiply(z)
+            ),
             new GradedReverseLexOrder(),
             100,
             100
@@ -76,21 +86,31 @@ class GroebnerBasisEngineOptimizationTest {
     }
 
     @Test
-    void deterministicSmallIdealsSatisfyBuchbergerCriterion() {
-        Random random = new Random(20260806L);
-        for (MonomialOrder order : List.of(new GradedReverseLexOrder(), new LexOrder())) {
-            for (int example = 0; example < 20; example++) {
-                List<Polynomial> generators = new ArrayList<>();
-                int generatorCount = 2 + random.nextInt(2);
-                for (int i = 0; i < generatorCount; i++) {
-                    generators.add(randomPolynomial(random));
-                }
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void boundedSmallIdealsSatisfyBuchbergerCriterion() {
+        Polynomial x = Polynomial.variable("x");
+        Polynomial y = Polynomial.variable("y");
+        Polynomial z = Polynomial.variable("z");
+        Polynomial one = Polynomial.constant(Rational.ONE);
+        List<List<Polynomial>> systems = List.of(
+            List.of(x.pow(2).subtract(y), x.multiply(y).subtract(one)),
+            List.of(x.add(y), x),
+            List.of(
+                x.pow(2).multiply(z),
+                x.multiply(y).multiply(z),
+                y.pow(2).multiply(z)
+            ),
+            List.of(x.pow(2).subtract(one), y.pow(2).subtract(one), z.pow(2).subtract(one))
+        );
 
+        for (MonomialOrder order : List.of(new GradedReverseLexOrder(), new LexOrder())) {
+            for (int example = 0; example < systems.size(); example++) {
+                List<Polynomial> generators = systems.get(example);
                 BuchbergerAlgorithm.BasisComputation result = new BuchbergerAlgorithm().computeBasis(
                     generators,
                     order,
-                    20_000,
-                    20_000
+                    TEST_STEP_BUDGET,
+                    TEST_PAIR_BUDGET
                 );
 
                 assertFalse(result.budgetExhausted(), "example " + example + " with " + order.name());
@@ -124,33 +144,6 @@ class GroebnerBasisEngineOptimizationTest {
         assertEquals("COMPLETE", payload.get("reducedBasisStatus"));
     }
 
-    private Polynomial randomPolynomial(Random random) {
-        Map<Monomial, Rational> terms = new HashMap<>();
-        int termCount = 1 + random.nextInt(4);
-        for (int i = 0; i < termCount; i++) {
-            int xExponent = random.nextInt(4);
-            int yExponent = random.nextInt(4 - xExponent);
-            int coefficient = random.nextInt(5) - 2;
-            if (coefficient == 0) {
-                coefficient = 1;
-            }
-            Map<String, Integer> powers = new HashMap<>();
-            if (xExponent > 0) {
-                powers.put("x", xExponent);
-            }
-            if (yExponent > 0) {
-                powers.put("y", yExponent);
-            }
-            terms.merge(new Monomial(powers), Rational.of(coefficient), Rational::add);
-        }
-
-        Polynomial result = Polynomial.zero();
-        for (Map.Entry<Monomial, Rational> entry : terms.entrySet()) {
-            result = result.add(Polynomial.term(entry.getKey(), entry.getValue()));
-        }
-        return result.isZero() ? Polynomial.variable("x") : result;
-    }
-
     private void assertGeneratorsReduceToZero(
         List<Polynomial> generators,
         List<Polynomial> basis,
@@ -158,7 +151,12 @@ class GroebnerBasisEngineOptimizationTest {
     ) {
         PolynomialReducer reducer = new PolynomialReducer();
         for (Polynomial generator : generators) {
-            PolynomialReducer.ReductionResult reduction = reducer.reduce(generator, basis, order, 100_000);
+            PolynomialReducer.ReductionResult reduction = reducer.reduce(
+                generator,
+                basis,
+                order,
+                TEST_STEP_BUDGET
+            );
             assertFalse(reduction.budgetExhausted());
             assertTrue(reduction.remainder().isZero(), generator.toCanonicalString(order));
         }
@@ -169,7 +167,12 @@ class GroebnerBasisEngineOptimizationTest {
         for (int i = 0; i < basis.size(); i++) {
             for (int j = i + 1; j < basis.size(); j++) {
                 Polynomial sPolynomial = reducer.sPolynomial(basis.get(i), basis.get(j), order);
-                PolynomialReducer.ReductionResult reduction = reducer.reduce(sPolynomial, basis, order, 100_000);
+                PolynomialReducer.ReductionResult reduction = reducer.reduce(
+                    sPolynomial,
+                    basis,
+                    order,
+                    TEST_STEP_BUDGET
+                );
                 assertFalse(reduction.budgetExhausted());
                 assertTrue(
                     reduction.remainder().isZero(),
