@@ -54,6 +54,7 @@ public final class GroebnerBasisEngine {
         return new BasisPreparation(
             basis.basis(),
             preparedReducers,
+            new ReducedBasisMemo(),
             basis.steps(),
             reusableBaseSteps + basis.steps(),
             basis.budgetStatus(),
@@ -63,6 +64,9 @@ public final class GroebnerBasisEngine {
             basis.pairsSkippedByProductCriterion(),
             basis.pairsSkippedByChainCriterion(),
             basis.maxPendingPairs(),
+            basis.initialGeneratorsConsidered(),
+            basis.initialGeneratorsReduced(),
+            basis.initialGeneratorsEliminated(),
             incrementalBaseSize,
             basis.extensionGeneratorsConsidered(),
             basis.extensionGeneratorsReduced(),
@@ -102,7 +106,9 @@ public final class GroebnerBasisEngine {
                 true,
                 "NOT_COMPUTED",
                 basisCacheHit,
-                basisPreparationStepsSaved
+                basisPreparationStepsSaved,
+                false,
+                0
             );
         }
 
@@ -126,26 +132,30 @@ public final class GroebnerBasisEngine {
                 true,
                 "NOT_COMPUTED",
                 basisCacheHit,
-                basisPreparationStepsSaved
+                basisPreparationStepsSaved,
+                false,
+                0
             );
         }
 
-        InterreductionResult interreduction = reducedBasis(
-            preparation.basis(),
+        InterreductionReuse interreduction = reducedBasis(
+            preparation,
             Math.max(0, maxSteps - proofSteps)
         );
         return result(
             preparation,
-            interreduction.basis(),
+            interreduction.result().basis(),
             reduction.remainder(),
             basisPreparationSteps,
             reduction.steps(),
-            interreduction.steps(),
+            interreduction.cacheHit() ? 0 : interreduction.result().steps(),
             "OK",
             false,
-            interreduction.complete() ? "COMPLETE" : "BUDGET_EXHAUSTED",
+            interreduction.result().complete() ? "COMPLETE" : "BUDGET_EXHAUSTED",
             basisCacheHit,
-            basisPreparationStepsSaved
+            basisPreparationStepsSaved,
+            interreduction.cacheHit(),
+            interreduction.stepsSaved()
         );
     }
 
@@ -170,7 +180,9 @@ public final class GroebnerBasisEngine {
         boolean budgetExhausted,
         String reducedBasisStatus,
         boolean basisCacheHit,
-        int basisPreparationStepsSaved
+        int basisPreparationStepsSaved,
+        boolean reducedBasisCacheHit,
+        int reducedBasisStepsSaved
     ) {
         return new EngineResult(
             preparation.basis(),
@@ -191,6 +203,11 @@ public final class GroebnerBasisEngine {
             basisPreparationStepsSaved,
             queryReductionSteps,
             interreductionSteps,
+            reducedBasisCacheHit,
+            reducedBasisStepsSaved,
+            preparation.initialGeneratorsConsidered(),
+            preparation.initialGeneratorsReduced(),
+            preparation.initialGeneratorsEliminated(),
             preparation.incrementalBaseSize(),
             preparation.extensionGeneratorsConsidered(),
             preparation.extensionGeneratorsReduced(),
@@ -198,7 +215,25 @@ public final class GroebnerBasisEngine {
         );
     }
 
-    private InterreductionResult reducedBasis(List<Polynomial> basis, int maxSteps) {
+    private InterreductionReuse reducedBasis(BasisPreparation preparation, int maxSteps) {
+        ReducedBasisMemo memo = preparation.reducedBasisMemo();
+        synchronized (memo) {
+            if (memo.completeResult != null) {
+                return new InterreductionReuse(
+                    memo.completeResult,
+                    true,
+                    memo.completeResult.steps()
+                );
+            }
+            InterreductionResult computed = computeReducedBasis(preparation.basis(), maxSteps);
+            if (computed.complete()) {
+                memo.completeResult = computed;
+            }
+            return new InterreductionReuse(computed, false, 0);
+        }
+    }
+
+    private InterreductionResult computeReducedBasis(List<Polynomial> basis, int maxSteps) {
         List<Polynomial> current = new ArrayList<>(normalizedBasis(basis));
         if (current.size() <= 1) {
             return new InterreductionResult(List.copyOf(current), 0, true);
@@ -271,6 +306,7 @@ public final class GroebnerBasisEngine {
     public record BasisPreparation(
         List<Polynomial> basis,
         PolynomialReducer.PreparedBasis preparedReducers,
+        ReducedBasisMemo reducedBasisMemo,
         int steps,
         int reusablePreparationSteps,
         String budgetStatus,
@@ -280,6 +316,9 @@ public final class GroebnerBasisEngine {
         int pairsSkippedByProductCriterion,
         int pairsSkippedByChainCriterion,
         int maxPendingPairs,
+        int initialGeneratorsConsidered,
+        int initialGeneratorsReduced,
+        int initialGeneratorsEliminated,
         int incrementalBaseSize,
         int extensionGeneratorsConsidered,
         int extensionGeneratorsReduced,
@@ -309,6 +348,11 @@ public final class GroebnerBasisEngine {
         int basisPreparationStepsSaved,
         int queryReductionSteps,
         int interreductionSteps,
+        boolean reducedBasisCacheHit,
+        int reducedBasisStepsSaved,
+        int initialGeneratorsConsidered,
+        int initialGeneratorsReduced,
+        int initialGeneratorsEliminated,
         int incrementalBaseSize,
         int extensionGeneratorsConsidered,
         int extensionGeneratorsReduced,
@@ -316,6 +360,17 @@ public final class GroebnerBasisEngine {
     ) {
     }
 
+    static final class ReducedBasisMemo {
+        private InterreductionResult completeResult;
+    }
+
     private record InterreductionResult(List<Polynomial> basis, int steps, boolean complete) {
+    }
+
+    private record InterreductionReuse(
+        InterreductionResult result,
+        boolean cacheHit,
+        int stepsSaved
+    ) {
     }
 }

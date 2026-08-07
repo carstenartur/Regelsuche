@@ -251,6 +251,7 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         payload.put("pairsSkippedByChainCriterion", result.pairsSkippedByChainCriterion());
         payload.put("maxPendingPairs", result.maxPendingPairs());
         payload.put("basisCacheHit", result.basisCacheHit());
+        payload.put("reducedBasisCacheHit", result.reducedBasisCacheHit());
         payload.put("basisReuseMode", reuseDecision.mode());
         payload.put("basisCacheSize", basisCache.size());
         payload.put("basisCacheCapacity", basisCache.capacity());
@@ -259,6 +260,9 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         payload.put("incrementalCandidatePairUpperBound", reuseDecision.incrementalPairUpperBound());
         payload.put("coldInitialPairUpperBound", reuseDecision.coldPairUpperBound());
         payload.put("incrementalReuseRejectedReason", reuseDecision.rejectionReason());
+        payload.put("initialGeneratorsConsidered", result.initialGeneratorsConsidered());
+        payload.put("initialGeneratorsReduced", result.initialGeneratorsReduced());
+        payload.put("initialGeneratorsEliminated", result.initialGeneratorsEliminated());
         payload.put("extensionGeneratorsConsidered", result.extensionGeneratorsConsidered());
         payload.put("extensionGeneratorsReduced", result.extensionGeneratorsReduced());
         payload.put("extensionGeneratorsEliminated", result.extensionGeneratorsEliminated());
@@ -266,6 +270,7 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         payload.put("basisPreparationStepsSaved", result.basisPreparationStepsSaved());
         payload.put("queryReductionSteps", result.queryReductionSteps());
         payload.put("interreductionSteps", result.interreductionSteps());
+        payload.put("reducedBasisStepsSaved", result.reducedBasisStepsSaved());
         payload.put("steps", result.steps());
         payload.put("budgetStatus", result.budgetStatus());
         return Map.copyOf(payload);

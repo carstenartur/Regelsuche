@@ -12,29 +12,41 @@ import org.junit.jupiter.api.Test;
 
 class GroebnerBasisCacheTest {
     @Test
-    void repeatedIdealQueryReusesCompletedBasisAndPreparedReducers() {
+    void repeatedIdealQueryReusesCompletedBasisPreparedReducersAndInterreduction() {
         GroebnerBasisEquivalenceService service = service(5_000, 5_000, 128);
         List<String> generators = List.of("x*y - 1", "y^2 - x");
 
         assertTrue(service.reducesToZeroModuloIdeal("x*y - 1", generators));
         Map<String, Object> first = service.lastResult().payload();
         int preparationSteps = integer(first, "basisPreparationSteps");
+        int interreductionSteps = integer(first, "interreductionSteps");
         int firstSteps = integer(first, "steps");
 
         assertFalse((Boolean) first.get("basisCacheHit"));
+        assertFalse((Boolean) first.get("reducedBasisCacheHit"));
         assertTrue(preparationSteps > 0);
         assertEquals(0, integer(first, "basisPreparationStepsSaved"));
+        assertEquals(0, integer(first, "reducedBasisStepsSaved"));
+        assertEquals(2, integer(first, "initialGeneratorsConsidered"));
+        assertTrue(integer(first, "initialGeneratorsReduced") >= 0);
+        assertTrue(integer(first, "initialGeneratorsEliminated") >= 0);
         assertEquals(1, integer(first, "basisCacheSize"));
 
         assertTrue(service.reducesToZeroModuloIdeal("x*y - 1", generators));
         Map<String, Object> second = service.lastResult().payload();
 
         assertTrue((Boolean) second.get("basisCacheHit"));
+        assertTrue((Boolean) second.get("reducedBasisCacheHit"));
         assertEquals(0, integer(second, "basisPreparationSteps"));
         assertEquals(preparationSteps, integer(second, "basisPreparationStepsSaved"));
         assertEquals(integer(first, "queryReductionSteps"), integer(second, "queryReductionSteps"));
-        assertEquals(integer(first, "interreductionSteps"), integer(second, "interreductionSteps"));
-        assertEquals(firstSteps - preparationSteps, integer(second, "steps"));
+        assertEquals(0, integer(second, "interreductionSteps"));
+        assertEquals(interreductionSteps, integer(second, "reducedBasisStepsSaved"));
+        assertEquals(2, integer(second, "initialGeneratorsConsidered"));
+        assertEquals(
+            firstSteps - preparationSteps - interreductionSteps,
+            integer(second, "steps")
+        );
     }
 
     @Test
