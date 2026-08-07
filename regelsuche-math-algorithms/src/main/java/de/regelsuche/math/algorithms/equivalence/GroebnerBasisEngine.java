@@ -13,63 +13,104 @@ public final class GroebnerBasisEngine {
         this.order = order;
     }
 
-    public EngineResult normalFormModuloIdeal(
-        Polynomial polynomial,
-        List<Polynomial> generators,
-        int maxSteps,
-        int maxPairs
-    ) {
+    public BasisPreparation prepareIdeal(List<Polynomial> generators, int maxSteps, int maxPairs) {
         BuchbergerAlgorithm.BasisComputation basis = buchberger.computeBasis(
             generators,
             order,
             maxSteps,
             maxPairs
         );
-        if (basis.budgetExhausted()) {
+        PolynomialReducer.PreparedBasis preparedReducers = basis.budgetExhausted()
+            ? null
+            : reducer.prepare(basis.basis(), order);
+        return new BasisPreparation(
+            basis.basis(),
+            preparedReducers,
+            basis.steps(),
+            basis.budgetStatus(),
+            basis.budgetExhausted(),
+            basis.pairsConsidered(),
+            basis.pairsReduced(),
+            basis.pairsSkippedByProductCriterion(),
+            basis.pairsSkippedByChainCriterion(),
+            basis.maxPendingPairs()
+        );
+    }
+
+    public EngineResult normalFormModuloIdeal(
+        Polynomial polynomial,
+        List<Polynomial> generators,
+        int maxSteps,
+        int maxPairs
+    ) {
+        BasisPreparation preparation = prepareIdeal(generators, maxSteps, maxPairs);
+        return normalFormModuloPreparedIdeal(polynomial, preparation, maxSteps, false);
+    }
+
+    public EngineResult normalFormModuloPreparedIdeal(
+        Polynomial polynomial,
+        BasisPreparation preparation,
+        int maxSteps,
+        boolean basisCacheHit
+    ) {
+        int basisPreparationSteps = basisCacheHit ? 0 : preparation.steps();
+        int basisPreparationStepsSaved = basisCacheHit ? preparation.steps() : 0;
+        if (preparation.budgetExhausted()) {
             return result(
-                basis,
+                preparation,
                 List.of(),
                 Polynomial.zero(),
-                basis.steps(),
-                basis.budgetStatus(),
+                basisPreparationSteps,
+                0,
+                0,
+                preparation.budgetStatus(),
                 true,
-                "NOT_COMPUTED"
+                "NOT_COMPUTED",
+                basisCacheHit,
+                basisPreparationStepsSaved
             );
         }
 
-        int remainingSteps = Math.max(0, maxSteps - basis.steps());
+        int remainingSteps = Math.max(0, maxSteps - basisPreparationSteps);
         PolynomialReducer.ReductionResult reduction = reducer.reduce(
             polynomial,
-            basis.basis(),
-            order,
+            preparation.preparedReducers(),
             remainingSteps
         );
-        int totalSteps = basis.steps() + reduction.steps();
-        boolean budgetExhausted = reduction.budgetExhausted() || totalSteps > maxSteps;
+        int proofSteps = basisPreparationSteps + reduction.steps();
+        boolean budgetExhausted = reduction.budgetExhausted() || proofSteps > maxSteps;
         if (budgetExhausted) {
             return result(
-                basis,
+                preparation,
                 List.of(),
                 reduction.remainder(),
-                totalSteps,
+                basisPreparationSteps,
+                reduction.steps(),
+                0,
                 "BUDGET_EXHAUSTED",
                 true,
-                "NOT_COMPUTED"
+                "NOT_COMPUTED",
+                basisCacheHit,
+                basisPreparationStepsSaved
             );
         }
 
         InterreductionResult interreduction = reducedBasis(
-            basis.basis(),
-            Math.max(0, maxSteps - totalSteps)
+            preparation.basis(),
+            Math.max(0, maxSteps - proofSteps)
         );
         return result(
-            basis,
+            preparation,
             interreduction.basis(),
             reduction.remainder(),
-            totalSteps + interreduction.steps(),
+            basisPreparationSteps,
+            reduction.steps(),
+            interreduction.steps(),
             "OK",
             false,
-            interreduction.complete() ? "COMPLETE" : "BUDGET_EXHAUSTED"
+            interreduction.complete() ? "COMPLETE" : "BUDGET_EXHAUSTED",
+            basisCacheHit,
+            basisPreparationStepsSaved
         );
     }
 
@@ -84,28 +125,37 @@ public final class GroebnerBasisEngine {
     }
 
     private EngineResult result(
-        BuchbergerAlgorithm.BasisComputation basis,
+        BasisPreparation preparation,
         List<Polynomial> reducedBasis,
         Polynomial remainder,
-        int steps,
+        int basisPreparationSteps,
+        int queryReductionSteps,
+        int interreductionSteps,
         String budgetStatus,
         boolean budgetExhausted,
-        String reducedBasisStatus
+        String reducedBasisStatus,
+        boolean basisCacheHit,
+        int basisPreparationStepsSaved
     ) {
         return new EngineResult(
-            basis.basis(),
+            preparation.basis(),
             reducedBasis,
             remainder,
             order.name(),
-            steps,
+            basisPreparationSteps + queryReductionSteps + interreductionSteps,
             budgetStatus,
             budgetExhausted,
             reducedBasisStatus,
-            basis.pairsConsidered(),
-            basis.pairsReduced(),
-            basis.pairsSkippedByProductCriterion(),
-            basis.pairsSkippedByChainCriterion(),
-            basis.maxPendingPairs()
+            preparation.pairsConsidered(),
+            preparation.pairsReduced(),
+            preparation.pairsSkippedByProductCriterion(),
+            preparation.pairsSkippedByChainCriterion(),
+            preparation.maxPendingPairs(),
+            basisCacheHit,
+            basisPreparationSteps,
+            basisPreparationStepsSaved,
+            queryReductionSteps,
+            interreductionSteps
         );
     }
 
@@ -179,6 +229,23 @@ public final class GroebnerBasisEngine {
             .toList();
     }
 
+    public record BasisPreparation(
+        List<Polynomial> basis,
+        PolynomialReducer.PreparedBasis preparedReducers,
+        int steps,
+        String budgetStatus,
+        boolean budgetExhausted,
+        int pairsConsidered,
+        int pairsReduced,
+        int pairsSkippedByProductCriterion,
+        int pairsSkippedByChainCriterion,
+        int maxPendingPairs
+    ) {
+        public BasisPreparation {
+            basis = List.copyOf(basis);
+        }
+    }
+
     public record EngineResult(
         List<Polynomial> basis,
         List<Polynomial> reducedBasis,
@@ -192,7 +259,12 @@ public final class GroebnerBasisEngine {
         int pairsReduced,
         int pairsSkippedByProductCriterion,
         int pairsSkippedByChainCriterion,
-        int maxPendingPairs
+        int maxPendingPairs,
+        boolean basisCacheHit,
+        int basisPreparationSteps,
+        int basisPreparationStepsSaved,
+        int queryReductionSteps,
+        int interreductionSteps
     ) {
     }
 

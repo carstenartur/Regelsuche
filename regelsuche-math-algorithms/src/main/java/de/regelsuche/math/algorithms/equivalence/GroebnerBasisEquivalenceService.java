@@ -19,12 +19,15 @@ import java.util.TreeSet;
  * {@code UNAVAILABLE} instead of falling back to normal-form equivalence.
  */
 public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceService {
+    private static final int DEFAULT_BASIS_CACHE_CAPACITY = 128;
     private static final MathematicalAlgorithmRegistry.AlgorithmBudget SAFE_DEFAULT_BUDGET =
         MathematicalAlgorithmRegistry.AlgorithmBudget.bounded(200, 1_000, 0, 0.0, 256, 20, 8);
     private final PolynomialArithmetic arithmetic = new PolynomialArithmetic();
     private final MathematicalAlgorithmRegistry registry;
     private final boolean jasBackendAvailable;
     private final MonomialOrder monomialOrder;
+    private final GroebnerBasisEngine engine;
+    private final BasisCache basisCache;
     private MathematicalAlgorithmRegistry.AlgorithmExecutionResult lastResult =
         MathematicalAlgorithmRegistry.AlgorithmExecutionResult.unknown("not executed");
 
@@ -41,9 +44,23 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         boolean jasBackendAvailable,
         MonomialOrder monomialOrder
     ) {
+        this(registry, jasBackendAvailable, monomialOrder, DEFAULT_BASIS_CACHE_CAPACITY);
+    }
+
+    public GroebnerBasisEquivalenceService(
+        MathematicalAlgorithmRegistry registry,
+        boolean jasBackendAvailable,
+        MonomialOrder monomialOrder,
+        int basisCacheCapacity
+    ) {
+        if (basisCacheCapacity < 0) {
+            throw new IllegalArgumentException("basisCacheCapacity must be non-negative");
+        }
         this.registry = registry;
         this.jasBackendAvailable = jasBackendAvailable;
         this.monomialOrder = monomialOrder;
+        this.engine = new GroebnerBasisEngine(monomialOrder);
+        this.basisCache = new BasisCache(basisCacheCapacity);
     }
 
     public MathematicalAlgorithmRegistry.AlgorithmExecutionResult lastResult() {
@@ -114,12 +131,22 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
             lastResult = unsupported("polynomial outside configured Gröbner limits", unsupportedReason.orElseThrow());
             return Optional.empty();
         }
-        GroebnerBasisEngine engine = new GroebnerBasisEngine(monomialOrder);
-        GroebnerBasisEngine.EngineResult result = engine.normalFormModuloIdeal(
+
+        IdealCacheKey cacheKey = idealCacheKey(generators);
+        GroebnerBasisEngine.BasisPreparation preparation = basisCache.get(cacheKey);
+        boolean basisCacheHit = preparation != null;
+        if (!basisCacheHit) {
+            preparation = engine.prepareIdeal(generators, budget.maxSteps(), budget.maxStates());
+            if (!preparation.budgetExhausted()) {
+                basisCache.put(cacheKey, preparation);
+            }
+        }
+
+        GroebnerBasisEngine.EngineResult result = engine.normalFormModuloPreparedIdeal(
             polynomial.orElseThrow(),
-            generators,
+            preparation,
             budget.maxSteps(),
-            budget.maxStates()
+            basisCacheHit
         );
         if (result.budgetExhausted()) {
             lastResult = new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(
@@ -141,6 +168,16 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         return Optional.of(result.remainder().toCanonicalString(monomialOrder));
     }
 
+    private IdealCacheKey idealCacheKey(List<Polynomial> generators) {
+        List<String> canonicalGenerators = generators.stream()
+            .filter(generator -> !generator.isZero())
+            .map(generator -> generator.monic(monomialOrder).toCanonicalString(monomialOrder))
+            .distinct()
+            .sorted()
+            .toList();
+        return new IdealCacheKey(monomialOrder.name(), canonicalGenerators);
+    }
+
     private Map<String, Object> resultPayload(GroebnerBasisEngine.EngineResult result) {
         Map<String, Object> payload = basePayload("");
         payload.put("basis", result.basis().stream().map(polynomial -> polynomial.toCanonicalString(monomialOrder)).toList());
@@ -157,6 +194,13 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         payload.put("pairsSkippedByProductCriterion", result.pairsSkippedByProductCriterion());
         payload.put("pairsSkippedByChainCriterion", result.pairsSkippedByChainCriterion());
         payload.put("maxPendingPairs", result.maxPendingPairs());
+        payload.put("basisCacheHit", result.basisCacheHit());
+        payload.put("basisCacheSize", basisCache.size());
+        payload.put("basisCacheCapacity", basisCache.capacity());
+        payload.put("basisPreparationSteps", result.basisPreparationSteps());
+        payload.put("basisPreparationStepsSaved", result.basisPreparationStepsSaved());
+        payload.put("queryReductionSteps", result.queryReductionSteps());
+        payload.put("interreductionSteps", result.interreductionSteps());
         payload.put("steps", result.steps());
         payload.put("budgetStatus", result.budgetStatus());
         return Map.copyOf(payload);
@@ -214,8 +258,48 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
             .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)
             .map(MathematicalAlgorithmRegistry.AlgorithmBudget::maxStates)
             .orElse(SAFE_DEFAULT_BUDGET.maxStates()));
+        payload.put("basisCacheCapacity", basisCache.capacity());
         payload.put("timeoutMillis", 0);
         payload.put("unsupportedReason", unsupportedReason == null ? "" : unsupportedReason);
         return payload;
+    }
+
+    private record IdealCacheKey(String monomialOrder, List<String> canonicalGenerators) {
+        private IdealCacheKey {
+            canonicalGenerators = List.copyOf(canonicalGenerators);
+        }
+    }
+
+    private static final class BasisCache {
+        private final int capacity;
+        private final LinkedHashMap<IdealCacheKey, GroebnerBasisEngine.BasisPreparation> entries =
+            new LinkedHashMap<>(16, 0.75f, true);
+
+        private BasisCache(int capacity) {
+            this.capacity = capacity;
+        }
+
+        private synchronized GroebnerBasisEngine.BasisPreparation get(IdealCacheKey key) {
+            return entries.get(key);
+        }
+
+        private synchronized void put(IdealCacheKey key, GroebnerBasisEngine.BasisPreparation preparation) {
+            if (capacity == 0) {
+                return;
+            }
+            entries.put(key, preparation);
+            while (entries.size() > capacity) {
+                IdealCacheKey eldest = entries.keySet().iterator().next();
+                entries.remove(eldest);
+            }
+        }
+
+        private synchronized int size() {
+            return entries.size();
+        }
+
+        private int capacity() {
+            return capacity;
+        }
     }
 }
