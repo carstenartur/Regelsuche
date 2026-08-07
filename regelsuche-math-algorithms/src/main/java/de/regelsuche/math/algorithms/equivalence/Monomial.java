@@ -3,6 +3,7 @@ package de.regelsuche.math.algorithms.equivalence;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 
 public record Monomial(Map<String, Integer> powers) {
@@ -23,7 +24,7 @@ public record Monomial(Map<String, Integer> powers) {
                 }
             }
         }
-        powers = Collections.unmodifiableMap(normalized);
+        powers = Collections.unmodifiableNavigableMap(normalized);
     }
 
     public static Monomial constant() {
@@ -137,5 +138,10 @@ public record Monomial(Map<String, Integer> powers) {
             }
         }
         return builder.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    NavigableMap<String, Integer> orderedPowers() {
+        return (NavigableMap<String, Integer>) powers;
     }
 }
