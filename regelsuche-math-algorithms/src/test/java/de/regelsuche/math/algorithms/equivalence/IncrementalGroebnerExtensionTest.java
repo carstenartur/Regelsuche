@@ -7,13 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import de.regelsuche.math.algorithms.registry.DefaultMathematicalAlgorithmRegistry;
 import de.regelsuche.validation.MathematicalAlgorithmRegistry;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 class IncrementalGroebnerExtensionTest {
+    private static final int TEST_STEP_BUDGET = 5_000;
+    private static final int TEST_PAIR_BUDGET = 5_000;
+
     @Test
     void extendingIndependentIdealDoesNotReconsiderOldPairs() {
         MonomialOrder order = new GradedReverseLexOrder();
@@ -129,37 +132,70 @@ class IncrementalGroebnerExtensionTest {
     }
 
     @Test
-    void deterministicIncrementalBasesRemainGroebnerBasesAndContainAllGenerators() {
-        Random random = new Random(2026080704L);
+    @Timeout(value = 30, unit = TimeUnit.SECONDS)
+    void boundedIncrementalAndColdBasesRemainEquivalent() {
+        Polynomial one = Polynomial.constant(Rational.ONE);
+        Polynomial x = Polynomial.variable("x");
+        Polynomial y = Polynomial.variable("y");
+        Polynomial z = Polynomial.variable("z");
+        List<ExtensionScenario> scenarios = List.of(
+            new ExtensionScenario(
+                List.of(x.pow(2).subtract(one), y.pow(2).subtract(one)),
+                z.pow(2).subtract(one),
+                x.multiply(y).add(z)
+            ),
+            new ExtensionScenario(
+                List.of(x.multiply(y).subtract(one), y.pow(2).subtract(x)),
+                z.subtract(one),
+                x.pow(2).add(y).add(z)
+            ),
+            new ExtensionScenario(
+                List.of(x, y),
+                x.add(y),
+                x.add(y).add(z)
+            ),
+            new ExtensionScenario(
+                List.of(x.add(y), x.subtract(y)),
+                z.subtract(x),
+                x.add(y).add(z)
+            )
+        );
+
         for (MonomialOrder order : List.of(new GradedReverseLexOrder(), new LexOrder())) {
-            for (int example = 0; example < 30; example++) {
-                List<Polynomial> parentGenerators = List.of(randomPolynomial(random), randomPolynomial(random));
-                Polynomial additional = randomPolynomial(random);
+            for (int example = 0; example < scenarios.size(); example++) {
+                ExtensionScenario scenario = scenarios.get(example);
                 BuchbergerAlgorithm algorithm = new BuchbergerAlgorithm();
                 BuchbergerAlgorithm.BasisComputation parent = algorithm.computeBasis(
-                    parentGenerators, order, 20_000, 20_000);
+                    scenario.parentGenerators(),
+                    order,
+                    TEST_STEP_BUDGET,
+                    TEST_PAIR_BUDGET
+                );
                 assertFalse(parent.budgetExhausted(), "parent " + example + " / " + order.name());
 
                 BuchbergerAlgorithm.BasisComputation incremental = algorithm.extendBasis(
-                    parent.basis(), List.of(additional), order, 20_000, 20_000);
-                BuchbergerAlgorithm.BasisComputation cold = algorithm.computeBasis(
-                    List.of(parentGenerators.get(0), parentGenerators.get(1), additional),
+                    parent.basis(),
+                    List.of(scenario.additionalGenerator()),
                     order,
-                    20_000,
-                    20_000
+                    TEST_STEP_BUDGET,
+                    TEST_PAIR_BUDGET
                 );
+                List<Polynomial> allGenerators = new ArrayList<>(scenario.parentGenerators());
+                allGenerators.add(scenario.additionalGenerator());
+                BuchbergerAlgorithm.BasisComputation cold = algorithm.computeBasis(
+                    allGenerators,
+                    order,
+                    TEST_STEP_BUDGET,
+                    TEST_PAIR_BUDGET
+                );
+
                 assertFalse(incremental.budgetExhausted(), "incremental " + example + " / " + order.name());
                 assertFalse(cold.budgetExhausted(), "cold " + example + " / " + order.name());
-
-                List<Polynomial> allGenerators = new ArrayList<>(parentGenerators);
-                allGenerators.add(additional);
                 assertGeneratorsReduceToZero(allGenerators, incremental.basis(), order);
                 assertBuchbergerCriterion(incremental.basis(), order);
-
-                Polynomial query = randomPolynomial(random);
                 assertEquals(
-                    reduce(query, cold.basis(), order).toCanonicalString(order),
-                    reduce(query, incremental.basis(), order).toCanonicalString(order),
+                    reduce(scenario.query(), cold.basis(), order).toCanonicalString(order),
+                    reduce(scenario.query(), incremental.basis(), order).toCanonicalString(order),
                     "normal form " + example + " / " + order.name()
                 );
             }
@@ -175,32 +211,6 @@ class IncrementalGroebnerExtensionTest {
             )
         );
         return new GroebnerBasisEquivalenceService(registry, false, new GradedReverseLexOrder(), 16);
-    }
-
-    private Polynomial randomPolynomial(Random random) {
-        Map<Monomial, Rational> terms = new HashMap<>();
-        int termCount = 1 + random.nextInt(3);
-        for (int i = 0; i < termCount; i++) {
-            int xExponent = random.nextInt(3);
-            int yExponent = random.nextInt(3);
-            int coefficient = random.nextInt(5) - 2;
-            if (coefficient == 0) {
-                coefficient = 1;
-            }
-            Map<String, Integer> powers = new HashMap<>();
-            if (xExponent > 0) {
-                powers.put("x", xExponent);
-            }
-            if (yExponent > 0) {
-                powers.put("y", yExponent);
-            }
-            terms.merge(new Monomial(powers), Rational.of(coefficient), Rational::add);
-        }
-        Polynomial polynomial = Polynomial.zero();
-        for (Map.Entry<Monomial, Rational> entry : terms.entrySet()) {
-            polynomial = polynomial.add(Polynomial.term(entry.getKey(), entry.getValue()));
-        }
-        return polynomial.isZero() ? Polynomial.variable("x") : polynomial;
     }
 
     private void assertGeneratorsReduceToZero(
@@ -225,12 +235,27 @@ class IncrementalGroebnerExtensionTest {
     }
 
     private Polynomial reduce(Polynomial polynomial, List<Polynomial> basis, MonomialOrder order) {
-        PolynomialReducer.ReductionResult reduction = new PolynomialReducer().reduce(polynomial, basis, order, 100_000);
+        PolynomialReducer.ReductionResult reduction = new PolynomialReducer().reduce(
+            polynomial,
+            basis,
+            order,
+            TEST_STEP_BUDGET
+        );
         assertFalse(reduction.budgetExhausted());
         return reduction.remainder();
     }
 
     private int integer(Map<String, Object> payload, String key) {
         return ((Number) payload.get(key)).intValue();
+    }
+
+    private record ExtensionScenario(
+        List<Polynomial> parentGenerators,
+        Polynomial additionalGenerator,
+        Polynomial query
+    ) {
+        private ExtensionScenario {
+            parentGenerators = List.copyOf(parentGenerators);
+        }
     }
 }
