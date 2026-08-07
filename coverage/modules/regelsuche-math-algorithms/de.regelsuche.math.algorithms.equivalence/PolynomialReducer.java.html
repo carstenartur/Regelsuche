@@ -28,17 +28,17 @@ import java.util.concurrent.ConcurrentMap;
 <span class="fc" id="L28">            Optional&lt;Reduction&gt; reduction = firstReduction(currentLeadingTerm, preparedBasis);</span>
 <span class="fc bfc" id="L29" title="All 2 branches covered.">            if (reduction.isPresent()) {</span>
 <span class="fc" id="L30">                Reduction divisor = reduction.orElseThrow();</span>
-<span class="fc" id="L31">                current = current.subtract(divisor.polynomial().multiply(</span>
-<span class="fc" id="L32">                    currentLeadingTerm.monomial().divideBy(divisor.leadingTerm().monomial()),</span>
-<span class="fc" id="L33">                    currentLeadingTerm.coefficient().divide(divisor.leadingTerm().coefficient())</span>
-                ));
-<span class="fc" id="L35">            } else {</span>
-<span class="fc" id="L36">                Polynomial leadingPolynomial = Polynomial.term(</span>
-<span class="fc" id="L37">                    currentLeadingTerm.monomial(),</span>
-<span class="fc" id="L38">                    currentLeadingTerm.coefficient()</span>
+<span class="fc" id="L31">                current = current.subtractMultiple(</span>
+<span class="fc" id="L32">                    divisor.polynomial(),</span>
+<span class="fc" id="L33">                    currentLeadingTerm.monomial().divideBy(divisor.leadingTerm().monomial()),</span>
+<span class="fc" id="L34">                    currentLeadingTerm.coefficient().divide(divisor.leadingTerm().coefficient())</span>
                 );
-<span class="fc" id="L40">                remainder = remainder.add(leadingPolynomial);</span>
-<span class="fc" id="L41">                current = current.subtract(leadingPolynomial);</span>
+<span class="fc" id="L36">            } else {</span>
+<span class="fc" id="L37">                remainder = remainder.addTerm(</span>
+<span class="fc" id="L38">                    currentLeadingTerm.monomial(),</span>
+<span class="fc" id="L39">                    currentLeadingTerm.coefficient()</span>
+                );
+<span class="fc" id="L41">                current = current.withoutTerm(currentLeadingTerm.monomial());</span>
             }
 <span class="fc" id="L43">            steps++;</span>
 <span class="fc" id="L44">        }</span>

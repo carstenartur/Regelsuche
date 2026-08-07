@@ -132,186 +132,232 @@ public final class Polynomial {
 <span class="fc" id="L132">        return owned(merged);</span>
     }
 
+    Polynomial addTerm(Monomial monomial, Rational coefficient) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (coefficient.isZero()) {</span>
+<span class="nc" id="L137">            return this;</span>
+        }
+<span class="fc" id="L139">        Map&lt;Monomial, Rational&gt; merged = new HashMap&lt;&gt;(terms);</span>
+<span class="fc" id="L140">        mergeTerm(merged, monomial, coefficient);</span>
+<span class="fc" id="L141">        return owned(merged);</span>
+    }
+
     public Polynomial subtract(Polynomial other) {
-<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (other.isZero()) {</span>
-<span class="fc" id="L137">            return this;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (other.isZero()) {</span>
+<span class="fc" id="L146">            return this;</span>
         }
-<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (this == other) {</span>
-<span class="fc" id="L140">            return ZERO;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (this == other) {</span>
+<span class="fc" id="L149">            return ZERO;</span>
         }
-<span class="fc" id="L142">        Map&lt;Monomial, Rational&gt; merged = new HashMap&lt;&gt;(terms);</span>
-<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : other.terms.entrySet()) {</span>
-<span class="fc" id="L144">            mergeTerm(merged, entry.getKey(), entry.getValue().negate());</span>
-<span class="fc" id="L145">        }</span>
-<span class="fc" id="L146">        return owned(merged);</span>
+<span class="fc" id="L151">        Map&lt;Monomial, Rational&gt; merged = new HashMap&lt;&gt;(terms);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : other.terms.entrySet()) {</span>
+<span class="fc" id="L153">            mergeTerm(merged, entry.getKey(), entry.getValue().negate());</span>
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">        return owned(merged);</span>
+    }
+
+    Polynomial subtractMultiple(Polynomial other, Monomial monomial, Rational coefficient) {
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">        if (other.isZero() || coefficient.isZero()) {</span>
+<span class="fc" id="L160">            return this;</span>
+        }
+<span class="fc bfc" id="L162" title="All 4 branches covered.">        if (monomial.powers().isEmpty() &amp;&amp; coefficient.isOne()) {</span>
+<span class="fc" id="L163">            return subtract(other);</span>
+        }
+<span class="fc" id="L165">        Rational negatedCoefficient = coefficient.negate();</span>
+<span class="fc" id="L166">        Map&lt;Monomial, Rational&gt; merged = new HashMap&lt;&gt;(terms);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : other.terms.entrySet()) {</span>
+<span class="fc" id="L168">            mergeTerm(</span>
+                merged,
+<span class="fc" id="L170">                entry.getKey().multiply(monomial),</span>
+<span class="fc" id="L171">                entry.getValue().multiply(negatedCoefficient)</span>
+            );
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return owned(merged);</span>
+    }
+
+    Polynomial withoutTerm(Monomial monomial) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (!terms.containsKey(monomial)) {</span>
+<span class="nc" id="L179">            return this;</span>
+        }
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (terms.size() == 1) {</span>
+<span class="fc" id="L182">            return ZERO;</span>
+        }
+<span class="fc" id="L184">        Map&lt;Monomial, Rational&gt; reduced = new HashMap&lt;&gt;(terms);</span>
+<span class="fc" id="L185">        reduced.remove(monomial);</span>
+<span class="fc" id="L186">        return owned(reduced);</span>
     }
 
     public Polynomial multiply(Rational scalar) {
-<span class="pc bpc" id="L150" title="2 of 4 branches missed.">        if (scalar.isZero() || isZero()) {</span>
-<span class="nc" id="L151">            return ZERO;</span>
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">        if (scalar.isZero() || isZero()) {</span>
+<span class="nc" id="L191">            return ZERO;</span>
         }
-<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (scalar.isOne()) {</span>
-<span class="fc" id="L154">            return this;</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (scalar.isOne()) {</span>
+<span class="fc" id="L194">            return this;</span>
         }
-<span class="fc" id="L156">        Map&lt;Monomial, Rational&gt; scaled = new HashMap&lt;&gt;(terms.size());</span>
-<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : terms.entrySet()) {</span>
-<span class="fc" id="L158">            scaled.put(entry.getKey(), entry.getValue().multiply(scalar));</span>
-<span class="fc" id="L159">        }</span>
-<span class="fc" id="L160">        return owned(scaled);</span>
+<span class="fc" id="L196">        Map&lt;Monomial, Rational&gt; scaled = new HashMap&lt;&gt;(terms.size());</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : terms.entrySet()) {</span>
+<span class="fc" id="L198">            scaled.put(entry.getKey(), entry.getValue().multiply(scalar));</span>
+<span class="fc" id="L199">        }</span>
+<span class="fc" id="L200">        return owned(scaled);</span>
     }
 
     public Polynomial multiply(Monomial monomial, Rational coefficient) {
-<span class="pc bpc" id="L164" title="2 of 4 branches missed.">        if (coefficient.isZero() || isZero()) {</span>
-<span class="nc" id="L165">            return ZERO;</span>
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">        if (coefficient.isZero() || isZero()) {</span>
+<span class="fc" id="L205">            return ZERO;</span>
         }
-<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (monomial.powers().isEmpty()) {</span>
-<span class="fc" id="L168">            return multiply(coefficient);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (monomial.powers().isEmpty()) {</span>
+<span class="fc" id="L208">            return multiply(coefficient);</span>
         }
-<span class="fc" id="L170">        Map&lt;Monomial, Rational&gt; multiplied = new HashMap&lt;&gt;(terms.size());</span>
-<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : terms.entrySet()) {</span>
-<span class="fc" id="L172">            multiplied.put(</span>
-<span class="fc" id="L173">                entry.getKey().multiply(monomial),</span>
-<span class="fc" id="L174">                entry.getValue().multiply(coefficient)</span>
+<span class="fc" id="L210">        Map&lt;Monomial, Rational&gt; multiplied = new HashMap&lt;&gt;(terms.size());</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : terms.entrySet()) {</span>
+<span class="fc" id="L212">            multiplied.put(</span>
+<span class="fc" id="L213">                entry.getKey().multiply(monomial),</span>
+<span class="fc" id="L214">                entry.getValue().multiply(coefficient)</span>
             );
-<span class="fc" id="L176">        }</span>
-<span class="fc" id="L177">        return owned(multiplied);</span>
+<span class="fc" id="L216">        }</span>
+<span class="fc" id="L217">        return owned(multiplied);</span>
     }
 
     public Polynomial multiply(Polynomial other) {
-<span class="pc bpc" id="L181" title="1 of 4 branches missed.">        if (isZero() || other.isZero()) {</span>
-<span class="fc" id="L182">            return ZERO;</span>
+<span class="pc bpc" id="L221" title="1 of 4 branches missed.">        if (isZero() || other.isZero()) {</span>
+<span class="fc" id="L222">            return ZERO;</span>
         }
-<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (this == ONE) {</span>
-<span class="fc" id="L185">            return other;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (this == ONE) {</span>
+<span class="fc" id="L225">            return other;</span>
         }
-<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (other == ONE) {</span>
-<span class="fc" id="L188">            return this;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (other == ONE) {</span>
+<span class="fc" id="L228">            return this;</span>
         }
-<span class="fc" id="L190">        Map&lt;Monomial, Rational&gt; multiplied = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; left : terms.entrySet()) {</span>
-<span class="fc bfc" id="L192" title="All 2 branches covered.">            for (Map.Entry&lt;Monomial, Rational&gt; right : other.terms.entrySet()) {</span>
-<span class="fc" id="L193">                Monomial monomial = left.getKey().multiply(right.getKey());</span>
-<span class="fc" id="L194">                Rational coefficient = left.getValue().multiply(right.getValue());</span>
-<span class="fc" id="L195">                mergeTerm(multiplied, monomial, coefficient);</span>
-<span class="fc" id="L196">            }</span>
-<span class="fc" id="L197">        }</span>
-<span class="fc" id="L198">        return owned(multiplied);</span>
+<span class="fc" id="L230">        Map&lt;Monomial, Rational&gt; multiplied = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; left : terms.entrySet()) {</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            for (Map.Entry&lt;Monomial, Rational&gt; right : other.terms.entrySet()) {</span>
+<span class="fc" id="L233">                Monomial monomial = left.getKey().multiply(right.getKey());</span>
+<span class="fc" id="L234">                Rational coefficient = left.getValue().multiply(right.getValue());</span>
+<span class="fc" id="L235">                mergeTerm(multiplied, monomial, coefficient);</span>
+<span class="fc" id="L236">            }</span>
+<span class="fc" id="L237">        }</span>
+<span class="fc" id="L238">        return owned(multiplied);</span>
     }
 
     public Polynomial pow(int exponent) {
-<span class="fc" id="L202">        Polynomial result = ONE;</span>
-<span class="fc" id="L203">        Polynomial factor = this;</span>
-<span class="fc" id="L204">        int remaining = exponent;</span>
-<span class="fc bfc" id="L205" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
-<span class="fc bfc" id="L206" title="All 2 branches covered.">            if ((remaining &amp; 1) != 0) {</span>
-<span class="fc" id="L207">                result = result.multiply(factor);</span>
+<span class="fc" id="L242">        Polynomial result = ONE;</span>
+<span class="fc" id="L243">        Polynomial factor = this;</span>
+<span class="fc" id="L244">        int remaining = exponent;</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        while (remaining &gt; 0) {</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            if ((remaining &amp; 1) != 0) {</span>
+<span class="fc" id="L247">                result = result.multiply(factor);</span>
             }
-<span class="fc" id="L209">            remaining &gt;&gt;&gt;= 1;</span>
-<span class="fc bfc" id="L210" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
-<span class="fc" id="L211">                factor = factor.multiply(factor);</span>
+<span class="fc" id="L249">            remaining &gt;&gt;&gt;= 1;</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">            if (remaining &gt; 0) {</span>
+<span class="fc" id="L251">                factor = factor.multiply(factor);</span>
             }
         }
-<span class="fc" id="L214">        return result;</span>
+<span class="fc" id="L254">        return result;</span>
     }
 
     public Optional&lt;PolynomialArithmetic.LinearEquation&gt; isolateLinear(String variable) {
-<span class="fc" id="L218">        Rational variableCoefficient = Rational.ZERO;</span>
-<span class="fc" id="L219">        Map&lt;Monomial, Rational&gt; restTerms = new HashMap&lt;&gt;();</span>
-<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : terms.entrySet()) {</span>
-<span class="fc" id="L221">            Monomial monomial = entry.getKey();</span>
-<span class="fc" id="L222">            int exponent = monomial.exponentOf(variable);</span>
-<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (exponent == 0) {</span>
-<span class="fc" id="L224">                restTerms.put(monomial, entry.getValue());</span>
-<span class="fc" id="L225">                continue;</span>
+<span class="fc" id="L258">        Rational variableCoefficient = Rational.ZERO;</span>
+<span class="fc" id="L259">        Map&lt;Monomial, Rational&gt; restTerms = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : terms.entrySet()) {</span>
+<span class="fc" id="L261">            Monomial monomial = entry.getKey();</span>
+<span class="fc" id="L262">            int exponent = monomial.exponentOf(variable);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (exponent == 0) {</span>
+<span class="fc" id="L264">                restTerms.put(monomial, entry.getValue());</span>
+<span class="fc" id="L265">                continue;</span>
             }
-<span class="pc bpc" id="L227" title="2 of 4 branches missed.">            if (exponent != 1 || monomial.without(variable).totalDegree() != 0) {</span>
-<span class="nc" id="L228">                return Optional.empty();</span>
+<span class="pc bpc" id="L267" title="2 of 4 branches missed.">            if (exponent != 1 || monomial.without(variable).totalDegree() != 0) {</span>
+<span class="nc" id="L268">                return Optional.empty();</span>
             }
-<span class="fc" id="L230">            variableCoefficient = variableCoefficient.add(entry.getValue());</span>
-<span class="fc" id="L231">        }</span>
-<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (variableCoefficient.isZero()) {</span>
-<span class="nc" id="L233">            return Optional.empty();</span>
+<span class="fc" id="L270">            variableCoefficient = variableCoefficient.add(entry.getValue());</span>
+<span class="fc" id="L271">        }</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if (variableCoefficient.isZero()) {</span>
+<span class="nc" id="L273">            return Optional.empty();</span>
         }
-<span class="fc" id="L235">        return Optional.of(new PolynomialArithmetic.LinearEquation(variableCoefficient, owned(restTerms)));</span>
+<span class="fc" id="L275">        return Optional.of(new PolynomialArithmetic.LinearEquation(variableCoefficient, owned(restTerms)));</span>
     }
 
     public String toCanonicalString() {
-<span class="fc" id="L239">        return toCanonicalString(DEFAULT_ORDER);</span>
+<span class="fc" id="L279">        return toCanonicalString(DEFAULT_ORDER);</span>
     }
 
     public String toCanonicalString(MonomialOrder order) {
-<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (terms.isEmpty()) {</span>
-<span class="fc" id="L244">            return &quot;0&quot;;</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (terms.isEmpty()) {</span>
+<span class="fc" id="L284">            return &quot;0&quot;;</span>
         }
-<span class="fc" id="L246">        List&lt;Map.Entry&lt;Monomial, Rational&gt;&gt; ordered = terms.entrySet().stream()</span>
-<span class="fc" id="L247">            .sorted((left, right) -&gt; {</span>
-<span class="fc" id="L248">                int comparison = order.compare(left.getKey(), right.getKey());</span>
-<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                return comparison != 0 ? comparison : left.getKey().key().compareTo(right.getKey().key());</span>
+<span class="fc" id="L286">        List&lt;Map.Entry&lt;Monomial, Rational&gt;&gt; ordered = terms.entrySet().stream()</span>
+<span class="fc" id="L287">            .sorted((left, right) -&gt; {</span>
+<span class="fc" id="L288">                int comparison = order.compare(left.getKey(), right.getKey());</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">                return comparison != 0 ? comparison : left.getKey().key().compareTo(right.getKey().key());</span>
             })
-<span class="fc" id="L251">            .toList();</span>
-<span class="fc" id="L252">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc bfc" id="L253" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : ordered) {</span>
-<span class="fc" id="L254">            Rational coefficient = entry.getValue();</span>
-<span class="fc" id="L255">            Monomial monomial = entry.getKey();</span>
-<span class="fc bfc" id="L256" title="All 2 branches covered.">            boolean negative = coefficient.compareTo(Rational.ZERO) &lt; 0;</span>
-<span class="fc" id="L257">            Rational absolute = coefficient.abs();</span>
-<span class="fc" id="L258">            String monomialKey = monomial.key();</span>
+<span class="fc" id="L291">            .toList();</span>
+<span class="fc" id="L292">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (Map.Entry&lt;Monomial, Rational&gt; entry : ordered) {</span>
+<span class="fc" id="L294">            Rational coefficient = entry.getValue();</span>
+<span class="fc" id="L295">            Monomial monomial = entry.getKey();</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            boolean negative = coefficient.compareTo(Rational.ZERO) &lt; 0;</span>
+<span class="fc" id="L297">            Rational absolute = coefficient.abs();</span>
+<span class="fc" id="L298">            String monomialKey = monomial.key();</span>
 
-<span class="fc bfc" id="L260" title="All 2 branches covered.">            if (builder.length() &gt; 0) {</span>
-<span class="fc bfc" id="L261" title="All 2 branches covered.">                builder.append(negative ? &quot; - &quot; : &quot; + &quot;);</span>
-<span class="fc bfc" id="L262" title="All 2 branches covered.">            } else if (negative) {</span>
-<span class="fc" id="L263">                builder.append('-');</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (builder.length() &gt; 0) {</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                builder.append(negative ? &quot; - &quot; : &quot; + &quot;);</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">            } else if (negative) {</span>
+<span class="fc" id="L303">                builder.append('-');</span>
             }
 
-<span class="fc bfc" id="L266" title="All 4 branches covered.">            boolean writeCoefficient = monomialKey.isEmpty() || !absolute.isOne();</span>
-<span class="fc bfc" id="L267" title="All 2 branches covered.">            if (writeCoefficient) {</span>
-<span class="fc" id="L268">                builder.append(absolute);</span>
+<span class="fc bfc" id="L306" title="All 4 branches covered.">            boolean writeCoefficient = monomialKey.isEmpty() || !absolute.isOne();</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (writeCoefficient) {</span>
+<span class="fc" id="L308">                builder.append(absolute);</span>
             }
-<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (!monomialKey.isEmpty()) {</span>
-<span class="fc bfc" id="L271" title="All 2 branches covered.">                if (writeCoefficient) {</span>
-<span class="fc" id="L272">                    builder.append('*');</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if (!monomialKey.isEmpty()) {</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">                if (writeCoefficient) {</span>
+<span class="fc" id="L312">                    builder.append('*');</span>
                 }
-<span class="fc" id="L274">                builder.append(monomialKey);</span>
+<span class="fc" id="L314">                builder.append(monomialKey);</span>
             }
-<span class="fc" id="L276">        }</span>
-<span class="fc" id="L277">        return builder.toString();</span>
+<span class="fc" id="L316">        }</span>
+<span class="fc" id="L317">        return builder.toString();</span>
     }
 
     private static Polynomial owned(Map&lt;Monomial, Rational&gt; normalizedTerms) {
-<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (normalizedTerms.isEmpty()) {</span>
-<span class="fc" id="L282">            return ZERO;</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (normalizedTerms.isEmpty()) {</span>
+<span class="fc" id="L322">            return ZERO;</span>
         }
-<span class="fc" id="L284">        return new Polynomial(normalizedTerms, true);</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">        if (normalizedTerms.size() == 1) {</span>
+<span class="fc" id="L325">            Map.Entry&lt;Monomial, Rational&gt; only = normalizedTerms.entrySet().iterator().next();</span>
+<span class="fc bfc" id="L326" title="All 4 branches covered.">            if (only.getKey().powers().isEmpty() &amp;&amp; only.getValue().isOne()) {</span>
+<span class="fc" id="L327">                return ONE;</span>
+            }
+        }
+<span class="fc" id="L330">        return new Polynomial(normalizedTerms, true);</span>
     }
 
     private static void mergeTerm(Map&lt;Monomial, Rational&gt; target, Monomial monomial, Rational coefficient) {
-<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (coefficient.isZero()) {</span>
-<span class="nc" id="L289">            return;</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (coefficient.isZero()) {</span>
+<span class="nc" id="L335">            return;</span>
         }
-<span class="fc" id="L291">        Rational current = target.get(monomial);</span>
-<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (current == null) {</span>
-<span class="fc" id="L293">            target.put(monomial, coefficient);</span>
-<span class="fc" id="L294">            return;</span>
+<span class="fc" id="L337">        Rational current = target.get(monomial);</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        if (current == null) {</span>
+<span class="fc" id="L339">            target.put(monomial, coefficient);</span>
+<span class="fc" id="L340">            return;</span>
         }
-<span class="fc" id="L296">        Rational merged = current.add(coefficient);</span>
-<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (merged.isZero()) {</span>
-<span class="fc" id="L298">            target.remove(monomial);</span>
+<span class="fc" id="L342">        Rational merged = current.add(coefficient);</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (merged.isZero()) {</span>
+<span class="fc" id="L344">            target.remove(monomial);</span>
         } else {
-<span class="fc" id="L300">            target.put(monomial, merged);</span>
+<span class="fc" id="L346">            target.put(monomial, merged);</span>
         }
-<span class="fc" id="L302">    }</span>
+<span class="fc" id="L348">    }</span>
 
     @Override
     public boolean equals(Object other) {
-<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        if (!(other instanceof Polynomial polynomial)) {</span>
-<span class="nc" id="L307">            return false;</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">        if (!(other instanceof Polynomial polynomial)) {</span>
+<span class="nc" id="L353">            return false;</span>
         }
-<span class="fc" id="L309">        return terms.equals(polynomial.terms);</span>
+<span class="fc" id="L355">        return terms.equals(polynomial.terms);</span>
     }
 
     @Override
     public int hashCode() {
-<span class="fc" id="L314">        return terms.hashCode();</span>
+<span class="fc" id="L360">        return terms.hashCode();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
