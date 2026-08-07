@@ -24,7 +24,7 @@ public record Rational(BigInteger numerator, BigInteger denominator) implements 
 <span class="fc" id="L24">    }</span>
 
     public static Rational of(long value) {
-<span class="nc" id="L27">        return new Rational(BigInteger.valueOf(value), BigInteger.ONE);</span>
+<span class="fc" id="L27">        return new Rational(BigInteger.valueOf(value), BigInteger.ONE);</span>
     }
 
     public static Rational fromDouble(double value) {
@@ -77,7 +77,7 @@ public record Rational(BigInteger numerator, BigInteger denominator) implements 
     }
 
     public boolean isOne() {
-<span class="pc bpc" id="L80" title="1 of 4 branches missed.">        return numerator.equals(BigInteger.ONE) &amp;&amp; denominator.equals(BigInteger.ONE);</span>
+<span class="fc bfc" id="L80" title="All 4 branches covered.">        return numerator.equals(BigInteger.ONE) &amp;&amp; denominator.equals(BigInteger.ONE);</span>
     }
 
     @Override

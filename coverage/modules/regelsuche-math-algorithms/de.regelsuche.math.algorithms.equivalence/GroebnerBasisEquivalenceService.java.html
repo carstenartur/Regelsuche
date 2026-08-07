@@ -147,11 +147,19 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
 <span class="fc" id="L147">        payload.put(&quot;reducedBasis&quot;, result.reducedBasis().stream()</span>
 <span class="fc" id="L148">            .map(polynomial -&gt; polynomial.toCanonicalString(monomialOrder))</span>
 <span class="fc" id="L149">            .toList());</span>
-<span class="fc" id="L150">        payload.put(&quot;remainder&quot;, result.remainder().toCanonicalString(monomialOrder));</span>
-<span class="fc" id="L151">        payload.put(&quot;monomialOrder&quot;, result.monomialOrder());</span>
-<span class="fc" id="L152">        payload.put(&quot;steps&quot;, result.steps());</span>
-<span class="fc" id="L153">        payload.put(&quot;budgetStatus&quot;, result.budgetStatus());</span>
-<span class="fc" id="L154">        return Map.copyOf(payload);</span>
+<span class="fc" id="L150">        payload.put(&quot;reducedBasisStatus&quot;, result.reducedBasisStatus());</span>
+<span class="fc" id="L151">        payload.put(&quot;remainder&quot;, result.remainder().toCanonicalString(monomialOrder));</span>
+<span class="fc" id="L152">        payload.put(&quot;monomialOrder&quot;, result.monomialOrder());</span>
+<span class="fc" id="L153">        payload.put(&quot;pairSelectionStrategy&quot;, &quot;lcm-total-degree&quot;);</span>
+<span class="fc" id="L154">        payload.put(&quot;buchbergerCriteria&quot;, List.of(&quot;product&quot;, &quot;chain&quot;));</span>
+<span class="fc" id="L155">        payload.put(&quot;pairsConsidered&quot;, result.pairsConsidered());</span>
+<span class="fc" id="L156">        payload.put(&quot;pairsReduced&quot;, result.pairsReduced());</span>
+<span class="fc" id="L157">        payload.put(&quot;pairsSkippedByProductCriterion&quot;, result.pairsSkippedByProductCriterion());</span>
+<span class="fc" id="L158">        payload.put(&quot;pairsSkippedByChainCriterion&quot;, result.pairsSkippedByChainCriterion());</span>
+<span class="fc" id="L159">        payload.put(&quot;maxPendingPairs&quot;, result.maxPendingPairs());</span>
+<span class="fc" id="L160">        payload.put(&quot;steps&quot;, result.steps());</span>
+<span class="fc" id="L161">        payload.put(&quot;budgetStatus&quot;, result.budgetStatus());</span>
+<span class="fc" id="L162">        return Map.copyOf(payload);</span>
     }
 
     private Optional&lt;String&gt; unsupportedByHardLimits(
@@ -159,56 +167,56 @@ public class GroebnerBasisEquivalenceService implements PolynomialEquivalenceSer
         List&lt;Polynomial&gt; generators,
         MathematicalAlgorithmRegistry.AlgorithmBudget budget
     ) {
-<span class="fc" id="L162">        List&lt;Polynomial&gt; all = new ArrayList&lt;&gt;();</span>
-<span class="fc" id="L163">        all.add(polynomial);</span>
-<span class="fc" id="L164">        all.addAll(generators);</span>
-<span class="fc" id="L165">        int termCount = all.stream().mapToInt(Polynomial::termCount).sum();</span>
-<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (termCount &gt; budget.maxTerms()) {</span>
-<span class="nc" id="L167">            return Optional.of(&quot;maxTerms&quot;);</span>
+<span class="fc" id="L170">        List&lt;Polynomial&gt; all = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L171">        all.add(polynomial);</span>
+<span class="fc" id="L172">        all.addAll(generators);</span>
+<span class="fc" id="L173">        int termCount = all.stream().mapToInt(Polynomial::termCount).sum();</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (termCount &gt; budget.maxTerms()) {</span>
+<span class="nc" id="L175">            return Optional.of(&quot;maxTerms&quot;);</span>
         }
-<span class="fc" id="L169">        int degree = all.stream().mapToInt(Polynomial::totalDegree).max().orElse(0);</span>
-<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (degree &gt; budget.maxDegree()) {</span>
-<span class="fc" id="L171">            return Optional.of(&quot;maxDegree&quot;);</span>
+<span class="fc" id="L177">        int degree = all.stream().mapToInt(Polynomial::totalDegree).max().orElse(0);</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (degree &gt; budget.maxDegree()) {</span>
+<span class="fc" id="L179">            return Optional.of(&quot;maxDegree&quot;);</span>
         }
-<span class="fc" id="L173">        Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
-<span class="fc" id="L174">        all.forEach(value -&gt; variables.addAll(value.variables()));</span>
-<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (variables.size() &gt; budget.maxVariables()) {</span>
-<span class="fc" id="L176">            return Optional.of(&quot;maxVariables&quot;);</span>
+<span class="fc" id="L181">        Set&lt;String&gt; variables = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L182">        all.forEach(value -&gt; variables.addAll(value.variables()));</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (variables.size() &gt; budget.maxVariables()) {</span>
+<span class="fc" id="L184">            return Optional.of(&quot;maxVariables&quot;);</span>
         }
-<span class="pc bpc" id="L178" title="3 of 4 branches missed.">        if (budget.maxCoefficient() &gt; 0 &amp;&amp; all.stream().anyMatch(value -&gt; value.coefficientMagnitudeExceeds(budget.maxCoefficient()))) {</span>
-<span class="nc" id="L179">            return Optional.of(&quot;maxCoefficient&quot;);</span>
+<span class="pc bpc" id="L186" title="3 of 4 branches missed.">        if (budget.maxCoefficient() &gt; 0 &amp;&amp; all.stream().anyMatch(value -&gt; value.coefficientMagnitudeExceeds(budget.maxCoefficient()))) {</span>
+<span class="nc" id="L187">            return Optional.of(&quot;maxCoefficient&quot;);</span>
         }
-<span class="fc" id="L181">        return Optional.empty();</span>
+<span class="fc" id="L189">        return Optional.empty();</span>
     }
 
     private MathematicalAlgorithmRegistry.AlgorithmExecutionResult unsupported(String detail, String reason) {
-<span class="fc" id="L185">        return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(</span>
+<span class="fc" id="L193">        return new MathematicalAlgorithmRegistry.AlgorithmExecutionResult(</span>
             MathematicalAlgorithmRegistry.ExecutionStatus.UNKNOWN,
             MathematicalAlgorithmRegistry.ResultType.DIAGNOSTIC,
             detail,
-<span class="fc" id="L189">            basePayload(reason)</span>
+<span class="fc" id="L197">            basePayload(reason)</span>
         );
     }
 
     private Map&lt;String, Object&gt; basePayload(String unsupportedReason) {
-<span class="fc" id="L194">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
-<span class="fc" id="L195">        payload.put(&quot;capability&quot;, MathematicalAlgorithmRegistry.GROEBNER_BASIS);</span>
-<span class="fc" id="L196">        boolean jasRequested = registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND);</span>
-<span class="fc bfc" id="L197" title="All 2 branches covered.">        payload.put(&quot;requestedBackend&quot;, jasRequested ? &quot;jas&quot; : &quot;pureJavaSmallGroebner&quot;);</span>
-<span class="fc" id="L198">        payload.put(&quot;backend&quot;, &quot;pureJavaSmallGroebner&quot;);</span>
-<span class="fc" id="L199">        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
-<span class="fc" id="L200">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
-<span class="fc" id="L201">            .orElse(SAFE_DEFAULT_BUDGET);</span>
-<span class="fc" id="L202">        payload.put(&quot;maxTerms&quot;, budget.maxTerms());</span>
-<span class="fc" id="L203">        payload.put(&quot;maxDegree&quot;, budget.maxDegree());</span>
-<span class="fc" id="L204">        payload.put(&quot;maxVariables&quot;, budget.maxVariables());</span>
-<span class="fc" id="L205">        payload.put(&quot;maxPairs&quot;, registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
-<span class="fc" id="L206">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
-<span class="fc" id="L207">            .map(MathematicalAlgorithmRegistry.AlgorithmBudget::maxStates)</span>
-<span class="fc" id="L208">            .orElse(SAFE_DEFAULT_BUDGET.maxStates()));</span>
-<span class="fc" id="L209">        payload.put(&quot;timeoutMillis&quot;, 0);</span>
-<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        payload.put(&quot;unsupportedReason&quot;, unsupportedReason == null ? &quot;&quot; : unsupportedReason);</span>
-<span class="fc" id="L211">        return payload;</span>
+<span class="fc" id="L202">        Map&lt;String, Object&gt; payload = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L203">        payload.put(&quot;capability&quot;, MathematicalAlgorithmRegistry.GROEBNER_BASIS);</span>
+<span class="fc" id="L204">        boolean jasRequested = registry.isEnabled(MathematicalAlgorithmRegistry.JAS_BACKEND);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        payload.put(&quot;requestedBackend&quot;, jasRequested ? &quot;jas&quot; : &quot;pureJavaSmallGroebner&quot;);</span>
+<span class="fc" id="L206">        payload.put(&quot;backend&quot;, &quot;pureJavaSmallGroebner&quot;);</span>
+<span class="fc" id="L207">        MathematicalAlgorithmRegistry.AlgorithmBudget budget = registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
+<span class="fc" id="L208">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L209">            .orElse(SAFE_DEFAULT_BUDGET);</span>
+<span class="fc" id="L210">        payload.put(&quot;maxTerms&quot;, budget.maxTerms());</span>
+<span class="fc" id="L211">        payload.put(&quot;maxDegree&quot;, budget.maxDegree());</span>
+<span class="fc" id="L212">        payload.put(&quot;maxVariables&quot;, budget.maxVariables());</span>
+<span class="fc" id="L213">        payload.put(&quot;maxPairs&quot;, registry.find(MathematicalAlgorithmRegistry.GROEBNER_BASIS)</span>
+<span class="fc" id="L214">            .map(MathematicalAlgorithmRegistry.AlgorithmDescriptor::budget)</span>
+<span class="fc" id="L215">            .map(MathematicalAlgorithmRegistry.AlgorithmBudget::maxStates)</span>
+<span class="fc" id="L216">            .orElse(SAFE_DEFAULT_BUDGET.maxStates()));</span>
+<span class="fc" id="L217">        payload.put(&quot;timeoutMillis&quot;, 0);</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        payload.put(&quot;unsupportedReason&quot;, unsupportedReason == null ? &quot;&quot; : unsupportedReason);</span>
+<span class="fc" id="L219">        return payload;</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

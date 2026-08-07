@@ -42,50 +42,54 @@ public record Monomial(Map&lt;String, Integer&gt; powers) {
 <span class="fc bfc" id="L42" title="All 2 branches covered.">            .allMatch(entry -&gt; other.exponentOf(entry.getKey()) &gt;= entry.getValue());</span>
     }
 
+    public boolean isRelativelyPrimeTo(Monomial other) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        return powers.keySet().stream().noneMatch(variable -&gt; other.exponentOf(variable) &gt; 0);</span>
+    }
+
     public Monomial divideBy(Monomial divisor) {
-<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (!divisor.divides(this)) {</span>
-<span class="nc" id="L47">            throw new ArithmeticException(&quot;monomial is not divisible by divisor&quot;);</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (!divisor.divides(this)) {</span>
+<span class="nc" id="L51">            throw new ArithmeticException(&quot;monomial is not divisible by divisor&quot;);</span>
         }
-<span class="fc" id="L49">        Map&lt;String, Integer&gt; quotient = new HashMap&lt;&gt;(powers);</span>
-<span class="fc" id="L50">        divisor.powers.forEach((variable, exponent) -&gt; quotient.compute(variable, (ignored, current) -&gt; current - exponent));</span>
-<span class="fc" id="L51">        return new Monomial(quotient);</span>
+<span class="fc" id="L53">        Map&lt;String, Integer&gt; quotient = new HashMap&lt;&gt;(powers);</span>
+<span class="fc" id="L54">        divisor.powers.forEach((variable, exponent) -&gt; quotient.compute(variable, (ignored, current) -&gt; current - exponent));</span>
+<span class="fc" id="L55">        return new Monomial(quotient);</span>
     }
 
     public Monomial lcm(Monomial other) {
-<span class="fc" id="L55">        Map&lt;String, Integer&gt; merged = new HashMap&lt;&gt;(powers);</span>
-<span class="fc" id="L56">        other.powers.forEach((variable, exponent) -&gt; merged.merge(variable, exponent, Math::max));</span>
-<span class="fc" id="L57">        return new Monomial(merged);</span>
+<span class="fc" id="L59">        Map&lt;String, Integer&gt; merged = new HashMap&lt;&gt;(powers);</span>
+<span class="fc" id="L60">        other.powers.forEach((variable, exponent) -&gt; merged.merge(variable, exponent, Math::max));</span>
+<span class="fc" id="L61">        return new Monomial(merged);</span>
     }
 
     public int exponentOf(String variable) {
-<span class="fc" id="L61">        return powers.getOrDefault(variable, 0);</span>
+<span class="fc" id="L65">        return powers.getOrDefault(variable, 0);</span>
     }
 
     public Monomial without(String variable) {
-<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (!powers.containsKey(variable)) {</span>
-<span class="nc" id="L66">            return this;</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (!powers.containsKey(variable)) {</span>
+<span class="nc" id="L70">            return this;</span>
         }
-<span class="fc" id="L68">        Map&lt;String, Integer&gt; reduced = new HashMap&lt;&gt;(powers);</span>
-<span class="fc" id="L69">        reduced.remove(variable);</span>
-<span class="fc" id="L70">        return new Monomial(reduced);</span>
+<span class="fc" id="L72">        Map&lt;String, Integer&gt; reduced = new HashMap&lt;&gt;(powers);</span>
+<span class="fc" id="L73">        reduced.remove(variable);</span>
+<span class="fc" id="L74">        return new Monomial(reduced);</span>
     }
 
     public int totalDegree() {
-<span class="fc" id="L74">        return powers.values().stream().mapToInt(Integer::intValue).sum();</span>
+<span class="fc" id="L78">        return powers.values().stream().mapToInt(Integer::intValue).sum();</span>
     }
 
     public String key() {
-<span class="fc" id="L78">        StringBuilder builder = new StringBuilder();</span>
-<span class="fc" id="L79">        new TreeMap&lt;&gt;(powers).forEach((name, exponent) -&gt; {</span>
-<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (builder.length() &gt; 0) {</span>
-<span class="fc" id="L81">                builder.append('*');</span>
+<span class="fc" id="L82">        StringBuilder builder = new StringBuilder();</span>
+<span class="fc" id="L83">        new TreeMap&lt;&gt;(powers).forEach((name, exponent) -&gt; {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (builder.length() &gt; 0) {</span>
+<span class="fc" id="L85">                builder.append('*');</span>
             }
-<span class="fc" id="L83">            builder.append(name);</span>
-<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (exponent != 1) {</span>
-<span class="fc" id="L85">                builder.append('^').append(exponent);</span>
+<span class="fc" id="L87">            builder.append(name);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (exponent != 1) {</span>
+<span class="fc" id="L89">                builder.append('^').append(exponent);</span>
             }
-<span class="fc" id="L87">        });</span>
-<span class="fc" id="L88">        return builder.toString();</span>
+<span class="fc" id="L91">        });</span>
+<span class="fc" id="L92">        return builder.toString();</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
