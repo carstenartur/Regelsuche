@@ -27,7 +27,7 @@ class ProofCarryingShowcasePlanTest {
     }
 
     @Test
-    void rejectsClaimInflationUnknownFieldsAndDuplicateFields() {
+    void rejectsClaimInflationUnknownDuplicateAndTrailingData() {
         ProofCarryingShowcasePlan plan =
             ProofCarryingShowcaseTestFixtures.plan();
         String canonical = plan.toCanonicalJson();
@@ -52,5 +52,9 @@ class ProofCarryingShowcasePlanTest {
                     "{\"schema\":\""
                         + ProofCarryingShowcasePlan.SCHEMA
                         + "\",")));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> ProofCarryingShowcasePlan.fromCanonicalJson(
+                canonical + "{}"));
     }
 }
