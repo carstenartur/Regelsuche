@@ -28,7 +28,7 @@ class ProofCarryingShowcaseArchitectureTest {
         assertTrue(Files.isRegularFile(javaRoot.resolve(
             "ProofCarryingShowcasePlan.java")));
         assertTrue(Files.isRegularFile(javaRoot.resolve(
-            "ProofCarryingShowcaseSeedDeriver.java")));
+            "ProofCarryingShowcaseSeedReceipt.java")));
         assertTrue(Files.isRegularFile(javaRoot.resolve(
             "ProofCarryingShowcaseCaseGenerator.java")));
     }
