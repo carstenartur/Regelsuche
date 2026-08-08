@@ -1,0 +1,873 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseTrainFreezeAuthorityCommand.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">app</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseTrainFreezeAuthorityCommand.java</span></div><h1>ProofCarryingShowcaseTrainFreezeAuthorityCommand.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.regex.Pattern;
+
+/**
+ * Verifies the one-attempt GitHub authority and executes the retained
+ * showcase TRAIN/freeze command without exposing later-stage material.
+ */
+public final class ProofCarryingShowcaseTrainFreezeAuthorityCommand {
+    static final String AUTHORITY_BRANCH =
+        &quot;showcase/train-freeze-authority-v1&quot;;
+    static final String AUTHORITY_REF =
+        &quot;refs/heads/&quot; + AUTHORITY_BRANCH;
+    static final String AUTHORITY_FILE =
+        &quot;research/showcase/proof-carrying-self-improvement/&quot;
+            + &quot;train-freeze-authority-v1.json&quot;;
+    static final String AUTHORITY_SCHEMA =
+        &quot;regelsuche.proof-carrying-showcase-train-freeze-authority/v1&quot;;
+    static final String AUTHORITY_ID =
+        &quot;proof-carrying-showcase-train-freeze-v1&quot;;
+    static final String AUTHORITY_OPERATION =
+        &quot;TRAIN_AND_FREEZE_FINAL_TEST_UNSEEN&quot;;
+    static final String AUTHORITY_STATUS = &quot;AUTHORIZED_NOT_RUN&quot;;
+    static final String EXECUTION_SCHEMA =
+        &quot;regelsuche.proof-carrying-showcase-train-freeze-execution/v1&quot;;
+    static final String EXECUTION_STATUS =
+        &quot;TRAIN_FREEZE_EXECUTED_FINAL_TEST_UNSEEN&quot;;
+    static final String WORKFLOW_FILE = &quot;gradle.yml&quot;;
+    private static final String PLAN_FILE =
+        &quot;research/showcase/proof-carrying-self-improvement/&quot;
+            + &quot;showcase-plan.json&quot;;
+<span class="fc" id="L60">    private static final Path OUTPUT_DIRECTORY = Path.of(</span>
+        &quot;build/proof-carrying-showcase/train-freeze&quot;);
+<span class="fc" id="L62">    private static final Path EVIDENCE_DIRECTORY = Path.of(</span>
+        &quot;build/proof-carrying-showcase/execution-evidence&quot;);
+<span class="fc" id="L64">    private static final Set&lt;String&gt; AUTHORITY_FIELDS = Set.of(</span>
+        &quot;authorityBranch&quot;,
+        &quot;authorityId&quot;,
+        &quot;implementationCommit&quot;,
+        &quot;maximumWorkflowAttempts&quot;,
+        &quot;operation&quot;,
+        &quot;schema&quot;,
+        &quot;status&quot;);
+<span class="fc" id="L72">    private static final Pattern COMMIT = Pattern.compile(&quot;[0-9a-f]{40}&quot;);</span>
+<span class="fc" id="L73">    private static final Pattern REPOSITORY = Pattern.compile(</span>
+        &quot;[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+&quot;);
+<span class="fc" id="L75">    private static final JsonMapper JSON = JsonMapper.builder()</span>
+<span class="fc" id="L76">        .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L77">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L78">        .build();</span>
+
+    private ProofCarryingShowcaseTrainFreezeAuthorityCommand() {
+    }
+
+    public static void main(String[] arguments) {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (arguments.length != 0) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;usage: no arguments&quot;);</span>
+        }
+<span class="nc" id="L87">        Path repositoryRoot = Path.of(&quot;&quot;).toAbsolutePath().normalize();</span>
+<span class="nc" id="L88">        Map&lt;String, String&gt; environment = System.getenv();</span>
+<span class="nc" id="L89">        String token = requireEnvironment(environment, &quot;GITHUB_TOKEN&quot;);</span>
+<span class="nc" id="L90">        String apiUrl = requireEnvironment(environment, &quot;GITHUB_API_URL&quot;);</span>
+<span class="nc" id="L91">        AuthoritySource authoritySource =</span>
+            new GitHubRestAuthoritySource(apiUrl, token);
+<span class="nc" id="L93">        Execution execution = execute(</span>
+            repositoryRoot,
+            environment,
+            authoritySource,
+            ProofCarryingShowcaseTrainAndFreezeCommand::execute);
+<span class="nc" id="L98">        System.out.println(</span>
+<span class="nc" id="L99">            &quot;showcaseAuthorityStatus=&quot; + execution.status());</span>
+<span class="nc" id="L100">        System.out.println(</span>
+            &quot;showcaseAuthorityCandidateFreezeHash=&quot;
+<span class="nc" id="L102">                + execution.candidateFreezeHash());</span>
+<span class="nc" id="L103">        System.out.println(</span>
+            &quot;showcaseAuthoritySelectedCandidateHash=&quot;
+<span class="nc" id="L105">                + execution.selectedCandidateHash());</span>
+<span class="nc" id="L106">        System.out.println(</span>
+<span class="nc" id="L107">            &quot;showcaseAuthorityEvidence=&quot; + execution.evidenceDirectory());</span>
+<span class="nc" id="L108">    }</span>
+
+    static Execution execute(
+        Path repositoryRoot,
+        Map&lt;String, String&gt; environment,
+        AuthoritySource authoritySource,
+        TrainFreezeRunner runner
+    ) {
+<span class="fc" id="L116">        Objects.requireNonNull(runner, &quot;runner&quot;);</span>
+<span class="fc" id="L117">        Path root = Objects.requireNonNull(</span>
+            repositoryRoot, &quot;repositoryRoot&quot;)
+<span class="fc" id="L119">            .toAbsolutePath()</span>
+<span class="fc" id="L120">            .normalize();</span>
+<span class="fc" id="L121">        Authority authority = authorize(</span>
+            root,
+            environment,
+            authoritySource);
+<span class="fc" id="L125">        Path output = root.resolve(OUTPUT_DIRECTORY).normalize();</span>
+<span class="fc" id="L126">        Path evidence = root.resolve(EVIDENCE_DIRECTORY).normalize();</span>
+<span class="pc bpc" id="L127" title="2 of 4 branches missed.">        if (Files.exists(output) || Files.exists(evidence)) {</span>
+<span class="nc" id="L128">            throw new IllegalStateException(</span>
+                &quot;showcase authority output already exists&quot;);
+        }
+
+<span class="fc" id="L132">        Path planPath = root.resolve(PLAN_FILE).normalize();</span>
+<span class="fc" id="L133">        var written = runner.run(</span>
+            planPath,
+<span class="fc" id="L135">            authority.repositoryCommit(),</span>
+            output);
+<span class="fc" id="L137">        ProofCarryingShowcasePlan plan =</span>
+<span class="fc" id="L138">            ProofCarryingShowcasePlan.read(planPath);</span>
+<span class="fc" id="L139">        ProofCarryingShowcaseCandidateFreeze freeze = readFreeze(</span>
+<span class="fc" id="L140">            written.candidateFreezePath());</span>
+<span class="fc" id="L141">        freeze.requireCompatible(plan);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (!authority.repositoryCommit().equals(freeze.repositoryCommit())) {</span>
+<span class="nc" id="L143">            throw new IllegalStateException(</span>
+                &quot;candidate freeze repository commit differs from authority&quot;);
+        }
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (!written.candidateFreezeHash().equals(freeze.contentHash())</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                || !written.selectedCandidateHash().equals(</span>
+<span class="fc" id="L148">                    freeze.candidateContentHash())) {</span>
+<span class="nc" id="L149">            throw new IllegalStateException(</span>
+                &quot;TRAIN/freeze result differs from retained candidate freeze&quot;);
+        }
+<span class="fc" id="L152">        rejectLaterStageArtifacts(written.outputDirectory());</span>
+
+<span class="fc" id="L154">        writeExecutionEvidence(</span>
+            evidence,
+<span class="fc" id="L156">            written.outputDirectory(),</span>
+            authority,
+            freeze,
+            environment);
+<span class="fc" id="L160">        return new Execution(</span>
+            EXECUTION_STATUS,
+<span class="fc" id="L162">            written.outputDirectory(),</span>
+            evidence,
+<span class="fc" id="L164">            freeze.contentHash(),</span>
+<span class="fc" id="L165">            freeze.candidateContentHash(),</span>
+<span class="fc" id="L166">            freeze.randomnessNotBeforeUnixTime());</span>
+    }
+
+    static Authority authorize(
+        Path repositoryRoot,
+        Map&lt;String, String&gt; environment,
+        AuthoritySource authoritySource
+    ) {
+<span class="fc" id="L174">        Objects.requireNonNull(authoritySource, &quot;authoritySource&quot;);</span>
+<span class="fc" id="L175">        Map&lt;String, String&gt; env = Map.copyOf(</span>
+<span class="fc" id="L176">            Objects.requireNonNull(environment, &quot;environment&quot;));</span>
+<span class="fc" id="L177">        requireEquals(</span>
+            &quot;create&quot;,
+<span class="fc" id="L179">            requireEnvironment(env, &quot;GITHUB_EVENT_NAME&quot;),</span>
+            &quot;authority requires a create event&quot;);
+<span class="fc" id="L181">        requireEquals(</span>
+            AUTHORITY_REF,
+<span class="fc" id="L183">            requireEnvironment(env, &quot;GITHUB_REF&quot;),</span>
+            &quot;authority requires the reserved branch ref&quot;);
+<span class="fc" id="L185">        requireEquals(</span>
+            &quot;1&quot;,
+<span class="fc" id="L187">            requireEnvironment(env, &quot;GITHUB_RUN_ATTEMPT&quot;),</span>
+            &quot;authority version may not be rerun&quot;);
+
+<span class="fc" id="L190">        long runId = requirePositiveLong(</span>
+<span class="fc" id="L191">            requireEnvironment(env, &quot;GITHUB_RUN_ID&quot;),</span>
+            &quot;GITHUB_RUN_ID&quot;);
+<span class="fc" id="L193">        String repository = requireEnvironment(env, &quot;GITHUB_REPOSITORY&quot;);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (!REPOSITORY.matcher(repository).matches()) {</span>
+<span class="nc" id="L195">            throw new IllegalArgumentException(</span>
+                &quot;invalid GITHUB_REPOSITORY&quot;);
+        }
+<span class="fc" id="L198">        String repositoryCommit = requireCommit(</span>
+<span class="fc" id="L199">            requireEnvironment(env, &quot;REGELSUCHE_AUTHORITY_GITHUB_SHA&quot;),</span>
+            &quot;REGELSUCHE_AUTHORITY_GITHUB_SHA&quot;);
+
+<span class="fc" id="L202">        Path authorityPath = repositoryRoot</span>
+<span class="fc" id="L203">            .resolve(AUTHORITY_FILE)</span>
+<span class="fc" id="L204">            .normalize();</span>
+<span class="fc" id="L205">        requireInside(repositoryRoot, authorityPath);</span>
+<span class="fc" id="L206">        byte[] authorityBytes = readRegularFile(authorityPath);</span>
+<span class="fc" id="L207">        AuthorityManifest manifest = parseAuthorityManifest(authorityBytes);</span>
+<span class="fc" id="L208">        String expectedManifest = canonicalManifest(</span>
+<span class="fc" id="L209">            manifest.implementationCommit());</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (!MessageDigest.isEqual(</span>
+<span class="fc" id="L211">                expectedManifest.getBytes(StandardCharsets.UTF_8),</span>
+                authorityBytes)) {
+<span class="fc" id="L213">            throw new IllegalArgumentException(</span>
+                &quot;authority manifest is not canonical&quot;);
+        }
+
+<span class="fc" id="L217">        CommitEvidence commit = authoritySource.commit(</span>
+            repository,
+            repositoryCommit);
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (!repositoryCommit.equals(commit.sha())) {</span>
+<span class="nc" id="L221">            throw new IllegalArgumentException(</span>
+                &quot;authority commit response has the wrong SHA&quot;);
+        }
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (!commit.parents().equals(</span>
+<span class="fc" id="L225">                List.of(manifest.implementationCommit()))) {</span>
+<span class="nc" id="L226">            throw new IllegalArgumentException(</span>
+                &quot;authority commit must have exactly the reviewed parent&quot;);
+        }
+<span class="fc" id="L229">        String localBlobSha = gitBlobSha1(authorityBytes);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (!commit.files().equals(List.of(</span>
+                new ChangedFile(AUTHORITY_FILE, &quot;added&quot;, localBlobSha)))) {
+<span class="fc" id="L232">            throw new IllegalArgumentException(</span>
+                &quot;authority manifest must be the commit's only added file&quot;);
+        }
+
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (RunEvidence run : authoritySource.createRuns(</span>
+                repository,
+                AUTHORITY_BRANCH)) {
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            if (run.id() != runId) {</span>
+<span class="fc" id="L240">                throw new IllegalArgumentException(</span>
+                    &quot;showcase authority branch was already consumed&quot;);
+            }
+<span class="fc" id="L243">            requireEquals(</span>
+                &quot;create&quot;,
+<span class="fc" id="L245">                run.event(),</span>
+                &quot;authority run history contains a non-create event&quot;);
+<span class="fc" id="L247">            requireEquals(</span>
+                AUTHORITY_BRANCH,
+<span class="fc" id="L249">                run.headBranch(),</span>
+                &quot;authority run history has the wrong branch&quot;);
+<span class="fc" id="L251">            requireEquals(</span>
+                repositoryCommit,
+<span class="fc" id="L253">                run.headSha(),</span>
+                &quot;current authority run has the wrong commit&quot;);
+<span class="fc" id="L255">        }</span>
+
+<span class="fc" id="L257">        return new Authority(</span>
+            repository,
+            repositoryCommit,
+<span class="fc" id="L260">            manifest.implementationCommit(),</span>
+            runId,
+<span class="fc" id="L262">            sha256(authorityBytes));</span>
+    }
+
+    static String canonicalManifest(String implementationCommit) {
+<span class="fc" id="L266">        String commit = requireCommit(</span>
+            implementationCommit, &quot;implementationCommit&quot;);
+<span class="fc" id="L268">        return &quot;{\&quot;authorityBranch\&quot;:\&quot;&quot; + AUTHORITY_BRANCH</span>
+            + &quot;\&quot;,\&quot;authorityId\&quot;:\&quot;&quot; + AUTHORITY_ID
+            + &quot;\&quot;,\&quot;implementationCommit\&quot;:\&quot;&quot; + commit
+            + &quot;\&quot;,\&quot;maximumWorkflowAttempts\&quot;:1&quot;
+            + &quot;,\&quot;operation\&quot;:\&quot;&quot; + AUTHORITY_OPERATION
+            + &quot;\&quot;,\&quot;schema\&quot;:\&quot;&quot; + AUTHORITY_SCHEMA
+            + &quot;\&quot;,\&quot;status\&quot;:\&quot;&quot; + AUTHORITY_STATUS + &quot;\&quot;}\n&quot;;
+    }
+
+    private static AuthorityManifest parseAuthorityManifest(byte[] bytes) {
+        JsonNode document;
+        try {
+<span class="fc" id="L280">            document = JSON.readTree(bytes);</span>
+<span class="nc" id="L281">        } catch (IOException exception) {</span>
+<span class="nc" id="L282">            throw new IllegalArgumentException(</span>
+                &quot;invalid authority manifest JSON&quot;,
+                exception);
+<span class="fc" id="L285">        }</span>
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">        if (document == null || !document.isObject()) {</span>
+<span class="nc" id="L287">            throw new IllegalArgumentException(</span>
+                &quot;authority manifest must be a JSON object&quot;);
+        }
+<span class="fc" id="L290">        Set&lt;String&gt; fields = new java.util.HashSet&lt;&gt;();</span>
+<span class="fc" id="L291">        document.fieldNames().forEachRemaining(fields::add);</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (!AUTHORITY_FIELDS.equals(fields)) {</span>
+<span class="nc" id="L293">            throw new IllegalArgumentException(</span>
+                &quot;authority manifest has unknown or missing fields&quot;);
+        }
+<span class="fc" id="L296">        requireJsonText(document, &quot;schema&quot;, AUTHORITY_SCHEMA);</span>
+<span class="fc" id="L297">        requireJsonText(document, &quot;authorityId&quot;, AUTHORITY_ID);</span>
+<span class="fc" id="L298">        requireJsonText(document, &quot;authorityBranch&quot;, AUTHORITY_BRANCH);</span>
+<span class="fc" id="L299">        requireJsonText(document, &quot;operation&quot;, AUTHORITY_OPERATION);</span>
+<span class="fc" id="L300">        requireJsonText(document, &quot;status&quot;, AUTHORITY_STATUS);</span>
+<span class="fc" id="L301">        JsonNode attempts = document.get(&quot;maximumWorkflowAttempts&quot;);</span>
+<span class="pc bpc" id="L302" title="2 of 4 branches missed.">        if (attempts == null || !attempts.isIntegralNumber()</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                || attempts.longValue() != 1L) {</span>
+<span class="nc" id="L304">            throw new IllegalArgumentException(</span>
+                &quot;authority maximumWorkflowAttempts must equal one&quot;);
+        }
+<span class="fc" id="L307">        JsonNode implementation = document.get(&quot;implementationCommit&quot;);</span>
+<span class="pc bpc" id="L308" title="2 of 4 branches missed.">        if (implementation == null || !implementation.isTextual()) {</span>
+<span class="nc" id="L309">            throw new IllegalArgumentException(</span>
+                &quot;authority implementationCommit must be text&quot;);
+        }
+<span class="fc" id="L312">        return new AuthorityManifest(</span>
+<span class="fc" id="L313">            requireCommit(</span>
+<span class="fc" id="L314">                implementation.textValue(),</span>
+                &quot;implementationCommit&quot;));
+    }
+
+    private static void requireJsonText(
+        JsonNode document,
+        String field,
+        String expected
+    ) {
+<span class="fc" id="L323">        JsonNode value = document.get(field);</span>
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">        if (value == null || !value.isTextual()</span>
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">                || !expected.equals(value.textValue())) {</span>
+<span class="nc" id="L326">            throw new IllegalArgumentException(</span>
+                &quot;authority &quot; + field + &quot; mismatch&quot;);
+        }
+<span class="fc" id="L329">    }</span>
+
+    private static ProofCarryingShowcaseCandidateFreeze readFreeze(
+        Path path
+    ) {
+        try {
+<span class="fc" id="L335">            return ProofCarryingShowcaseCandidateFreeze.fromCanonicalJson(</span>
+<span class="fc" id="L336">                Files.readString(path, StandardCharsets.UTF_8));</span>
+<span class="nc" id="L337">        } catch (IOException exception) {</span>
+<span class="nc" id="L338">            throw new IllegalStateException(</span>
+                &quot;unable to read retained candidate freeze&quot;,
+                exception);
+        }
+    }
+
+    private static void rejectLaterStageArtifacts(Path outputDirectory) {
+<span class="fc" id="L345">        try (var files = Files.list(outputDirectory)) {</span>
+<span class="fc" id="L346">            boolean found = files</span>
+<span class="fc" id="L347">                .filter(Files::isRegularFile)</span>
+<span class="fc" id="L348">                .map(path -&gt; path.getFileName().toString().toLowerCase())</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">                .anyMatch(name -&gt; name.contains(&quot;randomness&quot;)</span>
+<span class="pc bpc" id="L350" title="3 of 4 branches missed.">                    || (name.contains(&quot;final&quot;) &amp;&amp; name.contains(&quot;test&quot;)));</span>
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">            if (found) {</span>
+<span class="nc" id="L352">                throw new IllegalStateException(</span>
+                    &quot;later-stage artifact found in TRAIN/freeze output&quot;);
+            }
+<span class="nc" id="L355">        } catch (IOException exception) {</span>
+<span class="nc" id="L356">            throw new IllegalStateException(</span>
+                &quot;unable to inspect TRAIN/freeze output&quot;,
+                exception);
+<span class="fc" id="L359">        }</span>
+<span class="fc" id="L360">    }</span>
+
+    private static void writeExecutionEvidence(
+        Path evidenceDirectory,
+        Path outputDirectory,
+        Authority authority,
+        ProofCarryingShowcaseCandidateFreeze freeze,
+        Map&lt;String, String&gt; environment
+    ) {
+<span class="fc" id="L369">        Path parent = evidenceDirectory.getParent();</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (parent == null) {</span>
+<span class="nc" id="L371">            throw new IllegalArgumentException(</span>
+                &quot;execution evidence requires a parent directory&quot;);
+        }
+<span class="fc" id="L374">        Path staging = null;</span>
+        try {
+<span class="fc" id="L376">            Files.createDirectories(parent);</span>
+<span class="fc" id="L377">            staging = Files.createTempDirectory(</span>
+                parent,
+                &quot;.proof-carrying-showcase-execution-evidence-&quot;);
+<span class="fc" id="L380">            String artifactManifest = artifactManifest(outputDirectory);</span>
+<span class="fc" id="L381">            writeNew(</span>
+<span class="fc" id="L382">                staging.resolve(&quot;artifact-sha256sums.txt&quot;),</span>
+                artifactManifest);
+<span class="fc" id="L384">            String receipt = executionReceipt(</span>
+                authority,
+                freeze,
+                environment);
+<span class="fc" id="L388">            writeNew(</span>
+<span class="fc" id="L389">                staging.resolve(&quot;execution-receipt.json&quot;),</span>
+                receipt);
+<span class="fc" id="L391">            writeNew(</span>
+<span class="fc" id="L392">                staging.resolve(&quot;execution-receipt.sha256&quot;),</span>
+<span class="fc" id="L393">                &quot;sha256:&quot; + sha256(</span>
+<span class="fc" id="L394">                    receipt.getBytes(StandardCharsets.UTF_8)) + &quot;\n&quot;);</span>
+<span class="fc" id="L395">            Files.move(</span>
+                staging,
+                evidenceDirectory,
+                StandardCopyOption.ATOMIC_MOVE);
+<span class="fc" id="L399">            staging = null;</span>
+<span class="nc" id="L400">        } catch (IOException exception) {</span>
+<span class="nc" id="L401">            throw new IllegalStateException(</span>
+                &quot;unable to write showcase execution evidence&quot;,
+                exception);
+        } finally {
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            if (staging != null) {</span>
+<span class="nc" id="L406">                deleteTree(staging);</span>
+            }
+        }
+<span class="fc" id="L409">    }</span>
+
+    private static String artifactManifest(Path outputDirectory)
+            throws IOException {
+<span class="fc" id="L413">        List&lt;Path&gt; files = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L414">        try (var stream = Files.walk(outputDirectory)) {</span>
+<span class="fc" id="L415">            stream.filter(Files::isRegularFile).forEach(files::add);</span>
+        }
+<span class="fc" id="L417">        files.sort(Comparator.comparing(path -&gt;</span>
+<span class="fc" id="L418">            outputDirectory.relativize(path).toString()));</span>
+<span class="fc" id="L419">        StringBuilder result = new StringBuilder();</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        for (Path file : files) {</span>
+<span class="fc" id="L421">            String relative = outputDirectory.relativize(file)</span>
+<span class="fc" id="L422">                .toString()</span>
+<span class="fc" id="L423">                .replace('\\', '/');</span>
+<span class="fc" id="L424">            result.append(sha256(Files.readAllBytes(file)))</span>
+<span class="fc" id="L425">                .append(&quot;  &quot;)</span>
+<span class="fc" id="L426">                .append(relative)</span>
+<span class="fc" id="L427">                .append('\n');</span>
+<span class="fc" id="L428">        }</span>
+<span class="fc" id="L429">        return result.toString();</span>
+    }
+
+    private static String executionReceipt(
+        Authority authority,
+        ProofCarryingShowcaseCandidateFreeze freeze,
+        Map&lt;String, String&gt; environment
+    ) {
+<span class="fc" id="L437">        TreeMap&lt;String, Object&gt; receipt = new TreeMap&lt;&gt;();</span>
+<span class="fc" id="L438">        receipt.put(</span>
+            &quot;authorityManifestSha256&quot;,
+<span class="fc" id="L440">            &quot;sha256:&quot; + authority.authorityManifestSha256());</span>
+<span class="fc" id="L441">        receipt.put(&quot;authorityRef&quot;, AUTHORITY_REF);</span>
+<span class="fc" id="L442">        receipt.put(&quot;candidateFreezeHash&quot;, freeze.contentHash());</span>
+<span class="fc" id="L443">        receipt.put(</span>
+            &quot;implementationCommit&quot;,
+<span class="fc" id="L445">            authority.implementationCommit());</span>
+<span class="fc" id="L446">        receipt.put(</span>
+            &quot;randomnessNotBeforeUnixTime&quot;,
+<span class="fc" id="L448">            freeze.randomnessNotBeforeUnixTime());</span>
+<span class="fc" id="L449">        receipt.put(&quot;repositoryCommit&quot;, authority.repositoryCommit());</span>
+<span class="fc" id="L450">        receipt.put(</span>
+            &quot;runAttempt&quot;,
+<span class="fc" id="L452">            requireEnvironment(environment, &quot;GITHUB_RUN_ATTEMPT&quot;));</span>
+<span class="fc" id="L453">        receipt.put(&quot;runId&quot;, Long.toString(authority.runId()));</span>
+<span class="fc" id="L454">        receipt.put(&quot;schema&quot;, EXECUTION_SCHEMA);</span>
+<span class="fc" id="L455">        receipt.put(</span>
+            &quot;selectedCandidateHash&quot;,
+<span class="fc" id="L457">            freeze.candidateContentHash());</span>
+<span class="fc" id="L458">        receipt.put(&quot;status&quot;, EXECUTION_STATUS);</span>
+<span class="fc" id="L459">        receipt.put(</span>
+            &quot;workflow&quot;,
+<span class="fc" id="L461">            requireEnvironment(environment, &quot;GITHUB_WORKFLOW&quot;));</span>
+        try {
+<span class="fc" id="L463">            return JSON.writeValueAsString(receipt) + &quot;\n&quot;;</span>
+<span class="nc" id="L464">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L465">            throw new IllegalStateException(</span>
+                &quot;unable to serialize showcase execution receipt&quot;,
+                exception);
+        }
+    }
+
+    private static byte[] readRegularFile(Path path) {
+        try {
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">            if (!Files.isRegularFile(path)</span>
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">                    || Files.isSymbolicLink(path)) {</span>
+<span class="nc" id="L475">                throw new IllegalArgumentException(</span>
+                    &quot;authority manifest must be a regular file&quot;);
+            }
+<span class="fc" id="L478">            byte[] bytes = Files.readAllBytes(path);</span>
+<span class="pc bpc" id="L479" title="2 of 4 branches missed.">            if (bytes.length == 0 || bytes.length &gt; 4096) {</span>
+<span class="nc" id="L480">                throw new IllegalArgumentException(</span>
+                    &quot;authority manifest has an invalid byte length&quot;);
+            }
+<span class="fc" id="L483">            return bytes;</span>
+<span class="nc" id="L484">        } catch (IOException exception) {</span>
+<span class="nc" id="L485">            throw new IllegalStateException(</span>
+                &quot;unable to read authority manifest&quot;,
+                exception);
+        }
+    }
+
+    private static void requireInside(Path root, Path path) {
+<span class="fc" id="L492">        Path normalizedRoot = root.toAbsolutePath().normalize();</span>
+<span class="fc" id="L493">        Path normalized = path.toAbsolutePath().normalize();</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (!normalized.startsWith(normalizedRoot)) {</span>
+<span class="nc" id="L495">            throw new IllegalArgumentException(</span>
+                &quot;authority path escapes the repository root&quot;);
+        }
+<span class="fc" id="L498">    }</span>
+
+    private static String requireEnvironment(
+        Map&lt;String, String&gt; environment,
+        String name
+    ) {
+<span class="fc" id="L504">        String value = environment.get(name);</span>
+<span class="pc bpc" id="L505" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L506">            throw new IllegalArgumentException(</span>
+                &quot;missing environment variable &quot; + name);
+        }
+<span class="fc" id="L509">        return value;</span>
+    }
+
+    private static void requireEquals(
+        String expected,
+        String actual,
+        String message
+    ) {
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">        if (!expected.equals(actual)) {</span>
+<span class="nc" id="L518">            throw new IllegalArgumentException(message);</span>
+        }
+<span class="fc" id="L520">    }</span>
+
+    private static long requirePositiveLong(String raw, String name) {
+        try {
+<span class="fc" id="L524">            long value = Long.parseLong(raw);</span>
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">            if (value &lt; 1) {</span>
+<span class="nc" id="L526">                throw new NumberFormatException(&quot;not positive&quot;);</span>
+            }
+<span class="fc" id="L528">            return value;</span>
+<span class="nc" id="L529">        } catch (NumberFormatException exception) {</span>
+<span class="nc" id="L530">            throw new IllegalArgumentException(</span>
+                name + &quot; must be a positive integer&quot;,
+                exception);
+        }
+    }
+
+    private static String requireCommit(String value, String name) {
+<span class="pc bpc" id="L537" title="2 of 4 branches missed.">        if (value == null || !COMMIT.matcher(value).matches()) {</span>
+<span class="nc" id="L538">            throw new IllegalArgumentException(</span>
+                name + &quot; must be a lowercase 40-character Git SHA&quot;);
+        }
+<span class="fc" id="L541">        return value;</span>
+    }
+
+    private static String gitBlobSha1(byte[] content) {
+<span class="fc" id="L545">        byte[] header = (&quot;blob &quot; + content.length + &quot;\0&quot;)</span>
+<span class="fc" id="L546">            .getBytes(StandardCharsets.US_ASCII);</span>
+        try {
+<span class="fc" id="L548">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-1&quot;);</span>
+<span class="fc" id="L549">            digest.update(header);</span>
+<span class="fc" id="L550">            return HexFormat.of().formatHex(digest.digest(content));</span>
+<span class="nc" id="L551">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L552">            throw new IllegalStateException(&quot;SHA-1 is unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static String sha256(byte[] content) {
+        try {
+<span class="fc" id="L558">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L559">            return HexFormat.of().formatHex(digest.digest(content));</span>
+<span class="nc" id="L560">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L561">            throw new IllegalStateException(&quot;SHA-256 is unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static void writeNew(Path path, String content)
+            throws IOException {
+<span class="fc" id="L567">        Files.writeString(</span>
+            path,
+            content,
+            StandardCharsets.UTF_8,
+            StandardOpenOption.CREATE_NEW,
+            StandardOpenOption.WRITE);
+<span class="fc" id="L573">    }</span>
+
+    private static void deleteTree(Path root) {
+<span class="nc" id="L576">        try (var paths = Files.walk(root)) {</span>
+<span class="nc" id="L577">            paths.sorted(Comparator.reverseOrder()).forEach(path -&gt; {</span>
+                try {
+<span class="nc" id="L579">                    Files.deleteIfExists(path);</span>
+<span class="nc" id="L580">                } catch (IOException exception) {</span>
+<span class="nc" id="L581">                    throw new DeleteFailure(exception);</span>
+<span class="nc" id="L582">                }</span>
+<span class="nc" id="L583">            });</span>
+<span class="nc" id="L584">        } catch (IOException exception) {</span>
+<span class="nc" id="L585">            throw new IllegalStateException(</span>
+                &quot;unable to clean execution-evidence staging directory&quot;,
+                exception);
+<span class="nc" id="L588">        } catch (DeleteFailure failure) {</span>
+<span class="nc" id="L589">            throw new IllegalStateException(</span>
+                &quot;unable to clean execution-evidence staging directory&quot;,
+<span class="nc" id="L591">                failure.getCause());</span>
+<span class="nc" id="L592">        }</span>
+<span class="nc" id="L593">    }</span>
+
+    @FunctionalInterface
+    interface TrainFreezeRunner {
+        ProofCarryingShowcaseTrainAndFreezeCommand.WrittenFreeze run(
+            Path plan,
+            String repositoryCommit,
+            Path outputDirectory);
+    }
+
+    interface AuthoritySource {
+        CommitEvidence commit(String repository, String commit);
+
+        List&lt;RunEvidence&gt; createRuns(String repository, String branch);
+    }
+
+    record AuthorityManifest(String implementationCommit) {
+<span class="fc" id="L610">        AuthorityManifest {</span>
+<span class="fc" id="L611">            requireCommit(implementationCommit, &quot;implementationCommit&quot;);</span>
+<span class="fc" id="L612">        }</span>
+    }
+
+    record ChangedFile(String path, String status, String blobSha) {
+<span class="fc" id="L616">        ChangedFile {</span>
+<span class="pc bpc" id="L617" title="2 of 4 branches missed.">            if (path == null || path.isBlank()) {</span>
+<span class="nc" id="L618">                throw new IllegalArgumentException(&quot;changed file path is blank&quot;);</span>
+            }
+<span class="pc bpc" id="L620" title="2 of 4 branches missed.">            if (status == null || status.isBlank()) {</span>
+<span class="nc" id="L621">                throw new IllegalArgumentException(&quot;changed file status is blank&quot;);</span>
+            }
+<span class="fc" id="L623">            requireCommit(blobSha, &quot;changed file blob SHA&quot;);</span>
+<span class="fc" id="L624">        }</span>
+    }
+
+    record CommitEvidence(
+        String sha,
+        List&lt;String&gt; parents,
+        List&lt;ChangedFile&gt; files
+    ) {
+<span class="fc" id="L632">        CommitEvidence {</span>
+<span class="fc" id="L633">            requireCommit(sha, &quot;commit evidence SHA&quot;);</span>
+<span class="fc" id="L634">            parents = List.copyOf(parents);</span>
+<span class="fc" id="L635">            parents.forEach(parent -&gt;</span>
+<span class="fc" id="L636">                requireCommit(parent, &quot;commit parent SHA&quot;));</span>
+<span class="fc" id="L637">            files = List.copyOf(files);</span>
+<span class="fc" id="L638">        }</span>
+    }
+
+    record RunEvidence(
+        long id,
+        String event,
+        String headBranch,
+        String headSha
+    ) {
+<span class="fc" id="L647">        RunEvidence {</span>
+<span class="pc bpc" id="L648" title="3 of 6 branches missed.">            if (id &lt; 1 || event == null || headBranch == null) {</span>
+<span class="nc" id="L649">                throw new IllegalArgumentException(</span>
+                    &quot;invalid authority run evidence&quot;);
+            }
+<span class="fc" id="L652">            requireCommit(headSha, &quot;authority run head SHA&quot;);</span>
+<span class="fc" id="L653">        }</span>
+    }
+
+    record Authority(
+        String repository,
+        String repositoryCommit,
+        String implementationCommit,
+        long runId,
+        String authorityManifestSha256
+    ) {
+<span class="fc" id="L663">        Authority {</span>
+<span class="pc bpc" id="L664" title="1 of 2 branches missed.">            if (!REPOSITORY.matcher(repository).matches()) {</span>
+<span class="nc" id="L665">                throw new IllegalArgumentException(&quot;invalid repository&quot;);</span>
+            }
+<span class="fc" id="L667">            requireCommit(repositoryCommit, &quot;repositoryCommit&quot;);</span>
+<span class="fc" id="L668">            requireCommit(implementationCommit, &quot;implementationCommit&quot;);</span>
+<span class="pc bpc" id="L669" title="2 of 4 branches missed.">            if (runId &lt; 1</span>
+                    || authorityManifestSha256 == null
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">                    || !authorityManifestSha256.matches(&quot;[0-9a-f]{64}&quot;)) {</span>
+<span class="nc" id="L672">                throw new IllegalArgumentException(&quot;invalid authority evidence&quot;);</span>
+            }
+<span class="fc" id="L674">        }</span>
+    }
+
+    record Execution(
+        String status,
+        Path outputDirectory,
+        Path evidenceDirectory,
+        String candidateFreezeHash,
+        String selectedCandidateHash,
+        long randomnessNotBeforeUnixTime
+    ) {
+<span class="fc" id="L685">        Execution {</span>
+<span class="fc" id="L686">            requireEquals(</span>
+                EXECUTION_STATUS,
+                status,
+                &quot;invalid execution status&quot;);
+<span class="fc" id="L690">            Objects.requireNonNull(outputDirectory, &quot;outputDirectory&quot;);</span>
+<span class="fc" id="L691">            Objects.requireNonNull(evidenceDirectory, &quot;evidenceDirectory&quot;);</span>
+<span class="fc" id="L692">            EvolutionGenome.requireSha256(</span>
+                candidateFreezeHash,
+                &quot;candidateFreezeHash&quot;);
+<span class="fc" id="L695">            EvolutionGenome.requireSha256(</span>
+                selectedCandidateHash,
+                &quot;selectedCandidateHash&quot;);
+<span class="pc bpc" id="L698" title="1 of 2 branches missed.">            if (randomnessNotBeforeUnixTime &lt; 1) {</span>
+<span class="nc" id="L699">                throw new IllegalArgumentException(</span>
+                    &quot;invalid public-randomness boundary&quot;);
+            }
+<span class="fc" id="L702">        }</span>
+    }
+
+    private static final class GitHubRestAuthoritySource
+            implements AuthoritySource {
+<span class="nc" id="L707">        private static final Duration REQUEST_TIMEOUT =</span>
+<span class="nc" id="L708">            Duration.ofSeconds(30);</span>
+        private final URI apiBase;
+        private final String token;
+        private final HttpClient client;
+
+<span class="nc" id="L713">        GitHubRestAuthoritySource(String apiUrl, String token) {</span>
+<span class="nc" id="L714">            this.apiBase = normalizeApiBase(apiUrl);</span>
+<span class="nc" id="L715">            this.token = Objects.requireNonNull(token, &quot;token&quot;);</span>
+<span class="nc bnc" id="L716" title="All 2 branches missed.">            if (token.isBlank()) {</span>
+<span class="nc" id="L717">                throw new IllegalArgumentException(&quot;GitHub token is blank&quot;);</span>
+            }
+<span class="nc" id="L719">            this.client = HttpClient.newBuilder()</span>
+<span class="nc" id="L720">                .connectTimeout(Duration.ofSeconds(10))</span>
+<span class="nc" id="L721">                .followRedirects(HttpClient.Redirect.NORMAL)</span>
+<span class="nc" id="L722">                .build();</span>
+<span class="nc" id="L723">        }</span>
+
+        @Override
+        public CommitEvidence commit(String repository, String commit) {
+<span class="nc" id="L727">            JsonNode document = get(</span>
+                &quot;/repos/&quot; + repository + &quot;/commits/&quot; + commit);
+<span class="nc" id="L729">            JsonNode parentsNode = document.get(&quot;parents&quot;);</span>
+<span class="nc" id="L730">            JsonNode filesNode = document.get(&quot;files&quot;);</span>
+<span class="nc bnc" id="L731" title="All 6 branches missed.">            if (parentsNode == null || !parentsNode.isArray()</span>
+<span class="nc bnc" id="L732" title="All 2 branches missed.">                    || filesNode == null || !filesNode.isArray()) {</span>
+<span class="nc" id="L733">                throw new IllegalStateException(</span>
+                    &quot;GitHub commit response lacks parents or files&quot;);
+            }
+<span class="nc" id="L736">            List&lt;String&gt; parents = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L737">            parentsNode.forEach(node -&gt;</span>
+<span class="nc" id="L738">                parents.add(requireNodeText(node, &quot;sha&quot;)));</span>
+<span class="nc" id="L739">            List&lt;ChangedFile&gt; files = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L740">            filesNode.forEach(node -&gt; files.add(new ChangedFile(</span>
+<span class="nc" id="L741">                requireNodeText(node, &quot;filename&quot;),</span>
+<span class="nc" id="L742">                requireNodeText(node, &quot;status&quot;),</span>
+<span class="nc" id="L743">                requireNodeText(node, &quot;sha&quot;))));</span>
+<span class="nc" id="L744">            return new CommitEvidence(</span>
+<span class="nc" id="L745">                requireNodeText(document, &quot;sha&quot;),</span>
+                parents,
+                files);
+        }
+
+        @Override
+        public List&lt;RunEvidence&gt; createRuns(
+            String repository,
+            String branch
+        ) {
+<span class="nc" id="L755">            String encodedBranch = URLEncoder.encode(</span>
+                branch, StandardCharsets.UTF_8);
+<span class="nc" id="L757">            JsonNode document = get(</span>
+                &quot;/repos/&quot; + repository
+                    + &quot;/actions/workflows/&quot; + WORKFLOW_FILE
+                    + &quot;/runs?event=create&amp;branch=&quot; + encodedBranch
+                    + &quot;&amp;per_page=100&quot;);
+<span class="nc" id="L762">            JsonNode runsNode = document.get(&quot;workflow_runs&quot;);</span>
+<span class="nc bnc" id="L763" title="All 4 branches missed.">            if (runsNode == null || !runsNode.isArray()) {</span>
+<span class="nc" id="L764">                throw new IllegalStateException(</span>
+                    &quot;GitHub workflow-run response lacks workflow_runs&quot;);
+            }
+<span class="nc" id="L767">            List&lt;RunEvidence&gt; runs = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L768">            runsNode.forEach(node -&gt; runs.add(new RunEvidence(</span>
+<span class="nc" id="L769">                requireNodeLong(node, &quot;id&quot;),</span>
+<span class="nc" id="L770">                requireNodeText(node, &quot;event&quot;),</span>
+<span class="nc" id="L771">                requireNodeText(node, &quot;head_branch&quot;),</span>
+<span class="nc" id="L772">                requireNodeText(node, &quot;head_sha&quot;))));</span>
+<span class="nc" id="L773">            return List.copyOf(runs);</span>
+        }
+
+        private JsonNode get(String relativePath) {
+<span class="nc" id="L777">            URI uri = apiBase.resolve(relativePath);</span>
+<span class="nc" id="L778">            HttpRequest request = HttpRequest.newBuilder(uri)</span>
+<span class="nc" id="L779">                .timeout(REQUEST_TIMEOUT)</span>
+<span class="nc" id="L780">                .header(&quot;Accept&quot;, &quot;application/vnd.github+json&quot;)</span>
+<span class="nc" id="L781">                .header(&quot;Authorization&quot;, &quot;Bearer &quot; + token)</span>
+<span class="nc" id="L782">                .header(&quot;X-GitHub-Api-Version&quot;, &quot;2026-03-10&quot;)</span>
+<span class="nc" id="L783">                .header(&quot;User-Agent&quot;, &quot;Regelsuche-showcase-authority&quot;)</span>
+<span class="nc" id="L784">                .GET()</span>
+<span class="nc" id="L785">                .build();</span>
+            HttpResponse&lt;String&gt; response;
+            try {
+<span class="nc" id="L788">                response = client.send(</span>
+                    request,
+<span class="nc" id="L790">                    HttpResponse.BodyHandlers.ofString(</span>
+                        StandardCharsets.UTF_8));
+<span class="nc" id="L792">            } catch (IOException exception) {</span>
+<span class="nc" id="L793">                throw new IllegalStateException(</span>
+                    &quot;GitHub authority request failed&quot;,
+                    exception);
+<span class="nc" id="L796">            } catch (InterruptedException exception) {</span>
+<span class="nc" id="L797">                Thread.currentThread().interrupt();</span>
+<span class="nc" id="L798">                throw new IllegalStateException(</span>
+                    &quot;GitHub authority request was interrupted&quot;,
+                    exception);
+<span class="nc" id="L801">            }</span>
+<span class="nc bnc" id="L802" title="All 2 branches missed.">            if (response.statusCode() != 200) {</span>
+<span class="nc" id="L803">                throw new IllegalStateException(</span>
+                    &quot;GitHub authority request returned HTTP &quot;
+<span class="nc" id="L805">                        + response.statusCode());</span>
+            }
+            try {
+<span class="nc" id="L808">                JsonNode result = JSON.readTree(response.body());</span>
+<span class="nc bnc" id="L809" title="All 4 branches missed.">                if (result == null || !result.isObject()) {</span>
+<span class="nc" id="L810">                    throw new IllegalStateException(</span>
+                        &quot;GitHub authority response is not an object&quot;);
+                }
+<span class="nc" id="L813">                return result;</span>
+<span class="nc" id="L814">            } catch (IOException exception) {</span>
+<span class="nc" id="L815">                throw new IllegalStateException(</span>
+                    &quot;GitHub authority response is invalid JSON&quot;,
+                    exception);
+            }
+        }
+
+        private static URI normalizeApiBase(String apiUrl) {
+            URI uri;
+            try {
+<span class="nc bnc" id="L824" title="All 2 branches missed.">                uri = URI.create(apiUrl.endsWith(&quot;/&quot;)</span>
+<span class="nc" id="L825">                    ? apiUrl</span>
+<span class="nc" id="L826">                    : apiUrl + &quot;/&quot;);</span>
+<span class="nc" id="L827">            } catch (IllegalArgumentException exception) {</span>
+<span class="nc" id="L828">                throw new IllegalArgumentException(</span>
+                    &quot;invalid GITHUB_API_URL&quot;,
+                    exception);
+<span class="nc" id="L831">            }</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">            if (!&quot;https&quot;.equalsIgnoreCase(uri.getScheme())</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">                    || uri.getHost() == null</span>
+<span class="nc bnc" id="L834" title="All 2 branches missed.">                    || uri.getQuery() != null</span>
+<span class="nc bnc" id="L835" title="All 2 branches missed.">                    || uri.getFragment() != null) {</span>
+<span class="nc" id="L836">                throw new IllegalArgumentException(</span>
+                    &quot;GITHUB_API_URL must be an HTTPS base URL&quot;);
+            }
+<span class="nc" id="L839">            return uri;</span>
+        }
+
+        private static String requireNodeText(
+            JsonNode node,
+            String field
+        ) {
+<span class="nc" id="L846">            JsonNode value = node.get(field);</span>
+<span class="nc bnc" id="L847" title="All 4 branches missed.">            if (value == null || !value.isTextual()</span>
+<span class="nc bnc" id="L848" title="All 2 branches missed.">                    || value.textValue().isBlank()) {</span>
+<span class="nc" id="L849">                throw new IllegalStateException(</span>
+                    &quot;GitHub response lacks textual &quot; + field);
+            }
+<span class="nc" id="L852">            return value.textValue();</span>
+        }
+
+        private static long requireNodeLong(JsonNode node, String field) {
+<span class="nc" id="L856">            JsonNode value = node.get(field);</span>
+<span class="nc bnc" id="L857" title="All 4 branches missed.">            if (value == null || !value.canConvertToLong()) {</span>
+<span class="nc" id="L858">                throw new IllegalStateException(</span>
+                    &quot;GitHub response lacks integer &quot; + field);
+            }
+<span class="nc" id="L861">            return value.longValue();</span>
+        }
+    }
+
+    private static final class DeleteFailure extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        DeleteFailure(IOException cause) {
+<span class="nc" id="L869">            super(cause);</span>
+<span class="nc" id="L870">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

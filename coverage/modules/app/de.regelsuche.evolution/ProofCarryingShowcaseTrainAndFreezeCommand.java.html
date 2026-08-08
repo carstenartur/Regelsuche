@@ -624,28 +624,28 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
         String selectedCandidateHash,
         String retainedTrainRunHash
     ) {
-<span class="nc" id="L627">        public WrittenFreeze {</span>
-<span class="nc" id="L628">            outputDirectory = outputDirectory</span>
-<span class="nc" id="L629">                .toAbsolutePath()</span>
-<span class="nc" id="L630">                .normalize();</span>
-<span class="nc" id="L631">            candidateFreezePath = candidateFreezePath</span>
-<span class="nc" id="L632">                .toAbsolutePath()</span>
-<span class="nc" id="L633">                .normalize();</span>
-<span class="nc" id="L634">            EvolutionGenome.requireSha256(</span>
+<span class="fc" id="L627">        public WrittenFreeze {</span>
+<span class="fc" id="L628">            outputDirectory = outputDirectory</span>
+<span class="fc" id="L629">                .toAbsolutePath()</span>
+<span class="fc" id="L630">                .normalize();</span>
+<span class="fc" id="L631">            candidateFreezePath = candidateFreezePath</span>
+<span class="fc" id="L632">                .toAbsolutePath()</span>
+<span class="fc" id="L633">                .normalize();</span>
+<span class="fc" id="L634">            EvolutionGenome.requireSha256(</span>
                 candidateFreezeHash,
                 &quot;candidateFreezeHash&quot;);
-<span class="nc" id="L637">            EvolutionGenome.requireSha256(</span>
+<span class="fc" id="L637">            EvolutionGenome.requireSha256(</span>
                 selectedCandidateHash,
                 &quot;selectedCandidateHash&quot;);
-<span class="nc" id="L640">            EvolutionGenome.requireSha256(</span>
+<span class="fc" id="L640">            EvolutionGenome.requireSha256(</span>
                 retainedTrainRunHash,
                 &quot;retainedTrainRunHash&quot;);
-<span class="nc bnc" id="L643" title="All 2 branches missed.">            if (!candidateFreezePath.equals(</span>
-<span class="nc" id="L644">                    outputDirectory.resolve(&quot;candidate-freeze.json&quot;))) {</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">            if (!candidateFreezePath.equals(</span>
+<span class="fc" id="L644">                    outputDirectory.resolve(&quot;candidate-freeze.json&quot;))) {</span>
 <span class="nc" id="L645">                throw new IllegalArgumentException(</span>
                     &quot;candidate freeze path differs from output directory&quot;);
             }
-<span class="nc" id="L648">        }</span>
+<span class="fc" id="L648">        }</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
