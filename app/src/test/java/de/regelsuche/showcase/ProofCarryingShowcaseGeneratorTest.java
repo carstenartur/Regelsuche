@@ -119,7 +119,7 @@ class ProofCarryingShowcaseGeneratorTest {
             try {
                 ProcessBuilder builder = new ProcessBuilder(
                     executable,
-                    "scripts/generate-proof-carrying-showcase-cases.py",
+                    "scripts/generate-proof-carrying-showcase-final-test.py",
                     "--plan",
                     "research/showcase/proof-carrying-self-improvement/"
                         + "showcase-plan.json",
