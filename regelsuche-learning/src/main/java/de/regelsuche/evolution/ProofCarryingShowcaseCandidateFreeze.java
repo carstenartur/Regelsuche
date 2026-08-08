@@ -48,7 +48,7 @@ public record ProofCarryingShowcaseCandidateFreeze(
             throw new IllegalArgumentException(
                 "unsupported showcase candidate-freeze schema");
         }
-        requireText(showcaseId, "showcaseId");
+        showcaseId = requireText(showcaseId, "showcaseId");
         EvolutionGenome.requireSha256(planContentHash, "planContentHash");
         if (repositoryCommit == null
                 || !COMMIT.matcher(repositoryCommit).matches()) {
@@ -83,10 +83,21 @@ public record ProofCarryingShowcaseCandidateFreeze(
             throw new IllegalArgumentException(
                 "frozen candidate lacks required showcase structure");
         }
-        if (frozenAtUnixTime < 1
-                || randomnessNotBeforeUnixTime <= frozenAtUnixTime) {
+        long minimumNotBefore;
+        try {
+            minimumNotBefore = Math.addExact(
+                frozenAtUnixTime,
+                ProofCarryingShowcaseCandidateFreezer
+                    .MINIMUM_RANDOMNESS_DELAY_SECONDS);
+        } catch (ArithmeticException exception) {
             throw new IllegalArgumentException(
-                "candidate freeze requires a later randomness boundary");
+                "candidate freeze time overflows randomness boundary",
+                exception);
+        }
+        if (frozenAtUnixTime < 1
+                || randomnessNotBeforeUnixTime < minimumNotBefore) {
+            throw new IllegalArgumentException(
+                "candidate freeze violates the 300-second randomness delay");
         }
         if (!STATUS.equals(status)) {
             throw new IllegalArgumentException(
@@ -144,6 +155,7 @@ public record ProofCarryingShowcaseCandidateFreeze(
             throw new IllegalArgumentException(
                 "candidate payload differs from frozen selection");
         }
+        List<String> canonicalSeeds = canonicalHashes(seedCandidateHashes);
         String hash = EvolutionGenome.hash(render(
             showcaseId,
             planContentHash,
@@ -156,7 +168,7 @@ public record ProofCarryingShowcaseCandidateFreeze(
             primitiveInventoryHash,
             workBudgetPolicyHash,
             evaluationProtocolHash,
-            canonicalHashes(seedCandidateHashes),
+            canonicalSeeds,
             facts.nodeCount(),
             facts.containsCompositionTopology(),
             facts.containsDecisionTopology(),
@@ -177,7 +189,7 @@ public record ProofCarryingShowcaseCandidateFreeze(
             primitiveInventoryHash,
             workBudgetPolicyHash,
             evaluationProtocolHash,
-            seedCandidateHashes,
+            canonicalSeeds,
             facts.nodeCount(),
             facts.containsCompositionTopology(),
             facts.containsDecisionTopology(),
@@ -213,21 +225,21 @@ public record ProofCarryingShowcaseCandidateFreeze(
 
     private static List<String> canonicalHashes(List<String> values) {
         Objects.requireNonNull(values, "seedCandidateHashes");
-        List<String> result = values.stream()
+        List<String> checked = values.stream()
             .map(value -> {
                 EvolutionGenome.requireSha256(
                     value, "seedCandidateHash");
                 return value;
             })
-            .distinct()
-            .sorted(Comparator.naturalOrder())
             .toList();
-        if (result.isEmpty()
-                || new HashSet<>(result).size() != result.size()) {
+        if (checked.isEmpty()
+                || new HashSet<>(checked).size() != checked.size()) {
             throw new IllegalArgumentException(
                 "candidate freeze requires unique seed candidates");
         }
-        return List.copyOf(result);
+        return checked.stream()
+            .sorted(Comparator.naturalOrder())
+            .toList();
     }
 
     private static String render(
