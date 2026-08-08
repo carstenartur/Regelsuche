@@ -41,6 +41,49 @@ class EvolutionStudyContractsTest {
     }
 
     @Test
+    void trainOnlyManifestDefersBothHeldOutStages() {
+        List<EvolutionSplitManifest.CaseReference> train = List.of(
+            caseRef("train_only_case", "train_only_family", "train-only"));
+
+        EvolutionSplitManifest manifest = EvolutionSplitManifest.createTrainOnly(
+            "showcase_study",
+            hash("showcase corpus"),
+            hash("showcase features"),
+            train);
+
+        assertTrue(manifest.heldOutMaterializationDeferred());
+        assertTrue(manifest.validationCases().isEmpty());
+        assertTrue(manifest.finalTestCases().isEmpty());
+        assertEquals(EvolutionGenome.SourceSplit.TRAIN,
+            manifest.trainingScope().sourceSplit());
+        assertTrue(manifest.toCanonicalJson().contains(
+            "\"heldOutMaterialization\":\"DEFERRED_TO_PUBLIC_RANDOMNESS\""));
+        assertEquals(
+            manifest,
+            EvolutionSplitManifest.createTrainOnly(
+                "showcase_study",
+                hash("showcase corpus"),
+                hash("showcase features"),
+                train));
+    }
+
+    @Test
+    void concreteSplitFactoryStillRequiresValidationAndFinalTest() {
+        List<EvolutionSplitManifest.CaseReference> train = List.of(
+            caseRef("train_only_case", "train_only_family", "train-only"));
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> EvolutionSplitManifest.create(
+                "showcase_study",
+                hash("showcase corpus"),
+                hash("showcase features"),
+                train,
+                List.of(),
+                List.of()));
+    }
+
+    @Test
     void splitManifestRejectsEveryCrossSplitLeakageIdentity() {
         EvolutionSplitManifest.CaseReference train = caseRef(
             "train_case", "train_family", "train");
