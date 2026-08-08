@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,7 +21,6 @@ import java.util.Objects;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
-/** Shared strict JSON, canonicalization and validation support for the showcase. */
 final class ProofCarryingShowcaseJsonSupport {
     static final ObjectMapper JSON = new ObjectMapper(
         JsonFactory.builder()
@@ -89,17 +87,6 @@ final class ProofCarryingShowcaseJsonSupport {
 
     static String hashPayload(Map<String, ?> value) {
         return EvolutionGenome.hash(canonicalJson(JSON.valueToTree(value)));
-    }
-
-    static String hashWithoutContentHash(Object value) {
-        JsonNode node = JSON.valueToTree(value);
-        if (!(node instanceof ObjectNode object)) {
-            throw new IllegalArgumentException(
-                "content-addressed value must serialize as a JSON object");
-        }
-        ObjectNode payload = object.deepCopy();
-        payload.remove("contentHash");
-        return EvolutionGenome.hash(canonicalJson(payload));
     }
 
     static String canonicalJson(JsonNode node) {
@@ -251,21 +238,6 @@ final class ProofCarryingShowcaseJsonSupport {
         return sort
             ? checked.stream().sorted().toList()
             : List.copyOf(checked);
-    }
-
-    static List<String> immutableStringList(
-        List<String> values,
-        String name,
-        boolean requireNonEmpty
-    ) {
-        Objects.requireNonNull(values, name);
-        List<String> checked = values.stream()
-            .map(value -> requireText(value, name + " entry"))
-            .toList();
-        if (requireNonEmpty && checked.isEmpty()) {
-            throw new IllegalArgumentException(name + " must not be empty");
-        }
-        return List.copyOf(checked);
     }
 
     static List<String> immutableHashes(
