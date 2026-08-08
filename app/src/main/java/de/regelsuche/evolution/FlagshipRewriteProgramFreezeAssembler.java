@@ -39,10 +39,11 @@ import java.util.Objects;
 /**
  * Productive, pre-execution assembler for the flagship rewrite-program study.
  *
- * <p>The assembler consumes two already validated private reveal bundles in a
- * trusted local process and emits only public commitments, split identities,
- * frozen plans and the final {@code FROZEN_NOT_RUN} receipt. It never writes
- * concrete held-out expressions or assumptions.</p>
+ * <p>The trusted sealing path consumes two already validated private reveal
+ * bundles. The reproducibility path consumes only their published commitments
+ * and hash-only split references. Both paths emit byte-identical public plans
+ * and the final {@code FROZEN_NOT_RUN} receipt; neither writes concrete held-
+ * out expressions or assumptions.</p>
  */
 public final class FlagshipRewriteProgramFreezeAssembler {
     public static final String FREEZE_ID = "flagship_rewrite_program_freeze_v1";
@@ -60,8 +61,29 @@ public final class FlagshipRewriteProgramFreezeAssembler {
         EvolutionRewriteProgramHeldOutRevealBundle validation,
         EvolutionRewriteProgramHeldOutRevealBundle finalTest
     ) {
+        Objects.requireNonNull(validation, "validation");
+        Objects.requireNonNull(finalTest, "finalTest");
+        return assemble(
+            repositoryCommit,
+            validation.commitment(),
+            EvolutionRewriteProgramHeldOutSplitReferences.create(validation),
+            finalTest.commitment(),
+            EvolutionRewriteProgramHeldOutSplitReferences.create(finalTest));
+    }
+
+    public static FreezeInputs assemble(
+        String repositoryCommit,
+        EvolutionRewriteProgramHeldOutCommitment validationCommitment,
+        EvolutionRewriteProgramHeldOutSplitReferences validationReferences,
+        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment,
+        EvolutionRewriteProgramHeldOutSplitReferences finalTestReferences
+    ) {
         EvolutionSplitManifest manifest =
-            FlagshipRewriteProgramSplitManifest.create(validation, finalTest);
+            FlagshipRewriteProgramSplitManifest.create(
+                validationCommitment,
+                validationReferences,
+                finalTestCommitment,
+                finalTestReferences);
         EvolutionRewriteProgramTrainSuite train =
             FlagshipRewriteProgramTrainCorpus.create();
         EvolutionRewriteProgramEvaluationProtocol protocol =
@@ -132,10 +154,6 @@ public final class FlagshipRewriteProgramFreezeAssembler {
                 1_000,
                 250);
 
-        EvolutionRewriteProgramHeldOutCommitment validationCommitment =
-            validation.commitment();
-        EvolutionRewriteProgramHeldOutCommitment finalTestCommitment =
-            finalTest.commitment();
         EvolutionRewriteProgramFreezeReceipt receipt =
             EvolutionRewriteProgramFreezeReceipt.create(
                 FREEZE_ID,
@@ -185,8 +203,8 @@ public final class FlagshipRewriteProgramFreezeAssembler {
             train,
             validationCommitment,
             finalTestCommitment,
-            EvolutionRewriteProgramHeldOutSplitReferences.create(validation),
-            EvolutionRewriteProgramHeldOutSplitReferences.create(finalTest),
+            validationReferences,
+            finalTestReferences,
             protocol,
             genome,
             seeds,
@@ -211,10 +229,43 @@ public final class FlagshipRewriteProgramFreezeAssembler {
     ) {
         EvolutionRewriteProgramHeldOutRevealCodec codec =
             new EvolutionRewriteProgramHeldOutRevealCodec();
-        FreezeInputs inputs = assemble(
-            repositoryCommit,
-            codec.readPrivate(validationPrivateBundle),
-            codec.readPrivate(finalTestPrivateBundle));
+        return write(
+            outputDirectory,
+            assemble(
+                repositoryCommit,
+                codec.readPrivate(validationPrivateBundle),
+                codec.readPrivate(finalTestPrivateBundle)));
+    }
+
+    /**
+     * Reconstructs and writes the complete public freeze from already-published
+     * commitments and hash-only split references. No private reveal bundle is
+     * opened by this path.
+     */
+    public static WrittenFreeze writePublic(
+        Path outputDirectory,
+        String repositoryCommit,
+        Path validationCommitment,
+        Path validationReferences,
+        Path finalTestCommitment,
+        Path finalTestReferences
+    ) {
+        EvolutionRewriteProgramHeldOutPublicCodec codec =
+            new EvolutionRewriteProgramHeldOutPublicCodec();
+        return write(
+            outputDirectory,
+            assemble(
+                repositoryCommit,
+                codec.readCommitment(validationCommitment),
+                codec.readSplitReferences(validationReferences),
+                codec.readCommitment(finalTestCommitment),
+                codec.readSplitReferences(finalTestReferences)));
+    }
+
+    private static WrittenFreeze write(
+        Path outputDirectory,
+        FreezeInputs inputs
+    ) {
         Path output = Objects.requireNonNull(outputDirectory, "outputDirectory")
             .toAbsolutePath()
             .normalize();
@@ -275,16 +326,33 @@ public final class FlagshipRewriteProgramFreezeAssembler {
     }
 
     public static void main(String[] arguments) {
-        if (arguments.length != 4) {
+        WrittenFreeze result;
+        if (arguments.length == 4) {
+            result = write(
+                Path.of(arguments[3]),
+                arguments[0],
+                Path.of(arguments[1]),
+                Path.of(arguments[2]));
+        } else if (arguments.length == 7
+                && "--public".equals(arguments[0])) {
+            result = writePublic(
+                Path.of(arguments[6]),
+                arguments[1],
+                Path.of(arguments[2]),
+                Path.of(arguments[3]),
+                Path.of(arguments[4]),
+                Path.of(arguments[5]));
+        } else {
             throw new IllegalArgumentException(
                 "usage: <repository-commit> <validation-private.json> "
-                    + "<final-test-private.json> <public-output-directory>");
+                    + "<final-test-private.json> <public-output-directory> "
+                    + "or --public <repository-commit> "
+                    + "<validation-commitment.json> "
+                    + "<validation-split-references.json> "
+                    + "<final-test-commitment.json> "
+                    + "<final-test-split-references.json> "
+                    + "<public-output-directory>");
         }
-        WrittenFreeze result = write(
-            Path.of(arguments[3]),
-            arguments[0],
-            Path.of(arguments[1]),
-            Path.of(arguments[2]));
         System.out.println("flagshipFreezeStatus=FROZEN_NOT_RUN");
         System.out.println("flagshipFreezeReceiptHash=" + result.receiptHash());
         System.out.println("flagshipFreezeOutput=" + result.outputDirectory());
