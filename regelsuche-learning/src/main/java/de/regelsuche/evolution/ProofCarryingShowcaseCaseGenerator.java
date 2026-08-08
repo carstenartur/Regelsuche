@@ -146,8 +146,8 @@ public final class ProofCarryingShowcaseCaseGenerator {
                 "(" + left + "^2-" + right + "^2)";
             String divisor = "(" + left + "-" + right + ")";
             String term = variant == 0
-                ? "(" + coefficient + "*(("
-                    + difference + "/" + divisor + ")/"
+                ? "(" + coefficient + "*((("
+                    + difference + ")/" + divisor + ")/"
                     + denominator + "))"
                 : "(((" + coefficient + "*" + difference
                     + ")/" + divisor + ")/" + denominator + ")";

@@ -61,6 +61,37 @@ class ProofCarryingShowcaseCaseGeneratorTest {
     }
 
     @Test
+    void preservesThePublishedV1DevelopmentFixtureSurface() {
+        ProofCarryingShowcasePlan plan =
+            ProofCarryingShowcaseTestFixtures.plan();
+        ProofCarryingShowcaseSeedReceipt seed =
+            new ProofCarryingShowcaseSeedReceipt(
+                ProofCarryingShowcaseSeedReceipt.SCHEMA,
+                plan.showcaseId(),
+                plan.contentHash(),
+                ProofCarryingShowcaseTestFixtures.hash(
+                    "fixture-candidate-a"),
+                ProofCarryingShowcaseTestFixtures.hash(
+                    "fixture-randomness-a"),
+                plan.publicRandomness().chainHash(),
+                99_000_000L,
+                ProofCarryingShowcaseSeedReceipt
+                    .DERIVATION_ALGORITHM,
+                ProofCarryingShowcaseTestFixtures.hash(
+                    "fixture-derived-seed-a"),
+                ProofCarryingShowcaseSeedReceipt.STATUS,
+                "sha256:1c4bb6e7ef3e37b539ba0359dba8daa71b30f7b18ff79fbf6c87e24dadf9cb72");
+
+        ProofCarryingShowcaseGeneratedFinalTest generated =
+            new ProofCarryingShowcaseCaseGenerator().generate(
+                plan, seed);
+
+        assertEquals(
+            "sha256:28294f2993df4e8690cf0dad2cf1132bb203ce6217c51aa8747d9f07d5ea1eb1",
+            generated.caseContentRoot());
+    }
+
+    @Test
     void seedSubstitutionChangesTheCompleteGeneratedSurface() {
         ProofCarryingShowcasePlan plan =
             ProofCarryingShowcaseTestFixtures.plan();
