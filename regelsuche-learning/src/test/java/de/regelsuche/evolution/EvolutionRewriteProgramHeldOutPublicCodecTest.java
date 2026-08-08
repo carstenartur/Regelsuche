@@ -46,16 +46,21 @@ class EvolutionRewriteProgramHeldOutPublicCodecTest {
     }
 
     @Test
-    void rejectsUnknownFieldsTrailingValuesAndHashSubstitution() {
+    void rejectsDuplicateAndUnknownFieldsTrailingValuesAndHashSubstitution() {
         EvolutionRewriteProgramHeldOutCommitment commitment =
             bundle().commitment();
         String canonical = commitment.toCanonicalJson();
+        String duplicate = canonical.substring(0, 1)
+            + "\"schema\":\"duplicate\"," + canonical.substring(1);
         String unknown = canonical.substring(0, canonical.length() - 1)
             + ",\"unexpected\":true}";
         String substituted = canonical.replace(
             commitment.sealedRevealHash(),
             EvolutionGenome.hash("another-private-reveal"));
 
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> codec.readCommitment(duplicate));
         assertThrows(
             IllegalArgumentException.class,
             () -> codec.readCommitment(unknown));
