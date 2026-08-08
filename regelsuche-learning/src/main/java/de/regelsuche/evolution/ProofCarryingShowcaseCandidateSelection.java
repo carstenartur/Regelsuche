@@ -11,14 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Complete deterministic TRAIN-only selection evidence for the public showcase.
- *
- * <p>Every terminal candidate remains visible with its raw TRAIN metrics,
- * blockers, seed-equivalence decisions and structural facts. The selected
- * candidate is the first eligible alternative under the frozen ranking; no
- * VALIDATION, public randomness or FINAL TEST input participates.</p>
- */
 public record ProofCarryingShowcaseCandidateSelection(
     String schema,
     String showcaseId,
@@ -153,14 +145,6 @@ public record ProofCarryingShowcaseCandidateSelection(
             selected.planHash(),
             STATUS,
             hash);
-    }
-
-    public Alternative selectedAlternative() {
-        return alternatives.stream()
-            .filter(value -> value.candidateHash().equals(
-                selectedCandidateHash))
-            .findFirst()
-            .orElseThrow();
     }
 
     public String toCanonicalJson() {
