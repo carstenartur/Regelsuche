@@ -31,6 +31,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,23 +52,15 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
     }
 
     public static void main(String[] arguments) {
-        if (arguments.length != 4) {
+        if (arguments.length != 3) {
             throw new IllegalArgumentException(
                 "usage: <showcase-plan.json> <repository-commit> "
-                    + "<frozen-at-unix-time> <output-directory>");
-        }
-        long frozenAt;
-        try {
-            frozenAt = Long.parseLong(arguments[2]);
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException(
-                "frozen-at-unix-time must be an integer", exception);
+                    + "<output-directory>");
         }
         WrittenFreeze result = execute(
             Path.of(arguments[0]),
             arguments[1],
-            frozenAt,
-            Path.of(arguments[3]));
+            Path.of(arguments[2]));
         System.out.println(
             "showcaseTrainFreezeStatus="
                 + ProofCarryingShowcaseCandidateFreeze.STATUS);
@@ -84,7 +77,6 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
     public static WrittenFreeze execute(
         Path showcasePlanPath,
         String repositoryCommit,
-        long frozenAtUnixTime,
         Path outputDirectory
     ) {
         ProofCarryingShowcasePlan showcasePlan =
@@ -107,6 +99,7 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
                     configuration.seeds(),
                     configuration.mutationCatalog(),
                     evaluator);
+        long frozenAtUnixTime = Instant.now().getEpochSecond();
         var freeze = new ProofCarryingShowcaseCandidateFreezer().freeze(
             showcasePlan,
             retained,
