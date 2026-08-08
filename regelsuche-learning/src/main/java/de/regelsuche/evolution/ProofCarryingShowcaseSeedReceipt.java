@@ -22,6 +22,8 @@ public record ProofCarryingShowcaseSeedReceipt(
         "SHA256_DOMAIN_SEPARATED_V1";
     public static final String STATUS =
         "FINAL_TEST_SEED_DERIVED_AFTER_CANDIDATE_FREEZE";
+    private static final String DERIVATION_DOMAIN =
+        "regelsuche.proof-carrying-showcase-seed/v1";
 
     public ProofCarryingShowcaseSeedReceipt {
         if (!SCHEMA.equals(schema)) {
@@ -79,8 +81,8 @@ public record ProofCarryingShowcaseSeedReceipt(
         ProofCarryingShowcaseCandidateFreeze candidate,
         ProofCarryingShowcasePublicRandomnessReceipt randomness
     ) {
-        String derived = ProofCarryingShowcaseSeedDeriver.derive(
-            plan, candidate, randomness);
+        randomness.requireCompatible(plan, candidate);
+        String derived = derive(plan, candidate, randomness);
         Map<String, Object> payload = payload(
             SCHEMA,
             plan.showcaseId(),
@@ -140,6 +142,24 @@ public record ProofCarryingShowcaseSeedReceipt(
             throw new IllegalArgumentException(
                 "showcase seed receipt candidate mismatch");
         }
+    }
+
+    private static String derive(
+        ProofCarryingShowcasePlan plan,
+        ProofCarryingShowcaseCandidateFreeze candidate,
+        ProofCarryingShowcasePublicRandomnessReceipt randomness
+    ) {
+        return EvolutionGenome.hash(String.join(
+            "\n",
+            DERIVATION_DOMAIN,
+            "showcaseId=" + plan.showcaseId(),
+            "planContentHash=" + plan.contentHash(),
+            "candidateFreezeContentHash=" + candidate.contentHash(),
+            "chainHash=" + randomness.chainHash(),
+            "round=" + randomness.round(),
+            "randomness=" + randomness.randomness(),
+            "randomnessReceiptContentHash="
+                + randomness.contentHash()));
     }
 
     private static Map<String, Object> payload(
