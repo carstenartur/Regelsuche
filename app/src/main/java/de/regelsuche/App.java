@@ -99,8 +99,7 @@ public class App {
         System.out.println("  transform <expression>");
         System.out.println(
             "  showcase-train-freeze <showcase-plan.json> "
-                + "<repository-commit> <frozen-at-unix-time> "
-                + "<output-directory>");
+                + "<repository-commit> <output-directory>");
         System.out.println(
             "  plugins list|reload|watch|status "
                 + "[--dir PATH] [--rules PATH]");
