@@ -2,7 +2,6 @@ package de.regelsuche.evolution;
 
 import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.TerminalOutcome;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
-import de.regelsuche.json.JsonWriter;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -40,7 +39,7 @@ public record ProofCarryingShowcaseCandidateSelection(
             throw new IllegalArgumentException(
                 "unsupported showcase candidate-selection schema");
         }
-        requireText(showcaseId, "showcaseId");
+        ProofCarryingShowcaseJsonSupport.requireText(showcaseId, "showcaseId");
         EvolutionGenome.requireSha256(planContentHash, "planContentHash");
         EvolutionGenome.requireSha256(
             retainedPopulationRunHash, "retainedPopulationRunHash");
@@ -69,12 +68,7 @@ public record ProofCarryingShowcaseCandidateSelection(
             throw new IllegalArgumentException(
                 "candidate selection must keep FINAL TEST unseen");
         }
-        Alternative selected = alternatives.stream()
-            .filter(Alternative::eligibleForFreeze)
-            .sorted(ranking())
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException(
-                "candidate selection requires an eligible TRAIN alternative"));
+        Alternative selected = selected(alternatives);
         if (!selected.candidateHash().equals(selectedCandidateHash)
                 || !selected.alphaStructuralHash().equals(
                     selectedCandidateAlphaStructuralHash)
@@ -83,7 +77,7 @@ public record ProofCarryingShowcaseCandidateSelection(
                 "selected candidate differs from frozen deterministic ranking");
         }
         EvolutionGenome.requireSha256(contentHash, "contentHash");
-        String expected = EvolutionGenome.hash(render(
+        String expected = ProofCarryingShowcaseJsonSupport.hashPayload(payload(
             showcaseId,
             planContentHash,
             retainedPopulationRunHash,
@@ -93,8 +87,7 @@ public record ProofCarryingShowcaseCandidateSelection(
             alternatives,
             selectedCandidateHash,
             selectedCandidateAlphaStructuralHash,
-            selectedPlanHash,
-            null));
+            selectedPlanHash));
         if (!expected.equals(contentHash)) {
             throw new IllegalArgumentException(
                 "showcase candidate-selection contentHash mismatch");
@@ -109,16 +102,11 @@ public record ProofCarryingShowcaseCandidateSelection(
     ) {
         Objects.requireNonNull(retained, "retained");
         List<Alternative> canonical = canonicalAlternatives(alternatives);
-        Alternative selected = canonical.stream()
-            .filter(Alternative::eligibleForFreeze)
-            .sorted(ranking())
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException(
-                "TRAIN population contains no showcase-freezable candidate"));
+        Alternative selected = selected(canonical);
         var run = retained.populationRun();
         String finalGenerationHash = run.generationReports().getLast()
             .contentHash();
-        String hash = EvolutionGenome.hash(render(
+        String hash = ProofCarryingShowcaseJsonSupport.hashPayload(payload(
             showcaseId,
             planContentHash,
             retained.contentHash(),
@@ -128,8 +116,7 @@ public record ProofCarryingShowcaseCandidateSelection(
             canonical,
             selected.candidateHash(),
             selected.alphaStructuralHash(),
-            selected.planHash(),
-            null));
+            selected.planHash()));
         return new ProofCarryingShowcaseCandidateSelection(
             SCHEMA,
             showcaseId,
@@ -148,18 +135,16 @@ public record ProofCarryingShowcaseCandidateSelection(
     }
 
     public String toCanonicalJson() {
-        return render(
-            showcaseId,
-            planContentHash,
-            retainedPopulationRunHash,
-            populationRunHash,
-            finalGenerationReportHash,
-            populationTerminalOutcome,
-            alternatives,
-            selectedCandidateHash,
-            selectedCandidateAlphaStructuralHash,
-            selectedPlanHash,
-            contentHash);
+        return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);
+    }
+
+    private static Alternative selected(List<Alternative> alternatives) {
+        return alternatives.stream()
+            .filter(Alternative::eligibleForFreeze)
+            .sorted(ranking())
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException(
+                "candidate selection requires an eligible TRAIN alternative"));
     }
 
     private static Comparator<Alternative> ranking() {
@@ -189,10 +174,10 @@ public record ProofCarryingShowcaseCandidateSelection(
             throw new IllegalArgumentException(
                 "candidate alternatives require unique identities");
         }
-        return List.copyOf(result);
+        return result;
     }
 
-    private static String render(
+    private static Map<String, Object> payload(
         String showcaseId,
         String planContentHash,
         String retainedPopulationRunHash,
@@ -202,76 +187,23 @@ public record ProofCarryingShowcaseCandidateSelection(
         List<Alternative> alternatives,
         String selectedCandidateHash,
         String selectedCandidateAlphaStructuralHash,
-        String selectedPlanHash,
-        String contentHash
+        String selectedPlanHash
     ) {
-        JsonWriter json = new JsonWriter().beginObject()
-            .property("schema", SCHEMA)
-            .property("showcaseId", showcaseId)
-            .property("planContentHash", planContentHash)
-            .property(
-                "retainedPopulationRunHash", retainedPopulationRunHash)
-            .property("populationRunHash", populationRunHash)
-            .property(
-                "finalGenerationReportHash", finalGenerationReportHash)
-            .property(
-                "populationTerminalOutcome", terminalOutcome.name())
-            .property("selectionPolicy", SELECTION_POLICY)
-            .array("alternatives", array -> alternatives.forEach(value ->
-                array.objectValue(object -> {
-                    object.property("candidateHash", value.candidateHash())
-                        .property(
-                            "alphaStructuralHash",
-                            value.alphaStructuralHash())
-                        .property("genomeHash", value.genomeHash())
-                        .property("planHash", value.planHash())
-                        .property("evaluationHash", value.evaluationHash())
-                        .property("scalarFitness", value.scalarFitness())
-                        .object("rawComponents", components -> {
-                            for (FitnessComponent component
-                                    : FitnessComponent.values()) {
-                                Integer componentValue = value.rawComponents()
-                                    .get(component);
-                                if (componentValue != null) {
-                                    components.property(
-                                        component.name(), componentValue);
-                                }
-                            }
-                        })
-                        .stringArray("trainBlockers", value.trainBlockers())
-                        .property(
-                            "seedExactEquivalent",
-                            value.seedExactEquivalent())
-                        .property(
-                            "seedAlphaEquivalent",
-                            value.seedAlphaEquivalent())
-                        .property(
-                            "programNodeCount", value.programNodeCount())
-                        .property(
-                            "containsCompositionTopology",
-                            value.containsCompositionTopology())
-                        .property(
-                            "containsDecisionTopology",
-                            value.containsDecisionTopology())
-                        .property(
-                            "minimumStructuralPrimitivePathSteps",
-                            value.minimumStructuralPrimitivePathSteps())
-                        .stringArray(
-                            "freezeBlockers", value.freezeBlockers())
-                        .property(
-                            "eligibleForFreeze",
-                            value.eligibleForFreeze());
-                })))
-            .property("selectedCandidateHash", selectedCandidateHash)
-            .property(
-                "selectedCandidateAlphaStructuralHash",
-                selectedCandidateAlphaStructuralHash)
-            .property("selectedPlanHash", selectedPlanHash)
-            .property("status", STATUS);
-        if (contentHash != null) {
-            json.property("contentHash", contentHash);
-        }
-        return json.endObject().toString();
+        return ProofCarryingShowcaseJsonSupport.payload(
+            "schema", SCHEMA,
+            "showcaseId", showcaseId,
+            "planContentHash", planContentHash,
+            "retainedPopulationRunHash", retainedPopulationRunHash,
+            "populationRunHash", populationRunHash,
+            "finalGenerationReportHash", finalGenerationReportHash,
+            "populationTerminalOutcome", terminalOutcome,
+            "selectionPolicy", SELECTION_POLICY,
+            "alternatives", alternatives,
+            "selectedCandidateHash", selectedCandidateHash,
+            "selectedCandidateAlphaStructuralHash",
+                selectedCandidateAlphaStructuralHash,
+            "selectedPlanHash", selectedPlanHash,
+            "status", STATUS);
     }
 
     public record Alternative(
@@ -305,13 +237,14 @@ public record ProofCarryingShowcaseCandidateSelection(
                     "scalarFitness must be in [-1000,1000]");
             }
             rawComponents = canonicalComponents(rawComponents);
-            trainBlockers = canonicalStrings(trainBlockers);
+            trainBlockers = canonicalBlockers(trainBlockers, "trainBlockers");
             if (programNodeCount < 1
                     || minimumStructuralPrimitivePathSteps < 1) {
                 throw new IllegalArgumentException(
                     "candidate structural counters must be positive");
             }
-            freezeBlockers = canonicalStrings(freezeBlockers);
+            freezeBlockers = canonicalBlockers(
+                freezeBlockers, "freezeBlockers");
             boolean expectedEligible = trainBlockers.isEmpty()
                 && freezeBlockers.isEmpty();
             if (eligibleForFreeze != expectedEligible) {
@@ -340,21 +273,15 @@ public record ProofCarryingShowcaseCandidateSelection(
             return Collections.unmodifiableMap(result);
         }
 
-        private static List<String> canonicalStrings(List<String> values) {
-            return values == null
-                ? List.of()
-                : values.stream()
-                    .map(value -> requireText(value, "blocker"))
-                    .distinct()
-                    .sorted()
-                    .toList();
+        private static List<String> canonicalBlockers(
+            List<String> values,
+            String name
+        ) {
+            return ProofCarryingShowcaseJsonSupport.immutableStrings(
+                values == null ? List.of() : values,
+                name,
+                true,
+                false);
         }
-    }
-
-    private static String requireText(String value, String name) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(name + " must not be blank");
-        }
-        return value.trim().replaceAll("\\s+", " ");
     }
 }
