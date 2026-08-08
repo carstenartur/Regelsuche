@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.proof-carrying-showcase-public-randomness-receipt/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "showcaseId",
+    "planContentHash",
+    "candidateFreezeContentHash",
+    "network",
+    "chainHash",
+    "round",
+    "roundUnixTime",
+    "randomness",
+    "signature",
+    "previousSignature",
+    "chainInfoHash",
+    "verificationClient",
+    "verificationClientArtifactHash",
+    "verificationEvidenceHash",
+    "verificationStatus",
+    "endpointId",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.proof-carrying-showcase-public-randomness-receipt/v1"
+    },
+    "showcaseId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 160
+    },
+    "planContentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "candidateFreezeContentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "network": {
+      "const": "default"
+    },
+    "chainHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "roundUnixTime": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "randomness": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{96,1024}$"
+    },
+    "previousSignature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{96,1024}$"
+    },
+    "chainInfoHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "verificationClient": {
+      "type": "string",
+      "pattern": "^drand-client/[A-Za-z0-9._@:+-]{1,160}$"
+    },
+    "verificationClientArtifactHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "verificationEvidenceHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "verificationStatus": {
+      "const": "VERIFIED_BY_PINNED_DRAND_CLIENT"
+    },
+    "endpointId": {
+      "type": "string",
+      "pattern": "^[a-z0-9.-]{3,128}$"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
