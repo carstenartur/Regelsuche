@@ -150,7 +150,7 @@ public final class ProofCarryingShowcaseCandidateFreezer {
                 "retained population differs from frozen seed candidates");
         }
         if (!"NOT_EVALUATED".equals(retained.validationStatus())
-                || !"NOT_EVALUATED".equals(retained.finalTestStatus()) {
+                || !"NOT_EVALUATED".equals(retained.finalTestStatus())) {
             throw new IllegalArgumentException(
                 "candidate freeze cannot consume later-stage outcomes");
         }
@@ -267,7 +267,7 @@ public final class ProofCarryingShowcaseCandidateFreezer {
             return decisionWrapper(analyze(prioritize.body()));
         }
         if (node instanceof Prune prune) {
-            return decisionWrapper(analyze(prune.body());
+            return decisionWrapper(analyze(prune.body()));
         }
         throw new IllegalArgumentException(
             "unsupported rewrite-program node: " + node.getClass().getName());
