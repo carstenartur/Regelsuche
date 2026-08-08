@@ -4,10 +4,8 @@ import de.regelsuche.search.SearchHeuristic;
 import java.util.List;
 
 /**
- * Open, reviewable TRAIN corpus for the proof-carrying rewrite-program study.
- *
- * <p>All cases are visible by design and may be used for mutation and fitness.
- * No VALIDATION or FINAL TEST material is referenced from this class.</p>
+ * Open, reviewable TRAIN corpus for proof-carrying rewrite-program studies.
+ * No VALIDATION or FINAL TEST material is referenced from this class.
  */
 public final class FlagshipRewriteProgramTrainCorpus {
     public static final String SUITE_ID =
@@ -17,6 +15,10 @@ public final class FlagshipRewriteProgramTrainCorpus {
     }
 
     public static EvolutionRewriteProgramTrainSuite create() {
+        return create(SUITE_ID);
+    }
+
+    public static EvolutionRewriteProgramTrainSuite create(String suiteId) {
         SearchHeuristic heuristic = new SearchHeuristic(
             6,
             512,
@@ -32,7 +34,7 @@ public final class FlagshipRewriteProgramTrainCorpus {
                 4,
                 20_000L);
         return EvolutionRewriteProgramTrainSuite.create(
-            SUITE_ID,
+            suiteId,
             EvolutionRewriteProgramTrainSuite.EvaluatorProfile
                 .EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS,
             cases(),
