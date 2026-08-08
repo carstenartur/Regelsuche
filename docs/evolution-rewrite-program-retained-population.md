@@ -48,6 +48,19 @@ split manifest, TRAIN suite, mutation catalog, seed candidates, protocol and
 implementation class are the frozen inputs. Candidate freezing consumes this
 protocol-bound wrapper rather than a generic retained population.
 
+## Operational bounds and trust boundary
+
+The retained JSON is deliberately bounded by the strict schemas: the compact
+population ledger is limited to 16 MiB, each canonical genome and plan to 8 MiB,
+the readable program to 1 MiB, and the complete protocol-bound retained payload
+to 32 MiB. A future standalone loader must enforce the same limits before
+parsing and must reconstruct the runtime records rather than treating schema
+validity or caller-supplied hashes as authority.
+
+This tranche creates authority-bearing objects only inside the checked runtime
+path. It does not yet claim that arbitrary JSON conforming to the schema is an
+authorized retained TRAIN run.
+
 ## Protocol-bound execution
 
 `RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner` preserves the
