@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** One deterministic, content-addressed future showcase case. */
 public record ProofCarryingShowcaseGeneratedCase(
     String schema,
     String caseId,
@@ -75,9 +74,10 @@ public record ProofCarryingShowcaseGeneratedCase(
                 "generated coefficient vector differs from difficulty");
         }
         blockKinds = ProofCarryingShowcaseJsonSupport
-            .immutableStringList(
+            .immutableStrings(
                 blockKinds,
                 "blockKinds",
+                false,
                 true);
         if (blockKinds.size() != difficultyLevel
                 || blockKinds.stream().anyMatch(
@@ -145,8 +145,8 @@ public record ProofCarryingShowcaseGeneratedCase(
             ProofCarryingShowcaseJsonSupport.immutableIntegers(
                 coefficientVector, "coefficientVector");
         List<String> topology =
-            ProofCarryingShowcaseJsonSupport.immutableStringList(
-                blockKinds, "blockKinds", true);
+            ProofCarryingShowcaseJsonSupport.immutableStrings(
+                blockKinds, "blockKinds", false, true);
         String structure = structureHash(
             familyId,
             difficultyLevel,
@@ -299,5 +299,4 @@ public record ProofCarryingShowcaseGeneratedCase(
             "structuralFingerprint", structuralFingerprint,
             "caseIdentityPolicy", caseIdentityPolicy);
     }
-
 }
