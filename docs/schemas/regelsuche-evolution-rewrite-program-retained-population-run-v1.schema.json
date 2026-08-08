@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-rewrite-program-retained-population-run/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "populationRunHash",
+    "populationRunJson",
+    "finalCandidates",
+    "finalEvaluations",
+    "validationStatus",
+    "finalTestStatus",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-retained-population-run/v1"
+    },
+    "populationRunHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "populationRunJson": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 16777216
+    },
+    "finalCandidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "finalEvaluations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evaluation"
+      }
+    },
+    "validationStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "finalTestStatus": {
+      "const": "NOT_EVALUATED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateHash",
+        "alphaStructuralHash",
+        "genomeJson",
+        "planJson",
+        "humanReadableProgram",
+        "humanReadableProgramHash"
+      ],
+      "properties": {
+        "candidateHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "alphaStructuralHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "genomeJson": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 8388608
+        },
+        "planJson": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 8388608
+        },
+        "humanReadableProgram": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "humanReadableProgramHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateHash",
+        "alphaStructuralHash",
+        "rawComponents",
+        "blockers",
+        "scalarFitness",
+        "evidenceHash",
+        "contentHash"
+      ],
+      "properties": {
+        "candidateHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "alphaStructuralHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rawComponents": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "scalarFitness": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "evidenceHash": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
