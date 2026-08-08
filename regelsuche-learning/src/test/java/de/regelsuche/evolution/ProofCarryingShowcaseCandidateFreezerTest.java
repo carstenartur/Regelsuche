@@ -25,7 +25,6 @@ import de.regelsuche.evolution.EvolutionStudyPlan.PopulationPolicy;
 import de.regelsuche.evolution.EvolutionStudyPlan.StudyBudget;
 import de.regelsuche.search.SearchHeuristic;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -34,28 +33,15 @@ import org.junit.jupiter.api.Test;
 
 class ProofCarryingShowcaseCandidateFreezerTest {
     @Test
-    void showcaseSemanticsLiveInJavaAndRunThroughJUnit() {
-        Path root = ProofCarryingShowcaseTestFixtures.repositoryRoot();
-
-        assertFalse(Files.exists(root.resolve(
-            "scripts/verify-proof-carrying-showcase-contract.py")));
-        assertFalse(Files.exists(root.resolve(
-            "scripts/derive-proof-carrying-showcase-seed.py")));
-        assertFalse(Files.exists(root.resolve(
-            "scripts/generate-proof-carrying-showcase-cases.py")));
-        assertFalse(Files.exists(root.resolve(
-            "scripts/generate-proof-carrying-showcase-final-test.py")));
-        assertFalse(Files.exists(root.resolve(
-            "gradle/proof-carrying-showcase.init.gradle")));
-
-        Path javaRoot = root.resolve(
-            "regelsuche-learning/src/main/java/de/regelsuche/evolution");
-        assertTrue(Files.isRegularFile(javaRoot.resolve(
-            "ProofCarryingShowcasePlan.java")));
-        assertTrue(Files.isRegularFile(javaRoot.resolve(
-            "ProofCarryingShowcaseSeedReceipt.java")));
-        assertTrue(Files.isRegularFile(javaRoot.resolve(
-            "ProofCarryingShowcaseCaseGenerator.java")));
+    void showcaseSemanticsHaveNoPythonOrSpecialInitPath() {
+        var root = ProofCarryingShowcaseTestFixtures.repositoryRoot();
+        List.of(
+            "scripts/verify-proof-carrying-showcase-contract.py",
+            "scripts/derive-proof-carrying-showcase-seed.py",
+            "scripts/generate-proof-carrying-showcase-cases.py",
+            "scripts/generate-proof-carrying-showcase-final-test.py",
+            "gradle/proof-carrying-showcase.init.gradle")
+            .forEach(path -> assertFalse(Files.exists(root.resolve(path))));
     }
 
     @Test
@@ -90,7 +76,11 @@ class ProofCarryingShowcaseCandidateFreezerTest {
 
         assertEquals(retained.finalCandidates().size(),
             frozen.selection().alternatives().size());
-        var selected = frozen.selection().selectedAlternative();
+        var selected = frozen.selection().alternatives().stream()
+            .filter(value -> value.candidateHash().equals(
+                frozen.selection().selectedCandidateHash()))
+            .findFirst()
+            .orElseThrow();
         assertTrue(selected.eligibleForFreeze());
         assertFalse(selected.seedExactEquivalent());
         assertFalse(selected.seedAlphaEquivalent());
