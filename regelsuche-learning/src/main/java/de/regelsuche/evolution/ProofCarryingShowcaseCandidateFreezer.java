@@ -11,9 +11,7 @@ import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Sequence;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Source;
 import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.CandidateEvaluation;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,7 +34,8 @@ public final class ProofCarryingShowcaseCandidateFreezer {
     public static final int MINIMUM_PRIMITIVE_PATH_STEPS = 3;
 
     public FreezeBundle freeze(
-        RetainedEvolutionRewriteProgramPopulationRun retained,
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
+            protocolBoundRun,
         EvolutionRewriteProgramStudyPlan study,
         List<EvolutionRewriteProgramCandidate> seeds,
         String repositoryCommit,
@@ -44,10 +43,12 @@ public final class ProofCarryingShowcaseCandidateFreezer {
         String workBudgetPolicyHash,
         long frozenAtUnixTime
     ) {
-        Objects.requireNonNull(retained, "retained");
+        Objects.requireNonNull(protocolBoundRun, "protocolBoundRun");
+        RetainedEvolutionRewriteProgramPopulationRun retained =
+            protocolBoundRun.retainedPopulation();
         Objects.requireNonNull(study, "study");
         Objects.requireNonNull(seeds, "seeds");
-        requireBindings(retained, study, seeds);
+        requireBindings(protocolBoundRun, retained, study, seeds);
         EvolutionGenome.requireSha256(
             primitiveInventoryHash, "primitiveInventoryHash");
         EvolutionGenome.requireSha256(
@@ -94,12 +95,12 @@ public final class ProofCarryingShowcaseCandidateFreezer {
                 SHOWCASE_ID,
                 PLAN_CONTENT_HASH,
                 repositoryCommit,
-                retained.contentHash(),
+                protocolBoundRun.contentHash(),
                 selection,
                 selected,
                 primitiveInventoryHash,
                 workBudgetPolicyHash,
-                study.trainEvaluationProtocolHash(),
+                protocolBoundRun.evaluationProtocolHash(),
                 retained.populationRun().seedCandidateHashes(),
                 facts,
                 frozenAtUnixTime,
@@ -108,10 +109,22 @@ public final class ProofCarryingShowcaseCandidateFreezer {
     }
 
     private static void requireBindings(
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
+            protocolBoundRun,
         RetainedEvolutionRewriteProgramPopulationRun retained,
         EvolutionRewriteProgramStudyPlan study,
         List<EvolutionRewriteProgramCandidate> seeds
     ) {
+        if (!ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun.STATUS
+                .equals(protocolBoundRun.status())) {
+            throw new IllegalArgumentException(
+                "candidate freeze requires protocol-bound TRAIN authority");
+        }
+        if (!protocolBoundRun.evaluationProtocolHash().equals(
+                study.trainEvaluationProtocolHash())) {
+            throw new IllegalArgumentException(
+                "retained evaluator protocol differs from TRAIN study");
+        }
         if (!retained.populationRun().studyPlanHash().equals(
                 study.contentHash())) {
             throw new IllegalArgumentException(
