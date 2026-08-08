@@ -17,15 +17,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/**
- * Deterministically selects and freezes one learned TRAIN candidate.
- *
- * <p>The freezer operates only on the protocol-bound, retained
- * terminal TRAIN population. The strict showcase plan owns all
- * claim, topology, delay and randomness boundaries. This class
- * accepts no public randomness, generated FINAL TEST surface or
- * later-stage outcome.</p>
- */
 public final class ProofCarryingShowcaseCandidateFreezer {
     public FreezeBundle freeze(
         ProofCarryingShowcasePlan showcasePlan,
