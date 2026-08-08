@@ -28,9 +28,9 @@ import de.regelsuche.evolution.EvolutionStudyPlan.StudyBudget;
 import de.regelsuche.search.SearchHeuristic;
 import java.nio.file.Files;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.Test;
 
 class ProofCarryingShowcasePlanTest {
@@ -235,7 +235,7 @@ class ProofCarryingShowcasePlanTest {
             ProofCarryingShowcaseTestFixtures.plan();
         Fixture fixture = fixture();
         Map<String, EvolutionRewriteProgramCandidate> registry =
-            new HashMap<>();
+            new ConcurrentHashMap<>();
         var population = new EvolutionRewriteProgramPopulationEngine().run(
             fixture.study(), fixture.manifest(), fixture.suite(),
             fixture.seeds(), fixture.catalog(), candidate -> {
