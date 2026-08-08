@@ -2,6 +2,7 @@ package de.regelsuche.evolution;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -73,12 +74,10 @@ public record ProofCarryingShowcaseGeneratedCase(
             throw new IllegalArgumentException(
                 "generated coefficient vector differs from difficulty");
         }
-        blockKinds = ProofCarryingShowcaseJsonSupport
-            .immutableStrings(
-                blockKinds,
-                "blockKinds",
-                false,
-                true);
+        blockKinds = Objects.requireNonNull(blockKinds, "blockKinds").stream()
+            .map(value -> ProofCarryingShowcaseJsonSupport.requireText(
+                value, "blockKinds entry"))
+            .toList();
         if (blockKinds.size() != difficultyLevel
                 || blockKinds.stream().anyMatch(
                     kind -> !BLOCK_KINDS.contains(kind))) {
@@ -144,9 +143,12 @@ public record ProofCarryingShowcaseGeneratedCase(
         List<Integer> coefficients =
             ProofCarryingShowcaseJsonSupport.immutableIntegers(
                 coefficientVector, "coefficientVector");
-        List<String> topology =
-            ProofCarryingShowcaseJsonSupport.immutableStrings(
-                blockKinds, "blockKinds", false, true);
+        List<String> topology = Objects.requireNonNull(
+                blockKinds, "blockKinds")
+            .stream()
+            .map(value -> ProofCarryingShowcaseJsonSupport.requireText(
+                value, "blockKinds entry"))
+            .toList();
         String structure = structureHash(
             familyId,
             difficultyLevel,
