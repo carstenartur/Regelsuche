@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseCaseGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseCaseGenerator.java</span></div><h1>ProofCarryingShowcaseCaseGenerator.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeSet;
+
+/** Deterministic, network-free generator for the frozen 24-case showcase suite. */
+<span class="fc" id="L8">public final class ProofCarryingShowcaseCaseGenerator {</span>
+    public static final String DOMAIN =
+        &quot;regelsuche.proof-carrying-showcase-case-generator/v1&quot;;
+
+    public ProofCarryingShowcaseGeneratedFinalTest generate(
+        ProofCarryingShowcasePlan plan,
+        ProofCarryingShowcaseSeedReceipt seed
+    ) {
+<span class="fc" id="L16">        seed.requireCompatible(plan);</span>
+<span class="fc" id="L17">        List&lt;ProofCarryingShowcaseGeneratedCase&gt; cases =</span>
+            new ArrayList&lt;&gt;();
+<span class="fc" id="L19">        int ordinal = 0;</span>
+        for (ProofCarryingShowcasePlan.Family family
+<span class="fc bfc" id="L21" title="All 2 branches covered.">                : plan.challengeGenerator().families()) {</span>
+<span class="fc bfc" id="L22" title="All 2 branches covered.">            for (int difficulty : family.difficultyLevels()) {</span>
+<span class="fc bfc" id="L23" title="All 2 branches covered.">                for (int variant : List.of(0, 1)) {</span>
+<span class="fc" id="L24">                    byte[] data = digest(</span>
+<span class="fc" id="L25">                        seed.derivedSeed(),</span>
+<span class="fc" id="L26">                        family.familyId(),</span>
+                        difficulty,
+                        variant);
+<span class="fc" id="L29">                    GeneratedMaterial material = generateMaterial(</span>
+<span class="fc" id="L30">                        family.familyId(),</span>
+                        ordinal,
+                        difficulty,
+                        variant,
+                        data);
+<span class="fc" id="L35">                    cases.add(ProofCarryingShowcaseGeneratedCase.create(</span>
+                        plan,
+                        seed,
+<span class="fc" id="L38">                        family.familyId(),</span>
+                        difficulty,
+                        variant,
+<span class="fc" id="L41">                        material.inputExpression(),</span>
+<span class="fc" id="L42">                        material.targetExpression(),</span>
+<span class="fc" id="L43">                        material.assumptions(),</span>
+<span class="fc" id="L44">                        material.coefficientVector(),</span>
+<span class="fc" id="L45">                        material.blockKinds()));</span>
+<span class="fc" id="L46">                    ordinal++;</span>
+<span class="fc" id="L47">                }</span>
+<span class="fc" id="L48">            }</span>
+<span class="fc" id="L49">        }</span>
+<span class="fc" id="L50">        return ProofCarryingShowcaseGeneratedFinalTest.create(</span>
+            plan,
+            seed,
+            cases);
+    }
+
+    private static GeneratedMaterial generateMaterial(
+        String familyId,
+        int caseOrdinal,
+        int difficulty,
+        int variant,
+        byte[] data
+    ) {
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">        return switch (familyId) {</span>
+            case &quot;nested-rational-cancellation&quot; -&gt;
+<span class="fc" id="L65">                nestedRationalCase(</span>
+                    caseOrdinal, difficulty, variant, data);
+            case &quot;factor-cancel-collect&quot; -&gt;
+<span class="fc" id="L68">                factorCancelCollectCase(</span>
+                    caseOrdinal, difficulty, variant, data);
+            case &quot;multi-stage-rational-polynomial&quot; -&gt;
+<span class="fc" id="L71">                multiStageCase(</span>
+                    caseOrdinal, difficulty, variant, data);
+<span class="nc" id="L73">            default -&gt; throw new IllegalArgumentException(</span>
+                &quot;unsupported frozen showcase family &quot; + familyId);
+        };
+    }
+
+    private static GeneratedMaterial nestedRationalCase(
+        int caseOrdinal,
+        int difficulty,
+        int variant,
+        byte[] data
+    ) {
+<span class="fc" id="L84">        List&lt;Integer&gt; coefficients = coefficientVector(</span>
+            data, difficulty, caseOrdinal);
+<span class="fc" id="L86">        List&lt;String&gt; blocks = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L87">        List&lt;String&gt; numerators = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L88">        List&lt;String&gt; denominators = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L89">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int index = 0; index &lt; coefficients.size(); index++) {</span>
+<span class="fc" id="L91">            int coefficient = coefficients.get(index);</span>
+<span class="fc" id="L92">            String suffix = caseOrdinal + &quot;_&quot; + index;</span>
+<span class="fc" id="L93">            String p = &quot;p&quot; + suffix;</span>
+<span class="fc" id="L94">            String q = &quot;q&quot; + suffix;</span>
+<span class="fc" id="L95">            String factor = &quot;f&quot; + suffix;</span>
+<span class="fc" id="L96">            String quotient =</span>
+                &quot;((&quot; + p + &quot;/&quot; + factor + &quot;)/(&quot;
+                    + q + &quot;/&quot; + factor + &quot;))&quot;;
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            String block = variant == 0</span>
+<span class="fc" id="L100">                ? &quot;(&quot; + coefficient + &quot;*&quot; + quotient + &quot;)&quot;</span>
+                : &quot;(((&quot; + coefficient + &quot;*&quot; + p + &quot;)/&quot;
+<span class="fc" id="L102">                    + factor + &quot;)/(&quot; + q + &quot;/&quot; + factor + &quot;))&quot;;</span>
+<span class="fc" id="L103">            blocks.add(block);</span>
+<span class="fc" id="L104">            numerators.add(&quot;(&quot; + coefficient + &quot;*&quot; + p + &quot;)&quot;);</span>
+<span class="fc" id="L105">            denominators.add(q);</span>
+<span class="fc" id="L106">            assumptions.add(factor + &quot; != 0&quot;);</span>
+<span class="fc" id="L107">            assumptions.add(q + &quot; != 0&quot;);</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            if (index &gt; 0) {</span>
+<span class="fc" id="L109">                assumptions.add(p + &quot; != 0&quot;);</span>
+            }
+        }
+<span class="fc" id="L112">        String targetNumerator = parenthesizedProduct(</span>
+<span class="fc" id="L113">            combineFirstAndTail(numerators, denominators));</span>
+<span class="fc" id="L114">        String targetDenominator = parenthesizedProduct(</span>
+<span class="fc" id="L115">            combineFirstAndTail(denominators, numerators));</span>
+<span class="fc" id="L116">        return new GeneratedMaterial(</span>
+<span class="fc" id="L117">            leftDivision(blocks),</span>
+            &quot;(&quot; + targetNumerator + &quot;)/(&quot;
+                + targetDenominator + &quot;)&quot;,
+<span class="fc" id="L120">            normalizedAssumptions(assumptions),</span>
+            coefficients,
+<span class="fc" id="L122">            repeat(</span>
+                &quot;SHARED_DENOMINATOR_QUOTIENT&quot;,
+                difficulty));
+    }
+
+    private static GeneratedMaterial factorCancelCollectCase(
+        int caseOrdinal,
+        int difficulty,
+        int variant,
+        byte[] data
+    ) {
+<span class="fc" id="L133">        List&lt;Integer&gt; coefficients = coefficientVector(</span>
+            data, difficulty, caseOrdinal);
+<span class="fc" id="L135">        String denominator = &quot;d&quot; + caseOrdinal;</span>
+<span class="fc" id="L136">        List&lt;String&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L137">        List&lt;String&gt; targetTerms = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L138">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L139">        assumptions.add(denominator + &quot; != 0&quot;);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (int index = 0; index &lt; coefficients.size(); index++) {</span>
+<span class="fc" id="L141">            int coefficient = coefficients.get(index);</span>
+<span class="fc" id="L142">            String suffix = caseOrdinal + &quot;_&quot; + index;</span>
+<span class="fc" id="L143">            String left = &quot;a&quot; + suffix;</span>
+<span class="fc" id="L144">            String right = &quot;b&quot; + suffix;</span>
+<span class="fc" id="L145">            String difference =</span>
+                &quot;(&quot; + left + &quot;^2-&quot; + right + &quot;^2)&quot;;
+<span class="fc" id="L147">            String divisor = &quot;(&quot; + left + &quot;-&quot; + right + &quot;)&quot;;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            String term = variant == 0</span>
+                ? &quot;(&quot; + coefficient + &quot;*(((&quot;
+                    + difference + &quot;)/&quot; + divisor + &quot;)/&quot;
+<span class="fc" id="L151">                    + denominator + &quot;))&quot;</span>
+                : &quot;(((&quot; + coefficient + &quot;*&quot; + difference
+<span class="fc" id="L153">                    + &quot;)/&quot; + divisor + &quot;)/&quot; + denominator + &quot;)&quot;;</span>
+<span class="fc" id="L154">            terms.add(term);</span>
+<span class="fc" id="L155">            targetTerms.add(</span>
+                &quot;(&quot; + coefficient + &quot;*(&quot;
+                    + left + &quot;+&quot; + right + &quot;))&quot;);
+<span class="fc" id="L158">            assumptions.add(divisor + &quot; != 0&quot;);</span>
+        }
+<span class="fc" id="L160">        return new GeneratedMaterial(</span>
+<span class="fc" id="L161">            parenthesizedSum(terms),</span>
+<span class="fc" id="L162">            &quot;(&quot; + parenthesizedSum(targetTerms)</span>
+                + &quot;)/&quot; + denominator,
+<span class="fc" id="L164">            normalizedAssumptions(assumptions),</span>
+            coefficients,
+<span class="fc" id="L166">            repeat(</span>
+                &quot;FACTOR_CANCEL_SHARED_DENOMINATOR&quot;,
+                difficulty));
+    }
+
+    private static GeneratedMaterial multiStageCase(
+        int caseOrdinal,
+        int difficulty,
+        int variant,
+        byte[] data
+    ) {
+<span class="fc" id="L177">        List&lt;Integer&gt; coefficients = coefficientVector(</span>
+            data, difficulty, caseOrdinal);
+<span class="fc" id="L179">        List&lt;String&gt; blocks = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L180">        List&lt;String&gt; numerators = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L181">        List&lt;String&gt; denominators = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L182">        List&lt;String&gt; assumptions = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L183">        List&lt;String&gt; blockKinds = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int index = 0; index &lt; coefficients.size(); index++) {</span>
+<span class="fc" id="L186">            int coefficient = coefficients.get(index);</span>
+<span class="fc" id="L187">            String suffix = caseOrdinal + &quot;_&quot; + index;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            if (index % 2 == 0) {</span>
+<span class="fc" id="L189">                String a = &quot;r&quot; + suffix;</span>
+<span class="fc" id="L190">                String b = &quot;s&quot; + suffix;</span>
+<span class="fc" id="L191">                String x = &quot;x&quot; + suffix;</span>
+<span class="fc" id="L192">                String y = &quot;y&quot; + suffix;</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                String numerator = variant == 0</span>
+                    ? &quot;(&quot; + coefficient + &quot;*((&quot;
+                        + a + &quot;/&quot; + x + &quot;)-(&quot;
+<span class="fc" id="L196">                        + a + &quot;/&quot; + y + &quot;)))&quot;</span>
+                    : &quot;(((&quot; + coefficient + &quot;*&quot; + a + &quot;)/&quot;
+                        + x + &quot;)-((&quot; + coefficient + &quot;*&quot; + a
+<span class="fc" id="L199">                        + &quot;)/&quot; + y + &quot;))&quot;;</span>
+<span class="fc" id="L200">                String denominator =</span>
+                    &quot;((&quot; + b + &quot;/&quot; + x + &quot;)-(&quot;
+                        + b + &quot;/&quot; + y + &quot;))&quot;;
+<span class="fc" id="L203">                blocks.add(&quot;(&quot; + numerator + &quot;)/(&quot;</span>
+                    + denominator + &quot;)&quot;);
+<span class="fc" id="L205">                numerators.add(&quot;(&quot; + coefficient + &quot;*&quot; + a + &quot;)&quot;);</span>
+<span class="fc" id="L206">                denominators.add(b);</span>
+<span class="fc" id="L207">                String delta = &quot;(&quot; + y + &quot;-&quot; + x + &quot;)&quot;;</span>
+<span class="fc" id="L208">                assumptions.add(x + &quot; != 0&quot;);</span>
+<span class="fc" id="L209">                assumptions.add(y + &quot; != 0&quot;);</span>
+<span class="fc" id="L210">                assumptions.add(b + &quot; != 0&quot;);</span>
+<span class="fc" id="L211">                assumptions.add(delta + &quot; != 0&quot;);</span>
+<span class="fc" id="L212">                assumptions.add(&quot;(&quot; + b + &quot;*&quot; + delta + &quot;) != 0&quot;);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                if (index &gt; 0) {</span>
+<span class="fc" id="L214">                    assumptions.add(a + &quot; != 0&quot;);</span>
+<span class="fc" id="L215">                    assumptions.add(</span>
+                        &quot;(&quot; + a + &quot;*&quot; + delta + &quot;) != 0&quot;);
+                }
+<span class="fc" id="L218">                blockKinds.add(&quot;MIXED_DENOMINATOR_RATIO&quot;);</span>
+<span class="fc" id="L219">            } else {</span>
+<span class="fc" id="L220">                String p = &quot;u&quot; + suffix;</span>
+<span class="fc" id="L221">                String q = &quot;v&quot; + suffix;</span>
+<span class="fc" id="L222">                String difference =</span>
+                    &quot;(&quot; + p + &quot;^2-&quot; + q + &quot;^2)&quot;;
+<span class="fc" id="L224">                String divisor = &quot;(&quot; + p + &quot;-&quot; + q + &quot;)&quot;;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">                String block = variant == 0</span>
+                    ? &quot;(&quot; + coefficient + &quot;*((&quot;
+<span class="fc" id="L227">                        + difference + &quot;)/&quot; + divisor + &quot;))&quot;</span>
+                    : &quot;((&quot; + coefficient + &quot;*&quot; + difference
+<span class="fc" id="L229">                        + &quot;)/&quot; + divisor + &quot;)&quot;;</span>
+<span class="fc" id="L230">                blocks.add(block);</span>
+<span class="fc" id="L231">                numerators.add(</span>
+                    &quot;(&quot; + coefficient + &quot;*(&quot;
+                        + p + &quot;+&quot; + q + &quot;))&quot;);
+<span class="fc" id="L234">                denominators.add(&quot;1&quot;);</span>
+<span class="fc" id="L235">                assumptions.add(divisor + &quot; != 0&quot;);</span>
+<span class="fc" id="L236">                assumptions.add(&quot;(&quot; + p + &quot;+&quot; + q + &quot;) != 0&quot;);</span>
+<span class="fc" id="L237">                assumptions.add(difference + &quot; != 0&quot;);</span>
+<span class="fc" id="L238">                blockKinds.add(</span>
+                    &quot;DIFFERENCE_OF_SQUARES_QUOTIENT&quot;);
+            }
+        }
+
+<span class="fc" id="L243">        List&lt;String&gt; numeratorFactors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L244">        numeratorFactors.add(numerators.getFirst());</span>
+<span class="fc" id="L245">        denominators.stream()</span>
+<span class="fc" id="L246">            .skip(1)</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            .filter(value -&gt; !&quot;1&quot;.equals(value))</span>
+<span class="fc" id="L248">            .forEach(numeratorFactors::add);</span>
+<span class="fc" id="L249">        List&lt;String&gt; denominatorFactors = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L250">        denominatorFactors.add(denominators.getFirst());</span>
+<span class="fc" id="L251">        denominatorFactors.addAll(numerators.subList(</span>
+<span class="fc" id="L252">            1, numerators.size()));</span>
+<span class="fc" id="L253">        return new GeneratedMaterial(</span>
+<span class="fc" id="L254">            leftDivision(blocks),</span>
+<span class="fc" id="L255">            &quot;(&quot; + parenthesizedProduct(numeratorFactors)</span>
+                + &quot;)/(&quot;
+<span class="fc" id="L257">                + parenthesizedProduct(denominatorFactors)</span>
+                + &quot;)&quot;,
+<span class="fc" id="L259">            normalizedAssumptions(assumptions),</span>
+            coefficients,
+<span class="fc" id="L261">            List.copyOf(blockKinds));</span>
+    }
+
+    private static byte[] digest(
+        String seed,
+        String familyId,
+        int difficulty,
+        int variant
+    ) {
+<span class="fc" id="L270">        String material = String.join(</span>
+            &quot;\n&quot;,
+            DOMAIN,
+            &quot;seed=&quot; + seed,
+            &quot;family=&quot; + familyId,
+            &quot;difficulty=&quot; + difficulty,
+            &quot;variant=&quot; + variant);
+<span class="fc" id="L277">        return ProofCarryingShowcaseJsonSupport.sha256Bytes(material);</span>
+    }
+
+    private static List&lt;Integer&gt; coefficientVector(
+        byte[] data,
+        int count,
+        int caseOrdinal
+    ) {
+<span class="fc" id="L285">        List&lt;Integer&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        for (int index = 0; index &lt; count; index++) {</span>
+<span class="fc" id="L287">            int value = 2 + (</span>
+<span class="fc" id="L288">                (Byte.toUnsignedInt(data[index % data.length])</span>
+                    + 17 * caseOrdinal
+                    + 11 * index)
+                % 23);
+<span class="fc" id="L292">            result.add(value);</span>
+        }
+<span class="fc" id="L294">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;String&gt; combineFirstAndTail(
+        List&lt;String&gt; first,
+        List&lt;String&gt; tail
+    ) {
+<span class="fc" id="L301">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L302">        result.add(first.getFirst());</span>
+<span class="fc" id="L303">        result.addAll(tail.subList(1, tail.size()));</span>
+<span class="fc" id="L304">        return result;</span>
+    }
+
+    private static String parenthesizedProduct(
+        List&lt;String&gt; factors
+    ) {
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (factors.isEmpty()) {</span>
+<span class="nc" id="L311">            return &quot;1&quot;;</span>
+        }
+<span class="fc" id="L313">        String result = factors.getFirst();</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        for (String factor : factors.subList(1, factors.size())) {</span>
+<span class="fc" id="L315">            result = &quot;(&quot; + result + &quot;*&quot; + factor + &quot;)&quot;;</span>
+<span class="fc" id="L316">        }</span>
+<span class="fc" id="L317">        return result;</span>
+    }
+
+    private static String parenthesizedSum(List&lt;String&gt; terms) {
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        if (terms.isEmpty()) {</span>
+<span class="nc" id="L322">            return &quot;0&quot;;</span>
+        }
+<span class="fc" id="L324">        String result = terms.getFirst();</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        for (String term : terms.subList(1, terms.size())) {</span>
+<span class="fc" id="L326">            result = &quot;(&quot; + result + &quot;+&quot; + term + &quot;)&quot;;</span>
+<span class="fc" id="L327">        }</span>
+<span class="fc" id="L328">        return result;</span>
+    }
+
+    private static String leftDivision(List&lt;String&gt; blocks) {
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        if (blocks.isEmpty()) {</span>
+<span class="nc" id="L333">            throw new IllegalArgumentException(</span>
+                &quot;left division requires at least one block&quot;);
+        }
+<span class="fc" id="L336">        String result = blocks.getFirst();</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        for (String block : blocks.subList(1, blocks.size())) {</span>
+<span class="fc" id="L338">            result = &quot;(&quot; + result + &quot;)/(&quot; + block + &quot;)&quot;;</span>
+<span class="fc" id="L339">        }</span>
+<span class="fc" id="L340">        return result;</span>
+    }
+
+    private static List&lt;String&gt; normalizedAssumptions(
+        List&lt;String&gt; assumptions
+    ) {
+<span class="fc" id="L346">        return List.copyOf(new TreeSet&lt;&gt;(assumptions));</span>
+    }
+
+    private static List&lt;String&gt; repeat(String value, int count) {
+<span class="fc" id="L350">        List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        for (int index = 0; index &lt; count; index++) {</span>
+<span class="fc" id="L352">            result.add(value);</span>
+        }
+<span class="fc" id="L354">        return List.copyOf(result);</span>
+    }
+
+<span class="fc" id="L357">    private record GeneratedMaterial(</span>
+        String inputExpression,
+        String targetExpression,
+        List&lt;String&gt; assumptions,
+        List&lt;Integer&gt; coefficientVector,
+        List&lt;String&gt; blockKinds
+    ) {
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

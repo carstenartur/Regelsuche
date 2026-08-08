@@ -5,58 +5,76 @@ Tracked by: [#597](https://github.com/carstenartur/Regelsuche/issues/597)
 
 ## Purpose
 
-This showcase is designed to produce one result that is understandable before a
-reader studies Regelsuche's full evidence architecture:
+The showcase is intended to produce one result that is understandable before a
+reader studies the complete Regelsuche evidence architecture:
 
-> The system learns a human-readable executable rewrite/search program from
-> TRAIN-only observations. The complete program is frozen. Only afterwards are
-> concrete FINAL TEST cases generated from verifiable public randomness. The
-> learned program and every fixed baseline then receive the same cases,
-> information and canonical mechanical-work budget.
+> Regelsuche learns a human-readable executable rewrite/search program from
+> TRAIN-only observations. The complete program and configuration are frozen.
+> Only afterwards are concrete FINAL TEST cases generated from verifiable
+> public randomness. The learned program and every fixed baseline receive the
+> same cases, information and canonical mechanical-work budget.
 
-A successful run may receive only the status `SHOWCASE_CONFIRMED`. It does not
-claim external mathematical novelty, expert-reviewed importance,
-publication-grade benchmark validity or universal superiority.
+A successful run may receive only `SHOWCASE_CONFIRMED`. It does not establish
+external mathematical novelty, expert-reviewed importance, publication-grade
+benchmark validity or universal superiority.
 
-The publication-grade experiment in #521/#533 and the expert-review routes in
+The publication-grade experiment in #521/#533 and the expert-review paths in
 #389/#391 remain separate and deferred until qualified independent researchers
 can participate.
 
-## Why public future randomness is useful
+## Java-owned architecture
 
-A human custodian is not needed to hide concrete showcase FINAL TEST cases when
-those cases do not exist before candidate selection. The ordering contract is:
+Showcase semantics are implemented in the ordinary Java modules and exercised
+directly by JUnit. There is no Python verifier, Python generator, `ProcessBuilder`
+test bridge or special Gradle init script.
+
+The authoritative classes are:
+
+```text
+ProofCarryingShowcasePlan
+ProofCarryingShowcaseCandidateFreeze
+ProofCarryingShowcasePublicRandomnessReceipt
+ProofCarryingShowcaseSeedReceipt
+ProofCarryingShowcaseCaseGenerator
+ProofCarryingShowcaseGeneratedCase
+ProofCarryingShowcaseGeneratedFinalTest
+```
+
+The constructors and factories enforce schema identity, canonical content
+hashes, claim boundaries, stage ordering and cross-artifact bindings. Jackson
+is configured for duplicate-field detection, trailing-token rejection and
+unknown-field rejection. JUnit invokes these Java classes directly and sends
+every generated mathematical case through the production exact rational
+equivalence service.
+
+JSON Schema files remain a language-neutral interchange description. They do
+not replace the Java invariants and do not own executable test semantics.
+
+## Ordering boundary
+
+Concrete FINAL TEST cases must not exist while the candidate is selected:
 
 ```text
 TRAIN execution
   -> complete candidate and configuration freeze
   -> finite not-before delay
   -> first eligible verified public-randomness round
+  -> domain-separated seed derivation
   -> deterministic FINAL TEST generation
   -> one paired execution matrix
 ```
 
-The frozen plan pins the League of Entropy drand `default` mainnet chain:
+The frozen plan pins the League of Entropy drand `default` chain:
 
 ```text
 8990e7a9aaed2ffed73dbd7092123d6f289930540d7651336225dc172e51b2ce
 ```
 
-The drand documentation identifies this as the chained 30-second `default`
-mainnet and recommends client-library verification of every randomness value.
-The later receipt producer must therefore use a pinned, signature-verifying
-client and bind its chain information and verification evidence. A raw HTTP
-response is insufficient.
+A later receipt producer must use a pinned signature-verifying drand client and
+retain chain information, client identity and verification evidence. A raw HTTP
+response is not sufficient. No randomness round has been consumed.
 
-References:
-
-- <https://docs.drand.love/developer/>
-- <https://docs.drand.love/developer/API-v1/drand-http-api/>
-- <https://docs.drand.love/developer/API-v1/chain-hash-public-round/>
-
-No randomness round is fetched or consumed by the current contract slice.
-
-## Frozen result threshold
+## Frozen positive threshold
 
 A positive result requires all of the following:
 
@@ -76,9 +94,8 @@ The stretch objective is either a hundredfold canonical-work reduction on a
 retained stress tier or two solved difficulty levels beyond every fixed
 baseline.
 
-If the threshold is missed, the required result is a complete
-`SHOWCASE_NULL_RESULT`. Neither thresholds nor generated cases may be repaired
-after outcomes are visible.
+Missing the threshold produces a complete `SHOWCASE_NULL_RESULT`. Thresholds,
+cases and retries may not be repaired after outcomes are visible.
 
 ## Frozen comparison matrix
 
@@ -94,26 +111,32 @@ Every generated case is executed against exactly these configurations:
 Canonical primitive and total-work ledgers are authoritative. Wall-clock time
 is retained only as an environment-qualified engineering diagnostic.
 
-## Initial structural families
+## Deterministic structural families
 
-The deterministic generator will produce 24 cases, eight from each family:
+`ProofCarryingShowcaseCaseGenerator` produces 24 cases, eight from each family:
 
 - nested rational cancellation and quotient composition;
-- factor–cancel–collect ordering problems;
+- factor-cancel-collect ordering;
 - multi-stage rational/polynomial normalization with explicit nonzero
   assumptions.
 
-Each family has difficulty levels 3 through 6. All configurations receive the
-same generated cases. Manual replacement, pruning and selective reruns are
-forbidden.
+Each family contains two variants at difficulty levels 3 through 6. Case
+coefficients, expressions, assumptions, topology fingerprints, IDs and content
+hashes are derived deterministically from the authorized seed receipt. Every
+configuration receives the same generated suite. Manual replacement, pruning
+and selective regeneration are forbidden.
 
-The concrete expression generator and production runner are intentionally not
-part of this first contract slice. They are the next implementation stage and
-must preserve the identities and thresholds already frozen here.
+The generated artifact remains:
+
+```text
+FINAL_TEST_GENERATED_NOT_EXECUTED
+```
+
+Generation is not execution and authorizes no result claim.
 
 ## Candidate-freeze boundary
 
-Before the public-randomness not-before time, `candidate-freeze.json` must bind:
+Before the public-randomness not-before time, `candidate-freeze.json` binds:
 
 - repository commit;
 - complete TRAIN run and selection evidence;
@@ -122,10 +145,10 @@ Before the public-randomness not-before time, `candidate-freeze.json` must bind:
 - primitive inventory, work budget and evaluation protocol;
 - all seed candidate identities;
 - program node count;
-- required composition, decision and primitive-path properties;
+- composition, decision and primitive-path properties;
 - freeze time and public-randomness not-before time.
 
-The candidate status is fixed as:
+Its status is fixed as:
 
 ```text
 CANDIDATE_FROZEN_FINAL_TEST_UNSEEN
@@ -134,106 +157,78 @@ CANDIDATE_FROZEN_FINAL_TEST_UNSEEN
 Exact seed equivalence, missing topology, inadequate path depth and an
 insufficient delay fail closed.
 
-## Public-randomness receipt
+## Public-randomness and seed receipts
 
-`public-randomness-receipt.json` must bind:
-
-- showcase plan and candidate-freeze identities;
-- network and chain hash;
-- round and round time;
-- randomness, signature and previous signature;
-- chain-info identity;
-- pinned verifier identity and artifact hash;
-- verification evidence;
-- endpoint identity.
-
-Only this status is accepted:
+`public-randomness-receipt.json` binds the plan, candidate freeze, network,
+chain, round, round time, randomness, signatures, chain information, pinned
+verifier and verification evidence. Only this status is accepted:
 
 ```text
 VERIFIED_BY_PINNED_DRAND_CLIENT
 ```
 
-The round time must be strictly later than the frozen candidate's not-before
+The round time must be strictly later than the candidate's frozen not-before
 boundary.
 
-## Domain-separated seed
-
-The seed is not the raw drand randomness. It is SHA-256 over a versioned,
+The seed-receipt factory derives the generator seed as SHA-256 over versioned
 domain-separated material binding:
 
 - showcase ID;
 - plan content hash;
 - candidate-freeze content hash;
-- drand chain hash and round;
+- drand chain and round;
 - verified randomness;
 - complete randomness-receipt content hash.
 
-Changing any bound input changes the derived seed. The resulting
-`showcase-seed-receipt.json` has status:
+The resulting receipt has status:
 
 ```text
 FINAL_TEST_SEED_DERIVED_AFTER_CANDIDATE_FREEZE
 ```
 
+Changing any bound input changes the derived seed.
+
 ## Verification from a checkout
 
-Direct verifier:
+The ordinary lifecycle is authoritative:
 
 ```bash
-python3 scripts/verify-proof-carrying-showcase-contract.py \
-  research/showcase/proof-carrying-self-improvement/showcase-plan.json
+./gradlew test
+./gradlew check
+./gradlew --no-configuration-cache ciCheck
 ```
 
-Checkout-owned Gradle entry point:
+Focused Java/JUnit execution:
 
 ```bash
-./gradlew --no-daemon \
-  -I gradle/proof-carrying-showcase.init.gradle \
-  verifyProofCarryingShowcaseContract
+./gradlew :regelsuche-learning:test \
+  --tests 'de.regelsuche.evolution.ProofCarryingShowcase*'
 ```
 
-The verifier checks the exact frozen contract, content hash, strict schema
-surfaces and deterministic seed derivation. Its self-test also requires
-rejection of a too-early randomness round and sensitivity to substituted
-randomness.
+The focused tests cover:
 
-A real seed may later be derived with:
+- the committed plan and its exact content hash;
+- strict JSON roundtrips and rejection of duplicate, unknown and trailing data;
+- candidate-freeze and randomness ordering;
+- deterministic domain-separated seed derivation;
+- substitution sensitivity;
+- deterministic 24-case generation and complete family coverage;
+- case, family and suite content roots;
+- schema/Java vocabulary agreement;
+- exact mathematical confirmation and complete assumption coverage;
+- the absence of Python showcase scripts and special init-script test paths.
 
-```bash
-python3 scripts/derive-proof-carrying-showcase-seed.py \
-  --plan research/showcase/proof-carrying-self-improvement/showcase-plan.json \
-  --candidate-freeze candidate-freeze.json \
-  --randomness-receipt public-randomness-receipt.json \
-  --output showcase-seed-receipt.json
-```
+## Current boundary and next stage
 
-This command does not fetch or verify drand itself. It consumes the output of
-the future pinned verifier, revalidates all ordering and identity bindings, and
-derives the final generator seed.
+The contract, Java seed derivation and deterministic Java generator are
+implemented. No real TRAIN run, candidate freeze, drand round or FINAL TEST has
+been consumed.
 
-## Strict schemas
+The next stage is:
 
-The current slice adds Draft 2020-12 schemas for:
-
-- the frozen showcase plan;
-- the complete candidate freeze;
-- the verified public-randomness receipt;
-- the derived seed receipt.
-
-All schemas reject unknown top-level fields. Runtime verification additionally
-recomputes content hashes and cross-artifact relationships; schema validity
-alone is never treated as authority.
-
-## Next implementation stage
-
-The next code tranche is deliberately concrete:
-
-1. implement the three deterministic expression-family generators;
-2. add generated-case identity and split-collision tests;
-3. adapt the existing rewrite-program population output into the strict
-   candidate-freeze artifact;
-4. implement the pinned drand receipt producer;
-5. keep every stage at `NOT_RUN` until a real candidate is frozen.
-
-Only after those steps and the actual candidate freeze may an eligible future
-round be consumed.
+1. retain every complete terminal TRAIN candidate and its evaluation;
+2. select and freeze one eligible learned program deterministically;
+3. implement the pinned Java drand receipt adapter;
+4. derive the seed and generate the real suite exactly once;
+5. execute the complete paired comparison matrix;
+6. generate the result card and visual evidence from retained artifacts.

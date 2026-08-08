@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseGeneratedFinalTest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseGeneratedFinalTest.java</span></div><h1>ProofCarryingShowcaseGeneratedFinalTest.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+/** Complete deterministic future showcase suite before any execution. */
+public record ProofCarryingShowcaseGeneratedFinalTest(
+    String schema,
+    String showcaseId,
+    String planContentHash,
+    String candidateFreezeContentHash,
+    String seedReceiptContentHash,
+    String generatorId,
+    String derivedSeed,
+    String drandChainHash,
+    long drandRound,
+    int caseCount,
+    List&lt;FamilySummary&gt; familySummaries,
+    List&lt;ProofCarryingShowcaseGeneratedCase&gt; cases,
+    String caseContentRoot,
+    String caseIdentityPolicy,
+    String manualReplacementOrPruning,
+    String status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.proof-carrying-showcase-generated-final-test/v1&quot;;
+    public static final String STATUS =
+        &quot;FINAL_TEST_GENERATED_NOT_EXECUTED&quot;;
+
+<span class="fc" id="L36">    public ProofCarryingShowcaseGeneratedFinalTest {</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L38">            throw new IllegalArgumentException(</span>
+                &quot;unsupported generated FINAL TEST schema&quot;);
+        }
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">        if (!ProofCarryingShowcasePlan.SHOWCASE_ID.equals(showcaseId)) {</span>
+<span class="nc" id="L42">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST uses another showcase&quot;);
+        }
+<span class="fc" id="L45">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            planContentHash, &quot;planContentHash&quot;);
+<span class="fc" id="L47">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            candidateFreezeContentHash,
+            &quot;candidateFreezeContentHash&quot;);
+<span class="fc" id="L50">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            seedReceiptContentHash,
+            &quot;seedReceiptContentHash&quot;);
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (!ProofCarryingShowcasePlan.GENERATOR_ID.equals(generatorId)) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST generator identity drift&quot;);
+        }
+<span class="fc" id="L57">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            derivedSeed, &quot;derivedSeed&quot;);
+<span class="fc" id="L59">        ProofCarryingShowcaseJsonSupport.requireHex64(</span>
+            drandChainHash, &quot;drandChainHash&quot;);
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (drandRound &lt; 1) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST drand round must be positive&quot;);
+        }
+<span class="fc" id="L65">        Objects.requireNonNull(familySummaries, &quot;familySummaries&quot;);</span>
+<span class="fc" id="L66">        familySummaries = List.copyOf(familySummaries);</span>
+<span class="fc" id="L67">        Objects.requireNonNull(cases, &quot;cases&quot;);</span>
+<span class="fc" id="L68">        cases = List.copyOf(cases);</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (caseCount != 24</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                || cases.size() != caseCount</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                || familySummaries.size() != 3) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST has the wrong surface size&quot;);
+        }
+<span class="fc" id="L75">        requireExpectedOrder(cases);</span>
+<span class="fc" id="L76">        requireUnique(cases, ProofCarryingShowcaseGeneratedCase::caseId,</span>
+            &quot;caseId&quot;);
+<span class="fc" id="L78">        requireUnique(cases,</span>
+            ProofCarryingShowcaseGeneratedCase::contentHash,
+            &quot;contentHash&quot;);
+<span class="fc" id="L81">        requireUnique(cases,</span>
+            ProofCarryingShowcaseGeneratedCase::inputExpression,
+            &quot;inputExpression&quot;);
+<span class="fc" id="L84">        requireUnique(cases,</span>
+            ProofCarryingShowcaseGeneratedCase::structuralFingerprint,
+            &quot;structuralFingerprint&quot;);
+<span class="fc" id="L87">        requireFamilySummaries(familySummaries, cases);</span>
+<span class="fc" id="L88">        String expectedRoot = aggregateRoot(</span>
+            &quot;regelsuche.proof-carrying-showcase-case-root/v1&quot;,
+<span class="fc" id="L90">            cases.stream()</span>
+<span class="fc" id="L91">                .map(ProofCarryingShowcaseGeneratedCase::contentHash)</span>
+<span class="fc" id="L92">                .toList());</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (!expectedRoot.equals(caseContentRoot)) {</span>
+<span class="nc" id="L94">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST case root mismatch&quot;);
+        }
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (!ProofCarryingShowcasePlan.CASE_IDENTITY.equals(</span>
+                caseIdentityPolicy)
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                || !&quot;FORBIDDEN&quot;.equals(manualReplacementOrPruning)</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                || !STATUS.equals(status)) {</span>
+<span class="nc" id="L101">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST policy or status drift&quot;);
+        }
+<span class="fc" id="L104">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L106">        String expected = ProofCarryingShowcaseJsonSupport.hashPayload(</span>
+<span class="fc" id="L107">            payload(</span>
+                schema,
+                showcaseId,
+                planContentHash,
+                candidateFreezeContentHash,
+                seedReceiptContentHash,
+                generatorId,
+                derivedSeed,
+                drandChainHash,
+                drandRound,
+                caseCount,
+                familySummaries,
+                cases,
+                caseContentRoot,
+                caseIdentityPolicy,
+                manualReplacementOrPruning,
+                status));
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST contentHash mismatch&quot;);
+        }
+<span class="fc" id="L128">    }</span>
+
+    static ProofCarryingShowcaseGeneratedFinalTest create(
+        ProofCarryingShowcasePlan plan,
+        ProofCarryingShowcaseSeedReceipt seed,
+        List&lt;ProofCarryingShowcaseGeneratedCase&gt; cases
+    ) {
+<span class="fc" id="L135">        seed.requireCompatible(plan);</span>
+<span class="fc" id="L136">        List&lt;ProofCarryingShowcaseGeneratedCase&gt; retained =</span>
+<span class="fc" id="L137">            List.copyOf(cases);</span>
+<span class="fc" id="L138">        retained.forEach(item -&gt; item.requireCompatible(plan, seed));</span>
+<span class="fc" id="L139">        List&lt;FamilySummary&gt; summaries = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (String familyId : ProofCarryingShowcasePlan.FAMILIES) {</span>
+<span class="fc" id="L141">            List&lt;ProofCarryingShowcaseGeneratedCase&gt; familyCases =</span>
+<span class="fc" id="L142">                retained.stream()</span>
+<span class="fc" id="L143">                    .filter(item -&gt; familyId.equals(item.familyId()))</span>
+<span class="fc" id="L144">                    .toList();</span>
+<span class="fc" id="L145">            summaries.add(new FamilySummary(</span>
+                familyId,
+<span class="fc" id="L147">                familyCases.size(),</span>
+<span class="fc" id="L148">                familyCases.stream()</span>
+<span class="fc" id="L149">                    .map(ProofCarryingShowcaseGeneratedCase::difficultyLevel)</span>
+<span class="fc" id="L150">                    .distinct()</span>
+<span class="fc" id="L151">                    .sorted()</span>
+<span class="fc" id="L152">                    .toList(),</span>
+<span class="fc" id="L153">                aggregateRoot(</span>
+                    &quot;regelsuche.proof-carrying-showcase-family-root/v1&quot;,
+<span class="fc" id="L155">                    familyCases.stream()</span>
+<span class="fc" id="L156">                        .map(ProofCarryingShowcaseGeneratedCase::contentHash)</span>
+<span class="fc" id="L157">                        .toList())));</span>
+<span class="fc" id="L158">        }</span>
+<span class="fc" id="L159">        String root = aggregateRoot(</span>
+            &quot;regelsuche.proof-carrying-showcase-case-root/v1&quot;,
+<span class="fc" id="L161">            retained.stream()</span>
+<span class="fc" id="L162">                .map(ProofCarryingShowcaseGeneratedCase::contentHash)</span>
+<span class="fc" id="L163">                .toList());</span>
+<span class="fc" id="L164">        Map&lt;String, Object&gt; payload = payload(</span>
+            SCHEMA,
+<span class="fc" id="L166">            plan.showcaseId(),</span>
+<span class="fc" id="L167">            plan.contentHash(),</span>
+<span class="fc" id="L168">            seed.candidateFreezeContentHash(),</span>
+<span class="fc" id="L169">            seed.contentHash(),</span>
+<span class="fc" id="L170">            plan.challengeGenerator().generatorId(),</span>
+<span class="fc" id="L171">            seed.derivedSeed(),</span>
+<span class="fc" id="L172">            seed.drandChainHash(),</span>
+<span class="fc" id="L173">            seed.drandRound(),</span>
+<span class="fc" id="L174">            retained.size(),</span>
+            summaries,
+            retained,
+            root,
+<span class="fc" id="L178">            plan.challengeGenerator().caseIdentity(),</span>
+<span class="fc" id="L179">            plan.challengeGenerator().manualReplacementOrPruning(),</span>
+            STATUS);
+<span class="fc" id="L181">        return new ProofCarryingShowcaseGeneratedFinalTest(</span>
+            SCHEMA,
+<span class="fc" id="L183">            plan.showcaseId(),</span>
+<span class="fc" id="L184">            plan.contentHash(),</span>
+<span class="fc" id="L185">            seed.candidateFreezeContentHash(),</span>
+<span class="fc" id="L186">            seed.contentHash(),</span>
+<span class="fc" id="L187">            plan.challengeGenerator().generatorId(),</span>
+<span class="fc" id="L188">            seed.derivedSeed(),</span>
+<span class="fc" id="L189">            seed.drandChainHash(),</span>
+<span class="fc" id="L190">            seed.drandRound(),</span>
+<span class="fc" id="L191">            retained.size(),</span>
+            summaries,
+            retained,
+            root,
+<span class="fc" id="L195">            plan.challengeGenerator().caseIdentity(),</span>
+<span class="fc" id="L196">            plan.challengeGenerator().manualReplacementOrPruning(),</span>
+            STATUS,
+<span class="fc" id="L198">            ProofCarryingShowcaseJsonSupport.hashPayload(payload));</span>
+    }
+
+    public static ProofCarryingShowcaseGeneratedFinalTest
+            fromCanonicalJson(String json) {
+<span class="fc" id="L203">        return ProofCarryingShowcaseJsonSupport.read(</span>
+            json,
+            ProofCarryingShowcaseGeneratedFinalTest.class,
+            &quot;generated showcase FINAL TEST&quot;);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L210">        return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);</span>
+    }
+
+    public void requireCompatible(
+        ProofCarryingShowcasePlan plan,
+        ProofCarryingShowcaseSeedReceipt seed
+    ) {
+<span class="nc" id="L217">        seed.requireCompatible(plan);</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (!showcaseId.equals(plan.showcaseId())</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                || !planContentHash.equals(plan.contentHash())</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">                || !candidateFreezeContentHash.equals(</span>
+<span class="nc" id="L221">                    seed.candidateFreezeContentHash())</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">                || !seedReceiptContentHash.equals(seed.contentHash())</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                || !derivedSeed.equals(seed.derivedSeed())</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                || !drandChainHash.equals(seed.drandChainHash())</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                || drandRound != seed.drandRound()) {</span>
+<span class="nc" id="L226">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST identity mismatch&quot;);
+        }
+<span class="nc" id="L229">        cases.forEach(item -&gt; item.requireCompatible(plan, seed));</span>
+<span class="nc" id="L230">    }</span>
+
+    private static void requireExpectedOrder(
+        List&lt;ProofCarryingShowcaseGeneratedCase&gt; cases
+    ) {
+<span class="fc" id="L235">        int index = 0;</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        for (String familyId : ProofCarryingShowcasePlan.FAMILIES) {</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            for (int difficulty : ProofCarryingShowcasePlan.DIFFICULTY_LEVELS) {</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                for (int variant : List.of(0, 1)) {</span>
+<span class="fc" id="L239">                    ProofCarryingShowcaseGeneratedCase item =</span>
+<span class="fc" id="L240">                        cases.get(index++);</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                    if (!familyId.equals(item.familyId())</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                            || difficulty != item.difficultyLevel()</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">                            || variant != item.variant()) {</span>
+<span class="nc" id="L244">                        throw new IllegalArgumentException(</span>
+                            &quot;generated FINAL TEST cases are reordered&quot;);
+                    }
+<span class="fc" id="L247">                }</span>
+<span class="fc" id="L248">            }</span>
+<span class="fc" id="L249">        }</span>
+<span class="fc" id="L250">    }</span>
+
+    private static &lt;T&gt; void requireUnique(
+        List&lt;ProofCarryingShowcaseGeneratedCase&gt; cases,
+        Function&lt;ProofCarryingShowcaseGeneratedCase, T&gt; mapper,
+        String name
+    ) {
+<span class="fc" id="L257">        List&lt;T&gt; values = cases.stream().map(mapper).toList();</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (new HashSet&lt;&gt;(values).size() != values.size()) {</span>
+<span class="nc" id="L259">            throw new IllegalArgumentException(</span>
+                &quot;generated FINAL TEST contains duplicate &quot; + name);
+        }
+<span class="fc" id="L262">    }</span>
+
+    private static void requireFamilySummaries(
+        List&lt;FamilySummary&gt; summaries,
+        List&lt;ProofCarryingShowcaseGeneratedCase&gt; cases
+    ) {
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (!ProofCarryingShowcasePlan.FAMILIES.equals(</span>
+<span class="fc" id="L269">                summaries.stream()</span>
+<span class="fc" id="L270">                    .map(FamilySummary::familyId)</span>
+<span class="fc" id="L271">                    .toList())) {</span>
+<span class="nc" id="L272">            throw new IllegalArgumentException(</span>
+                &quot;generated family-summary ordering drift&quot;);
+        }
+<span class="fc" id="L275">        Map&lt;String, List&lt;ProofCarryingShowcaseGeneratedCase&gt;&gt; byFamily =</span>
+<span class="fc" id="L276">            cases.stream().collect(Collectors.groupingBy(</span>
+                ProofCarryingShowcaseGeneratedCase::familyId));
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (FamilySummary summary : summaries) {</span>
+<span class="fc" id="L279">            List&lt;ProofCarryingShowcaseGeneratedCase&gt; family =</span>
+<span class="fc" id="L280">                byFamily.getOrDefault(summary.familyId(), List.of());</span>
+<span class="fc" id="L281">            String expectedRoot = aggregateRoot(</span>
+                &quot;regelsuche.proof-carrying-showcase-family-root/v1&quot;,
+<span class="fc" id="L283">                family.stream()</span>
+<span class="fc" id="L284">                    .map(ProofCarryingShowcaseGeneratedCase::contentHash)</span>
+<span class="fc" id="L285">                    .toList());</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">            if (summary.caseCount() != family.size()</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                    || !expectedRoot.equals(summary.caseContentRoot())) {</span>
+<span class="nc" id="L288">                throw new IllegalArgumentException(</span>
+                    &quot;generated family summary differs from cases&quot;);
+            }
+<span class="fc" id="L291">        }</span>
+<span class="fc" id="L292">    }</span>
+
+    static String aggregateRoot(String domain, List&lt;String&gt; values) {
+<span class="fc" id="L295">        String material = domain + &quot;\n&quot; + String.join(&quot;\n&quot;, values);</span>
+<span class="fc" id="L296">        return EvolutionGenome.hash(material);</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String schema,
+        String showcaseId,
+        String planContentHash,
+        String candidateFreezeContentHash,
+        String seedReceiptContentHash,
+        String generatorId,
+        String derivedSeed,
+        String drandChainHash,
+        long drandRound,
+        int caseCount,
+        List&lt;FamilySummary&gt; familySummaries,
+        List&lt;ProofCarryingShowcaseGeneratedCase&gt; cases,
+        String caseContentRoot,
+        String caseIdentityPolicy,
+        String manualReplacementOrPruning,
+        String status
+    ) {
+<span class="fc" id="L317">        return ProofCarryingShowcaseJsonSupport.payload(</span>
+            &quot;schema&quot;, schema,
+            &quot;showcaseId&quot;, showcaseId,
+            &quot;planContentHash&quot;, planContentHash,
+            &quot;candidateFreezeContentHash&quot;,
+                candidateFreezeContentHash,
+            &quot;seedReceiptContentHash&quot;, seedReceiptContentHash,
+            &quot;generatorId&quot;, generatorId,
+            &quot;derivedSeed&quot;, derivedSeed,
+            &quot;drandChainHash&quot;, drandChainHash,
+<span class="fc" id="L327">            &quot;drandRound&quot;, drandRound,</span>
+<span class="fc" id="L328">            &quot;caseCount&quot;, caseCount,</span>
+            &quot;familySummaries&quot;, familySummaries,
+            &quot;cases&quot;, cases,
+            &quot;caseContentRoot&quot;, caseContentRoot,
+            &quot;caseIdentityPolicy&quot;, caseIdentityPolicy,
+            &quot;manualReplacementOrPruning&quot;,
+                manualReplacementOrPruning,
+            &quot;status&quot;, status);
+    }
+
+    public record FamilySummary(
+        String familyId,
+        int caseCount,
+        List&lt;Integer&gt; difficultyLevels,
+        String caseContentRoot
+    ) {
+<span class="fc" id="L344">        public FamilySummary {</span>
+<span class="fc" id="L345">            familyId = ProofCarryingShowcaseJsonSupport.requireText(</span>
+                familyId, &quot;familyId&quot;);
+<span class="fc" id="L347">            difficultyLevels = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L348">                .immutableIntegers(</span>
+                    difficultyLevels,
+                    &quot;difficultyLevels&quot;);
+<span class="fc" id="L351">            ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+                caseContentRoot, &quot;caseContentRoot&quot;);
+<span class="pc bpc" id="L353" title="2 of 4 branches missed.">            if (!ProofCarryingShowcasePlan.FAMILIES.contains(familyId)</span>
+                    || caseCount != 8
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">                    || !ProofCarryingShowcasePlan.DIFFICULTY_LEVELS.equals(</span>
+                        difficultyLevels)) {
+<span class="nc" id="L357">                throw new IllegalArgumentException(</span>
+                    &quot;generated family summary drift&quot;);
+            }
+<span class="fc" id="L360">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

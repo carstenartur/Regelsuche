@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseCandidateFreeze.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseCandidateFreeze.java</span></div><h1>ProofCarryingShowcaseCandidateFreeze.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Complete TRAIN-derived candidate freeze that must predate public randomness.
+ */
+public record ProofCarryingShowcaseCandidateFreeze(
+    String schema,
+    String showcaseId,
+    String planContentHash,
+    String repositoryCommit,
+    String trainingRunHash,
+    String selectionEvidenceHash,
+    String candidateContentHash,
+    String candidateAlphaStructuralHash,
+    String humanReadableProgramHash,
+    String primitiveInventoryHash,
+    String workBudgetPolicyHash,
+    String evaluationProtocolHash,
+    List&lt;String&gt; seedCandidateHashes,
+    int programNodeCount,
+    boolean containsCompositionTopology,
+    boolean containsDecisionTopology,
+    int minimumDeclaredPrimitivePathSteps,
+    long frozenAtUnixTime,
+    long randomnessNotBeforeUnixTime,
+    String status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.proof-carrying-showcase-candidate-freeze/v1&quot;;
+    public static final String STATUS =
+        &quot;CANDIDATE_FROZEN_FINAL_TEST_UNSEEN&quot;;
+
+<span class="fc" id="L37">    public ProofCarryingShowcaseCandidateFreeze {</span>
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(</span>
+                &quot;unsupported showcase candidate-freeze schema&quot;);
+        }
+<span class="fc" id="L42">        showcaseId = ProofCarryingShowcaseJsonSupport.requireText(</span>
+            showcaseId, &quot;showcaseId&quot;);
+<span class="fc" id="L44">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            planContentHash, &quot;planContentHash&quot;);
+<span class="fc" id="L46">        ProofCarryingShowcaseJsonSupport.requireCommit(</span>
+            repositoryCommit, &quot;repositoryCommit&quot;);
+<span class="fc" id="L48">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            trainingRunHash, &quot;trainingRunHash&quot;);
+<span class="fc" id="L50">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            selectionEvidenceHash, &quot;selectionEvidenceHash&quot;);
+<span class="fc" id="L52">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            candidateContentHash, &quot;candidateContentHash&quot;);
+<span class="fc" id="L54">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            candidateAlphaStructuralHash,
+            &quot;candidateAlphaStructuralHash&quot;);
+<span class="fc" id="L57">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            humanReadableProgramHash,
+            &quot;humanReadableProgramHash&quot;);
+<span class="fc" id="L60">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            primitiveInventoryHash, &quot;primitiveInventoryHash&quot;);
+<span class="fc" id="L62">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            workBudgetPolicyHash, &quot;workBudgetPolicyHash&quot;);
+<span class="fc" id="L64">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            evaluationProtocolHash, &quot;evaluationProtocolHash&quot;);
+<span class="fc" id="L66">        seedCandidateHashes = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L67">            .immutableHashes(</span>
+                seedCandidateHashes,
+                &quot;seedCandidateHashes&quot;,
+                true);
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (seedCandidateHashes.contains(candidateContentHash)) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(</span>
+                &quot;frozen candidate must not equal a seed candidate&quot;);
+        }
+<span class="pc bpc" id="L75" title="4 of 8 branches missed.">        if (programNodeCount &lt; 1</span>
+                || !containsCompositionTopology
+                || !containsDecisionTopology
+                || minimumDeclaredPrimitivePathSteps &lt; 3) {
+<span class="nc" id="L79">            throw new IllegalArgumentException(</span>
+                &quot;frozen candidate lacks required showcase structure&quot;);
+        }
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">        if (frozenAtUnixTime &lt; 1</span>
+                || randomnessNotBeforeUnixTime &lt;= frozenAtUnixTime) {
+<span class="nc" id="L84">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze has an invalid randomness boundary&quot;);
+        }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!STATUS.equals(status)) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze must keep FINAL TEST unseen&quot;);
+        }
+<span class="fc" id="L91">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L93">        String expected = ProofCarryingShowcaseJsonSupport.hashPayload(</span>
+<span class="fc" id="L94">            payload(</span>
+                schema,
+                showcaseId,
+                planContentHash,
+                repositoryCommit,
+                trainingRunHash,
+                selectionEvidenceHash,
+                candidateContentHash,
+                candidateAlphaStructuralHash,
+                humanReadableProgramHash,
+                primitiveInventoryHash,
+                workBudgetPolicyHash,
+                evaluationProtocolHash,
+                seedCandidateHashes,
+                programNodeCount,
+                containsCompositionTopology,
+                containsDecisionTopology,
+                minimumDeclaredPrimitivePathSteps,
+                frozenAtUnixTime,
+                randomnessNotBeforeUnixTime,
+                status));
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L116">            throw new IllegalArgumentException(</span>
+                &quot;showcase candidate-freeze contentHash mismatch&quot;);
+        }
+<span class="fc" id="L119">    }</span>
+
+    public static ProofCarryingShowcaseCandidateFreeze create(
+        ProofCarryingShowcasePlan plan,
+        String repositoryCommit,
+        String trainingRunHash,
+        String selectionEvidenceHash,
+        String candidateContentHash,
+        String candidateAlphaStructuralHash,
+        String humanReadableProgramHash,
+        String primitiveInventoryHash,
+        String workBudgetPolicyHash,
+        String evaluationProtocolHash,
+        List&lt;String&gt; seedCandidateHashes,
+        int programNodeCount,
+        boolean containsCompositionTopology,
+        boolean containsDecisionTopology,
+        int minimumDeclaredPrimitivePathSteps,
+        long frozenAtUnixTime
+    ) {
+        long notBefore;
+        try {
+<span class="fc" id="L141">            notBefore = Math.addExact(</span>
+                frozenAtUnixTime,
+<span class="fc" id="L143">                plan.publicRandomness()</span>
+<span class="fc" id="L144">                    .minimumDelaySecondsAfterCandidateFreeze());</span>
+<span class="nc" id="L145">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L146">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze time overflows randomness boundary&quot;,
+                exception);
+<span class="fc" id="L149">        }</span>
+<span class="fc" id="L150">        List&lt;String&gt; seeds = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L151">            .immutableHashes(</span>
+                seedCandidateHashes,
+                &quot;seedCandidateHashes&quot;,
+                true);
+<span class="fc" id="L155">        Map&lt;String, Object&gt; payload = payload(</span>
+            SCHEMA,
+<span class="fc" id="L157">            plan.showcaseId(),</span>
+<span class="fc" id="L158">            plan.contentHash(),</span>
+            repositoryCommit,
+            trainingRunHash,
+            selectionEvidenceHash,
+            candidateContentHash,
+            candidateAlphaStructuralHash,
+            humanReadableProgramHash,
+            primitiveInventoryHash,
+            workBudgetPolicyHash,
+            evaluationProtocolHash,
+            seeds,
+            programNodeCount,
+            containsCompositionTopology,
+            containsDecisionTopology,
+            minimumDeclaredPrimitivePathSteps,
+            frozenAtUnixTime,
+            notBefore,
+            STATUS);
+<span class="fc" id="L176">        return new ProofCarryingShowcaseCandidateFreeze(</span>
+            SCHEMA,
+<span class="fc" id="L178">            plan.showcaseId(),</span>
+<span class="fc" id="L179">            plan.contentHash(),</span>
+            repositoryCommit,
+            trainingRunHash,
+            selectionEvidenceHash,
+            candidateContentHash,
+            candidateAlphaStructuralHash,
+            humanReadableProgramHash,
+            primitiveInventoryHash,
+            workBudgetPolicyHash,
+            evaluationProtocolHash,
+            seeds,
+            programNodeCount,
+            containsCompositionTopology,
+            containsDecisionTopology,
+            minimumDeclaredPrimitivePathSteps,
+            frozenAtUnixTime,
+            notBefore,
+            STATUS,
+<span class="fc" id="L197">            ProofCarryingShowcaseJsonSupport.hashPayload(payload));</span>
+    }
+
+    public static ProofCarryingShowcaseCandidateFreeze fromCanonicalJson(
+        String json
+    ) {
+<span class="fc" id="L203">        return ProofCarryingShowcaseJsonSupport.read(</span>
+            json,
+            ProofCarryingShowcaseCandidateFreeze.class,
+            &quot;showcase candidate freeze&quot;);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L210">        return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);</span>
+    }
+
+    public void requireCompatible(ProofCarryingShowcasePlan plan) {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (!showcaseId.equals(plan.showcaseId())</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                || !planContentHash.equals(plan.contentHash())) {</span>
+<span class="nc" id="L216">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze is not bound to the frozen plan&quot;);
+        }
+<span class="fc" id="L219">        int requiredSteps = plan.candidateFormation()</span>
+<span class="fc" id="L220">            .requiredCandidateProperties()</span>
+<span class="fc" id="L221">            .minimumPrimitiveStepsOnSuccessfulPath();</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (minimumDeclaredPrimitivePathSteps &lt; requiredSteps) {</span>
+<span class="nc" id="L223">            throw new IllegalArgumentException(</span>
+                &quot;candidate primitive-path floor is below the plan&quot;);
+        }
+        long minimumNotBefore;
+        try {
+<span class="fc" id="L228">            minimumNotBefore = Math.addExact(</span>
+                frozenAtUnixTime,
+<span class="fc" id="L230">                plan.publicRandomness()</span>
+<span class="fc" id="L231">                    .minimumDelaySecondsAfterCandidateFreeze());</span>
+<span class="nc" id="L232">        } catch (ArithmeticException exception) {</span>
+<span class="nc" id="L233">            throw new IllegalArgumentException(</span>
+                &quot;candidate freeze time overflows randomness boundary&quot;,
+                exception);
+<span class="fc" id="L236">        }</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (randomnessNotBeforeUnixTime &lt; minimumNotBefore) {</span>
+<span class="nc" id="L238">            throw new IllegalArgumentException(</span>
+                &quot;candidate randomness boundary violates the plan delay&quot;);
+        }
+<span class="fc" id="L241">    }</span>
+
+    private static Map&lt;String, Object&gt; payload(
+        String schema,
+        String showcaseId,
+        String planContentHash,
+        String repositoryCommit,
+        String trainingRunHash,
+        String selectionEvidenceHash,
+        String candidateContentHash,
+        String candidateAlphaStructuralHash,
+        String humanReadableProgramHash,
+        String primitiveInventoryHash,
+        String workBudgetPolicyHash,
+        String evaluationProtocolHash,
+        List&lt;String&gt; seedCandidateHashes,
+        int programNodeCount,
+        boolean containsCompositionTopology,
+        boolean containsDecisionTopology,
+        int minimumDeclaredPrimitivePathSteps,
+        long frozenAtUnixTime,
+        long randomnessNotBeforeUnixTime,
+        String status
+    ) {
+<span class="fc" id="L265">        return ProofCarryingShowcaseJsonSupport.payload(</span>
+            &quot;schema&quot;, schema,
+            &quot;showcaseId&quot;, showcaseId,
+            &quot;planContentHash&quot;, planContentHash,
+            &quot;repositoryCommit&quot;, repositoryCommit,
+            &quot;trainingRunHash&quot;, trainingRunHash,
+            &quot;selectionEvidenceHash&quot;, selectionEvidenceHash,
+            &quot;candidateContentHash&quot;, candidateContentHash,
+            &quot;candidateAlphaStructuralHash&quot;,
+                candidateAlphaStructuralHash,
+            &quot;humanReadableProgramHash&quot;, humanReadableProgramHash,
+            &quot;primitiveInventoryHash&quot;, primitiveInventoryHash,
+            &quot;workBudgetPolicyHash&quot;, workBudgetPolicyHash,
+            &quot;evaluationProtocolHash&quot;, evaluationProtocolHash,
+            &quot;seedCandidateHashes&quot;, seedCandidateHashes,
+<span class="fc" id="L280">            &quot;programNodeCount&quot;, programNodeCount,</span>
+            &quot;containsCompositionTopology&quot;,
+<span class="fc" id="L282">                containsCompositionTopology,</span>
+<span class="fc" id="L283">            &quot;containsDecisionTopology&quot;, containsDecisionTopology,</span>
+            &quot;minimumDeclaredPrimitivePathSteps&quot;,
+<span class="fc" id="L285">                minimumDeclaredPrimitivePathSteps,</span>
+<span class="fc" id="L286">            &quot;frozenAtUnixTime&quot;, frozenAtUnixTime,</span>
+            &quot;randomnessNotBeforeUnixTime&quot;,
+<span class="fc" id="L288">                randomnessNotBeforeUnixTime,</span>
+            &quot;status&quot;, status);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

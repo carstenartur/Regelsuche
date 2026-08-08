@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseJsonSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseJsonSupport.java</span></div><h1>ProofCarryingShowcaseJsonSupport.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.regex.Pattern;
+
+final class ProofCarryingShowcaseJsonSupport {
+<span class="fc" id="L25">    static final ObjectMapper JSON = new ObjectMapper(</span>
+<span class="fc" id="L26">        JsonFactory.builder()</span>
+<span class="fc" id="L27">            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)</span>
+<span class="fc" id="L28">            .build())</span>
+<span class="fc" id="L29">        .findAndRegisterModules()</span>
+<span class="fc" id="L30">        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)</span>
+<span class="fc" id="L31">        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)</span>
+<span class="fc" id="L32">        .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)</span>
+<span class="fc" id="L33">        .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)</span>
+<span class="fc" id="L34">        .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES);</span>
+
+<span class="fc" id="L36">    static final Pattern SHA256 = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L37">    static final Pattern HEX_64 = Pattern.compile(&quot;[0-9a-f]{64}&quot;);</span>
+<span class="fc" id="L38">    static final Pattern COMMIT = Pattern.compile(&quot;[0-9a-f]{40}&quot;);</span>
+<span class="fc" id="L39">    static final Pattern ENDPOINT = Pattern.compile(&quot;[a-z0-9.-]{3,128}&quot;);</span>
+<span class="fc" id="L40">    static final Pattern CLIENT =</span>
+<span class="fc" id="L41">        Pattern.compile(&quot;drand-client/[A-Za-z0-9._@:+-]{1,160}&quot;);</span>
+
+    private ProofCarryingShowcaseJsonSupport() {
+    }
+
+    static &lt;T&gt; T read(String json, Class&lt;T&gt; type, String description) {
+<span class="pc bpc" id="L47" title="2 of 4 branches missed.">        if (json == null || json.isBlank()) {</span>
+<span class="nc" id="L48">            throw new IllegalArgumentException(</span>
+                description + &quot; JSON must not be blank&quot;);
+        }
+        try {
+<span class="fc" id="L52">            return JSON.readValue(json, type);</span>
+<span class="fc" id="L53">        } catch (JsonProcessingException exception) {</span>
+<span class="fc" id="L54">            throw new IllegalArgumentException(</span>
+                &quot;invalid &quot; + description + &quot; JSON&quot;, exception);
+        }
+    }
+
+    static &lt;T&gt; T read(Path path, Class&lt;T&gt; type, String description) {
+<span class="fc" id="L60">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L62">            return read(</span>
+<span class="fc" id="L63">                Files.readString(path, StandardCharsets.UTF_8),</span>
+                type,
+                description);
+<span class="nc" id="L66">        } catch (IOException exception) {</span>
+<span class="nc" id="L67">            throw new IllegalArgumentException(</span>
+                &quot;cannot read &quot; + description + &quot; from &quot; + path,
+                exception);
+        }
+    }
+
+    static JsonNode readTree(Path path, String description) {
+<span class="fc" id="L74">        Objects.requireNonNull(path, &quot;path&quot;);</span>
+        try {
+<span class="fc" id="L76">            return JSON.readTree(Files.readString(path, StandardCharsets.UTF_8));</span>
+<span class="nc" id="L77">        } catch (IOException exception) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;cannot read &quot; + description + &quot; from &quot; + path,
+                exception);
+        }
+    }
+
+    static String toCanonicalJson(Object value) {
+<span class="fc" id="L85">        return canonicalJson(JSON.valueToTree(value)) + &quot;\n&quot;;</span>
+    }
+
+    static String hashPayload(Map&lt;String, ?&gt; value) {
+<span class="fc" id="L89">        return EvolutionGenome.hash(canonicalJson(JSON.valueToTree(value)));</span>
+    }
+
+    static String canonicalJson(JsonNode node) {
+<span class="fc" id="L93">        StringBuilder output = new StringBuilder();</span>
+<span class="fc" id="L94">        appendCanonical(output, Objects.requireNonNull(node, &quot;node&quot;));</span>
+<span class="fc" id="L95">        return output.toString();</span>
+    }
+
+    private static void appendCanonical(StringBuilder output, JsonNode node) {
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (node.isObject()) {</span>
+<span class="fc" id="L100">            output.append('{');</span>
+<span class="fc" id="L101">            List&lt;String&gt; names = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L102">            node.fieldNames().forEachRemaining(names::add);</span>
+<span class="fc" id="L103">            names.sort(Comparator.naturalOrder());</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            for (int index = 0; index &lt; names.size(); index++) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                if (index &gt; 0) {</span>
+<span class="fc" id="L106">                    output.append(',');</span>
+                }
+<span class="fc" id="L108">                String name = names.get(index);</span>
+<span class="fc" id="L109">                appendScalar(output, JSON.valueToTree(name));</span>
+<span class="fc" id="L110">                output.append(':');</span>
+<span class="fc" id="L111">                appendCanonical(output, node.get(name));</span>
+            }
+<span class="fc" id="L113">            output.append('}');</span>
+<span class="fc" id="L114">            return;</span>
+        }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (node.isArray()) {</span>
+<span class="fc" id="L117">            output.append('[');</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            for (int index = 0; index &lt; node.size(); index++) {</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (index &gt; 0) {</span>
+<span class="fc" id="L120">                    output.append(',');</span>
+                }
+<span class="fc" id="L122">                appendCanonical(output, node.get(index));</span>
+            }
+<span class="fc" id="L124">            output.append(']');</span>
+<span class="fc" id="L125">            return;</span>
+        }
+<span class="fc" id="L127">        appendScalar(output, node);</span>
+<span class="fc" id="L128">    }</span>
+
+    private static void appendScalar(StringBuilder output, JsonNode node) {
+        try {
+<span class="fc" id="L132">            output.append(JSON.writeValueAsString(node));</span>
+<span class="nc" id="L133">        } catch (JsonProcessingException exception) {</span>
+<span class="nc" id="L134">            throw new IllegalStateException(</span>
+                &quot;cannot serialize canonical JSON scalar&quot;, exception);
+<span class="fc" id="L136">        }</span>
+<span class="fc" id="L137">    }</span>
+
+    static Map&lt;String, Object&gt; payload(Object... keyValues) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (keyValues.length % 2 != 0) {</span>
+<span class="nc" id="L141">            throw new IllegalArgumentException(</span>
+                &quot;payload requires key/value pairs&quot;);
+        }
+<span class="fc" id="L144">        Map&lt;String, Object&gt; result = new TreeMap&lt;&gt;();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (int index = 0; index &lt; keyValues.length; index += 2) {</span>
+<span class="fc" id="L146">            String key = requireText(</span>
+                (String) keyValues[index],
+                &quot;payload key&quot;);
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (result.put(key, keyValues[index + 1]) != null) {</span>
+<span class="nc" id="L150">                throw new IllegalArgumentException(</span>
+                    &quot;duplicate payload key &quot; + key);
+            }
+        }
+<span class="fc" id="L154">        return result;</span>
+    }
+
+    static String requireText(String value, String name) {
+<span class="pc bpc" id="L158" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L159">            throw new IllegalArgumentException(</span>
+                name + &quot; must not be blank&quot;);
+        }
+<span class="fc" id="L162">        return value.trim();</span>
+    }
+
+    static String requireSha256(String value, String name) {
+<span class="pc bpc" id="L166" title="2 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
+<span class="nc" id="L167">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+        }
+<span class="fc" id="L169">        return value;</span>
+    }
+
+    static String requireHex64(String value, String name) {
+<span class="pc bpc" id="L173" title="2 of 4 branches missed.">        if (value == null || !HEX_64.matcher(value).matches()) {</span>
+<span class="nc" id="L174">            throw new IllegalArgumentException(</span>
+                name + &quot; must contain 64 lowercase hex characters&quot;);
+        }
+<span class="fc" id="L177">        return value;</span>
+    }
+
+    static String requireCommit(String value, String name) {
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">        if (value == null || !COMMIT.matcher(value).matches()) {</span>
+<span class="nc" id="L182">            throw new IllegalArgumentException(</span>
+                name + &quot; must be a lowercase 40-character commit&quot;);
+        }
+<span class="fc" id="L185">        return value;</span>
+    }
+
+    static String requireEndpoint(String value) {
+<span class="pc bpc" id="L189" title="2 of 4 branches missed.">        if (value == null || !ENDPOINT.matcher(value).matches()) {</span>
+<span class="nc" id="L190">            throw new IllegalArgumentException(</span>
+                &quot;endpointId has invalid syntax&quot;);
+        }
+<span class="fc" id="L193">        return value;</span>
+    }
+
+    static String requireClient(String value) {
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">        if (value == null || !CLIENT.matcher(value).matches()) {</span>
+<span class="nc" id="L198">            throw new IllegalArgumentException(</span>
+                &quot;verificationClient must identify a pinned drand client&quot;);
+        }
+<span class="fc" id="L201">        return value;</span>
+    }
+
+    static String requireBoundedHex(
+        String value,
+        int minimumLength,
+        int maximumLength,
+        String name
+    ) {
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">        if (value == null</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">                || value.length() &lt; minimumLength</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">                || value.length() &gt; maximumLength</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                || value.length() % 2 != 0</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                || !value.matches(&quot;[0-9a-f]+&quot;)) {</span>
+<span class="nc" id="L215">            throw new IllegalArgumentException(</span>
+                name + &quot; must be bounded even-length lowercase hex&quot;);
+        }
+<span class="fc" id="L218">        return value;</span>
+    }
+
+    static List&lt;String&gt; immutableStrings(
+        List&lt;String&gt; values,
+        String name,
+        boolean sort,
+        boolean requireNonEmpty
+    ) {
+<span class="fc" id="L227">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L228">        List&lt;String&gt; checked = values.stream()</span>
+<span class="fc" id="L229">            .map(value -&gt; requireText(value, name + &quot; entry&quot;))</span>
+<span class="fc" id="L230">            .toList();</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (checked.stream().distinct().count() != checked.size()) {</span>
+<span class="nc" id="L232">            throw new IllegalArgumentException(</span>
+                name + &quot; must not contain duplicates&quot;);
+        }
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">        if (requireNonEmpty &amp;&amp; checked.isEmpty()) {</span>
+<span class="nc" id="L236">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        return sort</span>
+<span class="fc" id="L239">            ? checked.stream().sorted().toList()</span>
+<span class="fc" id="L240">            : List.copyOf(checked);</span>
+    }
+
+    static List&lt;String&gt; immutableHashes(
+        List&lt;String&gt; values,
+        String name,
+        boolean requireNonEmpty
+    ) {
+<span class="fc" id="L248">        Objects.requireNonNull(values, name);</span>
+<span class="fc" id="L249">        List&lt;String&gt; checked = values.stream()</span>
+<span class="fc" id="L250">            .map(value -&gt; requireSha256(value, name + &quot; entry&quot;))</span>
+<span class="fc" id="L251">            .toList();</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (checked.stream().distinct().count() != checked.size()) {</span>
+<span class="nc" id="L253">            throw new IllegalArgumentException(</span>
+                name + &quot; must not contain duplicates&quot;);
+        }
+<span class="pc bpc" id="L256" title="2 of 4 branches missed.">        if (requireNonEmpty &amp;&amp; checked.isEmpty()) {</span>
+<span class="nc" id="L257">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+        }
+<span class="fc" id="L259">        return checked.stream().sorted().toList();</span>
+    }
+
+    static List&lt;Integer&gt; immutableIntegers(
+        List&lt;Integer&gt; values,
+        String name
+    ) {
+<span class="fc" id="L266">        Objects.requireNonNull(values, name);</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (values.stream().anyMatch(Objects::isNull)) {</span>
+<span class="nc" id="L268">            throw new IllegalArgumentException(</span>
+                name + &quot; must not contain null&quot;);
+        }
+<span class="fc" id="L271">        return List.copyOf(values);</span>
+    }
+
+    static byte[] sha256Bytes(String material) {
+<span class="fc" id="L275">        String hash = EvolutionGenome.hash(material);</span>
+<span class="fc" id="L276">        return HexFormat.of().parseHex(hash.substring(&quot;sha256:&quot;.length()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

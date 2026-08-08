@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcasePlan.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcasePlan.java</span></div><h1>ProofCarryingShowcasePlan.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Immutable pre-execution contract for the public proof-carrying showcase.
+ *
+ * &lt;p&gt;The contract is parsed and checked by production Java code. JUnit exercises
+ * the same constructors and cross-artifact rules; no external verifier owns
+ * showcase semantics.&lt;/p&gt;
+ */
+public record ProofCarryingShowcasePlan(
+    String schema,
+    String showcaseId,
+    int issue,
+    String status,
+    String claimPolicy,
+    String publicationGradeFlagship,
+    CandidateFormation candidateFormation,
+    PublicRandomness publicRandomness,
+    ChallengeGenerator challengeGenerator,
+    Comparison comparison,
+    Acceptance acceptance,
+    List&lt;String&gt; requiredArtifacts,
+    StageStates stageStates,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.proof-carrying-self-improvement-showcase-plan/v1&quot;;
+    public static final String SHOWCASE_ID =
+        &quot;proof-carrying-self-improvement-2026-08/v1&quot;;
+    public static final String STATUS = &quot;CONTRACT_FROZEN_NOT_RUN&quot;;
+    public static final String CLAIM_POLICY =
+        &quot;SHOWCASE_CONFIRMED_DOES_NOT_IMPLY_EXPERT_REVIEW_OR_EXTERNAL_NOVELTY&quot;;
+    public static final String PUBLICATION_GRADE_FLAGSHIP =
+        &quot;DEFERRED_PENDING_INDEPENDENT_REVIEW&quot;;
+    public static final String GENERATOR_ID =
+        &quot;proof-carrying-symbolic-stress-ladders/v1&quot;;
+    public static final String CASE_IDENTITY =
+        &quot;SHA256_CANONICAL_CASE_V1&quot;;
+    public static final String DRAND_CHAIN_HASH =
+        &quot;8990e7a9aaed2ffed73dbd7092123d6f289930540d7651336225dc172e51b2ce&quot;;
+
+<span class="fc" id="L47">    public static final List&lt;String&gt; FAMILIES = List.of(</span>
+        &quot;nested-rational-cancellation&quot;,
+        &quot;factor-cancel-collect&quot;,
+        &quot;multi-stage-rational-polynomial&quot;);
+<span class="fc" id="L51">    public static final List&lt;Integer&gt; DIFFICULTY_LEVELS =</span>
+<span class="fc" id="L52">        List.of(3, 4, 5, 6);</span>
+<span class="fc" id="L53">    public static final List&lt;String&gt; CONFIGURATIONS = List.of(</span>
+        &quot;primitive-best-first&quot;,
+        &quot;preregistered-handwritten-program&quot;,
+        &quot;random-valid-program&quot;,
+        &quot;no-composition-ablation&quot;,
+        &quot;no-decision-ablation&quot;,
+        &quot;learned-program&quot;);
+<span class="fc" id="L60">    public static final List&lt;String&gt; AUTHORITATIVE_METRICS = List.of(</span>
+        &quot;reachedCases&quot;,
+        &quot;newlyReachedCases&quot;,
+        &quot;distinctImprovedFamilies&quot;,
+        &quot;canonicalPrimitiveWork&quot;,
+        &quot;canonicalTotalWork&quot;,
+        &quot;exploredStates&quot;,
+        &quot;generatedCandidates&quot;,
+        &quot;pathPrimitiveSteps&quot;,
+        &quot;correctnessRegressions&quot;,
+        &quot;hiddenAssumptionRegressions&quot;,
+        &quot;technicalFailures&quot;);
+<span class="fc" id="L72">    public static final List&lt;String&gt; REQUIRED_ARTIFACTS = List.of(</span>
+        &quot;showcase-plan.json&quot;,
+        &quot;candidate-freeze.json&quot;,
+        &quot;public-randomness-receipt.json&quot;,
+        &quot;showcase-seed-receipt.json&quot;,
+        &quot;generated-final-test.json&quot;,
+        &quot;baseline-results.json&quot;,
+        &quot;learned-program-results.json&quot;,
+        &quot;showcase-result-card.json&quot;,
+        &quot;showcase-run.json&quot;);
+
+<span class="fc" id="L83">    public ProofCarryingShowcasePlan {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L85">            throw new IllegalArgumentException(</span>
+                &quot;unsupported showcase-plan schema&quot;);
+        }
+<span class="pc bpc" id="L88" title="2 of 4 branches missed.">        if (!SHOWCASE_ID.equals(showcaseId) || issue != 597) {</span>
+<span class="nc" id="L89">            throw new IllegalArgumentException(</span>
+                &quot;showcase identity or issue binding drift&quot;);
+        }
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (!STATUS.equals(status)) {</span>
+<span class="nc" id="L93">            throw new IllegalArgumentException(</span>
+                &quot;committed showcase contract must remain unexecuted&quot;);
+        }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!CLAIM_POLICY.equals(claimPolicy)) {</span>
+<span class="fc" id="L97">            throw new IllegalArgumentException(</span>
+                &quot;showcase claim policy drift&quot;);
+        }
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (!PUBLICATION_GRADE_FLAGSHIP.equals(</span>
+                publicationGradeFlagship)) {
+<span class="nc" id="L102">            throw new IllegalArgumentException(</span>
+                &quot;publication-grade flagship boundary drift&quot;);
+        }
+<span class="fc" id="L105">        candidateFormation = Objects.requireNonNull(</span>
+            candidateFormation, &quot;candidateFormation&quot;);
+<span class="fc" id="L107">        publicRandomness = Objects.requireNonNull(</span>
+            publicRandomness, &quot;publicRandomness&quot;);
+<span class="fc" id="L109">        challengeGenerator = Objects.requireNonNull(</span>
+            challengeGenerator, &quot;challengeGenerator&quot;);
+<span class="fc" id="L111">        comparison = Objects.requireNonNull(comparison, &quot;comparison&quot;);</span>
+<span class="fc" id="L112">        acceptance = Objects.requireNonNull(acceptance, &quot;acceptance&quot;);</span>
+<span class="fc" id="L113">        requiredArtifacts = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L114">            .immutableStrings(</span>
+                requiredArtifacts,
+                &quot;requiredArtifacts&quot;,
+                false,
+                true);
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (!REQUIRED_ARTIFACTS.equals(requiredArtifacts)) {</span>
+<span class="nc" id="L120">            throw new IllegalArgumentException(</span>
+                &quot;required showcase artifacts drift&quot;);
+        }
+<span class="fc" id="L123">        stageStates = Objects.requireNonNull(stageStates, &quot;stageStates&quot;);</span>
+<span class="fc" id="L124">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L126">        String expected = ProofCarryingShowcaseJsonSupport.hashPayload(</span>
+<span class="fc" id="L127">            payload(</span>
+                schema,
+                showcaseId,
+                issue,
+                status,
+                claimPolicy,
+                publicationGradeFlagship,
+                candidateFormation,
+                publicRandomness,
+                challengeGenerator,
+                comparison,
+                acceptance,
+                requiredArtifacts,
+                stageStates));
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L142">            throw new IllegalArgumentException(</span>
+                &quot;showcase plan contentHash mismatch&quot;);
+        }
+<span class="fc" id="L145">    }</span>
+
+    public static ProofCarryingShowcasePlan fromCanonicalJson(String json) {
+<span class="fc" id="L148">        return ProofCarryingShowcaseJsonSupport.read(</span>
+            json,
+            ProofCarryingShowcasePlan.class,
+            &quot;proof-carrying showcase plan&quot;);
+    }
+
+    public static ProofCarryingShowcasePlan read(Path path) {
+<span class="fc" id="L155">        return ProofCarryingShowcaseJsonSupport.read(</span>
+            path,
+            ProofCarryingShowcasePlan.class,
+            &quot;proof-carrying showcase plan&quot;);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L162">        return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String schema,
+        String showcaseId,
+        int issue,
+        String status,
+        String claimPolicy,
+        String publicationGradeFlagship,
+        CandidateFormation candidateFormation,
+        PublicRandomness publicRandomness,
+        ChallengeGenerator challengeGenerator,
+        Comparison comparison,
+        Acceptance acceptance,
+        List&lt;String&gt; requiredArtifacts,
+        StageStates stageStates
+    ) {
+<span class="fc" id="L180">        return ProofCarryingShowcaseJsonSupport.payload(</span>
+            &quot;schema&quot;, schema,
+            &quot;showcaseId&quot;, showcaseId,
+<span class="fc" id="L183">            &quot;issue&quot;, issue,</span>
+            &quot;status&quot;, status,
+            &quot;claimPolicy&quot;, claimPolicy,
+            &quot;publicationGradeFlagship&quot;, publicationGradeFlagship,
+            &quot;candidateFormation&quot;, candidateFormation,
+            &quot;publicRandomness&quot;, publicRandomness,
+            &quot;challengeGenerator&quot;, challengeGenerator,
+            &quot;comparison&quot;, comparison,
+            &quot;acceptance&quot;, acceptance,
+            &quot;requiredArtifacts&quot;, requiredArtifacts,
+            &quot;stageStates&quot;, stageStates);
+    }
+
+    public record CandidateFormation(
+        List&lt;String&gt; visibleSplits,
+        List&lt;String&gt; prohibitedInformation,
+        boolean candidateFreezeRequiredBeforeRandomnessRound,
+        RequiredCandidateProperties requiredCandidateProperties
+    ) {
+<span class="fc" id="L202">        private static final List&lt;String&gt; PROHIBITED_INFORMATION = List.of(</span>
+            &quot;FINAL_TEST_SEED&quot;,
+            &quot;FINAL_TEST_CASES&quot;,
+            &quot;DRAND_RANDOMNESS&quot;,
+            &quot;EXPERT_LABELS&quot;,
+            &quot;EXTERNAL_NOVELTY_RESULTS&quot;);
+
+<span class="fc" id="L209">        public CandidateFormation {</span>
+<span class="fc" id="L210">            visibleSplits = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L211">                .immutableStrings(</span>
+                    visibleSplits,
+                    &quot;visibleSplits&quot;,
+                    false,
+                    true);
+<span class="fc" id="L216">            prohibitedInformation = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L217">                .immutableStrings(</span>
+                    prohibitedInformation,
+                    &quot;prohibitedInformation&quot;,
+                    false,
+                    true);
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (!List.of(&quot;TRAIN&quot;).equals(visibleSplits)</span>
+<span class="pc bpc" id="L223" title="2 of 4 branches missed.">                    || !PROHIBITED_INFORMATION.equals(</span>
+                        prohibitedInformation)
+                    || !candidateFreezeRequiredBeforeRandomnessRound) {
+<span class="nc" id="L226">                throw new IllegalArgumentException(</span>
+                    &quot;candidate formation must remain TRAIN-only&quot;);
+            }
+<span class="fc" id="L229">            requiredCandidateProperties = Objects.requireNonNull(</span>
+                requiredCandidateProperties,
+                &quot;requiredCandidateProperties&quot;);
+<span class="fc" id="L232">        }</span>
+    }
+
+    public record RequiredCandidateProperties(
+        boolean notSeedEquivalent,
+        boolean compositionTopology,
+        boolean decisionTopology,
+        int minimumPrimitiveStepsOnSuccessfulPath
+    ) {
+<span class="fc" id="L241">        public RequiredCandidateProperties {</span>
+<span class="pc bpc" id="L242" title="4 of 8 branches missed.">            if (!notSeedEquivalent</span>
+                    || !compositionTopology
+                    || !decisionTopology
+                    || minimumPrimitiveStepsOnSuccessfulPath != 3) {
+<span class="nc" id="L246">                throw new IllegalArgumentException(</span>
+                    &quot;required candidate properties drift&quot;);
+            }
+<span class="fc" id="L249">        }</span>
+    }
+
+    public record PublicRandomness(
+        String provider,
+        String network,
+        String chainHash,
+        String apiVersion,
+        String roundEndpointTemplate,
+        String roundSelection,
+        String signatureVerification,
+        String seedDerivation,
+        int minimumDelaySecondsAfterCandidateFreeze
+    ) {
+<span class="fc" id="L263">        public PublicRandomness {</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            if (!&quot;DRAND_LEAGUE_OF_ENTROPY&quot;.equals(provider)</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">                    || !&quot;default&quot;.equals(network)</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">                    || !DRAND_CHAIN_HASH.equals(chainHash)</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                    || !&quot;v1&quot;.equals(apiVersion)</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                    || !&quot;/{chainHash}/public/{round}&quot;.equals(</span>
+                        roundEndpointTemplate)
+                    || !&quot;FIRST_VERIFIED_ROUND_STRICTLY_AFTER_CANDIDATE_NOT_BEFORE&quot;
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                        .equals(roundSelection)</span>
+                    || !&quot;PINNED_DRAND_CLIENT_AND_CHAIN_INFO_REQUIRED&quot;
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                        .equals(signatureVerification)</span>
+<span class="pc bpc" id="L274" title="2 of 4 branches missed.">                    || !&quot;SHA256_DOMAIN_SEPARATED_V1&quot;.equals(</span>
+                        seedDerivation)
+                    || minimumDelaySecondsAfterCandidateFreeze != 300) {
+<span class="nc" id="L277">                throw new IllegalArgumentException(</span>
+                    &quot;public-randomness contract drift&quot;);
+            }
+<span class="fc" id="L280">        }</span>
+    }
+
+    public record ChallengeGenerator(
+        String generatorId,
+        int caseCount,
+        List&lt;Family&gt; families,
+        boolean sameGeneratedCasesForAllConfigurations,
+        boolean assumptionsRetained,
+        String caseIdentity,
+        String manualReplacementOrPruning
+    ) {
+<span class="fc" id="L292">        public ChallengeGenerator {</span>
+<span class="fc" id="L293">            Objects.requireNonNull(families, &quot;families&quot;);</span>
+<span class="fc" id="L294">            families = List.copyOf(families);</span>
+<span class="pc bpc" id="L295" title="2 of 4 branches missed.">            if (!GENERATOR_ID.equals(generatorId)</span>
+                    || caseCount != 24
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">                    || families.size() != 3</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                    || !FAMILIES.equals(families.stream()</span>
+<span class="fc" id="L299">                        .map(Family::familyId)</span>
+<span class="fc" id="L300">                        .toList())</span>
+<span class="pc bpc" id="L301" title="3 of 6 branches missed.">                    || families.stream().anyMatch(</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">                        family -&gt; family.caseCount() != 8</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                            || !DIFFICULTY_LEVELS.equals(</span>
+<span class="fc" id="L304">                                family.difficultyLevels()))</span>
+                    || !sameGeneratedCasesForAllConfigurations
+                    || !assumptionsRetained
+<span class="pc bpc" id="L307" title="1 of 2 branches missed.">                    || !CASE_IDENTITY.equals(caseIdentity)</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                    || !&quot;FORBIDDEN&quot;.equals(manualReplacementOrPruning)) {</span>
+<span class="nc" id="L309">                throw new IllegalArgumentException(</span>
+                    &quot;challenge-generator contract drift&quot;);
+            }
+<span class="fc" id="L312">        }</span>
+    }
+
+    public record Family(
+        String familyId,
+        int caseCount,
+        List&lt;Integer&gt; difficultyLevels
+    ) {
+<span class="fc" id="L320">        public Family {</span>
+<span class="fc" id="L321">            familyId = ProofCarryingShowcaseJsonSupport.requireText(</span>
+                familyId, &quot;familyId&quot;);
+<span class="fc" id="L323">            difficultyLevels = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L324">                .immutableIntegers(</span>
+                    difficultyLevels,
+                    &quot;difficultyLevels&quot;);
+<span class="pc bpc" id="L327" title="2 of 4 branches missed.">            if (!FAMILIES.contains(familyId)</span>
+                    || caseCount != 8
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                    || !DIFFICULTY_LEVELS.equals(difficultyLevels)) {</span>
+<span class="nc" id="L330">                throw new IllegalArgumentException(</span>
+                    &quot;showcase family contract drift&quot;);
+            }
+<span class="fc" id="L333">        }</span>
+    }
+
+    public record Comparison(
+        boolean matchedInformation,
+        boolean matchedMechanicalWork,
+        List&lt;String&gt; configurations,
+        List&lt;String&gt; authoritativeMetrics,
+        String elapsedTimeRole
+    ) {
+<span class="fc" id="L343">        public Comparison {</span>
+<span class="fc" id="L344">            configurations = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L345">                .immutableStrings(</span>
+                    configurations,
+                    &quot;configurations&quot;,
+                    false,
+                    true);
+<span class="fc" id="L350">            authoritativeMetrics = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L351">                .immutableStrings(</span>
+                    authoritativeMetrics,
+                    &quot;authoritativeMetrics&quot;,
+                    false,
+                    true);
+<span class="pc bpc" id="L356" title="2 of 4 branches missed.">            if (!matchedInformation</span>
+                    || !matchedMechanicalWork
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">                    || !CONFIGURATIONS.equals(configurations)</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                    || !AUTHORITATIVE_METRICS.equals(</span>
+                        authoritativeMetrics)
+                    || !&quot;ENVIRONMENT_QUALIFIED_DIAGNOSTIC_ONLY&quot;
+<span class="pc bpc" id="L362" title="1 of 2 branches missed.">                        .equals(elapsedTimeRole)) {</span>
+<span class="nc" id="L363">                throw new IllegalArgumentException(</span>
+                    &quot;showcase comparison contract drift&quot;);
+            }
+<span class="fc" id="L366">        }</span>
+    }
+
+    public record Acceptance(
+        int minimumImprovedCases,
+        int minimumDistinctImprovedFamilies,
+        int minimumNewlyReachedCases,
+        int minimumMedianCanonicalWorkReductionPermille,
+        int maximumCorrectnessRegressions,
+        int maximumHiddenAssumptionRegressions,
+        int maximumTechnicalFailures,
+        String positiveRoute,
+        String stretchRoute,
+        String nullResultPolicy,
+        int requiredCleanReproductions,
+        boolean requirePinnedContainerReproduction
+    ) {
+<span class="fc" id="L383">        public Acceptance {</span>
+<span class="pc bpc" id="L384" title="7 of 14 branches missed.">            if (minimumImprovedCases != 4</span>
+                    || minimumDistinctImprovedFamilies != 2
+                    || minimumNewlyReachedCases != 2
+                    || minimumMedianCanonicalWorkReductionPermille != 900
+                    || maximumCorrectnessRegressions != 0
+                    || maximumHiddenAssumptionRegressions != 0
+                    || maximumTechnicalFailures != 0
+                    || !&quot;NEW_REACHABILITY_OR_TEN_X_MEDIAN_CANONICAL_WORK_REDUCTION&quot;
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">                        .equals(positiveRoute)</span>
+                    || !&quot;HUNDRED_X_WORK_REDUCTION_OR_TWO_ADDITIONAL_DIFFICULTY_LEVELS&quot;
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">                        .equals(stretchRoute)</span>
+                    || !&quot;COMPLETE_SHOWCASE_NULL_RESULT_WITHOUT_THRESHOLD_OR_CASE_REPAIR&quot;
+<span class="pc bpc" id="L396" title="3 of 6 branches missed.">                        .equals(nullResultPolicy)</span>
+                    || requiredCleanReproductions != 2
+                    || !requirePinnedContainerReproduction) {
+<span class="nc" id="L399">                throw new IllegalArgumentException(</span>
+                    &quot;showcase acceptance thresholds drift&quot;);
+            }
+<span class="fc" id="L402">        }</span>
+    }
+
+    public record StageStates(
+        String candidateFreeze,
+        String publicRandomness,
+        String generatedFinalTest,
+        String execution,
+        String resultCard,
+        String expertReview,
+        String externalNovelty
+    ) {
+<span class="fc" id="L414">        public StageStates {</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">            if (!&quot;NOT_CREATED&quot;.equals(candidateFreeze)</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">                    || !&quot;NOT_AVAILABLE&quot;.equals(publicRandomness)</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                    || !&quot;NOT_CREATED&quot;.equals(generatedFinalTest)</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">                    || !&quot;NOT_RUN&quot;.equals(execution)</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">                    || !&quot;NOT_CREATED&quot;.equals(resultCard)</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                    || !&quot;DEFERRED&quot;.equals(expertReview)</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">                    || !&quot;NOT_EVALUATED&quot;.equals(externalNovelty)) {</span>
+<span class="nc" id="L422">                throw new IllegalArgumentException(</span>
+                    &quot;pre-execution stage states drift&quot;);
+            }
+<span class="fc" id="L425">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
