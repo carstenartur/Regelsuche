@@ -3,7 +3,6 @@ package de.regelsuche.evolution;
 import de.regelsuche.evolution.EvolutionGenome.SourceSplit;
 import de.regelsuche.evolution.EvolutionGenome.TrainingScope;
 import de.regelsuche.json.JsonWriter;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -12,11 +11,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Frozen TRAIN, VALIDATION and FINAL TEST partition for one evolutionary study.
- *
- * <p>Families, exact signatures and alpha-normalized signatures are pairwise
- * disjoint across all three splits. Only the derived TRAIN scope may be attached
- * to an {@link EvolutionGenome}.</p>
+ * Frozen TRAIN partition with either concrete held-out references or an
+ * explicitly deferred public-randomness boundary.
  */
 public record EvolutionSplitManifest(
     String schema,
@@ -31,6 +27,8 @@ public record EvolutionSplitManifest(
     String contentHash
 ) {
     public static final String SCHEMA = "regelsuche.evolution-split-manifest/v1";
+    public static final String DEFERRED_HELD_OUT =
+        "DEFERRED_TO_PUBLIC_RANDOMNESS";
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]{2,127}");
     private static final Pattern SHA256 = Pattern.compile("sha256:[0-9a-f]{64}");
 
@@ -41,9 +39,13 @@ public record EvolutionSplitManifest(
         requireId(studyId, "studyId");
         requireHash(corpusHash, "corpusHash");
         requireHash(featureSchemaHash, "featureSchemaHash");
-        trainCases = normalize(trainCases, "trainCases");
-        validationCases = normalize(validationCases, "validationCases");
-        finalTestCases = normalize(finalTestCases, "finalTestCases");
+        trainCases = normalize(trainCases, "trainCases", false);
+        validationCases = normalize(validationCases, "validationCases", true);
+        finalTestCases = normalize(finalTestCases, "finalTestCases", true);
+        if (validationCases.isEmpty() != finalTestCases.isEmpty()) {
+            throw new IllegalArgumentException(
+                "VALIDATION and FINAL TEST must be concrete together or deferred together");
+        }
         requireDisjoint(trainCases, validationCases, finalTestCases);
 
         String expectedFamilies = partitionHash(
@@ -87,9 +89,43 @@ public record EvolutionSplitManifest(
         List<CaseReference> validationCases,
         List<CaseReference> finalTestCases
     ) {
-        List<CaseReference> train = normalize(trainCases, "trainCases");
-        List<CaseReference> validation = normalize(validationCases, "validationCases");
-        List<CaseReference> test = normalize(finalTestCases, "finalTestCases");
+        List<CaseReference> train = normalize(trainCases, "trainCases", false);
+        List<CaseReference> validation = normalize(
+            validationCases, "validationCases", false);
+        List<CaseReference> test = normalize(
+            finalTestCases, "finalTestCases", false);
+        return createCanonical(
+            studyId,
+            corpusHash,
+            featureSchemaHash,
+            train,
+            validation,
+            test);
+    }
+
+    public static EvolutionSplitManifest createTrainOnly(
+        String studyId,
+        String corpusHash,
+        String featureSchemaHash,
+        List<CaseReference> trainCases
+    ) {
+        return createCanonical(
+            studyId,
+            corpusHash,
+            featureSchemaHash,
+            normalize(trainCases, "trainCases", false),
+            List.of(),
+            List.of());
+    }
+
+    private static EvolutionSplitManifest createCanonical(
+        String studyId,
+        String corpusHash,
+        String featureSchemaHash,
+        List<CaseReference> train,
+        List<CaseReference> validation,
+        List<CaseReference> test
+    ) {
         requireDisjoint(train, validation, test);
         String families = partitionHash(
             "families",
@@ -124,6 +160,10 @@ public record EvolutionSplitManifest(
             content);
     }
 
+    public boolean heldOutMaterializationDeferred() {
+        return validationCases.isEmpty();
+    }
+
     /** Returns the only scope that candidate genomes may consume. */
     public TrainingScope trainingScope() {
         return new TrainingScope(
@@ -149,10 +189,11 @@ public record EvolutionSplitManifest(
 
     private static List<CaseReference> normalize(
         List<CaseReference> cases,
-        String name
+        String name,
+        boolean allowEmpty
     ) {
         Objects.requireNonNull(cases, name);
-        if (cases.isEmpty()) {
+        if (cases.isEmpty() && !allowEmpty) {
             throw new IllegalArgumentException(name + " must not be empty");
         }
         List<CaseReference> result = cases.stream()
@@ -244,6 +285,9 @@ public record EvolutionSplitManifest(
             .property("studyId", studyId)
             .property("corpusHash", corpusHash)
             .property("featureSchemaHash", featureSchemaHash);
+        if (validation.isEmpty() && test.isEmpty()) {
+            json.property("heldOutMaterialization", DEFERRED_HELD_OUT);
+        }
         writeCases(json, "trainCases", train);
         writeCases(json, "validationCases", validation);
         writeCases(json, "finalTestCases", test);

@@ -26,8 +26,11 @@ class EvolutionRewriteProgramPopulationSchemaContractTest {
         assertTrue(study.contains(
             "regelsuche.evolution-rewrite-program-study-plan/v1"));
         assertTrue(study.contains("\"const\": \"NOT_STARTED\""));
-        assertTrue(study.contains(
-            "\"const\": \"ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION\""));
+        for (EvolutionRewriteProgramStudyPlan.FinalTestPolicy policy :
+                EvolutionRewriteProgramStudyPlan.FinalTestPolicy.values()) {
+            assertTrue(study.contains("\"" + policy.name() + "\""),
+                policy.name());
+        }
         assertTrue(study.contains("\"additionalProperties\": false"));
         for (EvolutionRewriteProgramMutationKind kind :
                 EvolutionRewriteProgramMutationKind.values()) {

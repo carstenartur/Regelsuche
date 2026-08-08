@@ -79,7 +79,10 @@
       "const": "NOT_STARTED"
     },
     "finalTestPolicy": {
-      "const": "ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION"
+      "enum": [
+        "ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION",
+        "ONE_TIME_AFTER_FROZEN_TRAIN_SELECTION_AND_PUBLIC_RANDOMNESS"
+      ]
     },
     "proofStatus": {
       "const": "NOT_EVALUATED"

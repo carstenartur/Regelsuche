@@ -2,7 +2,6 @@ package de.regelsuche.evolution;
 
 import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationCatalog;
 import de.regelsuche.evolution.EvolutionGenome.Objective;
-import de.regelsuche.evolution.EvolutionStudyPlan.FinalTestPolicy;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessWeight;
 import de.regelsuche.evolution.EvolutionStudyPlan.GateStatus;
 import de.regelsuche.evolution.EvolutionStudyPlan.PopulationPolicy;
@@ -44,6 +43,11 @@ public record EvolutionRewriteProgramStudyPlan(
         "regelsuche.evolution-rewrite-program-study-plan/v1";
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]{2,127}");
 
+    public enum FinalTestPolicy {
+        ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION,
+        ONE_TIME_AFTER_FROZEN_TRAIN_SELECTION_AND_PUBLIC_RANDOMNESS
+    }
+
     public EvolutionRewriteProgramStudyPlan {
         if (!SCHEMA.equals(schema)) {
             throw new IllegalArgumentException(
@@ -63,9 +67,8 @@ public record EvolutionRewriteProgramStudyPlan(
         Objects.requireNonNull(populationPolicy, "populationPolicy");
         fitnessWeights = canonicalWeights(fitnessWeights);
         Objects.requireNonNull(budget, "budget");
+        Objects.requireNonNull(finalTestPolicy, "finalTestPolicy");
         if (status != StudyStatus.NOT_STARTED
-                || finalTestPolicy
-                    != FinalTestPolicy.ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION
                 || proofStatus != GateStatus.NOT_EVALUATED
                 || externalNoveltyStatus != GateStatus.NOT_EVALUATED
                 || promotionStatus != GateStatus.NOT_EVALUATED
@@ -86,6 +89,7 @@ public record EvolutionRewriteProgramStudyPlan(
             populationPolicy,
             fitnessWeights,
             budget,
+            finalTestPolicy,
             null));
         if (!expected.equals(contentHash)) {
             throw new IllegalArgumentException(
@@ -93,10 +97,6 @@ public record EvolutionRewriteProgramStudyPlan(
         }
     }
 
-    /**
-     * Compatibility factory for deterministic population-mechanics tests. It
-     * remains bound to the same official information-parity protocol.
-     */
     public static EvolutionRewriteProgramStudyPlan create(
         String studyId,
         EvolutionSplitManifest splitManifest,
@@ -172,6 +172,7 @@ public record EvolutionRewriteProgramStudyPlan(
         List<EvolutionRewriteProgramMutationKind> mutations =
             canonicalMutations(mutationOperators);
         List<FitnessWeight> weights = canonicalWeights(fitnessWeights);
+        FinalTestPolicy finalTestPolicy = policyFor(splitManifest);
         String hash = EvolutionGenome.hash(render(
             studyId,
             objective,
@@ -184,6 +185,7 @@ public record EvolutionRewriteProgramStudyPlan(
             populationPolicy,
             weights,
             budget,
+            finalTestPolicy,
             null));
         return new EvolutionRewriteProgramStudyPlan(
             SCHEMA,
@@ -199,7 +201,7 @@ public record EvolutionRewriteProgramStudyPlan(
             weights,
             budget,
             StudyStatus.NOT_STARTED,
-            FinalTestPolicy.ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION,
+            finalTestPolicy,
             GateStatus.NOT_EVALUATED,
             GateStatus.NOT_EVALUATED,
             GateStatus.NOT_EVALUATED,
@@ -220,6 +222,7 @@ public record EvolutionRewriteProgramStudyPlan(
             populationPolicy,
             fitnessWeights,
             budget,
+            finalTestPolicy,
             contentHash);
     }
 
@@ -258,6 +261,10 @@ public record EvolutionRewriteProgramStudyPlan(
         requireExactTrainSurface(splitManifest, trainSuite);
         requireMatchingEvaluatorProfile(trainSuite, evaluationProtocol);
         requireCatalogSourcesInEverySeed(mutationCatalog, seeds);
+        if (finalTestPolicy != policyFor(splitManifest)) {
+            throw new IllegalArgumentException(
+                "rewrite-program final-test policy differs from held-out materialization");
+        }
         if (!splitManifest.contentHash().equals(splitManifestHash)
                 || !trainSuite.contentHash().equals(trainSuiteHash)
                 || !evaluationProtocol.contentHash().equals(
@@ -275,6 +282,15 @@ public record EvolutionRewriteProgramStudyPlan(
             throw new IllegalArgumentException(
                 "rewrite-program study seed candidates differ");
         }
+    }
+
+    private static FinalTestPolicy policyFor(
+        EvolutionSplitManifest splitManifest
+    ) {
+        return splitManifest.heldOutMaterializationDeferred()
+            ? FinalTestPolicy
+                .ONE_TIME_AFTER_FROZEN_TRAIN_SELECTION_AND_PUBLIC_RANDOMNESS
+            : FinalTestPolicy.ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION;
     }
 
     private static void requireExactTrainSurface(
@@ -400,6 +416,7 @@ public record EvolutionRewriteProgramStudyPlan(
         PopulationPolicy populationPolicy,
         List<FitnessWeight> fitnessWeights,
         StudyBudget budget,
+        FinalTestPolicy finalTestPolicy,
         String contentHash
     ) {
         JsonWriter json = new JsonWriter().beginObject()
@@ -438,8 +455,7 @@ public record EvolutionRewriteProgramStudyPlan(
                     budget.maxFinalTestEvaluations())
                 .property("maxCheckpoints", budget.maxCheckpoints()))
             .property("status", StudyStatus.NOT_STARTED.name())
-            .property("finalTestPolicy",
-                FinalTestPolicy.ONE_TIME_AFTER_FROZEN_VALIDATION_SELECTION.name())
+            .property("finalTestPolicy", finalTestPolicy.name())
             .property("proofStatus", GateStatus.NOT_EVALUATED.name())
             .property("externalNoveltyStatus", GateStatus.NOT_EVALUATED.name())
             .property("promotionStatus", GateStatus.NOT_EVALUATED.name())

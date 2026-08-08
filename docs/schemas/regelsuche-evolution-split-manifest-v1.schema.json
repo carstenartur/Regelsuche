@@ -28,8 +28,11 @@
     "featureSchemaHash": {
       "$ref": "#/$defs/sha256"
     },
+    "heldOutMaterialization": {
+      "const": "DEFERRED_TO_PUBLIC_RANDOMNESS"
+    },
     "trainCases": {
-      "$ref": "#/$defs/cases"
+      "$ref": "#/$defs/nonEmptyCases"
     },
     "validationCases": {
       "$ref": "#/$defs/cases"
@@ -47,6 +50,33 @@
       "$ref": "#/$defs/sha256"
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["heldOutMaterialization"]
+      },
+      "then": {
+        "properties": {
+          "validationCases": {
+            "maxItems": 0
+          },
+          "finalTestCases": {
+            "maxItems": 0
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "validationCases": {
+            "$ref": "#/$defs/nonEmptyCases"
+          },
+          "finalTestCases": {
+            "$ref": "#/$defs/nonEmptyCases"
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "id": {
       "type": "string",
@@ -58,11 +88,20 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 1,
       "maxItems": 100000,
       "items": {
         "$ref": "#/$defs/case"
       }
+    },
+    "nonEmptyCases": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/cases"
+        },
+        {
+          "minItems": 1
+        }
+      ]
     },
     "case": {
       "type": "object",
