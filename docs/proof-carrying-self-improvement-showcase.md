@@ -63,7 +63,7 @@ assumption or technical regressions. Otherwise the complete result is
 `SHOWCASE_NULL_RESULT`; cases, thresholds and retries cannot be repaired after
 outcomes are visible.
 
-## Verification and current boundary
+## Verification and reversible TRAIN/freeze command
 
 ```bash
 ./gradlew test
@@ -71,7 +71,21 @@ outcomes are visible.
 ./gradlew --no-configuration-cache ciCheck
 ```
 
-The ordinary CLI exposes the reversible TRAIN-and-freeze command. It accepts no
-drand, VALIDATION or FINAL TEST input and publishes retained TRAIN, selection
-and freeze evidence atomically. No real TRAIN run, candidate freeze, drand round
-or FINAL TEST has yet been consumed.
+After those gates are green, the ordinary application entry point runs the
+TRAIN-only stage and atomically publishes its retained population, deterministic
+selection and candidate freeze:
+
+```bash
+./gradlew :app:run --args='showcase-train-freeze \
+  research/showcase/proof-carrying-self-improvement/showcase-plan.json \
+  <repository-commit> <new-output-directory>'
+```
+
+The command accepts no drand, VALIDATION, FINAL TEST or caller-provided clock
+input. It obtains the freeze time only after the complete TRAIN run has returned,
+derives the not-before boundary from the frozen plan and writes
+`candidate-freeze.json` last. Publication succeeds only through an atomic move
+of a previously private sibling staging directory.
+
+No real TRAIN run, candidate freeze, drand round or FINAL TEST has yet been
+consumed.
