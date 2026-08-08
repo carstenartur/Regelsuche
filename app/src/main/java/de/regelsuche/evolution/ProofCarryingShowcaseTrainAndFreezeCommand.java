@@ -19,7 +19,6 @@ import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessWeight;
 import de.regelsuche.evolution.EvolutionStudyPlan.PopulationPolicy;
 import de.regelsuche.evolution.EvolutionStudyPlan.StudyBudget;
-import de.regelsuche.json.JsonWriter;
 import de.regelsuche.transform.RewriteKind;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -33,29 +32,18 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-/**
- * Runs the public showcase's TRAIN-only population and freezes one candidate.
- *
- * <p>The command has no drand, VALIDATION or FINAL TEST input. It publishes all
- * retained TRAIN and selection evidence in one atomic directory move, with
- * {@code candidate-freeze.json} written last inside the private staging
- * directory.</p>
- */
+/** Runs TRAIN and freezes one candidate without exposing a later stage. */
 public final class ProofCarryingShowcaseTrainAndFreezeCommand {
     static final String STUDY_ID =
         "proof_carrying_showcase_train_2026_08_v1";
     static final String SUITE_ID =
         "proof_carrying_showcase_train_suite_v1";
-    static final String STATIC_CONTRACT_SCHEMA =
-        "regelsuche.proof-carrying-showcase-train-contract/v1";
-
     private static final List<EvidenceObligation> OBLIGATIONS =
         Arrays.asList(EvidenceObligation.values());
 
@@ -106,12 +94,11 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
             configuration.study().fitnessWeights().stream()
                 .map(FitnessWeight::component)
                 .toList());
-        ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator
-            evaluator = RewriteProgramFitnessComposition
-                .exactRationalTrainEvaluator(
-                    configuration.trainSuite(),
-                    requiredComponents);
-        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun retained =
+        var evaluator = RewriteProgramFitnessComposition
+            .exactRationalTrainEvaluator(
+                configuration.trainSuite(),
+                requiredComponents);
+        var retained =
             new RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner()
                 .run(
                     configuration.study(),
@@ -120,16 +107,15 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
                     configuration.seeds(),
                     configuration.mutationCatalog(),
                     evaluator);
-        ProofCarryingShowcaseCandidateFreezer.FreezeBundle freeze =
-            new ProofCarryingShowcaseCandidateFreezer().freeze(
-                showcasePlan,
-                retained,
-                configuration.study(),
-                configuration.seeds(),
-                repositoryCommit,
-                configuration.primitiveInventoryHash(),
-                configuration.workBudgetPolicyHash(),
-                frozenAtUnixTime);
+        var freeze = new ProofCarryingShowcaseCandidateFreezer().freeze(
+            showcasePlan,
+            retained,
+            configuration.study(),
+            configuration.seeds(),
+            repositoryCommit,
+            configuration.primitiveInventoryHash(),
+            configuration.workBudgetPolicyHash(),
+            frozenAtUnixTime);
         return write(
             outputDirectory,
             showcasePlan,
@@ -178,9 +164,6 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
                 new PopulationPolicy(24, 12, 4, 8, 3, 4, 20260802L),
                 fitnessWeights,
                 new StudyBudget(4_096, 4_096, 1, 24, 16));
-        String primitiveInventoryJson = primitiveInventoryJson(genome.rewrites());
-        String mutationCatalogJson = mutationCatalogJson(mutationCatalog);
-        String workBudgetPolicyJson = workBudgetPolicyJson(trainSuite);
         return new TrainConfiguration(
             splitManifest,
             trainSuite,
@@ -189,11 +172,8 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
             seeds,
             mutationCatalog,
             study,
-            primitiveInventoryJson,
-            mutationCatalogJson,
-            workBudgetPolicyJson,
-            contentHash(primitiveInventoryJson),
-            contentHash(workBudgetPolicyJson));
+            primitiveInventoryHash(genome.rewrites()),
+            workBudgetPolicyHash(trainSuite));
     }
 
     static Path publishAtomically(
@@ -235,9 +215,7 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
                 }
                 writeNew(staging.resolve(name), artifact.getValue());
             }
-            writeNew(
-                staging.resolve(finalArtifactName),
-                finalArtifactContent);
+            writeNew(staging.resolve(finalArtifactName), finalArtifactContent);
             try {
                 Files.move(
                     staging,
@@ -282,15 +260,6 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
             "evaluation-protocol.json",
             configuration.protocol().toCanonicalJson());
         artifacts.put(
-            "primitive-inventory.json",
-            configuration.primitiveInventoryJson());
-        artifacts.put(
-            "mutation-catalog.json",
-            configuration.mutationCatalogJson());
-        artifacts.put(
-            "work-budget-policy.json",
-            configuration.workBudgetPolicyJson());
-        artifacts.put(
             "seed-genome.json",
             configuration.genome().toCanonicalJson());
         for (int index = 0; index < configuration.seeds().size(); index++) {
@@ -315,12 +284,6 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
         artifacts.put(
             "selected-candidate.json",
             selected.toCanonicalJson());
-        artifacts.put(
-            "selected-genome.json",
-            selected.genome().toCanonicalJson());
-        artifacts.put(
-            "selected-plan.json",
-            selected.plan().toCanonicalJson());
         artifacts.put(
             "selected-program.regelsuche",
             selected.plan().toReadableProgram());
@@ -483,9 +446,7 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
                 RewriteKind.NORMALIZE,
                 true,
                 2,
-                List.of(
-                    nonZero("?x"),
-                    nonZero("?y"))),
+                List.of(nonZero("?x"), nonZero("?y"))),
             gene(
                 "cancel_common_factor",
                 "(?f*?a)/(?f*?b)",
@@ -493,9 +454,7 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
                 RewriteKind.SIMPLIFY,
                 false,
                 -3,
-                List.of(
-                    nonZero("?f"),
-                    nonZero("?b"))),
+                List.of(nonZero("?f"), nonZero("?b"))),
             gene(
                 "flatten_shared_denominator_division",
                 "(?a/?d)/(?b/?d)",
@@ -503,9 +462,7 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
                 RewriteKind.SIMPLIFY,
                 false,
                 -3,
-                List.of(
-                    nonZero("?d"),
-                    nonZero("?b"))),
+                List.of(nonZero("?d"), nonZero("?b"))),
             gene(
                 "factor_difference_of_squares",
                 "?a^2-?b^2",
@@ -553,127 +510,18 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
             List.of(expression));
     }
 
-    private static String primitiveInventoryJson(
-        List<RewriteGene> genes
-    ) {
-        JsonWriter json = new JsonWriter().beginObject()
-            .property("schema", STATIC_CONTRACT_SCHEMA)
-            .property("contract", "PRIMITIVE_INVENTORY")
-            .array("genes", array -> genes.stream()
-                .sorted(Comparator.comparing(RewriteGene::geneId))
-                .forEach(gene -> array.objectValue(object -> object
-                    .property("geneId", gene.geneId())
-                    .property("sourcePattern", gene.sourcePattern())
-                    .property("targetPattern", gene.targetPattern())
-                    .property("kind", gene.kind().name())
-                    .property("reversible", gene.reversible())
-                    .property(
-                        "estimatedCostDelta",
-                        gene.estimatedCostDelta())
-                    .property(
-                        "maxApplicationsPerPath",
-                        gene.maxApplicationsPerPath())
-                    .property("maxAstGrowth", gene.maxAstGrowth())
-                    .stringArray(
-                        "assumptions",
-                        gene.assumptions().stream()
-                            .map(item -> item.kind().name()
-                                + ":" + item.expression())
-                            .toList())
-                    .stringArray(
-                        "evidenceObligations",
-                        gene.evidenceObligations().stream()
-                            .map(Enum::name)
-                            .toList()))));
-        return withHash(json.endObject().toString());
+    private static String primitiveInventoryHash(List<RewriteGene> genes) {
+        return EvolutionGenome.hash(
+            "regelsuche.proof-carrying-showcase-primitive-inventory/v1\n"
+                + genes);
     }
 
-    private static String mutationCatalogJson(
-        MutationCatalog catalog
-    ) {
-        JsonWriter json = new JsonWriter().beginObject()
-            .property("schema", STATIC_CONTRACT_SCHEMA)
-            .property("contract", "MUTATION_CATALOG")
-            .property("catalogHash", catalog.contentHash())
-            .stringArray(
-                "mutationKinds",
-                Arrays.stream(EvolutionRewriteProgramMutationKind.values())
-                    .map(Enum::name)
-                    .sorted()
-                    .toList())
-            .stringArray("sourceGeneIds", catalog.sourceGeneIds())
-            .stringArray(
-                "repeatBounds",
-                catalog.repeatBounds().stream()
-                    .map(value -> value.minIterations()
-                        + ".." + value.maxIterations())
-                    .toList())
-            .stringArray(
-                "requirements",
-                catalog.requirements().stream()
-                    .map(value -> value.kind().name()
-                        + ":" + value.threshold())
-                    .toList())
-            .stringArray(
-                "priorities",
-                catalog.priorities().stream()
-                    .map(value -> value.kind().name()
-                        + ":" + value.preferredGeneIds())
-                    .toList())
-            .array(
-                "pruneLimits",
-                array -> catalog.pruneLimits().forEach(
-                    array::numberValue));
-        return withHash(json.endObject().toString());
-    }
-
-    private static String workBudgetPolicyJson(
+    private static String workBudgetPolicyHash(
         EvolutionRewriteProgramTrainSuite trainSuite
     ) {
-        var budget = trainSuite.primitiveWorkBudget();
-        JsonWriter json = new JsonWriter().beginObject()
-            .property("schema", STATIC_CONTRACT_SCHEMA)
-            .property("contract", "MATCHED_WORK_POLICY")
-            .property("trainSuiteHash", trainSuite.contentHash())
-            .property("maximumDepth", budget.maximumDepth())
-            .property(
-                "maximumVisitedExpressions",
-                budget.maximumVisitedExpressions())
-            .property(
-                "maximumCandidatesPerState",
-                budget.maximumCandidatesPerState())
-            .property(
-                "maximumExpandingSteps",
-                budget.maximumExpandingSteps())
-            .property(
-                "totalPrimitiveWorkUnits",
-                budget.totalPrimitiveWorkUnits())
-            .property(
-                "authority",
-                "CANONICAL_PRIMITIVE_AND_TOTAL_WORK_LEDGER");
-        return withHash(json.endObject().toString());
-    }
-
-    private static String withHash(String unhashedJson) {
-        String hash = EvolutionGenome.hash(unhashedJson);
-        if (!unhashedJson.endsWith("}")) {
-            throw new IllegalArgumentException(
-                "canonical JSON object required");
-        }
-        return unhashedJson.substring(0, unhashedJson.length() - 1)
-            + ",\"contentHash\":\"" + hash + "\"}";
-    }
-
-    private static String contentHash(String canonicalJson) {
-        int marker = canonicalJson.lastIndexOf(
-            ",\"contentHash\":\"");
-        if (marker < 0 || !canonicalJson.endsWith("\"}")) {
-            throw new IllegalArgumentException(
-                "static contract lacks terminal contentHash");
-        }
-        return canonicalJson.substring(
-            marker + ",\"contentHash\":\"".length(),
-            canonicalJson.length() - 2);
+        return EvolutionGenome.hash(
+            "regelsuche.proof-carrying-showcase-work-budget/v1\n"
+                + trainSuite.primitiveWorkBudget());
     }
 
     private static void requireFileName(String name) {
@@ -740,9 +588,6 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
         List<EvolutionRewriteProgramCandidate> seeds,
         MutationCatalog mutationCatalog,
         EvolutionRewriteProgramStudyPlan study,
-        String primitiveInventoryJson,
-        String mutationCatalogJson,
-        String workBudgetPolicyJson,
         String primitiveInventoryHash,
         String workBudgetPolicyHash
     ) {
@@ -754,15 +599,6 @@ public final class ProofCarryingShowcaseTrainAndFreezeCommand {
             seeds = List.copyOf(Objects.requireNonNull(seeds, "seeds"));
             Objects.requireNonNull(mutationCatalog, "mutationCatalog");
             Objects.requireNonNull(study, "study");
-            Objects.requireNonNull(
-                primitiveInventoryJson,
-                "primitiveInventoryJson");
-            Objects.requireNonNull(
-                mutationCatalogJson,
-                "mutationCatalogJson");
-            Objects.requireNonNull(
-                workBudgetPolicyJson,
-                "workBudgetPolicyJson");
             EvolutionGenome.requireSha256(
                 primitiveInventoryHash,
                 "primitiveInventoryHash");
