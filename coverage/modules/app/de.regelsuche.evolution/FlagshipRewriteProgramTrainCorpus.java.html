@@ -4,10 +4,8 @@ import de.regelsuche.search.SearchHeuristic;
 import java.util.List;
 
 /**
- * Open, reviewable TRAIN corpus for the proof-carrying rewrite-program study.
- *
- * &lt;p&gt;All cases are visible by design and may be used for mutation and fitness.
- * No VALIDATION or FINAL TEST material is referenced from this class.&lt;/p&gt;
+ * Open, reviewable TRAIN corpus for proof-carrying rewrite-program studies.
+ * No VALIDATION or FINAL TEST material is referenced from this class.
  */
 public final class FlagshipRewriteProgramTrainCorpus {
     public static final String SUITE_ID =
@@ -17,79 +15,83 @@ public final class FlagshipRewriteProgramTrainCorpus {
     }
 
     public static EvolutionRewriteProgramTrainSuite create() {
-<span class="fc" id="L20">        SearchHeuristic heuristic = new SearchHeuristic(</span>
+<span class="fc" id="L18">        return create(SUITE_ID);</span>
+    }
+
+    public static EvolutionRewriteProgramTrainSuite create(String suiteId) {
+<span class="fc" id="L22">        SearchHeuristic heuristic = new SearchHeuristic(</span>
             6,
             512,
             1,
             4,
             40,
             8);
-<span class="fc" id="L27">        EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget workBudget =</span>
+<span class="fc" id="L29">        EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget workBudget =</span>
             new EvolutionRewriteProgramTrainSuite.PrimitiveWorkBudget(
                 6,
                 512,
                 40,
                 4,
                 20_000L);
-<span class="fc" id="L34">        return EvolutionRewriteProgramTrainSuite.create(</span>
-            SUITE_ID,
+<span class="fc" id="L36">        return EvolutionRewriteProgramTrainSuite.create(</span>
+            suiteId,
             EvolutionRewriteProgramTrainSuite.EvaluatorProfile
                 .EXACT_RATIONAL_NORMAL_FORM_WITH_DECLARED_ASSUMPTIONS,
-<span class="fc" id="L38">            cases(),</span>
+<span class="fc" id="L40">            cases(),</span>
             heuristic,
             workBudget);
     }
 
     public static List&lt;EvolutionRewriteProgramTrainSuite.TrainCase&gt; cases() {
-<span class="fc" id="L44">        return List.of(</span>
-<span class="fc" id="L45">            trainCase(</span>
+<span class="fc" id="L46">        return List.of(</span>
+<span class="fc" id="L47">            trainCase(</span>
                 &quot;train_affine_factor_cancellation&quot;,
                 &quot;affine_factor_cancellation&quot;,
                 &quot;((u + 2) * p) / ((u + 2) * q)&quot;,
                 &quot;p / q&quot;,
-<span class="fc" id="L50">                List.of(&quot;u + 2 != 0&quot;, &quot;q != 0&quot;)),</span>
-<span class="fc" id="L51">            trainCase(</span>
+<span class="fc" id="L52">                List.of(&quot;u + 2 != 0&quot;, &quot;q != 0&quot;)),</span>
+<span class="fc" id="L53">            trainCase(</span>
                 &quot;train_common_denominator_difference&quot;,
                 &quot;common_denominator_arithmetic&quot;,
                 &quot;a / x - a / y&quot;,
                 &quot;a * (y - x) / (x * y)&quot;,
-<span class="fc" id="L56">                List.of(&quot;x != 0&quot;, &quot;y != 0&quot;)),</span>
-<span class="fc" id="L57">            trainCase(</span>
+<span class="fc" id="L58">                List.of(&quot;x != 0&quot;, &quot;y != 0&quot;)),</span>
+<span class="fc" id="L59">            trainCase(</span>
                 &quot;train_direct_factor_cancellation&quot;,
                 &quot;direct_factor_cancellation&quot;,
                 &quot;(x * a) / (x * b)&quot;,
                 &quot;a / b&quot;,
-<span class="fc" id="L62">                List.of(&quot;x != 0&quot;, &quot;b != 0&quot;)),</span>
-<span class="fc" id="L63">            trainCase(</span>
+<span class="fc" id="L64">                List.of(&quot;x != 0&quot;, &quot;b != 0&quot;)),</span>
+<span class="fc" id="L65">            trainCase(</span>
                 &quot;train_equal_denominator_collection&quot;,
                 &quot;common_denominator_arithmetic&quot;,
                 &quot;a / x + b / x&quot;,
                 &quot;(a + b) / x&quot;,
-<span class="fc" id="L68">                List.of(&quot;x != 0&quot;)),</span>
-<span class="fc" id="L69">            trainCase(</span>
+<span class="fc" id="L70">                List.of(&quot;x != 0&quot;)),</span>
+<span class="fc" id="L71">            trainCase(</span>
                 &quot;train_identity_then_cancellation&quot;,
                 &quot;normalization_before_cancellation&quot;,
                 &quot;((z + 1) * 1) / ((z + 1) * t)&quot;,
                 &quot;1 / t&quot;,
-<span class="fc" id="L74">                List.of(&quot;z + 1 != 0&quot;, &quot;t != 0&quot;)),</span>
-<span class="fc" id="L75">            trainCase(</span>
+<span class="fc" id="L76">                List.of(&quot;z + 1 != 0&quot;, &quot;t != 0&quot;)),</span>
+<span class="fc" id="L77">            trainCase(</span>
                 &quot;train_nested_shared_denominator_division&quot;,
                 &quot;nested_rational_composition&quot;,
                 &quot;(m / n) / (p / n)&quot;,
                 &quot;m / p&quot;,
-<span class="fc" id="L80">                List.of(&quot;n != 0&quot;, &quot;p != 0&quot;)),</span>
-<span class="fc" id="L81">            trainCase(</span>
+<span class="fc" id="L82">                List.of(&quot;n != 0&quot;, &quot;p != 0&quot;)),</span>
+<span class="fc" id="L83">            trainCase(</span>
                 &quot;train_scaled_linear_collection&quot;,
                 &quot;polynomial_collection&quot;,
                 &quot;(2 * x + 2 * y) / 2&quot;,
                 &quot;x + y&quot;,
-<span class="fc" id="L86">                List.of()),</span>
-<span class="fc" id="L87">            trainCase(</span>
+<span class="fc" id="L88">                List.of()),</span>
+<span class="fc" id="L89">            trainCase(</span>
                 &quot;train_square_difference_bridge&quot;,
                 &quot;polynomial_factor_bridge&quot;,
                 &quot;(r^2 - s^2) / (r - s)&quot;,
                 &quot;r + s&quot;,
-<span class="fc" id="L92">                List.of(&quot;r - s != 0&quot;)));</span>
+<span class="fc" id="L94">                List.of(&quot;r - s != 0&quot;)));</span>
     }
 
     private static EvolutionRewriteProgramTrainSuite.TrainCase trainCase(
@@ -99,7 +101,7 @@ public final class FlagshipRewriteProgramTrainCorpus {
         String target,
         List&lt;String&gt; assumptions
     ) {
-<span class="fc" id="L102">        return new EvolutionRewriteProgramTrainSuite.TrainCase(</span>
+<span class="fc" id="L104">        return new EvolutionRewriteProgramTrainSuite.TrainCase(</span>
             caseId,
             familyId,
             input,

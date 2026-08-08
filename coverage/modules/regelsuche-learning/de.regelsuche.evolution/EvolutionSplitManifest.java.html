@@ -3,7 +3,6 @@
 import de.regelsuche.evolution.EvolutionGenome.SourceSplit;
 import de.regelsuche.evolution.EvolutionGenome.TrainingScope;
 import de.regelsuche.json.JsonWriter;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -12,11 +11,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Frozen TRAIN, VALIDATION and FINAL TEST partition for one evolutionary study.
- *
- * &lt;p&gt;Families, exact signatures and alpha-normalized signatures are pairwise
- * disjoint across all three splits. Only the derived TRAIN scope may be attached
- * to an {@link EvolutionGenome}.&lt;/p&gt;
+ * Frozen TRAIN partition with either concrete held-out references or an
+ * explicitly deferred public-randomness boundary.
  */
 public record EvolutionSplitManifest(
     String schema,
@@ -31,40 +27,46 @@ public record EvolutionSplitManifest(
     String contentHash
 ) {
     public static final String SCHEMA = &quot;regelsuche.evolution-split-manifest/v1&quot;;
-<span class="fc" id="L34">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
-<span class="fc" id="L35">    private static final Pattern SHA256 = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
+    public static final String DEFERRED_HELD_OUT =
+        &quot;DEFERRED_TO_PUBLIC_RANDOMNESS&quot;;
+<span class="fc" id="L32">    private static final Pattern ID = Pattern.compile(&quot;[a-z][a-z0-9_-]{2,127}&quot;);</span>
+<span class="fc" id="L33">    private static final Pattern SHA256 = Pattern.compile(&quot;sha256:[0-9a-f]{64}&quot;);</span>
 
-<span class="fc" id="L37">    public EvolutionSplitManifest {</span>
-<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
-<span class="nc" id="L39">            throw new IllegalArgumentException(&quot;unsupported evolution split-manifest schema&quot;);</span>
+<span class="fc" id="L35">    public EvolutionSplitManifest {</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L37">            throw new IllegalArgumentException(&quot;unsupported evolution split-manifest schema&quot;);</span>
         }
-<span class="fc" id="L41">        requireId(studyId, &quot;studyId&quot;);</span>
-<span class="fc" id="L42">        requireHash(corpusHash, &quot;corpusHash&quot;);</span>
-<span class="fc" id="L43">        requireHash(featureSchemaHash, &quot;featureSchemaHash&quot;);</span>
-<span class="fc" id="L44">        trainCases = normalize(trainCases, &quot;trainCases&quot;);</span>
-<span class="fc" id="L45">        validationCases = normalize(validationCases, &quot;validationCases&quot;);</span>
-<span class="fc" id="L46">        finalTestCases = normalize(finalTestCases, &quot;finalTestCases&quot;);</span>
-<span class="fc" id="L47">        requireDisjoint(trainCases, validationCases, finalTestCases);</span>
+<span class="fc" id="L39">        requireId(studyId, &quot;studyId&quot;);</span>
+<span class="fc" id="L40">        requireHash(corpusHash, &quot;corpusHash&quot;);</span>
+<span class="fc" id="L41">        requireHash(featureSchemaHash, &quot;featureSchemaHash&quot;);</span>
+<span class="fc" id="L42">        trainCases = normalize(trainCases, &quot;trainCases&quot;, false);</span>
+<span class="fc" id="L43">        validationCases = normalize(validationCases, &quot;validationCases&quot;, true);</span>
+<span class="fc" id="L44">        finalTestCases = normalize(finalTestCases, &quot;finalTestCases&quot;, true);</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (validationCases.isEmpty() != finalTestCases.isEmpty()) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(</span>
+                &quot;VALIDATION and FINAL TEST must be concrete together or deferred together&quot;);
+        }
+<span class="fc" id="L49">        requireDisjoint(trainCases, validationCases, finalTestCases);</span>
 
-<span class="fc" id="L49">        String expectedFamilies = partitionHash(</span>
+<span class="fc" id="L51">        String expectedFamilies = partitionHash(</span>
             &quot;families&quot;,
-<span class="fc" id="L51">            trainCases.stream().map(CaseReference::familyId).toList(),</span>
-<span class="fc" id="L52">            validationCases.stream().map(CaseReference::familyId).toList(),</span>
-<span class="fc" id="L53">            finalTestCases.stream().map(CaseReference::familyId).toList());</span>
-<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (!expectedFamilies.equals(familyPartitionHash)) {</span>
-<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;familyPartitionHash does not match split families&quot;);</span>
+<span class="fc" id="L53">            trainCases.stream().map(CaseReference::familyId).toList(),</span>
+<span class="fc" id="L54">            validationCases.stream().map(CaseReference::familyId).toList(),</span>
+<span class="fc" id="L55">            finalTestCases.stream().map(CaseReference::familyId).toList());</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (!expectedFamilies.equals(familyPartitionHash)) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;familyPartitionHash does not match split families&quot;);</span>
         }
-<span class="fc" id="L57">        String expectedSignatures = partitionHash(</span>
+<span class="fc" id="L59">        String expectedSignatures = partitionHash(</span>
             &quot;signatures&quot;,
-<span class="fc" id="L59">            signatureMaterial(trainCases),</span>
-<span class="fc" id="L60">            signatureMaterial(validationCases),</span>
-<span class="fc" id="L61">            signatureMaterial(finalTestCases));</span>
-<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (!expectedSignatures.equals(signaturePartitionHash)) {</span>
-<span class="nc" id="L63">            throw new IllegalArgumentException(</span>
+<span class="fc" id="L61">            signatureMaterial(trainCases),</span>
+<span class="fc" id="L62">            signatureMaterial(validationCases),</span>
+<span class="fc" id="L63">            signatureMaterial(finalTestCases));</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (!expectedSignatures.equals(signaturePartitionHash)) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(</span>
                 &quot;signaturePartitionHash does not match exact and alpha signatures&quot;);
         }
-<span class="fc" id="L66">        requireHash(contentHash, &quot;contentHash&quot;);</span>
-<span class="fc" id="L67">        String expectedContent = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L68">        requireHash(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L69">        String expectedContent = EvolutionGenome.hash(render(</span>
             studyId,
             corpusHash,
             featureSchemaHash,
@@ -74,10 +76,10 @@ public record EvolutionSplitManifest(
             familyPartitionHash,
             signaturePartitionHash,
             null));
-<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (!expectedContent.equals(contentHash)) {</span>
-<span class="fc" id="L78">            throw new IllegalArgumentException(&quot;contentHash does not match split manifest&quot;);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (!expectedContent.equals(contentHash)) {</span>
+<span class="fc" id="L80">            throw new IllegalArgumentException(&quot;contentHash does not match split manifest&quot;);</span>
         }
-<span class="fc" id="L80">    }</span>
+<span class="fc" id="L82">    }</span>
 
     public static EvolutionSplitManifest create(
         String studyId,
@@ -87,21 +89,55 @@ public record EvolutionSplitManifest(
         List&lt;CaseReference&gt; validationCases,
         List&lt;CaseReference&gt; finalTestCases
     ) {
-<span class="fc" id="L90">        List&lt;CaseReference&gt; train = normalize(trainCases, &quot;trainCases&quot;);</span>
-<span class="fc" id="L91">        List&lt;CaseReference&gt; validation = normalize(validationCases, &quot;validationCases&quot;);</span>
-<span class="fc" id="L92">        List&lt;CaseReference&gt; test = normalize(finalTestCases, &quot;finalTestCases&quot;);</span>
-<span class="fc" id="L93">        requireDisjoint(train, validation, test);</span>
-<span class="fc" id="L94">        String families = partitionHash(</span>
+<span class="fc" id="L92">        List&lt;CaseReference&gt; train = normalize(trainCases, &quot;trainCases&quot;, false);</span>
+<span class="fc" id="L93">        List&lt;CaseReference&gt; validation = normalize(</span>
+            validationCases, &quot;validationCases&quot;, false);
+<span class="fc" id="L95">        List&lt;CaseReference&gt; test = normalize(</span>
+            finalTestCases, &quot;finalTestCases&quot;, false);
+<span class="fc" id="L97">        return createCanonical(</span>
+            studyId,
+            corpusHash,
+            featureSchemaHash,
+            train,
+            validation,
+            test);
+    }
+
+    public static EvolutionSplitManifest createTrainOnly(
+        String studyId,
+        String corpusHash,
+        String featureSchemaHash,
+        List&lt;CaseReference&gt; trainCases
+    ) {
+<span class="fc" id="L112">        return createCanonical(</span>
+            studyId,
+            corpusHash,
+            featureSchemaHash,
+<span class="fc" id="L116">            normalize(trainCases, &quot;trainCases&quot;, false),</span>
+<span class="fc" id="L117">            List.of(),</span>
+<span class="fc" id="L118">            List.of());</span>
+    }
+
+    private static EvolutionSplitManifest createCanonical(
+        String studyId,
+        String corpusHash,
+        String featureSchemaHash,
+        List&lt;CaseReference&gt; train,
+        List&lt;CaseReference&gt; validation,
+        List&lt;CaseReference&gt; test
+    ) {
+<span class="fc" id="L129">        requireDisjoint(train, validation, test);</span>
+<span class="fc" id="L130">        String families = partitionHash(</span>
             &quot;families&quot;,
-<span class="fc" id="L96">            train.stream().map(CaseReference::familyId).toList(),</span>
-<span class="fc" id="L97">            validation.stream().map(CaseReference::familyId).toList(),</span>
-<span class="fc" id="L98">            test.stream().map(CaseReference::familyId).toList());</span>
-<span class="fc" id="L99">        String signatures = partitionHash(</span>
+<span class="fc" id="L132">            train.stream().map(CaseReference::familyId).toList(),</span>
+<span class="fc" id="L133">            validation.stream().map(CaseReference::familyId).toList(),</span>
+<span class="fc" id="L134">            test.stream().map(CaseReference::familyId).toList());</span>
+<span class="fc" id="L135">        String signatures = partitionHash(</span>
             &quot;signatures&quot;,
-<span class="fc" id="L101">            signatureMaterial(train),</span>
-<span class="fc" id="L102">            signatureMaterial(validation),</span>
-<span class="fc" id="L103">            signatureMaterial(test));</span>
-<span class="fc" id="L104">        String content = EvolutionGenome.hash(render(</span>
+<span class="fc" id="L137">            signatureMaterial(train),</span>
+<span class="fc" id="L138">            signatureMaterial(validation),</span>
+<span class="fc" id="L139">            signatureMaterial(test));</span>
+<span class="fc" id="L140">        String content = EvolutionGenome.hash(render(</span>
             studyId,
             corpusHash,
             featureSchemaHash,
@@ -111,7 +147,7 @@ public record EvolutionSplitManifest(
             families,
             signatures,
             null));
-<span class="fc" id="L114">        return new EvolutionSplitManifest(</span>
+<span class="fc" id="L150">        return new EvolutionSplitManifest(</span>
             SCHEMA,
             studyId,
             corpusHash,
@@ -124,9 +160,13 @@ public record EvolutionSplitManifest(
             content);
     }
 
+    public boolean heldOutMaterializationDeferred() {
+<span class="fc" id="L164">        return validationCases.isEmpty();</span>
+    }
+
     /** Returns the only scope that candidate genomes may consume. */
     public TrainingScope trainingScope() {
-<span class="fc" id="L129">        return new TrainingScope(</span>
+<span class="fc" id="L169">        return new TrainingScope(</span>
             SourceSplit.TRAIN,
             corpusHash,
             familyPartitionHash,
@@ -135,7 +175,7 @@ public record EvolutionSplitManifest(
     }
 
     public String toCanonicalJson() {
-<span class="fc" id="L138">        return render(</span>
+<span class="fc" id="L178">        return render(</span>
             studyId,
             corpusHash,
             featureSchemaHash,
@@ -149,21 +189,22 @@ public record EvolutionSplitManifest(
 
     private static List&lt;CaseReference&gt; normalize(
         List&lt;CaseReference&gt; cases,
-        String name
+        String name,
+        boolean allowEmpty
     ) {
-<span class="fc" id="L154">        Objects.requireNonNull(cases, name);</span>
-<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (cases.isEmpty()) {</span>
-<span class="nc" id="L156">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
+<span class="fc" id="L195">        Objects.requireNonNull(cases, name);</span>
+<span class="fc bfc" id="L196" title="All 4 branches covered.">        if (cases.isEmpty() &amp;&amp; !allowEmpty) {</span>
+<span class="fc" id="L197">            throw new IllegalArgumentException(name + &quot; must not be empty&quot;);</span>
         }
-<span class="fc" id="L158">        List&lt;CaseReference&gt; result = cases.stream()</span>
-<span class="fc" id="L159">            .map(item -&gt; Objects.requireNonNull(item, name + &quot; entry&quot;))</span>
-<span class="fc" id="L160">            .sorted(Comparator.comparing(CaseReference::caseId))</span>
-<span class="fc" id="L161">            .toList();</span>
-<span class="fc" id="L162">        if (new HashSet&lt;&gt;(result.stream().map(CaseReference::caseId).toList()).size()</span>
-<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                != result.size()) {</span>
-<span class="nc" id="L164">            throw new IllegalArgumentException(name + &quot; contains duplicate case IDs&quot;);</span>
+<span class="fc" id="L199">        List&lt;CaseReference&gt; result = cases.stream()</span>
+<span class="fc" id="L200">            .map(item -&gt; Objects.requireNonNull(item, name + &quot; entry&quot;))</span>
+<span class="fc" id="L201">            .sorted(Comparator.comparing(CaseReference::caseId))</span>
+<span class="fc" id="L202">            .toList();</span>
+<span class="fc" id="L203">        if (new HashSet&lt;&gt;(result.stream().map(CaseReference::caseId).toList()).size()</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L205">            throw new IllegalArgumentException(name + &quot; contains duplicate case IDs&quot;);</span>
         }
-<span class="fc" id="L166">        return List.copyOf(result);</span>
+<span class="fc" id="L207">        return List.copyOf(result);</span>
     }
 
     private static void requireDisjoint(
@@ -171,43 +212,43 @@ public record EvolutionSplitManifest(
         List&lt;CaseReference&gt; validation,
         List&lt;CaseReference&gt; test
     ) {
-<span class="fc" id="L174">        List&lt;SplitCases&gt; splits = List.of(</span>
+<span class="fc" id="L215">        List&lt;SplitCases&gt; splits = List.of(</span>
             new SplitCases(&quot;TRAIN&quot;, train),
             new SplitCases(&quot;VALIDATION&quot;, validation),
             new SplitCases(&quot;FINAL_TEST&quot;, test));
-<span class="fc" id="L178">        requireUniqueAcross(splits, &quot;case ID&quot;, CaseReference::caseId);</span>
-<span class="fc" id="L179">        requireUniqueAcross(splits, &quot;family&quot;, CaseReference::familyId);</span>
-<span class="fc" id="L180">        requireUniqueAcross(splits, &quot;exact signature&quot;, CaseReference::exactSignatureHash);</span>
-<span class="fc" id="L181">        requireUniqueAcross(splits, &quot;alpha signature&quot;, CaseReference::alphaSignatureHash);</span>
-<span class="fc" id="L182">        requireUniqueAcross(splits, &quot;input identity&quot;, CaseReference::inputHash);</span>
-<span class="fc" id="L183">        requireUniqueAcross(splits, &quot;hidden-target identity&quot;, CaseReference::hiddenTargetHash);</span>
-<span class="fc" id="L184">    }</span>
+<span class="fc" id="L219">        requireUniqueAcross(splits, &quot;case ID&quot;, CaseReference::caseId);</span>
+<span class="fc" id="L220">        requireUniqueAcross(splits, &quot;family&quot;, CaseReference::familyId);</span>
+<span class="fc" id="L221">        requireUniqueAcross(splits, &quot;exact signature&quot;, CaseReference::exactSignatureHash);</span>
+<span class="fc" id="L222">        requireUniqueAcross(splits, &quot;alpha signature&quot;, CaseReference::alphaSignatureHash);</span>
+<span class="fc" id="L223">        requireUniqueAcross(splits, &quot;input identity&quot;, CaseReference::inputHash);</span>
+<span class="fc" id="L224">        requireUniqueAcross(splits, &quot;hidden-target identity&quot;, CaseReference::hiddenTargetHash);</span>
+<span class="fc" id="L225">    }</span>
 
     private static void requireUniqueAcross(
         List&lt;SplitCases&gt; splits,
         String label,
         java.util.function.Function&lt;CaseReference, String&gt; identity
     ) {
-<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (int left = 0; left &lt; splits.size(); left++) {</span>
-<span class="fc" id="L192">            Set&lt;String&gt; values = new HashSet&lt;&gt;(splits.get(left).cases().stream()</span>
-<span class="fc" id="L193">                .map(identity)</span>
-<span class="fc" id="L194">                .toList());</span>
-<span class="fc bfc" id="L195" title="All 2 branches covered.">            for (int right = left + 1; right &lt; splits.size(); right++) {</span>
-<span class="fc" id="L196">                Set&lt;String&gt; collisions = new HashSet&lt;&gt;(values);</span>
-<span class="fc" id="L197">                collisions.retainAll(splits.get(right).cases().stream().map(identity).toList());</span>
-<span class="fc bfc" id="L198" title="All 2 branches covered.">                if (!collisions.isEmpty()) {</span>
-<span class="fc" id="L199">                    throw new IllegalArgumentException(</span>
-<span class="fc" id="L200">                        label + &quot; collision between &quot; + splits.get(left).name()</span>
-<span class="fc" id="L201">                            + &quot; and &quot; + splits.get(right).name() + &quot;: &quot; + collisions);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (int left = 0; left &lt; splits.size(); left++) {</span>
+<span class="fc" id="L233">            Set&lt;String&gt; values = new HashSet&lt;&gt;(splits.get(left).cases().stream()</span>
+<span class="fc" id="L234">                .map(identity)</span>
+<span class="fc" id="L235">                .toList());</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            for (int right = left + 1; right &lt; splits.size(); right++) {</span>
+<span class="fc" id="L237">                Set&lt;String&gt; collisions = new HashSet&lt;&gt;(values);</span>
+<span class="fc" id="L238">                collisions.retainAll(splits.get(right).cases().stream().map(identity).toList());</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                if (!collisions.isEmpty()) {</span>
+<span class="fc" id="L240">                    throw new IllegalArgumentException(</span>
+<span class="fc" id="L241">                        label + &quot; collision between &quot; + splits.get(left).name()</span>
+<span class="fc" id="L242">                            + &quot; and &quot; + splits.get(right).name() + &quot;: &quot; + collisions);</span>
                 }
             }
         }
-<span class="fc" id="L205">    }</span>
+<span class="fc" id="L246">    }</span>
 
     private static List&lt;String&gt; signatureMaterial(List&lt;CaseReference&gt; cases) {
-<span class="fc" id="L208">        return cases.stream()</span>
-<span class="fc" id="L209">            .map(item -&gt; item.exactSignatureHash() + &quot;|&quot; + item.alphaSignatureHash())</span>
-<span class="fc" id="L210">            .toList();</span>
+<span class="fc" id="L249">        return cases.stream()</span>
+<span class="fc" id="L250">            .map(item -&gt; item.exactSignatureHash() + &quot;|&quot; + item.alphaSignatureHash())</span>
+<span class="fc" id="L251">            .toList();</span>
     }
 
     private static String partitionHash(
@@ -216,16 +257,16 @@ public record EvolutionSplitManifest(
         List&lt;String&gt; validation,
         List&lt;String&gt; test
     ) {
-<span class="fc" id="L219">        return EvolutionGenome.hash(</span>
+<span class="fc" id="L260">        return EvolutionGenome.hash(</span>
             &quot;regelsuche.evolution-split-partition/v1&quot;
                 + &quot;\nkind=&quot; + label
-<span class="fc" id="L222">                + &quot;\nTRAIN=&quot; + sorted(train)</span>
-<span class="fc" id="L223">                + &quot;\nVALIDATION=&quot; + sorted(validation)</span>
-<span class="fc" id="L224">                + &quot;\nFINAL_TEST=&quot; + sorted(test));</span>
+<span class="fc" id="L263">                + &quot;\nTRAIN=&quot; + sorted(train)</span>
+<span class="fc" id="L264">                + &quot;\nVALIDATION=&quot; + sorted(validation)</span>
+<span class="fc" id="L265">                + &quot;\nFINAL_TEST=&quot; + sorted(test));</span>
     }
 
     private static List&lt;String&gt; sorted(List&lt;String&gt; values) {
-<span class="fc" id="L228">        return values.stream().sorted().toList();</span>
+<span class="fc" id="L269">        return values.stream().sorted().toList();</span>
     }
 
     private static String render(
@@ -239,20 +280,23 @@ public record EvolutionSplitManifest(
         String signaturePartitionHash,
         String contentHash
     ) {
-<span class="fc" id="L242">        JsonWriter json = new JsonWriter().beginObject()</span>
-<span class="fc" id="L243">            .property(&quot;schema&quot;, SCHEMA)</span>
-<span class="fc" id="L244">            .property(&quot;studyId&quot;, studyId)</span>
-<span class="fc" id="L245">            .property(&quot;corpusHash&quot;, corpusHash)</span>
-<span class="fc" id="L246">            .property(&quot;featureSchemaHash&quot;, featureSchemaHash);</span>
-<span class="fc" id="L247">        writeCases(json, &quot;trainCases&quot;, train);</span>
-<span class="fc" id="L248">        writeCases(json, &quot;validationCases&quot;, validation);</span>
-<span class="fc" id="L249">        writeCases(json, &quot;finalTestCases&quot;, test);</span>
-<span class="fc" id="L250">        json.property(&quot;familyPartitionHash&quot;, familyPartitionHash)</span>
-<span class="fc" id="L251">            .property(&quot;signaturePartitionHash&quot;, signaturePartitionHash);</span>
-<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (contentHash != null) {</span>
-<span class="fc" id="L253">            json.property(&quot;contentHash&quot;, contentHash);</span>
+<span class="fc" id="L283">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L284">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L285">            .property(&quot;studyId&quot;, studyId)</span>
+<span class="fc" id="L286">            .property(&quot;corpusHash&quot;, corpusHash)</span>
+<span class="fc" id="L287">            .property(&quot;featureSchemaHash&quot;, featureSchemaHash);</span>
+<span class="pc bpc" id="L288" title="1 of 4 branches missed.">        if (validation.isEmpty() &amp;&amp; test.isEmpty()) {</span>
+<span class="fc" id="L289">            json.property(&quot;heldOutMaterialization&quot;, DEFERRED_HELD_OUT);</span>
         }
-<span class="fc" id="L255">        return json.endObject().toString();</span>
+<span class="fc" id="L291">        writeCases(json, &quot;trainCases&quot;, train);</span>
+<span class="fc" id="L292">        writeCases(json, &quot;validationCases&quot;, validation);</span>
+<span class="fc" id="L293">        writeCases(json, &quot;finalTestCases&quot;, test);</span>
+<span class="fc" id="L294">        json.property(&quot;familyPartitionHash&quot;, familyPartitionHash)</span>
+<span class="fc" id="L295">            .property(&quot;signaturePartitionHash&quot;, signaturePartitionHash);</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L297">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L299">        return json.endObject().toString();</span>
     }
 
     private static void writeCases(
@@ -260,27 +304,27 @@ public record EvolutionSplitManifest(
         String name,
         List&lt;CaseReference&gt; cases
     ) {
-<span class="fc" id="L263">        json.array(name, array -&gt; cases.forEach(item -&gt;</span>
-<span class="fc" id="L264">            array.objectValue(object -&gt; object</span>
-<span class="fc" id="L265">                .property(&quot;caseId&quot;, item.caseId())</span>
-<span class="fc" id="L266">                .property(&quot;familyId&quot;, item.familyId())</span>
-<span class="fc" id="L267">                .property(&quot;exactSignatureHash&quot;, item.exactSignatureHash())</span>
-<span class="fc" id="L268">                .property(&quot;alphaSignatureHash&quot;, item.alphaSignatureHash())</span>
-<span class="fc" id="L269">                .property(&quot;inputHash&quot;, item.inputHash())</span>
-<span class="fc" id="L270">                .property(&quot;hiddenTargetHash&quot;, item.hiddenTargetHash()))));</span>
-<span class="fc" id="L271">    }</span>
+<span class="fc" id="L307">        json.array(name, array -&gt; cases.forEach(item -&gt;</span>
+<span class="fc" id="L308">            array.objectValue(object -&gt; object</span>
+<span class="fc" id="L309">                .property(&quot;caseId&quot;, item.caseId())</span>
+<span class="fc" id="L310">                .property(&quot;familyId&quot;, item.familyId())</span>
+<span class="fc" id="L311">                .property(&quot;exactSignatureHash&quot;, item.exactSignatureHash())</span>
+<span class="fc" id="L312">                .property(&quot;alphaSignatureHash&quot;, item.alphaSignatureHash())</span>
+<span class="fc" id="L313">                .property(&quot;inputHash&quot;, item.inputHash())</span>
+<span class="fc" id="L314">                .property(&quot;hiddenTargetHash&quot;, item.hiddenTargetHash()))));</span>
+<span class="fc" id="L315">    }</span>
 
     private static void requireId(String value, String name) {
-<span class="pc bpc" id="L274" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
-<span class="nc" id="L275">            throw new IllegalArgumentException(name + &quot; has invalid identifier syntax&quot;);</span>
+<span class="pc bpc" id="L318" title="2 of 4 branches missed.">        if (value == null || !ID.matcher(value).matches()) {</span>
+<span class="nc" id="L319">            throw new IllegalArgumentException(name + &quot; has invalid identifier syntax&quot;);</span>
         }
-<span class="fc" id="L277">    }</span>
+<span class="fc" id="L321">    }</span>
 
     private static void requireHash(String value, String name) {
-<span class="pc bpc" id="L280" title="2 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
-<span class="nc" id="L281">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
+<span class="pc bpc" id="L324" title="2 of 4 branches missed.">        if (value == null || !SHA256.matcher(value).matches()) {</span>
+<span class="nc" id="L325">            throw new IllegalArgumentException(name + &quot; must be SHA-256&quot;);</span>
         }
-<span class="fc" id="L283">    }</span>
+<span class="fc" id="L327">    }</span>
 
     public record CaseReference(
         String caseId,
@@ -290,17 +334,17 @@ public record EvolutionSplitManifest(
         String inputHash,
         String hiddenTargetHash
     ) {
-<span class="fc" id="L293">        public CaseReference {</span>
-<span class="fc" id="L294">            requireId(caseId, &quot;caseId&quot;);</span>
-<span class="fc" id="L295">            requireId(familyId, &quot;familyId&quot;);</span>
-<span class="fc" id="L296">            requireHash(exactSignatureHash, &quot;exactSignatureHash&quot;);</span>
-<span class="fc" id="L297">            requireHash(alphaSignatureHash, &quot;alphaSignatureHash&quot;);</span>
-<span class="fc" id="L298">            requireHash(inputHash, &quot;inputHash&quot;);</span>
-<span class="fc" id="L299">            requireHash(hiddenTargetHash, &quot;hiddenTargetHash&quot;);</span>
-<span class="fc" id="L300">        }</span>
+<span class="fc" id="L337">        public CaseReference {</span>
+<span class="fc" id="L338">            requireId(caseId, &quot;caseId&quot;);</span>
+<span class="fc" id="L339">            requireId(familyId, &quot;familyId&quot;);</span>
+<span class="fc" id="L340">            requireHash(exactSignatureHash, &quot;exactSignatureHash&quot;);</span>
+<span class="fc" id="L341">            requireHash(alphaSignatureHash, &quot;alphaSignatureHash&quot;);</span>
+<span class="fc" id="L342">            requireHash(inputHash, &quot;inputHash&quot;);</span>
+<span class="fc" id="L343">            requireHash(hiddenTargetHash, &quot;hiddenTargetHash&quot;);</span>
+<span class="fc" id="L344">        }</span>
     }
 
-<span class="fc" id="L303">    private record SplitCases(String name, List&lt;CaseReference&gt; cases) {</span>
+<span class="fc" id="L347">    private record SplitCases(String name, List&lt;CaseReference&gt; cases) {</span>
     }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

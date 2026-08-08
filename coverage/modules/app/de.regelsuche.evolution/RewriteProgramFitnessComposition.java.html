@@ -18,9 +18,9 @@ public final class RewriteProgramFitnessComposition {
         EvolutionRewriteProgramTrainSuite suite,
         Set&lt;EvolutionStudyPlan.FitnessComponent&gt; requiredComponents
     ) {
-<span class="nc" id="L21">        return new ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator(</span>
-<span class="nc" id="L22">            Objects.requireNonNull(suite, &quot;suite&quot;),</span>
-<span class="nc" id="L23">            Set.copyOf(Objects.requireNonNull(</span>
+<span class="fc" id="L21">        return new ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator(</span>
+<span class="fc" id="L22">            Objects.requireNonNull(suite, &quot;suite&quot;),</span>
+<span class="fc" id="L23">            Set.copyOf(Objects.requireNonNull(</span>
                 requiredComponents, &quot;requiredComponents&quot;)),
             new RationalFunctionNormalFormEquivalencePortAdapter());
     }

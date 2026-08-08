@@ -414,8 +414,8 @@ public class WebWorkbenchServer {
 <span class="fc" id="L414">                ? profile.defaultGoal()</span>
 <span class="fc" id="L415">                : de.regelsuche.scoring.cost.TransformationGoal.valueOf(goalName);</span>
 <span class="fc" id="L416">        } catch (IllegalArgumentException ex) {</span>
-<span class="fc" id="L417">            sendStatus(exchange, 400, ex.getMessage());</span>
-<span class="fc" id="L418">            return;</span>
+<span class="nc" id="L417">            sendStatus(exchange, 400, ex.getMessage());</span>
+<span class="nc" id="L418">            return;</span>
 <span class="fc" id="L419">        }</span>
 <span class="fc" id="L420">        TransformationSearchService search = new TransformationSearchService(</span>
             new SymPyTransformationEngine(),

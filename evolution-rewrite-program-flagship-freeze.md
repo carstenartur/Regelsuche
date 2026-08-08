@@ -40,6 +40,28 @@ The commitment must match the corresponding surface of
 identities are unique within the committed split; the split manifest continues
 to enforce cross-split disjointness.
 
+## Split-manifest assembly
+
+`FlagshipRewriteProgramSplitManifest` combines the public, reviewable
+`FlagshipRewriteProgramTrainCorpus` with one trusted private VALIDATION reveal
+bundle and one trusted private FINAL TEST reveal bundle. The resulting
+`EvolutionSplitManifest` exposes hashes and stable identities only; concrete
+held-out expressions, targets, assumptions, difficulty labels and terminal
+classes remain private.
+
+`EvolutionRewriteProgramTrainCaseReferences` applies the same normalization and
+exact/alpha-signature algorithms to TRAIN that the held-out reveal contract uses.
+Manifest construction rejects cross-split collisions in case IDs, structural
+families, exact and alpha signatures, input identities and hidden-target
+identities. Both held-out commitments must match the completed manifest.
+
+The builder accepts reveal bundles only in a trusted local process, persists
+nothing by itself and returns no concrete held-out value. Changing private case
+material changes the reveal, corpus and manifest identities; substituting another
+study or split fails closed. Manifest creation is only an input to the eventual
+`EvolutionRewriteProgramFreezeReceipt`: it does not execute TRAIN, reveal
+VALIDATION or consume FINAL TEST.
+
 ## Numerical thresholds
 
 `EvolutionRewriteProgramAcceptanceThresholds` fixes the positive and null-result
