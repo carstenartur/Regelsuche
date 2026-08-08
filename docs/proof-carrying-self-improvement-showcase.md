@@ -34,7 +34,6 @@ The authoritative classes are:
 ProofCarryingShowcasePlan
 ProofCarryingShowcaseCandidateFreeze
 ProofCarryingShowcasePublicRandomnessReceipt
-ProofCarryingShowcaseSeedDeriver
 ProofCarryingShowcaseSeedReceipt
 ProofCarryingShowcaseCaseGenerator
 ProofCarryingShowcaseGeneratedCase
@@ -171,7 +170,8 @@ VERIFIED_BY_PINNED_DRAND_CLIENT
 The round time must be strictly later than the candidate's frozen not-before
 boundary.
 
-The generator seed is SHA-256 over versioned domain-separated material binding:
+The seed-receipt factory derives the generator seed as SHA-256 over versioned
+domain-separated material binding:
 
 - showcase ID;
 - plan content hash;
