@@ -196,14 +196,22 @@ class RetainedProtocolBoundEvolutionRewriteProgramPopulationRunnerTest {
             new ResourceBudget(16, 128, 12, 32, 80),
             List.of("core.ast-rewrite"),
             List.of());
-        EvolutionRewriteProgramPlan seedPlan =
+        EvolutionRewriteProgramPlan addZeroSeedPlan =
             EvolutionRewriteProgramPlan.create(
                 genome,
                 new Source("retained_seed_add_zero", List.of("add_zero")),
                 12,
                 12);
+        EvolutionRewriteProgramPlan multiplyOneSeedPlan =
+            EvolutionRewriteProgramPlan.create(
+                genome,
+                new Source("retained_seed_mul_one", List.of("mul_one")),
+                12,
+                12);
         List<EvolutionRewriteProgramCandidate> seeds = List.of(
-            EvolutionRewriteProgramCandidate.create(genome, seedPlan));
+            EvolutionRewriteProgramCandidate.create(genome, addZeroSeedPlan),
+            EvolutionRewriteProgramCandidate.create(
+                genome, multiplyOneSeedPlan));
         EvolutionRewriteProgramTrainSuite suite =
             EvolutionRewriteProgramTrainSuite.create(
                 "retained_program_population_train_suite",
