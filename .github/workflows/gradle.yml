@@ -5,28 +5,106 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  create:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: >-
+    ${{ github.event_name == 'create'
+        && github.event.ref_type == 'branch'
+        && github.event.ref == 'showcase/train-freeze-authority-v1'
+        && format('showcase-train-freeze-{0}', github.repository)
+        || format('ci-{0}-{1}', github.repository, github.ref) }}
+  cancel-in-progress: >-
+    ${{ github.event_name != 'create'
+        || github.event.ref_type != 'branch'
+        || github.event.ref != 'showcase/train-freeze-authority-v1' }}
 
 permissions:
+  actions: read
   contents: read
   packages: read
 
 jobs:
   verification:
     name: Checkout-local ciCheck
+    if: >-
+      github.event_name != 'create'
+      || (github.event.ref_type == 'branch'
+          && github.event.ref == 'showcase/train-freeze-authority-v1')
     runs-on: ubuntu-22.04
     timeout-minutes: 300
     env:
       AI_KNOWLEDGE_EXTRACTOR_ENABLED: 'true'
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Reject a repeated showcase authority run
+        if: >-
+          github.event_name == 'create'
+          && github.event.ref_type == 'branch'
+          && github.event.ref == 'showcase/train-freeze-authority-v1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUTHORITY_BRANCH: showcase/train-freeze-authority-v1
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_RUN_ATTEMPT" != "1" ]]; then
+            echo "A showcase authority run may not be rerun." >&2
+            exit 1
+          fi
+          prior_runs="$(
+            gh api --method GET \
+              -H 'Accept: application/vnd.github+json' \
+              "/repos/${GITHUB_REPOSITORY}/actions/workflows/gradle.yml/runs" \
+              -f event=create \
+              -f branch="$AUTHORITY_BRANCH" \
+              -f per_page=100 \
+              --jq "[.workflow_runs[] | select(.id != ${GITHUB_RUN_ID})] | length"
+          )"
+          if [[ "$prior_runs" != "0" ]]; then
+            echo "The showcase authority branch has already been consumed." >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+
+      - name: Validate the committed showcase authority
+        if: >-
+          github.event_name == 'create'
+          && github.event.ref_type == 'branch'
+          && github.event.ref == 'showcase/train-freeze-authority-v1'
+        env:
+          AUTHORITY_FILE: research/showcase/proof-carrying-self-improvement/train-freeze-authority-v1.json
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/showcase/train-freeze-authority-v1'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-list --parents -n 1 HEAD | wc -w)" = '2'
+          canonical_authority="$(jq -S -c . "$AUTHORITY_FILE")"
+          printf '%s\n' "$canonical_authority" | cmp -s - "$AUTHORITY_FILE"
+          implementation_commit="$(jq -r '.implementationCommit' "$AUTHORITY_FILE")"
+          test "$(git rev-parse HEAD^)" = "$implementation_commit"
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = "$AUTHORITY_FILE"
+          jq -e --arg implementation "$implementation_commit" '
+            (keys == [
+              "authorityBranch",
+              "authorityId",
+              "implementationCommit",
+              "maximumWorkflowAttempts",
+              "operation",
+              "schema",
+              "status"
+            ])
+            and .schema == "regelsuche.proof-carrying-showcase-train-freeze-authority/v1"
+            and .authorityId == "proof-carrying-showcase-train-freeze-v1"
+            and .authorityBranch == "showcase/train-freeze-authority-v1"
+            and .implementationCommit == $implementation
+            and .operation == "TRAIN_AND_FREEZE_FINAL_TEST_UNSEEN"
+            and .maximumWorkflowAttempts == 1
+            and .status == "AUTHORIZED_NOT_RUN"
+          ' "$AUTHORITY_FILE" >/dev/null
 
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
@@ -77,6 +155,130 @@ jobs:
             docs/generated/**
           include-hidden-files: true
           if-no-files-found: warn
+
+  showcase-train-freeze:
+    name: Authorized proof-carrying showcase TRAIN and freeze
+    needs: verification
+    if: >-
+      github.event_name == 'create'
+      && github.event.ref_type == 'branch'
+      && github.event.ref == 'showcase/train-freeze-authority-v1'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    env:
+      TZ: UTC
+      AUTHORITY_FILE: research/showcase/proof-carrying-self-improvement/train-freeze-authority-v1.json
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          cache-cleanup: on-success
+
+      - name: Confirm the exact clean authority checkout
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/showcase/train-freeze-authority-v1'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-list --parents -n 1 HEAD | wc -w)" = '2'
+          canonical_authority="$(jq -S -c . "$AUTHORITY_FILE")"
+          printf '%s\n' "$canonical_authority" | cmp -s - "$AUTHORITY_FILE"
+          implementation_commit="$(jq -r '.implementationCommit' "$AUTHORITY_FILE")"
+          test "$(git rev-parse HEAD^)" = "$implementation_commit"
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD)" = "$AUTHORITY_FILE"
+          git diff --exit-code
+          git diff --cached --exit-code
+
+      - name: Run TRAIN and atomically publish the candidate freeze
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          output='build/proof-carrying-showcase/train-freeze'
+          evidence='build/proof-carrying-showcase/execution-evidence'
+          mkdir -p build/logs "$evidence"
+          test ! -e "$output"
+          ./gradlew \
+            --no-daemon \
+            --no-configuration-cache \
+            :app:run \
+            --args="showcase-train-freeze research/showcase/proof-carrying-self-improvement/showcase-plan.json $GITHUB_SHA $output" \
+            --console=plain \
+            --stacktrace \
+            2>&1 | tee build/logs/showcase-train-freeze.log
+          test -f "$output/candidate-freeze.json"
+          jq -e --arg commit "$GITHUB_SHA" \
+            '.status == "CANDIDATE_FROZEN_FINAL_TEST_UNSEEN"
+             and .repositoryCommit == $commit
+             and .randomnessNotBeforeUnixTime > .frozenAtUnixTime' \
+            "$output/candidate-freeze.json" >/dev/null
+          if find "$output" -maxdepth 1 -type f \
+              \( -iname '*randomness*' -o -iname '*final*test*' \) \
+              -print -quit | grep -q .; then
+            echo "Later-stage artifact found in the TRAIN/freeze output." >&2
+            exit 1
+          fi
+          (
+            cd "$output"
+            find . -type f -print0 \
+              | sort -z \
+              | xargs -0 sha256sum
+          ) > "$evidence/artifact-sha256sums.txt"
+          freeze_hash="$(jq -r '.contentHash' "$output/candidate-freeze.json")"
+          selected_hash="$(jq -r '.candidateContentHash' "$output/candidate-freeze.json")"
+          not_before="$(jq -r '.randomnessNotBeforeUnixTime' "$output/candidate-freeze.json")"
+          implementation_commit="$(jq -r '.implementationCommit' "$AUTHORITY_FILE")"
+          authority_sha256="$(sha256sum "$AUTHORITY_FILE" | cut -d ' ' -f 1)"
+          jq -n \
+            --arg schema 'regelsuche.proof-carrying-showcase-train-freeze-execution/v1' \
+            --arg authorityRef "$GITHUB_REF" \
+            --arg authorityManifestSha256 "sha256:$authority_sha256" \
+            --arg implementationCommit "$implementation_commit" \
+            --arg repositoryCommit "$GITHUB_SHA" \
+            --arg workflow "$GITHUB_WORKFLOW" \
+            --arg runId "$GITHUB_RUN_ID" \
+            --arg runAttempt "$GITHUB_RUN_ATTEMPT" \
+            --arg candidateFreezeHash "$freeze_hash" \
+            --arg selectedCandidateHash "$selected_hash" \
+            --argjson randomnessNotBeforeUnixTime "$not_before" \
+            '{
+              schema: $schema,
+              authorityRef: $authorityRef,
+              authorityManifestSha256: $authorityManifestSha256,
+              implementationCommit: $implementationCommit,
+              repositoryCommit: $repositoryCommit,
+              workflow: $workflow,
+              runId: $runId,
+              runAttempt: $runAttempt,
+              candidateFreezeHash: $candidateFreezeHash,
+              selectedCandidateHash: $selectedCandidateHash,
+              randomnessNotBeforeUnixTime: $randomnessNotBeforeUnixTime,
+              status: "TRAIN_FREEZE_EXECUTED_FINAL_TEST_UNSEEN"
+            }' > "$evidence/execution-receipt.json"
+          sha256sum "$evidence/execution-receipt.json" \
+            > "$evidence/execution-receipt.sha256"
+          git diff --exit-code
+          git diff --cached --exit-code
+
+      - name: Retain the authorized TRAIN and freeze attempt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: proof-carrying-showcase-train-freeze-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            build/logs/showcase-train-freeze.log
+            build/proof-carrying-showcase/**
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 90
 
   publish-pages:
     name: Publish generated reports
