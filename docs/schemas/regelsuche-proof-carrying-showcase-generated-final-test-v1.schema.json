@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.proof-carrying-showcase-generated-final-test/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "showcaseId",
+    "planContentHash",
+    "candidateFreezeContentHash",
+    "seedReceiptContentHash",
+    "generatorId",
+    "derivedSeed",
+    "drandChainHash",
+    "drandRound",
+    "caseCount",
+    "familySummaries",
+    "cases",
+    "caseContentRoot",
+    "caseIdentityPolicy",
+    "manualReplacementOrPruning",
+    "status",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.proof-carrying-showcase-generated-final-test/v1"
+    },
+    "showcaseId": {
+      "const": "proof-carrying-self-improvement-2026-08/v1"
+    },
+    "planContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidateFreezeContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "seedReceiptContentHash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "generatorId": {
+      "const": "proof-carrying-symbolic-stress-ladders/v1"
+    },
+    "derivedSeed": {
+      "$ref": "#/$defs/sha256"
+    },
+    "drandChainHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "drandRound": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "caseCount": {
+      "const": 24
+    },
+    "familySummaries": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/familySummary"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 24,
+      "maxItems": 24,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "caseContentRoot": {
+      "$ref": "#/$defs/sha256"
+    },
+    "caseIdentityPolicy": {
+      "const": "SHA256_CANONICAL_CASE_V1"
+    },
+    "manualReplacementOrPruning": {
+      "const": "FORBIDDEN"
+    },
+    "status": {
+      "const": "FINAL_TEST_GENERATED_NOT_EXECUTED"
+    },
+    "contentHash": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "familyId": {
+      "type": "string",
+      "enum": [
+        "nested-rational-cancellation",
+        "factor-cancel-collect",
+        "multi-stage-rational-polynomial"
+      ]
+    },
+    "difficultyLevels": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "const": 3
+        },
+        {
+          "const": 4
+        },
+        {
+          "const": 5
+        },
+        {
+          "const": 6
+        }
+      ],
+      "items": false,
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "familySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "familyId",
+        "caseCount",
+        "difficultyLevels",
+        "caseContentRoot"
+      ],
+      "properties": {
+        "familyId": {
+          "$ref": "#/$defs/familyId"
+        },
+        "caseCount": {
+          "const": 8
+        },
+        "difficultyLevels": {
+          "$ref": "#/$defs/difficultyLevels"
+        },
+        "caseContentRoot": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "caseId",
+        "familyId",
+        "difficultyLevel",
+        "variant",
+        "inputExpression",
+        "targetExpression",
+        "assumptions",
+        "coefficientVector",
+        "blockKinds",
+        "structuralFingerprint",
+        "caseIdentityPolicy",
+        "contentHash"
+      ],
+      "properties": {
+        "schema": {
+          "const": "regelsuche.proof-carrying-showcase-generated-case/v1"
+        },
+        "caseId": {
+          "type": "string",
+          "pattern": "^ft-(nrc|fcc|mrp)-d[3-6]-v[01]-[0-9a-f]{12}$"
+        },
+        "familyId": {
+          "$ref": "#/$defs/familyId"
+        },
+        "difficultyLevel": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 6
+        },
+        "variant": {
+          "type": "integer",
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "inputExpression": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 20000
+        },
+        "targetExpression": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "assumptions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 256
+          }
+        },
+        "coefficientVector": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 24
+          }
+        },
+        "blockKinds": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "enum": [
+              "SHARED_DENOMINATOR_QUOTIENT",
+              "FACTOR_CANCEL_SHARED_DENOMINATOR",
+              "MIXED_DENOMINATOR_RATIO",
+              "DIFFERENCE_OF_SQUARES_QUOTIENT"
+            ]
+          }
+        },
+        "structuralFingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "caseIdentityPolicy": {
+          "const": "SHA256_CANONICAL_CASE_V1"
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
