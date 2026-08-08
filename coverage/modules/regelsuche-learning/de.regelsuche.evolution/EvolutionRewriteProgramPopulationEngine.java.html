@@ -472,8 +472,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="pc bpc" id="L472" title="1 of 2 branches missed.">                || state.mutationAttempts &gt;= plan.budget().maxMutationAttempts()) {</span>
 <span class="nc" id="L473">            return GenerationOutcome.BUDGET_EXHAUSTED;</span>
         }
-<span class="pc bpc" id="L475" title="1 of 2 branches missed.">        if (samePopulation(previous, selected)</span>
-<span class="nc bnc" id="L476" title="All 2 branches missed.">                &amp;&amp; mutationRound.children().isEmpty()) {</span>
+<span class="fc bfc" id="L475" title="All 2 branches covered.">        if (samePopulation(previous, selected)</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">                &amp;&amp; mutationRound.children().isEmpty()) {</span>
 <span class="nc" id="L477">            return GenerationOutcome.STAGNATED;</span>
         }
 <span class="fc bfc" id="L479" title="All 2 branches covered.">        if (generation == plan.populationPolicy().generationCount()) {</span>

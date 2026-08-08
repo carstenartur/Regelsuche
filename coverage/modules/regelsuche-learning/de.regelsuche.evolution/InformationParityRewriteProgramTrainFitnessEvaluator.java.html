@@ -120,7 +120,7 @@ public final class InformationParityRewriteProgramTrainFitnessEvaluator {
             candidate, measurements);
 <span class="fc" id="L121">        addUnsupportedComponentBlockers(components, blockers);</span>
 <span class="fc" id="L122">        components.keySet().removeIf(</span>
-<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            component -&gt; !requiredComponents.contains(component));</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            component -&gt; !requiredComponents.contains(component));</span>
 
 <span class="fc" id="L125">        return EvolutionRewriteProgramTrainFitnessEvidence.create(</span>
             suite, candidate, measurements, components, blockers);

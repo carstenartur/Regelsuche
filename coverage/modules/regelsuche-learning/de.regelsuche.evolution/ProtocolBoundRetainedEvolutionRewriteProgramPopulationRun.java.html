@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun.java</span></div><h1>ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.json.JsonWriter;
+import java.util.Objects;
+
+/**
+ * Authority-bearing protocol binding for one retained terminal TRAIN run.
+ *
+ * &lt;p&gt;The underlying retained population is structurally complete but may be
+ * constructed from any compatible engine run. This wrapper additionally binds
+ * the frozen evaluator protocol and exact implementation class that the
+ * protocol-bound runner verified before execution.&lt;/p&gt;
+ */
+public record ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun(
+    String schema,
+    RetainedEvolutionRewriteProgramPopulationRun retainedPopulation,
+    String evaluationProtocolHash,
+    String evaluatorImplementationClass,
+    String status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-protocol-bound-retained-run/v1&quot;;
+    public static final String STATUS = &quot;PROTOCOL_BOUND_TRAIN_RETAINED&quot;;
+
+<span class="fc" id="L26">    public ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun {</span>
+<span class="pc bpc" id="L27" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L28">            throw new IllegalArgumentException(</span>
+                &quot;unsupported protocol-bound retained-run schema&quot;);
+        }
+<span class="fc" id="L31">        Objects.requireNonNull(</span>
+            retainedPopulation, &quot;retainedPopulation&quot;);
+<span class="fc" id="L33">        EvolutionGenome.requireSha256(</span>
+            evaluationProtocolHash, &quot;evaluationProtocolHash&quot;);
+<span class="fc" id="L35">        evaluatorImplementationClass = requireText(</span>
+            evaluatorImplementationClass,
+            &quot;evaluatorImplementationClass&quot;);
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (!STATUS.equals(status)) {</span>
+<span class="nc" id="L39">            throw new IllegalArgumentException(</span>
+                &quot;retained run lacks protocol-bound TRAIN authority&quot;);
+        }
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(</span>
+<span class="fc" id="L43">                retainedPopulation.validationStatus())</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(</span>
+<span class="fc" id="L45">                    retainedPopulation.finalTestStatus())) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(</span>
+                &quot;protocol-bound TRAIN run cannot contain later outcomes&quot;);
+        }
+<span class="fc" id="L49">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L50">        String expected = EvolutionGenome.hash(render(</span>
+            retainedPopulation,
+            evaluationProtocolHash,
+            evaluatorImplementationClass,
+            null));
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(</span>
+                &quot;protocol-bound retained-run contentHash mismatch&quot;);
+        }
+<span class="fc" id="L59">    }</span>
+
+    static ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun create(
+        RetainedEvolutionRewriteProgramPopulationRun retainedPopulation,
+        EvolutionRewriteProgramEvaluationProtocol protocol,
+        Class&lt;?&gt; evaluatorClass
+    ) {
+<span class="fc" id="L66">        Objects.requireNonNull(</span>
+            retainedPopulation, &quot;retainedPopulation&quot;);
+<span class="fc" id="L68">        Objects.requireNonNull(protocol, &quot;protocol&quot;);</span>
+<span class="fc" id="L69">        Objects.requireNonNull(evaluatorClass, &quot;evaluatorClass&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (!protocol.implementationClass().equals(</span>
+<span class="fc" id="L71">                evaluatorClass.getName())) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(</span>
+                &quot;evaluator implementation differs from frozen protocol&quot;);
+        }
+<span class="fc" id="L75">        String hash = EvolutionGenome.hash(render(</span>
+            retainedPopulation,
+<span class="fc" id="L77">            protocol.contentHash(),</span>
+<span class="fc" id="L78">            evaluatorClass.getName(),</span>
+            null));
+<span class="fc" id="L80">        return new ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun(</span>
+            SCHEMA,
+            retainedPopulation,
+<span class="fc" id="L83">            protocol.contentHash(),</span>
+<span class="fc" id="L84">            evaluatorClass.getName(),</span>
+            STATUS,
+            hash);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L90">        return render(</span>
+            retainedPopulation,
+            evaluationProtocolHash,
+            evaluatorImplementationClass,
+            contentHash);
+    }
+
+    private static String render(
+        RetainedEvolutionRewriteProgramPopulationRun retainedPopulation,
+        String evaluationProtocolHash,
+        String evaluatorImplementationClass,
+        String contentHash
+    ) {
+<span class="fc" id="L103">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L104">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L105">            .property(</span>
+                &quot;retainedPopulationHash&quot;,
+<span class="fc" id="L107">                retainedPopulation.contentHash())</span>
+<span class="fc" id="L108">            .property(</span>
+                &quot;retainedPopulationJson&quot;,
+<span class="fc" id="L110">                retainedPopulation.toCanonicalJson())</span>
+<span class="fc" id="L111">            .property(</span>
+                &quot;evaluationProtocolHash&quot;, evaluationProtocolHash)
+<span class="fc" id="L113">            .property(</span>
+                &quot;evaluatorImplementationClass&quot;,
+                evaluatorImplementationClass)
+<span class="fc" id="L116">            .property(&quot;status&quot;, STATUS);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L118">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L120">        return json.endObject().toString();</span>
+    }
+
+    private static String requireText(String value, String name) {
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(name + &quot; must not be blank&quot;);</span>
+        }
+<span class="fc" id="L127">        return value.trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

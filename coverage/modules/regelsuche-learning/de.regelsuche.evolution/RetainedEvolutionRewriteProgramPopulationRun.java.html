@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RetainedEvolutionRewriteProgramPopulationRun.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">RetainedEvolutionRewriteProgramPopulationRun.java</span></div><h1>RetainedEvolutionRewriteProgramPopulationRun.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.CandidateEvaluation;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.PopulationRun;
+import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
+import de.regelsuche.json.JsonWriter;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+/**
+ * Self-contained terminal TRAIN population state.
+ *
+ * &lt;p&gt;{@link PopulationRun} intentionally remains a compact result ledger. This
+ * artifact retains the complete immutable genome/plan payload for every final
+ * candidate and the corresponding final-generation evaluation. It is therefore
+ * sufficient for later candidate freezing without consulting transient engine
+ * objects or any VALIDATION/FINAL TEST data.&lt;/p&gt;
+ */
+public record RetainedEvolutionRewriteProgramPopulationRun(
+    String schema,
+    PopulationRun populationRun,
+    List&lt;RetainedCandidate&gt; finalCandidates,
+    List&lt;CandidateEvaluation&gt; finalEvaluations,
+    String validationStatus,
+    String finalTestStatus,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.evolution-rewrite-program-retained-population-run/v1&quot;;
+<span class="fc" id="L34">    private static final EvolutionGenomeCodec GENOME_CODEC =</span>
+        new EvolutionGenomeCodec();
+<span class="fc" id="L36">    private static final EvolutionRewriteProgramPlanCodec PLAN_CODEC =</span>
+        new EvolutionRewriteProgramPlanCodec();
+
+<span class="fc" id="L39">    public RetainedEvolutionRewriteProgramPopulationRun {</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L41">            throw new IllegalArgumentException(</span>
+                &quot;unsupported retained rewrite-program population schema&quot;);
+        }
+<span class="fc" id="L44">        Objects.requireNonNull(populationRun, &quot;populationRun&quot;);</span>
+<span class="fc" id="L45">        finalCandidates = canonicalCandidates(finalCandidates);</span>
+<span class="fc" id="L46">        finalEvaluations = canonicalEvaluations(finalEvaluations);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        if (!&quot;NOT_EVALUATED&quot;.equals(validationStatus)</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">                || !&quot;NOT_EVALUATED&quot;.equals(finalTestStatus)) {</span>
+<span class="nc" id="L49">            throw new IllegalArgumentException(</span>
+                &quot;retained TRAIN population cannot contain later-stage outcomes&quot;);
+        }
+<span class="fc" id="L52">        requireBindings(populationRun, finalCandidates, finalEvaluations);</span>
+<span class="fc" id="L53">        EvolutionGenome.requireSha256(contentHash, &quot;contentHash&quot;);</span>
+<span class="fc" id="L54">        String expected = EvolutionGenome.hash(render(</span>
+            populationRun,
+            finalCandidates,
+            finalEvaluations,
+            null));
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L60">            throw new IllegalArgumentException(</span>
+                &quot;retained population contentHash mismatch&quot;);
+        }
+<span class="fc" id="L63">    }</span>
+
+    public static RetainedEvolutionRewriteProgramPopulationRun create(
+        PopulationRun populationRun,
+        List&lt;EvolutionRewriteProgramCandidate&gt; finalCandidates
+    ) {
+<span class="fc" id="L69">        Objects.requireNonNull(populationRun, &quot;populationRun&quot;);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        List&lt;RetainedCandidate&gt; retained = finalCandidates == null</span>
+<span class="nc" id="L71">            ? List.of()</span>
+<span class="fc" id="L72">            : finalCandidates.stream()</span>
+<span class="fc" id="L73">                .map(RetainedCandidate::from)</span>
+<span class="fc" id="L74">                .sorted(Comparator.comparing(</span>
+                    RetainedCandidate::candidateHash))
+<span class="fc" id="L76">                .toList();</span>
+<span class="fc" id="L77">        Map&lt;String, CandidateEvaluation&gt; finalEvaluationByCandidate =</span>
+            new HashMap&lt;&gt;();
+<span class="fc" id="L79">        populationRun.generationReports().getLast().evaluations()</span>
+<span class="fc" id="L80">            .forEach(evaluation -&gt;</span>
+<span class="fc" id="L81">                finalEvaluationByCandidate.put(</span>
+<span class="fc" id="L82">                    evaluation.candidateHash(), evaluation));</span>
+<span class="fc" id="L83">        List&lt;CandidateEvaluation&gt; evaluations =</span>
+<span class="fc" id="L84">            populationRun.finalCandidateHashes().stream()</span>
+<span class="fc" id="L85">                .map(hash -&gt; {</span>
+<span class="fc" id="L86">                    CandidateEvaluation evaluation =</span>
+<span class="fc" id="L87">                        finalEvaluationByCandidate.get(hash);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                    if (evaluation == null) {</span>
+<span class="nc" id="L89">                        throw new IllegalArgumentException(</span>
+                            &quot;final population candidate lacks final evaluation: &quot;
+                                + hash);
+                    }
+<span class="fc" id="L93">                    return evaluation;</span>
+                })
+<span class="fc" id="L95">                .sorted(Comparator.comparing(</span>
+                    CandidateEvaluation::candidateHash))
+<span class="fc" id="L97">                .toList();</span>
+<span class="fc" id="L98">        String hash = EvolutionGenome.hash(render(</span>
+            populationRun,
+            retained,
+            evaluations,
+            null));
+<span class="fc" id="L103">        return new RetainedEvolutionRewriteProgramPopulationRun(</span>
+            SCHEMA,
+            populationRun,
+            retained,
+            evaluations,
+            &quot;NOT_EVALUATED&quot;,
+            &quot;NOT_EVALUATED&quot;,
+            hash);
+    }
+
+    public List&lt;EvolutionRewriteProgramCandidate&gt; candidates() {
+<span class="fc" id="L114">        return finalCandidates.stream()</span>
+<span class="fc" id="L115">            .map(RetainedCandidate::candidate)</span>
+<span class="fc" id="L116">            .toList();</span>
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L120">        return render(</span>
+            populationRun,
+            finalCandidates,
+            finalEvaluations,
+            contentHash);
+    }
+
+    private static void requireBindings(
+        PopulationRun run,
+        List&lt;RetainedCandidate&gt; candidates,
+        List&lt;CandidateEvaluation&gt; evaluations
+    ) {
+<span class="fc" id="L132">        List&lt;String&gt; expectedCandidates = run.finalCandidateHashes();</span>
+<span class="fc" id="L133">        List&lt;String&gt; actualCandidates = candidates.stream()</span>
+<span class="fc" id="L134">            .map(RetainedCandidate::candidateHash)</span>
+<span class="fc" id="L135">            .toList();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (!expectedCandidates.equals(actualCandidates)) {</span>
+<span class="fc" id="L137">            throw new IllegalArgumentException(</span>
+                &quot;retained candidates differ from population-run final roots&quot;);
+        }
+<span class="fc" id="L140">        List&lt;String&gt; expectedSelected = run.generationReports().getLast()</span>
+<span class="fc" id="L141">            .selectedCandidateHashes();</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (!expectedCandidates.equals(expectedSelected)) {</span>
+<span class="nc" id="L143">            throw new IllegalArgumentException(</span>
+                &quot;population run final roots differ from final generation&quot;);
+        }
+<span class="fc" id="L146">        List&lt;String&gt; actualEvaluations = evaluations.stream()</span>
+<span class="fc" id="L147">            .map(CandidateEvaluation::candidateHash)</span>
+<span class="fc" id="L148">            .toList();</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (!expectedCandidates.equals(actualEvaluations)) {</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(</span>
+                &quot;retained final evaluations differ from final candidates&quot;);
+        }
+<span class="fc" id="L153">        Map&lt;String, RetainedCandidate&gt; byHash = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L154">        candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L155">            byHash.put(candidate.candidateHash(), candidate));</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (CandidateEvaluation evaluation : evaluations) {</span>
+<span class="fc" id="L157">            RetainedCandidate candidate = byHash.get(</span>
+<span class="fc" id="L158">                evaluation.candidateHash());</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">            if (candidate == null</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                    || !candidate.alphaStructuralHash().equals(</span>
+<span class="fc" id="L161">                        evaluation.alphaStructuralHash())) {</span>
+<span class="nc" id="L162">                throw new IllegalArgumentException(</span>
+                    &quot;retained evaluation identity differs from candidate&quot;);
+            }
+<span class="fc" id="L165">        }</span>
+<span class="fc" id="L166">    }</span>
+
+    private static List&lt;RetainedCandidate&gt; canonicalCandidates(
+        List&lt;RetainedCandidate&gt; values
+    ) {
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        List&lt;RetainedCandidate&gt; result = values == null</span>
+<span class="nc" id="L172">            ? List.of()</span>
+<span class="fc" id="L173">            : values.stream()</span>
+<span class="fc" id="L174">                .map(value -&gt; Objects.requireNonNull(</span>
+                    value, &quot;retained candidate&quot;))
+<span class="fc" id="L176">                .sorted(Comparator.comparing(</span>
+                    RetainedCandidate::candidateHash))
+<span class="fc" id="L178">                .toList();</span>
+<span class="fc" id="L179">        if (new HashSet&lt;&gt;(result.stream()</span>
+<span class="fc" id="L180">                .map(RetainedCandidate::candidateHash).toList()).size()</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L182">            throw new IllegalArgumentException(</span>
+                &quot;retained candidates require unique identities&quot;);
+        }
+<span class="fc" id="L185">        return List.copyOf(result);</span>
+    }
+
+    private static List&lt;CandidateEvaluation&gt; canonicalEvaluations(
+        List&lt;CandidateEvaluation&gt; values
+    ) {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        List&lt;CandidateEvaluation&gt; result = values == null</span>
+<span class="nc" id="L192">            ? List.of()</span>
+<span class="fc" id="L193">            : values.stream()</span>
+<span class="fc" id="L194">                .map(value -&gt; Objects.requireNonNull(</span>
+                    value, &quot;candidate evaluation&quot;))
+<span class="fc" id="L196">                .sorted(Comparator.comparing(</span>
+                    CandidateEvaluation::candidateHash))
+<span class="fc" id="L198">                .toList();</span>
+<span class="fc" id="L199">        if (new HashSet&lt;&gt;(result.stream()</span>
+<span class="fc" id="L200">                .map(CandidateEvaluation::candidateHash).toList()).size()</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">                != result.size()) {</span>
+<span class="nc" id="L202">            throw new IllegalArgumentException(</span>
+                &quot;retained evaluations require unique candidates&quot;);
+        }
+<span class="fc" id="L205">        return List.copyOf(result);</span>
+    }
+
+    private static String render(
+        PopulationRun run,
+        List&lt;RetainedCandidate&gt; candidates,
+        List&lt;CandidateEvaluation&gt; evaluations,
+        String contentHash
+    ) {
+<span class="fc" id="L214">        JsonWriter json = new JsonWriter().beginObject()</span>
+<span class="fc" id="L215">            .property(&quot;schema&quot;, SCHEMA)</span>
+<span class="fc" id="L216">            .property(&quot;populationRunHash&quot;, run.contentHash())</span>
+<span class="fc" id="L217">            .property(&quot;populationRunJson&quot;, run.toCanonicalJson())</span>
+<span class="fc" id="L218">            .array(&quot;finalCandidates&quot;, array -&gt; candidates.forEach(candidate -&gt;</span>
+<span class="fc" id="L219">                array.objectValue(object -&gt; object</span>
+<span class="fc" id="L220">                    .property(&quot;candidateHash&quot;, candidate.candidateHash())</span>
+<span class="fc" id="L221">                    .property(</span>
+                        &quot;alphaStructuralHash&quot;,
+<span class="fc" id="L223">                        candidate.alphaStructuralHash())</span>
+<span class="fc" id="L224">                    .property(&quot;genomeJson&quot;, candidate.genomeJson())</span>
+<span class="fc" id="L225">                    .property(&quot;planJson&quot;, candidate.planJson())</span>
+<span class="fc" id="L226">                    .property(</span>
+                        &quot;humanReadableProgram&quot;,
+<span class="fc" id="L228">                        candidate.humanReadableProgram())</span>
+<span class="fc" id="L229">                    .property(</span>
+                        &quot;humanReadableProgramHash&quot;,
+<span class="fc" id="L231">                        candidate.humanReadableProgramHash()))))</span>
+<span class="fc" id="L232">            .array(&quot;finalEvaluations&quot;, array -&gt; evaluations.forEach(</span>
+<span class="fc" id="L233">                evaluation -&gt; array.objectValue(object -&gt; {</span>
+<span class="fc" id="L234">                    object.property(</span>
+<span class="fc" id="L235">                            &quot;candidateHash&quot;, evaluation.candidateHash())</span>
+<span class="fc" id="L236">                        .property(</span>
+                            &quot;alphaStructuralHash&quot;,
+<span class="fc" id="L238">                            evaluation.alphaStructuralHash())</span>
+<span class="fc" id="L239">                        .object(&quot;rawComponents&quot;, components -&gt; {</span>
+                            for (FitnessComponent component
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                                    : FitnessComponent.values()) {</span>
+<span class="fc" id="L242">                                Integer value = evaluation.rawComponents()</span>
+<span class="fc" id="L243">                                    .get(component);</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                                if (value != null) {</span>
+<span class="fc" id="L245">                                    components.property(</span>
+<span class="fc" id="L246">                                        component.name(), value);</span>
+                                }
+                            }
+<span class="fc" id="L249">                        })</span>
+<span class="fc" id="L250">                        .stringArray(&quot;blockers&quot;, evaluation.blockers())</span>
+<span class="fc" id="L251">                        .property(</span>
+<span class="fc" id="L252">                            &quot;scalarFitness&quot;, evaluation.scalarFitness());</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">                    if (evaluation.evidenceHash() == null) {</span>
+<span class="nc" id="L254">                        object.nullProperty(&quot;evidenceHash&quot;);</span>
+                    } else {
+<span class="fc" id="L256">                        object.property(</span>
+<span class="fc" id="L257">                            &quot;evidenceHash&quot;, evaluation.evidenceHash());</span>
+                    }
+<span class="fc" id="L259">                    object.property(</span>
+<span class="fc" id="L260">                        &quot;contentHash&quot;, evaluation.contentHash());</span>
+<span class="fc" id="L261">                })))</span>
+<span class="fc" id="L262">            .property(&quot;validationStatus&quot;, &quot;NOT_EVALUATED&quot;)</span>
+<span class="fc" id="L263">            .property(&quot;finalTestStatus&quot;, &quot;NOT_EVALUATED&quot;);</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (contentHash != null) {</span>
+<span class="fc" id="L265">            json.property(&quot;contentHash&quot;, contentHash);</span>
+        }
+<span class="fc" id="L267">        return json.endObject().toString();</span>
+    }
+
+    public record RetainedCandidate(
+        String candidateHash,
+        String alphaStructuralHash,
+        String genomeJson,
+        String planJson,
+        String humanReadableProgram,
+        String humanReadableProgramHash
+    ) {
+<span class="fc" id="L278">        public RetainedCandidate {</span>
+<span class="fc" id="L279">            EvolutionGenome.requireSha256(</span>
+                candidateHash, &quot;candidateHash&quot;);
+<span class="fc" id="L281">            EvolutionGenome.requireSha256(</span>
+                alphaStructuralHash, &quot;alphaStructuralHash&quot;);
+<span class="pc bpc" id="L283" title="3 of 6 branches missed.">            if (genomeJson == null || genomeJson.isBlank()</span>
+<span class="pc bpc" id="L284" title="2 of 4 branches missed.">                    || planJson == null || planJson.isBlank()</span>
+                    || humanReadableProgram == null
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                    || humanReadableProgram.isBlank()) {</span>
+<span class="nc" id="L287">                throw new IllegalArgumentException(</span>
+                    &quot;retained candidate requires complete payloads&quot;);
+            }
+<span class="fc" id="L290">            EvolutionGenome.requireSha256(</span>
+                humanReadableProgramHash,
+                &quot;humanReadableProgramHash&quot;);
+<span class="fc" id="L293">            EvolutionGenome genome = GENOME_CODEC.read(genomeJson);</span>
+<span class="fc" id="L294">            EvolutionRewriteProgramPlan plan = PLAN_CODEC.read(planJson);</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            if (!GENOME_CODEC.write(genome).equals(genomeJson)</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                    || !PLAN_CODEC.write(plan).equals(planJson)) {</span>
+<span class="nc" id="L297">                throw new IllegalArgumentException(</span>
+                    &quot;retained candidate payload is not canonical&quot;);
+            }
+<span class="fc" id="L300">            EvolutionRewriteProgramCandidate reconstructed =</span>
+<span class="fc" id="L301">                EvolutionRewriteProgramCandidate.create(genome, plan);</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            if (!candidateHash.equals(reconstructed.contentHash())</span>
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">                    || !alphaStructuralHash.equals(</span>
+<span class="fc" id="L304">                        reconstructed.alphaStructuralHash())) {</span>
+<span class="nc" id="L305">                throw new IllegalArgumentException(</span>
+                    &quot;retained candidate identities differ from payload&quot;);
+            }
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">            if (!humanReadableProgram.equals(plan.toReadableProgram())</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                    || !humanReadableProgramHash.equals(</span>
+<span class="fc" id="L310">                        EvolutionGenome.hash(humanReadableProgram))) {</span>
+<span class="nc" id="L311">                throw new IllegalArgumentException(</span>
+                    &quot;retained readable program differs from program plan&quot;);
+            }
+<span class="fc" id="L314">        }</span>
+
+        static RetainedCandidate from(
+            EvolutionRewriteProgramCandidate candidate
+        ) {
+<span class="fc" id="L319">            Objects.requireNonNull(candidate, &quot;candidate&quot;);</span>
+<span class="fc" id="L320">            String readable = candidate.plan().toReadableProgram();</span>
+<span class="fc" id="L321">            return new RetainedCandidate(</span>
+<span class="fc" id="L322">                candidate.contentHash(),</span>
+<span class="fc" id="L323">                candidate.alphaStructuralHash(),</span>
+<span class="fc" id="L324">                GENOME_CODEC.write(candidate.genome()),</span>
+<span class="fc" id="L325">                PLAN_CODEC.write(candidate.plan()),</span>
+                readable,
+<span class="fc" id="L327">                EvolutionGenome.hash(readable));</span>
+        }
+
+        EvolutionRewriteProgramCandidate candidate() {
+<span class="fc" id="L331">            return EvolutionRewriteProgramCandidate.create(</span>
+<span class="fc" id="L332">                GENOME_CODEC.read(genomeJson),</span>
+<span class="fc" id="L333">                PLAN_CODEC.read(planJson));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

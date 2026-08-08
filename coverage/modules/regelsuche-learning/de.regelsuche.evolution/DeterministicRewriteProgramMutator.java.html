@@ -128,8 +128,8 @@ public final class DeterministicRewriteProgramMutator {
 <span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (child.contentHash().equals(parent.contentHash())) {</span>
 <span class="nc" id="L129">            blockers.add(&quot;IDENTITY_MUTATION:contentHash&quot;);</span>
         }
-<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (structuralHashes.contains(child.alphaStructuralHash())) {</span>
-<span class="nc" id="L132">            blockers.add(&quot;STRUCTURAL_DIVERSITY_DUPLICATE:alphaStructuralHash&quot;);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (structuralHashes.contains(child.alphaStructuralHash())) {</span>
+<span class="fc" id="L132">            blockers.add(&quot;STRUCTURAL_DIVERSITY_DUPLICATE:alphaStructuralHash&quot;);</span>
         }
 <span class="fc bfc" id="L134" title="All 2 branches covered.">        if (!acceptanceCapacity) {</span>
 <span class="fc" id="L135">            blockers.add(&quot;ACCEPTED_BUDGET_EXHAUSTED:maxAccepted&quot;);</span>
@@ -416,12 +416,12 @@ public final class DeterministicRewriteProgramMutator {
 <span class="fc" id="L416">                sequence.nodeId(),</span>
 <span class="fc" id="L417">                replaceChildren(sequence.steps(), targetNodeId, mutation));</span>
         }
-<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (current instanceof Repeat repeat) {</span>
-<span class="nc" id="L420">            return new Repeat(</span>
-<span class="nc" id="L421">                repeat.nodeId(),</span>
-<span class="nc" id="L422">                replace(repeat.body(), targetNodeId, mutation),</span>
-<span class="nc" id="L423">                repeat.minIterations(),</span>
-<span class="nc" id="L424">                repeat.maxIterations());</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        if (current instanceof Repeat repeat) {</span>
+<span class="fc" id="L420">            return new Repeat(</span>
+<span class="fc" id="L421">                repeat.nodeId(),</span>
+<span class="fc" id="L422">                replace(repeat.body(), targetNodeId, mutation),</span>
+<span class="fc" id="L423">                repeat.minIterations(),</span>
+<span class="fc" id="L424">                repeat.maxIterations());</span>
         }
 <span class="pc bpc" id="L426" title="1 of 2 branches missed.">        if (current instanceof Require require) {</span>
 <span class="nc" id="L427">            return new Require(</span>
@@ -491,8 +491,8 @@ public final class DeterministicRewriteProgramMutator {
     }
 
     private static Node wrapperBody(Node node) {
-<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (node instanceof Repeat repeat) {</span>
-<span class="nc" id="L495">            return repeat.body();</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
+<span class="fc" id="L495">            return repeat.body();</span>
         }
 <span class="pc bpc" id="L497" title="1 of 2 branches missed.">        if (node instanceof Require require) {</span>
 <span class="nc" id="L498">            return require.body();</span>
