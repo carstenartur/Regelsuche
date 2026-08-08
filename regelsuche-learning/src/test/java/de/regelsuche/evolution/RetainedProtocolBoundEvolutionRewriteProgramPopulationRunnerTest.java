@@ -225,7 +225,13 @@ class RetainedProtocolBoundEvolutionRewriteProgramPopulationRunnerTest {
         EvolutionRewriteProgramPlan multiplyOneSeedPlan =
             EvolutionRewriteProgramPlan.create(
                 genome,
-                new Source("retained_seed_mul_one", List.of("mul_one")),
+                new EvolutionRewriteProgramPlan.Repeat(
+                    "retained_seed_mul_one_repeat",
+                    new Source(
+                        "retained_seed_mul_one",
+                        List.of("mul_one")),
+                    1,
+                    2),
                 12,
                 12);
         List<EvolutionRewriteProgramCandidate> seeds = List.of(
