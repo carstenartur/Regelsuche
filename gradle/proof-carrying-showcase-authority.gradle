@@ -1,0 +1,31 @@
+/*
+ * Checkout-owned one-attempt execution entry point for the proof-carrying
+ * self-improvement showcase. GitHub Actions selects this Gradle task only for
+ * the reserved authority branch-creation event; all authority decisions and
+ * retained execution semantics remain in Java/JUnit.
+ */
+
+def authorizedShowcase = tasks.register(
+    'authorizedShowcaseTrainFreeze') {
+    group = 'verification'
+    description = 'Runs ciCheck, then verifies the one-attempt authority and freezes the real TRAIN candidate.'
+    dependsOn 'ciCheck'
+}
+
+gradle.projectsEvaluated {
+    def appProject = project(':app')
+    def authorityExecution = appProject.tasks.register(
+        'runAuthorizedShowcaseTrainFreeze', JavaExec) {
+        group = 'verification'
+        description = 'Verifies the committed GitHub authority and executes the retained Java TRAIN/freeze command.'
+        dependsOn appProject.tasks.named('classes')
+        classpath = appProject.sourceSets.main.runtimeClasspath
+        mainClass = 'de.regelsuche.evolution.ProofCarryingShowcaseTrainFreezeAuthorityCommand'
+        workingDir rootProject.projectDir
+        mustRunAfter rootProject.tasks.named('ciCheck')
+        outputs.upToDateWhen { false }
+    }
+    authorizedShowcase.configure {
+        dependsOn authorityExecution
+    }
+}

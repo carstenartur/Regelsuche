@@ -263,3 +263,20 @@
   evidenceTypes:
     - ui-evidence
   tags: [web, ui, rest, workbench]
+
+- id: proof-carrying-showcase
+  label: "Proof-carrying self-improvement showcase"
+  description: "Forms, freezes and retains the TRAIN-only learned rewrite program and the one-attempt authority evidence while keeping public randomness and FINAL TEST material unavailable until after the candidate freeze."
+  modules: [app, regelsuche-learning]
+  ownerModules: [app]
+  typePatterns:
+    - 'ProofCarryingShowcase*'
+    - 'Retained*EvolutionRewriteProgramPopulation*'
+    - 'ProtocolBoundRetainedEvolutionRewriteProgramPopulation*'
+  testPatterns:
+    - 'ProofCarryingShowcase*Test'
+    - 'Retained*EvolutionRewriteProgramPopulation*Test'
+  docPatterns:
+    - docs/proof-carrying-self-improvement-showcase.md
+    - docs/evolution-rewrite-program-populations.md
+  tags: [showcase, learning, reproducibility, authority]

@@ -36,6 +36,8 @@ RetainedEvolutionRewriteProgramPopulationRun
 ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
 ProofCarryingShowcaseCandidateFreezer
 ProofCarryingShowcaseCandidateFreeze
+ProofCarryingShowcaseTrainAndFreezeCommand
+ProofCarryingShowcaseTrainFreezeAuthorityCommand
 ProofCarryingShowcasePublicRandomnessReceipt
 ProofCarryingShowcaseSeedReceipt
 ProofCarryingShowcaseCaseGenerator
@@ -230,6 +232,9 @@ Focused Java/JUnit execution:
 ```bash
 ./gradlew :regelsuche-learning:test \
   --tests 'de.regelsuche.evolution.ProofCarryingShowcase*'
+
+./gradlew :app:test \
+  --tests 'de.regelsuche.evolution.ProofCarryingShowcase*'
 ```
 
 The focused tests cover:
@@ -244,10 +249,12 @@ The focused tests cover:
 - case, family and suite content roots;
 - schema/Java vocabulary agreement;
 - exact mathematical confirmation and complete assumption coverage;
+- canonical one-attempt authority manifests and run-history rejection;
+- authority-commit parent/file binding and retained execution receipts;
 - the absence of Python showcase scripts and special init-script test paths.
 
-After those gates are green, the reversible TRAIN-only stage is launched through
-the ordinary application entry point:
+After those gates are green, the reversible TRAIN-only stage can also be run
+through the ordinary application entry point for development and characterization:
 
 ```bash
 ./gradlew :app:run --args='showcase-train-freeze \
@@ -258,22 +265,97 @@ the ordinary application entry point:
 The output directory must not already exist. A successful invocation contains
 the plan, TRAIN-only split, suite, evaluator, seeds, study, protocol-bound
 terminal population, selection, selected candidate, readable program and the
-final candidate-freeze receipt.
+final candidate-freeze receipt. This development invocation is not the retained
+one-attempt authority run.
+
+## One-attempt execution authority
+
+The retained real execution reuses the existing central `CI` workflow rather
+than adding a showcase-specific workflow. GitHub Actions remains a thin
+platform adapter: for the exact reserved branch-creation event it chooses the
+checkout-owned Gradle task `authorizedShowcaseTrainFreeze`; for ordinary CI it
+chooses `ciCheck`. The workflow contains no authority validation, candidate
+selection or result interpretation.
+
+`authorizedShowcaseTrainFreeze` depends on the unchanged authoritative
+`ciCheck` lifecycle. Only after that lifecycle succeeds can the ordinary Java
+class `ProofCarryingShowcaseTrainFreezeAuthorityCommand` verify the authority
+and execute TRAIN/freeze. This preserves the repository rule that pass/fail
+semantics belong to checkout-owned Gradle/Java/JUnit code rather than GitHub
+Actions YAML.
+
+After the execution support is merged and the resulting `main` commit is green,
+an unreferenced single-parent authority commit is created whose only changed
+file is:
+
+```text
+research/showcase/proof-carrying-self-improvement/
+  train-freeze-authority-v1.json
+```
+
+The manifest binds the authority ID and branch, the reviewed implementation
+commit, the TRAIN-and-freeze operation, a maximum of one workflow attempt and
+the `AUTHORIZED_NOT_RUN` state. Creating the new branch
+`showcase/train-freeze-authority-v1` directly at that commit emits the one
+authorized GitHub `create` event. Later pushes to the branch are not execution
+triggers.
+
+The checkout-owned Java authority verifier fails closed unless all of the
+following hold:
+
+- the environment identifies a branch-creation `create` event for the exact
+  authority ref;
+- the workflow attempt number is one;
+- no earlier `create`-triggered workflow run exists for that authority branch;
+- the authority manifest is a bounded regular non-symlink file;
+- the manifest is canonical one-line JSON with one final newline and exactly
+  the fixed authority vocabulary;
+- the authority commit has exactly one parent;
+- that parent equals the manifest's reviewed implementation commit;
+- the authority manifest is the commit's only added file and its local Git blob
+  identity matches GitHub's commit evidence;
+- the authority commit equals the event-bound repository SHA supplied by the
+  thin workflow adapter;
+- the produced candidate freeze parses through the production Java contract,
+  remains compatible with the frozen plan and binds the same repository commit;
+- the retained output contains no public-randomness or FINAL TEST artifact.
+
+The verifier queries GitHub's read-only REST surface for immutable commit
+metadata and the create-event run history. The workflow grants only `actions:
+read`, `contents: read` and `packages: read`; neither the verifier nor the
+TRAIN/freeze run can write repository state.
+
+The special concurrency group never cancels an active authority run. Deleting
+and recreating the same branch emits another `create` event, which is rejected
+by the retained run-history check; GitHub's rerun action is rejected by the
+attempt-number check. Cancellation or technical failure therefore consumes
+authority version `v1`. Another attempt requires a newly reviewed authority
+version instead of a silent retry.
+
+A successful retained attempt writes the ordinary atomically published
+TRAIN/freeze directory plus checkout-owned execution evidence containing a
+deterministic SHA-256 file manifest, the authority-manifest hash and an
+execution receipt. The existing artifact-upload step only retains these files;
+it does not create their semantics. No drand round is selected or fetched and
+no FINAL TEST can be generated by this authority path.
 
 ## Current boundary and next stage
 
-The Java contract, retained TRAIN population, deterministic selection and
-atomic TRAIN/freeze command are implemented on the current development stack.
-No real TRAIN run, candidate freeze, drand round or FINAL TEST has been consumed.
+The Java contract, retained TRAIN population, deterministic selection, atomic
+TRAIN/freeze command and checkout-owned one-attempt authority are implemented
+on the current development stack. No real TRAIN run, candidate freeze, drand
+round or FINAL TEST has been consumed.
 
 The remaining sequence is:
 
-1. merge the complete pre-randomness Java stack only after the normal checkout
-   gate is green;
-2. run TRAIN and atomically publish one real candidate freeze from the pinned
-   clean checkout;
-3. implement and verify the pinned Java drand adapter against official vectors;
-4. choose the first eligible round strictly after the frozen not-before time;
-5. derive the seed and generate the real suite exactly once;
-6. execute the complete paired comparison matrix;
-7. generate the result card and visual evidence from retained artifacts.
+1. merge the one-attempt execution authority only after its normal checkout gate
+   is green;
+2. require the post-merge `main` gate to be green before creating the authority
+   commit;
+3. create the single authority commit and reserved branch exactly once, then
+   retain the resulting TRAIN population and candidate freeze;
+4. implement and verify the pinned Java drand adapter against official vectors;
+5. choose the first eligible round strictly after the frozen not-before time;
+6. derive the seed and generate the real suite exactly once;
+7. execute the complete paired comparison matrix;
+8. generate the result card and visual evidence from retained artifacts.

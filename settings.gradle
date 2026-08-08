@@ -119,6 +119,9 @@ gradle.beforeProject { candidate ->
             'gradle/ci-verification.gradle')
         candidate.apply from: new File(
             settingsDir,
+            'gradle/proof-carrying-showcase-authority.gradle')
+        candidate.apply from: new File(
+            settingsDir,
             'gradle/visual-regression-verification.gradle')
     }
     if (candidate.path == ':app') {
