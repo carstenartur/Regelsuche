@@ -1,0 +1,19 @@
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    def pythonExecutable = root.providers.gradleProperty('pythonExecutable').getOrElse('python3')
+
+    root.tasks.register('verifyProofCarryingShowcaseContract', Exec) {
+        group = 'verification'
+        description = 'Verifies the frozen, unexecuted proof-carrying self-improvement showcase contract and seed-ordering boundary.'
+        workingDir root.rootDir
+        commandLine pythonExecutable,
+            'scripts/verify-proof-carrying-showcase-contract.py',
+            'research/showcase/proof-carrying-self-improvement/showcase-plan.json'
+        inputs.file('research/showcase/proof-carrying-self-improvement/showcase-plan.json')
+        inputs.file('scripts/verify-proof-carrying-showcase-contract.py')
+        inputs.file('scripts/derive-proof-carrying-showcase-seed.py')
+        inputs.files(root.fileTree('docs/schemas') {
+            include 'regelsuche-proof-carrying-showcase-*.schema.json'
+        })
+    }
+}

@@ -1,0 +1,402 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.proof-carrying-self-improvement-showcase-plan/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "showcaseId",
+    "issue",
+    "status",
+    "claimPolicy",
+    "publicationGradeFlagship",
+    "candidateFormation",
+    "publicRandomness",
+    "challengeGenerator",
+    "comparison",
+    "acceptance",
+    "requiredArtifacts",
+    "stageStates",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.proof-carrying-self-improvement-showcase-plan/v1"
+    },
+    "showcaseId": {
+      "const": "proof-carrying-self-improvement-2026-08/v1"
+    },
+    "issue": {
+      "const": 597
+    },
+    "status": {
+      "const": "CONTRACT_FROZEN_NOT_RUN"
+    },
+    "claimPolicy": {
+      "const": "SHOWCASE_CONFIRMED_DOES_NOT_IMPLY_EXPERT_REVIEW_OR_EXTERNAL_NOVELTY"
+    },
+    "publicationGradeFlagship": {
+      "const": "DEFERRED_PENDING_INDEPENDENT_REVIEW"
+    },
+    "candidateFormation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visibleSplits",
+        "prohibitedInformation",
+        "candidateFreezeRequiredBeforeRandomnessRound",
+        "requiredCandidateProperties"
+      ],
+      "properties": {
+        "visibleSplits": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "TRAIN"
+            }
+          ],
+          "items": false,
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "prohibitedInformation": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "FINAL_TEST_SEED"
+            },
+            {
+              "const": "FINAL_TEST_CASES"
+            },
+            {
+              "const": "DRAND_RANDOMNESS"
+            },
+            {
+              "const": "EXPERT_LABELS"
+            },
+            {
+              "const": "EXTERNAL_NOVELTY_RESULTS"
+            }
+          ],
+          "items": false,
+          "minItems": 5,
+          "maxItems": 5
+        },
+        "candidateFreezeRequiredBeforeRandomnessRound": {
+          "const": true
+        },
+        "requiredCandidateProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "notSeedEquivalent",
+            "compositionTopology",
+            "decisionTopology",
+            "minimumPrimitiveStepsOnSuccessfulPath"
+          ],
+          "properties": {
+            "notSeedEquivalent": {
+              "const": true
+            },
+            "compositionTopology": {
+              "const": true
+            },
+            "decisionTopology": {
+              "const": true
+            },
+            "minimumPrimitiveStepsOnSuccessfulPath": {
+              "type": "integer",
+              "minimum": 3
+            }
+          }
+        }
+      }
+    },
+    "publicRandomness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "network",
+        "chainHash",
+        "apiVersion",
+        "roundEndpointTemplate",
+        "roundSelection",
+        "signatureVerification",
+        "seedDerivation",
+        "minimumDelaySecondsAfterCandidateFreeze"
+      ],
+      "properties": {
+        "provider": {
+          "const": "DRAND_LEAGUE_OF_ENTROPY"
+        },
+        "network": {
+          "const": "default"
+        },
+        "chainHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "apiVersion": {
+          "const": "v1"
+        },
+        "roundEndpointTemplate": {
+          "const": "/{chainHash}/public/{round}"
+        },
+        "roundSelection": {
+          "const": "FIRST_VERIFIED_ROUND_STRICTLY_AFTER_CANDIDATE_NOT_BEFORE"
+        },
+        "signatureVerification": {
+          "const": "PINNED_DRAND_CLIENT_AND_CHAIN_INFO_REQUIRED"
+        },
+        "seedDerivation": {
+          "const": "SHA256_DOMAIN_SEPARATED_V1"
+        },
+        "minimumDelaySecondsAfterCandidateFreeze": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "challengeGenerator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generatorId",
+        "caseCount",
+        "families",
+        "sameGeneratedCasesForAllConfigurations",
+        "assumptionsRetained",
+        "caseIdentity",
+        "manualReplacementOrPruning"
+      ],
+      "properties": {
+        "generatorId": {
+          "const": "proof-carrying-symbolic-stress-ladders/v1"
+        },
+        "caseCount": {
+          "const": 24
+        },
+        "families": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "familyId",
+              "caseCount",
+              "difficultyLevels"
+            ],
+            "properties": {
+              "familyId": {
+                "type": "string",
+                "enum": [
+                  "nested-rational-cancellation",
+                  "factor-cancel-collect",
+                  "multi-stage-rational-polynomial"
+                ]
+              },
+              "caseCount": {
+                "const": 8
+              },
+              "difficultyLevels": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "const": 3
+                  },
+                  {
+                    "const": 4
+                  },
+                  {
+                    "const": 5
+                  },
+                  {
+                    "const": 6
+                  }
+                ],
+                "items": false,
+                "minItems": 4,
+                "maxItems": 4
+              }
+            }
+          }
+        },
+        "sameGeneratedCasesForAllConfigurations": {
+          "const": true
+        },
+        "assumptionsRetained": {
+          "const": true
+        },
+        "caseIdentity": {
+          "const": "SHA256_CANONICAL_CASE_V1"
+        },
+        "manualReplacementOrPruning": {
+          "const": "FORBIDDEN"
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "matchedInformation",
+        "matchedMechanicalWork",
+        "configurations",
+        "authoritativeMetrics",
+        "elapsedTimeRole"
+      ],
+      "properties": {
+        "matchedInformation": {
+          "const": true
+        },
+        "matchedMechanicalWork": {
+          "const": true
+        },
+        "configurations": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "enum": [
+              "primitive-best-first",
+              "preregistered-handwritten-program",
+              "random-valid-program",
+              "no-composition-ablation",
+              "no-decision-ablation",
+              "learned-program"
+            ]
+          }
+        },
+        "authoritativeMetrics": {
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 11,
+          "maxItems": 11,
+          "items": {
+            "type": "string"
+          }
+        },
+        "elapsedTimeRole": {
+          "const": "ENVIRONMENT_QUALIFIED_DIAGNOSTIC_ONLY"
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimumImprovedCases",
+        "minimumDistinctImprovedFamilies",
+        "minimumNewlyReachedCases",
+        "minimumMedianCanonicalWorkReductionPermille",
+        "maximumCorrectnessRegressions",
+        "maximumHiddenAssumptionRegressions",
+        "maximumTechnicalFailures",
+        "positiveRoute",
+        "stretchRoute",
+        "nullResultPolicy",
+        "requiredCleanReproductions",
+        "requirePinnedContainerReproduction"
+      ],
+      "properties": {
+        "minimumImprovedCases": {
+          "type": "integer",
+          "minimum": 4
+        },
+        "minimumDistinctImprovedFamilies": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimumNewlyReachedCases": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimumMedianCanonicalWorkReductionPermille": {
+          "type": "integer",
+          "minimum": 900,
+          "maximum": 1000
+        },
+        "maximumCorrectnessRegressions": {
+          "const": 0
+        },
+        "maximumHiddenAssumptionRegressions": {
+          "const": 0
+        },
+        "maximumTechnicalFailures": {
+          "const": 0
+        },
+        "positiveRoute": {
+          "const": "NEW_REACHABILITY_OR_TEN_X_MEDIAN_CANONICAL_WORK_REDUCTION"
+        },
+        "stretchRoute": {
+          "const": "HUNDRED_X_WORK_REDUCTION_OR_TWO_ADDITIONAL_DIFFICULTY_LEVELS"
+        },
+        "nullResultPolicy": {
+          "const": "COMPLETE_SHOWCASE_NULL_RESULT_WITHOUT_THRESHOLD_OR_CASE_REPAIR"
+        },
+        "requiredCleanReproductions": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "requirePinnedContainerReproduction": {
+          "const": true
+        }
+      }
+    },
+    "requiredArtifacts": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+\\.json$"
+      }
+    },
+    "stageStates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateFreeze",
+        "publicRandomness",
+        "generatedFinalTest",
+        "execution",
+        "resultCard",
+        "expertReview",
+        "externalNovelty"
+      ],
+      "properties": {
+        "candidateFreeze": {
+          "const": "NOT_CREATED"
+        },
+        "publicRandomness": {
+          "const": "NOT_AVAILABLE"
+        },
+        "generatedFinalTest": {
+          "const": "NOT_CREATED"
+        },
+        "execution": {
+          "const": "NOT_RUN"
+        },
+        "resultCard": {
+          "const": "NOT_CREATED"
+        },
+        "expertReview": {
+          "const": "DEFERRED"
+        },
+        "externalNovelty": {
+          "const": "NOT_EVALUATED"
+        }
+      }
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

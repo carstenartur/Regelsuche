@@ -1,0 +1,139 @@
+{
+  "schema": "regelsuche.proof-carrying-self-improvement-showcase-plan/v1",
+  "showcaseId": "proof-carrying-self-improvement-2026-08/v1",
+  "issue": 597,
+  "status": "CONTRACT_FROZEN_NOT_RUN",
+  "claimPolicy": "SHOWCASE_CONFIRMED_DOES_NOT_IMPLY_EXPERT_REVIEW_OR_EXTERNAL_NOVELTY",
+  "publicationGradeFlagship": "DEFERRED_PENDING_INDEPENDENT_REVIEW",
+  "candidateFormation": {
+    "visibleSplits": [
+      "TRAIN"
+    ],
+    "prohibitedInformation": [
+      "FINAL_TEST_SEED",
+      "FINAL_TEST_CASES",
+      "DRAND_RANDOMNESS",
+      "EXPERT_LABELS",
+      "EXTERNAL_NOVELTY_RESULTS"
+    ],
+    "candidateFreezeRequiredBeforeRandomnessRound": true,
+    "requiredCandidateProperties": {
+      "notSeedEquivalent": true,
+      "compositionTopology": true,
+      "decisionTopology": true,
+      "minimumPrimitiveStepsOnSuccessfulPath": 3
+    }
+  },
+  "publicRandomness": {
+    "provider": "DRAND_LEAGUE_OF_ENTROPY",
+    "network": "default",
+    "chainHash": "8990e7a9aaed2ffed73dbd7092123d6f289930540d7651336225dc172e51b2ce",
+    "apiVersion": "v1",
+    "roundEndpointTemplate": "/{chainHash}/public/{round}",
+    "roundSelection": "FIRST_VERIFIED_ROUND_STRICTLY_AFTER_CANDIDATE_NOT_BEFORE",
+    "signatureVerification": "PINNED_DRAND_CLIENT_AND_CHAIN_INFO_REQUIRED",
+    "seedDerivation": "SHA256_DOMAIN_SEPARATED_V1",
+    "minimumDelaySecondsAfterCandidateFreeze": 300
+  },
+  "challengeGenerator": {
+    "generatorId": "proof-carrying-symbolic-stress-ladders/v1",
+    "caseCount": 24,
+    "families": [
+      {
+        "familyId": "nested-rational-cancellation",
+        "caseCount": 8,
+        "difficultyLevels": [
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "familyId": "factor-cancel-collect",
+        "caseCount": 8,
+        "difficultyLevels": [
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      {
+        "familyId": "multi-stage-rational-polynomial",
+        "caseCount": 8,
+        "difficultyLevels": [
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    ],
+    "sameGeneratedCasesForAllConfigurations": true,
+    "assumptionsRetained": true,
+    "caseIdentity": "SHA256_CANONICAL_CASE_V1",
+    "manualReplacementOrPruning": "FORBIDDEN"
+  },
+  "comparison": {
+    "matchedInformation": true,
+    "matchedMechanicalWork": true,
+    "configurations": [
+      "primitive-best-first",
+      "preregistered-handwritten-program",
+      "random-valid-program",
+      "no-composition-ablation",
+      "no-decision-ablation",
+      "learned-program"
+    ],
+    "authoritativeMetrics": [
+      "reachedCases",
+      "newlyReachedCases",
+      "distinctImprovedFamilies",
+      "canonicalPrimitiveWork",
+      "canonicalTotalWork",
+      "exploredStates",
+      "generatedCandidates",
+      "pathPrimitiveSteps",
+      "correctnessRegressions",
+      "hiddenAssumptionRegressions",
+      "technicalFailures"
+    ],
+    "elapsedTimeRole": "ENVIRONMENT_QUALIFIED_DIAGNOSTIC_ONLY"
+  },
+  "acceptance": {
+    "minimumImprovedCases": 4,
+    "minimumDistinctImprovedFamilies": 2,
+    "minimumNewlyReachedCases": 2,
+    "minimumMedianCanonicalWorkReductionPermille": 900,
+    "maximumCorrectnessRegressions": 0,
+    "maximumHiddenAssumptionRegressions": 0,
+    "maximumTechnicalFailures": 0,
+    "positiveRoute": "NEW_REACHABILITY_OR_TEN_X_MEDIAN_CANONICAL_WORK_REDUCTION",
+    "stretchRoute": "HUNDRED_X_WORK_REDUCTION_OR_TWO_ADDITIONAL_DIFFICULTY_LEVELS",
+    "nullResultPolicy": "COMPLETE_SHOWCASE_NULL_RESULT_WITHOUT_THRESHOLD_OR_CASE_REPAIR",
+    "requiredCleanReproductions": 2,
+    "requirePinnedContainerReproduction": true
+  },
+  "requiredArtifacts": [
+    "showcase-plan.json",
+    "candidate-freeze.json",
+    "public-randomness-receipt.json",
+    "showcase-seed-receipt.json",
+    "generated-final-test.json",
+    "baseline-results.json",
+    "learned-program-results.json",
+    "showcase-result-card.json",
+    "showcase-run.json"
+  ],
+  "stageStates": {
+    "candidateFreeze": "NOT_CREATED",
+    "publicRandomness": "NOT_AVAILABLE",
+    "generatedFinalTest": "NOT_CREATED",
+    "execution": "NOT_RUN",
+    "resultCard": "NOT_CREATED",
+    "expertReview": "DEFERRED",
+    "externalNovelty": "NOT_EVALUATED"
+  },
+  "contentHash": "sha256:3aaff50d7208c0339479926049ff8aa9729ae878ab5f9972a54c865ed84970d8"
+}
