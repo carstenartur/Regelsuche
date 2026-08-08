@@ -423,11 +423,11 @@ public final class DeterministicRewriteProgramMutator {
 <span class="fc" id="L423">                repeat.minIterations(),</span>
 <span class="fc" id="L424">                repeat.maxIterations());</span>
         }
-<span class="pc bpc" id="L426" title="1 of 2 branches missed.">        if (current instanceof Require require) {</span>
-<span class="nc" id="L427">            return new Require(</span>
-<span class="nc" id="L428">                require.nodeId(),</span>
-<span class="nc" id="L429">                replace(require.body(), targetNodeId, mutation),</span>
-<span class="nc" id="L430">                require.requirement());</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        if (current instanceof Require require) {</span>
+<span class="fc" id="L427">            return new Require(</span>
+<span class="fc" id="L428">                require.nodeId(),</span>
+<span class="fc" id="L429">                replace(require.body(), targetNodeId, mutation),</span>
+<span class="fc" id="L430">                require.requirement());</span>
         }
 <span class="fc bfc" id="L432" title="All 2 branches covered.">        if (current instanceof Prioritize prioritize) {</span>
 <span class="fc" id="L433">            return new Prioritize(</span>
@@ -494,8 +494,8 @@ public final class DeterministicRewriteProgramMutator {
 <span class="fc bfc" id="L494" title="All 2 branches covered.">        if (node instanceof Repeat repeat) {</span>
 <span class="fc" id="L495">            return repeat.body();</span>
         }
-<span class="pc bpc" id="L497" title="1 of 2 branches missed.">        if (node instanceof Require require) {</span>
-<span class="nc" id="L498">            return require.body();</span>
+<span class="fc bfc" id="L497" title="All 2 branches covered.">        if (node instanceof Require require) {</span>
+<span class="fc" id="L498">            return require.body();</span>
         }
 <span class="fc bfc" id="L500" title="All 2 branches covered.">        if (node instanceof Prioritize prioritize) {</span>
 <span class="fc" id="L501">            return prioritize.body();</span>

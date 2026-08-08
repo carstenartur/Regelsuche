@@ -241,8 +241,8 @@ public final class EvolutionRewriteProgramPopulationEngine {
 <span class="fc bfc" id="L241" title="All 2 branches covered.">        for (EvolutionRewriteProgramCandidate parent : parents) {</span>
 <span class="fc" id="L242">            int remainingAttempts = plan.budget().maxMutationAttempts()</span>
                 - state.mutationAttempts;
-<span class="pc bpc" id="L244" title="2 of 4 branches missed.">            if (remainingAttempts &lt;= 0 || children.size() &gt;= poolLimit) {</span>
-<span class="nc" id="L245">                break;</span>
+<span class="pc bpc" id="L244" title="1 of 4 branches missed.">            if (remainingAttempts &lt;= 0 || children.size() &gt;= poolLimit) {</span>
+<span class="fc" id="L245">                break;</span>
             }
 <span class="fc" id="L247">            int maxProposals = Math.min(128, remainingAttempts);</span>
 <span class="fc" id="L248">            int maxAccepted = Math.min(</span>

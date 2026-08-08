@@ -242,9 +242,9 @@ public final class EvolutionRewriteProgramCompiler {
     private static Predicate&lt;RewriteCandidate&gt; requirementPredicate(
         Requirement requirement
     ) {
-<span class="pc bpc" id="L245" title="2 of 4 branches missed.">        return switch (requirement.kind()) {</span>
+<span class="pc bpc" id="L245" title="1 of 4 branches missed.">        return switch (requirement.kind()) {</span>
             case EQUIVALENCE_PRESERVING_BY_CONSTRUCTION -&gt;
-<span class="nc" id="L247">                RewritePrograms.equivalencePreserving();</span>
+<span class="fc" id="L247">                RewritePrograms.equivalencePreserving();</span>
 <span class="pc" id="L248">            case ASSUMPTION_FREE -&gt; candidate -&gt; candidate.steps().stream()</span>
 <span class="nc" id="L249">                .allMatch(step -&gt; step.assumptions().isEmpty());</span>
 <span class="nc" id="L250">            case MAX_ESTIMATED_COST_DELTA -&gt; candidate -&gt;</span>
