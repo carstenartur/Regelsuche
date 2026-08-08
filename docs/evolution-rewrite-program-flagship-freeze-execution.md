@@ -109,6 +109,28 @@ Repeated assembly from identical private bundles and the same repository commit
 is byte-identical. Changing any private case, public plan or repository commit
 changes the final receipt identity.
 
+## Independent public reproduction
+
+After publication, an auditor must not need access to either private bundle to
+reconstruct the public freeze. The commitments and hash-only split references
+contain the reveal-root and complete split identities required for deterministic
+reconstruction. Run:
+
+```bash
+scripts/freeze-flagship-rewrite-program-public.sh \
+  "$(git rev-parse HEAD)" \
+  path/to/validation-commitment.json \
+  path/to/validation-split-references.json \
+  path/to/final-test-commitment.json \
+  path/to/final-test-split-references.json \
+  build/flagship-freeze-reproduction
+```
+
+The resulting directory must be byte-identical to the trusted private-path
+output. See
+[`evolution-rewrite-program-public-freeze-reproduction.md`](evolution-rewrite-program-public-freeze-reproduction.md)
+for the fail-closed input checks and claim boundary.
+
 ## Next permitted action
 
 Only after review and publication of the complete freeze may the protocol-bound

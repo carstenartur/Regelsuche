@@ -1,0 +1,99 @@
+gradle.projectsEvaluated {
+    def appProject = gradle.rootProject.project(':app')
+    appProject.tasks.register('reproduceFlagshipRewriteProgramFreeze', JavaExec) {
+        group = 'research'
+        description = 'Reconstructs the public FROZEN_NOT_RUN flagship preregistration without private reveal material.'
+        dependsOn appProject.tasks.named('classes')
+        classpath = appProject.sourceSets.main.runtimeClasspath
+        mainClass = 'de.regelsuche.evolution.FlagshipRewriteProgramFreezeAssembler'
+        workingDir gradle.rootProject.rootDir
+
+        doFirst {
+            def required = [
+                repositoryCommit: appProject.providers.gradleProperty('flagshipRepositoryCommit').orNull,
+                validationCommitment: appProject.providers.gradleProperty('flagshipValidationCommitment').orNull,
+                validationReferences: appProject.providers.gradleProperty('flagshipValidationReferences').orNull,
+                finalTestCommitment: appProject.providers.gradleProperty('flagshipFinalTestCommitment').orNull,
+                finalTestReferences: appProject.providers.gradleProperty('flagshipFinalTestReferences').orNull,
+                output: appProject.providers.gradleProperty('flagshipFreezeOutput').orNull
+            ]
+            def missing = required.findAll { key, value -> value == null || value.trim().isEmpty() }
+                .keySet()
+            if (!missing.isEmpty()) {
+                throw new GradleException(
+                    'Missing public flagship freeze properties: '
+                        + missing.sort().join(', '))
+            }
+            if (!(required.repositoryCommit ==~ /[0-9a-f]{40}/)) {
+                throw new GradleException(
+                    'flagshipRepositoryCommit must be a lowercase 40-character Git commit')
+            }
+
+            def repositoryRoot = gradle.rootProject.rootDir.toPath().toRealPath()
+            def actualCommit = appProject.providers.exec {
+                workingDir gradle.rootProject.rootDir
+                commandLine 'git', 'rev-parse', 'HEAD'
+            }.standardOutput.asText.get().trim()
+            if (actualCommit != required.repositoryCommit) {
+                throw new GradleException(
+                    'Repository commit differs from current HEAD: expected='
+                        + required.repositoryCommit + ', actual=' + actualCommit)
+            }
+            def dirtyState = appProject.providers.exec {
+                workingDir gradle.rootProject.rootDir
+                commandLine 'git', 'status', '--porcelain', '--untracked-files=all'
+            }.standardOutput.asText.get().trim()
+            if (!dirtyState.isEmpty()) {
+                throw new GradleException(
+                    'Public flagship freeze reproduction requires a clean checkout')
+            }
+
+            def resolvePath = { String raw ->
+                def candidate = java.nio.file.Path.of(raw)
+                candidate.isAbsolute()
+                    ? candidate.normalize()
+                    : repositoryRoot.resolve(candidate).normalize()
+            }
+            def publicPaths = [
+                resolvePath(required.validationCommitment),
+                resolvePath(required.validationReferences),
+                resolvePath(required.finalTestCommitment),
+                resolvePath(required.finalTestReferences)
+            ]
+            publicPaths.each { publicPath ->
+                if (!java.nio.file.Files.isRegularFile(publicPath)
+                        || java.nio.file.Files.isSymbolicLink(publicPath)) {
+                    throw new GradleException(
+                        'Public flagship input is not a regular non-symlink file: '
+                            + publicPath)
+                }
+            }
+
+            def outputPath = resolvePath(required.output)
+            if (java.nio.file.Files.exists(outputPath)) {
+                if (!java.nio.file.Files.isDirectory(outputPath)) {
+                    throw new GradleException(
+                        'Flagship freeze output exists and is not a directory: '
+                            + outputPath)
+                }
+                def nonEmpty
+                java.nio.file.Files.list(outputPath).withCloseable { stream ->
+                    nonEmpty = stream.findAny().isPresent()
+                }
+                if (nonEmpty) {
+                    throw new GradleException(
+                        'Flagship freeze output directory must be empty: '
+                            + outputPath)
+                }
+            }
+
+            args '--public',
+                required.repositoryCommit,
+                publicPaths[0].toString(),
+                publicPaths[1].toString(),
+                publicPaths[2].toString(),
+                publicPaths[3].toString(),
+                outputPath.toString()
+        }
+    }
+}
