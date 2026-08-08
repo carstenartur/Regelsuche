@@ -154,8 +154,10 @@ public record ProofCarryingShowcaseDrandChainInfo(
     /**
      * First scheduled round whose Unix time is strictly greater than the
      * supplied frozen candidate boundary. No network access is performed.
+     * Stage C verifies exactly this round and fails closed instead of silently
+     * substituting a later round.
      */
-    public long firstRoundStrictlyAfter(long unixTime) {
+    public long firstEligibleScheduledRound(long unixTime) {
         if (unixTime < 0) {
             throw new IllegalArgumentException("boundary must not be negative");
         }

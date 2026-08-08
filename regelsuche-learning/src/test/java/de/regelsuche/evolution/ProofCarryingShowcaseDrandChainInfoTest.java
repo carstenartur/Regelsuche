@@ -30,23 +30,23 @@ class ProofCarryingShowcaseDrandChainInfoTest {
     }
 
     @Test
-    void computesOnlyTheFirstScheduledRoundStrictlyAfterTheBoundary() {
+    void computesOnlyTheFirstEligibleScheduledRoundAfterTheBoundary() {
         ProofCarryingShowcaseDrandChainInfo chain =
             ProofCarryingShowcaseDrandChainInfo.createDefault();
 
-        assertEquals(1L, chain.firstRoundStrictlyAfter(0L));
-        assertEquals(2L, chain.firstRoundStrictlyAfter(chain.genesisTime()));
+        assertEquals(1L, chain.firstEligibleScheduledRound(0L));
+        assertEquals(2L, chain.firstEligibleScheduledRound(chain.genesisTime()));
         assertEquals(
             2L,
-            chain.firstRoundStrictlyAfter(chain.genesisTime() + 29));
+            chain.firstEligibleScheduledRound(chain.genesisTime() + 29));
         assertEquals(
             3L,
-            chain.firstRoundStrictlyAfter(chain.genesisTime() + 30));
+            chain.firstEligibleScheduledRound(chain.genesisTime() + 30));
         assertEquals(chain.genesisTime(), chain.roundUnixTime(1));
         assertEquals(chain.genesisTime() + 30, chain.roundUnixTime(2));
         assertThrows(
             IllegalArgumentException.class,
-            () -> chain.firstRoundStrictlyAfter(-1));
+            () -> chain.firstEligibleScheduledRound(-1));
         assertThrows(
             IllegalArgumentException.class,
             () -> chain.roundUnixTime(0));
