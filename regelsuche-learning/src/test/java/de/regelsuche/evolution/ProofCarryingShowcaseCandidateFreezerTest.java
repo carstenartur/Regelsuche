@@ -64,9 +64,11 @@ class ProofCarryingShowcaseCandidateFreezerTest {
         RetainedEvolutionRewriteProgramPopulationRun retained =
             RetainedEvolutionRewriteProgramPopulationRun.create(
                 run, finalCandidates);
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun authority =
+            authority(fixture, retained);
 
         var first = freezer.freeze(
-            retained,
+            authority,
             fixture.study(),
             fixture.seeds(),
             "a".repeat(40),
@@ -74,7 +76,7 @@ class ProofCarryingShowcaseCandidateFreezerTest {
             hash("showcase-work-budget"),
             2_000_000_000L);
         var second = freezer.freeze(
-            retained,
+            authority,
             fixture.study(),
             fixture.seeds(),
             "a".repeat(40),
@@ -107,10 +109,10 @@ class ProofCarryingShowcaseCandidateFreezerTest {
             first.selection().contentHash(),
             first.candidateFreeze().selectionEvidenceHash());
         assertEquals(
-            retained.contentHash(),
+            authority.contentHash(),
             first.candidateFreeze().trainingRunHash());
         assertEquals(
-            fixture.study().trainEvaluationProtocolHash(),
+            authority.evaluationProtocolHash(),
             first.candidateFreeze().evaluationProtocolHash());
         assertEquals(
             2_000_000_300L,
@@ -169,9 +171,11 @@ class ProofCarryingShowcaseCandidateFreezerTest {
                 run.finalCandidateHashes().stream()
                     .map(registry::get)
                     .toList());
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun authority =
+            authority(fixture, retained);
 
         assertThrows(IllegalArgumentException.class, () -> freezer.freeze(
-            retained,
+            authority,
             fixture.study(),
             List.of(),
             "a".repeat(40),
@@ -179,7 +183,7 @@ class ProofCarryingShowcaseCandidateFreezerTest {
             hash("budget"),
             2_000_000_000L));
         assertThrows(IllegalArgumentException.class, () -> freezer.freeze(
-            retained,
+            authority,
             fixture.study(),
             fixture.seeds(),
             "a".repeat(40),
@@ -209,6 +213,18 @@ class ProofCarryingShowcaseCandidateFreezerTest {
             "CANDIDATE_FROZEN_FINAL_TEST_UNSEEN"));
         assertFalse(selection.contains("drandRound"));
         assertFalse(selection.contains("finalTestCases"));
+    }
+
+    private static ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
+            authority(
+                Fixture fixture,
+                RetainedEvolutionRewriteProgramPopulationRun retained
+            ) {
+        return ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun.create(
+            retained,
+            fixture.protocol(),
+            ProtocolBoundInformationParityRewriteProgramTrainFitnessEvaluator
+                .class);
     }
 
     private static EvolutionRewriteProgramTrainFitnessEvidence scoredEvidence(
@@ -334,11 +350,15 @@ class ProofCarryingShowcaseCandidateFreezerTest {
             List.of(Priority.estimatedCostThenRule()),
             List.of(8),
             List.of("add_zero", "mul_one"));
+        EvolutionRewriteProgramEvaluationProtocol protocol =
+            EvolutionRewriteProgramEvaluationProtocol
+                .informationParityExactRationalV1();
         EvolutionRewriteProgramStudyPlan study =
             EvolutionRewriteProgramStudyPlan.create(
                 manifest.studyId(),
                 manifest,
                 suite,
+                protocol,
                 catalog,
                 seeds,
                 Arrays.asList(
@@ -358,6 +378,7 @@ class ProofCarryingShowcaseCandidateFreezerTest {
             seeds.stream()
                 .map(EvolutionRewriteProgramCandidate::contentHash)
                 .toList(),
+            protocol,
             study);
     }
 
@@ -397,6 +418,7 @@ class ProofCarryingShowcaseCandidateFreezerTest {
         MutationCatalog catalog,
         List<EvolutionRewriteProgramCandidate> seeds,
         List<String> seedHashes,
+        EvolutionRewriteProgramEvaluationProtocol protocol,
         EvolutionRewriteProgramStudyPlan study
     ) {
     }
