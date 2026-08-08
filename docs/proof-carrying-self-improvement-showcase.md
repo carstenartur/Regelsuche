@@ -260,6 +260,50 @@ the plan, TRAIN-only split, suite, evaluator, seeds, study, protocol-bound
 terminal population, selection, selected candidate, readable program and the
 final candidate-freeze receipt.
 
+## One-attempt execution authority
+
+The retained real execution uses the existing central `CI` workflow rather than
+a showcase-specific workflow. After the execution support is merged, an
+unreferenced single-parent authority commit is created whose only changed file
+is:
+
+```text
+research/showcase/proof-carrying-self-improvement/
+  train-freeze-authority-v1.json
+```
+
+The manifest binds the authority ID and branch, the reviewed implementation
+commit, the TRAIN-and-freeze operation, a maximum of one workflow attempt and
+the `AUTHORIZED_NOT_RUN` state. Creating the new branch
+`showcase/train-freeze-authority-v1` directly at that commit emits the one
+authorized GitHub `create` event. Later pushes to the branch are not execution
+triggers.
+
+The authority fails closed unless all of the following hold:
+
+- the event is a branch-creation `create` event for the exact authority branch;
+- the workflow attempt number is one;
+- no earlier `create`-triggered workflow run exists for that authority branch;
+- the authority commit has exactly one parent;
+- that parent equals the manifest's reviewed implementation commit;
+- the authority manifest is the commit's only changed file;
+- the manifest is canonical one-line JSON with one final newline and its exact
+  fixed vocabulary and maximum-attempt value validate;
+- the checked-out commit equals `GITHUB_SHA` and has no tracked changes;
+- the complete checkout-owned `ciCheck` succeeds first.
+
+The special concurrency group never cancels an active authority run. Deleting
+and recreating the same branch emits another `create` event, which is rejected
+by the prior-run check; GitHub's rerun action is rejected by the attempt-number
+check. Cancellation or technical failure therefore consumes authority version
+`v1`. Another attempt requires a newly reviewed authority version instead of a
+silent retry.
+
+The workflow has read-only repository permissions. It retains the atomically
+published directory, execution log, deterministic SHA-256 file manifest, the
+authority-manifest hash and an execution receipt as a GitHub Actions artifact.
+It does not select or fetch a drand round and cannot generate FINAL TEST data.
+
 ## Current boundary and next stage
 
 The Java contract, retained TRAIN population, deterministic selection and
@@ -268,10 +312,10 @@ No real TRAIN run, candidate freeze, drand round or FINAL TEST has been consumed
 
 The remaining sequence is:
 
-1. merge the complete pre-randomness Java stack only after the normal checkout
-   gate is green;
-2. run TRAIN and atomically publish one real candidate freeze from the pinned
-   clean checkout;
+1. merge the one-attempt execution authority only after its normal checkout gate
+   is green;
+2. create the single authority commit and branch, then retain the resulting
+   TRAIN population and candidate freeze;
 3. implement and verify the pinned Java drand adapter against official vectors;
 4. choose the first eligible round strictly after the frozen not-before time;
 5. derive the seed and generate the real suite exactly once;
