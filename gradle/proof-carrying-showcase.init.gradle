@@ -24,11 +24,12 @@ gradle.projectsEvaluated {
         dependsOn verifyContract
         workingDir root.rootDir
         commandLine pythonExecutable,
-            'scripts/generate-proof-carrying-showcase-cases.py',
+            'scripts/generate-proof-carrying-showcase-final-test.py',
             '--plan', showcasePlan,
             '--self-test'
         inputs.file(showcasePlan)
         inputs.file('scripts/generate-proof-carrying-showcase-cases.py')
+        inputs.file('scripts/generate-proof-carrying-showcase-final-test.py')
         inputs.file('docs/schemas/regelsuche-proof-carrying-showcase-generated-final-test-v1.schema.json')
     }
 }
