@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-rewrite-program-protocol-bound-retained-run/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "retainedPopulationHash",
+    "retainedPopulationJson",
+    "evaluationProtocolHash",
+    "evaluatorImplementationClass",
+    "status",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-protocol-bound-retained-run/v1"
+    },
+    "retainedPopulationHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "retainedPopulationJson": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 33554432
+    },
+    "evaluationProtocolHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "evaluatorImplementationClass": {
+      "type": "string",
+      "pattern": "^[A-Za-z_$][A-Za-z0-9_$.]{2,511}$"
+    },
+    "status": {
+      "const": "PROTOCOL_BOUND_TRAIN_RETAINED"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
