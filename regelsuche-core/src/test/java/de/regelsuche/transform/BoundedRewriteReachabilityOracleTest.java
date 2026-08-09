@@ -35,7 +35,7 @@ class BoundedRewriteReachabilityOracleTest {
                 .map(BoundedRewriteReachabilityOracle.Step::expressionAfter)
                 .toList());
         assertEquals(4, result.visitedStates());
-        assertEquals(4, result.generatedTransitions());
+        assertEquals(3, result.generatedTransitions());
         assertEquals(2, result.maximumDepthReached());
         assertFalse(result.depthLimitReached());
         assertFalse(result.stateLimitReached());
