@@ -16,7 +16,9 @@ import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Priority;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Requirement;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Source;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class DeterministicRewriteProgramMutatorTest {
@@ -200,6 +202,153 @@ class DeterministicRewriteProgramMutatorTest {
         assertNotEquals(first.contentHash(), second.contentHash());
         assertTrue(first.toCanonicalJson().contains(
             "regelsuche.evolution-rewrite-program-mutation-batch/v1"));
+    }
+
+    @Test
+    void stratifiedSchedulingCoversEveryValidPermittedKindWhenCapacityAllows() {
+        EvolutionGenome genome = genome();
+        EvolutionRewriteProgramPlan parent = EvolutionRewriteProgramPlan.create(
+            genome,
+            new Source("initial_zero_source", List.of("add_zero")),
+            10,
+            10);
+        MutationCatalog catalog = richCatalog();
+        DeterministicRewriteProgramMutator mutator =
+            new DeterministicRewriteProgramMutator();
+        long seed = 20260809L;
+
+        var exhaustive = mutator.mutate(
+            genome,
+            parent,
+            catalog,
+            seed,
+            new MutationLimits(100, 100));
+        Set<EvolutionRewriteProgramMutationKind> validKinds = acceptedKinds(
+            exhaustive);
+        assertTrue(validKinds.size() >= 3);
+
+        var stratified = mutator.mutateStratifiedByMutationKind(
+            genome,
+            parent,
+            catalog,
+            seed,
+            new MutationLimits(100, validKinds.size()),
+            validKinds);
+
+        assertEquals(validKinds.size(), stratified.acceptedCount());
+        assertEquals(validKinds, acceptedKinds(stratified));
+        assertEquals(stratified, mutator.mutateStratifiedByMutationKind(
+            genome,
+            parent,
+            catalog,
+            seed,
+            new MutationLimits(100, validKinds.size()),
+            validKinds));
+    }
+
+    @Test
+    void stratifiedSchedulingUsesDistinctKindsBeforeFillingSpareCapacity() {
+        EvolutionGenome genome = genome();
+        EvolutionRewriteProgramPlan parent = EvolutionRewriteProgramPlan.create(
+            genome,
+            new Source("initial_zero_source", List.of("add_zero")),
+            10,
+            10);
+        MutationCatalog catalog = richCatalog();
+        DeterministicRewriteProgramMutator mutator =
+            new DeterministicRewriteProgramMutator();
+        long seed = 20260809L;
+
+        var exhaustive = mutator.mutate(
+            genome,
+            parent,
+            catalog,
+            seed,
+            new MutationLimits(100, 100));
+        Set<EvolutionRewriteProgramMutationKind> validKinds = acceptedKinds(
+            exhaustive);
+        assertTrue(validKinds.size() >= 3);
+
+        var bounded = mutator.mutateStratifiedByMutationKind(
+            genome,
+            parent,
+            catalog,
+            seed,
+            new MutationLimits(100, 2),
+            validKinds);
+
+        assertEquals(2, bounded.acceptedCount());
+        assertEquals(2, acceptedKinds(bounded).size());
+        assertTrue(bounded.attempts().stream().anyMatch(attempt ->
+            attempt.status() == MutationStatus.REJECTED
+                && attempt.blockers().contains(
+                    "ACCEPTED_BUDGET_EXHAUSTED:maxAccepted")));
+    }
+
+    @Test
+    void stratifiedSchedulingNeverSpendsFairnessSlotsOnUnpermittedKinds() {
+        EvolutionGenome genome = genome();
+        EvolutionRewriteProgramPlan parent = EvolutionRewriteProgramPlan.create(
+            genome,
+            new Source("initial_zero_source", List.of("add_zero")),
+            10,
+            10);
+        MutationCatalog catalog = richCatalog();
+        DeterministicRewriteProgramMutator mutator =
+            new DeterministicRewriteProgramMutator();
+        long seed = 20260809L;
+
+        var exhaustive = mutator.mutate(
+            genome,
+            parent,
+            catalog,
+            seed,
+            new MutationLimits(100, 100));
+        List<EvolutionRewriteProgramMutationKind> orderedKinds =
+            exhaustive.attempts().stream()
+                .filter(attempt -> attempt.status() == MutationStatus.ACCEPTED)
+                .map(attempt -> attempt.kind())
+                .distinct()
+                .toList();
+        assertTrue(orderedKinds.size() >= 3);
+        Set<EvolutionRewriteProgramMutationKind> permitted = Set.of(
+            orderedKinds.get(0), orderedKinds.get(2));
+
+        var bounded = mutator.mutateStratifiedByMutationKind(
+            genome,
+            parent,
+            catalog,
+            seed,
+            new MutationLimits(100, 2),
+            permitted);
+
+        assertEquals(permitted, acceptedKinds(bounded));
+        assertTrue(bounded.attempts().stream().anyMatch(attempt ->
+            !permitted.contains(attempt.kind())
+                && attempt.childPlanHash() != null
+                && attempt.blockers().contains(
+                    "MUTATION_KIND_NOT_PREREGISTERED:" + attempt.kind())));
+    }
+
+    private static MutationCatalog richCatalog() {
+        return new MutationCatalog(
+            List.of(new RepeatBounds(1, 2), new RepeatBounds(1, 3)),
+            List.of(
+                Requirement.assumptionFree(),
+                Requirement.maxPrimitiveSteps(3)),
+            List.of(Priority.estimatedCostThenRule()),
+            List.of(2, 4),
+            List.of("mul_one"));
+    }
+
+    private static Set<EvolutionRewriteProgramMutationKind> acceptedKinds(
+        DeterministicRewriteProgramMutator.MutationBatch batch
+    ) {
+        return batch.attempts().stream()
+            .filter(attempt -> attempt.status() == MutationStatus.ACCEPTED)
+            .map(attempt -> attempt.kind())
+            .collect(java.util.stream.Collectors.toCollection(
+                LinkedHashSet::new));
     }
 
     private static EvolutionGenome genome() {
