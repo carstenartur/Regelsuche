@@ -69,4 +69,27 @@ class PersistenceConfigTest {
         assertEquals(GraphPersistenceMode.POSTGRESQL, config.mode());
         assertFalse(config.hasPostgresCredentials());
     }
+
+    @Test
+    void programmaticBlankPostgresCredentialsRemainIncomplete() {
+        PersistenceConfig config = PersistenceConfig.postgresqlWithJsonFallback(
+            Path.of("build/persistence-config-blank-postgres"),
+            " ",
+            "user",
+            "secret");
+
+        assertFalse(config.hasPostgresCredentials());
+    }
+
+    @Test
+    void programmaticBlankNeo4jCredentialsRemainIncomplete() {
+        PersistenceConfig config = new PersistenceConfig(
+            GraphPersistenceMode.REMOTE_NEO4J,
+            Path.of("build/persistence-config-blank-neo4j"),
+            "bolt://localhost:7687",
+            "neo4j",
+            " ");
+
+        assertFalse(config.hasNeo4jCredentials());
+    }
 }
