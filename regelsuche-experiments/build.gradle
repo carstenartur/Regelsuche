@@ -50,6 +50,7 @@ tasks.register('generateHistoricalRediscoveryAtlas', JavaExec) {
     group = 'verification'
     description = 'Executes the frozen historical reachability and search-policy atlas.'
     dependsOn tasks.named('classes')
+    timeout = java.time.Duration.ofMinutes(10)
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'de.regelsuche.benchmark.DiscoveryExperimentRunner'
     argumentProviders.add({
