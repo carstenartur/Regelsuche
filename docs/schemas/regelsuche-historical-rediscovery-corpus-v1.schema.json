@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://carstenartur.github.io/Regelsuche/schemas/regelsuche-historical-rediscovery-corpus-v1.schema.json",
+  "title": "Regelsuche historical rediscovery corpus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evidenceStatus",
+    "inventoryRevision",
+    "claimBoundary",
+    "cases"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.historical-rediscovery-corpus/v1"
+    },
+    "evidenceStatus": {
+      "const": "FROZEN_DIAGNOSTIC_CORPUS"
+    },
+    "inventoryRevision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claimBoundary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "family",
+        "source",
+        "target",
+        "relation",
+        "role",
+        "diagnosticPurpose",
+        "provenance",
+        "targetRelation",
+        "oracleMaxDepth",
+        "oracleMaxVisitedStates",
+        "searchMaxDepth",
+        "searchMaxVisitedStates",
+        "maxCandidatesPerState",
+        "maxExpandingSteps",
+        "beamWidth"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation": {
+          "enum": [
+            "EQUIVALENT",
+            "NOT_EQUIVALENT"
+          ]
+        },
+        "role": {
+          "enum": [
+            "HISTORICAL_POSITIVE",
+            "NEGATIVE_CONTROL",
+            "SEARCH_POLICY_CONTROL"
+          ]
+        },
+        "diagnosticPurpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetRelation": {
+          "enum": [
+            "SYNTAX_EXACT",
+            "VALUE_EQUIVALENT"
+          ]
+        },
+        "oracleMaxDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "oracleMaxVisitedStates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "searchMaxDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "searchMaxVisitedStates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxCandidatesPerState": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxExpandingSteps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "beamWidth": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "NEGATIVE_CONTROL"
+              }
+            },
+            "required": [
+              "role"
+            ]
+          },
+          "then": {
+            "properties": {
+              "relation": {
+                "const": "NOT_EQUIVALENT"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
