@@ -128,7 +128,7 @@ public record EvolutionRewriteProgramPopulationExecutionProtocol(
         return create(
             EvolutionRewriteProgramPopulationEngine.class,
             PopulationEngineSemanticsVersion.PROTOCOL_DRIVEN_POPULATION_ENGINE_V2,
-            DeterministicRewriteProgramMutator.class,
+            StratifiedMutationKindRewriteProgramMutator.class,
             MutatorSemanticsVersion.STRATIFIED_MUTATION_KIND_MUTATOR_V2,
             ProposalOrderingPolicy.KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,
             OffspringSchedulingPolicy.STRATIFIED_MUTATION_KIND_V1,
