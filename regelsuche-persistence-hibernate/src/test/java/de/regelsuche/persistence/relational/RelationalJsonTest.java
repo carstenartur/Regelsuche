@@ -1,8 +1,10 @@
 package de.regelsuche.persistence.relational;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import de.regelsuche.mining.HypothesisCandidate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +27,21 @@ class RelationalJsonTest {
         assertEquals("[]", RelationalJson.array(null));
         assertEquals(List.of(), RelationalJson.arrayValues(null));
         assertEquals(List.of(), RelationalJson.arrayValues("  "));
+    }
+
+    @Test
+    void arraysRejectNullElementsInsteadOfWritingUnreadableJson() {
+        List<String> values = new ArrayList<>();
+        values.add("readable");
+        values.add(null);
+
+        IllegalArgumentException failure = assertThrows(
+            IllegalArgumentException.class,
+            () -> RelationalJson.array(values));
+
+        assertEquals(
+            "relational JSON string arrays must not contain null elements",
+            failure.getMessage());
     }
 
     @Test
