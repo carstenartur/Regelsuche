@@ -52,10 +52,10 @@ import java.util.function.Supplier;
 /**
  * Layered diagnostic atlas for historical identities and search-policy controls.
  *
- * <p>The target-aware oracle, target-guided search and curated control are kept
- * separate from target-blind scalar and structural-diversity searches. The
- * resulting classification is derived from retained evidence, never manually
- * assigned after inspection.</p>
+ * <p>Target-aware reachability and guidance are retained separately from the
+ * target-blind scalar and structural-diversity searches. Every primary diagnosis
+ * is therefore derived from explicit evidence rather than inferred from one
+ * aggregate success flag.</p>
  */
 public final class HistoricalRediscoveryAtlas {
     public static final String SCHEMA =
@@ -74,8 +74,6 @@ public final class HistoricalRediscoveryAtlas {
             .sorted(Comparator.comparing(Case::id))
             .map(this::runCase)
             .toList();
-        List<DirectionalityResult> directionality = directionality(results);
-        Assessment assessment = Assessment.derive(results);
         return new AtlasReport(
             SCHEMA,
             corpus.schema(),
@@ -83,8 +81,8 @@ public final class HistoricalRediscoveryAtlas {
             corpus.inventoryRevision(),
             corpus.claimBoundary(),
             results,
-            directionality,
-            assessment
+            directionality(results),
+            Assessment.derive(results)
         );
     }
 
@@ -106,19 +104,17 @@ public final class HistoricalRediscoveryAtlas {
     private CaseResult runCase(Case benchmarkCase) {
         RepresentationEvidence representation = represent(benchmarkCase);
         if (!representation.supported()) {
+            String detail = "representation unsupported";
             return new CaseResult(
                 benchmarkCase,
                 representation,
                 EquivalenceEvidence.notEvaluated(),
                 EngineEvidence.notEvaluated(
-                    EngineProfile.PRODUCTION_PRIMITIVES,
-                    "representation unsupported"),
+                    EngineProfile.PRODUCTION_PRIMITIVES, detail),
                 EngineEvidence.notEvaluated(
-                    EngineProfile.GENERIC_HYPOTHESIS_BRIDGE,
-                    "representation unsupported"),
+                    EngineProfile.GENERIC_HYPOTHESIS_BRIDGE, detail),
                 EngineEvidence.notEvaluated(
-                    EngineProfile.CURATED_RECOGNITION_CONTROL,
-                    "representation unsupported"),
+                    EngineProfile.CURATED_RECOGNITION_CONTROL, detail),
                 PrimaryStatus.REPRESENTATION_UNSUPPORTED
             );
         }
@@ -132,7 +128,6 @@ public final class HistoricalRediscoveryAtlas {
                 representation.formattedSource(),
                 representation.formattedTarget())
         );
-
         EngineEvidence production = runEngine(
             benchmarkCase,
             representation,
@@ -161,13 +156,6 @@ public final class HistoricalRediscoveryAtlas {
             : EngineEvidence.notApplicable(
                 EngineProfile.CURATED_RECOGNITION_CONTROL);
 
-        PrimaryStatus status = classify(
-            benchmarkCase,
-            equivalenceEvidence,
-            production,
-            genericBridge,
-            curatedControl
-        );
         return new CaseResult(
             benchmarkCase,
             representation,
@@ -175,7 +163,12 @@ public final class HistoricalRediscoveryAtlas {
             production,
             genericBridge,
             curatedControl,
-            status
+            classify(
+                benchmarkCase,
+                equivalenceEvidence,
+                production,
+                genericBridge,
+                curatedControl)
         );
     }
 
@@ -204,45 +197,44 @@ public final class HistoricalRediscoveryAtlas {
         Supplier<TransformationEngine> engineFactory,
         boolean runSearchControls
     ) {
-        OracleEvidence oracle = oracle(
+        OracleEvidence oracle = runOracle(
             benchmarkCase,
             representation,
             engineFactory.get());
         if (!runSearchControls) {
+            SearchEvidence omitted = SearchEvidence.notEvaluated(
+                "curated oracle control only");
             return new EngineEvidence(
                 profile,
                 EvidenceExecution.EXECUTED,
                 "",
                 oracle,
-                SearchEvidence.notEvaluated("curated oracle control only"),
-                SearchEvidence.notEvaluated("curated oracle control only"),
-                SearchEvidence.notEvaluated("curated oracle control only")
+                omitted,
+                omitted,
+                omitted
             );
         }
-        SearchEvidence scalar = scalarSearch(
-            benchmarkCase,
-            representation,
-            engineFactory.get());
-        SearchEvidence guided = guidedSearch(
-            benchmarkCase,
-            representation,
-            engineFactory.get());
-        SearchEvidence diversity = diversitySearch(
-            benchmarkCase,
-            representation,
-            engineFactory.get());
         return new EngineEvidence(
             profile,
             EvidenceExecution.EXECUTED,
             "",
             oracle,
-            scalar,
-            guided,
-            diversity
+            runScalarSearch(
+                benchmarkCase,
+                representation,
+                engineFactory.get()),
+            runGuidedSearch(
+                benchmarkCase,
+                representation,
+                engineFactory.get()),
+            runDiversitySearch(
+                benchmarkCase,
+                representation,
+                engineFactory.get())
         );
     }
 
-    private OracleEvidence oracle(
+    private OracleEvidence runOracle(
         Case benchmarkCase,
         RepresentationEvidence representation,
         TransformationEngine engine
@@ -276,18 +268,17 @@ public final class HistoricalRediscoveryAtlas {
         );
     }
 
-    private SearchEvidence scalarSearch(
+    private SearchEvidence runScalarSearch(
         Case benchmarkCase,
         RepresentationEvidence representation,
         TransformationEngine engine
     ) {
         CountingEngine counting = new CountingEngine(engine);
-        SearchProblem problem = searchProblem(
-            benchmarkCase,
-            representation.formattedSource(),
-            counting);
         GoalSearchResult result = new BestFirstSearchStrategy()
-            .searchWithDiagnostics(problem);
+            .searchWithDiagnostics(searchProblem(
+                benchmarkCase,
+                representation.formattedSource(),
+                counting));
         Optional<SearchState> match = findMatch(
             benchmarkCase,
             representation.formattedTarget(),
@@ -300,48 +291,44 @@ public final class HistoricalRediscoveryAtlas {
         );
     }
 
-    private SearchEvidence guidedSearch(
+    private SearchEvidence runGuidedSearch(
         Case benchmarkCase,
         RepresentationEvidence representation,
         TransformationEngine engine
     ) {
         CountingEngine counting = new CountingEngine(engine);
-        SearchProblem problem = searchProblem(
-            benchmarkCase,
-            representation.formattedSource(),
-            counting).withTarget(searchTarget(
-                benchmarkCase,
-                representation.formattedTarget()));
         GoalSearchResult result = new BestFirstSearchStrategy()
-            .searchWithDiagnostics(problem);
-        Optional<SearchState> match = Optional.ofNullable(result.reachedState());
+            .searchWithDiagnostics(searchProblem(
+                benchmarkCase,
+                representation.formattedSource(),
+                counting).withTarget(searchTarget(
+                    benchmarkCase,
+                    representation.formattedTarget())));
         return SearchEvidence.fromGoalResult(
             "TARGET_GUIDED_BEST_FIRST_DIAGNOSTIC",
-            match,
+            Optional.ofNullable(result.reachedState()),
             result,
             counting
         );
     }
 
-    private SearchEvidence diversitySearch(
+    private SearchEvidence runDiversitySearch(
         Case benchmarkCase,
         RepresentationEvidence representation,
         TransformationEngine engine
     ) {
         CountingEngine counting = new CountingEngine(engine);
-        SearchProblem problem = searchProblem(
-            benchmarkCase,
-            representation.formattedSource(),
-            counting);
         List<SearchState> states = new StructuralDiversitySearchStrategy()
-            .search(problem);
-        Optional<SearchState> match = findMatch(
-            benchmarkCase,
-            representation.formattedTarget(),
-            states);
+            .search(searchProblem(
+                benchmarkCase,
+                representation.formattedSource(),
+                counting));
         return SearchEvidence.fromStates(
             "STRUCTURAL_DIVERSITY_TARGET_BLIND",
-            match,
+            findMatch(
+                benchmarkCase,
+                representation.formattedTarget(),
+                states),
             states,
             counting
         );
@@ -352,20 +339,18 @@ public final class HistoricalRediscoveryAtlas {
         String source,
         TransformationEngine engine
     ) {
-        SearchHeuristic heuristic = new SearchHeuristic(
-            benchmarkCase.searchMaxDepth(),
-            benchmarkCase.searchMaxVisitedStates(),
-            1,
-            benchmarkCase.maxExpandingSteps(),
-            benchmarkCase.maxCandidatesPerState(),
-            benchmarkCase.beamWidth()
-        );
         return new SearchProblem(
             source,
             engine,
             scorer,
             canonicalizer,
-            heuristic
+            new SearchHeuristic(
+                benchmarkCase.searchMaxDepth(),
+                benchmarkCase.searchMaxVisitedStates(),
+                1,
+                benchmarkCase.maxExpandingSteps(),
+                benchmarkCase.maxCandidatesPerState(),
+                benchmarkCase.beamWidth())
         );
     }
 
@@ -381,11 +366,15 @@ public final class HistoricalRediscoveryAtlas {
         List<SearchState> states
     ) {
         return states.stream()
-            .filter(state -> matches(benchmarkCase, state.expression(), target))
+            .filter(state -> matches(
+                benchmarkCase,
+                state.expression(),
+                target))
             .min(Comparator
                 .comparingInt(SearchState::depth)
                 .thenComparing(SearchState::expression)
-                .thenComparing(state -> String.join("->", state.appliedRuleIds())));
+                .thenComparing(state ->
+                    String.join("->", state.appliedRuleIds())));
     }
 
     private boolean matches(Case benchmarkCase, String expression, String target) {
@@ -462,7 +451,8 @@ public final class HistoricalRediscoveryAtlas {
         EngineEvidence curatedControl
     ) {
         if (benchmarkCase.relation() == Relation.NOT_EQUIVALENT) {
-            return anyReached(production, genericBridge, curatedControl)
+            return equivalenceEvidence.equivalent()
+                    || anyReached(production, genericBridge, curatedControl)
                 ? PrimaryStatus.CORRECTNESS_REGRESSION
                 : PrimaryStatus.NEGATIVE_CONTROL_CONFIRMED;
         }
@@ -486,7 +476,8 @@ public final class HistoricalRediscoveryAtlas {
         if (genericBridge.executed() && anyReached(genericBridge)) {
             return PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND;
         }
-        if (curatedControl.executed() && curatedControl.oracle().reachable()) {
+        if (curatedControl.executed()
+                && curatedControl.oracle().reachable()) {
             return PrimaryStatus
                 .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE;
         }
@@ -514,26 +505,36 @@ public final class HistoricalRediscoveryAtlas {
 
     private List<DirectionalityResult> directionality(List<CaseResult> results) {
         Map<String, CaseResult> byId = new LinkedHashMap<>();
-        results.forEach(result -> byId.put(result.benchmarkCase().id(), result));
-        return List.of(
-            directionalityPair(
-                "binomial-square",
-                byId.get("complete-square"),
-                byId.get("expand-binomial-square")),
-            directionalityPair(
-                "difference-of-squares",
-                byId.get("difference-of-squares"),
-                byId.get("reverse-difference-of-squares"))
-        );
+        results.forEach(result ->
+            byId.put(result.benchmarkCase().id(), result));
+        List<DirectionalityResult> pairs = new ArrayList<>();
+        addDirectionality(
+            pairs,
+            byId,
+            "binomial-square",
+            "complete-square",
+            "expand-binomial-square");
+        addDirectionality(
+            pairs,
+            byId,
+            "difference-of-squares",
+            "difference-of-squares",
+            "reverse-difference-of-squares");
+        return List.copyOf(pairs);
     }
 
-    private DirectionalityResult directionalityPair(
+    private void addDirectionality(
+        List<DirectionalityResult> pairs,
+        Map<String, CaseResult> byId,
         String id,
-        CaseResult forward,
-        CaseResult reverse
+        String forwardId,
+        String reverseId
     ) {
-        Objects.requireNonNull(forward, "forward");
-        Objects.requireNonNull(reverse, "reverse");
+        CaseResult forward = byId.get(forwardId);
+        CaseResult reverse = byId.get(reverseId);
+        if (forward == null || reverse == null) {
+            return;
+        }
         boolean forwardReachable = forward.production().oracle().reachable();
         boolean reverseReachable = reverse.production().oracle().reachable();
         boolean inconclusive = forward.production().oracle().inconclusive()
@@ -550,14 +551,14 @@ public final class HistoricalRediscoveryAtlas {
         } else {
             status = DirectionalityStatus.NEITHER_REACHABLE;
         }
-        return new DirectionalityResult(
+        pairs.add(new DirectionalityResult(
             id,
-            forward.benchmarkCase().id(),
-            reverse.benchmarkCase().id(),
+            forwardId,
+            reverseId,
             status,
             forwardReachable,
             reverseReachable
-        );
+        ));
     }
 
     private String format(String expression) {
@@ -765,7 +766,7 @@ public final class HistoricalRediscoveryAtlas {
                 EvidenceExecution.EXECUTED,
                 policy,
                 state != null,
-                states.size() >= 1 ? "COMPLETED_BOUNDED_SEARCH" : "NO_STATES",
+                states.isEmpty() ? "NO_STATES" : "COMPLETED_BOUNDED_SEARCH",
                 states.size(),
                 counting.calls(),
                 counting.generated(),
@@ -913,29 +914,33 @@ public final class HistoricalRediscoveryAtlas {
         }
 
         private static Assessment derive(List<CaseResult> results) {
-            Map<PrimaryStatus, Integer> counts = new EnumMap<>(
-                PrimaryStatus.class);
-            results.forEach(result -> counts.merge(result.status(), 1, Integer::sum));
+            Map<PrimaryStatus, Integer> counts =
+                new EnumMap<>(PrimaryStatus.class);
+            results.forEach(result ->
+                counts.merge(result.status(), 1, Integer::sum));
             boolean representation = results.stream()
                 .allMatch(result -> result.representation().supported());
             boolean equivalence = results.stream()
-                .filter(result -> result.benchmarkCase().role() == Role.NEGATIVE_CONTROL)
+                .filter(result ->
+                    result.benchmarkCase().role() == Role.NEGATIVE_CONTROL)
                 .allMatch(result -> result.equivalence().evaluated()
                     && !result.equivalence().equivalent())
                 && results.stream()
                     .filter(result -> result.benchmarkCase().relation()
                         == Relation.EQUIVALENT)
                     .anyMatch(result -> result.equivalence().equivalent());
-            boolean productionPositive = results.stream().anyMatch(result ->
-                result.production().oracle().reachable());
+            boolean productionPositive = results.stream()
+                .anyMatch(result -> result.production().oracle().reachable());
             boolean missingInventory = counts.getOrDefault(
-                PrimaryStatus.CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,
+                PrimaryStatus
+                    .CURATED_CONTROL_ONLY_MISSING_PRODUCTION_PRIMITIVE,
                 0) > 0;
             boolean searchPolicy = counts.getOrDefault(
                 PrimaryStatus.REACHABLE_BUT_SCALAR_MISSED_DIVERSITY_FOUND,
                 0) > 0
                 || counts.getOrDefault(
-                    PrimaryStatus.REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND,
+                    PrimaryStatus
+                        .REACHABLE_BUT_SCALAR_MISSED_GUIDANCE_FOUND,
                     0) > 0;
             boolean genericBridge = counts.getOrDefault(
                 PrimaryStatus.GENERIC_BRIDGE_REQUIRED_AND_FOUND,
@@ -962,16 +967,20 @@ public final class HistoricalRediscoveryAtlas {
             }
             List<String> reasons = new ArrayList<>();
             if (productionPositive) {
-                reasons.add("production primitives recover at least one frozen identity");
+                reasons.add(
+                    "production primitives recover at least one frozen identity");
             }
             if (missingInventory) {
-                reasons.add("curated control separates a missing production primitive from representation failure");
+                reasons.add(
+                    "curated control separates a missing production primitive from representation failure");
             }
             if (searchPolicy) {
-                reasons.add("matched-work search policies produce different reachability outcomes");
+                reasons.add(
+                    "matched-work search policies produce different reachability outcomes");
             }
             if (genericBridge) {
-                reasons.add("a generic hypothesis bridge moves the reachable capability frontier");
+                reasons.add(
+                    "a generic hypothesis bridge moves the reachable capability frontier");
             }
             if (negative) {
                 reasons.add("the false near-miss remains rejected");
@@ -1023,17 +1032,11 @@ public final class HistoricalRediscoveryAtlas {
             writer.array("cases", array -> cases.forEach(result ->
                 array.objectValue(object -> writeCase(object, result))));
             writer.array("directionality", array -> directionality.forEach(result ->
-                array.objectValue(object -> {
-                    object.property("id", result.id());
-                    object.property("forwardCaseId", result.forwardCaseId());
-                    object.property("reverseCaseId", result.reverseCaseId());
-                    object.property("status", result.status().name());
-                    object.property("forwardReachable", result.forwardReachable());
-                    object.property("reverseReachable", result.reverseReachable());
-                })));
-            writer.object("assessment", object -> writeAssessment(
-                object,
-                assessment));
+                array.objectValue(object -> writeDirectionality(
+                    object,
+                    result))));
+            writer.object("assessment", object ->
+                writeAssessment(object, assessment));
             return writer.endObject().toString();
         }
 
@@ -1052,17 +1055,21 @@ public final class HistoricalRediscoveryAtlas {
             markdown.append("> ")
                 .append(claimBoundary)
                 .append("\n\n");
-            markdown.append("| Case | Family | Primary diagnosis | Production oracle | Scalar | Diversity | Guided |\n");
+            markdown.append(
+                "| Case | Family | Primary diagnosis | Production oracle | Scalar | Diversity | Guided |\n");
             markdown.append("|---|---|---|---|---:|---:|---:|\n");
             for (CaseResult result : cases) {
-                markdown.append('|').append(' ')
+                markdown.append("| ")
                     .append(result.benchmarkCase().id()).append(" | ")
                     .append(result.benchmarkCase().family()).append(" | ")
                     .append(result.status()).append(" | ")
                     .append(result.production().oracle().status()).append(" | ")
-                    .append(mark(result.production().scalar().reached())).append(" | ")
-                    .append(mark(result.production().diversity().reached())).append(" | ")
-                    .append(mark(result.production().guided().reached())).append(" |\n");
+                    .append(mark(result.production().scalar().reached()))
+                    .append(" | ")
+                    .append(mark(result.production().diversity().reached()))
+                    .append(" | ")
+                    .append(mark(result.production().guided().reached()))
+                    .append(" |\n");
             }
             markdown.append("\n## Directionality\n\n");
             for (DirectionalityResult result : directionality) {
@@ -1083,22 +1090,40 @@ public final class HistoricalRediscoveryAtlas {
             return value ? "yes" : "no";
         }
 
+        private static void writeDirectionality(
+            JsonWriter writer,
+            DirectionalityResult result
+        ) {
+            writer.property("id", result.id());
+            writer.property("forwardCaseId", result.forwardCaseId());
+            writer.property("reverseCaseId", result.reverseCaseId());
+            writer.property("status", result.status().name());
+            writer.property("forwardReachable", result.forwardReachable());
+            writer.property("reverseReachable", result.reverseReachable());
+        }
+
         private static void writeCase(JsonWriter writer, CaseResult result) {
             Case benchmarkCase = result.benchmarkCase();
             writer.property("id", benchmarkCase.id());
             writer.property("family", benchmarkCase.family());
             writer.property("role", benchmarkCase.role().name());
             writer.property("relation", benchmarkCase.relation().name());
-            writer.property("diagnosticPurpose", benchmarkCase.diagnosticPurpose());
+            writer.property(
+                "diagnosticPurpose", benchmarkCase.diagnosticPurpose());
             writer.property("provenance", benchmarkCase.provenance());
             writer.property("source", benchmarkCase.source());
             writer.property("target", benchmarkCase.target());
-            writer.property("targetRelation", benchmarkCase.targetRelation().name());
+            writer.property(
+                "targetRelation", benchmarkCase.targetRelation().name());
             writer.property("primaryStatus", result.status().name());
             writer.object("representation", object -> {
                 object.property("supported", result.representation().supported());
-                object.property("formattedSource", result.representation().formattedSource());
-                object.property("formattedTarget", result.representation().formattedTarget());
+                object.property(
+                    "formattedSource",
+                    result.representation().formattedSource());
+                object.property(
+                    "formattedTarget",
+                    result.representation().formattedTarget());
                 object.property("detail", result.representation().detail());
             });
             writer.object("equivalence", object -> {
@@ -1106,15 +1131,12 @@ public final class HistoricalRediscoveryAtlas {
                 object.property("equivalent", result.equivalence().equivalent());
                 object.property("detail", result.equivalence().detail());
             });
-            writer.object("production", object -> writeEngine(
-                object,
-                result.production()));
-            writer.object("genericBridge", object -> writeEngine(
-                object,
-                result.genericBridge()));
-            writer.object("curatedControl", object -> writeEngine(
-                object,
-                result.curatedControl()));
+            writer.object("production", object ->
+                writeEngine(object, result.production()));
+            writer.object("genericBridge", object ->
+                writeEngine(object, result.genericBridge()));
+            writer.object("curatedControl", object ->
+                writeEngine(object, result.curatedControl()));
         }
 
         private static void writeEngine(
@@ -1124,18 +1146,14 @@ public final class HistoricalRediscoveryAtlas {
             writer.property("profile", evidence.profile().name());
             writer.property("execution", evidence.execution().name());
             writer.property("detail", evidence.detail());
-            writer.object("oracle", object -> writeOracle(
-                object,
-                evidence.oracle()));
-            writer.object("scalar", object -> writeSearch(
-                object,
-                evidence.scalar()));
-            writer.object("guided", object -> writeSearch(
-                object,
-                evidence.guided()));
-            writer.object("diversity", object -> writeSearch(
-                object,
-                evidence.diversity()));
+            writer.object("oracle", object ->
+                writeOracle(object, evidence.oracle()));
+            writer.object("scalar", object ->
+                writeSearch(object, evidence.scalar()));
+            writer.object("guided", object ->
+                writeSearch(object, evidence.guided()));
+            writer.object("diversity", object ->
+                writeSearch(object, evidence.diversity()));
         }
 
         private static void writeOracle(
@@ -1144,12 +1162,15 @@ public final class HistoricalRediscoveryAtlas {
         ) {
             writer.property("execution", evidence.execution().name());
             writer.property("status", evidence.status());
-            writer.stringArray("witnessExpressions", evidence.witnessExpressions());
+            writer.stringArray(
+                "witnessExpressions", evidence.witnessExpressions());
             writer.stringArray("witnessRuleIds", evidence.witnessRuleIds());
             writer.property("primitiveSteps", evidence.primitiveSteps());
             writer.property("visitedStates", evidence.visitedStates());
-            writer.property("generatedTransitions", evidence.generatedTransitions());
-            writer.property("maximumDepthReached", evidence.maximumDepthReached());
+            writer.property(
+                "generatedTransitions", evidence.generatedTransitions());
+            writer.property(
+                "maximumDepthReached", evidence.maximumDepthReached());
             writer.property("depthLimitReached", evidence.depthLimitReached());
             writer.property("stateLimitReached", evidence.stateLimitReached());
             writer.property("detail", evidence.detail());
@@ -1165,16 +1186,17 @@ public final class HistoricalRediscoveryAtlas {
             writer.property("terminalStatus", evidence.terminalStatus());
             writer.property("exploredStates", evidence.exploredStates());
             writer.property("engineCalls", evidence.engineCalls());
-            writer.property("generatedTransformations", evidence.generatedTransformations());
+            writer.property(
+                "generatedTransformations",
+                evidence.generatedTransformations());
             writer.property("depth", evidence.depth());
             writer.stringArray("path", evidence.path());
             writer.stringArray("ruleIds", evidence.ruleIds());
             if (evidence.metrics() == null) {
                 writer.nullProperty("goalMetrics");
             } else {
-                writer.object("goalMetrics", object -> writeGoalMetrics(
-                    object,
-                    evidence.metrics()));
+                writer.object("goalMetrics", object ->
+                    writeGoalMetrics(object, evidence.metrics()));
             }
             writer.property("detail", evidence.detail());
         }
@@ -1185,16 +1207,25 @@ public final class HistoricalRediscoveryAtlas {
         ) {
             writer.property("exploredStates", metrics.exploredStates());
             writer.property("expandedStates", metrics.expandedStates());
-            writer.property("generatedTransformations", metrics.generatedTransformations());
+            writer.property(
+                "generatedTransformations",
+                metrics.generatedTransformations());
             writer.property("enqueuedStates", metrics.enqueuedStates());
-            writer.property("skippedTransformations", metrics.skippedTransformations());
+            writer.property(
+                "skippedTransformations",
+                metrics.skippedTransformations());
             writer.property("duplicatePrunes", metrics.duplicatePrunes());
-            writer.property("transpositionPrunes", metrics.transpositionPrunes());
+            writer.property(
+                "transpositionPrunes", metrics.transpositionPrunes());
             writer.property("depthPrunes", metrics.depthPrunes());
-            writer.property("candidateBudgetPrunes", metrics.candidateBudgetPrunes());
-            writer.property("statesWithoutTransformations", metrics.statesWithoutTransformations());
+            writer.property(
+                "candidateBudgetPrunes", metrics.candidateBudgetPrunes());
+            writer.property(
+                "statesWithoutTransformations",
+                metrics.statesWithoutTransformations());
             writer.property("identityCacheHits", metrics.identityCacheHits());
-            writer.property("identityCacheMisses", metrics.identityCacheMisses());
+            writer.property(
+                "identityCacheMisses", metrics.identityCacheMisses());
             writer.property("cachedExpressions", metrics.cachedExpressions());
             writer.property("internedValues", metrics.internedValues());
         }
@@ -1204,20 +1235,36 @@ public final class HistoricalRediscoveryAtlas {
             Assessment assessment
         ) {
             writer.property("decision", assessment.decision().name());
-            writer.property("representationLayerWorks", assessment.representationLayerWorks());
-            writer.property("equivalenceLayerDiscriminates", assessment.equivalenceLayerDiscriminates());
-            writer.property("productionPositiveControlWorks", assessment.productionPositiveControlWorks());
-            writer.property("missingInventoryLayerIdentified", assessment.missingInventoryLayerIdentified());
-            writer.property("searchPolicyDifferenceIdentified", assessment.searchPolicyDifferenceIdentified());
-            writer.property("genericBridgeDifferenceIdentified", assessment.genericBridgeDifferenceIdentified());
-            writer.property("negativeControlPassed", assessment.negativeControlPassed());
-            writer.property("distinctPrimaryStatuses", assessment.distinctPrimaryStatuses());
-            writer.object("statusCounts", object -> assessment.statusCounts().entrySet()
-                .stream()
-                .sorted(Map.Entry.comparingByKey())
-                .forEach(entry -> object.property(
-                    entry.getKey().name(),
-                    entry.getValue())));
+            writer.property(
+                "representationLayerWorks",
+                assessment.representationLayerWorks());
+            writer.property(
+                "equivalenceLayerDiscriminates",
+                assessment.equivalenceLayerDiscriminates());
+            writer.property(
+                "productionPositiveControlWorks",
+                assessment.productionPositiveControlWorks());
+            writer.property(
+                "missingInventoryLayerIdentified",
+                assessment.missingInventoryLayerIdentified());
+            writer.property(
+                "searchPolicyDifferenceIdentified",
+                assessment.searchPolicyDifferenceIdentified());
+            writer.property(
+                "genericBridgeDifferenceIdentified",
+                assessment.genericBridgeDifferenceIdentified());
+            writer.property(
+                "negativeControlPassed",
+                assessment.negativeControlPassed());
+            writer.property(
+                "distinctPrimaryStatuses",
+                assessment.distinctPrimaryStatuses());
+            writer.object("statusCounts", object ->
+                assessment.statusCounts().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(entry -> object.property(
+                        entry.getKey().name(),
+                        entry.getValue())));
             writer.stringArray("reasons", assessment.reasons());
         }
     }
