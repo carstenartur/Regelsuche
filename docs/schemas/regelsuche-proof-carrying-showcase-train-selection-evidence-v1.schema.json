@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regelsuche.de/schemas/regelsuche-proof-carrying-showcase-train-selection-evidence-v1.schema.json",
+  "title": "Regelsuche proof-carrying showcase TRAIN selection evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "showcaseId",
+    "planContentHash",
+    "retainedPopulationRunHash",
+    "populationRunHash",
+    "finalGenerationReportHash",
+    "populationTerminalOutcome",
+    "selectionPolicy",
+    "alternatives",
+    "selectedCandidateHash",
+    "selectedCandidateAlphaStructuralHash",
+    "selectedPlanHash",
+    "status",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.proof-carrying-showcase-train-selection-evidence/v1"
+    },
+    "showcaseId": { "type": "string", "minLength": 1 },
+    "planContentHash": { "$ref": "#/$defs/sha256" },
+    "retainedPopulationRunHash": { "$ref": "#/$defs/sha256" },
+    "populationRunHash": { "$ref": "#/$defs/sha256" },
+    "finalGenerationReportHash": { "$ref": "#/$defs/sha256" },
+    "populationTerminalOutcome": { "type": "string", "minLength": 1 },
+    "selectionPolicy": {
+      "const": "MAX_TRAIN_SCALAR_THEN_MIN_PROGRAM_NODES_THEN_CANDIDATE_HASH_AMONG_NON_SEED_COMPOSITE_DECISION_CANDIDATES"
+    },
+    "alternatives": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/alternative" }
+    },
+    "selectedCandidateHash": { "$ref": "#/$defs/nullableSha256" },
+    "selectedCandidateAlphaStructuralHash": {
+      "$ref": "#/$defs/nullableSha256"
+    },
+    "selectedPlanHash": { "$ref": "#/$defs/nullableSha256" },
+    "status": {
+      "enum": [
+        "ELIGIBLE_CANDIDATE_AVAILABLE_FINAL_TEST_UNSEEN",
+        "NO_ELIGIBLE_TRAIN_ALTERNATIVE_FINAL_TEST_UNSEEN"
+      ]
+    },
+    "contentHash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "nullableSha256": {
+      "oneOf": [
+        { "$ref": "#/$defs/sha256" },
+        { "type": "null" }
+      ]
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "alternative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateHash",
+        "alphaStructuralHash",
+        "genomeHash",
+        "planHash",
+        "evaluationHash",
+        "scalarFitness",
+        "rawComponents",
+        "trainBlockers",
+        "seedExactEquivalent",
+        "seedAlphaEquivalent",
+        "programNodeCount",
+        "containsCompositionTopology",
+        "containsDecisionTopology",
+        "minimumStructuralPrimitivePathSteps",
+        "freezeBlockers",
+        "eligibleForFreeze"
+      ],
+      "properties": {
+        "candidateHash": { "$ref": "#/$defs/sha256" },
+        "alphaStructuralHash": { "$ref": "#/$defs/sha256" },
+        "genomeHash": { "$ref": "#/$defs/sha256" },
+        "planHash": { "$ref": "#/$defs/sha256" },
+        "evaluationHash": { "$ref": "#/$defs/sha256" },
+        "scalarFitness": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "rawComponents": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          }
+        },
+        "trainBlockers": { "$ref": "#/$defs/blockers" },
+        "seedExactEquivalent": { "type": "boolean" },
+        "seedAlphaEquivalent": { "type": "boolean" },
+        "programNodeCount": { "type": "integer", "minimum": 1 },
+        "containsCompositionTopology": { "type": "boolean" },
+        "containsDecisionTopology": { "type": "boolean" },
+        "minimumStructuralPrimitivePathSteps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "freezeBlockers": { "$ref": "#/$defs/blockers" },
+        "eligibleForFreeze": { "type": "boolean" }
+      }
+    }
+  }
+}
