@@ -3,19 +3,18 @@ package de.regelsuche.evolution;
 import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationCatalog;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * Retained TRAIN runner that binds the previously implicit population mechanics
- * without changing the historical execution algorithm.
+ * Retained TRAIN runner that executes only explicitly implemented and
+ * content-addressed population protocols.
  *
- * <p>This first protocol tranche deliberately supports only the exact legacy
- * scheduler. A future scheduling policy must receive a separate implementation
- * and protocol identity before it becomes executable.</p>
+ * <p>The default constructor remains bound to the exact historical legacy
+ * protocol. The stratified scheduler is executable only through its distinct
+ * protocol identity and mutator implementation class.</p>
  */
 public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner {
     private final EvolutionRewriteProgramPopulationExecutionProtocol protocol;
-    private final RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner
-        delegate;
 
     public ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner() {
         this(EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1());
@@ -28,11 +27,7 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
         requireImplementedProtocol(protocol);
         protocol.requireImplementations(
             EvolutionRewriteProgramPopulationEngine.class,
-            DeterministicRewriteProgramMutator.class);
-        this.delegate =
-            new RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner(
-                new EvolutionRewriteProgramPopulationEngine(
-                    new DeterministicRewriteProgramMutator()));
+            mutatorImplementationClass(protocol));
     }
 
     public ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun run(
@@ -46,7 +41,7 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
     ) {
         requirePlan(executionPlan, studyPlan);
         ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun retained =
-            delegate.run(
+            delegate(studyPlan).run(
                 studyPlan,
                 splitManifest,
                 suite,
@@ -69,7 +64,7 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
         int completedGeneration
     ) {
         requirePlan(executionPlan, studyPlan);
-        var checkpoint = delegate.checkpoint(
+        var checkpoint = delegate(studyPlan).checkpoint(
             studyPlan,
             splitManifest,
             suite,
@@ -96,7 +91,7 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
         Objects.requireNonNull(checkpoint, "checkpoint");
         checkpoint.requireCompatible(executionPlan, protocol);
         ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun retained =
-            delegate.resume(
+            delegate(studyPlan).resume(
                 studyPlan,
                 splitManifest,
                 suite,
@@ -120,14 +115,44 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
             .requireInputs(studyPlan, protocol);
     }
 
+    private RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner delegate(
+        EvolutionRewriteProgramStudyPlan studyPlan
+    ) {
+        Objects.requireNonNull(studyPlan, "studyPlan");
+        DeterministicRewriteProgramMutator mutator = switch (
+            protocol.offspringSchedulingPolicy()) {
+            case ROTATED_PREFIX_V1 -> new DeterministicRewriteProgramMutator();
+            case STRATIFIED_MUTATION_KIND_V1 ->
+                new StratifiedMutationKindRewriteProgramMutator(
+                    Set.copyOf(studyPlan.mutationOperators()));
+        };
+        return new RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner(
+            new EvolutionRewriteProgramPopulationEngine(mutator));
+    }
+
+    private static Class<? extends DeterministicRewriteProgramMutator>
+            mutatorImplementationClass(
+                EvolutionRewriteProgramPopulationExecutionProtocol protocol
+            ) {
+        return switch (protocol.offspringSchedulingPolicy()) {
+            case ROTATED_PREFIX_V1 -> DeterministicRewriteProgramMutator.class;
+            case STRATIFIED_MUTATION_KIND_V1 ->
+                StratifiedMutationKindRewriteProgramMutator.class;
+        };
+    }
+
     private static void requireImplementedProtocol(
         EvolutionRewriteProgramPopulationExecutionProtocol protocol
     ) {
         var legacy = EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1();
-        if (!legacy.contentHash().equals(protocol.contentHash())) {
+        var stratified = EvolutionRewriteProgramPopulationExecutionProtocol
+            .stratifiedMutationKindV1();
+        if (!legacy.contentHash().equals(protocol.contentHash())
+                && !stratified.contentHash().equals(protocol.contentHash())) {
             throw new IllegalArgumentException(
                 "population execution protocol is not implemented by this runner: "
-                    + "expectedHash=" + legacy.contentHash()
+                    + "supportedHashes=[" + legacy.contentHash() + ","
+                    + stratified.contentHash() + "]"
                     + ", actualHash=" + protocol.contentHash()
                     + ", engineSemantics="
                     + protocol.populationEngineSemanticsVersion()
