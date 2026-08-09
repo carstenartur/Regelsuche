@@ -180,7 +180,7 @@ public final class BoundedRewriteReachabilityOracle {
             expressionAfter = requireExpression(expressionAfter, "expressionAfter");
             rule = requireExpression(rule, "rule");
             assumptions = List.copyOf(Objects.requireNonNull(assumptions, "assumptions"));
-            applicationKey = Objects.requireNonNull(applicationKey, "applicationKey");
+            applicationKey = requireExpression(applicationKey, "applicationKey");
             primitiveRuleIds = List.copyOf(
                 Objects.requireNonNull(primitiveRuleIds, "primitiveRuleIds"));
             if (primitiveStepCount < 1) {
