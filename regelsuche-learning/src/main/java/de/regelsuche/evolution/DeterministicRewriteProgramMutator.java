@@ -111,12 +111,14 @@ public final class DeterministicRewriteProgramMutator {
      *
      * <p>Every proposal is preflighted in that fixed order. Among otherwise
      * valid and preregistered proposals, the first pass gives each newly seen
-     * mutation kind one accepted slot while capacity remains. A second pass
-     * fills spare capacity in the original rotated proposal order. If capacity
-     * is smaller than the number of represented valid kinds, the kinds whose
-     * first valid proposal occurs earliest in that frozen order win. No
-     * proposal, blocker or capacity rejection is omitted from the returned
-     * batch.</p>
+     * mutation kind one accepted slot while capacity remains. Alpha-structural
+     * identity is reserved only when an eligible proposal is actually selected,
+     * so an unpermitted or otherwise unselected proposal cannot poison a later
+     * eligible stratum. A second pass fills spare capacity in the original
+     * rotated proposal order. If capacity is smaller than the number of
+     * represented valid kinds, the kinds whose first selectable proposal occurs
+     * earliest in that frozen order win. No proposal or preflight blocker is
+     * omitted from the returned batch.</p>
      */
     public MutationBatch mutateStratifiedByMutationKind(
         EvolutionGenome genome,
@@ -148,24 +150,21 @@ public final class DeterministicRewriteProgramMutator {
             .toList();
 
         List<Evaluation> evaluated = new ArrayList<>();
-        Set<String> structuralHashes = new LinkedHashSet<>();
-        structuralHashes.add(parent.alphaStructuralHash());
+        Set<String> preflightStructuralHashes = Set.of(
+            parent.alphaStructuralHash());
         for (int index = 0; index < ordered.size(); index++) {
-            Evaluation evaluation = evaluate(
+            evaluated.add(evaluate(
                 genome,
                 parent,
                 ordered.get(index),
                 index + 1,
-                structuralHashes,
-                true);
-            evaluated.add(evaluation);
-            if (evaluation.child() != null
-                    && evaluation.attempt().status() == MutationStatus.ACCEPTED) {
-                structuralHashes.add(evaluation.child().alphaStructuralHash());
-            }
+                preflightStructuralHashes,
+                true));
         }
 
         Set<Integer> selectedOrdinals = new LinkedHashSet<>();
+        Set<String> selectedStructuralHashes = new LinkedHashSet<>();
+        selectedStructuralHashes.add(parent.alphaStructuralHash());
         Set<EvolutionRewriteProgramMutationKind> represented =
             new LinkedHashSet<>();
         for (Evaluation evaluation : evaluated) {
@@ -176,7 +175,10 @@ public final class DeterministicRewriteProgramMutator {
             if (evaluation.child() != null
                     && attempt.status() == MutationStatus.ACCEPTED
                     && permitted.contains(attempt.kind())
-                    && represented.add(attempt.kind())) {
+                    && !represented.contains(attempt.kind())
+                    && selectedStructuralHashes.add(
+                        evaluation.child().alphaStructuralHash())) {
+                represented.add(attempt.kind());
                 selectedOrdinals.add(attempt.ordinal());
             }
         }
@@ -187,7 +189,10 @@ public final class DeterministicRewriteProgramMutator {
             }
             if (evaluation.child() != null
                     && attempt.status() == MutationStatus.ACCEPTED
-                    && permitted.contains(attempt.kind())) {
+                    && permitted.contains(attempt.kind())
+                    && !selectedOrdinals.contains(attempt.ordinal())
+                    && selectedStructuralHashes.add(
+                        evaluation.child().alphaStructuralHash())) {
                 selectedOrdinals.add(attempt.ordinal());
             }
         }
@@ -208,9 +213,11 @@ public final class DeterministicRewriteProgramMutator {
                 continue;
             }
             if (!selectedOrdinals.contains(attempt.ordinal())) {
-                attempts.add(rejectedFromValid(
-                    attempt,
-                    "ACCEPTED_BUDGET_EXHAUSTED:maxAccepted"));
+                String blocker = selectedStructuralHashes.contains(
+                    evaluation.child().alphaStructuralHash())
+                        ? "STRUCTURAL_DIVERSITY_DUPLICATE:alphaStructuralHash"
+                        : "ACCEPTED_BUDGET_EXHAUSTED:maxAccepted";
+                attempts.add(rejectedFromValid(attempt, blocker));
                 continue;
             }
             attempts.add(attempt);
