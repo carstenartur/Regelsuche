@@ -116,6 +116,8 @@ Die Regeln für Pflege, Sprache, Claim-Grenzen und generierte Abschnitte stehen 
 - [Developer Guide](developer-guide.md) — lokaler Entwicklungsablauf und
   Änderungstypen.
 - [Testing](testing.md) — autoritative Gradle-Lebenszyklen und Diagnose.
+- [GitHub Merge Governance](github-merge-governance.md) — required Check,
+  Up-to-date-Policy, Bypass-Grenze und Remote-Ruleset-Audit.
 - [Testing-Strategie](testing-strategy.md) — Testschichten und Zuständigkeiten.
 - [Dokumentationskonventionen](documentation-conventions.md) — Seitentypen,
   Quellen der Wahrheit und Claim-Regeln.

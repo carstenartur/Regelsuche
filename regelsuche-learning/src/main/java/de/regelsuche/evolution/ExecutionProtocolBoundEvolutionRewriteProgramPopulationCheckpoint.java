@@ -75,6 +75,12 @@ public record ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint(
             hash);
     }
 
+    /**
+     * Rebinds a potentially deserialized checkpoint to the actual execution
+     * artifacts supplied by the caller. The outer identities alone are not
+     * sufficient: the plan must itself name the protocol and the nested
+     * historical checkpoint must belong to the plan's study.
+     */
     public void requireCompatible(
         EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
         EvolutionRewriteProgramPopulationExecutionProtocol executionProtocol
@@ -83,7 +89,11 @@ public record ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint(
         Objects.requireNonNull(executionProtocol, "executionProtocol");
         if (!executionPlanHash.equals(executionPlan.contentHash())
                 || !executionProtocolHash.equals(
-                    executionProtocol.contentHash())) {
+                    executionProtocol.contentHash())
+                || !executionPlan.executionProtocolHash().equals(
+                    executionProtocol.contentHash())
+                || !executionPlan.studyPlanHash().equals(
+                    checkpoint.studyPlanHash())) {
             throw new IllegalArgumentException(
                 "checkpoint population execution identity mismatch");
         }
