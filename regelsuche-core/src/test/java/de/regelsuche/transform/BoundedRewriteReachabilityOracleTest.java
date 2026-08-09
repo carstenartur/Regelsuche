@@ -186,6 +186,6 @@ class BoundedRewriteReachabilityOracleTest {
     }
 
     private static Transformation edge(String rule, String target) {
-        return new Transformation(rule, target, List.of(), "root");
+        return new Transformation(rule, target);
     }
 }
