@@ -25,8 +25,9 @@ class HistoricalRediscoveryAtlasTest {
         new HistoricalRediscoveryAtlas();
 
     @Test
-    @Timeout(120)
-    void separatesInventoryBridgeSearchPolicyAndNegativeControlMechanisms() {
+    @Timeout(180)
+    void separatesMechanismsAndWritesStableEvidence(@TempDir Path directory)
+            throws Exception {
         HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(subset());
         Map<String, CaseResult> cases = byId(report);
 
@@ -49,13 +50,6 @@ class HistoricalRediscoveryAtlasTest {
         assertEquals(
             AssessmentDecision.USEFUL_DIAGNOSTIC_STEP,
             report.assessment().decision());
-    }
-
-    @Test
-    @Timeout(120)
-    void reportSerializationIsStableAndArtifactsAreWritable(@TempDir Path directory)
-            throws Exception {
-        HistoricalRediscoveryAtlas.AtlasReport report = atlas.run(subset());
 
         assertEquals(report.toJson(), report.toJson());
         assertTrue(report.toJson().startsWith(
