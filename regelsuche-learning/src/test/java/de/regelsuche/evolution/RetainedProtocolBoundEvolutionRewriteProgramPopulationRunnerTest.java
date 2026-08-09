@@ -2,6 +2,7 @@ package de.regelsuche.evolution;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,6 +17,10 @@ import de.regelsuche.evolution.EvolutionGenome.ResourceBudget;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Priority;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Requirement;
 import de.regelsuche.evolution.EvolutionRewriteProgramPlan.Source;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationExecutionProtocol.MutationSeedDerivationPolicy;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationExecutionProtocol.OffspringSchedulingPolicy;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationExecutionProtocol.ProposalOrderingPolicy;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationExecutionProtocol.SurvivorSelectionPolicy;
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainSuite.EvaluatorProfile;
 import de.regelsuche.evolution.EvolutionRewriteProgramTrainSuite.TrainCase;
 import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
@@ -117,6 +122,104 @@ class RetainedProtocolBoundEvolutionRewriteProgramPopulationRunnerTest {
             "validationCases"));
         assertFalse(uninterrupted.toCanonicalJson().contains(
             "finalTestOutcome"));
+    }
+
+    @Test
+    void legacyExecutionBindingPreservesHistoricalRunAndResumeBytes() {
+        Fixture fixture = fixture();
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun historical =
+            runner.run(
+                fixture.study(),
+                fixture.manifest(),
+                fixture.suite(),
+                fixture.seeds(),
+                fixture.catalog(),
+                evaluator(fixture.suite()));
+
+        EvolutionRewriteProgramPopulationExecutionProtocol protocol =
+            EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1();
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan =
+            EvolutionRewriteProgramPopulationExecutionPlan.create(
+                fixture.study(), protocol);
+        var executionRunner =
+            new ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner(
+                protocol);
+        ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
+            uninterrupted = executionRunner.run(
+                executionPlan,
+                fixture.study(),
+                fixture.manifest(),
+                fixture.suite(),
+                fixture.seeds(),
+                fixture.catalog(),
+                evaluator(fixture.suite()));
+        var checkpoint = executionRunner.checkpoint(
+            executionPlan,
+            fixture.study(),
+            fixture.manifest(),
+            fixture.suite(),
+            fixture.seeds(),
+            fixture.catalog(),
+            evaluator(fixture.suite()),
+            1);
+        ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun resumed =
+            executionRunner.resume(
+                executionPlan,
+                fixture.study(),
+                fixture.manifest(),
+                fixture.suite(),
+                fixture.seeds(),
+                fixture.catalog(),
+                evaluator(fixture.suite()),
+                checkpoint);
+
+        assertEquals(
+            historical.toCanonicalJson(),
+            uninterrupted.retainedRun().toCanonicalJson());
+        assertEquals(
+            uninterrupted.toCanonicalJson(),
+            resumed.toCanonicalJson());
+        assertEquals(
+            uninterrupted.retainedRun().toCanonicalJson(),
+            resumed.retainedRun().toCanonicalJson());
+        assertEquals(protocol.contentHash(), uninterrupted.executionProtocolHash());
+        assertEquals(executionPlan.contentHash(), uninterrupted.executionPlanHash());
+        assertEquals(protocol.contentHash(), checkpoint.executionProtocolHash());
+        assertEquals(executionPlan.contentHash(), checkpoint.executionPlanHash());
+        assertTrue(uninterrupted.toCanonicalJson().contains(
+            "EVALUATOR_AND_POPULATION_EXECUTION_PROTOCOL_BOUND_TRAIN_RETAINED"));
+        assertFalse(uninterrupted.toCanonicalJson().contains("validationCases"));
+        assertFalse(uninterrupted.toCanonicalJson().contains("finalTestOutcome"));
+    }
+
+    @Test
+    void futureSchedulingPolicyChangesIdentityAndCannotExecuteYet() {
+        Fixture fixture = fixture();
+        EvolutionRewriteProgramPopulationExecutionProtocol legacy =
+            EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1();
+        EvolutionRewriteProgramPopulationExecutionProtocol stratified =
+            EvolutionRewriteProgramPopulationExecutionProtocol.create(
+                EvolutionRewriteProgramPopulationEngine.class,
+                DeterministicRewriteProgramMutator.class,
+                ProposalOrderingPolicy
+                    .KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,
+                OffspringSchedulingPolicy.STRATIFIED_MUTATION_KIND_V1,
+                2,
+                MutationSeedDerivationPolicy
+                    .STUDY_HASH_GENERATION_PARENT_HASH_SHA256_PREFIX64_V1,
+                SurvivorSelectionPolicy
+                    .FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1);
+
+        assertNotEquals(legacy.contentHash(), stratified.contentHash());
+        assertNotEquals(
+            EvolutionRewriteProgramPopulationExecutionPlan.create(
+                fixture.study(), legacy).contentHash(),
+            EvolutionRewriteProgramPopulationExecutionPlan.create(
+                fixture.study(), stratified).contentHash());
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner(
+                stratified));
     }
 
     @Test
