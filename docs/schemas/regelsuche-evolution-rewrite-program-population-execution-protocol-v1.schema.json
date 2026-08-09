@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "regelsuche.evolution-rewrite-program-population-execution-protocol/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "populationEngineImplementationClass",
+    "mutatorImplementationClass",
+    "proposalOrderingPolicy",
+    "offspringSchedulingPolicy",
+    "generatedPoolMultiplier",
+    "mutationSeedDerivationPolicy",
+    "survivorSelectionPolicy",
+    "status",
+    "contentHash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "regelsuche.evolution-rewrite-program-population-execution-protocol/v1"
+    },
+    "populationEngineImplementationClass": {
+      "type": "string",
+      "pattern": "^[A-Za-z_$][A-Za-z0-9_$.]{2,511}$"
+    },
+    "mutatorImplementationClass": {
+      "type": "string",
+      "pattern": "^[A-Za-z_$][A-Za-z0-9_$.]{2,511}$"
+    },
+    "proposalOrderingPolicy": {
+      "const": "KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1"
+    },
+    "offspringSchedulingPolicy": {
+      "enum": [
+        "ROTATED_PREFIX_V1",
+        "STRATIFIED_MUTATION_KIND_V1"
+      ]
+    },
+    "generatedPoolMultiplier": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 64
+    },
+    "mutationSeedDerivationPolicy": {
+      "const": "STUDY_HASH_GENERATION_PARENT_HASH_SHA256_PREFIX64_V1"
+    },
+    "survivorSelectionPolicy": {
+      "const": "FITNESS_DESC_NODES_ASC_HASH_ASC_UNIQUE_ALPHA_ELITES_V1"
+    },
+    "status": {
+      "const": "FROZEN_NOT_RUN"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
