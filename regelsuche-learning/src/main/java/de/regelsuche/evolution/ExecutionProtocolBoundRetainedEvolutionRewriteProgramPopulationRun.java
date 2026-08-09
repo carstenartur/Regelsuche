@@ -109,6 +109,35 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
             hash);
     }
 
+    /**
+     * Rebinds a deserialized retained run to the actual execution artifacts a
+     * consumer intends to trust. The redundant implementation/version fields
+     * are checked as well as the content-addressed plan/protocol identities so
+     * a valid outer hash cannot be mistaken for semantic protocol agreement.
+     */
+    public void requireCompatible(
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramPopulationExecutionProtocol executionProtocol
+    ) {
+        Objects.requireNonNull(executionPlan, "executionPlan");
+        Objects.requireNonNull(executionProtocol, "executionProtocol");
+        if (!executionPlanHash.equals(executionPlan.contentHash())
+                || !executionProtocolHash.equals(executionProtocol.contentHash())
+                || !executionPlan.executionProtocolHash().equals(
+                    executionProtocol.contentHash())
+                || !populationEngineImplementationClass.equals(
+                    executionProtocol.populationEngineImplementationClass())
+                || populationEngineSemanticsVersion
+                    != executionProtocol.populationEngineSemanticsVersion()
+                || !mutatorImplementationClass.equals(
+                    executionProtocol.mutatorImplementationClass())
+                || mutatorSemanticsVersion
+                    != executionProtocol.mutatorSemanticsVersion()) {
+            throw new IllegalArgumentException(
+                "retained TRAIN run population execution identity mismatch");
+        }
+    }
+
     public String toCanonicalJson() {
         return render(
             retainedRun,
