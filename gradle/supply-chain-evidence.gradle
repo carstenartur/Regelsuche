@@ -1,3 +1,5 @@
+import org.gradle.api.file.RegularFile
+
 /*
  * Checkout-owned deterministic dependency inventory foundation for issue #514.
  *
@@ -17,8 +19,6 @@ buildscript {
 }
 
 apply plugin: 'org.cyclonedx.bom'
-
-import org.gradle.api.file.RegularFile
 
 def supplyChainReportDirectory = layout.buildDirectory.dir('reports/quality/supply-chain')
 
