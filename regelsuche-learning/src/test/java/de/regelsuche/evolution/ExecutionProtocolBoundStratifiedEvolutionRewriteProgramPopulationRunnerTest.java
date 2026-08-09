@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.regelsuche.equivalence.AssumptionAwareEquivalenceService;
 import de.regelsuche.evolution.DeterministicRewriteProgramMutator.MutationCatalog;
@@ -91,6 +92,89 @@ class ExecutionProtocolBoundStratifiedEvolutionRewriteProgramPopulationRunnerTes
         assertFalse(
             uninterrupted.retainedRun().retainedPopulation()
                 .populationRun().generationReports().isEmpty());
+    }
+
+    @Test
+    void stratifiedDiagnosticsAreDeterministicBoundAndTrainOnly() {
+        Fixture fixture = fixture();
+        EvolutionRewriteProgramPopulationExecutionProtocol protocol =
+            EvolutionRewriteProgramPopulationExecutionProtocol
+                .stratifiedMutationKindV1();
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan =
+            EvolutionRewriteProgramPopulationExecutionPlan.create(
+                fixture.study(), protocol);
+        var runner =
+            new ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner(
+                protocol);
+
+        var first = runner.runWithDiagnostics(
+            executionPlan,
+            fixture.study(),
+            fixture.manifest(),
+            fixture.suite(),
+            fixture.seeds(),
+            fixture.catalog(),
+            evaluator(fixture.suite()));
+        var second = runner.runWithDiagnostics(
+            executionPlan,
+            fixture.study(),
+            fixture.manifest(),
+            fixture.suite(),
+            fixture.seeds(),
+            fixture.catalog(),
+            evaluator(fixture.suite()));
+
+        assertEquals(first.run().toCanonicalJson(), second.run().toCanonicalJson());
+        assertEquals(
+            first.diagnostics().toCanonicalJson(),
+            second.diagnostics().toCanonicalJson());
+        assertEquals(
+            first.run().contentHash(),
+            first.diagnostics().executionBoundRunHash());
+        assertEquals(
+            first.run().retainedRun().retainedPopulation()
+                .populationRun().contentHash(),
+            first.diagnostics().populationRunHash());
+        assertEquals(
+            first.run().retainedRun().retainedPopulation()
+                .populationRun().generationReports().size(),
+            first.diagnostics().generations().size());
+        assertTrue(first.diagnostics().mutationBatches().stream()
+            .allMatch(batch -> batch.mutationBatchJson().contains(
+                DeterministicRewriteProgramMutator.SCHEMA)));
+        assertTrue(first.diagnostics().candidateStructures().size()
+            >= fixture.seeds().size());
+        assertEquals(
+            EvolutionRewriteProgramTrainDiagnostics.DATA_SCOPE,
+            first.diagnostics().dataScope());
+        assertFalse(first.diagnostics().toCanonicalJson().contains(
+            "validationCases"));
+        assertFalse(first.diagnostics().toCanonicalJson().contains(
+            "finalTestOutcome"));
+    }
+
+    @Test
+    void legacyProtocolCannotRequestStratifiedDiagnostics() {
+        Fixture fixture = fixture();
+        EvolutionRewriteProgramPopulationExecutionProtocol protocol =
+            EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1();
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan =
+            EvolutionRewriteProgramPopulationExecutionPlan.create(
+                fixture.study(), protocol);
+        var runner =
+            new ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRunner(
+                protocol);
+
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> runner.runWithDiagnostics(
+                executionPlan,
+                fixture.study(),
+                fixture.manifest(),
+                fixture.suite(),
+                fixture.seeds(),
+                fixture.catalog(),
+                evaluator(fixture.suite())));
     }
 
     @Test
