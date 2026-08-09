@@ -11,7 +11,9 @@ from pathlib import Path
 
 WORKFLOW_DIR = Path(".github/workflows")
 POLICY_FILE = Path("config/workflow-semantics-policy.json")
+GOVERNANCE_POLICY_FILE = Path("config/github-merge-governance-policy.json")
 EXPECTED_SCHEMA = "regelsuche.workflow-semantics-policy/v2"
+EXPECTED_GOVERNANCE_SCHEMA = "regelsuche.github-merge-governance-policy/v1"
 
 
 @dataclass(frozen=True)
@@ -19,6 +21,19 @@ class Policy:
     maximum_workflow_count: int
     verification_workflows: tuple[str, ...]
     platform_workflows: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class MergeGovernancePolicy:
+    default_branch: str
+    required_status_check_context: str
+    required_status_check_integration_id: int
+    strict_up_to_date: bool
+    create_event_check_context: str
+    routine_bypass_actors: tuple[object, ...]
+    current_user_can_bypass: str
+    required_approving_review_count: int
+    required_review_thread_resolution: bool
 
 
 @dataclass(frozen=True)
@@ -108,6 +123,91 @@ def load_policy() -> Policy:
     return Policy(maximum, tuple(verification), tuple(platform))
 
 
+def load_governance_policy() -> MergeGovernancePolicy:
+    try:
+        document = json.loads(GOVERNANCE_POLICY_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"cannot read {GOVERNANCE_POLICY_FILE}: {error}") from error
+
+    expected_fields = {
+        "schema",
+        "defaultBranch",
+        "requiredStatusCheck",
+        "createEventCheckContext",
+        "routineBypassActors",
+        "currentUserCanBypass",
+        "requiredApprovingReviewCount",
+        "requiredReviewThreadResolution",
+    }
+    if set(document) != expected_fields:
+        raise ValueError("merge-governance policy has unknown or missing top-level fields")
+    if document["schema"] != EXPECTED_GOVERNANCE_SCHEMA:
+        raise ValueError(
+            f"unsupported merge-governance policy schema: {document['schema']!r}"
+        )
+
+    required = document["requiredStatusCheck"]
+    if not isinstance(required, dict) or set(required) != {
+        "context",
+        "integrationId",
+        "strictUpToDate",
+    }:
+        raise ValueError("requiredStatusCheck has unknown or missing fields")
+
+    default_branch = document["defaultBranch"]
+    required_context = required["context"]
+    integration_id = required["integrationId"]
+    strict_up_to_date = required["strictUpToDate"]
+    create_context = document["createEventCheckContext"]
+    bypass_actors = document["routineBypassActors"]
+    current_user_can_bypass = document["currentUserCanBypass"]
+    review_count = document["requiredApprovingReviewCount"]
+    thread_resolution = document["requiredReviewThreadResolution"]
+
+    if not isinstance(default_branch, str) or not default_branch:
+        raise ValueError("defaultBranch must be a non-empty string")
+    if not isinstance(required_context, str) or not required_context:
+        raise ValueError("required status context must be a non-empty string")
+    if not isinstance(create_context, str) or not create_context:
+        raise ValueError("create-event check context must be a non-empty string")
+    if required_context == create_context:
+        raise ValueError(
+            "create-event check context must differ from the required merge check"
+        )
+    if (
+        not isinstance(integration_id, int)
+        or isinstance(integration_id, bool)
+        or integration_id <= 0
+    ):
+        raise ValueError("required status integrationId must be a positive integer")
+    if strict_up_to_date is not True:
+        raise ValueError("strictUpToDate must remain true in the intended merge policy")
+    if not isinstance(bypass_actors, list) or bypass_actors:
+        raise ValueError("routineBypassActors must be an empty array")
+    if current_user_can_bypass != "never":
+        raise ValueError("currentUserCanBypass must be 'never'")
+    if (
+        not isinstance(review_count, int)
+        or isinstance(review_count, bool)
+        or review_count < 0
+    ):
+        raise ValueError("requiredApprovingReviewCount must be a non-negative integer")
+    if thread_resolution is not True:
+        raise ValueError("requiredReviewThreadResolution must remain true")
+
+    return MergeGovernancePolicy(
+        default_branch,
+        required_context,
+        integration_id,
+        strict_up_to_date,
+        create_context,
+        tuple(bypass_actors),
+        current_user_can_bypass,
+        review_count,
+        thread_resolution,
+    )
+
+
 def workflow_names() -> list[str]:
     if not WORKFLOW_DIR.is_dir():
         raise ValueError(f"workflow directory does not exist: {WORKFLOW_DIR}")
@@ -118,7 +218,9 @@ def workflow_names() -> list[str]:
     )
 
 
-def scan_verification_workflow(workflow: str) -> list[Violation]:
+def scan_verification_workflow(
+    workflow: str, governance: MergeGovernancePolicy
+) -> list[Violation]:
     path = WORKFLOW_DIR / workflow
     text = path.read_text(encoding="utf-8")
     violations: list[Violation] = []
@@ -163,6 +265,25 @@ def scan_verification_workflow(workflow: str) -> list[Violation]:
                 "verification workflow does not invoke ciCheck",
             )
         )
+
+    compact = " ".join(text.split())
+    expected_job_name = (
+        "${{ github.event_name == 'create' && '"
+        + governance.create_event_check_context
+        + "' || '"
+        + governance.required_status_check_context
+        + "' }}"
+    )
+    if expected_job_name not in compact:
+        violations.append(
+            Violation(
+                workflow,
+                1,
+                "required-check-create-collision",
+                "verification job must give create events a distinct check name: "
+                + expected_job_name,
+            )
+        )
     return violations
 
 
@@ -188,6 +309,7 @@ def main() -> int:
     try:
         self_test()
         policy = load_policy()
+        governance = load_governance_policy()
         actual = workflow_names()
     except (AssertionError, ValueError) as error:
         print(f"Workflow semantics guard configuration failed: {error}", file=sys.stderr)
@@ -219,7 +341,7 @@ def main() -> int:
     violations = [
         violation
         for workflow in policy.verification_workflows
-        for violation in scan_verification_workflow(workflow)
+        for violation in scan_verification_workflow(workflow, governance)
     ]
     if violations:
         print("Verification workflows contain checkout-owned semantics:", file=sys.stderr)
@@ -235,6 +357,8 @@ def main() -> int:
         "OK: "
         f"{len(actual)}/{policy.maximum_workflow_count} workflow slots used; "
         f"{len(policy.verification_workflows)} verification workflow(s) invoke ciCheck; "
+        f"required merge check is {governance.required_status_check_context!r}; "
+        f"create events use {governance.create_event_check_context!r}; "
         f"{len(policy.platform_workflows)} platform workflow(s) remain"
     )
     return 0
