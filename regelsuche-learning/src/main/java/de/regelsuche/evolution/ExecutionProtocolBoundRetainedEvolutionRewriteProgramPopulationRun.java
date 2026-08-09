@@ -1,5 +1,7 @@
 package de.regelsuche.evolution;
 
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationExecutionProtocol.MutatorSemanticsVersion;
+import de.regelsuche.evolution.EvolutionRewriteProgramPopulationExecutionProtocol.PopulationEngineSemanticsVersion;
 import de.regelsuche.json.JsonWriter;
 import java.util.Objects;
 
@@ -13,7 +15,9 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
     String executionPlanHash,
     String executionProtocolHash,
     String populationEngineImplementationClass,
+    PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
     String mutatorImplementationClass,
+    MutatorSemanticsVersion mutatorSemanticsVersion,
     String status,
     String contentHash
 ) {
@@ -34,9 +38,15 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
         populationEngineImplementationClass = requireText(
             populationEngineImplementationClass,
             "populationEngineImplementationClass");
+        Objects.requireNonNull(
+            populationEngineSemanticsVersion,
+            "populationEngineSemanticsVersion");
         mutatorImplementationClass = requireText(
             mutatorImplementationClass,
             "mutatorImplementationClass");
+        Objects.requireNonNull(
+            mutatorSemanticsVersion,
+            "mutatorSemanticsVersion");
         if (!STATUS.equals(status)) {
             throw new IllegalArgumentException(
                 "retained TRAIN run lacks population execution authority");
@@ -47,7 +57,9 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
             executionPlanHash,
             executionProtocolHash,
             populationEngineImplementationClass,
+            populationEngineSemanticsVersion,
             mutatorImplementationClass,
+            mutatorSemanticsVersion,
             null));
         if (!expected.equals(contentHash)) {
             throw new IllegalArgumentException(
@@ -80,7 +92,9 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
             executionPlan.contentHash(),
             executionProtocol.contentHash(),
             executionProtocol.populationEngineImplementationClass(),
+            executionProtocol.populationEngineSemanticsVersion(),
             executionProtocol.mutatorImplementationClass(),
+            executionProtocol.mutatorSemanticsVersion(),
             null));
         return new ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun(
             SCHEMA,
@@ -88,7 +102,9 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
             executionPlan.contentHash(),
             executionProtocol.contentHash(),
             executionProtocol.populationEngineImplementationClass(),
+            executionProtocol.populationEngineSemanticsVersion(),
             executionProtocol.mutatorImplementationClass(),
+            executionProtocol.mutatorSemanticsVersion(),
             STATUS,
             hash);
     }
@@ -99,7 +115,9 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
             executionPlanHash,
             executionProtocolHash,
             populationEngineImplementationClass,
+            populationEngineSemanticsVersion,
             mutatorImplementationClass,
+            mutatorSemanticsVersion,
             contentHash);
     }
 
@@ -108,7 +126,9 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
         String executionPlanHash,
         String executionProtocolHash,
         String populationEngineImplementationClass,
+        PopulationEngineSemanticsVersion populationEngineSemanticsVersion,
         String mutatorImplementationClass,
+        MutatorSemanticsVersion mutatorSemanticsVersion,
         String contentHash
     ) {
         JsonWriter json = new JsonWriter().beginObject()
@@ -120,7 +140,13 @@ public record ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
             .property(
                 "populationEngineImplementationClass",
                 populationEngineImplementationClass)
+            .property(
+                "populationEngineSemanticsVersion",
+                populationEngineSemanticsVersion.name())
             .property("mutatorImplementationClass", mutatorImplementationClass)
+            .property(
+                "mutatorSemanticsVersion",
+                mutatorSemanticsVersion.name())
             .property("status", STATUS);
         if (contentHash != null) {
             json.property("contentHash", contentHash);
