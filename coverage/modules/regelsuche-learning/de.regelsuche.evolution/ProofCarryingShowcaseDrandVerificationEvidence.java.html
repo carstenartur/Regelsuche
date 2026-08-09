@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseDrandVerificationEvidence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseDrandVerificationEvidence.java</span></div><h1>ProofCarryingShowcaseDrandVerificationEvidence.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Map;
+
+/**
+ * Content-addressed evidence returned by a pinned drand client after BLS
+ * verification of the single preregistered eligible showcase round.
+ *
+ * &lt;p&gt;The external client owns BLS verification. Java independently checks all
+ * experiment bindings, scheduled round time, and the drand invariant that the
+ * public randomness equals SHA-256 of the verified signature.&lt;/p&gt;
+ */
+public record ProofCarryingShowcaseDrandVerificationEvidence(
+    String schema,
+    String planContentHash,
+    String candidateFreezeContentHash,
+    String chainInfoContentHash,
+    String chainHash,
+    String publicKey,
+    long round,
+    long roundUnixTime,
+    String randomness,
+    String signature,
+    String previousSignature,
+    String verificationClient,
+    String verificationClientArtifactHash,
+    String endpointId,
+    String verificationStatus,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.proof-carrying-showcase-drand-verification-evidence/v1&quot;;
+    public static final String VERIFICATION_CLIENT = &quot;drand-client/1.4.2&quot;;
+    public static final String STATUS =
+        &quot;BEACON_VERIFIED_BY_PINNED_DRAND_CLIENT&quot;;
+
+<span class="fc" id="L41">    public ProofCarryingShowcaseDrandVerificationEvidence {</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(</span>
+                &quot;unsupported drand verification-evidence schema&quot;);
+        }
+<span class="fc" id="L46">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            planContentHash, &quot;planContentHash&quot;);
+<span class="fc" id="L48">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            candidateFreezeContentHash, &quot;candidateFreezeContentHash&quot;);
+<span class="fc" id="L50">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            chainInfoContentHash, &quot;chainInfoContentHash&quot;);
+<span class="fc" id="L52">        ProofCarryingShowcaseJsonSupport.requireHex64(</span>
+            chainHash, &quot;chainHash&quot;);
+<span class="fc" id="L54">        ProofCarryingShowcaseJsonSupport.requireBoundedHex(</span>
+            publicKey, 96, 96, &quot;publicKey&quot;);
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        if (round &lt; 1 || roundUnixTime &lt; 1) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(</span>
+                &quot;verified drand round and time must be positive&quot;);
+        }
+<span class="fc" id="L60">        ProofCarryingShowcaseJsonSupport.requireHex64(</span>
+            randomness, &quot;randomness&quot;);
+<span class="fc" id="L62">        signature = ProofCarryingShowcaseJsonSupport.requireBoundedHex(</span>
+            signature, 96, 1024, &quot;signature&quot;);
+<span class="fc" id="L64">        previousSignature = ProofCarryingShowcaseJsonSupport</span>
+<span class="fc" id="L65">            .requireBoundedHex(</span>
+                previousSignature, 96, 1024, &quot;previousSignature&quot;);
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (!VERIFICATION_CLIENT.equals(verificationClient)) {</span>
+<span class="fc" id="L68">            throw new IllegalArgumentException(</span>
+                &quot;drand verification client version drift&quot;);
+        }
+<span class="fc" id="L71">        ProofCarryingShowcaseJsonSupport.requireClient(verificationClient);</span>
+<span class="fc" id="L72">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            verificationClientArtifactHash,
+            &quot;verificationClientArtifactHash&quot;);
+<span class="fc" id="L75">        endpointId = ProofCarryingShowcaseJsonSupport.requireEndpoint(</span>
+            endpointId);
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (!STATUS.equals(verificationStatus)) {</span>
+<span class="nc" id="L78">            throw new IllegalArgumentException(</span>
+                &quot;drand evidence is not client-verified&quot;);
+        }
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (!randomness.equals(randomnessFromSignature(signature))) {</span>
+<span class="fc" id="L82">            throw new IllegalArgumentException(</span>
+                &quot;drand randomness is not SHA-256(signature)&quot;);
+        }
+<span class="fc" id="L85">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L87">        String expected = ProofCarryingShowcaseJsonSupport.hashPayload(</span>
+<span class="fc" id="L88">            payload(</span>
+                schema,
+                planContentHash,
+                candidateFreezeContentHash,
+                chainInfoContentHash,
+                chainHash,
+                publicKey,
+                round,
+                roundUnixTime,
+                randomness,
+                signature,
+                previousSignature,
+                verificationClient,
+                verificationClientArtifactHash,
+                endpointId,
+                verificationStatus));
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (!expected.equals(contentHash)) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(</span>
+                &quot;drand verification-evidence contentHash mismatch&quot;);
+        }
+<span class="fc" id="L108">    }</span>
+
+    public static ProofCarryingShowcaseDrandVerificationEvidence
+            createFromVerifiedClientOutput(
+        ProofCarryingShowcasePlan plan,
+        ProofCarryingShowcaseCandidateFreeze candidate,
+        ProofCarryingShowcaseDrandChainInfo chainInfo,
+        long round,
+        String randomness,
+        String signature,
+        String previousSignature,
+        String verificationClientArtifactHash,
+        String endpointId
+    ) {
+<span class="fc" id="L122">        chainInfo.requireCompatible(plan);</span>
+<span class="fc" id="L123">        candidate.requireCompatible(plan);</span>
+<span class="fc" id="L124">        long expectedRound = chainInfo.firstEligibleScheduledRound(</span>
+<span class="fc" id="L125">            candidate.randomnessNotBeforeUnixTime());</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (round != expectedRound) {</span>
+<span class="fc" id="L127">            throw new IllegalArgumentException(</span>
+                &quot;only the first eligible scheduled drand round is admissible&quot;);
+        }
+<span class="fc" id="L130">        long roundTime = chainInfo.roundUnixTime(round);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (roundTime &lt;= candidate.randomnessNotBeforeUnixTime()) {</span>
+<span class="nc" id="L132">            throw new IllegalArgumentException(</span>
+                &quot;drand round is not strictly after candidate boundary&quot;);
+        }
+<span class="fc" id="L135">        Map&lt;String, Object&gt; payload = payload(</span>
+            SCHEMA,
+<span class="fc" id="L137">            plan.contentHash(),</span>
+<span class="fc" id="L138">            candidate.contentHash(),</span>
+<span class="fc" id="L139">            chainInfo.contentHash(),</span>
+<span class="fc" id="L140">            chainInfo.chainHash(),</span>
+<span class="fc" id="L141">            chainInfo.publicKey(),</span>
+            round,
+            roundTime,
+            randomness,
+            signature,
+            previousSignature,
+            VERIFICATION_CLIENT,
+            verificationClientArtifactHash,
+            endpointId,
+            STATUS);
+<span class="fc" id="L151">        return new ProofCarryingShowcaseDrandVerificationEvidence(</span>
+            SCHEMA,
+<span class="fc" id="L153">            plan.contentHash(),</span>
+<span class="fc" id="L154">            candidate.contentHash(),</span>
+<span class="fc" id="L155">            chainInfo.contentHash(),</span>
+<span class="fc" id="L156">            chainInfo.chainHash(),</span>
+<span class="fc" id="L157">            chainInfo.publicKey(),</span>
+            round,
+            roundTime,
+            randomness,
+            signature,
+            previousSignature,
+            VERIFICATION_CLIENT,
+            verificationClientArtifactHash,
+            endpointId,
+            STATUS,
+<span class="fc" id="L167">            ProofCarryingShowcaseJsonSupport.hashPayload(payload));</span>
+    }
+
+    public static ProofCarryingShowcaseDrandVerificationEvidence
+            fromCanonicalJson(String json) {
+<span class="nc" id="L172">        return ProofCarryingShowcaseJsonSupport.read(</span>
+            json,
+            ProofCarryingShowcaseDrandVerificationEvidence.class,
+            &quot;drand verification evidence&quot;);
+    }
+
+    public String toCanonicalJson() {
+<span class="nc" id="L179">        return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);</span>
+    }
+
+    public void requireCompatible(
+        ProofCarryingShowcasePlan plan,
+        ProofCarryingShowcaseCandidateFreeze candidate,
+        ProofCarryingShowcaseDrandChainInfo chainInfo
+    ) {
+<span class="fc" id="L187">        chainInfo.requireCompatible(plan);</span>
+<span class="fc" id="L188">        candidate.requireCompatible(plan);</span>
+<span class="fc" id="L189">        long expectedRound = chainInfo.firstEligibleScheduledRound(</span>
+<span class="fc" id="L190">            candidate.randomnessNotBeforeUnixTime());</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (!planContentHash.equals(plan.contentHash())</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                || !candidateFreezeContentHash.equals(candidate.contentHash())</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                || !chainInfoContentHash.equals(chainInfo.contentHash())</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                || !chainHash.equals(chainInfo.chainHash())</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">                || !publicKey.equals(chainInfo.publicKey())</span>
+                || round != expectedRound
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                || roundUnixTime != chainInfo.roundUnixTime(round)</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                || roundUnixTime &lt;= candidate.randomnessNotBeforeUnixTime()) {</span>
+<span class="nc" id="L199">            throw new IllegalArgumentException(</span>
+                &quot;drand verification evidence binding mismatch&quot;);
+        }
+<span class="fc" id="L202">    }</span>
+
+    static String randomnessFromSignature(String signature) {
+<span class="fc" id="L205">        String checked = ProofCarryingShowcaseJsonSupport.requireBoundedHex(</span>
+            signature, 96, 1024, &quot;signature&quot;);
+        try {
+<span class="fc" id="L208">            byte[] digest = MessageDigest.getInstance(&quot;SHA-256&quot;)</span>
+<span class="fc" id="L209">                .digest(HexFormat.of().parseHex(checked));</span>
+<span class="fc" id="L210">            return HexFormat.of().formatHex(digest);</span>
+<span class="nc" id="L211">        } catch (NoSuchAlgorithmException exception) {</span>
+<span class="nc" id="L212">            throw new IllegalStateException(&quot;SHA-256 unavailable&quot;, exception);</span>
+        }
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String schema,
+        String planContentHash,
+        String candidateFreezeContentHash,
+        String chainInfoContentHash,
+        String chainHash,
+        String publicKey,
+        long round,
+        long roundUnixTime,
+        String randomness,
+        String signature,
+        String previousSignature,
+        String verificationClient,
+        String verificationClientArtifactHash,
+        String endpointId,
+        String verificationStatus
+    ) {
+<span class="fc" id="L233">        return ProofCarryingShowcaseJsonSupport.payload(</span>
+            &quot;schema&quot;, schema,
+            &quot;planContentHash&quot;, planContentHash,
+            &quot;candidateFreezeContentHash&quot;, candidateFreezeContentHash,
+            &quot;chainInfoContentHash&quot;, chainInfoContentHash,
+            &quot;chainHash&quot;, chainHash,
+            &quot;publicKey&quot;, publicKey,
+<span class="fc" id="L240">            &quot;round&quot;, round,</span>
+<span class="fc" id="L241">            &quot;roundUnixTime&quot;, roundUnixTime,</span>
+            &quot;randomness&quot;, randomness,
+            &quot;signature&quot;, signature,
+            &quot;previousSignature&quot;, previousSignature,
+            &quot;verificationClient&quot;, verificationClient,
+            &quot;verificationClientArtifactHash&quot;,
+                verificationClientArtifactHash,
+            &quot;endpointId&quot;, endpointId,
+            &quot;verificationStatus&quot;, verificationStatus);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

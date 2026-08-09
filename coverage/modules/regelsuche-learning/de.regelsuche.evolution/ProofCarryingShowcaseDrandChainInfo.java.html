@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcaseDrandChainInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcaseDrandChainInfo.java</span></div><h1>ProofCarryingShowcaseDrandChainInfo.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+import java.nio.file.Path;
+import java.util.Map;
+
+/**
+ * Preregistered root-of-trust metadata for the drand default mainnet chain.
+ *
+ * &lt;p&gt;This artifact freezes chain identity and timing before any eligible
+ * showcase randomness round is selected. It deliberately contains no beacon
+ * round, signature, randomness value, or FINAL TEST material.&lt;/p&gt;
+ */
+public record ProofCarryingShowcaseDrandChainInfo(
+    String schema,
+    String network,
+    String chainHash,
+    String publicKey,
+    int periodSeconds,
+    long genesisTime,
+    String genesisSeed,
+    String scheme,
+    String beaconId,
+    String sourceApi,
+    String status,
+    String contentHash
+) {
+    public static final String SCHEMA =
+        &quot;regelsuche.proof-carrying-showcase-drand-chain-info/v1&quot;;
+    public static final String NETWORK = &quot;default&quot;;
+    public static final String CHAIN_HASH =
+        &quot;8990e7a9aaed2ffed73dbd7092123d6f289930540d7651336225dc172e51b2ce&quot;;
+    public static final String PUBLIC_KEY =
+        &quot;868f005eb8e6e4ca0a47c8a77ceaa5309a47978a7c71bc5cce96366b5d7a569937c529eeda66c7293784a9402801af31&quot;;
+    public static final int PERIOD_SECONDS = 30;
+    public static final long GENESIS_TIME = 1_595_431_050L;
+    public static final String GENESIS_SEED =
+        &quot;176f93498eac9ca337150b46d21dd58673ea4e3581185f869672e59fa4cb390a&quot;;
+    public static final String SCHEME = &quot;pedersen-bls-chained&quot;;
+    public static final String BEACON_ID = &quot;default&quot;;
+    public static final String SOURCE_API =
+        &quot;https://api.drand.sh/v2/chains/&quot; + CHAIN_HASH + &quot;/info&quot;;
+    public static final String STATUS = &quot;PINNED_BEFORE_PUBLIC_RANDOMNESS&quot;;
+
+<span class="fc" id="L44">    public ProofCarryingShowcaseDrandChainInfo {</span>
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (!SCHEMA.equals(schema)</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">                || !NETWORK.equals(network)</span>
+<span class="pc bpc" id="L47" title="3 of 6 branches missed.">                || !CHAIN_HASH.equals(chainHash)</span>
+                || periodSeconds != PERIOD_SECONDS
+                || genesisTime != GENESIS_TIME
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">                || !GENESIS_SEED.equals(genesisSeed)</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                || !SCHEME.equals(scheme)</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">                || !BEACON_ID.equals(beaconId)</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                || !SOURCE_API.equals(sourceApi)</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                || !STATUS.equals(status)) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(</span>
+                &quot;drand default-chain root of trust drift&quot;);
+        }
+<span class="fc" id="L58">        ProofCarryingShowcaseJsonSupport.requireBoundedHex(</span>
+            publicKey, 96, 96, &quot;publicKey&quot;);
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (!PUBLIC_KEY.equals(publicKey)) {</span>
+<span class="fc" id="L61">            throw new IllegalArgumentException(&quot;drand public key drift&quot;);</span>
+        }
+<span class="fc" id="L63">        ProofCarryingShowcaseJsonSupport.requireHex64(</span>
+            chainHash, &quot;chainHash&quot;);
+<span class="fc" id="L65">        ProofCarryingShowcaseJsonSupport.requireHex64(</span>
+            genesisSeed, &quot;genesisSeed&quot;);
+<span class="fc" id="L67">        ProofCarryingShowcaseJsonSupport.requireSha256(</span>
+            contentHash, &quot;contentHash&quot;);
+<span class="fc" id="L69">        String expected = ProofCarryingShowcaseJsonSupport.hashPayload(</span>
+<span class="fc" id="L70">            payload(</span>
+                schema,
+                network,
+                chainHash,
+                publicKey,
+                periodSeconds,
+                genesisTime,
+                genesisSeed,
+                scheme,
+                beaconId,
+                sourceApi,
+                status));
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!expected.equals(contentHash)) {</span>
+<span class="fc" id="L83">            throw new IllegalArgumentException(</span>
+                &quot;drand chain-info contentHash mismatch&quot;);
+        }
+<span class="fc" id="L86">    }</span>
+
+    public static ProofCarryingShowcaseDrandChainInfo createDefault() {
+<span class="fc" id="L89">        Map&lt;String, Object&gt; payload = payload(</span>
+            SCHEMA,
+            NETWORK,
+            CHAIN_HASH,
+            PUBLIC_KEY,
+            PERIOD_SECONDS,
+            GENESIS_TIME,
+            GENESIS_SEED,
+            SCHEME,
+            BEACON_ID,
+            SOURCE_API,
+            STATUS);
+<span class="fc" id="L101">        return new ProofCarryingShowcaseDrandChainInfo(</span>
+            SCHEMA,
+            NETWORK,
+            CHAIN_HASH,
+            PUBLIC_KEY,
+            PERIOD_SECONDS,
+            GENESIS_TIME,
+            GENESIS_SEED,
+            SCHEME,
+            BEACON_ID,
+            SOURCE_API,
+            STATUS,
+<span class="fc" id="L113">            ProofCarryingShowcaseJsonSupport.hashPayload(payload));</span>
+    }
+
+    public static ProofCarryingShowcaseDrandChainInfo read(Path path) {
+<span class="fc" id="L117">        return ProofCarryingShowcaseJsonSupport.read(</span>
+            path,
+            ProofCarryingShowcaseDrandChainInfo.class,
+            &quot;showcase drand chain info&quot;);
+    }
+
+    public static ProofCarryingShowcaseDrandChainInfo fromCanonicalJson(
+        String json
+    ) {
+<span class="nc" id="L126">        return ProofCarryingShowcaseJsonSupport.read(</span>
+            json,
+            ProofCarryingShowcaseDrandChainInfo.class,
+            &quot;showcase drand chain info&quot;);
+    }
+
+    public String toCanonicalJson() {
+<span class="fc" id="L133">        return ProofCarryingShowcaseJsonSupport.toCanonicalJson(this);</span>
+    }
+
+    public void requireCompatible(ProofCarryingShowcasePlan plan) {
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (!NETWORK.equals(plan.publicRandomness().network())</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                || !CHAIN_HASH.equals(plan.publicRandomness().chainHash())) {</span>
+<span class="nc" id="L139">            throw new IllegalArgumentException(</span>
+                &quot;drand chain info does not match showcase plan&quot;);
+        }
+<span class="fc" id="L142">    }</span>
+
+    /** Unix time of a drand round according to the pinned 30-second schedule. */
+    public long roundUnixTime(long round) {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (round &lt; 1) {</span>
+<span class="fc" id="L147">            throw new IllegalArgumentException(&quot;drand round must be positive&quot;);</span>
+        }
+<span class="fc" id="L149">        return Math.addExact(</span>
+            genesisTime,
+<span class="fc" id="L151">            Math.multiplyExact(round - 1, (long) periodSeconds));</span>
+    }
+
+    /**
+     * First scheduled round whose Unix time is strictly greater than the
+     * supplied frozen candidate boundary. No network access is performed.
+     * Stage C verifies exactly this round and fails closed instead of silently
+     * substituting a later round.
+     */
+    public long firstEligibleScheduledRound(long unixTime) {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (unixTime &lt; 0) {</span>
+<span class="fc" id="L162">            throw new IllegalArgumentException(&quot;boundary must not be negative&quot;);</span>
+        }
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (unixTime &lt; genesisTime) {</span>
+<span class="fc" id="L165">            return 1L;</span>
+        }
+<span class="fc" id="L167">        long elapsed = Math.subtractExact(unixTime, genesisTime);</span>
+<span class="fc" id="L168">        return Math.addExact(elapsed / periodSeconds, 2L);</span>
+    }
+
+    private static Map&lt;String, Object&gt; payload(
+        String schema,
+        String network,
+        String chainHash,
+        String publicKey,
+        int periodSeconds,
+        long genesisTime,
+        String genesisSeed,
+        String scheme,
+        String beaconId,
+        String sourceApi,
+        String status
+    ) {
+<span class="fc" id="L184">        return ProofCarryingShowcaseJsonSupport.payload(</span>
+            &quot;schema&quot;, schema,
+            &quot;network&quot;, network,
+            &quot;chainHash&quot;, chainHash,
+            &quot;publicKey&quot;, publicKey,
+<span class="fc" id="L189">            &quot;periodSeconds&quot;, periodSeconds,</span>
+<span class="fc" id="L190">            &quot;genesisTime&quot;, genesisTime,</span>
+            &quot;genesisSeed&quot;, genesisSeed,
+            &quot;scheme&quot;, scheme,
+            &quot;beaconId&quot;, beaconId,
+            &quot;sourceApi&quot;, sourceApi,
+            &quot;status&quot;, status);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>

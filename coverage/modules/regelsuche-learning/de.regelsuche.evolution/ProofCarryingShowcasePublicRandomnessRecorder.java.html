@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProofCarryingShowcasePublicRandomnessRecorder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">regelsuche-learning</a> &gt; <a href="index.source.html" class="el_package">de.regelsuche.evolution</a> &gt; <span class="el_source">ProofCarryingShowcasePublicRandomnessRecorder.java</span></div><h1>ProofCarryingShowcasePublicRandomnessRecorder.java</h1><pre class="source lang-java linenums">package de.regelsuche.evolution;
+
+/**
+ * Converts typed, independently bound drand verification evidence into the
+ * public-randomness receipt accepted by the showcase seed-derivation stage.
+ */
+<span class="fc" id="L7">public final class ProofCarryingShowcasePublicRandomnessRecorder {</span>
+    public ProofCarryingShowcasePublicRandomnessReceipt record(
+        ProofCarryingShowcasePlan plan,
+        ProofCarryingShowcaseCandidateFreeze candidate,
+        ProofCarryingShowcaseDrandChainInfo chainInfo,
+        ProofCarryingShowcaseDrandVerificationEvidence evidence
+    ) {
+<span class="fc" id="L14">        evidence.requireCompatible(plan, candidate, chainInfo);</span>
+<span class="fc" id="L15">        return ProofCarryingShowcasePublicRandomnessReceipt.create(</span>
+            plan,
+            candidate,
+<span class="fc" id="L18">            evidence.round(),</span>
+<span class="fc" id="L19">            evidence.roundUnixTime(),</span>
+<span class="fc" id="L20">            evidence.randomness(),</span>
+<span class="fc" id="L21">            evidence.signature(),</span>
+<span class="fc" id="L22">            evidence.previousSignature(),</span>
+<span class="fc" id="L23">            chainInfo.contentHash(),</span>
+<span class="fc" id="L24">            evidence.verificationClient(),</span>
+<span class="fc" id="L25">            evidence.verificationClientArtifactHash(),</span>
+<span class="fc" id="L26">            evidence.contentHash(),</span>
+<span class="fc" id="L27">            evidence.endpointId());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.13.202504020838</span></div></body></html>
