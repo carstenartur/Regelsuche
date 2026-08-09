@@ -126,7 +126,14 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
         var legacy = EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1();
         if (!legacy.contentHash().equals(protocol.contentHash())) {
             throw new IllegalArgumentException(
-                "population execution protocol is declared but not implemented: "
+                "population execution protocol is not implemented by this runner: "
+                    + "expectedHash=" + legacy.contentHash()
+                    + ", actualHash=" + protocol.contentHash()
+                    + ", engineSemantics="
+                    + protocol.populationEngineSemanticsVersion()
+                    + ", mutatorSemantics="
+                    + protocol.mutatorSemanticsVersion()
+                    + ", scheduling="
                     + protocol.offspringSchedulingPolicy());
         }
     }
