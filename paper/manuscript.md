@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Symbolic systems can generate transformation candidates, validate identities, search for counterexamples, and accelerate later problem solving. These capabilities are often reported through one overloaded success label, making it difficult to distinguish candidate formation from validation, proof, novelty, utility, and reproducibility. We present the Regelsuche evidence architecture for target-free symbolic rule discovery. The system derives executable rule candidates from self-generated search observations and retains separate, fail-closed artifacts for lineage, validation, counterexamples, project-internal novelty, proof strength, held-out utility, lifecycle disposition, and claim authorization. This working manuscript defines the methods and evaluation protocol. Final quantitative conclusions are intentionally deferred until the preregistered candidate-independent benchmark, information-parity baselines, ablations, end-to-end cost analysis, and independent reproduction are complete.
+Symbolic systems can generate transformation candidates, validate identities, search for counterexamples, and accelerate later problem solving. These capabilities are often reported through one overloaded success label, making it difficult to distinguish candidate formation from validation, proof, novelty, utility, and reproducibility. We present the Regelsuche evidence architecture for target-free symbolic rule discovery. The system derives executable rule candidates from self-generated search observations and retains separate, fail-closed artifacts for lineage, validation, counterexamples, project-internal novelty, proof strength, held-out utility, lifecycle disposition, and claim authorization. A separately preregistered public systems showcase has additionally exercised the fail-closed boundary in practice: its one-attempt v1 TRAIN run produced no freeze-eligible terminal candidate, so candidate freeze, public randomness, and FINAL TEST were never reached. This null systems result is not evidence of self-improvement, but it demonstrates that an unmet candidate-formation gate can terminate the protocol before hidden test material exists. This working manuscript defines the methods and evaluation protocol. Final quantitative conclusions are intentionally deferred until the preregistered candidate-independent benchmark, information-parity baselines, ablations, end-to-end cost analysis, and independent reproduction are complete.
 
 ## 1. Research question
 
@@ -115,9 +115,34 @@ The independent artifact in #387 must execute without undocumented maintainer kn
 
 ## 9. Results
 
-Primary tables and figures are intentionally absent from this foundation revision. They will be generated from retained evidence after #383, #235, and #384 freeze their evaluated outputs.
+Primary benchmark tables and figures are intentionally absent from this foundation revision. They will be generated from retained evidence after #383, #235, and #384 freeze their evaluated outputs.
 
-Required result families include:
+### 9.1 Public fail-closed protocol stress test
+
+A smaller public proof-carrying self-improvement showcase was run separately from the publication-grade evaluation. Its purpose was to freeze one learned human-readable rewrite program before any hidden FINAL TEST material existed, and only then derive a future holdout from externally verifiable public randomness.
+
+The one-attempt v1 authority was consumed exactly once. The checkout-owned `ciCheck` completed successfully and the real TRAIN population executed. At deterministic terminal selection, however, no retained alternative satisfied the preregistered freeze-eligibility policy. Candidate formation therefore terminated before a candidate freeze could be published.
+
+The retained boundary is:
+
+```text
+TRAIN:                 EXECUTED
+eligible selection:    NOT PRODUCED
+candidate freeze:      NOT CREATED
+public randomness:     NOT CONSUMED
+FINAL TEST seed:       NOT DERIVED
+FINAL TEST cases:      NOT GENERATED
+FINAL TEST execution:  NOT RUN
+showcase claim:         NOT ESTABLISHED
+```
+
+This is a candidate-formation null result, not a hidden-test failure. It supports only claim C12 in `claims-and-evidence.md`: the protocol stopped before hidden test material existed when its earlier frozen eligibility gate was unmet. It does not support self-improvement, baseline superiority, held-out utility, external novelty, or mathematical importance. The consumed v1 run is immutable and is not rerun or reconstructed through later TRAIN-only characterization.
+
+This stress test also exposed engineering requirements for future experiments: null terminal selection must retain complete per-candidate blockers, TRAIN-only characterization must be explicitly separated from one-attempt authority, and population/mutation execution semantics must be versioned so scheduler changes cannot silently preserve an old study identity. Those corrections are methods infrastructure, not a reinterpretation of v1.
+
+### 9.2 Pending primary evaluation
+
+Required primary result families remain:
 
 - campaign and candidate terminal accounting;
 - split and leakage audits;
@@ -129,11 +154,11 @@ Required result families include:
 - claim-status matrix;
 - failure taxonomy.
 
-No primary result may be copied manually into the manuscript.
+No primary quantitative result may be copied manually into the manuscript.
 
 ## 10. Limitations
 
-The mandatory limitations are maintained in `limitations.md`. The final paper must discuss candidate simplicity, benchmark scope, evaluator coverage, external novelty status, reviewer status, compute bounds, and the distinction between symbolic validation and formal proof.
+The mandatory limitations are maintained in `limitations.md`. The final paper must discuss candidate simplicity, benchmark scope, evaluator coverage, external novelty status, reviewer status, compute bounds, and the distinction between symbolic validation and formal proof. The public showcase-v1 null result additionally demonstrates that deterministic candidate formation can fail before held-out evaluation; later improvements to training, scheduling, or preflight are new methods versions and cannot retroactively alter that result.
 
 ## 11. Related work
 
@@ -143,4 +168,4 @@ Candidate generation must be distinguished from candidate validation and proof. 
 
 ## 12. Conclusion
 
-This foundation defines a falsifiable, claim-bounded evaluation of autonomous symbolic rule discovery. The final conclusion will be written only after the candidate-independent experiments, comparisons, amortization study, and independent artifact reproduction are frozen.
+This foundation defines a falsifiable, claim-bounded evaluation of autonomous symbolic rule discovery. The public showcase-v1 null result provides one concrete demonstration of the fail-closed stage boundary without establishing the stronger empirical claims under evaluation. The final conclusion will be written only after the candidate-independent experiments, comparisons, amortization study, and independent artifact reproduction are frozen.
