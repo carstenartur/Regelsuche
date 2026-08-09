@@ -1,5 +1,6 @@
 package de.regelsuche.evolution;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -31,6 +32,8 @@ class EvolutionSchemaContractTest {
             "regelsuche-evolution-rewrite-program-plan-v1.schema.json");
         String rewriteProgramMutations = readSchema(
             "regelsuche-evolution-rewrite-program-mutation-batch-v1.schema.json");
+        String rewriteProgramDiagnostics = readSchema(
+            "regelsuche-evolution-rewrite-program-train-diagnostics-v1.schema.json");
 
         assertTrue(genome.contains("regelsuche.evolution-genome/v1"));
         assertTrue(genome.contains("\"const\": \"TRAIN\""));
@@ -139,12 +142,31 @@ class EvolutionSchemaContractTest {
                 EvolutionRewriteProgramMutationKind.values()) {
             assertTrue(rewriteProgramMutations.contains(
                 "\"" + kind.name() + "\""), kind.name());
+            assertTrue(rewriteProgramDiagnostics.contains(
+                "\"" + kind.name() + "\""), kind.name());
         }
         for (DeterministicRewriteProgramMutator.MutationStatus status :
                 DeterministicRewriteProgramMutator.MutationStatus.values()) {
             assertTrue(rewriteProgramMutations.contains(
                 "\"" + status.name() + "\""), status.name());
         }
+
+        assertTrue(rewriteProgramDiagnostics.contains(
+            "regelsuche.evolution-rewrite-program-train-diagnostics/v1"));
+        assertTrue(rewriteProgramDiagnostics.contains(
+            "\"additionalProperties\": false"));
+        assertTrue(rewriteProgramDiagnostics.contains(
+            "\"const\": \"TRAIN_ONLY\""));
+        assertTrue(rewriteProgramDiagnostics.contains(
+            "\"eligibleProposalCountsByMutationKind\""));
+        assertTrue(rewriteProgramDiagnostics.contains(
+            "\"maxAcceptedOnlyRejectionCountsByMutationKind\""));
+        assertTrue(rewriteProgramDiagnostics.contains(
+            "\"minimumStructuralPrimitivePathSteps\""));
+        assertTrue(rewriteProgramDiagnostics.contains(
+            "\"mutationBatchJsonHash\""));
+        assertFalse(rewriteProgramDiagnostics.contains("\"validationCases\""));
+        assertFalse(rewriteProgramDiagnostics.contains("\"finalTestOutcome\""));
     }
 
     private static String readSchema(String fileName) throws Exception {

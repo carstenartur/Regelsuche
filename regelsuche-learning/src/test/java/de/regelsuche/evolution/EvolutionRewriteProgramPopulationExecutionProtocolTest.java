@@ -40,7 +40,7 @@ class EvolutionRewriteProgramPopulationExecutionProtocolTest {
         var legacy = EvolutionRewriteProgramPopulationExecutionProtocol.legacyV1();
         var future = EvolutionRewriteProgramPopulationExecutionProtocol.create(
             EvolutionRewriteProgramPopulationEngine.class,
-            DeterministicRewriteProgramMutator.class,
+            StratifiedMutationKindRewriteProgramMutator.class,
             ProposalOrderingPolicy.KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,
             OffspringSchedulingPolicy.STRATIFIED_MUTATION_KIND_V1,
             2,
@@ -56,6 +56,10 @@ class EvolutionRewriteProgramPopulationExecutionProtocolTest {
             MutatorSemanticsVersion.STRATIFIED_MUTATION_KIND_MUTATOR_V2,
             future.mutatorSemanticsVersion());
         assertNotEquals(legacy.contentHash(), future.contentHash());
+        assertEquals(
+            future,
+            EvolutionRewriteProgramPopulationExecutionProtocol
+                .stratifiedMutationKindV1());
     }
 
     @Test
@@ -81,7 +85,7 @@ class EvolutionRewriteProgramPopulationExecutionProtocolTest {
                 EvolutionRewriteProgramPopulationEngine.class,
                 PopulationEngineSemanticsVersion
                     .PROTOCOL_DRIVEN_POPULATION_ENGINE_V2,
-                DeterministicRewriteProgramMutator.class,
+                StratifiedMutationKindRewriteProgramMutator.class,
                 MutatorSemanticsVersion.STRATIFIED_MUTATION_KIND_MUTATOR_V2,
                 ProposalOrderingPolicy
                     .KEY_ASCENDING_THEN_GLOBAL_SEED_ROTATION_V1,

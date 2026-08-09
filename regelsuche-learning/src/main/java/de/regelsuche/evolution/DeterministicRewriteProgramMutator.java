@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
  * Deterministic, bounded mutation enumeration for executable rewrite-program
  * topology. Every proposal is retained as accepted or rejected evidence.
  */
-public final class DeterministicRewriteProgramMutator {
+public class DeterministicRewriteProgramMutator {
     public static final String SCHEMA =
         "regelsuche.evolution-rewrite-program-mutation-batch/v1";
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_-]{2,127}");
@@ -44,6 +44,10 @@ public final class DeterministicRewriteProgramMutator {
         this.compiler = Objects.requireNonNull(compiler, "compiler");
     }
 
+    /**
+     * Historical rotated-prefix behavior. This method is intentionally kept as
+     * the exact legacy execution path bound by {@code ROTATED_PREFIX_V1}.
+     */
     public MutationBatch mutate(
         EvolutionGenome genome,
         EvolutionRewriteProgramPlan parent,
@@ -93,6 +97,155 @@ public final class DeterministicRewriteProgramMutator {
             limits,
             attempts,
             accepted);
+    }
+
+    /**
+     * Deterministic v2 scheduler that prevents a mutation kind from monopolizing
+     * the bounded accepted-offspring prefix.
+     *
+     * <p>The proposal surface and initial ordering are exactly the same as the
+     * legacy path: key ascending followed by the same global seed rotation and
+     * the same {@code maxProposals} window. Filtering a cyclic global rotation
+     * by mutation kind also preserves a cyclic, seed-derived ordering within
+     * every represented stratum.</p>
+     *
+     * <p>Every proposal is preflighted in that fixed order. Among otherwise
+     * valid and preregistered proposals, the first pass gives each newly seen
+     * mutation kind one accepted slot while capacity remains. Alpha-structural
+     * identity is reserved only when an eligible proposal is actually selected,
+     * so an unpermitted or otherwise unselected proposal cannot poison a later
+     * eligible stratum. A second pass fills spare capacity in the original
+     * rotated proposal order. If capacity is smaller than the number of
+     * represented valid kinds, the kinds whose first selectable proposal occurs
+     * earliest in that frozen order win. No proposal or preflight blocker is
+     * omitted from the returned batch.</p>
+     */
+    public MutationBatch mutateStratifiedByMutationKind(
+        EvolutionGenome genome,
+        EvolutionRewriteProgramPlan parent,
+        MutationCatalog catalog,
+        long seed,
+        MutationLimits limits,
+        Set<EvolutionRewriteProgramMutationKind> permittedKinds
+    ) {
+        Objects.requireNonNull(genome, "genome");
+        Objects.requireNonNull(parent, "parent");
+        Objects.requireNonNull(catalog, "catalog");
+        Objects.requireNonNull(limits, "limits");
+        Objects.requireNonNull(permittedKinds, "permittedKinds");
+        if (permittedKinds.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException(
+                "permittedKinds must not contain null");
+        }
+        Set<EvolutionRewriteProgramMutationKind> permitted = Set.copyOf(
+            permittedKinds);
+        compiler.compile(genome, parent);
+        validateCatalogAgainstGenome(genome, catalog);
+
+        List<Proposal> proposals = generate(genome, parent, catalog).stream()
+            .sorted(Comparator.comparing(Proposal::key))
+            .toList();
+        List<Proposal> ordered = rotate(proposals, seed).stream()
+            .limit(limits.maxProposals())
+            .toList();
+
+        List<Evaluation> evaluated = new ArrayList<>();
+        Set<String> preflightStructuralHashes = Set.of(
+            parent.alphaStructuralHash());
+        for (int index = 0; index < ordered.size(); index++) {
+            evaluated.add(evaluate(
+                genome,
+                parent,
+                ordered.get(index),
+                index + 1,
+                preflightStructuralHashes,
+                true));
+        }
+
+        Set<Integer> selectedOrdinals = new LinkedHashSet<>();
+        Set<String> selectedStructuralHashes = new LinkedHashSet<>();
+        selectedStructuralHashes.add(parent.alphaStructuralHash());
+        Set<EvolutionRewriteProgramMutationKind> represented =
+            new LinkedHashSet<>();
+        for (Evaluation evaluation : evaluated) {
+            MutationAttempt attempt = evaluation.attempt();
+            if (selectedOrdinals.size() >= limits.maxAccepted()) {
+                break;
+            }
+            if (evaluation.child() != null
+                    && attempt.status() == MutationStatus.ACCEPTED
+                    && permitted.contains(attempt.kind())
+                    && !represented.contains(attempt.kind())
+                    && selectedStructuralHashes.add(
+                        evaluation.child().alphaStructuralHash())) {
+                represented.add(attempt.kind());
+                selectedOrdinals.add(attempt.ordinal());
+            }
+        }
+        for (Evaluation evaluation : evaluated) {
+            MutationAttempt attempt = evaluation.attempt();
+            if (selectedOrdinals.size() >= limits.maxAccepted()) {
+                break;
+            }
+            if (evaluation.child() != null
+                    && attempt.status() == MutationStatus.ACCEPTED
+                    && permitted.contains(attempt.kind())
+                    && !selectedOrdinals.contains(attempt.ordinal())
+                    && selectedStructuralHashes.add(
+                        evaluation.child().alphaStructuralHash())) {
+                selectedOrdinals.add(attempt.ordinal());
+            }
+        }
+
+        List<MutationAttempt> attempts = new ArrayList<>();
+        List<EvolutionRewriteProgramPlan> accepted = new ArrayList<>();
+        for (Evaluation evaluation : evaluated) {
+            MutationAttempt attempt = evaluation.attempt();
+            if (evaluation.child() == null
+                    || attempt.status() == MutationStatus.REJECTED) {
+                attempts.add(attempt);
+                continue;
+            }
+            if (!permitted.contains(attempt.kind())) {
+                attempts.add(rejectedFromValid(
+                    attempt,
+                    "MUTATION_KIND_NOT_PREREGISTERED:" + attempt.kind()));
+                continue;
+            }
+            if (!selectedOrdinals.contains(attempt.ordinal())) {
+                String blocker = selectedStructuralHashes.contains(
+                    evaluation.child().alphaStructuralHash())
+                        ? "STRUCTURAL_DIVERSITY_DUPLICATE:alphaStructuralHash"
+                        : "ACCEPTED_BUDGET_EXHAUSTED:maxAccepted";
+                attempts.add(rejectedFromValid(attempt, blocker));
+                continue;
+            }
+            attempts.add(attempt);
+            accepted.add(evaluation.child());
+        }
+
+        return MutationBatch.create(
+            genome,
+            parent,
+            catalog,
+            seed,
+            limits,
+            attempts,
+            accepted);
+    }
+
+    private static MutationAttempt rejectedFromValid(
+        MutationAttempt attempt,
+        String blocker
+    ) {
+        return new MutationAttempt(
+            attempt.ordinal(),
+            attempt.kind(),
+            attempt.proposalKey(),
+            MutationStatus.REJECTED,
+            attempt.childPlanHash(),
+            attempt.childAlphaStructuralHash(),
+            List.of(blocker));
     }
 
     private Evaluation evaluate(
