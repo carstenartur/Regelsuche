@@ -15,11 +15,15 @@ The task produces under `build/reports/quality/supply-chain/`:
 - `supply-chain-evidence.json` — policy, inventory hashes and accounting;
 - `supply-chain-evidence.md` — a compact human-readable summary.
 
-The plugin-generated UUID serial number and environment-specific build-system
-reference are disabled. The raw CycloneDX generation timestamp is retained in
-the raw document for provenance but explicitly excluded from the canonical
-inventory identity. Synthetic tests require different timestamps to produce the
-same canonical inventory and evidence bytes.
+The raw document is generated directly from Gradle's resolved component graph.
+No separate SBOM plugin-resolution path is introduced. Generated UUID serial
+numbers, wall-clock timestamps and environment-specific build-system references
+are omitted, so an unchanged resolved dependency graph produces unchanged raw
+BOM bytes. The repository verifier then independently normalizes component and
+dependency identities and rejects unknown graph references.
+
+Synthetic verifier tests additionally prove that even an externally supplied raw
+CycloneDX timestamp cannot alter the canonical inventory or evidence identity.
 
 ## Vulnerability boundary
 
