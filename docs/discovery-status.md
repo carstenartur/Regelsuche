@@ -1,24 +1,36 @@
 # Discovery- und Forschungsstand
 
-**Stand: 2. August 2026**
+**Stand: 9. August 2026**
 
 Diese Seite fasst den gegenwärtigen Forschungsstand zusammen. Sie trennt
 implementierte Softwarefähigkeiten, reproduzierte Projektergebnisse,
-vergleichende Benchmarks und noch nicht ausgeführte Experimente.
+vergleichende Benchmarks, den ausgeführten öffentlichen Showcase und das davon
+getrennte publication-grade Flagship-Experiment.
 
 ## Zusammenfassung
 
 Regelsuche besitzt eine umfangreiche, checkout-lokal verifizierte Infrastruktur
 für symbolische Suche, targetfreie Candidate Formation, Holdout-Prüfung,
-Counterexample Search, Proof-Obligationen, reproduzierbare Evidence und
-mehrere mathematische Objekttypen.
+Counterexample Search, Proof-Obligationen, reproduzierbare Evidence,
+mehrere mathematische Objekttypen und ausführbare gelernte `RewriteProgram`s.
 
-Das stärkere Flagship-Ziel — ein aus primitiven Operationen erlerntes,
-interpretierbares `RewriteProgram`, das auf einem genau einmal verwendeten
-FINAL TEST die Suche verbessert — ist **noch nicht ausgeführt**. Die
-reversiblen technischen Vorarbeiten sind weit fortgeschritten; reales privates
-VALIDATION-/FINAL-TEST-Material, das endgültige `FROZEN_NOT_RUN`-Receipt und die
-anschließenden TRAIN-/VALIDATION-/FINAL-TEST-Ergebnisse fehlen noch.
+Die bestehende autonome Referenz-Campaign und das domänenneutrale
+Discovery-Profil sind für ihre jeweils eng begrenzten projektinternen Claims
+qualifiziert. Der eingefrorene targetfreie Simplification-Vergleich bleibt ein
+negatives Ergebnis: Regelsuche erreicht sechs von sieben Referenzformen, SymPy
+sieben von sieben.
+
+Der bewusst kleinere öffentliche **proof-carrying self-improvement Showcase v1**
+wurde inzwischen genau einmal ausgeführt. TRAIN lief, aber kein terminaler
+Kandidat erfüllte die vorab festgelegte Freeze-Eligibility. Deshalb entstand
+kein Candidate Freeze; öffentliche Zufälligkeit und FINAL TEST wurden überhaupt
+nicht konsumiert. Das ist ein terminaler **Candidate-Formation-Nullversuch**,
+kein verstecktes Testversagen und kein Erfolg. Der Versuch darf nicht
+wiederholt oder nachträglich rekonstruiert werden.
+
+Das publication-grade **Flagship #521/#533** ist davon strikt getrennt und
+weiterhin nicht ausgeführt. Es existiert kein reales Flagship-VALIDATION- oder
+FINAL-TEST-Ergebnis.
 
 ## Status auf einen Blick
 
@@ -27,11 +39,13 @@ anschließenden TRAIN-/VALIDATION-/FINAL-TEST-Ergebnisse fehlen noch.
 | Produkt und Build | Web-Workbench, CLI, Docker, Full Mode, Proof-Image und checkout-eigener `ciCheck` sind vorhanden | Kein Produktions- oder Sicherheitszertifikat |
 | Autonome Referenz-Campaign | Für den eng definierten internen Claim qualifiziert und reproduzierbar gebunden | Keine externe mathematische Neuheit |
 | Mehrdomänen-Discovery | Expression Rewrite und endliche Differenzen sind getrennt qualifiziert | Kein universeller domänenunabhängiger Discovery-Nachweis |
-| Targetfreie Simplification | Regelsuche erreicht 6/7, SymPy 7/7 eingefrorene Referenzformen | Negatives Track-Ergebnis; keine allgemeine Rangfolge |
-| Flagship-Präregistrierung | Work Accounting, Corpus-/Reveal-/Split-/Freeze-Werkzeuge und Baseline-Verträge sind implementiert | Reales Experiment noch nicht freigegeben |
-| TRAIN | Kein Flagship-Populationsresultat | Keine Aussage über erlernte Verbesserung |
-| VALIDATION | Nicht geöffnet und nicht zur Auswahl verwendet | Keine ausgewählte Flagship-Konfiguration |
-| FINAL TEST | Nicht reserviert oder konsumiert | Kein Flagship-Erfolg und kein Nullresultat |
+| Targetfreie Simplification | Regelsuche 6/7, SymPy 7/7 eingefrorene Referenzformen | Negatives Track-Ergebnis; keine allgemeine Rangfolge |
+| Öffentlicher Showcase v1 | TRAIN ausgeführt; keine freeze-eligible terminale Alternative; kein Freeze | Terminaler Candidate-Formation-Nullversuch |
+| Showcase Randomness / FINAL TEST | Nicht konsumiert / nicht erzeugt | Kein Showcase-Erfolg und kein Hidden-Test-Ergebnis |
+| Showcase-Härtung | Null-Selection-Evidence und TRAIN-only Preflight implementiert; Execution-Protocol-Bindung in Arbeit | Vorbereitung für einen separat preregistrierten zukünftigen Versuch |
+| Publication-grade Flagship | Corpus-/Freeze-/Work-Accounting- und Population-Mechanik weit fortgeschritten | Reales Flagship noch nicht freigegeben |
+| Flagship TRAIN | Kein autoritatives Publication-Grade-Populationsresultat | Keine Aussage über held-out Verbesserung |
+| Flagship VALIDATION / FINAL TEST | Nicht geöffnet bzw. konsumiert | Keine ausgewählte Flagship-Konfiguration, kein Final-Ergebnis |
 | Externe Neuheit | `BLOCKED` | Keine weltweite Neuheitsbehauptung |
 | Formaler Beweis des retained Produktionskandidaten | `NOT_EVALUATED` | Symbolische Validierung ist kein formaler Beweis |
 | Promotion / Public Evidence | `NOT_EVALUATED` | Kein autoritativer Regelimport oder externer Evidenzclaim |
@@ -62,7 +76,7 @@ Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Ver
 ### Zielgerichtete Suchsteuerung
 
 Eine dokumentierte TEST-Auswertung reduzierte die Zahl erkundeter Zustände von
-sieben auf fünf, ohne den Zielpfad zu verändern. Dies belegt eine begrenzte,
+sieben auf fünf, ohne den Zielpfad zu verändern. Das belegt eine begrenzte,
 erklärbare Suchsteuerung für die eingefrorene Suite, nicht mathematische
 Discovery.
 
@@ -105,7 +119,7 @@ domänenneutralen Generation-, Such-, Validierungs- und Evidence-Grenzen. Das
 separate Profil `DOMAIN_GENERIC_DISCOVERY` ist qualifiziert, erweitert aber den
 algebraischen Autonomie-Claim nicht automatisch.
 
-## Aktueller vergleichender Benchmark
+## Vergleichender targetfreier Simplification-Track
 
 Der Track `target-free-simplification-head-to-head` vergleicht tatsächliche
 Simplifier. Weder Regelsuche noch SymPy erhält die gepinnte Referenzform als
@@ -129,13 +143,93 @@ gemessene Default-Inventar hineindefiniert.
 Vollständiger Vertrag, Coverage Gaps und Reproduktion:
 [Comparative Discovery Benchmarks](discovery-benchmarks.md).
 
-## Flagship-Experiment: proof-carrying self-improvement
+## Öffentlicher proof-carrying Showcase v1
 
-Das primäre nächste Forschungsziel ist in
-[Issue #521](https://github.com/carstenartur/Regelsuche/issues/521) beschrieben:
-Aus primitiven, ausführbaren Operationen und ausschließlich TRAIN-basierter
-Evidence soll ein echtes Strategieprogramm mit Sequenzen, Entscheidungen,
-Guards, Prioritäten und explizitem Pruning gelernt werden.
+Der öffentliche Showcase aus
+[Issue #597](https://github.com/carstenartur/Regelsuche/issues/597) sollte einen
+kleineren, öffentlich auditierbaren Selbstverbesserungsnachweis ermöglichen,
+ohne das private publication-grade Flagship vorwegzunehmen.
+
+Die Reihenfolge war streng:
+
+1. TRAIN-only Candidate Formation;
+2. deterministische Auswahl und Candidate Freeze;
+3. erst **nach** dem Freeze externe zukünftige öffentliche Zufälligkeit;
+4. daraus deterministisch erzeugter FINAL TEST;
+5. einmalige gepaarte Ausführung gegen Baselines und Ablationen.
+
+v1 stoppte in Schritt 2, bevor ein Candidate Freeze entstand. Der
+checkout-eigene `ciCheck` war erfolgreich, TRAIN wurde ausgeführt, aber keine
+terminale Alternative erfüllte gleichzeitig die eingefrorenen strukturellen
+und TRAIN-basierten Freeze-Bedingungen.
+
+Daraus folgen ausdrücklich:
+
+```text
+TRAIN:                 EXECUTED
+eligible selection:    NOT PRODUCED
+candidate freeze:      NOT CREATED
+public randomness:     NOT CONSUMED
+FINAL TEST seed:       NOT DERIVED
+FINAL TEST cases:      NOT GENERATED
+FINAL TEST execution:  NOT RUN
+showcase claim:         NOT ESTABLISHED
+```
+
+Der unveränderliche Befund einschließlich Authority- und Artifact-Identitäten
+steht unter
+[Showcase-v1-Ergebnis](proof-carrying-self-improvement-showcase-v1-result.md).
+Die Architektur- und Stage-Grenzen stehen unter
+[Proof-carrying self-improvement showcase](proof-carrying-self-improvement-showcase.md).
+
+v1 darf nicht wiederholt werden. Ein zukünftiger Versuch benötigt eine neue,
+vorher eingefrorene Versions- und Authority-Identität.
+
+## Was v1 technisch aufgedeckt hat
+
+Der Nullversuch war wissenschaftlich nützlich, weil er eine konkrete
+Candidate-Formation-Lücke sichtbar machte, ohne Hidden-Test-Material zu
+verbrauchen.
+
+Die beiden v1-Seeds waren bewusst nicht freeze-eligible. Eine eligible
+Topologie benötigt unter anderem echte Composition, Decision und eine
+strukturelle primitive Pfadtiefe von mindestens drei. Vom Decision-Seed sind
+mindestens zwei Strukturmutationen erforderlich, um diese Tiefe zu erreichen.
+
+Gleichzeitig sortiert die Population primär nach TRAIN-Fitness und danach nach
+kleinerem Programm. Die Fitness-Komponenten `CANDIDATE_COMPLEXITY` und
+`PROOF_COST_PROXY` belohnen Einfachheit. Der bisherige deterministische Mutator
+akzeptiert zudem nur einen begrenzten Prefix gültiger, seed-rotiert sortierter
+Proposals pro Lineage, ohne Mutationstyp-Abdeckung. Dadurch kann eine notwendige
+Zwischenstruktur erzeugt, aber vor der nächsten Strukturmutation wieder
+verdrängt werden.
+
+Das ist ein generischer **Fitness-/Explorations-Valley-Befund**. Er autorisiert
+keine nachträgliche Änderung von v1.
+
+Die daraus abgeleiteten Engineering-Arbeiten werden insbesondere in
+[#609](https://github.com/carstenartur/Regelsuche/issues/609) und
+[#613](https://github.com/carstenartur/Regelsuche/issues/613) verfolgt:
+
+- vollständige Null-Selection-Evidence;
+- expliziter TRAIN-only Preflight für künftig preregistrierte Verträge;
+- gemeinsame Eligibility-/Ranking-Semantik von Preflight und Freezer;
+- versionierte Bindung von Population-Engine, Mutator, Proposal Scheduling,
+  Seed-Ableitung und Survivor-Tie-Breaks;
+- process-independent Checkpoint/Resume-Bindung an genau dieses
+  Execution-Protokoll;
+- erst danach ein separat reviewter, generischer stratifizierter Scheduler.
+
+Die neue Scheduling-Logik darf nicht die Showcase-Freeze-Bedingung als
+Zielheuristik einbauen. Sie soll die deklarierte Mutationsoperator-Menge
+reproduzierbar abdecken, nicht ein gewünschtes Ergebnis erzwingen.
+
+## Publication-grade Flagship #521/#533
+
+Das stärkere Flagship bleibt separat. Sein Ziel ist ein aus primitiven,
+ausführbaren Operationen und ausschließlich erlaubter früher Evidence gelerntes
+Strategieprogramm, das auf einem genau einmal verwendeten held-out FINAL TEST
+die symbolische Suche verbessert.
 
 Ein positives Ergebnis darf nur folgende begrenzte Aussage stützen:
 
@@ -144,39 +238,19 @@ Ein positives Ergebnis darf nur folgende begrenzte Aussage stützen:
 > Rewrite-Programm synthetisiert, das die held-out symbolische Suche ohne
 > Korrektheitsregression verbessert.
 
-### Implementierte reversible Voraussetzungen
+Implementiert sind unter anderem Work Accounting, executable Rewrite Programs,
+Population/Mutation, durable Checkpoint/Resume, Split-/Freeze-Werkzeuge,
+Baseline-/Ablationsverträge und ein öffentlicher TRAIN-Corpus.
 
-- getrennte primitive, programminterne, äußere Such- und Exact-Audit-
-  Arbeitszähler;
-- öffentliche numerische Erfolgs- und Nullresultat-Schwellen;
-- eingefrorene Baseline- und Ablationsidentitäten;
-- Performance-Messplan mit semantischer Paritätsanforderung;
-- konkreter öffentlicher TRAIN-Corpus mit rationalen und polynomialen Fällen;
-- privater Reveal-Vertrag mit split-spezifischer Autorisierung;
-- strikter Loader sowie lokale exakte Prüfung vor dem Versiegeln;
-- öffentliche Hash-Commitments ohne private Ausdrücke;
-- Split-Manifest mit Case-, Family-, Exact-, Alpha-, Input- und Target-
-  Kollisionskontrollen;
-- öffentlicher Freeze-Assembler mit `FROZEN_NOT_RUN`-Semantik;
-- Regel-Tiers, Profile, content-addressed Regelinventar und Ablationsfähigkeit.
+Nicht ausgeführt sind weiterhin die autoritative Publication-Grade-
+TRAIN/VALIDATION/FINAL-TEST-Kette und der genau einmalige FINAL TEST. Der
+öffentliche Showcase-v1-Nullversuch verbraucht oder ersetzt diese Evidence
+nicht.
 
-### Noch fehlende irreversible Schritte
-
-1. reale VALIDATION- und FINAL-TEST-Fälle außerhalb des Repositorys erstellen;
-2. diese Fälle mit dem vertrauenswürdigen lokalen Werkzeug exakt prüfen und
-   versiegeln;
-3. Commitments, Split-Manifest und sämtliche Experimentverträge in einem realen
-   `FROZEN_NOT_RUN`-Receipt binden;
-4. unabhängig bestätigen, dass zu diesem Zeitpunkt keine TRAIN-, VALIDATION-
-   oder FINAL-TEST-Ergebnisse existieren;
-5. die TRAIN-Population unter dem eingefrorenen Vertrag ausführen;
-6. ausschließlich mit VALIDATION eine Konfiguration auswählen und einfrieren;
-7. den FINAL TEST genau einmal reservieren und konsumieren;
-8. alle Baselines, Ablationen, Fehler und Nullresultate vollständig retainen.
-
-Bis Schritt 4 abgeschlossen ist, darf die Flagship-TRAIN-Ausführung nicht
-beginnen. [Issue #533](https://github.com/carstenartur/Regelsuche/issues/533)
-bleibt daher sachlich offen.
+Vor dem publication-grade Lauf müssen die in #521/#533 definierten
+Informations-, Freeze-, Work-Accounting-, Baseline- und unabhängigen
+Verifikationsgrenzen vollständig erfüllt sein. Ein zukünftiger öffentlicher
+Showcase ist ebenfalls kein Ersatz für diese Anforderungen.
 
 ## Claim-Stufen richtig lesen
 
@@ -190,9 +264,12 @@ Regelsuche unterscheidet mindestens:
    projektintern neue Hypothese.
 4. **Autonomous Campaign Qualification:** Ein autonom erzeugter Kandidat besteht
    die eingefrorene interne Qualifikation und Reproduktion.
-5. **Flagship Held-out Improvement:** Ein erlerntes Strategieprogramm verbessert
-   einen genau einmal verwendeten FINAL TEST.
-6. **Externally Novel Mathematics:** Literatur-, Datenbank- und unabhängige
+5. **Proof-carrying Showcase:** Ein vor Hidden-Test-Erzeugung eingefrorenes
+   gelerntes Programm verbessert eine öffentlich auditierbare zukünftige
+   Holdout-Suite unter dem separaten Showcase-Vertrag.
+6. **Flagship Held-out Improvement:** Das publication-grade Experiment erfüllt
+   seine strengeren Corpus-, VALIDATION-, FINAL-TEST- und Reproduktionsverträge.
+7. **Externally Novel Mathematics:** Literatur-, Datenbank- und unabhängige
    fachliche Prüfung stützen eine externe Neuheitsentscheidung.
 
 Keine Stufe impliziert automatisch die nächste. Wahrheit, Projekt-Neuheit,
@@ -222,16 +299,23 @@ bash scripts/run-comparative-benchmarks-verification.sh
 Unabhängiges Reproduktionspaket und Claim-Grenzen:
 [Independent Reproduction](independent-reproduction.md).
 
+Der verbrauchte Showcase-v1-Authority-Run wird **nicht** als
+Reproduktionskommando angeboten. Seine retained Evidence wird geprüft, nicht neu
+erzeugt.
+
 ## Nächste Prioritäten
 
-1. reales Flagship-`FROZEN_NOT_RUN`-Receipt erzeugen und #533 abschließen;
-2. TRAIN-Populationen, VALIDATION-Auswahl und genau einmaligen FINAL TEST für
-   #521 ausführen;
-3. information-paritäre Baselines und Ablationen aus #235 vervollständigen;
-4. Performance-Optimierungen nur bei byteidentischer Evidence- und
-   Work-Accounting-Parität aktivieren;
-5. das Methodenpaper ausschließlich aus kanonischen Ergebnissen generieren;
-6. externe Interestingness- und Novelty-Prüfungen als getrennte reale Studien
+1. Execution-Protocol- und durable Checkpoint-Bindung aus #613 abschließen,
+   während die historische v1-Semantik byte-identisch bleibt;
+2. erst danach einen generischen, versionierten stratifizierten Scheduler mit
+   TRAIN-only Diagnostik implementieren und gegen Legacy charakterisieren;
+3. einen zukünftigen öffentlichen Showcase nur als neue, separat
+   preregistrierte Version starten; TRAIN-only Preflight-Berechtigung muss Teil
+   dieses Vertrags sein;
+4. publication-grade #521/#533 unabhängig davon weiter vervollständigen;
+5. information-paritäre Baselines und Ablationen aus #235 ergänzen;
+6. das Methodenpaper ausschließlich aus kanonischen Ergebnissen ableiten;
+7. externe Interestingness- und Novelty-Prüfungen als getrennte reale Studien
    durchführen.
 
 ## Verbindliche Grenzen
@@ -240,6 +324,8 @@ Unabhängiges Reproduktionspaket und Claim-Grenzen:
   bewertenden Kandidaten.
 - Target-, Referenz-, Familien-, VALIDATION-, FINAL-TEST- und Review-
   Informationen dürfen nicht in eine frühere Formation einfließen.
+- Ein verbrauchter Einmalversuch wird nicht durch einen späteren
+  Charakterisierungslauf rekonstruiert.
 - Konfigurierte, ausgeführte, übersprungene und verbleibende Arbeit wird
   vollständig bilanziert.
 - Fehlende Evidence führt zu `BLOCKED` oder `NOT_EVALUATED`, niemals zu einem

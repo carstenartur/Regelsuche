@@ -113,13 +113,22 @@ für unendlich viele konkrete Ausdrücke stehen.
 
 ## Aktueller Stand
 
-Der gegenwärtige Stand ist bewusst zweigeteilt:
+Der gegenwärtige Stand ist bewusst dreigeteilt:
 
 1. Die bestehende autonome Discovery- und Mehrdomänen-Evidence ist für ihre
    jeweils eng begrenzten internen Claims qualifiziert.
-2. Das stärkere Flagship-Experiment zur proof-carrying Selbstverbesserung ist
-   technisch vorbereitet, aber noch nicht mit realem VALIDATION- und FINAL-TEST-
-   Material ausgeführt.
+2. Der kleinere öffentliche proof-carrying Self-Improvement-Showcase v1 wurde
+   genau einmal ausgeführt und endete als transparenter
+   **Candidate-Formation-Nullversuch**: TRAIN lief, aber kein terminaler Kandidat
+   erfüllte die eingefrorene Freeze-Eligibility. Es entstanden deshalb weder
+   Candidate Freeze noch öffentliche Zufälligkeit noch FINAL TEST. Das
+   [unveränderliche v1-Ergebnis](docs/proof-carrying-self-improvement-showcase-v1-result.md)
+   ist kein Erfolgsclaim und darf nicht durch einen erneuten TRAIN-Lauf
+   rekonstruiert werden.
+3. Das stärkere publication-grade Flagship-Experiment zur proof-carrying
+   Selbstverbesserung ist technisch weit vorbereitet, aber weiterhin nicht mit
+   realem VALIDATION- und FINAL-TEST-Material ausgeführt. Der öffentliche
+   v1-Nullversuch verbraucht oder ersetzt diese Evidence nicht.
 
 Der aktuelle targetfreie Simplification-Track erreicht mit dem eingefrorenen
 Standardinventar sechs von sieben Referenzformen; SymPy erreicht sieben von
@@ -164,9 +173,11 @@ Die folgende Kurzmatrix wird aus den kanonischen Release-, Domain- und Trust-Ver
 `QUALIFIED` autorisiert nur den jeweils benannten Claim. Externe mathematische Neuheit, formaler Beweis, Promotion und Public Evidence werden nicht aus einem anderen erfolgreichen Profil abgeleitet.
 <!-- capability-status:end -->
 
-Eine datierte Einordnung mit bereits belegten Ergebnissen, offenen Grenzen und
-dem nächsten irreversiblen Experiment-Schritt steht unter
-[Aktueller Discovery- und Forschungsstand](docs/discovery-status.md).
+Eine datierte Einordnung mit bereits belegten Ergebnissen, dem öffentlichen
+v1-Nullversuch, offenen Grenzen und den nächsten experimentellen Schritten steht
+unter [Aktueller Discovery- und Forschungsstand](docs/discovery-status.md). Die
+Stage-Grenzen des Showcase beschreibt
+[Proof-carrying self-improvement showcase](docs/proof-carrying-self-improvement-showcase.md).
 
 ## Systemmodell
 
@@ -220,6 +231,7 @@ erzeugte Ergebnisse. Details und fokussierte Tasks beschreibt
   [User Workflows](docs/user-workflows.md),
   [Demo Gallery](docs/demo-gallery.md)
 - **Forschung und Evidenz:** [Discovery-Status](docs/discovery-status.md),
+  [Showcase v1 result](docs/proof-carrying-self-improvement-showcase-v1-result.md),
   [Discovery Evidence](docs/discovery-evidence-v1.md),
   [Benchmarks](docs/discovery-benchmarks.md),
   [Scientific Reproducibility](docs/scientific-reproducibility.md)
