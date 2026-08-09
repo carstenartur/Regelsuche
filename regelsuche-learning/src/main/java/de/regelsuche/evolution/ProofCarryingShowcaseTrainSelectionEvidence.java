@@ -2,7 +2,6 @@ package de.regelsuche.evolution;
 
 import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.CandidateEvaluation;
 import de.regelsuche.evolution.EvolutionRewriteProgramPopulationEngine.TerminalOutcome;
-import de.regelsuche.evolution.EvolutionStudyPlan.FitnessComponent;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -141,11 +140,9 @@ public record ProofCarryingShowcaseTrainSelectionEvidence(
             .minimumPrimitiveStepsOnSuccessfulPath();
         List<ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative>
             alternatives = retained.finalCandidates().stream()
-                .map(value -> alternative(
+                .map(value -> ProofCarryingShowcaseCandidateFreezer.alternative(
                     value,
-                    Objects.requireNonNull(
-                        evaluations.get(value.candidateHash()),
-                        "terminal candidate evaluation"),
+                    evaluations.get(value.candidateHash()),
                     seedHashes,
                     seedAlphaHashes,
                     minimumDepth))
@@ -261,61 +258,6 @@ public record ProofCarryingShowcaseTrainSelectionEvidence(
         }
     }
 
-    private static ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
-            alternative(
-        RetainedEvolutionRewriteProgramPopulationRun.RetainedCandidate retained,
-        CandidateEvaluation evaluation,
-        Set<String> seedHashes,
-        Set<String> seedAlphaHashes,
-        int minimumPrimitivePathSteps
-    ) {
-        EvolutionRewriteProgramCandidate candidate = retained.candidate();
-        ProofCarryingShowcaseCandidateFreezer.ProgramFacts facts =
-            ProofCarryingShowcaseCandidateFreezer.analyze(candidate.plan().root());
-        boolean seedExact = seedHashes.contains(candidate.contentHash());
-        boolean seedAlpha = seedAlphaHashes.contains(candidate.alphaStructuralHash());
-        java.util.ArrayList<String> freezeBlockers = new java.util.ArrayList<>();
-        if (seedExact) {
-            freezeBlockers.add("SEED_EXACT_EQUIVALENT");
-        }
-        if (seedAlpha) {
-            freezeBlockers.add("SEED_ALPHA_EQUIVALENT");
-        }
-        if (!facts.containsCompositionTopology()) {
-            freezeBlockers.add("MISSING_COMPOSITION_TOPOLOGY");
-        }
-        if (!facts.containsDecisionTopology()) {
-            freezeBlockers.add("MISSING_DECISION_TOPOLOGY");
-        }
-        if (facts.minimumStructuralPrimitivePathSteps()
-                < minimumPrimitivePathSteps) {
-            freezeBlockers.add("PRIMITIVE_PATH_DEPTH_BELOW_"
-                + minimumPrimitivePathSteps);
-        }
-        List<String> canonicalFreezeBlockers = freezeBlockers.stream()
-            .distinct()
-            .sorted()
-            .toList();
-        return new ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative(
-            candidate.contentHash(),
-            candidate.alphaStructuralHash(),
-            candidate.genome().contentHash(),
-            candidate.plan().contentHash(),
-            evaluation.contentHash(),
-            evaluation.scalarFitness(),
-            evaluation.rawComponents(),
-            evaluation.blockers(),
-            seedExact,
-            seedAlpha,
-            facts.nodeCount(),
-            facts.containsCompositionTopology(),
-            facts.containsDecisionTopology(),
-            facts.minimumStructuralPrimitivePathSteps(),
-            canonicalFreezeBlockers,
-            evaluation.blockers().isEmpty()
-                && canonicalFreezeBlockers.isEmpty());
-    }
-
     private static List<ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative>
             canonicalAlternatives(
         List<ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative> values
@@ -345,17 +287,7 @@ public record ProofCarryingShowcaseTrainSelectionEvidence(
         return alternatives.stream()
             .filter(ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
                 ::eligibleForFreeze)
-            .sorted(Comparator
-                .comparingInt(
-                    ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
-                        ::scalarFitness)
-                .reversed()
-                .thenComparingInt(
-                    ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
-                        ::programNodeCount)
-                .thenComparing(
-                    ProofCarryingShowcaseCandidateFreezer.CandidateSelection.Alternative
-                        ::candidateHash))
+            .sorted(ProofCarryingShowcaseCandidateFreezer.CandidateSelection.ranking())
             .findFirst()
             .orElse(null);
     }
