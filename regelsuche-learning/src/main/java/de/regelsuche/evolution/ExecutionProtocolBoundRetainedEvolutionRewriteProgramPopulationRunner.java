@@ -52,6 +52,49 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
             .create(retained, executionPlan, protocol);
     }
 
+    /**
+     * Executes the stratified protocol and returns a separate TRAIN-only
+     * diagnostics artifact without changing the canonical population run.
+     */
+    public DiagnosedRun runWithDiagnostics(
+        EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
+        EvolutionRewriteProgramStudyPlan studyPlan,
+        EvolutionSplitManifest splitManifest,
+        EvolutionRewriteProgramTrainSuite suite,
+        List<EvolutionRewriteProgramCandidate> seeds,
+        MutationCatalog catalog,
+        EvolutionRewriteProgramFitnessEvaluator evaluator
+    ) {
+        requirePlan(executionPlan, studyPlan);
+        if (protocol.offspringSchedulingPolicy()
+                != EvolutionRewriteProgramPopulationExecutionProtocol
+                    .OffspringSchedulingPolicy.STRATIFIED_MUTATION_KIND_V1) {
+            throw new IllegalArgumentException(
+                "TRAIN diagnostics require the stratified execution protocol");
+        }
+        StratifiedMutationKindRewriteProgramMutator mutator =
+            new StratifiedMutationKindRewriteProgramMutator(studyPlan);
+        ProtocolBoundRetainedEvolutionRewriteProgramPopulationRun retained =
+            delegate(mutator).run(
+                studyPlan,
+                splitManifest,
+                suite,
+                seeds,
+                catalog,
+                evaluator);
+        ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun bound =
+            ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun
+                .create(retained, executionPlan, protocol);
+        EvolutionRewriteProgramTrainDiagnostics diagnostics =
+            EvolutionRewriteProgramTrainDiagnostics.create(
+                executionPlan,
+                protocol,
+                bound,
+                seeds,
+                mutator.observedBatches());
+        return new DiagnosedRun(bound, diagnostics);
+    }
+
     public ExecutionProtocolBoundEvolutionRewriteProgramPopulationCheckpoint
             checkpoint(
         EvolutionRewriteProgramPopulationExecutionPlan executionPlan,
@@ -126,6 +169,11 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
                 new StratifiedMutationKindRewriteProgramMutator(
                     Set.copyOf(studyPlan.mutationOperators()));
         };
+        return delegate(mutator);
+    }
+
+    private static RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner
+            delegate(DeterministicRewriteProgramMutator mutator) {
         return new RetainedProtocolBoundEvolutionRewriteProgramPopulationRunner(
             new EvolutionRewriteProgramPopulationEngine(mutator));
     }
@@ -160,6 +208,20 @@ public final class ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulati
                     + protocol.mutatorSemanticsVersion()
                     + ", scheduling="
                     + protocol.offspringSchedulingPolicy());
+        }
+    }
+
+    public record DiagnosedRun(
+        ExecutionProtocolBoundRetainedEvolutionRewriteProgramPopulationRun run,
+        EvolutionRewriteProgramTrainDiagnostics diagnostics
+    ) {
+        public DiagnosedRun {
+            Objects.requireNonNull(run, "run");
+            Objects.requireNonNull(diagnostics, "diagnostics");
+            if (!run.contentHash().equals(diagnostics.executionBoundRunHash())) {
+                throw new IllegalArgumentException(
+                    "diagnostics are not bound to the returned run");
+            }
         }
     }
 }
